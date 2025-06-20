@@ -1,0 +1,44 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+.poppins-font {
+  font-family: Poppins, sans-serif;
+}
+.font-roboto {
+  font-family: Roboto, sans-serif;
+}
+body {
+  font-family: "Roboto", sans-serif;
+  background-color: #f4f4f4;
+  overflow-x: hidden;
+}
+
+a {
+  text-decoration: none;
+}
+
+button {
+  cursor: pointer;
+}
+.hover-icon svg {
+  transition: 300ms ease-in-out;
+  transform: scale(1);
+}
+.hover-icon:hover {
+  transform: scale(1.1);
+}
+
+.css-nqyt62-MuiDataGrid-root .MuiDataGrid-iconSeparator {
+  display: none;
+}
