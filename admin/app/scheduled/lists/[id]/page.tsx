@@ -94,6 +94,10 @@ import {
   CalendarToday,
   TrendingUp,
   Assessment,
+  PlayArrow,
+  Pending,
+  CheckCircleOutline,
+  PriorityHigh,
 } from "@mui/icons-material";
 import { Formik, Form, Field } from "formik";
 import * as Yup from "yup";
@@ -120,6 +124,7 @@ import {
   Item,
 } from "@/api/list";
 import { DELIVERY_STATUS, INTERVAL_OPTIONS } from "@/utils/interfaces";
+import { successStyles } from "@/utils/constants";
 
 // Types for activity logs
 interface ActivityLog {
@@ -142,6 +147,12 @@ interface ActivityLog {
   status: "pending" | "approved" | "rejected";
   requiresApproval: boolean;
   metadata?: any;
+  action?: string;
+  changes?: any;
+  rejectionReason?: string;
+  performedByType?: string;
+  performedAt?: Date | string;
+  approvalStatus?: "pending" | "approved" | "rejected";
 }
 
 // Tab Panel Component
@@ -186,17 +197,17 @@ const DELIVERY_STATUS_CONFIG: any = {
   },
 };
 
+// Modified DeliveryCell component - removed quantity editing
 function DeliveryCell({ row, period, onUpdateDelivery }: any) {
   const delivery = row.deliveries?.[period];
   const [isEditing, setIsEditing] = useState(false);
-  const [quantity, setQuantity] = useState(delivery?.quantity || 0);
   const [status, setStatus] = useState(
     delivery?.status || DELIVERY_STATUS.PENDING
   );
 
   const handleSave = () => {
     onUpdateDelivery(row.id, period, {
-      quantity: Number(quantity),
+      quantity: delivery?.quantity || 0, // Keep existing quantity, don't allow editing
       status,
       deliveredAt:
         status === DELIVERY_STATUS.DELIVERED ? new Date() : undefined,
@@ -205,7 +216,6 @@ function DeliveryCell({ row, period, onUpdateDelivery }: any) {
   };
 
   const handleCancel = () => {
-    setQuantity(delivery?.quantity || 0);
     setStatus(delivery?.status || DELIVERY_STATUS.PENDING);
     setIsEditing(false);
   };
@@ -221,19 +231,6 @@ function DeliveryCell({ row, period, onUpdateDelivery }: any) {
           minWidth: 150,
         }}
       >
-        <TextField
-          size="small"
-          type="number"
-          value={quantity}
-          onChange={(e) => setQuantity(e.target.value)}
-          placeholder="Quantity"
-          sx={{
-            "& .MuiOutlinedInput-root": {
-              height: 32,
-              fontSize: "0.75rem",
-            },
-          }}
-        />
         <FormControl size="small">
           <Select
             value={status}
@@ -334,6 +331,18 @@ function DeliveryCell({ row, period, onUpdateDelivery }: any) {
             {Number(delivery?.quantity || 0).toFixed(0) || 0}
           </Typography>
         </Box>
+        <Chip
+          label={config.label}
+          size="small"
+          color={config.color}
+          sx={{
+            fontSize: "0.65rem",
+            height: 20,
+            "& .MuiChip-label": {
+              px: 1,
+            },
+          }}
+        />
       </Box>
     </Tooltip>
   );
@@ -707,100 +716,7 @@ function formatPeriodLabel(period: string, cargoNo: string): string {
   return `Lieferung ${monthName} ${cargoNo}`;
 }
 
-// Image Cell Renderer
-function ImageCellRenderer({ row }: any) {
-  const [open, setOpen] = useState(false);
-
-  if (!row.imageUrl) {
-    return (
-      <Box
-        sx={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          color: "text.disabled",
-        }}
-      >
-        <Image fontSize="small" />
-      </Box>
-    );
-  }
-
-  return (
-    <>
-      <Box
-        sx={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          cursor: "pointer",
-        }}
-        onClick={() => setOpen(true)}
-      >
-        <Box
-          sx={{
-            width: 36,
-            height: 36,
-            borderRadius: "50%",
-            overflow: "hidden",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            boxShadow: "0 2px 5px rgba(0,0,0,0.1)",
-            border: "2px solid #fff",
-            transition: "all 0.2s ease",
-            "&:hover": {
-              boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-              transform: "scale(1.1)",
-            },
-          }}
-        >
-          <img
-            src={row.imageUrl}
-            alt={row.productName}
-            style={{
-              width: "100%",
-              height: "100%",
-              objectFit: "cover",
-            }}
-          />
-        </Box>
-      </Box>
-
-      <Dialog open={open} onClose={() => setOpen(false)} maxWidth="md">
-        <DialogTitle>
-          <Box
-            sx={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-            }}
-          >
-            <span>{row.productName || "Product Image"}</span>
-            <IconButton onClick={() => setOpen(false)} size="small">
-              <X fontSize="small" />
-            </IconButton>
-          </Box>
-        </DialogTitle>
-        <DialogContent sx={{ p: 3 }}>
-          <img
-            src={row.imageUrl}
-            alt={row.productName}
-            style={{
-              width: "100%",
-              maxHeight: "70vh",
-              objectFit: "contain",
-              borderRadius: 8,
-            }}
-          />
-        </DialogContent>
-      </Dialog>
-    </>
-  );
-}
-
-// Activity Log Component
-// Activity Log Component - Updated to match database schema
+// Enhanced Activity Log Component with improved UI
 function ActivityLogCard({
   log,
   onApprove,
@@ -814,34 +730,99 @@ function ActivityLogCard({
     switch (action.toLowerCase()) {
       case "create":
       case "item_created":
-        return <Add sx={{ color: theme.palette.success.main }} />;
+        return <Add sx={{ color: theme.palette.success.main, fontSize: 20 }} />;
       case "update":
       case "item_updated":
-        return <Edit sx={{ color: theme.palette.info.main }} />;
+        return <Edit sx={{ color: theme.palette.info.main, fontSize: 20 }} />;
       case "delete":
       case "item_deleted":
-        return <Delete sx={{ color: theme.palette.error.main }} />;
+        return (
+          <Delete sx={{ color: theme.palette.error.main, fontSize: 20 }} />
+        );
       case "quantity_changed":
-        return <TrendingUp sx={{ color: theme.palette.warning.main }} />;
+        return (
+          <TrendingUp
+            sx={{ color: theme.palette.warning.main, fontSize: 20 }}
+          />
+        );
       case "status_changed":
-        return <Timeline sx={{ color: theme.palette.primary.main }} />;
+        return (
+          <Timeline sx={{ color: theme.palette.primary.main, fontSize: 20 }} />
+        );
       case "delivery_updated":
-        return <LocalOffer sx={{ color: theme.palette.secondary.main }} />;
+        return (
+          <LocalOffer
+            sx={{ color: theme.palette.secondary.main, fontSize: 20 }}
+          />
+        );
       default:
-        return <History sx={{ color: theme.palette.text.secondary }} />;
+        return (
+          <History sx={{ color: theme.palette.text.secondary, fontSize: 20 }} />
+        );
     }
   };
 
   const getStatusChip = (status: string) => {
     switch (status) {
       case "approved":
-        return <Chip label="Approved" color="success" size="small" />;
+        return (
+          <Chip
+            label="Approved"
+            size="small"
+            sx={{
+              backgroundColor: alpha(theme.palette.success.main, 0.1),
+              color: theme.palette.success.main,
+              fontWeight: 600,
+              fontSize: "0.75rem",
+              border: `1px solid ${alpha(theme.palette.success.main, 0.2)}`,
+            }}
+            icon={<CheckCircleOutline sx={{ fontSize: 14 }} />}
+          />
+        );
       case "rejected":
-        return <Chip label="Rejected" color="error" size="small" />;
+        return (
+          <Chip
+            label="Rejected"
+            size="small"
+            sx={{
+              backgroundColor: alpha(theme.palette.error.main, 0.1),
+              color: theme.palette.error.main,
+              fontWeight: 600,
+              fontSize: "0.75rem",
+              border: `1px solid ${alpha(theme.palette.error.main, 0.2)}`,
+            }}
+            icon={<Cancel sx={{ fontSize: 14 }} />}
+          />
+        );
       case "pending":
-        return <Chip label="Pending Approval" color="warning" size="small" />;
+        return (
+          <Chip
+            label="Pending Approval"
+            size="small"
+            sx={{
+              backgroundColor: alpha(theme.palette.warning.main, 0.1),
+              color: theme.palette.warning.main,
+              fontWeight: 600,
+              fontSize: "0.75rem",
+              border: `1px solid ${alpha(theme.palette.warning.main, 0.2)}`,
+              animation: "pulse 2s infinite",
+            }}
+            icon={<PriorityHigh sx={{ fontSize: 14 }} />}
+          />
+        );
       default:
-        return <Chip label="Unknown" color="default" size="small" />;
+        return (
+          <Chip
+            label="Unknown"
+            size="small"
+            sx={{
+              backgroundColor: alpha("#666", 0.1),
+              color: "#666",
+              fontWeight: 600,
+              fontSize: "0.75rem",
+            }}
+          />
+        );
     }
   };
 
@@ -856,158 +837,371 @@ function ActivityLogCard({
     }).format(dateObj);
   };
 
-  // Get user display name based on performedByType
   const getUserDisplayName = () => {
     return log.performedByType === "customer" ? "Customer" : "Admin";
   };
 
   const requiresApproval = log.approvalStatus === "pending";
+  const isPending = log.approvalStatus === "pending";
 
   return (
     <Card
       sx={{
-        mb: 2,
-        border:
-          log.approvalStatus === "pending"
-            ? `2px solid ${alpha(theme.palette.warning.main, 0.3)}`
-            : `1px solid ${alpha("#ADB5BD", 0.15)}`,
-        borderRadius: 3,
+        mb: 2.5,
+        border: isPending
+          ? `2px solid ${theme.palette.warning.main}`
+          : `1px solid ${alpha("#ADB5BD", 0.15)}`,
+        borderRadius: 4,
         overflow: "hidden",
-        transition: "all 0.2s ease",
+        transition: "all 0.3s ease",
+        position: "relative",
         "&:hover": {
-          boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-          transform: "translateY(-1px)",
+          boxShadow: isPending
+            ? `0 8px 32px ${alpha(theme.palette.warning.main, 0.25)}`
+            : "0 8px 24px rgba(0,0,0,0.12)",
+          transform: "translateY(-2px)",
+          borderColor: isPending
+            ? theme.palette.warning.main
+            : alpha(theme.palette.primary.main, 0.3),
         },
+        ...(isPending && {
+          background: `linear-gradient(135deg, ${alpha(
+            theme.palette.warning.main,
+            0.03
+          )} 0%, ${alpha(theme.palette.warning.main, 0.08)} 100%)`,
+        }),
       }}
     >
-      <CardContent sx={{ p: 3 }}>
+      {/* Priority indicator for pending items */}
+      {isPending && (
+        <Box
+          sx={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            height: 4,
+            background: `linear-gradient(90deg, ${theme.palette.warning.main}, ${theme.palette.warning.light})`,
+            animation: "shimmer 2s infinite linear",
+          }}
+        />
+      )}
+
+      <CardContent sx={{ p: 4 }}>
         <Box sx={{ display: "flex", gap: 3 }}>
-          {/* Activity Icon */}
+          {/* Enhanced Activity Icon */}
           <Box
             sx={{
-              p: 1.5,
-              borderRadius: 2,
-              backgroundColor: alpha(theme.palette.primary.main, 0.1),
+              p: 2,
+              borderRadius: 3,
+              backgroundColor: isPending
+                ? alpha(theme.palette.warning.main, 0.1)
+                : alpha(theme.palette.primary.main, 0.08),
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
+              minWidth: 56,
+              height: 56,
+              border: `2px solid ${
+                isPending
+                  ? alpha(theme.palette.warning.main, 0.2)
+                  : alpha(theme.palette.primary.main, 0.1)
+              }`,
+              position: "relative",
+              "&::after": isPending
+                ? {
+                    content: '""',
+                    position: "absolute",
+                    top: -2,
+                    left: -2,
+                    right: -2,
+                    bottom: -2,
+                    borderRadius: 3,
+                    background: `linear-gradient(45deg, ${theme.palette.warning.main}, ${theme.palette.warning.light})`,
+                    opacity: 0.3,
+                    animation: "pulse 2s infinite",
+                  }
+                : {},
             }}
           >
             {getActivityIcon(log.action)}
           </Box>
 
-          {/* Activity Details */}
+          {/* Enhanced Activity Details */}
           <Box sx={{ flex: 1 }}>
             <Box
               sx={{
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "flex-start",
-                mb: 1,
+                mb: 2,
               }}
             >
-              <Typography variant="body1" fontWeight={600}>
-                {log.action
-                  .replace(/_/g, " ")
-                  .replace(/\b\w/g, (l: any) => l.toUpperCase())}
-              </Typography>
+              <Box>
+                <Typography
+                  variant="h6"
+                  fontWeight={700}
+                  sx={{
+                    fontSize: "1.1rem",
+                    color: isPending
+                      ? theme.palette.warning.dark
+                      : "text.primary",
+                    mb: 0.5,
+                  }}
+                >
+                  {log.action
+                    .replace(/_/g, " ")
+                    .replace(/\b\w/g, (l: any) => l.toUpperCase())}
+                </Typography>
+
+                {/* Enhanced metadata display */}
+                {log.itemName && (
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 0.5,
+                      fontSize: "0.875rem",
+                    }}
+                  >
+                    <Inventory sx={{ fontSize: 16 }} />
+                    Item: <strong>{log.itemName}</strong>
+                  </Typography>
+                )}
+              </Box>
+
               {getStatusChip(log.approvalStatus)}
             </Box>
 
-            {/* Change Details */}
+            {/* Enhanced Change Details */}
             {log.changes && Object.keys(log.changes).length > 0 && (
-              <Box
+              <Paper
+                elevation={0}
                 sx={{
-                  mb: 2,
-                  p: 2,
-                  backgroundColor: alpha("#f5f5f5", 0.5),
-                  borderRadius: 2,
+                  mb: 2.5,
+                  p: 2.5,
+                  backgroundColor: alpha(
+                    isPending
+                      ? theme.palette.warning.main
+                      : theme.palette.primary.main,
+                    0.05
+                  ),
+                  borderRadius: 3,
+                  border: `1px solid ${alpha(
+                    isPending
+                      ? theme.palette.warning.main
+                      : theme.palette.primary.main,
+                    0.1
+                  )}`,
                 }}
               >
+                <Typography
+                  variant="subtitle2"
+                  fontWeight={600}
+                  sx={{
+                    mb: 1.5,
+                    color: isPending
+                      ? theme.palette.warning.dark
+                      : theme.palette.primary.dark,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 1,
+                  }}
+                >
+                  <Timeline sx={{ fontSize: 18 }} />
+                  Changes Made:
+                </Typography>
+
+                <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                  {Object.entries(log.changes).map(
+                    ([key, value]: [string, any]) => (
+                      <Box
+                        key={key}
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 1,
+                          p: 1.5,
+                          backgroundColor: "rgba(255,255,255,0.7)",
+                          borderRadius: 2,
+                          border: "1px solid rgba(0,0,0,0.05)",
+                        }}
+                      >
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            fontWeight: 600,
+                            color: "text.primary",
+                            minWidth: 80,
+                            textTransform: "capitalize",
+                          }}
+                        >
+                          {key}:
+                        </Typography>
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            backgroundColor: alpha(
+                              theme.palette.info.main,
+                              0.1
+                            ),
+                            px: 1.5,
+                            py: 0.5,
+                            borderRadius: 1,
+                            fontSize: "0.875rem",
+                            fontFamily: "monospace",
+                          }}
+                        >
+                          {typeof value === "object"
+                            ? JSON.stringify(value)
+                            : String(value)}
+                        </Typography>
+                      </Box>
+                    )
+                  )}
+                </Box>
+              </Paper>
+            )}
+
+            {/* Enhanced Rejection Reason */}
+            {log.rejectionReason && (
+              <Alert
+                severity="error"
+                sx={{
+                  mb: 2.5,
+                  borderRadius: 3,
+                  border: `1px solid ${alpha(theme.palette.error.main, 0.2)}`,
+                  "& .MuiAlert-message": {
+                    width: "100%",
+                  },
+                }}
+                icon={<ErrorOutline />}
+              >
+                <Typography
+                  variant="subtitle2"
+                  fontWeight={600}
+                  sx={{ mb: 0.5 }}
+                >
+                  Rejection Reason:
+                </Typography>
+                <Typography variant="body2">{log.rejectionReason}</Typography>
+              </Alert>
+            )}
+
+            {/* Enhanced User and Timestamp */}
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                mb: requiresApproval ? 3 : 0,
+                p: 2,
+                backgroundColor: alpha("#f8f9fa", 0.5),
+                borderRadius: 3,
+                border: "1px solid rgba(0,0,0,0.05)",
+              }}
+            >
+              <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+                <Avatar
+                  sx={{
+                    width: 32,
+                    height: 32,
+                    fontSize: "0.875rem",
+                    backgroundColor:
+                      log.performedByType === "customer"
+                        ? theme.palette.info.main
+                        : theme.palette.primary.main,
+                    fontWeight: 600,
+                  }}
+                >
+                  {getUserDisplayName().charAt(0).toUpperCase()}
+                </Avatar>
+                <Box>
+                  <Typography
+                    variant="body2"
+                    fontWeight={600}
+                    color="text.primary"
+                  >
+                    {getUserDisplayName()}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {log.performedByType}
+                  </Typography>
+                </Box>
+              </Box>
+
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                <AccessTime fontSize="small" sx={{ color: "text.secondary" }} />
                 <Typography
                   variant="caption"
                   color="text.secondary"
-                  display="block"
-                  sx={{ mb: 1 }}
+                  fontWeight={500}
                 >
-                  Changes:
-                </Typography>
-                {Object.entries(log.changes).map(
-                  ([key, value]: [string, any]) => (
-                    <Box key={key} sx={{ mb: 1 }}>
-                      <Typography variant="caption" color="text.primary">
-                        <strong>{key}:</strong>{" "}
-                        {typeof value === "object"
-                          ? JSON.stringify(value)
-                          : String(value)}
-                      </Typography>
-                    </Box>
-                  )
-                )}
-              </Box>
-            )}
-
-            {/* Rejection Reason */}
-            {log.rejectionReason && (
-              <Box
-                sx={{
-                  mb: 2,
-                  p: 2,
-                  backgroundColor: alpha(theme.palette.error.main, 0.1),
-                  borderRadius: 2,
-                }}
-              >
-                <Typography
-                  variant="caption"
-                  color="error.main"
-                  display="block"
-                >
-                  <strong>Rejection Reason:</strong> {log.rejectionReason}
-                </Typography>
-              </Box>
-            )}
-
-            {/* User and Timestamp */}
-            <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 2 }}>
-              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                <Avatar sx={{ width: 24, height: 24, fontSize: "0.75rem" }}>
-                  {getUserDisplayName().charAt(0).toUpperCase()}
-                </Avatar>
-                <Typography variant="caption" color="text.secondary">
-                  <strong>{getUserDisplayName()}</strong> ({log.performedByType}
-                  )
-                </Typography>
-              </Box>
-              <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                <AccessTime fontSize="small" sx={{ color: "text.secondary" }} />
-                <Typography variant="caption" color="text.secondary">
                   {formatTimestamp(log.performedAt)}
                 </Typography>
               </Box>
             </Box>
 
-            {/* Approval Actions */}
+            {/* Enhanced Approval Actions */}
             {requiresApproval && (
-              <Box sx={{ display: "flex", gap: 1 }}>
+              <Box
+                sx={{
+                  display: "flex",
+                  gap: 2,
+                  mt: 2,
+                  p: 2,
+                  backgroundColor: alpha(theme.palette.warning.main, 0.05),
+                  borderRadius: 3,
+                  border: `1px dashed ${alpha(
+                    theme.palette.warning.main,
+                    0.3
+                  )}`,
+                }}
+              >
                 <CustomButton
-                  size="small"
+                  size="medium"
                   variant="contained"
-                  color="success"
+                  sx={{
+                    backgroundColor: theme.palette.success.main,
+                    color: "white",
+                    fontWeight: 600,
+                    boxShadow: `0 4px 12px ${alpha(
+                      theme.palette.success.main,
+                      0.3
+                    )}`,
+                    "&:hover": {
+                      backgroundColor: theme.palette.success.dark,
+                      boxShadow: `0 6px 16px ${alpha(
+                        theme.palette.success.main,
+                        0.4
+                      )}`,
+                      transform: "translateY(-2px)",
+                    },
+                  }}
                   startIcon={<ThumbUp />}
                   onClick={() => onApprove(log.id)}
-                  sx={{ minWidth: 100 }}
                 >
-                  Approve
+                  Approve Changes
                 </CustomButton>
                 <CustomButton
-                  size="small"
+                  size="medium"
                   variant="outlined"
-                  color="error"
+                  sx={{
+                    borderColor: theme.palette.error.main,
+                    color: theme.palette.error.main,
+                    fontWeight: 600,
+                    "&:hover": {
+                      backgroundColor: alpha(theme.palette.error.main, 0.1),
+                      borderColor: theme.palette.error.dark,
+                      transform: "translateY(-2px)",
+                    },
+                  }}
                   startIcon={<ThumbDown />}
                   onClick={() => onReject(log.id)}
-                  sx={{ minWidth: 100 }}
                 >
-                  Reject
+                  Reject Changes
                 </CustomButton>
               </Box>
             )}
@@ -1403,6 +1597,22 @@ const AdminListDetailPage = () => {
     return extractDeliveryPeriods(listData.items);
   }, [listData?.items]);
 
+  // Sort activity logs with pending ones at the top
+  const sortedActivityLogs = useMemo(() => {
+    return [...activityLogs].sort((a, b) => {
+      // First sort by approval status (pending first)
+      if (a.approvalStatus === "pending" && b.approvalStatus !== "pending")
+        return -1;
+      if (a.approvalStatus !== "pending" && b.approvalStatus === "pending")
+        return 1;
+
+      // Then sort by timestamp (most recent first)
+      const dateA = new Date(a.performedAt || a.timestamp);
+      const dateB = new Date(b.performedAt || b.timestamp);
+      return dateB.getTime() - dateA.getTime();
+    });
+  }, [activityLogs]);
+
   // Load list data and activity logs
   useEffect(() => {
     const loadListData = async () => {
@@ -1422,7 +1632,9 @@ const AdminListDetailPage = () => {
           setPendingApprovals(
             response.activityLogs.filter(
               (log: ActivityLog) =>
-                log.status === "pending" && log.requiresApproval
+                (log.status === "pending" ||
+                  log.approvalStatus === "pending") &&
+                log.requiresApproval
             ).length
           );
         }
@@ -1492,7 +1704,10 @@ const AdminListDetailPage = () => {
       }));
 
       setSelectedRows(new Set());
-      toast.success(`${selectedRows.size} item(s) deleted successfully!`);
+      toast.success(
+        `${selectedRows.size} item(s) deleted successfully!`,
+        successStyles
+      );
     } catch (error) {
       console.error("Failed to delete items:", error);
     } finally {
@@ -1542,13 +1757,21 @@ const AdminListDetailPage = () => {
 
       setActivityLogs((prev) =>
         prev.map((log) =>
-          log.id === logId ? { ...log, status: "approved" as const } : log
+          log.id === logId
+            ? {
+                ...log,
+                status: "approved" as const,
+                approvalStatus: "approved" as const,
+              }
+            : log
         )
       );
 
       setPendingApprovals((prev) => prev - 1);
+      toast.success("Activity approved successfully!", successStyles);
     } catch (error) {
       console.error("Failed to approve activity:", error);
+      toast.error("Failed to approve activity");
     }
   };
 
@@ -1558,13 +1781,21 @@ const AdminListDetailPage = () => {
 
       setActivityLogs((prev) =>
         prev.map((log) =>
-          log.id === logId ? { ...log, status: "rejected" as const } : log
+          log.id === logId
+            ? {
+                ...log,
+                status: "rejected" as const,
+                approvalStatus: "rejected" as const,
+              }
+            : log
         )
       );
 
       setPendingApprovals((prev) => prev - 1);
+      toast.success("Activity rejected successfully!", successStyles);
     } catch (error) {
       console.error("Failed to reject activity:", error);
+      toast.error("Failed to reject activity");
     }
   };
 
@@ -1916,8 +2147,8 @@ const AdminListDetailPage = () => {
   }
 
   return (
-    <Box sx={{ width: "100%", py: 3, px: 2, pt: 0 }}>
-      <Box sx={{ maxWidth: "76vw", mx: "auto" }}>
+    <Box sx={{ width: "100%", py: 3, px: 0, pt: 0 }}>
+      <Box sx={{ maxWidth: "75vw", mx: "auto" }}>
         {/* Header */}
         <Box
           sx={{
@@ -2043,7 +2274,13 @@ const AdminListDetailPage = () => {
                       <Badge
                         badgeContent={pendingApprovals}
                         color="error"
-                        sx={{ ml: 1 }}
+                        sx={{
+                          ml: 1,
+                          "& .MuiBadge-badge": {
+                            animation: "pulse 2s infinite",
+                            fontWeight: 700,
+                          },
+                        }}
                       />
                     )}
                   </Box>
@@ -2495,7 +2732,7 @@ const AdminListDetailPage = () => {
 
               {/* Activity Logs List */}
               <Box sx={{ maxHeight: "600px", overflowY: "auto" }}>
-                {activityLogs.length === 0 ? (
+                {sortedActivityLogs.length === 0 ? (
                   <Paper
                     sx={{
                       p: 4,
@@ -2521,7 +2758,7 @@ const AdminListDetailPage = () => {
                     </Typography>
                   </Paper>
                 ) : (
-                  activityLogs.map((log) => (
+                  sortedActivityLogs.map((log) => (
                     <ActivityLogCard
                       key={log.id}
                       log={log}
@@ -2542,6 +2779,30 @@ const AdminListDetailPage = () => {
           onAddItem={handleAddItem}
           listId={listId}
         />
+
+        {/* Add CSS animations */}
+        <style jsx global>{`
+          @keyframes pulse {
+            0% {
+              opacity: 1;
+            }
+            50% {
+              opacity: 0.5;
+            }
+            100% {
+              opacity: 1;
+            }
+          }
+
+          @keyframes shimmer {
+            0% {
+              background-position: -200px 0;
+            }
+            100% {
+              background-position: calc(200px + 100%) 0;
+            }
+          }
+        `}</style>
       </Box>
     </Box>
   );

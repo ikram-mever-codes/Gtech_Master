@@ -25,10 +25,11 @@ import {
 import { alpha } from "@mui/material";
 import theme from "@/styles/theme";
 import Image from "next/image";
-import { useSelector } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { RootState } from "@/app/Redux/store";
 import CustomButton from "@/components/UI/CustomButton";
 import { Badge, Tooltip, Avatar } from "@mui/material";
+import { logoutCustomer } from "@/api/customer";
 
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -37,7 +38,7 @@ const Header = () => {
   const { customer } = useSelector((state: RootState) => state.customer);
   const profileRef = useRef<any>(null);
   const notificationRef = useRef<any>(null);
-
+  const dispatch = useDispatch();
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen);
   };
@@ -52,7 +53,6 @@ const Header = () => {
     if (isProfileMenuOpen) setIsProfileMenuOpen(false);
   };
 
-  // Close dropdowns when clicking outside
   useEffect(() => {
     function handleClickOutside(event: any) {
       if (profileRef.current && !profileRef.current.contains(event.target)) {
@@ -72,7 +72,6 @@ const Header = () => {
     };
   }, []);
 
-  // Sample notifications
   const notifications = [
     {
       id: 1,
@@ -94,6 +93,10 @@ const Header = () => {
     },
   ];
 
+  const handleLogout = async () => {
+    await logoutCustomer(dispatch);
+  };
+
   return (
     <div
       className="relative font-sans"
@@ -110,7 +113,7 @@ const Header = () => {
             <div className="flex">
               {/* Logo */}
               <div className="flex-shrink-0 flex items-center">
-                <div className="flex items-center">
+                <a href="/" className="flex items-center">
                   <Image
                     src={"/logo.png"}
                     width={150}
@@ -122,7 +125,7 @@ const Header = () => {
                     }}
                     className="hover:scale-105"
                   />
-                </div>
+                </a>
               </div>
 
               {/* Desktop Navigation */}
@@ -417,19 +420,21 @@ const Header = () => {
                       </a>
                     </div>
 
-                    <div
+                    <button
+                      onClick={handleLogout}
+                      className="w-full "
                       style={{
                         borderTop: `1px solid ${alpha("#ADB5BD", 0.15)}`,
                       }}
                     >
                       <a
                         href="#"
-                        className="flex items-center px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors duration-150"
+                        className="flex items-center px-4 py-2 text-sm w-full text-red-600 hover:bg-red-50 transition-colors duration-150"
                       >
                         <LogOut className="mr-3 text-red-400" size={18} />
-                        Sign out
+                        Logout
                       </a>
-                    </div>
+                    </button>
                   </div>
                 )}
               </div>

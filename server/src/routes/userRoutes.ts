@@ -8,6 +8,8 @@ import {
   changePassword,
   editProfile,
   getAllUsers,
+  forgetPassword,
+  resetPassword,
 } from "../controllers/user_controllers";
 import { authenticateUser } from "../middlewares/authorized";
 
@@ -26,5 +28,9 @@ router.post("/users", authenticateUser, createUser);
 router.get("/users", authenticateUser, getAllUsers);
 
 router.put("/users/me", authenticateUser, uploadSingleFile, editProfile);
+
+// Add these to your existing routes
+router.post("/forgot-password", forgetPassword);
+router.post("/reset-password", resetPassword);
 
 export default router;

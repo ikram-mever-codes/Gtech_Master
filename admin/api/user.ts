@@ -165,3 +165,39 @@ export const getAllUsers = async () => {
     handleApiError(error);
   }
 };
+
+// Password Reset Functions
+export const requestPasswordReset = async (email: string) => {
+  try {
+    toast.loading("Sending reset link...", loadingStyles);
+    const response = await api.post("/auth/forgot-password", { email });
+    toast.dismiss();
+    toast.success(
+      "If the email exists, a reset link has been sent",
+      successStyles
+    );
+    return response.data;
+  } catch (error) {
+    handleApiError(error, "Failed to send reset link");
+    throw error;
+  }
+};
+
+export const submitPasswordReset = async (
+  token: string,
+  newPassword: string
+) => {
+  try {
+    toast.loading("Updating password...", loadingStyles);
+    const response = await api.post("/auth/reset-password", {
+      token,
+      newPassword,
+    });
+    toast.dismiss();
+    toast.success("Password updated successfully", successStyles);
+    return response.data;
+  } catch (error) {
+    handleApiError(error, "Password reset failed");
+    throw error;
+  }
+};

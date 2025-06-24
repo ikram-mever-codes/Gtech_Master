@@ -59,3 +59,10 @@ export const INTERVAL_OPTIONS = [
   { value: "weekly", label: "Wöchentlich" },
   { value: "daily", label: "Täglich" },
 ];
+
+// Enum for customer verification status
+export enum CustomerVerificationStatus {
+  PENDING = "pending",
+  APPROVED = "verified",
+  REJECTED = "rejected",
+}

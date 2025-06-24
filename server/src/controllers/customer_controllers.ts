@@ -512,14 +512,14 @@ export const forgotPassword = async (
 
     // Generate reset token
     const resetToken = crypto.randomBytes(20).toString("hex");
-    const resetPasswordExp = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes
+    const resetPasswordExp = new Date(Date.now() + 30 * 60 * 1000);
 
     customer.resetPasswordToken = resetToken;
     customer.resetPasswordExp = resetPasswordExp;
     await customerRepository.save(customer);
 
     // Send reset email
-    const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
+    const resetUrl = `${process.env.STAR_URL}/reset-password?token=${resetToken}`;
     const message = `
       <h2>Password Reset Request</h2>
       <p>You requested a password reset. Click the link below to reset your password:</p>
@@ -818,13 +818,14 @@ export const getSingleUser = async (
 ) => {
   try {
     const { customerId } = req.params;
-
+    console.log(customerId);
     const customerRepo = AppDataSource.getRepository(Customer);
-    const customer = await customerRepo.find({ where: { id: customerId } });
+    const customer = await customerRepo.findOne({ where: { id: customerId } });
 
     if (!customer) {
       return next(new ErrorHandler("Customer Not Found!", 404));
     }
+
     return res.status(200).json({ data: customer, success: true });
   } catch (error) {
     return next(error);

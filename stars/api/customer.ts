@@ -166,7 +166,7 @@ export const resetCustomerPassword = async (
   try {
     toast.loading("Resetting password...", loadingStyles);
     const response = await api.put(`/customers/reset-password/${token}`, {
-      newPassword,
+      password: newPassword,
     });
     toast.dismiss();
     toast.success("Password reset successfully", successStyles);

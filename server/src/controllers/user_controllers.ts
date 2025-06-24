@@ -412,3 +412,126 @@ export const getAllUsers = async (
     return next(error);
   }
 };
+
+export const forgetPassword = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return next(new ErrorHandler("Email is required", 400));
+    }
+
+    const userRepository = AppDataSource.getRepository(User);
+    const user = await userRepository.findOne({ where: { email } });
+
+    if (!user) {
+      return res.status(200).json({
+        success: true,
+        message: "If the email exists, a reset link has been sent",
+      });
+    }
+
+    // Generate reset token with expiration (1 hour)
+    const resetToken = jwt.sign({ id: user.id }, process.env.JWT_SECRET!, {
+      expiresIn: "1h",
+    });
+
+    // Save reset token to user
+    user.resetPasswordToken = resetToken;
+    user.resetPasswordExp = new Date(Date.now() + 3600000);
+    await userRepository.save(user);
+
+    // Create reset link
+    const resetLink = `${process.env.MASTER}/reset-password?token=${resetToken}`;
+
+    const message = `
+      <h2>Password Reset Request</h2>
+      <p>You requested a password reset for your account.</p>
+      <p>Click the link below to reset your password (expires in 1 hour):</p>
+      <a href="${resetLink}">Reset Password</a>
+      <p>If you didn't request this, please ignore this email.</p>
+    `;
+
+    await sendEmail({
+      to: email,
+      subject: "Password Reset Request",
+      html: message,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "If the email exists, a reset link has been sent",
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+// Reset Password Controller
+export const resetPassword = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { token, newPassword } = req.body;
+
+    if (!token || !newPassword) {
+      return next(new ErrorHandler("Token and new password are required", 400));
+    }
+
+    // Verify token
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET!) as { id: string };
+    } catch (error) {
+      return next(new ErrorHandler("Invalid or expired token", 401));
+    }
+
+    const userRepository = AppDataSource.getRepository(User);
+    const user = await userRepository.findOne({
+      where: {
+        id: decoded.id,
+        resetPasswordToken: token,
+      },
+    });
+
+    if (
+      !user ||
+      (user.resetPasswordExp && new Date() > user.resetPasswordExp)
+    ) {
+      return next(new ErrorHandler("Invalid or expired token", 401));
+    }
+
+    // Update password and clear reset token
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    user.password = hashedPassword;
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExp = undefined;
+    await userRepository.save(user);
+
+    // Send confirmation email
+    const message = `
+      <h2>Password Updated</h2>
+      <p>Your password has been successfully updated.</p>
+      <p>If you didn't make this change, please contact support immediately.</p>
+    `;
+
+    await sendEmail({
+      to: user.email,
+      subject: "Password Updated",
+      html: message,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Password reset successfully",
+    });
+  } catch (error) {
+    return next(error);
+  }
+};

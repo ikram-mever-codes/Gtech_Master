@@ -87,7 +87,6 @@ export const deleteListItem = async (itemId: string) => {
     toast.loading("Removing item...", loadingStyles);
     const response = await api.delete(`/lists/items/${itemId}`);
     toast.dismiss();
-    toast.success("Item removed", successStyles);
     return response.data;
   } catch (error) {
     handleApiError(error, "Failed to remove item");

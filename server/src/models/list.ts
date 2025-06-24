@@ -128,16 +128,18 @@ export class List {
     return log;
   }
 
-  approveActivityLog(
-    logId: string,
-    approvedById: string,
-    approvedByType: "user" | "customer"
-  ) {
+  async approveActivityLog(logId: string) {
+    if (!this.activityLogs) {
+      throw new Error("Activity logs not loaded");
+    }
+
     const log = this.activityLogs.find((log) => log.id === logId);
     if (log) {
+      console.log(log);
       log.approvalStatus = LOG_APPROVAL_STATUS.APPROVED;
       log.approvedAt = new Date();
     }
+    return log;
   }
 }
 

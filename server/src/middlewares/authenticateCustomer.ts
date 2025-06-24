@@ -28,7 +28,6 @@ export const authenticateCustomer = async (
     const customer = await customerRepository.findOne({
       where: { id: decoded.id },
     });
-    console.log(customer);
     if (!customer) {
       return next(new ErrorHandler("Customer not found", 404));
     }

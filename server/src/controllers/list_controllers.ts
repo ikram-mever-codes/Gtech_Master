@@ -8,6 +8,8 @@ import {
   ListCreator,
   UserCreator,
   CustomerCreator,
+  ListActivityLog,
+  LOG_APPROVAL_STATUS,
 } from "../models/list";
 import { ListItem } from "../models/list";
 import ErrorHandler from "../utils/errorHandler";
@@ -26,10 +28,11 @@ async function fetchItemData(itemId: number) {
       SELECT 
         i.*, 
         os.cargo_id, 
-        oi.qty AS quantity,  -- Fetch quantity from order_items
+        oi.qty AS quantity,
         c.cargo_no,
         c.pickup_date, 
-        c.dep_date
+        c.dep_date,
+        os.status AS order_status
       FROM items i
       LEFT JOIN order_items oi ON i.ItemID_DE = oi.ItemID_DE
       LEFT JOIN order_statuses os ON oi.master_id = os.master_id 
@@ -54,6 +57,7 @@ async function fetchItemData(itemId: number) {
         status: DELIVERY_STATUS;
         deliveredAt: Date;
         cargoNo: string[];
+        orderStatus: string;
       }
     >();
 
@@ -64,24 +68,35 @@ async function fetchItemData(itemId: number) {
         [row.pickup_date, row.dep_date].forEach((date: Date | null) => {
           if (date) {
             const dateKey = date.toISOString().split("T")[0];
-            const quantity = row.quantity || 0; // Directly use numeric value
+            const quantity = Number(row.quantity) || 0; // Ensure quantity is a number
 
             if (!deliveryMap.has(dateKey)) {
               deliveryMap.set(dateKey, {
                 quantity,
-                status: DELIVERY_STATUS.PENDING,
+                status:
+                  row.order_status === "Invoiced"
+                    ? DELIVERY_STATUS.DELIVERED
+                    : DELIVERY_STATUS.PENDING,
                 deliveredAt: date,
                 cargoNo: row.cargo_no ? [row.cargo_no] : [],
+                orderStatus: row.order_status || "",
               });
             } else {
               const existing = deliveryMap.get(dateKey)!;
+              // Only add quantity if this is a unique order_item (check by master_id + ItemID_DE)
+              const isUniqueDelivery = !existing.cargoNo.includes(row.cargo_no);
+
               deliveryMap.set(dateKey, {
-                quantity: existing.quantity + quantity,
+                quantity: isUniqueDelivery
+                  ? existing.quantity + quantity
+                  : existing.quantity,
                 status: existing.status,
                 deliveredAt: existing.deliveredAt,
-                cargoNo: row.cargo_no
-                  ? [...existing.cargoNo, row.cargo_no]
-                  : existing.cargoNo,
+                cargoNo:
+                  row.cargo_no && isUniqueDelivery
+                    ? [...existing.cargoNo, row.cargo_no]
+                    : existing.cargoNo,
+                orderStatus: existing.orderStatus,
               });
             }
           }
@@ -96,10 +111,12 @@ async function fetchItemData(itemId: number) {
         status: DELIVERY_STATUS;
         deliveredAt?: Date;
         cargoNo: string;
+        orderStatus: string;
       };
     } = {};
 
     deliveryMap.forEach((value, dateKey) => {
+      console.log(deliveryMap);
       // Deduplicate cargo numbers and join into a string
       const uniqueCargoNo = Array.from(new Set(value.cargoNo)).join(", ");
 
@@ -108,6 +125,7 @@ async function fetchItemData(itemId: number) {
         status: value.status,
         deliveredAt: value.deliveredAt,
         cargoNo: uniqueCargoNo || "",
+        orderStatus: value.orderStatus,
       };
     });
 
@@ -127,7 +145,7 @@ async function fetchItemData(itemId: number) {
   } finally {
     connection.release();
   }
-} // Helper to create creator entity
+}
 async function createCreator(userId: string | null, customerId: string | null) {
   if (userId) {
     const user = await AppDataSource.getRepository(User).findOne({
@@ -234,15 +252,12 @@ export const addListItem = async (
     // Fetch item data from MIS database
     const itemData = await fetchItemData(itemId);
 
-    // Calculate total item quantity (user input or FOQ default)
-    const totalQuantity = quantity || itemData.quantity;
-
     // Create new list item
     const listItem = listItemRepository.create({
       itemNumber: itemId.toString(),
       articleName: itemData.articleName,
       articleNumber: itemData.articleNumber,
-      quantity: totalQuantity,
+      quantity: quantity,
       interval: interval || "monthly",
       comment,
       imageUrl: itemData.imageUrl,
@@ -253,13 +268,10 @@ export const addListItem = async (
     if (itemData.deliveries && Object.keys(itemData.deliveries).length > 0) {
       const deliveries = { ...itemData.deliveries };
 
-      const deliveryCount = Object.keys(deliveries).length;
-      const quantityPerDelivery = totalQuantity / deliveryCount;
-
       for (const dateKey in deliveries) {
         deliveries[dateKey] = {
           ...deliveries[dateKey],
-          quantity: quantityPerDelivery,
+          quantity: deliveries[dateKey].quantity,
         };
       }
 
@@ -449,31 +461,59 @@ export const deleteListItem = async (
 ) => {
   try {
     const { itemId } = req.params;
-    const userId = (req as any).user.id;
+    const userId = (req as any).user?.id;
+    const customerId = (req as any).customer?.id;
 
     if (!itemId) {
       return next(new ErrorHandler("Item ID is required", 400));
     }
 
+    if (!userId && !customerId) {
+      return next(new ErrorHandler("Authentication required", 401));
+    }
+
     const listItemRepository = AppDataSource.getRepository(ListItem);
+    const listRepository = AppDataSource.getRepository(List);
+
+    // Find item with list relation for activity logging
     const item = await listItemRepository.findOne({
       where: { id: itemId },
-      relations: ["list"],
+      relations: ["list", "list.customer"],
     });
 
     if (!item) {
       return next(new ErrorHandler("List item not found", 404));
     }
 
+    // Verify permissions
+    if (customerId) {
+      // Check if the customer owns the list
+      if (item.list.customer.id !== customerId) {
+        return next(
+          new ErrorHandler("Not authorized to delete this item", 403)
+        );
+      }
+    }
+    // Users don't need additional checks since they have admin privileges
+
+    // Determine who is performing the action
+    const performerId = userId || customerId;
+    const performerType = userId ? "user" : "customer";
+
     // Log deletion activity
     item.list.logActivity(
       "ITEM_DELETED",
-      { itemId: item.id, itemDetails: item },
-      userId,
-      "user"
+      {
+        itemId: item.id,
+        itemName: item.articleName,
+        deletedBy: performerType,
+      },
+      performerId,
+      performerType
     );
 
     await listItemRepository.remove(item);
+    await listRepository.save(item.list); // Save to persist the activity log
 
     return res.status(200).json({
       success: true,
@@ -502,7 +542,6 @@ export const getListWithItems = async (
       where: { id: listId },
       relations: ["items", "activityLogs", "customer"],
     });
-
     if (!list) {
       return next(new ErrorHandler("List not found", 404));
     }
@@ -516,118 +555,132 @@ export const getListWithItems = async (
   }
 };
 
-// 6. Approve List Item Changes
 export const approveListItemChanges = async (
   req: Request,
   res: Response,
   next: NextFunction
 ) => {
   try {
-    const { itemId } = req.params;
+    const { logId } = req.params;
     const userId = (req as any).user.id;
 
-    if (!itemId) {
-      return next(new ErrorHandler("Item ID is required", 400));
+    if (!logId) {
+      return next(new ErrorHandler("Log ID is required", 400));
     }
 
-    const listItemRepository = AppDataSource.getRepository(ListItem);
-    const item = await listItemRepository.findOne({
-      where: { id: itemId },
-      relations: ["list"],
+    const listActivityLogRepository =
+      AppDataSource.getRepository(ListActivityLog);
+    const log = await listActivityLogRepository.findOne({
+      where: { id: logId },
+      relations: ["list", "list.activityLogs"],
     });
 
-    if (!item) {
-      return next(new ErrorHandler("List item not found", 404));
+    if (!log) {
+      return next(new ErrorHandler("Activity log not found", 404));
     }
 
-    if (item.changeStatus !== CHANGE_STATUS.PENDING) {
+    if (log.approvalStatus !== LOG_APPROVAL_STATUS.PENDING) {
       return next(new ErrorHandler("No pending changes to approve", 400));
     }
 
-    // Approve changes
-    item.changeStatus = CHANGE_STATUS.CONFIRMED;
-    item.confirmedAt = new Date();
+    // Approve the activity log
+    let newLog: any = await log.list.approveActivityLog(logId);
+    await listActivityLogRepository.save(newLog);
 
-    await listItemRepository.save(item);
+    if (log.action === "CHANGE_REQUESTED" && log.changes?.itemId) {
+      const listItemRepository = AppDataSource.getRepository(ListItem);
+      const item = await listItemRepository.findOne({
+        where: { id: log.changes.itemId },
+        relations: ["list"],
+      });
 
-    // Log approval activity
-    item.list.logActivity(
-      "CHANGE_APPROVED",
-      { itemId: item.id },
-      userId,
-      "user"
-    );
+      if (item) {
+        item.changeStatus = CHANGE_STATUS.CONFIRMED;
+        item.confirmedAt = new Date();
+        await listItemRepository.save(item);
+      }
+    }
 
     return res.status(200).json({
       success: true,
-      message: "Item changes approved successfully",
-      data: item,
+      message: "Changes approved successfully",
+      data: log,
     });
   } catch (error) {
     return next(error);
   }
 };
 
-// 7. Reject List Item Changes
 export const rejectListItemChanges = async (
   req: Request,
   res: Response,
   next: NextFunction
 ) => {
   try {
-    const { itemId } = req.params;
+    const { logId } = req.params;
     const { reason } = req.body;
     const userId = (req as any).user.id;
 
-    if (!itemId || !reason) {
-      return next(new ErrorHandler("Item ID and reason are required", 400));
+    if (!logId || !reason) {
+      return next(new ErrorHandler("Log ID and reason are required", 400));
     }
 
-    const listItemRepository = AppDataSource.getRepository(ListItem);
-    const item = await listItemRepository.findOne({
-      where: { id: itemId },
-      relations: ["list"],
+    const listActivityLogRepository =
+      AppDataSource.getRepository(ListActivityLog);
+    const log = await listActivityLogRepository.findOne({
+      where: { id: logId },
+      relations: ["list", "list.activityLogs"], // Ensure relations are loaded
     });
 
-    if (!item) {
-      return next(new ErrorHandler("List item not found", 404));
+    if (!log) {
+      return next(new ErrorHandler("Activity log not found", 404));
     }
 
-    if (item.changeStatus !== CHANGE_STATUS.PENDING) {
+    if (log.approvalStatus !== LOG_APPROVAL_STATUS.PENDING) {
       return next(new ErrorHandler("No pending changes to reject", 400));
     }
 
-    // Revert to original values
-    if (item.originalValues) {
-      if (item.originalValues.quantity !== undefined) {
-        item.quantity = item.originalValues.quantity;
-      }
-      if (item.originalValues.interval !== undefined) {
-        item.interval = item.originalValues.interval;
-      }
-      if (item.originalValues.comment !== undefined) {
-        item.comment = item.originalValues.comment;
+    // Reject the activity log
+    log.approvalStatus = LOG_APPROVAL_STATUS.REJECTED;
+    log.rejectionReason = reason;
+    log.approvedAt = new Date();
+
+    await listActivityLogRepository.save(log);
+
+    // If this log was for a change approval, revert the corresponding list item
+    if (log.action === "CHANGE_REQUESTED" && log.changes?.itemId) {
+      const listItemRepository = AppDataSource.getRepository(ListItem);
+      const item = await listItemRepository.findOne({
+        where: { id: log.changes.itemId },
+        relations: ["list"],
+      });
+
+      if (item) {
+        // Revert to original values
+        if (item.originalValues) {
+          if (item.originalValues.quantity !== undefined) {
+            item.quantity = item.originalValues.quantity;
+          }
+          if (item.originalValues.interval !== undefined) {
+            item.interval = item.originalValues.interval;
+          }
+          if (item.originalValues.comment !== undefined) {
+            item.comment = item.originalValues.comment;
+          }
+        }
+
+        item.changeStatus = CHANGE_STATUS.REJECTED;
+        item.confirmedAt = new Date();
+        item.originalValues = {};
+
+        await listItemRepository.save(item);
       }
     }
 
-    item.changeStatus = CHANGE_STATUS.REJECTED;
-    item.confirmedAt = new Date();
-    item.originalValues = {};
-
-    await listItemRepository.save(item);
-
-    // Log rejection activity
-    item.list.logActivity(
-      "CHANGE_REJECTED",
-      { itemId: item.id, reason },
-      userId,
-      "user"
-    );
-
     return res.status(200).json({
       success: true,
-      message: "Item changes rejected successfully",
-      data: item,
+      message: "Changes rejected successfully",
+      data: log,
     });
   } catch (error) {
     return next(error);

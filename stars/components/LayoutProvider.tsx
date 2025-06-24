@@ -9,7 +9,12 @@ import Header from "./Layout/Header";
 
 const LayoutProvider = ({ children }: { children: ReactNode }) => {
   const pathname = usePathname();
-  const excludedPaths = ["/login", "/forgot-password", "/register"];
+  const excludedPaths = [
+    "/login",
+    "/forgot-password",
+    "/register",
+    "/reset-password",
+  ];
 
   const shouldRenderLayout = !excludedPaths.includes(pathname || "");
 

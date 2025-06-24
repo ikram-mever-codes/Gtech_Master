@@ -773,7 +773,8 @@ const AdminListsPage = () => {
 
   const handleEditList = (list: any) => {
     // Navigate to list edit page
-    router.push(`/admin/lists/${list.id}/edit`);
+    router.push(`/scheduled/lists/${list.id}
+      `);
   };
 
   const handleDeleteList = (list: any) => {

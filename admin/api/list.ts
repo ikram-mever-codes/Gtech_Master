@@ -133,7 +133,6 @@ export const deleteListItem = async (itemId: string) => {
     toast.loading("Removing item...", loadingStyles);
     const response = await api.delete(`/lists/items/${itemId}`);
     toast.dismiss();
-    toast.success("Item removed", successStyles);
     return response.data;
   } catch (error) {
     handleApiError(error, "Failed to remove item");
@@ -233,7 +232,6 @@ export const approveActivityLog = async (logId: string) => {
     toast.loading("Approving changes...", loadingStyles);
     const response = await api.put(`/lists/admin/items/${logId}/approve`);
     toast.dismiss();
-    toast.success("Changes approved", successStyles);
     return response.data;
   } catch (error) {
     handleApiError(error, "Approval failed");
@@ -252,7 +250,6 @@ export const rejectActivityLog = async (
       payload
     );
     toast.dismiss();
-    toast.success("Changes rejected", successStyles);
     return response.data;
   } catch (error) {
     handleApiError(error, "Rejection failed");

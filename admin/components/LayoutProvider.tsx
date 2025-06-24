@@ -12,7 +12,12 @@ import { Toaster } from "react-hot-toast";
 
 const LayoutProvider = ({ children }: { children: ReactNode }) => {
   const pathname = usePathname();
-  const excludedPaths = ["/login", "/register", "/forgot-password"];
+  const excludedPaths = [
+    "/login",
+    "/register",
+    "/forgot-password",
+    "/reset-password",
+  ];
 
   const shouldRenderLayout = !excludedPaths.includes(pathname || "");
 

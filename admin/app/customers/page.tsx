@@ -55,12 +55,7 @@ import CustomButton from "@/components/UI/CustomButton";
 import CustomTable from "@/components/UI/CustomTable";
 import theme from "@/styles/theme";
 import { getAllCustomers, updateCustomerStatus } from "@/api/customers";
-
-export enum CustomerVerificationStatus {
-  PENDING = "pending",
-  APPROVED = "verified",
-  REJECTED = "rejected",
-}
+import { CustomerVerificationStatus } from "@/utils/interfaces";
 
 // Main customer page component
 const CustomersPage = () => {
@@ -625,15 +620,6 @@ const CustomersPage = () => {
           >
             <LucidePencil className="mr-2" size={18} color="#666" />
             <Typography variant="body2">Edit Customer</Typography>
-          </MenuItem>
-          <MenuItem
-            onClick={() => {
-              toast.success("Email sent to customer");
-              handleActionClose();
-            }}
-          >
-            <LucideMail className="mr-2" size={18} color="#666" />
-            <Typography variant="body2">Send Email</Typography>
           </MenuItem>
 
           {/* Change Status MenuItem - Added as requested */}

@@ -1,11 +1,5 @@
 "use client";
-import React, {
-  useState,
-  useEffect,
-  useMemo,
-  useRef,
-  useCallback,
-} from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import {
   Box,
   Typography,
@@ -16,7 +10,6 @@ import {
   IconButton,
   InputAdornment,
   Card,
-  Grid,
   Chip,
   Dialog,
   DialogTitle,
@@ -26,15 +19,10 @@ import {
   CircularProgress,
   Alert,
   alpha,
-  InputBase,
-  styled,
   Autocomplete,
-  Button,
   FormControl,
-  InputLabel,
   Select,
   MenuItem,
-  CardContent,
   Tooltip,
 } from "@mui/material";
 import {
@@ -46,23 +34,14 @@ import {
   Save,
   Home,
   Search,
-  CloudUpload,
   Refresh,
   CheckCircle,
-  ErrorOutline,
-  Info,
-  HourglassEmpty,
   Cancel,
   ShoppingCart,
-  Inventory,
-  Category,
-  LocalOffer,
-  Schedule,
   CheckBoxOutlineBlank,
   CheckBox,
 } from "@mui/icons-material";
-import { Formik, Form, Field } from "formik";
-import { DataGrid, renderHeaderCell } from "react-data-grid";
+import { DataGrid } from "react-data-grid";
 import "react-data-grid/lib/styles.css";
 import theme from "@/styles/theme";
 import CustomButton from "@/components/UI/CustomButton";
@@ -76,115 +55,138 @@ import {
   updateListItem,
   deleteListItem,
   getListDetails,
-  approveListItem,
-  rejectListItem,
   searchItems,
-  Item,
   updateList,
 } from "@/api/lists";
 import { DELIVERY_STATUS, INTERVAL_OPTIONS } from "@/utils/interfaces";
 import { errorStyles, successStyles } from "@/utils/constants";
 
 const DELIVERY_STATUS_CONFIG: any = {
-  [DELIVERY_STATUS.PENDING]: {
-    color: "warning",
-    label: "Pending",
-  },
-  [DELIVERY_STATUS.PARTIAL]: {
-    color: "info",
-    label: "Partial",
-  },
-  [DELIVERY_STATUS.DELIVERED]: {
-    color: "success",
-    label: "Delivered",
-  },
-  [DELIVERY_STATUS.CANCELLED]: {
-    color: "error",
-    label: "Cancelled",
-  },
+  [DELIVERY_STATUS.PENDING]: { color: "warning", label: "Pending" },
+  [DELIVERY_STATUS.PARTIAL]: { color: "info", label: "Partial" },
+  [DELIVERY_STATUS.DELIVERED]: { color: "success", label: "Delivered" },
+  [DELIVERY_STATUS.CANCELLED]: { color: "error", label: "Cancelled" },
 };
 
-function DeliveryCell({ row, period, onUpdateDelivery }: any) {
-  const delivery = row.deliveries?.[period];
+// Editable Comment Cell Component
+function EditableCommentCell({ row, onUpdateItem }: any) {
   const [isEditing, setIsEditing] = useState(false);
-  const [quantity, setQuantity] = useState(delivery?.quantity || 0);
-  const [status, setStatus] = useState(
-    delivery?.status || DELIVERY_STATUS.PENDING
-  );
+  const [value, setValue] = useState(row.comment || "");
+  const [saving, setSaving] = useState(false);
 
-  const handleSave = () => {
-    onUpdateDelivery(row.id, period, {
-      quantity: Number(quantity),
-      status,
-      deliveredAt:
-        status === DELIVERY_STATUS.DELIVERED ? new Date() : undefined,
-    });
-    setIsEditing(false);
+  const handleSave = async () => {
+    if (value === row.comment) {
+      setIsEditing(false);
+      return;
+    }
+
+    try {
+      setSaving(true);
+      await onUpdateItem(row.id, { comment: value });
+      setIsEditing(false);
+    } catch (error) {
+      console.error("Failed to update comment:", error);
+      setValue(row.comment);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleCancel = () => {
-    setQuantity(delivery?.quantity || 0);
-    setStatus(delivery?.status || DELIVERY_STATUS.PENDING);
+    setValue(row.comment);
     setIsEditing(false);
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      handleSave();
+    } else if (e.key === "Escape") {
+      handleCancel();
+    }
   };
 
   if (isEditing) {
     return (
       <Box
-        sx={{
-          display: "flex",
-          flexDirection: "column",
-          gap: 1,
-          p: 1,
-          minWidth: 150,
-        }}
+        sx={{ display: "flex", alignItems: "center", gap: 1, width: "100%" }}
       >
         <TextField
           size="small"
-          type="number"
-          value={quantity}
-          onChange={(e) => setQuantity(e.target.value)}
-          placeholder="Quantity"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={handleKeyPress}
+          disabled={saving}
           sx={{
-            "& .MuiOutlinedInput-root": {
-              height: 32,
-              fontSize: "0.75rem",
-            },
+            width: "100%",
+            "& .MuiOutlinedInput-root": { height: 32, fontSize: "0.875rem" },
           }}
+          autoFocus
+          onBlur={handleSave}
         />
-        <FormControl size="small">
-          <Select
-            value={status}
-            onChange={(e) => setStatus(e.target.value as DELIVERY_STATUS)}
-            sx={{
-              height: 32,
-              fontSize: "0.75rem",
-            }}
-          >
-            {Object.values(DELIVERY_STATUS).map((statusOption) => (
-              <MenuItem key={statusOption} value={statusOption}>
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                  {DELIVERY_STATUS_CONFIG[statusOption].icon}
-                  <Typography variant="caption">
-                    {DELIVERY_STATUS_CONFIG[statusOption].label}
-                  </Typography>
-                </Box>
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-        <Box sx={{ display: "flex", gap: 0.5 }}>
-          <IconButton size="small" onClick={handleSave} color="success">
-            <CheckCircle fontSize="small" />
-          </IconButton>
-          <IconButton size="small" onClick={handleCancel} color="error">
-            <Cancel fontSize="small" />
-          </IconButton>
-        </Box>
+        {saving && <CircularProgress size={16} />}
       </Box>
     );
   }
 
+  return (
+    <Box
+      sx={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        width: "100%",
+        height: "100%",
+        cursor: "pointer",
+        borderRadius: 1,
+        "&:hover": { backgroundColor: alpha(theme.palette.primary.main, 0.05) },
+        transition: "background-color 0.2s",
+      }}
+      onClick={() => setIsEditing(true)}
+    >
+      <Typography variant="body2" sx={{ fontSize: "14px" }}>
+        {row.comment || "Add comment..."}
+      </Typography>
+    </Box>
+  );
+}
+
+// Editable Marked Cell Component
+function EditableMarkedCell({ row, onUpdateItem }: any) {
+  const [saving, setSaving] = useState(false);
+
+  const handleToggle = async () => {
+    try {
+      setSaving(true);
+      await onUpdateItem(row.id, { marked: !row.marked });
+    } catch (error) {
+      console.error("Failed to update marked status:", error);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Box
+      sx={{ display: "flex", alignItems: "center", justifyContent: "center" }}
+    >
+      {saving ? (
+        <CircularProgress size={20} />
+      ) : (
+        <Checkbox
+          size="small"
+          checked={row.marked || false}
+          icon={<CheckBoxOutlineBlank />}
+          checkedIcon={<CheckBox />}
+          onChange={handleToggle}
+        />
+      )}
+    </Box>
+  );
+}
+
+// Delivery Cell Component (Read-only)
+function DeliveryCell({ row, period }: any) {
+  const delivery = row.deliveries?.[period];
   const config =
     DELIVERY_STATUS_CONFIG[delivery?.status || DELIVERY_STATUS.PENDING];
 
@@ -223,40 +225,27 @@ function DeliveryCell({ row, period, onUpdateDelivery }: any) {
           justifyContent: "center",
           gap: 0.5,
           p: 1,
-          cursor: "pointer",
           borderRadius: 1,
           minHeight: 60,
-          "&:hover": {
-            backgroundColor: alpha("#f5f5f5", 0.5),
-          },
+          backgroundColor: alpha("#f5f5f5", 0.3),
         }}
-        onClick={() => setIsEditing(true)}
       >
-        <Box
-          sx={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            width: "100%",
-            gap: 0.5,
-          }}
+        <Typography
+          fontSize={"16px"}
+          variant="caption"
+          fontWeight={600}
+          width={"100%"}
+          display={"flex"}
+          justifyContent={"center"}
         >
-          <Typography
-            fontSize={"16px"}
-            variant="caption"
-            fontWeight={600}
-            width={"100%"}
-            display={"flex"}
-            justifyContent={"center"}
-          >
-            {Number(delivery?.quantity || 0).toFixed(0) || 0}
-          </Typography>
-        </Box>
+          {Number(delivery?.quantity || 0).toFixed(0) || 0}
+        </Typography>
       </Box>
     </Tooltip>
   );
 }
 
+// Editable Quantity Cell Component
 function EditableQuantityCell({ row, onUpdateItem }: any) {
   const [isEditing, setIsEditing] = useState(false);
   const [value, setValue] = useState(row.quantity || 0);
@@ -296,12 +285,7 @@ function EditableQuantityCell({ row, onUpdateItem }: any) {
   if (isEditing) {
     return (
       <Box
-        sx={{
-          display: "flex",
-          alignItems: "center",
-          gap: 1,
-          width: "100%",
-        }}
+        sx={{ display: "flex", alignItems: "center", gap: 1, width: "100%" }}
       >
         <TextField
           size="small"
@@ -312,10 +296,7 @@ function EditableQuantityCell({ row, onUpdateItem }: any) {
           disabled={saving}
           sx={{
             width: 80,
-            "& .MuiOutlinedInput-root": {
-              height: 32,
-              fontSize: "0.875rem",
-            },
+            "& .MuiOutlinedInput-root": { height: 32, fontSize: "0.875rem" },
           }}
           autoFocus
           onBlur={handleSave}
@@ -335,9 +316,7 @@ function EditableQuantityCell({ row, onUpdateItem }: any) {
         height: "100%",
         cursor: "pointer",
         borderRadius: 1,
-        "&:hover": {
-          backgroundColor: alpha(theme.palette.primary.main, 0.05),
-        },
+        "&:hover": { backgroundColor: alpha(theme.palette.primary.main, 0.05) },
         transition: "background-color 0.2s",
       }}
       onClick={() => setIsEditing(true)}
@@ -349,60 +328,7 @@ function EditableQuantityCell({ row, onUpdateItem }: any) {
   );
 }
 
-// Function to extract and format delivery periods from all items
-function extractDeliveryPeriods(items: any[]): {
-  sortedPeriods: string[];
-  periodCargoMap: Map<string, string[]>;
-} {
-  const periodsSet = new Set<string>();
-  const periodCargoMap = new Map<string, string[]>();
-
-  items.forEach((item) => {
-    if (item.deliveries) {
-      Object.entries(item.deliveries).forEach(
-        ([period, deliveryDetails]: [string, any]) => {
-          periodsSet.add(period);
-
-          if (!periodCargoMap.has(period)) {
-            periodCargoMap.set(period, []);
-          }
-
-          if (deliveryDetails.cargoNo) {
-            const cargoNos =
-              typeof deliveryDetails.cargoNo === "string"
-                ? deliveryDetails.cargoNo
-                    .split(",")
-                    .map((c: string) => c.trim())
-                : [deliveryDetails.cargoNo];
-
-            // Add unique cargo numbers for this period
-            const existingCargos = periodCargoMap.get(period)!;
-            cargoNos.forEach((cargoNo: string) => {
-              if (cargoNo && !existingCargos.includes(cargoNo)) {
-                existingCargos.push(cargoNo);
-              }
-            });
-          }
-        }
-      );
-    }
-  });
-
-  // Sort periods chronologically
-  const sortedPeriods = Array.from(periodsSet).sort((a, b) => {
-    const [yearA, periodA] = a.split("-").map((p) => p.replace("T", ""));
-    const [yearB, periodB] = b.split("-").map((p) => p.replace("T", ""));
-
-    if (yearA !== yearB) return parseInt(yearA) - parseInt(yearB);
-    return parseInt(periodA) - parseInt(periodB);
-  });
-
-  return {
-    sortedPeriods,
-    periodCargoMap,
-  };
-}
-
+// Editable Interval Cell Component
 function EditableIntervalCell({ row, onUpdateItem }: any) {
   const [isEditing, setIsEditing] = useState(false);
   const [value, setValue] = useState(row.interval || "monthly");
@@ -426,11 +352,6 @@ function EditableIntervalCell({ row, onUpdateItem }: any) {
     }
   };
 
-  const handleCancel = () => {
-    setValue(row.interval);
-    setIsEditing(false);
-  };
-
   const getCurrentLabel = () => {
     const option = INTERVAL_OPTIONS.find(
       (opt) => opt.value === (row.interval || "monthly")
@@ -441,12 +362,7 @@ function EditableIntervalCell({ row, onUpdateItem }: any) {
   if (isEditing) {
     return (
       <Box
-        sx={{
-          display: "flex",
-          alignItems: "center",
-          gap: 1,
-          width: "100%",
-        }}
+        sx={{ display: "flex", alignItems: "center", gap: 1, width: "100%" }}
       >
         <FormControl size="small" sx={{ minWidth: 120 }}>
           <Select
@@ -456,10 +372,7 @@ function EditableIntervalCell({ row, onUpdateItem }: any) {
               handleSave(e.target.value);
             }}
             disabled={saving}
-            sx={{
-              fontSize: "0.875rem",
-              height: 32,
-            }}
+            sx={{ fontSize: "0.875rem", height: 32 }}
             onClose={() => setIsEditing(false)}
             autoFocus
             open={isEditing}
@@ -486,9 +399,7 @@ function EditableIntervalCell({ row, onUpdateItem }: any) {
         height: "100%",
         cursor: "pointer",
         borderRadius: 1,
-        "&:hover": {
-          backgroundColor: alpha(theme.palette.primary.main, 0.05),
-        },
+        "&:hover": { backgroundColor: alpha(theme.palette.primary.main, 0.05) },
         transition: "background-color 0.2s",
       }}
       onClick={() => setIsEditing(true)}
@@ -499,8 +410,32 @@ function EditableIntervalCell({ row, onUpdateItem }: any) {
     </Box>
   );
 }
-// Function to format period for display
-function formatPeriodLabel(period: string, cargoNo: string): string {
+
+// Extract delivery periods utility
+function extractDeliveryPeriods(items: any[]): { sortedPeriods: string[] } {
+  const periodsSet = new Set<string>();
+
+  items.forEach((item) => {
+    if (item.deliveries) {
+      Object.keys(item.deliveries).forEach((period) => {
+        periodsSet.add(period);
+      });
+    }
+  });
+
+  const sortedPeriods = Array.from(periodsSet).sort((a, b) => {
+    const [yearA, periodA] = a.split("-").map((p) => p.replace("T", ""));
+    const [yearB, periodB] = b.split("-").map((p) => p.replace("T", ""));
+
+    if (yearA !== yearB) return parseInt(yearA) - parseInt(yearB);
+    return parseInt(periodA) - parseInt(periodB);
+  });
+
+  return { sortedPeriods };
+}
+
+// Format period label utility
+function formatPeriodLabel(period: string): string {
   const monthMap: { [key: string]: string } = {
     "01": "Januar",
     "02": "Februar",
@@ -518,92 +453,10 @@ function formatPeriodLabel(period: string, cargoNo: string): string {
 
   const [yearPart, periodNum] = period.split("-");
   const monthName = monthMap[periodNum] || `Period ${periodNum}`;
-
-  return `Lieferung ${monthName} ${cargoNo}`;
+  return `${monthName} ${yearPart}`;
 }
 
-// Types
-// Styled components
-const StyledTextField = styled(TextField)(({ theme }) => ({
-  "& .MuiOutlinedInput-root": {
-    borderRadius: 16,
-    backgroundColor: alpha(theme.palette.background.paper, 0.9),
-    transition: "all 0.3s ease",
-    border: "2px solid transparent",
-    "&:hover": {
-      backgroundColor: alpha(theme.palette.background.paper, 1),
-      boxShadow: "0 8px 25px rgba(140, 194, 27, 0.15)",
-      border: "2px solid rgba(140, 194, 27, 0.2)",
-    },
-    "&.Mui-focused": {
-      backgroundColor: alpha(theme.palette.background.paper, 1),
-      boxShadow: "0 8px 30px rgba(140, 194, 27, 0.25)",
-      border: "2px solid rgba(140, 194, 27, 0.5)",
-      "& .MuiOutlinedInput-notchedOutline": {
-        borderColor: "transparent",
-      },
-    },
-  },
-  "& .MuiOutlinedInput-notchedOutline": {
-    borderColor: "transparent",
-  },
-}));
-
-const SearchField = styled(TextField)(({ theme }) => ({
-  "& .MuiOutlinedInput-root": {
-    borderRadius: 25,
-    backgroundColor: alpha(theme.palette.background.paper, 0.7),
-    boxShadow: "0 2px 5px rgba(0, 0, 0, 0.05)",
-    transition: "all 0.3s",
-    "&:hover": {
-      backgroundColor: alpha(theme.palette.background.paper, 0.9),
-      boxShadow: "0 4px 10px rgba(0, 0, 0, 0.07)",
-    },
-    "&.Mui-focused": {
-      boxShadow: "0 4px 15px rgba(140, 194, 27, 0.15)",
-    },
-  },
-  "& .MuiOutlinedInput-notchedOutline": {
-    borderColor: alpha(theme.palette.divider, 0.5),
-  },
-}));
-
-const ItemOptionCard = styled(Box)(({ theme }) => ({
-  display: "flex",
-  alignItems: "center",
-  gap: 16,
-  padding: 12,
-  borderRadius: 12,
-  transition: "all 0.2s ease",
-  cursor: "pointer",
-  "&:hover": {
-    backgroundColor: alpha(theme.palette.primary.main, 0.08),
-    transform: "translateX(4px)",
-  },
-}));
-
-const ImageContainer = styled(Box)(({ theme }) => ({
-  width: 60,
-  height: 60,
-  borderRadius: 12,
-  overflow: "hidden",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  backgroundColor: alpha(theme.palette.grey[200], 0.5),
-  border: `2px solid ${alpha(theme.palette.primary.main, 0.1)}`,
-  position: "relative",
-  "& img": {
-    width: "100%",
-    height: "100%",
-    objectFit: "cover",
-    transition: "transform 0.3s ease",
-  },
-  "&:hover img": {
-    transform: "scale(1.1)",
-  },
-}));
-
+// Add Item Dialog Component
 function AddItemDialog({ open, onClose, onAddItem, listId }: any) {
   const [items, setItems] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -659,8 +512,6 @@ function AddItemDialog({ open, onClose, onAddItem, listId }: any) {
       };
 
       await onAddItem(itemData);
-
-      // Reset form
       setSelectedItem(null);
       setSearchTerm("");
       setItems([]);
@@ -679,10 +530,7 @@ function AddItemDialog({ open, onClose, onAddItem, listId }: any) {
       maxWidth="md"
       fullWidth
       PaperProps={{
-        sx: {
-          borderRadius: 3,
-          boxShadow: "0 20px 40px rgba(0, 0, 0, 0.1)",
-        },
+        sx: { borderRadius: 3, boxShadow: "0 20px 40px rgba(0, 0, 0, 0.1)" },
       }}
     >
       <DialogTitle>
@@ -707,7 +555,6 @@ function AddItemDialog({ open, onClose, onAddItem, listId }: any) {
 
       <DialogContent sx={{ p: 3 }}>
         <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
-          {/* Search Field */}
           <Autocomplete
             options={items}
             getOptionLabel={(option) => option.name || ""}
@@ -801,17 +648,8 @@ function AddItemDialog({ open, onClose, onAddItem, listId }: any) {
                 }}
               />
             )}
-            ListboxProps={{
-              sx: {
-                maxHeight: 300,
-                "& .MuiAutocomplete-option": {
-                  padding: 0,
-                },
-              },
-            }}
           />
 
-          {/* Selected Item Preview */}
           {selectedItem && (
             <Card
               sx={{ p: 2, bgcolor: alpha(theme.palette.primary.main, 0.05) }}
@@ -858,7 +696,6 @@ function AddItemDialog({ open, onClose, onAddItem, listId }: any) {
             </Card>
           )}
 
-          {/* Empty State */}
           {!searchTerm && (
             <Box
               sx={{
@@ -897,7 +734,7 @@ function AddItemDialog({ open, onClose, onAddItem, listId }: any) {
   );
 }
 
-// Debounce utility function
+// Debounce utility
 function debounce<T extends (...args: any[]) => any>(
   func: T,
   delay: number
@@ -908,7 +745,8 @@ function debounce<T extends (...args: any[]) => any>(
     timeoutId = setTimeout(() => func(...args), delay);
   };
 }
-// Enhanced Breadcrumbs
+
+// Enhanced Breadcrumbs Component
 function EnhancedBreadcrumbs({ listTitle }: { listTitle: string }) {
   return (
     <Box sx={{ borderRadius: 3, px: 2.5, py: 1, display: "inline-flex" }}>
@@ -964,23 +802,20 @@ function EnhancedBreadcrumbs({ listTitle }: { listTitle: string }) {
   );
 }
 
+// Main Component
 const ListManagementPage = () => {
   const router = useRouter();
   const params = useParams();
   const listId = params?.id as string;
-
-  // State management
 
   const [listData, setListData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   const [searchTerm, setSearchTerm] = useState("");
-  const [isAdmin, setIsAdmin] = useState(true);
   const [addItemDialog, setAddItemDialog] = useState(false);
-
   const [isEditingTitle, setIsEditingTitle] = useState(false);
-  const [editedTitle, setEditedTitle] = useState(listData?.name || "");
+  const [editedTitle, setEditedTitle] = useState("");
 
   const handleUpdateTitle = async () => {
     if (!editedTitle.trim()) {
@@ -990,8 +825,7 @@ const ListManagementPage = () => {
 
     try {
       setSaving(true);
-      // Call your API to update the list title
-      const response = await updateList(listData.id, { name: editedTitle });
+      await updateList(listData.id, { name: editedTitle });
       setListData((prev: any) => ({ ...prev, name: editedTitle }));
       setIsEditingTitle(false);
       toast.success("Title updated successfully", successStyles);
@@ -1004,11 +838,10 @@ const ListManagementPage = () => {
   };
 
   const deliveryPeriodsData = useMemo(() => {
-    if (!listData?.items) return { sortedPeriods: [], cargoNumbers: [] };
+    if (!listData?.items) return { sortedPeriods: [] };
     return extractDeliveryPeriods(listData.items);
   }, [listData?.items]);
 
-  // Load list data
   useEffect(() => {
     const loadListData = async () => {
       if (!listId) {
@@ -1020,6 +853,7 @@ const ListManagementPage = () => {
         setLoading(true);
         const response = await getListDetails(listId);
         setListData(response);
+        setEditedTitle(response.name);
       } catch (error) {
         console.error("Failed to load list:", error);
       } finally {
@@ -1030,32 +864,27 @@ const ListManagementPage = () => {
     loadListData();
   }, [listId]);
 
-  // Handle adding new item to list
   const handleAddItem = async (itemData: any) => {
     if (!listData) return;
 
     try {
       setSaving(true);
       const response = await addItemToList(listData.id, itemData);
-
-      // Update local state
       setListData((prev: any) => ({
         ...prev,
         items: [...prev.items, response],
       }));
     } catch (error) {
       console.error("Failed to add item:", error);
+      toast.error("Failed to add item", errorStyles);
     } finally {
       setSaving(false);
     }
   };
 
-  // Handle updating item
   const handleUpdateItem = async (itemId: string, updateData: any) => {
     try {
-      const response = await updateListItem(itemId, updateData);
-
-      // Update local state
+      await updateListItem(itemId, updateData);
       setListData((prev: any) => ({
         ...prev,
         items: prev.items.map((item: any) =>
@@ -1064,10 +893,10 @@ const ListManagementPage = () => {
       }));
     } catch (error) {
       console.error("Failed to update item:", error);
+      toast.error("Failed to update item", errorStyles);
     }
   };
 
-  // Handle deleting selected items
   const handleDeleteSelectedItems = async () => {
     if (!listData || selectedRows.size === 0) return;
 
@@ -1079,7 +908,6 @@ const ListManagementPage = () => {
 
       await Promise.all(deletePromises);
 
-      // Update local state
       setListData((prev: any) => ({
         ...prev,
         items: prev.items.filter((item: any) => !selectedRows.has(item.id)),
@@ -1092,47 +920,12 @@ const ListManagementPage = () => {
       );
     } catch (error) {
       console.error("Failed to delete items:", error);
+      toast.error("Failed to delete items", errorStyles);
     } finally {
       setSaving(false);
     }
   };
 
-  const handleUpdateDelivery = useCallback(
-    async (itemId: string, period: string, deliveryData: any) => {
-      try {
-        // Update local state immediately for better UX
-        setListData((prev: any) => ({
-          ...prev,
-          items: prev.items.map((item: any) => {
-            if (item.id === itemId) {
-              const updatedDeliveries = {
-                ...item.deliveries,
-                [period]: {
-                  ...item.deliveries?.[period],
-                  ...deliveryData,
-                  cargoNo:
-                    deliveryData.cargoNo ||
-                    item.deliveries?.[period]?.cargoNo ||
-                    "",
-                },
-              };
-              return {
-                ...item,
-                deliveries: updatedDeliveries,
-              };
-            }
-            return item;
-          }),
-        }));
-      } catch (error) {
-        console.error("Failed to update delivery:", error);
-        // Revert the local state change if API call fails
-      }
-    },
-    []
-  );
-
-  // Filter items based on search
   const columns = useMemo(() => {
     const baseColumns = [
       {
@@ -1320,42 +1113,16 @@ const ListManagementPage = () => {
       },
     ];
 
-    // Add delivery columns dynamically
-    const deliveryColumns = deliveryPeriodsData.sortedPeriods.map((period) => {
-      const cargoNo = listData?.items
-        .map((item: any) => item.deliveries?.[period]?.cargoNo)
-        .find((cn: string) => cn);
-
-      return {
-        key: `delivery_${period}`,
-        name: formatPeriodLabel(period, cargoNo),
-        width: 140,
-        resizable: false,
-        renderCell: (props: any) => (
-          <DeliveryCell
-            row={props.row}
-            period={period}
-            onUpdateDelivery={handleUpdateDelivery}
-          />
-        ),
-        renderHeaderCell: (props: any) => (
-          <Box
-            sx={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-              height: "100%",
-              padding: "8px 4px",
-              maxWidth: "500px",
-              textWrap: "wrap",
-            }}
-          >
-            <div>{formatPeriodLabel(period, cargoNo)}</div>
-          </Box>
-        ),
-      };
-    });
+    // Add delivery columns dynamically (read-only)
+    const deliveryColumns = deliveryPeriodsData.sortedPeriods.map((period) => ({
+      key: `delivery_${period}`,
+      name: formatPeriodLabel(period),
+      width: 140,
+      resizable: false,
+      renderCell: (props: any) => (
+        <DeliveryCell row={props.row} period={period} />
+      ),
+    }));
 
     const endColumns = [
       {
@@ -1403,16 +1170,10 @@ const ListManagementPage = () => {
       {
         key: "marked",
         name: "Markiert",
-        width: 80,
+        width: 120,
         resizable: true,
         renderCell: (props: any) => (
-          <Checkbox
-            size="small"
-            checked={props.row.marked}
-            icon={<CheckBoxOutlineBlank />}
-            checkedIcon={<CheckBox />}
-            onChange={() => {}}
-          />
+          <EditableMarkedCell row={props.row} onUpdateItem={handleUpdateItem} />
         ),
       },
       {
@@ -1420,19 +1181,18 @@ const ListManagementPage = () => {
         name: "Kommentar",
         width: 200,
         resizable: true,
+        renderCell: (props: any) => (
+          <EditableCommentCell
+            row={props.row}
+            onUpdateItem={handleUpdateItem}
+          />
+        ),
       },
     ];
 
     return [...baseColumns, ...deliveryColumns, ...endColumns];
-  }, [
-    deliveryPeriodsData,
-    selectedRows,
-    handleUpdateDelivery,
-    handleUpdateItem,
-    listData?.items,
-  ]);
+  }, [deliveryPeriodsData, selectedRows, handleUpdateItem]);
 
-  // Filter items based on search
   const filteredItems = useMemo(() => {
     if (!listData?.items) return [];
 
@@ -1459,23 +1219,6 @@ const ListManagementPage = () => {
     );
   }
 
-  // Show loading state
-  if (loading) {
-    return (
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          height: "100vh",
-        }}
-      >
-        <CircularProgress />
-      </Box>
-    );
-  }
-
-  // Show error if no list data
   if (!listData) {
     return (
       <Box sx={{ p: 3 }}>
@@ -1542,9 +1285,7 @@ const ListManagementPage = () => {
                 />
                 <IconButton
                   size="small"
-                  onClick={async () => {
-                    await handleUpdateTitle();
-                  }}
+                  onClick={handleUpdateTitle}
                   disabled={saving}
                 >
                   {saving ? <CircularProgress size={20} /> : <CheckCircle />}
@@ -1602,6 +1343,7 @@ const ListManagementPage = () => {
 
           <EnhancedBreadcrumbs listTitle={listData.name} />
         </Box>
+
         {/* Main Content */}
         <Card
           sx={{
@@ -1617,8 +1359,8 @@ const ListManagementPage = () => {
             {/* List Info */}
             <Box sx={{ mb: 3 }}>
               <Typography variant="body2" color="text.secondary">
-                <strong>Customer: </strong>{" "}
-                {" " + listData.customer?.email || "N/A"}
+                <strong>Customer: </strong>
+                {listData.customer?.email || "N/A"}
               </Typography>
             </Box>
 
@@ -1627,7 +1369,7 @@ const ListManagementPage = () => {
               sx={{ display: "flex", justifyContent: "space-between", mb: 3 }}
             >
               <Box sx={{ display: "flex", gap: 1.5, alignItems: "center" }}>
-                <SearchField
+                <TextField
                   placeholder="Search items..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
@@ -1647,7 +1389,6 @@ const ListManagementPage = () => {
                   startIcon={<Add />}
                   onClick={() => setAddItemDialog(true)}
                   gradient={true}
-                  hoverEffect="scale"
                 >
                   Add Item
                 </CustomButton>
@@ -1773,39 +1514,6 @@ const ListManagementPage = () => {
                     borderColor: "rgba(140, 194, 27, 0.2)",
                   },
                 },
-                // Special styling for delivery columns
-                "& .rdg-cell[aria-colindex]": {
-                  "&:nth-of-type(n+6)": {
-                    padding: "8px !important",
-                    backgroundColor: "rgba(248, 255, 248, 0.7)",
-                  },
-                },
-                // Enhanced focus states
-                "& .rdg-cell:focus-within": {
-                  outline: "2px solid rgba(140, 194, 27, 0.4)",
-                  outlineOffset: "-2px",
-                  backgroundColor: "rgba(140, 194, 27, 0.05)",
-                },
-                // Beautiful scrollbar
-                "& .rdg-viewport": {
-                  "&::-webkit-scrollbar": {
-                    width: "8px",
-                    height: "8px",
-                  },
-                  "&::-webkit-scrollbar-track": {
-                    background: "rgba(248, 250, 252, 0.5)",
-                    borderRadius: "4px",
-                  },
-                  "&::-webkit-scrollbar-thumb": {
-                    background:
-                      "linear-gradient(135deg, rgba(140, 194, 27, 0.3), rgba(140, 194, 27, 0.5))",
-                    borderRadius: "4px",
-                    "&:hover": {
-                      background:
-                        "linear-gradient(135deg, rgba(140, 194, 27, 0.5), rgba(140, 194, 27, 0.7))",
-                    },
-                  },
-                },
               }}
             >
               <DataGrid
@@ -1831,7 +1539,8 @@ const ListManagementPage = () => {
                 }}
               />
             </Paper>
-            {/* Footer */}
+
+            {/* Footer Stats */}
             {listData.items.length > 0 && (
               <Box
                 sx={{
@@ -1847,68 +1556,16 @@ const ListManagementPage = () => {
                   backdropFilter: "blur(10px)",
                 }}
               >
-                <Typography
-                  variant="body2"
-                  color="text.secondary"
-                  sx={{
-                    display: "flex",
-                    alignItems: "center",
-                    "&::before": {
-                      content: '""',
-                      display: "inline-block",
-                      width: 8,
-                      height: 8,
-                      borderRadius: "50%",
-                      backgroundColor: theme.palette.info.main,
-                      marginRight: 1,
-                    },
-                  }}
-                >
+                <Typography variant="body2" color="text.secondary">
                   Showing {filteredItems.length} of {listData.items.length}{" "}
                   items
                 </Typography>
 
                 <Box sx={{ display: "flex", gap: 4 }}>
-                  <Typography
-                    variant="body2"
-                    sx={{ display: "flex", alignItems: "center" }}
-                  >
-                    <Box
-                      component="span"
-                      sx={{
-                        width: 8,
-                        height: 8,
-                        borderRadius: "50%",
-                        backgroundColor: theme.palette.info.main,
-                        display: "inline-block",
-                        mr: 1,
-                        boxShadow: `0 0 0 2px ${alpha(
-                          theme.palette.info.main,
-                          0.2
-                        )}`,
-                      }}
-                    />
-                    <strong>Total Items:</strong> {listData.items.length}
+                  <Typography variant="body2">
+                    <strong>Total:</strong> {listData.items.length}
                   </Typography>
-                  <Typography
-                    variant="body2"
-                    sx={{ display: "flex", alignItems: "center" }}
-                  >
-                    <Box
-                      component="span"
-                      sx={{
-                        width: 8,
-                        height: 8,
-                        borderRadius: "50%",
-                        backgroundColor: theme.palette.success.main,
-                        display: "inline-block",
-                        mr: 1,
-                        boxShadow: `0 0 0 2px ${alpha(
-                          theme.palette.success.main,
-                          0.2
-                        )}`,
-                      }}
-                    />
+                  <Typography variant="body2">
                     <strong>Confirmed:</strong>{" "}
                     {
                       listData.items.filter(
@@ -1916,25 +1573,7 @@ const ListManagementPage = () => {
                       ).length
                     }
                   </Typography>
-                  <Typography
-                    variant="body2"
-                    sx={{ display: "flex", alignItems: "center" }}
-                  >
-                    <Box
-                      component="span"
-                      sx={{
-                        width: 8,
-                        height: 8,
-                        borderRadius: "50%",
-                        backgroundColor: theme.palette.warning.main,
-                        display: "inline-block",
-                        mr: 1,
-                        boxShadow: `0 0 0 2px ${alpha(
-                          theme.palette.warning.main,
-                          0.2
-                        )}`,
-                      }}
-                    />
+                  <Typography variant="body2">
                     <strong>Pending:</strong>{" "}
                     {
                       listData.items.filter(
@@ -1943,51 +1582,7 @@ const ListManagementPage = () => {
                       ).length
                     }
                   </Typography>
-                  <Typography
-                    variant="body2"
-                    sx={{ display: "flex", alignItems: "center" }}
-                  >
-                    <Box
-                      component="span"
-                      sx={{
-                        width: 8,
-                        height: 8,
-                        borderRadius: "50%",
-                        backgroundColor: theme.palette.error.main,
-                        display: "inline-block",
-                        mr: 1,
-                        boxShadow: `0 0 0 2px ${alpha(
-                          theme.palette.error.main,
-                          0.2
-                        )}`,
-                      }}
-                    />
-                    <strong>Rejected:</strong>{" "}
-                    {
-                      listData.items.filter(
-                        (item: any) => item.changeStatus === "rejected"
-                      ).length
-                    }
-                  </Typography>
-                  <Typography
-                    variant="body2"
-                    sx={{ display: "flex", alignItems: "center" }}
-                  >
-                    <Box
-                      component="span"
-                      sx={{
-                        width: 8,
-                        height: 8,
-                        borderRadius: "50%",
-                        backgroundColor: theme.palette.primary.main,
-                        display: "inline-block",
-                        mr: 1,
-                        boxShadow: `0 0 0 2px ${alpha(
-                          theme.palette.primary.main,
-                          0.2
-                        )}`,
-                      }}
-                    />
+                  <Typography variant="body2">
                     <strong>Marked:</strong>{" "}
                     {listData.items.filter((item: any) => item.marked).length}
                   </Typography>

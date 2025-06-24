@@ -111,12 +111,12 @@ router.put(
 
 // Admin-only approval routes ================================================
 router.put(
-  "/admin/items/:itemId/approve",
+  "/admin/items/:logId/approve",
   authenticateUser,
   approveListItemChanges
 );
 router.put(
-  "/admin/items/:itemId/reject",
+  "/admin/items/:logId/reject",
   authenticateUser,
   rejectListItemChanges
 );

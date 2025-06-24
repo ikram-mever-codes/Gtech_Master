@@ -1,4 +1,4 @@
-import express from "express";
+import express, { NextFunction, Response } from "express";
 import { uploadSingleFile } from "../middlewares/multer";
 import { authenticateCustomer } from "../middlewares/authenticateCustomer";
 import {
@@ -15,7 +15,7 @@ import {
   getSingleUser,
   updateCustomerStatus,
 } from "../controllers/customer_controllers";
-import { authenticateUser } from "../middlewares/authorized";
+import { authenticateUser, AuthorizedRequest } from "../middlewares/authorized";
 
 const router: any = express.Router();
 
@@ -40,7 +40,27 @@ router.put("/me", authenticateCustomer, uploadSingleFile, editCustomerProfile);
 
 router.get("/all", authenticateUser, getAllCustomers);
 
-router.get("/single/:customerId", authenticateCustomer, getSingleUser);
+router.get(
+  "/single/:customerId",
+  (req: AuthorizedRequest, res: Response, next: NextFunction) => {
+    if (req.cookies?.token) {
+      try {
+        authenticateUser(req, res, (err?: any) => {
+          if (err || !req.user) {
+            authenticateCustomer(req, res, next);
+          } else {
+            next();
+          }
+        });
+      } catch {
+        authenticateCustomer(req, res, next);
+      }
+    } else {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+  },
+  getSingleUser
+);
 
 router.put("/:customerId/status", authenticateUser, updateCustomerStatus);
 

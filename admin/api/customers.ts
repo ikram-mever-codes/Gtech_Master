@@ -1,5 +1,5 @@
-import { CustomerVerificationStatus } from "@/app/customers/page";
 import { api, handleApiError } from "@/utils/api";
+import { CustomerVerificationStatus } from "@/utils/interfaces";
 
 export type CustomerData = {
   id: string;
@@ -41,7 +41,7 @@ export const updateCustomerStatus = async (
 
 export const getSingleCustomer = async (customerId: string) => {
   try {
-    const res = await api.get(`/customers/${customerId}`);
+    const res = await api.get(`/customers/single/${customerId}`);
     return res;
   } catch (error) {
     handleApiError(error);
