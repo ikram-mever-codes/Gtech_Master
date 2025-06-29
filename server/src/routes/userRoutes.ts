@@ -10,6 +10,7 @@ import {
   getAllUsers,
   forgetPassword,
   resetPassword,
+  createCompany,
 } from "../controllers/user_controllers";
 import { authenticateUser } from "../middlewares/authorized";
 
@@ -32,5 +33,9 @@ router.put("/users/me", authenticateUser, uploadSingleFile, editProfile);
 // Add these to your existing routes
 router.post("/forgot-password", forgetPassword);
 router.post("/reset-password", resetPassword);
+
+// Customer Routes
+
+router.post("/customers/create", authenticateUser, createCompany);
 
 export default router;

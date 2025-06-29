@@ -608,7 +608,7 @@ export const updateCustomerStatus = async (
     const { status } = req.body;
 
     // Validate status
-    const allowedStatuses = ["pending", "verified", "suspended"];
+    const allowedStatuses = ["pending", "verified", "rejected"];
     if (!allowedStatuses.includes(status)) {
       return next(new ErrorHandler("Invalid status value", 400));
     }
@@ -772,9 +772,7 @@ export const getAllCustomers = async (
 
     const validatedOrder = order === "ASC" ? "ASC" : "DESC";
 
-    const queryBuilder = customerRepository
-      .createQueryBuilder("customer")
-      .where("customer.isEmailVerified = :verified", { verified: true });
+    const queryBuilder = customerRepository.createQueryBuilder("customer");
 
     if (status) {
       queryBuilder.andWhere("customer.accountVerificationStatus = :status", {

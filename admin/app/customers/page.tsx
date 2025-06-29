@@ -48,6 +48,7 @@ import {
   Filter,
   Mail,
   Settings,
+  PlusIcon,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
@@ -148,10 +149,12 @@ const CustomersPage = () => {
 
   const handleChangeStatus = async () => {
     try {
-      await updateCustomerStatus(selectedCustomer.id, newStatus);
-      setChangeStatusDialogOpen(false);
-      handleRefresh();
-      toast.success(`Customer status updated to ${formatStatus(newStatus)}`);
+      const data = await updateCustomerStatus(selectedCustomer.id, newStatus);
+      if (data?.success) {
+        setChangeStatusDialogOpen(false);
+        handleRefresh();
+        toast.success(`Customer status updated to ${formatStatus(newStatus)}`);
+      }
     } catch (error) {
       console.error("Error changing customer status:", error);
       toast.error("Failed to update customer status");
@@ -482,6 +485,15 @@ const CustomersPage = () => {
             >
               Refresh
             </Button>
+
+            <CustomButton
+              startIcon={<PlusIcon color="white" size={18} />}
+              gradient
+              shadow="large"
+              onClick={() => router.push("/customers/create")}
+            >
+              Create Company
+            </CustomButton>
           </div>
         </div>
 
@@ -611,15 +623,6 @@ const CustomersPage = () => {
           >
             <LucideEye className="mr-2" size={18} color="#666" />
             <Typography variant="body2">View Details</Typography>
-          </MenuItem>
-          <MenuItem
-            onClick={() => {
-              router.push(`/customers/${selectedCustomerId}/edit`);
-              handleActionClose();
-            }}
-          >
-            <LucidePencil className="mr-2" size={18} color="#666" />
-            <Typography variant="body2">Edit Customer</Typography>
           </MenuItem>
 
           {/* Change Status MenuItem - Added as requested */}

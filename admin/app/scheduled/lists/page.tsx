@@ -491,7 +491,7 @@ const ListViewItem = ({ list, onEdit, onDelete, onDuplicate, router }: any) => {
             },
           }}
         >
-          <MenuItem
+          {/* <MenuItem
             onClick={() => {
               onDuplicate(list);
               setMenuAnchor(null);
@@ -508,7 +508,7 @@ const ListViewItem = ({ list, onEdit, onDelete, onDuplicate, router }: any) => {
               sx={{ color: theme.palette.secondary.main }}
             />
             <Typography variant="body2">Duplicate</Typography>
-          </MenuItem>
+          </MenuItem> */}
           <MenuItem
             onClick={() => {
               setMenuAnchor(null);

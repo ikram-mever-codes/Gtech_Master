@@ -29,35 +29,35 @@ export class Customer {
   @Column()
   taxNumber!: string;
 
-  @Column()
-  addressLine1!: string;
+  @Column({ nullable: true })
+  addressLine1?: string;
 
   @Column({ nullable: true })
   addressLine2?: string;
 
-  @Column()
-  postalCode!: string;
+  @Column({ nullable: true })
+  postalCode?: string;
 
-  @Column()
-  city!: string;
+  @Column({ nullable: true })
+  city?: string;
 
-  @Column()
-  country!: string;
+  @Column({ nullable: true })
+  country?: string;
 
-  @Column()
-  deliveryAddressLine1!: string;
+  @Column({ nullable: true })
+  deliveryAddressLine1?: string;
 
   @Column({ nullable: true })
   deliveryAddressLine2?: string;
 
-  @Column()
-  deliveryPostalCode!: string;
+  @Column({ nullable: true })
+  deliveryPostalCode?: string;
 
-  @Column()
-  deliveryCity!: string;
+  @Column({ nullable: true })
+  deliveryCity?: string;
 
-  @Column()
-  deliveryCountry!: string;
+  @Column({ nullable: true })
+  deliveryCountry?: string;
 
   @Column({ type: "boolean", default: false })
   isEmailVerified!: boolean;

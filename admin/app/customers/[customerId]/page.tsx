@@ -589,7 +589,7 @@ const CustomerProfilePage = () => {
             Change Status
           </CustomButton>
 
-          <CustomButton
+          {/* <CustomButton
             variant="outlined"
             color="primary"
             startIcon={<Pencil size={16} />}
@@ -599,7 +599,7 @@ const CustomerProfilePage = () => {
             shadow="small"
           >
             Edit
-          </CustomButton>
+          </CustomButton> */}
 
           <CustomButton
             variant="contained"

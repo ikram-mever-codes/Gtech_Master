@@ -488,7 +488,7 @@ const ListViewItem = ({
             },
           }}
         >
-          <MenuItem
+          {/* <MenuItem
             onClick={() => {
               onDuplicate(list);
               setMenuAnchor(null);
@@ -505,7 +505,7 @@ const ListViewItem = ({
               sx={{ color: theme.palette.secondary.main }}
             />
             <Typography variant="body2">Duplicate</Typography>
-          </MenuItem>
+          </MenuItem> */}
 
           <Divider sx={{ my: 1, borderColor: alpha("#ADB5BD", 0.15) }} />
           <MenuItem
@@ -725,7 +725,7 @@ const GridViewItem = ({
             },
           }}
         >
-          <MenuItem
+          {/* <MenuItem
             onClick={() => {
               onDuplicate(list);
               setMenuAnchor(null);
@@ -742,7 +742,7 @@ const GridViewItem = ({
               sx={{ color: theme.palette.secondary.main }}
             />
             <Typography variant="body2">Duplicate</Typography>
-          </MenuItem>
+          </MenuItem> */}
           <Divider sx={{ my: 1, borderColor: alpha("#ADB5BD", 0.15) }} />
           <MenuItem
             onClick={() => {

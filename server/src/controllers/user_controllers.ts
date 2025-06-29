@@ -10,6 +10,7 @@ import sendEmail from "../services/emailService";
 import cloudinary from "../config/cloudinary";
 import fs from "fs";
 import { AppDataSource } from "../config/database";
+import { Customer } from "../models/customers";
 
 // Create User with Permissions (Admin/Super Admin only)
 export const createUser = async (
@@ -530,6 +531,129 @@ export const resetPassword = async (
     return res.status(200).json({
       success: true,
       message: "Password reset successfully",
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const createCompany = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const {
+      companyName,
+      email,
+      contactEmail,
+      contactPhoneNumber,
+      taxNumber,
+      addressLine1,
+      addressLine2,
+      postalCode,
+      city,
+      country,
+      deliveryAddressLine1,
+      deliveryAddressLine2,
+      deliveryPostalCode,
+      deliveryCity,
+      deliveryCountry,
+    } = req.body;
+
+    // Validations
+    if (
+      !companyName ||
+      !email ||
+      !contactEmail ||
+      !contactPhoneNumber ||
+      !taxNumber
+    ) {
+      return next(
+        new ErrorHandler(
+          "Company name, email, contact email, contact phone number and tax number are required",
+          400
+        )
+      );
+    }
+
+    const customerRepository = AppDataSource.getRepository(Customer);
+    const existingCustomer = await customerRepository.findOne({
+      where: { email },
+    });
+
+    if (existingCustomer) {
+      return next(new ErrorHandler("Email already exists", 400));
+    }
+
+    // Generate temporary password
+    const tempPassword = crypto.randomBytes(8).toString("hex");
+    const hashedPassword = await bcrypt.hash(tempPassword, 10);
+
+    // Create customer (company)
+    const customer = customerRepository.create({
+      companyName,
+      email,
+      contactEmail,
+      contactPhoneNumber,
+      taxNumber,
+      addressLine1,
+      addressLine2,
+      postalCode,
+      city,
+      country,
+      deliveryAddressLine1,
+      deliveryAddressLine2,
+      deliveryPostalCode,
+      deliveryCity,
+      deliveryCountry,
+      password: hashedPassword,
+      accountVerificationStatus: "verified",
+      isEmailVerified: true,
+    });
+
+    await customerRepository.save(customer);
+
+    const loginLink = `${process.env.STAR_URL}/login`;
+    const message = `
+      <h2>Welcome to Our Gtech Customers Portal</h2>
+      <p>Your company account has been created by the admin with the following credentials:</p>
+      <p><strong>Company Name:</strong> ${companyName}</p>
+      <p><strong>Email:</strong> ${email}</p>
+      <p><strong>Temporary Password:</strong> ${tempPassword}</p>
+      <p>Please login <a href="${loginLink}">here</a> and change your password.</p>
+      <p>You can now start using our platform with your company account.</p>
+    `;
+
+    await sendEmail({
+      to: email,
+      subject: "Your Company Account Credentials",
+      html: message,
+    });
+
+    // Also send to contact email if different
+    if (contactEmail !== email) {
+      await sendEmail({
+        to: contactEmail,
+        subject: "Your Company Account Credentials",
+        html: message,
+      });
+    }
+
+    // Return response without sensitive data
+    const customerData = {
+      id: customer.id,
+      companyName: customer.companyName,
+      email: customer.email,
+      contactEmail: customer.contactEmail,
+      contactPhoneNumber: customer.contactPhoneNumber,
+      createdAt: customer.createdAt,
+    };
+
+    return res.status(201).json({
+      success: true,
+      message: "Company created successfully. Credentials sent to email.",
+      data: customerData,
     });
   } catch (error) {
     return next(error);
