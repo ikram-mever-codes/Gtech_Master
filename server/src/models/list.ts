@@ -189,6 +189,9 @@ export class ListItem {
   @Column()
   itemNumber!: string;
 
+  @Column({ nullable: true })
+  item_no_de!: string;
+
   @Column({ default: false })
   marked!: boolean;
 

@@ -76,6 +76,8 @@ import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
 import {
   createNewList,
+  deleteList,
+  deleteListItem,
   getAllListForACustomer,
   handleDuplicateList,
 } from "@/api/lists";
@@ -990,15 +992,18 @@ const ProductListsPage = () => {
       setIsDeleting(true);
       try {
         // Add your delete API call here
-        // await deleteListItem(selectedList.id as string);
-        // Remove from local state
-        setProductLists(
-          productLists.filter((list: any) => list.id !== selectedList.id)
-        );
+        const data = await deleteList(selectedList.id as string);
 
-        toast.success("List deleted successfully", successStyles);
-        setDeleteDialogOpen(false);
-        setSelectedList(null);
+        // Remove from local state
+        if (data?.success) {
+          setProductLists(
+            productLists.filter((list: any) => list.id !== selectedList.id)
+          );
+
+          toast.success("List deleted successfully", successStyles);
+          setDeleteDialogOpen(false);
+          setSelectedList(null);
+        }
       } catch (error) {
         console.error("Failed to delete list:", error);
         handleApiError(error, "Failed to delete list");

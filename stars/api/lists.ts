@@ -85,7 +85,9 @@ export const updateListItem = async (
 export const deleteListItem = async (itemId: string) => {
   try {
     toast.loading("Removing item...", loadingStyles);
-    const response = await api.delete(`/lists/items/${itemId}`);
+    const response: ResponseInterface = await api.delete(
+      `/lists/item/${itemId}`
+    );
     toast.dismiss();
     return response.data;
   } catch (error) {
@@ -94,6 +96,19 @@ export const deleteListItem = async (itemId: string) => {
   }
 };
 
+export const deleteList = async (itemId: string) => {
+  try {
+    toast.loading("Removing item...", loadingStyles);
+    const response: ResponseInterface = await api.delete(
+      `/lists/list/${itemId}`
+    );
+    toast.dismiss();
+    return response;
+  } catch (error) {
+    handleApiError(error, "Failed to remove item");
+    throw error;
+  }
+};
 // Delivery Information Update
 interface DeliveryInfoPayload {
   deliveryDate?: string;
@@ -248,6 +263,16 @@ export const updateList = async (
     return response.data;
   } catch (error) {
     handleApiError(error);
+    throw error;
+  }
+};
+
+export const getCustomerDeliveries = async (customerId: string) => {
+  try {
+    const response = await api.get(`/lists/${customerId}/deliveries`);
+    return response.data;
+  } catch (error) {
+    handleApiError(error, "Failed to fetch deliveries");
     throw error;
   }
 };

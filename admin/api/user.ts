@@ -140,6 +140,15 @@ export const updateUserProfile = async (
   }
 };
 
+export const getUserById = async (userId: string) => {
+  try {
+    const response = await api.get(`/auth/users/${userId}`);
+    return response;
+  } catch (error) {
+    handleApiError(error);
+  }
+};
+
 export const prepareProfileFormData = (
   data: UpdateProfilePayload
 ): FormData => {
@@ -200,4 +209,27 @@ export const submitPasswordReset = async (
     handleApiError(error, "Password reset failed");
     throw error;
   }
+};
+
+export const updateUserFunction = async (userId: string, userData: any) => {
+  try {
+    toast.loading("Updating user...", loadingStyles);
+    const response = await api.put(`/auth/users/${userId}`, userData);
+    toast.dismiss();
+    toast.success("User updated successfully", successStyles);
+    return response.data;
+  } catch (error) {
+    handleApiError(error, "User update failed");
+    throw error;
+  }
+};
+
+export const deleteUser = async (userId: string) => {
+  try {
+  } catch (error) {}
+};
+
+export const resetPassword = async () => {
+  try {
+  } catch (error) {}
 };

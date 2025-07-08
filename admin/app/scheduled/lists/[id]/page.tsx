@@ -1824,11 +1824,22 @@ const AdminListDetailPage = () => {
         ),
       },
       {
-        key: "itemNumber",
-        name: "Item #",
-        width: 100,
+        key: "item_no_de",
+        name: "Item No. DE",
+        width: 120,
         resizable: true,
+        renderCell: (props: any) => (
+          <Typography variant="body2" sx={{ fontSize: "14px" }}>
+            {props.row.item_no_de || "-"}
+          </Typography>
+        ),
       },
+      // {
+      //   key: "itemNumber",
+      //   name: "Item #",
+      //   width: 100,
+      //   resizable: true,
+      // },
       {
         key: "articleNumber",
         name: "Article Number",
@@ -2113,7 +2124,8 @@ const AdminListDetailPage = () => {
       (item: any) =>
         item.articleName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         item.articleNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.itemNumber?.toLowerCase().includes(searchTerm.toLowerCase())
+        item.itemNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.item_no_de?.toLowerCase().includes(searchTerm.toLowerCase()) // Add this line
     );
   }, [listData?.items, searchTerm]);
 

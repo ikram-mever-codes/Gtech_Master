@@ -14,6 +14,8 @@ import {
   getAllLists,
   duplicateList,
   updateList,
+  deleteList,
+  getCustomerDeliveries,
 } from "../controllers/list_controllers";
 import { authenticateUser, AuthorizedRequest } from "../middlewares/authorized";
 import { authenticateCustomer } from "../middlewares/authenticateCustomer";
@@ -142,6 +144,28 @@ router.delete(
     }
   },
   deleteListItem
+);
+
+router.delete(
+  "/list/:listId",
+  (req: AuthorizedRequest, res: Response, next: NextFunction) => {
+    if (req.cookies?.token) {
+      try {
+        authenticateUser(req, res, (err?: any) => {
+          if (err || !req.user) {
+            authenticateCustomer(req, res, next);
+          } else {
+            next();
+          }
+        });
+      } catch {
+        authenticateCustomer(req, res, next);
+      }
+    } else {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+  },
+  deleteList
 );
 
 router.put(
@@ -278,5 +302,27 @@ router.put(
 );
 
 router.get("/admin/all-lists", authenticateUser, getAllLists);
+
+router.get(
+  "/:customerId/deliveries",
+  (req: AuthorizedRequest, res: Response, next: NextFunction) => {
+    if (req.cookies?.token) {
+      try {
+        authenticateUser(req, res, (err?: any) => {
+          if (err || !req.user) {
+            authenticateCustomer(req, res, next);
+          } else {
+            next();
+          }
+        });
+      } catch {
+        authenticateCustomer(req, res, next);
+      }
+    } else {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+  },
+  getCustomerDeliveries
+);
 
 export default router;

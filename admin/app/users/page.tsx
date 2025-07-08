@@ -160,19 +160,19 @@ const UsersPage = () => {
       ),
     },
     {
-      key: "status",
+      key: "isEmailVerified",
       label: "Status",
-      render: (value: UserStatus) => (
+      render: (value: boolean) => (
         <span
           className={`px-3 py-1 rounded-full text-xs font-medium ${
-            value === UserStatus.VERIFIED
+            value === true
               ? "bg-green-200/80 text-green-600"
-              : value === UserStatus.PENDING
+              : value === false
               ? "bg-yellow-200/80 text-yellow-800"
               : "bg-red-200/80 text-red-800"
           }`}
         >
-          {value || "Unknown"}
+          {value === true ? "Verified" : "Unverified"}
         </span>
       ),
     },

@@ -22,7 +22,7 @@ async function fetchItemData(itemId: number) {
   const connection = await getConnection();
 
   try {
-    // Fetch item data with cargo information
+    // Fetch item data with cargo information and warehouse_item relation
     const [itemRows]: any = await connection.query(
       `
       SELECT 
@@ -32,12 +32,14 @@ async function fetchItemData(itemId: number) {
         c.cargo_no,
         c.pickup_date, 
         c.dep_date,
-        os.status AS order_status
+        os.status AS order_status,
+        wi.item_no_de
       FROM items i
       LEFT JOIN order_items oi ON i.ItemID_DE = oi.ItemID_DE
       LEFT JOIN order_statuses os ON oi.master_id = os.master_id 
                                   AND oi.ItemID_DE = os.ItemID_DE
       LEFT JOIN cargos c ON os.cargo_id = c.id
+      LEFT JOIN warehouse_items wi ON i.ItemID_DE = wi.ItemID_DE
       WHERE i.id = ?
     `,
       [itemId]
@@ -132,6 +134,7 @@ async function fetchItemData(itemId: number) {
     return {
       articleName: itemData.item_name || "",
       articleNumber: itemData.ItemID_DE || "",
+      itemNoDe: itemData.item_no_de || "", // Add the item_no_de field
       quantity: itemData.FOQ || 0,
       weight: itemData.weight,
       imageUrl: itemData.photo || null,
@@ -216,6 +219,7 @@ export const createList = async (
     return next(error);
   }
 };
+
 // 2. Add List Item
 export const addListItem = async (
   req: Request,
@@ -255,6 +259,7 @@ export const addListItem = async (
     // Create new list item
     const listItem = listItemRepository.create({
       itemNumber: itemId.toString(),
+      item_no_de: itemData.itemNoDe, // Add the item_no_de field
       articleName: itemData.articleName,
       articleNumber: itemData.articleNumber,
       quantity: quantity,
@@ -305,7 +310,6 @@ export const addListItem = async (
 };
 
 // 3. Update List Item
-// 3. Update List Item
 export const updateListItem = async (
   req: Request,
   res: Response,
@@ -322,6 +326,7 @@ export const updateListItem = async (
       articleName,
       articleNumber,
       imageUrl,
+      item_no_de,
     } = req.body;
 
     const userId = (req as any).user?.id;
@@ -400,6 +405,11 @@ export const updateListItem = async (
       item.imageUrl = imageUrl;
     }
 
+    // Add tracking for item_no_de field
+    if (trackChange("item_no_de", item_no_de, item.item_no_de)) {
+      item.item_no_de = item_no_de;
+    }
+
     if (marked !== undefined) {
       item.marked = marked;
     }
@@ -463,7 +473,7 @@ export const deleteListItem = async (
     const { itemId } = req.params;
     const userId = (req as any).user?.id;
     const customerId = (req as any).customer?.id;
-
+    console.log(itemId);
     if (!itemId) {
       return next(new ErrorHandler("Item ID is required", 400));
     }
@@ -819,7 +829,14 @@ export const getCustomerLists = async (
     const listRepository = AppDataSource.getRepository(List);
     const lists = await listRepository.find({
       where: { customer: { id: customerId } },
-      relations: ["createdBy", "createdBy.user", "createdBy.customer", "items"],
+      relations: [
+        "createdBy",
+        "createdBy.user",
+        "createdBy.customer",
+        "items",
+        "customer",
+        "activityLogs",
+      ],
     });
     return res.status(200).json({
       success: true,
@@ -950,7 +967,8 @@ export const duplicateList = async (
     if (originalList.items && originalList.items.length > 0) {
       for (const item of originalList.items) {
         const newItem = listItemRepository.create({
-          itemNumber: item.itemNumber || item.articleNumber, // Ensure itemNumber is set
+          itemNumber: item.itemNumber || item.articleNumber,
+          item_no_de: item.item_no_de, // Include the item_no_de field
           articleName: item.articleName,
           articleNumber: item.articleNumber,
           quantity: item.quantity,
@@ -960,7 +978,6 @@ export const duplicateList = async (
           deliveries: item.deliveries,
           list: newList,
           createdBy,
-          // Copy other necessary fields
           marked: item.marked || false,
           changeStatus: item.changeStatus || CHANGE_STATUS.CONFIRMED,
           originalValues: item.originalValues || null,
@@ -1067,5 +1084,139 @@ export const updateList = async (
     });
   } catch (error) {
     return next(error);
+  }
+};
+
+// 12. Delete List
+export const deleteList = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { listId } = req.params;
+    const userId = (req as any).user?.id;
+    const customerId = (req as any).customer?.id;
+
+    if (!listId) {
+      return next(new ErrorHandler("List ID is required", 400));
+    }
+
+    if (!userId && !customerId) {
+      return next(new ErrorHandler("Authentication required", 401));
+    }
+
+    const listRepository = AppDataSource.getRepository(List);
+    const listItemRepository = AppDataSource.getRepository(ListItem);
+    const listActivityLogRepository =
+      AppDataSource.getRepository(ListActivityLog);
+
+    const list = await listRepository.findOne({
+      where: { id: listId },
+      relations: ["items", "activityLogs", "customer"],
+    });
+
+    if (!list) {
+      return next(new ErrorHandler("List not found", 404));
+    }
+
+    if (customerId) {
+      // Check if the customer owns the list
+      if (list.customer.id !== customerId) {
+        return next(
+          new ErrorHandler("Not authorized to delete this list", 403)
+        );
+      }
+    }
+    const performerId = userId || customerId;
+    const performerType = userId ? "user" : "customer";
+
+    if (list.items && list.items.length > 0) {
+      await listItemRepository.remove(list.items);
+    }
+
+    if (list.activityLogs && list.activityLogs.length > 0) {
+      await listActivityLogRepository.remove(list.activityLogs);
+    }
+
+    await listRepository.remove(list);
+
+    return res.status(200).json({
+      success: true,
+      message: "List and all associated items deleted successfully",
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const getCustomerDeliveries = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { customerId } = req.params;
+
+    if (!customerId) {
+      return next(new ErrorHandler("Customer ID is required", 400));
+    }
+
+    // Validate customer exists
+    const customerRepository = AppDataSource.getRepository(Customer);
+    const customer = await customerRepository.findOne({
+      where: { id: customerId },
+    });
+
+    if (!customer) {
+      return next(new ErrorHandler("Customer not found", 404));
+    }
+
+    // Get all lists for the customer with items and deliveries
+    const listRepository = AppDataSource.getRepository(List);
+    const lists = await listRepository.find({
+      where: { customer: { id: customerId } },
+      relations: ["items"],
+    });
+
+    // Process all deliveries across all lists
+    const allDeliveries: any[] = [];
+
+    lists.forEach((list) => {
+      list.items?.forEach((item) => {
+        if (item.deliveries) {
+          Object.entries(item.deliveries).forEach(([period, delivery]) => {
+            allDeliveries.push({
+              id: item.id,
+              listId: list.id,
+              listName: list.name,
+              itemName: item.articleName,
+              articleNumber: item.articleNumber,
+              quantity: delivery.quantity || item.quantity,
+              scheduledDate: period, // Using period as date (format: YYYY-MM)
+              status: delivery.status || DELIVERY_STATUS.PENDING,
+              deliveredAt: delivery.deliveredAt,
+              cargoNo: delivery.cargoNo || "",
+              interval: item.interval || "monthly",
+              imageUrl: item.imageUrl || null,
+            });
+          });
+        }
+      });
+    });
+
+    // Sort deliveries by date (ascending)
+    allDeliveries.sort((a, b) => {
+      const dateA = new Date(a.scheduledDate);
+      const dateB = new Date(b.scheduledDate);
+      return dateA.getTime() - dateB.getTime();
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: allDeliveries,
+    });
+  } catch (error) {
+    return next(new ErrorHandler("Failed to fetch customer deliveries", 500));
   }
 };

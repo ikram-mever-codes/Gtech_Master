@@ -78,7 +78,7 @@ import CustomButton from "@/components/UI/CustomButton";
 import theme from "@/styles/theme";
 import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
-import { createNewList, getAllLists, deleteListItem } from "@/api/list";
+import { createNewList, getAllLists, deleteList } from "@/api/list";
 import { api, handleApiError } from "@/utils/api";
 import { getAllCustomers } from "@/api/customers";
 
@@ -773,8 +773,7 @@ const AdminListsPage = () => {
 
   const handleEditList = (list: any) => {
     // Navigate to list edit page
-    router.push(`/scheduled/lists/${list.id}
-      `);
+    router.push(`/scheduled/lists/${list.id}`);
   };
 
   const handleDeleteList = (list: any) => {
@@ -786,11 +785,13 @@ const AdminListsPage = () => {
     if (selectedList) {
       setIsDeleting(true);
       try {
-        await deleteListItem(selectedList.id);
+        const data = await deleteList(selectedList.id);
         // Remove from local state
-        setLists(lists.filter((list: any) => list.id !== selectedList.id));
-        setDeleteDialogOpen(false);
-        setSelectedList(null);
+        if (data?.success) {
+          setLists(lists.filter((list: any) => list.id !== selectedList.id));
+          setDeleteDialogOpen(false);
+          setSelectedList(null);
+        }
       } catch (error) {
         console.error("Failed to delete list:", error);
         handleApiError(error, "Failed to delete list");

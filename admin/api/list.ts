@@ -1,6 +1,7 @@
 import { toast } from "react-hot-toast";
 import { api, handleApiError } from "../utils/api";
 import { loadingStyles, successStyles } from "@/utils/constants";
+import { ResponseInterface } from "@/utils/interfaces";
 
 // Types
 export interface Item {
@@ -134,6 +135,20 @@ export const deleteListItem = async (itemId: string) => {
     const response = await api.delete(`/lists/items/${itemId}`);
     toast.dismiss();
     return response.data;
+  } catch (error) {
+    handleApiError(error, "Failed to remove item");
+    throw error;
+  }
+};
+
+export const deleteList = async (itemId: string) => {
+  try {
+    toast.loading("Removing item...", loadingStyles);
+    const response: ResponseInterface = await api.delete(
+      `/lists/list/${itemId}`
+    );
+    toast.dismiss();
+    return response;
   } catch (error) {
     handleApiError(error, "Failed to remove item");
     throw error;

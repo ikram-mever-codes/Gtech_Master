@@ -11,6 +11,8 @@ import {
   forgetPassword,
   resetPassword,
   createCompany,
+  getUserById,
+  updateUser,
 } from "../controllers/user_controllers";
 import { authenticateUser } from "../middlewares/authorized";
 
@@ -27,6 +29,8 @@ router.put("/change-password", authenticateUser, changePassword);
 // User Management Routes
 router.post("/users", authenticateUser, createUser);
 router.get("/users", authenticateUser, getAllUsers);
+router.get("/users/:userId", authenticateUser, getUserById);
+router.put("/users/:userId", authenticateUser, updateUser);
 
 router.put("/users/me", authenticateUser, uploadSingleFile, editProfile);
 

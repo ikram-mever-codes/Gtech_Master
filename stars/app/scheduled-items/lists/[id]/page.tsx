@@ -435,7 +435,7 @@ function extractDeliveryPeriods(items: any[]): { sortedPeriods: string[] } {
 }
 
 // Format period label utility
-function formatPeriodLabel(period: string): string {
+function formatPeriodLabel(period: string, cargoNo: string): string {
   const monthMap: { [key: string]: string } = {
     "01": "Januar",
     "02": "Februar",
@@ -453,7 +453,8 @@ function formatPeriodLabel(period: string): string {
 
   const [yearPart, periodNum] = period.split("-");
   const monthName = monthMap[periodNum] || `Period ${periodNum}`;
-  return `${monthName} ${yearPart}`;
+
+  return `Lieferung ${monthName} ${cargoNo}`;
 }
 
 // Add Item Dialog Component
@@ -949,11 +950,22 @@ const ListManagementPage = () => {
           />
         ),
       },
+      // {
+      //   key: "itemNumber",
+      //   name: "Artikel-Nr.",
+      //   width: 100,
+      //   resizable: true,
+      // },
       {
-        key: "itemNumber",
-        name: "Artikel-Nr.",
-        width: 100,
+        key: "item_no_de",
+        name: "Item No. DE",
+        width: 120,
         resizable: true,
+        renderCell: (props: any) => (
+          <Typography variant="body2" sx={{ fontSize: "14px" }}>
+            {props.row.item_no_de || "-"}
+          </Typography>
+        ),
       },
       {
         key: "articleNumber",
@@ -1114,15 +1126,37 @@ const ListManagementPage = () => {
     ];
 
     // Add delivery columns dynamically (read-only)
-    const deliveryColumns = deliveryPeriodsData.sortedPeriods.map((period) => ({
-      key: `delivery_${period}`,
-      name: formatPeriodLabel(period),
-      width: 140,
-      resizable: false,
-      renderCell: (props: any) => (
-        <DeliveryCell row={props.row} period={period} />
-      ),
-    }));
+    const deliveryColumns = deliveryPeriodsData.sortedPeriods.map((period) => {
+      const cargoNo = listData?.items
+        .map((item: any) => item.deliveries?.[period]?.cargoNo)
+        .find((cn: string) => cn);
+
+      return {
+        key: `delivery_${period}`,
+        name: formatPeriodLabel(period, cargoNo || ""),
+        width: 140,
+        resizable: false,
+        renderCell: (props: any) => (
+          <DeliveryCell row={props.row} period={period} />
+        ),
+        renderHeaderCell: (props: any) => (
+          <Box
+            sx={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              height: "100%",
+              padding: "8px 4px",
+              maxWidth: "500px",
+              textWrap: "wrap",
+            }}
+          >
+            <div>{formatPeriodLabel(period, cargoNo || "")}</div>
+          </Box>
+        ),
+      };
+    });
 
     const endColumns = [
       {
@@ -1200,7 +1234,8 @@ const ListManagementPage = () => {
       (item: any) =>
         item.articleName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         item.articleNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.itemNumber?.toLowerCase().includes(searchTerm.toLowerCase())
+        item.itemNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.item_no_de?.toLowerCase().includes(searchTerm.toLowerCase()) // Add this line
     );
   }, [listData?.items, searchTerm]);
 

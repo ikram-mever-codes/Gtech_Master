@@ -414,6 +414,53 @@ export const getAllUsers = async (
   }
 };
 
+export const getUserById = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { userId } = req.params;
+    const id = userId;
+    if (!id) {
+      return next(new ErrorHandler("User ID is required", 400));
+    }
+
+    const userRepository = AppDataSource.getRepository(User);
+    const user = await userRepository.findOne({
+      where: { id },
+      relations: ["permissions"],
+    });
+
+    if (!user) {
+      return next(new ErrorHandler("User not found", 404));
+    }
+
+    const userData = {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      permissions: user.permissions,
+      assignedResources: user.assignedResources,
+      avatar: user.avatar,
+      phoneNumber: user.phoneNumber,
+      gender: user.gender,
+      dateOfBirth: user.dateOfBirth,
+      address: user.address,
+      country: user.country,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+    };
+
+    return res.status(200).json({
+      success: true,
+      data: userData,
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
 export const forgetPassword = async (
   req: Request,
   res: Response,
@@ -654,6 +701,122 @@ export const createCompany = async (
       success: true,
       message: "Company created successfully. Credentials sent to email.",
       data: customerData,
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const updateUser = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { userId } = req.params;
+    const id = userId;
+    const {
+      name,
+      email,
+      role,
+      assignedResources,
+      permissions,
+      phoneNumber,
+      gender,
+      dateOfBirth,
+      address,
+      country,
+    } = req.body;
+
+    // Validation
+    if (!id) {
+      return next(new ErrorHandler("User ID is required", 400));
+    }
+
+    if (!name || !email || !role) {
+      return next(new ErrorHandler("Name, email and role are required", 400));
+    }
+
+    if (!Object.values(UserRole).includes(role)) {
+      return next(new ErrorHandler("Invalid user role", 400));
+    }
+
+    const userRepository = AppDataSource.getRepository(User);
+    const permissionRepository = AppDataSource.getRepository(Permission);
+
+    const user = await userRepository.findOne({
+      where: { id },
+      relations: ["permissions"],
+    });
+
+    if (!user) {
+      return next(new ErrorHandler("User not found", 404));
+    }
+
+    if (email !== user.email) {
+      const existingUser = await userRepository.findOne({ where: { email } });
+      if (existingUser) {
+        return next(new ErrorHandler("Email already exists", 400));
+      }
+    }
+
+    user.name = name;
+    user.email = email;
+    user.role = role;
+    user.assignedResources = assignedResources || [];
+    user.phoneNumber = phoneNumber;
+    user.gender = gender;
+    user.dateOfBirth = dateOfBirth;
+    user.address = address;
+    user.country = country;
+
+    if (permissions) {
+      await permissionRepository.delete({ user: { id: user.id } });
+
+      if (permissions.length > 0) {
+        const permissionEntities = permissions.map((perm: any) =>
+          permissionRepository.create({
+            resource: perm.resource,
+            actions: perm.actions,
+            user,
+          })
+        );
+        await permissionRepository.save(permissionEntities);
+      }
+    }
+
+    await userRepository.save(user);
+
+    const updatedUser = await userRepository.findOne({
+      where: { id: user.id },
+      relations: ["permissions"],
+    });
+
+    if (!updatedUser) {
+      return next(new ErrorHandler("Failed to fetch updated user", 500));
+    }
+
+    const userData = {
+      id: updatedUser.id,
+      name: updatedUser.name,
+      email: updatedUser.email,
+      role: updatedUser.role,
+      assignedResources: updatedUser.assignedResources,
+      permissions: updatedUser.permissions,
+      phoneNumber: updatedUser.phoneNumber,
+      gender: updatedUser.gender,
+      dateOfBirth: updatedUser.dateOfBirth,
+      address: updatedUser.address,
+      country: updatedUser.country,
+      avatar: updatedUser.avatar,
+      createdAt: updatedUser.createdAt,
+      updatedAt: updatedUser.updatedAt,
+    };
+
+    return res.status(200).json({
+      success: true,
+      message: "User updated successfully",
+      data: userData,
     });
   } catch (error) {
     return next(error);
