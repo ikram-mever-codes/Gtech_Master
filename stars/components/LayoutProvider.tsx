@@ -32,8 +32,8 @@ const LayoutProvider = ({ children }: { children: ReactNode }) => {
                 <Header />{" "}
               </header>
 
-              <main className="flex-1 p-6 bg-gray-50">
-                <div className="w-full p-6 px-5 mb-[2rem] mx-auto">
+              <main className="flex-1 p-2 sm:p-6  bg-gray-50">
+                <div className="w-full p-3 sm:p-6 overflow-x-hidden px-3 sm:px-5 mb-[2rem] mx-auto">
                   {children}
                 </div>
               </main>

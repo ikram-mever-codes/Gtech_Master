@@ -364,17 +364,18 @@ const LoginPage = () => {
 
             <div className="mt-auto border-t border-white/20 pt-6">
               <div className="text-sm text-white/80">
-                "This platform has transformed how we manage our business
-                operations and helped us grow by 35% in just six months."
+                "We don't just supply parts. We supply support."
               </div>
               <div className="mt-4 flex items-center">
                 <div className="h-10 w-10 rounded-full bg-white/30 flex items-center justify-center text-white font-bold font-syne">
                   JD
                 </div>
                 <div className="ml-3">
-                  <div className="text-white font-medium">Jane Doe</div>
+                  <div className="text-white font-medium">
+                    Joschua Grenzheuser
+                  </div>
                   <div className="text-white/70 text-sm">
-                    CEO, Example Company
+                    CEO, Gtech Industries
                   </div>
                 </div>
               </div>
