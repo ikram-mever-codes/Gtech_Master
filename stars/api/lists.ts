@@ -28,7 +28,7 @@ export const createNewList = async (listData: CreateListPayload) => {
 
 export const getAllListForACustomer = async (customerId: string) => {
   try {
-    const response = await api.get(`/lists/customer/${customerId}`);
+    const response = await api.get(`/lists/customer/all/${customerId}`);
     toast.dismiss();
     return response.data;
   } catch (error) {

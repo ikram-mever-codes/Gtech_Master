@@ -13,6 +13,7 @@ import {
   ListItem,
   UserCreator,
 } from "../models/list";
+import { Invoice, InvoiceItem } from "../models/invoice";
 
 dotenv.config();
 
@@ -36,6 +37,8 @@ export const AppDataSource = new DataSource({
     UserCreator,
     CustomerCreator,
     Permission,
+    Invoice,
+    InvoiceItem,
   ],
   extra: {
     ssl:

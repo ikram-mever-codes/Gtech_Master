@@ -6,6 +6,7 @@ import cookieParser from "cookie-parser";
 import userRoutes from "./routes/userRoutes";
 import customerRoutes from "./routes/customer_routes";
 import listRoutes from "./routes/list_routes";
+import invoiceRoutes from "./routes/invoice_routes";
 const app: any = express();
 
 // Cors Setup
@@ -33,6 +34,7 @@ app.use(cors(corsOptions));
 app.use("/api/v1/auth", userRoutes);
 app.use("/api/v1/customers", customerRoutes);
 app.use("/api/v1/lists", listRoutes);
+app.use("/api/v1/invoices", invoiceRoutes);
 
 // Configuring the Uploads Dir
 

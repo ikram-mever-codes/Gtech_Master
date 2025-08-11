@@ -204,7 +204,7 @@ const CustomersPage = () => {
       }
     };
 
-    return `${getOrdinalSuffix(day)} ${month} '${year}`;
+    return `${getOrdinalSuffix(day)} ${month}, ${year}`;
   };
 
   // Helper function to format the status text

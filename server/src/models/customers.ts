@@ -4,7 +4,9 @@ import {
   Column,
   CreateDateColumn,
   UpdateDateColumn,
+  OneToMany,
 } from "typeorm";
+import { Invoice } from "./invoice";
 
 @Entity()
 export class Customer {
@@ -28,6 +30,9 @@ export class Customer {
 
   @Column()
   taxNumber!: string;
+
+  @OneToMany(() => Invoice, (invoice) => invoice.customer)
+  invoices!: Invoice[];
 
   @Column({ nullable: true })
   addressLine1?: string;

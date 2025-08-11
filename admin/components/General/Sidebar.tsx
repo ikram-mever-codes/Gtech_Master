@@ -36,6 +36,7 @@ import {
   LucideHelpCircle,
   Timer,
   BookUser,
+  DollarSign,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -70,10 +71,10 @@ const allMenuItems = [
     resource: "Users",
   },
   {
-    icon: LucideBox,
-    text: "Products",
-    path: "/products",
-    resource: "Products",
+    icon: DollarSign,
+    text: "Invoices",
+    path: "/invoices",
+    resource: "Invoices",
   },
   {
     icon: LucideShoppingCart,

@@ -217,7 +217,7 @@ router.get(
 );
 
 router.get(
-  "/customer/:customerId",
+  "/customer/all/:customerId",
   (req: AuthorizedRequest, res: Response, next: NextFunction) => {
     if (req.cookies?.token) {
       try {

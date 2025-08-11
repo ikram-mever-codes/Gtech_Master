@@ -1,6 +1,6 @@
 import { DELIVERY_STATUS } from "./interfaces";
-// export const BASE_URL = "http://localhost:1000/api/v1";
-export const BASE_URL = "https://api.gtech.de/api/v1";
+export const BASE_URL = "http://localhost:1000/api/v1";
+// export const BASE_URL = "https://api.gtech.de/api/v1";
 
 export const successStyles = {
   style: {

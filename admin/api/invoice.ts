@@ -79,8 +79,8 @@ export const deleteInvoice = async (invoiceId: string) => {
 
 export const getAllInvoices = async () => {
   try {
-    const response = await api.get<InvoiceResponse>("/invoices");
-    return response.data;
+    const response = await api.get("/invoices");
+    return response;
   } catch (error) {
     handleApiError(error, "Failed to fetch invoices");
     throw error;
