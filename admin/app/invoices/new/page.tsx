@@ -15,6 +15,7 @@ import {
   Mail,
   Phone,
   Hash,
+  Router,
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 
@@ -22,6 +23,7 @@ import { toast } from "react-hot-toast";
 import { createNewInvoice } from "@/api/invoice";
 import { getAllCustomers } from "@/api/customers";
 import CustomButton from "@/components/UI/CustomButton";
+import { useRouter } from "next/navigation";
 
 // Types based on your code
 interface CustomerData {
@@ -204,6 +206,7 @@ const InvoiceGenerator: React.FC = () => {
     { netTotal: 0, taxTotal: 0, grossTotal: 0 }
   );
 
+  const router = useRouter();
   // Handle invoice creation
   const handleCreateInvoice = async () => {
     try {
@@ -245,30 +248,31 @@ const InvoiceGenerator: React.FC = () => {
 
       setSelectedCustomer(null);
       setCustomerSearchTerm("");
-      //   setInvoiceData({
-      //     invoiceNumber: `INV-${Date.now()}`,
-      //     orderNumber: "",
-      //     invoiceDate: new Date().toISOString().split("T")[0],
-      //     deliveryDate: new Date().toISOString().split("T")[0],
-      //     paymentMethod: "bank_transfer",
-      //     shippingMethod: "standard",
-      //     notes: "",
-      //     taxAmount: 0,
-      //     grossTotal: 0,
-      //     netTotal: 0,
-      //   });
-      //   setItems([
-      //     {
-      //       quantity: 1,
-      //       articleNumber: "",
-      //       description: "",
-      //       unitPrice: 0,
-      //       netPrice: 0,
-      //       taxRate: 19,
-      //       taxAmount: 0,
-      //       grossPrice: 0,
-      //     },
-      //   ]);
+      setInvoiceData({
+        invoiceNumber: `INV-${Date.now()}`,
+        orderNumber: "",
+        invoiceDate: new Date().toISOString().split("T")[0],
+        deliveryDate: new Date().toISOString().split("T")[0],
+        paymentMethod: "bank_transfer",
+        shippingMethod: "standard",
+        notes: "",
+        taxAmount: 0,
+        grossTotal: 0,
+        netTotal: 0,
+      });
+      setItems([
+        {
+          quantity: 1,
+          articleNumber: "",
+          description: "",
+          unitPrice: 0,
+          netPrice: 0,
+          taxRate: 19,
+          taxAmount: 0,
+          grossPrice: 0,
+        },
+      ]);
+      router.push("/invoices");
     } catch (error) {
       console.error("Failed to create invoice:", error);
     } finally {

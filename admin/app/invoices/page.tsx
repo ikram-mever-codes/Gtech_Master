@@ -876,6 +876,7 @@ const InvoiceListPage: React.FC = () => {
                         <td className="py-4 px-6">
                           <div className="flex items-center justify-center gap-1">
                             <Link
+                              target="_blank"
                               href={`https://api.gtech.de${invoice.pdfUrl}`}
                               className="p-2 rounded-lg transition-colors hover:bg-[#E8F4D6]"
                               title="Download PDF"
@@ -893,6 +894,7 @@ const InvoiceListPage: React.FC = () => {
                               )}
                             </Link>
                             <Link
+                              target="_blank"
                               href={`https://api.gtech.de${invoice.pdfUrl}`}
                               className="p-2 rounded-lg transition-colors hover:bg-[#E3F2FD]"
                               title="View"

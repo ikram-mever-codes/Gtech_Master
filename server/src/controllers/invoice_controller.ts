@@ -125,7 +125,7 @@ export class InvoiceController {
         // Logo (left side - perfectly aligned)
         const logoPath = path.join(process.cwd(), "assets", "logo.png");
         if (fs.existsSync(logoPath)) {
-          doc.image(logoPath, leftAlignX, yPos, { width: 100, height: 60 });
+          doc.image(logoPath, leftAlignX, yPos, { width: 100, height: 50 });
         }
 
         // Company details (right side - perfectly aligned)
