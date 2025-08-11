@@ -1,3 +1,4 @@
+import { DELIVERY_STATUS } from "./interfaces";
 // export const BASE_URL = "http://localhost:1000/api/v1";
 export const BASE_URL = "https://api.gtech.de/api/v1";
 
@@ -90,3 +91,10 @@ export function formatPeriodLabel(period: string, cargoNo: string): string {
 
   return `Lieferung ${monthName} ${cargoNo}`;
 }
+
+export const DELIVERY_STATUS_CONFIG: any = {
+  [DELIVERY_STATUS.PENDING]: { color: "warning", label: "Pending" },
+  [DELIVERY_STATUS.PARTIAL]: { color: "info", label: "Partial" },
+  [DELIVERY_STATUS.DELIVERED]: { color: "success", label: "Delivered" },
+  [DELIVERY_STATUS.CANCELLED]: { color: "error", label: "Cancelled" },
+};

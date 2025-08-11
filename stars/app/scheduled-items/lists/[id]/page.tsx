@@ -68,6 +68,7 @@ import {
 } from "@/api/lists";
 import { DELIVERY_STATUS, INTERVAL_OPTIONS } from "@/utils/interfaces";
 import {
+  DELIVERY_STATUS_CONFIG,
   errorStyles,
   formatPeriodLabel,
   successStyles,
@@ -83,14 +84,7 @@ import DeliveryDetailsModal, {
 } from "@/components/List/DelieveryDetails";
 import { AddItemDialog } from "@/components/List/AddItemDialog";
 
-export const DELIVERY_STATUS_CONFIG: any = {
-  [DELIVERY_STATUS.PENDING]: { color: "warning", label: "Pending" },
-  [DELIVERY_STATUS.PARTIAL]: { color: "info", label: "Partial" },
-  [DELIVERY_STATUS.DELIVERED]: { color: "success", label: "Delivered" },
-  [DELIVERY_STATUS.CANCELLED]: { color: "error", label: "Cancelled" },
-};
-
-export const CARGO_STATUS_OPTIONS = [
+const CARGO_STATUS_OPTIONS = [
   {
     value: "preparing",
     label: "Preparing",
