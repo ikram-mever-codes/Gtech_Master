@@ -1,14 +1,12 @@
-import {
-  CARGO_STATUS_OPTIONS,
-  DELIVERY_STATUS_CONFIG,
-  formatPeriodLabel,
-} from "@/app/scheduled-items/lists/[id]/page";
+import { DELIVERY_STATUS_CONFIG, formatPeriodLabel } from "@/utils/constants";
 import { DELIVERY_STATUS, INTERVAL_OPTIONS } from "@/utils/interfaces";
 import {
   CheckBox,
   CheckBoxOutlineBlank,
   Close,
   LocalShipping,
+  LocationOn,
+  Schedule,
   Visibility,
 } from "@mui/icons-material";
 import {
@@ -48,6 +46,34 @@ import CustomButton from "../UI/CustomButton";
 import { useState } from "react";
 import theme from "@/styles/theme";
 
+const CARGO_STATUS_OPTIONS = [
+  {
+    value: "preparing",
+    label: "Preparing",
+    color: "warning",
+    icon: <Schedule />,
+  },
+  {
+    value: "shipped",
+    label: "Shipped",
+    color: "info",
+    icon: <LocalShipping />,
+  },
+  {
+    value: "in_transit",
+    label: "In Transit",
+    color: "primary",
+    icon: <LocationOn />,
+  },
+  {
+    value: "arrived",
+    label: "Arrived",
+    color: "success",
+    icon: <CheckCircle />,
+  },
+  { value: "delayed", label: "Delayed", color: "error", icon: <Schedule /> },
+];
+
 export default function DeliveryDetailsModal({
   open,
   onClose,
@@ -60,7 +86,7 @@ export default function DeliveryDetailsModal({
 
   const getCargoStatusConfig = (status: string) => {
     return (
-      CARGO_STATUS_OPTIONS.find((option) => option.value === status) ||
+      CARGO_STATUS_OPTIONS.find((option: any) => option.value === status) ||
       CARGO_STATUS_OPTIONS[0]
     );
   };
