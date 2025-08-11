@@ -67,7 +67,11 @@ import {
   getAllListForACustomer,
 } from "@/api/lists";
 import { DELIVERY_STATUS, INTERVAL_OPTIONS } from "@/utils/interfaces";
-import { errorStyles, successStyles } from "@/utils/constants";
+import {
+  errorStyles,
+  formatPeriodLabel,
+  successStyles,
+} from "@/utils/constants";
 import { useSelector } from "react-redux";
 import { RootState } from "@/app/Redux/store";
 import DeliveryDetailsModal, {
@@ -938,28 +942,6 @@ function ListTabs({ currentListId, customerId, onListChange }: any) {
       </Box>
     </Box>
   );
-}
-
-export function formatPeriodLabel(period: string, cargoNo: string): string {
-  const monthMap: { [key: string]: string } = {
-    "01": "Januar",
-    "02": "Februar",
-    "03": "März",
-    "04": "April",
-    "05": "Mai",
-    "06": "Juni",
-    "07": "Juli",
-    "08": "August",
-    "09": "September",
-    "10": "Oktober",
-    "11": "November",
-    "12": "Dezember",
-  };
-
-  const [yearPart, periodNum] = period.split("-");
-  const monthName = monthMap[periodNum] || `Period ${periodNum}`;
-
-  return `Lieferung ${monthName} ${cargoNo}`;
 }
 
 // Main Component
