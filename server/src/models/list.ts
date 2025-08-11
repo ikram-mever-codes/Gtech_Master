@@ -9,9 +9,12 @@ import {
   JoinColumn,
   TableInheritance,
   ChildEntity,
+  BeforeInsert,
+  Like,
 } from "typeorm";
 import { Customer } from "./customers";
 import { User } from "./users";
+import { AppDataSource } from "../config/database";
 
 export enum LIST_STATUS {
   ACTIVE = "active",
@@ -25,17 +28,32 @@ export enum CHANGE_STATUS {
   REJECTED = "rejected",
 }
 
-export enum DELIVERY_STATUS {
-  PENDING = "pending",
-  PARTIAL = "partial",
-  DELIVERED = "delivered",
-  CANCELLED = "cancelled",
-}
-
 export enum LOG_APPROVAL_STATUS {
   PENDING = "pending",
   APPROVED = "approved",
   REJECTED = "rejected",
+}
+
+export const DELIVERY_STATUS = {
+  OPEN: "Open",
+  PENDING: "Pending",
+  IN_TRANSIT: "In Transit",
+  PARTIALLY_DELIVERED: "Partially Delivered",
+  DELIVERED: "Delivered",
+  CANCELLED: "Cancelled",
+  RETURNED: "Returned",
+} as const;
+
+interface DeliveryInfo {
+  quantity?: number;
+  status: string;
+  deliveredAt?: Date;
+  shippedAt?: Date;
+  remark?: string;
+  eta?: number;
+  cargoNo: string;
+  cargoType: string;
+  cargoStatus?: string;
 }
 
 @Entity()
@@ -68,6 +86,12 @@ export class List {
 
   @Column({ nullable: false })
   name!: string;
+
+  @Column({
+    nullable: true,
+    unique: true,
+  })
+  listNumber!: string;
 
   @Column({ nullable: true })
   description!: string;
@@ -106,6 +130,24 @@ export class List {
   @UpdateDateColumn()
   updatedAt!: Date;
 
+  @BeforeInsert()
+  async generateListNumber() {
+    if (!this.listNumber) {
+      const customerPrefix = this.customer.companyName
+        .slice(0, 4)
+        .toUpperCase();
+
+      const maxNumber = await AppDataSource.getRepository(List).count({
+        where: {
+          customer: { id: this.customer.id },
+          listNumber: Like(`${customerPrefix}-%`),
+        },
+      });
+
+      this.listNumber = `${customerPrefix}-${maxNumber + 1}`;
+    }
+  }
+
   logActivity(
     action: string,
     changes: Record<string, any>,
@@ -135,7 +177,6 @@ export class List {
 
     const log = this.activityLogs.find((log) => log.id === logId);
     if (log) {
-      console.log(log);
       log.approvalStatus = LOG_APPROVAL_STATUS.APPROVED;
       log.approvedAt = new Date();
     }
@@ -245,12 +286,7 @@ export class ListItem {
 
   @Column({ type: "json", nullable: true })
   deliveries!: {
-    [period: string]: {
-      quantity?: number;
-      status: DELIVERY_STATUS;
-      deliveredAt?: Date;
-      cargoNo: string;
-    };
+    [period: string]: DeliveryInfo;
   };
 
   @ManyToOne(() => List, (list) => list.items)
@@ -261,15 +297,23 @@ export class ListItem {
     period: string,
     data: {
       quantity?: number;
-      status?: DELIVERY_STATUS;
+      status?: string;
       deliveredAt?: Date;
+      shippedAt?: Date;
+      cargoType: string;
+      remark?: string;
+      eta?: number;
+      cargoNo?: string;
+      cargoStatus?: string;
       notes?: string;
     }
   ) {
     this.deliveries = this.deliveries || {};
     this.deliveries[period] = {
-      ...(this.deliveries[period] || {}),
-      status: DELIVERY_STATUS.PENDING,
+      ...(this.deliveries[period] || {
+        status: DELIVERY_STATUS.OPEN,
+        cargoNo: "",
+      }),
       ...data,
     };
   }

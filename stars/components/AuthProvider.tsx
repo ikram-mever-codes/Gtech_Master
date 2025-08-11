@@ -1,4 +1,3 @@
-//  AuthProvider.tsx
 "use client";
 
 import React, { ReactNode, useEffect, useState } from "react";
@@ -56,11 +55,18 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     "/setup/contact",
     "/forgot-password",
     "/reset-password",
+    "/list",
   ];
 
-  const isUnprotectedRoute = unprotectedRoutes.some((route) =>
-    pathname?.startsWith(route)
-  );
+  const isUnprotectedRoute = (path: string | null) => {
+    if (!path) return false;
+
+    if (unprotectedRoutes.some((route) => path.startsWith(route))) return true;
+
+    if (/^\/[^/]+$/.test(path)) return true;
+
+    return false;
+  };
 
   useEffect(() => {
     const initializeAuth = async () => {
@@ -72,18 +78,21 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   useEffect(() => {
     if (!loading) {
-      if (!isUnprotectedRoute && !customer) {
-        router.replace("/login");
-        return;
+      if (!isUnprotectedRoute(pathname)) {
+        if (!customer) {
+          router.replace("/login");
+          return;
+        }
       }
     }
-  }, [loading, customer, router, pathname, isUnprotectedRoute]);
+  }, [loading, customer, router, pathname]);
 
   if (loading) {
     return <Loading type="full" text="Loading Page..." />;
   }
 
-  if (!isUnprotectedRoute && !customer) {
+  // If it's a protected route and user is not authenticated
+  if (!isUnprotectedRoute(pathname) && !customer) {
     return <Loading type="full" text="Loading Page..." />;
   }
 

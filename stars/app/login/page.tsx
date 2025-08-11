@@ -23,6 +23,7 @@ import { AppDispatch } from "../Redux/store";
 import { customerLogin } from "../Redux/features/customerSlice";
 import { handleApiError } from "@/utils/api";
 import axios from "axios";
+import { getAllListForACustomer } from "@/api/lists";
 
 // Validation schema
 const loginSchema = Yup.object().shape({
@@ -128,15 +129,31 @@ const LoginPage = () => {
     }
   };
 
-  // Handle form submission
   const handleSubmit = async (
     values: any,
     { setSubmitting, resetForm }: any
   ) => {
     try {
       setAuthError("");
-      await loginCustomer(values.email, values.password, dispatch);
-      router.push("/");
+      const response = await loginCustomer(
+        values.email,
+        values.password,
+        dispatch
+      );
+
+      try {
+        const listsResponse = await getAllListForACustomer(response.data.id);
+        if (listsResponse && listsResponse.length > 0) {
+          // Redirect to the first list page
+          router.push(`/scheduled-items/lists/${listsResponse[0].id}`);
+        } else {
+          // No lists found, redirect to home page
+          router.push("/");
+        }
+      } catch (listError) {
+        console.error("Error fetching lists:", listError);
+        router.push("/");
+      }
     } catch (error: any) {
       setAuthError(error.message || "Authentication failed. Please try again.");
     } finally {

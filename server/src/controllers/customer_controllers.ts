@@ -54,11 +54,20 @@ export const requestCustomerAccount = async (
     }
 
     const customerRepository = AppDataSource.getRepository(Customer);
+    // Check for existing customer with same company name, email, contact email, or phone
     const existingCustomer = await customerRepository.findOne({
-      where: [{ email }, { contactEmail }, { contactPhoneNumber }],
+      where: [
+        { companyName },
+        { email },
+        { contactEmail },
+        { contactPhoneNumber },
+      ],
     });
 
     if (existingCustomer) {
+      if (existingCustomer.companyName === companyName) {
+        return next(new ErrorHandler("Company name already exists", 400));
+      }
       if (existingCustomer.email === email) {
         return next(new ErrorHandler("Email already exists", 400));
       }

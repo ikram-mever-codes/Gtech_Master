@@ -30,6 +30,8 @@ import { RootState } from "@/app/Redux/store";
 import CustomButton from "@/components/UI/CustomButton";
 import { Badge, Tooltip, Avatar } from "@mui/material";
 import { logoutCustomer } from "@/api/customer";
+import { usePathname, useRouter } from "next/navigation";
+import Link from "next/link";
 
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -39,6 +41,8 @@ const Header = () => {
   const profileRef = useRef<any>(null);
   const notificationRef = useRef<any>(null);
   const dispatch = useDispatch();
+  const router = useRouter();
+  const path = usePathname();
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen);
   };
@@ -71,6 +75,12 @@ const Header = () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
+  const isActive = (linkPath: string) => {
+    // if (path === "/" && linkPath === path) {
+    //   return true;
+    // }
+    return path.startsWith(linkPath);
+  };
 
   const notifications = [
     {
@@ -113,7 +123,7 @@ const Header = () => {
             <div className="flex">
               {/* Logo */}
               <div className="flex-shrink-0 flex items-center">
-                <a href="/" className="flex items-center">
+                <Link href="/" className="flex items-center">
                   <Image
                     src={"/logo.png"}
                     width={150}
@@ -125,44 +135,67 @@ const Header = () => {
                     }}
                     className="hover:scale-105"
                   />
-                </a>
+                </Link>
               </div>
 
               {/* Desktop Navigation */}
               <div className="hidden sm:ml-8 sm:flex sm:space-x-6">
-                <a
-                  href="#"
-                  className="inline-flex items-center px-2 pt-1 text-sm font-medium border-b-2 transition-all duration-200 transform hover:translate-y-[-2px]"
+                <Link
+                  href="/"
+                  className={`inline-flex items-center px-2 pt-1 text-sm font-medium border-b-2 transition-all duration-200 transform hover:translate-y-[-2px] ${
+                    isActive("/")
+                      ? `text-[${theme.palette.primary.main}] border-primary`
+                      : "text-gray-500 hover:text-gray-700 border-transparent hover:border-gray-300"
+                  }`}
                   style={{
-                    borderColor: theme.palette.primary.main,
-                    color: theme.palette.text.primary,
                     borderBottomWidth: "3px",
                   }}
                 >
                   <Home size={18} className="mr-1.5" />
                   Dashboard
-                </a>
-                <a
+                </Link>
+                <Link
                   href="/scheduled-items/lists"
-                  className="inline-flex items-center px-2 pt-1 text-sm font-medium border-b-2 border-transparent hover:border-gray-300 text-gray-500 hover:text-gray-700 transition-all duration-200 transform hover:translate-y-[-2px]"
+                  className={`inline-flex items-center px-2 pt-1 text-sm font-medium border-b-2 transition-all duration-200 transform hover:translate-y-[-2px] ${
+                    isActive("/scheduled-items/lists")
+                      ? `text-[${theme.palette.primary.main}] border-primary`
+                      : "text-gray-500 hover:text-gray-700 border-transparent hover:border-gray-300"
+                  }`}
+                  style={{
+                    borderBottomWidth: "3px",
+                  }}
                 >
                   <Timer size={18} className="mr-1.5" />
                   Scheduled Lists
-                </a>
-                <a
-                  href="#"
-                  className="inline-flex items-center px-2 pt-1 text-sm font-medium border-b-2 border-transparent hover:border-gray-300 text-gray-500 hover:text-gray-700 transition-all duration-200 transform hover:translate-y-[-2px]"
+                </Link>
+                <Link
+                  href="/orders"
+                  className={`inline-flex items-center px-2 pt-1 text-sm font-medium border-b-2 transition-all duration-200 transform hover:translate-y-[-2px] ${
+                    isActive("/orders")
+                      ? `text-[${theme.palette.primary.main}] border-primary`
+                      : "text-gray-500 hover:text-gray-700 border-transparent hover:border-gray-300"
+                  }`}
+                  style={{
+                    borderBottomWidth: "3px",
+                  }}
                 >
                   <ShoppingCart size={18} className="mr-1.5" />
                   Orders
-                </a>
-                <a
+                </Link>
+                <Link
                   href="/settings"
-                  className="inline-flex items-center px-2 pt-1 text-sm font-medium border-b-2 border-transparent hover:border-gray-300 text-gray-500 hover:text-gray-700 transition-all duration-200 transform hover:translate-y-[-2px]"
+                  className={`inline-flex items-center px-2 pt-1 text-sm font-medium border-b-2 transition-all duration-200 transform hover:translate-y-[-2px] ${
+                    isActive("/settings")
+                      ? `text-[${theme.palette.primary.main}] border-primary`
+                      : "text-gray-500 hover:text-gray-700 border-transparent hover:border-gray-300"
+                  }`}
+                  style={{
+                    borderBottomWidth: "3px",
+                  }}
                 >
                   <Settings size={18} className="mr-1.5" />
-                  Settings{" "}
-                </a>
+                  Settings
+                </Link>
               </div>
             </div>
 
@@ -401,13 +434,17 @@ const Header = () => {
                     </div>
 
                     <div className="py-1">
-                      <a
+                      <Link
                         href="/settings"
-                        className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors duration-150"
+                        className={`flex items-center px-4 py-2 text-sm hover:bg-gray-50 transition-colors duration-150 ${
+                          isActive("/settings")
+                            ? "text-primary bg-blue-50"
+                            : "text-gray-700"
+                        }`}
                       >
                         <Settings className="mr-3 text-gray-400" size={18} />
                         Account Settings
-                      </a>
+                      </Link>
                       <a
                         href="#"
                         className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors duration-150"
@@ -478,40 +515,82 @@ const Header = () => {
             }}
           >
             <div className="pt-2 pb-3 space-y-1">
-              <a
-                href="#"
-                className="block pl-3 pr-4 py-2 text-base font-medium rounded-md hover:bg-gray-50 transition-all duration-150"
+              <Link
+                href="/"
+                className={`block pl-3 pr-4 py-2 text-base font-medium rounded-md hover:bg-gray-50 transition-all duration-150 ${
+                  isActive("/")
+                    ? "bg-blue-50 text-primary"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
                 style={{
-                  backgroundColor: alpha(theme.palette.primary.main, 0.08),
-                  color: theme.palette.primary.main,
                   borderLeftWidth: "4px",
-                  borderLeftColor: theme.palette.primary.main,
+                  borderLeftColor: isActive("/")
+                    ? theme.palette.primary.main
+                    : "transparent",
                 }}
               >
                 <div className="flex items-center">
                   <Home size={18} className="mr-3" />
                   Dashboard
                 </div>
-              </a>
-              <a
-                href="#"
-                className="block pl-3 pr-4 py-2 text-base font-medium text-gray-500 hover:bg-gray-50 hover:text-gray-700 border-l-4 border-transparent transition-all duration-150"
+              </Link>
+              <Link
+                href="/scheduled-items/lists"
+                className={`block pl-3 pr-4 py-2 text-base font-medium rounded-md hover:bg-gray-50 transition-all duration-150 ${
+                  isActive("/scheduled-items/lists")
+                    ? "bg-blue-50 text-primary"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
+                style={{
+                  borderLeftWidth: "4px",
+                  borderLeftColor: isActive("/scheduled-items/lists")
+                    ? theme.palette.primary.main
+                    : "transparent",
+                }}
               >
                 <div className="flex items-center">
                   <Timer size={18} className="mr-3" />
                   Scheduled Lists
                 </div>
-              </a>
-
-              <a
+              </Link>
+              <Link
+                href="/orders"
+                className={`block pl-3 pr-4 py-2 text-base font-medium rounded-md hover:bg-gray-50 transition-all duration-150 ${
+                  isActive("/orders")
+                    ? "bg-blue-50 text-primary"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
+                style={{
+                  borderLeftWidth: "4px",
+                  borderLeftColor: isActive("/orders")
+                    ? theme.palette.primary.main
+                    : "transparent",
+                }}
+              >
+                <div className="flex items-center">
+                  <ShoppingCart size={18} className="mr-3" />
+                  Orders
+                </div>
+              </Link>
+              <Link
                 href="/settings"
-                className="block pl-3 pr-4 py-2 text-base font-medium text-gray-500 hover:bg-gray-50 hover:text-gray-700 border-l-4 border-transparent transition-all duration-150"
+                className={`block pl-3 pr-4 py-2 text-base font-medium rounded-md hover:bg-gray-50 transition-all duration-150 ${
+                  isActive("/settings")
+                    ? "bg-blue-50 text-primary"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
+                style={{
+                  borderLeftWidth: "4px",
+                  borderLeftColor: isActive("/settings")
+                    ? theme.palette.primary.main
+                    : "transparent",
+                }}
               >
                 <div className="flex items-center">
                   <Settings size={18} className="mr-3" />
                   Settings
                 </div>
-              </a>
+              </Link>
               <div
                 className="pt-3 border-t"
                 style={{ borderColor: alpha("#ADB5BD", 0.15) }}

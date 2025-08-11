@@ -86,7 +86,7 @@ export const deleteListItem = async (itemId: string) => {
   try {
     toast.loading("Removing item...", loadingStyles);
     const response: ResponseInterface = await api.delete(
-      `/lists/item/${itemId}`
+      `/lists/items/${itemId}`
     );
     toast.dismiss();
     return response.data;
@@ -274,5 +274,26 @@ export const getCustomerDeliveries = async (customerId: string) => {
   } catch (error) {
     handleApiError(error, "Failed to fetch deliveries");
     throw error;
+  }
+};
+
+export const searchListsByNumber = async (listNumber: string) => {
+  try {
+    const endpoint = `/lists/search/${listNumber}`;
+
+    const response = await api.get(endpoint);
+    return response.data;
+  } catch (error) {
+    handleApiError(error, "List search failed");
+    throw error;
+  }
+};
+
+export const searchListsByCustomerNamee = async (customerName: string) => {
+  try {
+    const response = await api.get(`/lists/customer/${customerName}`);
+    return response.data;
+  } catch (error) {
+    handleApiError(error);
   }
 };

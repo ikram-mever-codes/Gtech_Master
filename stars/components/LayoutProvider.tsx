@@ -1,4 +1,5 @@
 "use client";
+
 import { ReactNode } from "react";
 import { ThemeProvider, CssBaseline } from "@mui/material";
 import theme from "@/styles/theme";
@@ -14,9 +15,22 @@ const LayoutProvider = ({ children }: { children: ReactNode }) => {
     "/forgot-password",
     "/register",
     "/reset-password",
+    "/list",
   ];
 
-  const shouldRenderLayout = !excludedPaths.includes(pathname || "");
+  const isExcludedPath = (path: string | null) => {
+    if (!path) return false;
+
+    // Check static excluded paths
+    if (excludedPaths.includes(path)) return true;
+
+    // Check dynamic /:companyName pattern (single segment paths)
+    if (/^\/[^/]+$/.test(path)) return true;
+
+    return false;
+  };
+
+  const shouldRenderLayout = !isExcludedPath(pathname);
 
   return (
     <Provider store={store}>
@@ -24,15 +38,16 @@ const LayoutProvider = ({ children }: { children: ReactNode }) => {
         <CssBaseline />
         {shouldRenderLayout ? (
           <div
-            className={`w-full min-h-screen h-max bg-[${theme.palette.secondary.main}] flex`}
+            className="w-full min-h-screen h-max flex"
+            style={{ backgroundColor: theme.palette.secondary.main }}
           >
             <div className="flex-1 flex flex-col">
               {/* Header */}
               <header className="sticky top-0 z-50">
-                <Header />{" "}
+                <Header />
               </header>
 
-              <main className="flex-1 p-2 sm:p-6  bg-gray-50">
+              <main className="flex-1 p-2 sm:p-6 bg-gray-50">
                 <div className="w-full p-3 sm:p-6 overflow-x-hidden px-3 sm:px-5 mb-[2rem] mx-auto">
                   {children}
                 </div>

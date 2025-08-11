@@ -222,12 +222,12 @@ const Sidebar = () => {
         sx={{
           width: "100%",
           height: "100%",
-          overflow: "auto",
+          overflow: "hidden",
           overflowX: "hidden",
         }}
       >
         <Divider sx={{ borderColor: "divider", mb: 2 }} />
-        <Box sx={{ width: "100%", px: 1 }}>
+        <Box sx={{ width: "100%", px: 1, overflow: "hidden " }}>
           {menuItems.map((item) => (
             <Tooltip
               key={item.text}
@@ -292,12 +292,12 @@ const Sidebar = () => {
 
                 <Typography
                   sx={{
-                    fontWeight: activePath === item.path ? 600 : 500,
+                    fontWeight: 400,
                     opacity: isCollapsed ? 0 : 1,
                     transition: "opacity 0.2s ease, color 0.2s ease",
                     whiteSpace: "nowrap",
+                    color: activePath === item.path ? "white" : "#777777",
                   }}
-                  color={activePath === item.path ? "white" : "#777777"}
                 >
                   {item.text}
                 </Typography>

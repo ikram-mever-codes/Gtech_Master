@@ -16,11 +16,15 @@ import {
   updateList,
   deleteList,
   getCustomerDeliveries,
+  searchListsByNumber,
+  getListsByCompanyName,
 } from "../controllers/list_controllers";
 import { authenticateUser, AuthorizedRequest } from "../middlewares/authorized";
 import { authenticateCustomer } from "../middlewares/authenticateCustomer";
 
 const router: any = Router();
+
+router.get("/customer/:companyName", getListsByCompanyName);
 
 router.get(
   "/items/search",
@@ -324,5 +328,7 @@ router.get(
   },
   getCustomerDeliveries
 );
+
+router.get("/search/:listNumber", searchListsByNumber);
 
 export default router;

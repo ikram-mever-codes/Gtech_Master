@@ -12,13 +12,10 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
-  DialogActions,
   Checkbox,
   CircularProgress,
   Alert,
   alpha,
-  Autocomplete,
-  FormControl,
   Select,
   MenuItem,
   Tooltip,
@@ -28,12 +25,9 @@ import {
   Stack,
   Avatar,
   Collapse,
-  Tab,
-  Tabs,
-  Badge,
-  Divider,
   Fab,
   Grid,
+  FormControl,
 } from "@mui/material";
 import {
   ArrowBack,
@@ -41,27 +35,24 @@ import {
   Delete,
   Edit,
   Image,
-  Save,
   Search,
   Refresh,
   CheckCircle,
   Cancel,
-  ShoppingCart,
   CheckBoxOutlineBlank,
   CheckBox,
   ExpandMore,
   ExpandLess,
-  Close,
-  Visibility,
-  MoreVert,
-  KeyboardArrowLeft,
-  KeyboardArrowRight,
+  LocalShipping,
+  Schedule,
+  LocationOn,
+  Info,
 } from "@mui/icons-material";
 import { DataGrid } from "react-data-grid";
 import "react-data-grid/lib/styles.css";
 import theme from "@/styles/theme";
 import CustomButton from "@/components/UI/CustomButton";
-import { ImageIcon, X, Calendar, User, Package, Hash } from "lucide-react";
+import { ImageIcon, X, Package, Hash } from "lucide-react";
 import { useRouter, useParams } from "next/navigation";
 import { toast } from "react-hot-toast";
 
@@ -79,189 +70,50 @@ import { DELIVERY_STATUS, INTERVAL_OPTIONS } from "@/utils/interfaces";
 import { errorStyles, successStyles } from "@/utils/constants";
 import { useSelector } from "react-redux";
 import { RootState } from "@/app/Redux/store";
+import DeliveryDetailsModal, {
+  DeliveryCell,
+  EditableCommentCell,
+  EditableIntervalCell,
+  EditableMarkedCell,
+  EditableQuantityCell,
+} from "@/components/List/DelieveryDetails";
+import { AddItemDialog } from "@/components/List/AddItemDialog";
 
-const DELIVERY_STATUS_CONFIG: any = {
+export const DELIVERY_STATUS_CONFIG: any = {
   [DELIVERY_STATUS.PENDING]: { color: "warning", label: "Pending" },
   [DELIVERY_STATUS.PARTIAL]: { color: "info", label: "Partial" },
   [DELIVERY_STATUS.DELIVERED]: { color: "success", label: "Delivered" },
   [DELIVERY_STATUS.CANCELLED]: { color: "error", label: "Cancelled" },
 };
-function DeliveryCell({ row, period }: any) {
-  const delivery = row.deliveries?.[period];
-  const config =
-    DELIVERY_STATUS_CONFIG[delivery?.status || DELIVERY_STATUS.PENDING];
 
-  return (
-    <Tooltip
-      title={
-        <Box sx={{ color: "white" }}>
-          <Typography color="white" variant="caption" display="block">
-            Period: {period}
-          </Typography>
-          <Typography color="white" variant="caption" display="block">
-            Quantity: {delivery?.quantity || 0}
-          </Typography>
-          <Typography color="white" variant="caption" display="block">
-            Status: {config.label}
-          </Typography>
-          {delivery?.deliveredAt && (
-            <Typography color="white" variant="caption" display="block">
-              Delivered: {new Date(delivery.deliveredAt).toLocaleDateString()}
-            </Typography>
-          )}
-          {delivery?.cargoNo && (
-            <Typography color="white" variant="caption" display="block">
-              Cargo: {delivery.cargoNo}
-            </Typography>
-          )}
-        </Box>
-      }
-    >
-      <Box
-        sx={{
-          display: "flex",
-          width: "100%",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: 0.5,
-          p: 1,
-          borderRadius: 1,
-          minHeight: 60,
-          backgroundColor: alpha("#f5f5f5", 0.3),
-        }}
-      >
-        <Typography
-          fontSize={"16px"}
-          variant="caption"
-          fontWeight={600}
-          width={"100%"}
-          display={"flex"}
-          justifyContent={"center"}
-        >
-          {Number(delivery?.quantity || 0).toFixed(0) || 0}
-        </Typography>
-      </Box>
-    </Tooltip>
-  );
-}
+export const CARGO_STATUS_OPTIONS = [
+  {
+    value: "preparing",
+    label: "Preparing",
+    color: "warning",
+    icon: <Schedule />,
+  },
+  {
+    value: "shipped",
+    label: "Shipped",
+    color: "info",
+    icon: <LocalShipping />,
+  },
+  {
+    value: "in_transit",
+    label: "In Transit",
+    color: "primary",
+    icon: <LocationOn />,
+  },
+  {
+    value: "arrived",
+    label: "Arrived",
+    color: "success",
+    icon: <CheckCircle />,
+  },
+  { value: "delayed", label: "Delayed", color: "error", icon: <Schedule /> },
+];
 
-function EditableCommentCell({ row, onUpdateItem }: any) {
-  const [isEditing, setIsEditing] = useState(false);
-  const [value, setValue] = useState(row.comment || "");
-  const [saving, setSaving] = useState(false);
-
-  const handleSave = async () => {
-    if (value === row.comment) {
-      setIsEditing(false);
-      return;
-    }
-
-    try {
-      setSaving(true);
-      await onUpdateItem(row.id, { comment: value });
-      setIsEditing(false);
-    } catch (error) {
-      console.error("Failed to update comment:", error);
-      setValue(row.comment);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleCancel = () => {
-    setValue(row.comment);
-    setIsEditing(false);
-  };
-
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") {
-      handleSave();
-    } else if (e.key === "Escape") {
-      handleCancel();
-    }
-  };
-
-  if (isEditing) {
-    return (
-      <Box
-        sx={{ display: "flex", alignItems: "center", gap: 1, width: "100%" }}
-      >
-        <TextField
-          size="small"
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          onKeyDown={handleKeyPress}
-          disabled={saving}
-          sx={{
-            width: "100%",
-            "& .MuiOutlinedInput-root": { height: 32, fontSize: "0.875rem" },
-          }}
-          autoFocus
-          onBlur={handleSave}
-        />
-        {saving && <CircularProgress size={16} />}
-      </Box>
-    );
-  }
-
-  return (
-    <Box
-      sx={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        width: "100%",
-        height: "100%",
-        cursor: "pointer",
-        borderRadius: 1,
-        "&:hover": { backgroundColor: alpha(theme.palette.primary.main, 0.05) },
-        transition: "background-color 0.2s",
-      }}
-      onClick={() => setIsEditing(true)}
-    >
-      <Typography variant="body2" sx={{ fontSize: "14px" }}>
-        {row.comment || "Add comment..."}
-      </Typography>
-    </Box>
-  );
-}
-
-// Editable Marked Cell Component
-function EditableMarkedCell({ row, onUpdateItem }: any) {
-  const [saving, setSaving] = useState(false);
-
-  const handleToggle = async () => {
-    try {
-      setSaving(true);
-      await onUpdateItem(row.id, { marked: !row.marked });
-    } catch (error) {
-      console.error("Failed to update marked status:", error);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <Box
-      sx={{ display: "flex", alignItems: "center", justifyContent: "center" }}
-    >
-      {saving ? (
-        <CircularProgress size={20} />
-      ) : (
-        <Checkbox
-          size="small"
-          checked={row.marked || false}
-          icon={<CheckBoxOutlineBlank />}
-          checkedIcon={<CheckBox />}
-          onChange={handleToggle}
-        />
-      )}
-    </Box>
-  );
-}
-
-// Enhanced Mobile Item Card Component with Grid Layout
 const MobileItemCard = ({ item, onUpdateItem, onSelect, isSelected }: any) => {
   const [expanded, setExpanded] = useState(false);
   const [editingField, setEditingField] = useState<string | null>(null);
@@ -323,7 +175,7 @@ const MobileItemCard = ({ item, onUpdateItem, onSelect, isSelected }: any) => {
         borderColor: isSelected
           ? theme.palette.primary.main
           : alpha("#E0E7FF", 0.8),
-        borderRadius: 2,
+        borderRadius: 1,
         overflow: "hidden",
         transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
         backgroundColor: isSelected
@@ -377,7 +229,7 @@ const MobileItemCard = ({ item, onUpdateItem, onSelect, isSelected }: any) => {
               sx={{
                 width: 56,
                 height: 56,
-                borderRadius: 2,
+                borderRadius: 1,
                 border: `2px solid ${alpha("#FFFFFF", 0.8)}`,
                 boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
                 background: alpha("#F8FAFC", 0.9),
@@ -557,7 +409,7 @@ const MobileItemCard = ({ item, onUpdateItem, onSelect, isSelected }: any) => {
               <Box
                 sx={{
                   p: 1.5,
-                  borderRadius: 2,
+                  borderRadius: 1,
                   backgroundColor: "background.paper",
                   border: `1px solid ${alpha("#E2E8F0", 0.8)}`,
                   transition: "all 0.2s ease",
@@ -654,7 +506,7 @@ const MobileItemCard = ({ item, onUpdateItem, onSelect, isSelected }: any) => {
               <Box
                 sx={{
                   p: 1.5,
-                  borderRadius: 2,
+                  borderRadius: 1,
                   backgroundColor: "background.paper",
                   border: `1px solid ${alpha("#E2E8F0", 0.8)}`,
                   transition: "all 0.2s ease",
@@ -744,7 +596,7 @@ const MobileItemCard = ({ item, onUpdateItem, onSelect, isSelected }: any) => {
               <Box
                 sx={{
                   p: 1.5,
-                  borderRadius: 2,
+                  borderRadius: 1,
                   backgroundColor: "background.paper",
                   border: `1px solid ${alpha("#E2E8F0", 0.8)}`,
                   transition: "all 0.2s ease",
@@ -841,7 +693,7 @@ const MobileItemCard = ({ item, onUpdateItem, onSelect, isSelected }: any) => {
                 <Box
                   sx={{
                     p: 1.5,
-                    borderRadius: 2,
+                    borderRadius: 1,
                     backgroundColor: alpha(theme.palette.info.main, 0.04),
                     border: `1px solid ${alpha(theme.palette.info.main, 0.15)}`,
                   }}
@@ -918,309 +770,6 @@ const MobileItemCard = ({ item, onUpdateItem, onSelect, isSelected }: any) => {
     </Card>
   );
 };
-
-// Enhanced Add Item Dialog
-function AddItemDialog({ open, onClose, onAddItem, listId }: any) {
-  const [items, setItems] = useState<any[]>([]);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedItem, setSelectedItem] = useState<any>(null);
-  const [loading, setLoading] = useState(false);
-  const [searchLoading, setSearchLoading] = useState(false);
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
-
-  const debouncedSearch = useCallback(
-    debounce(async (query: string) => {
-      if (!query.trim()) {
-        setItems([]);
-        return;
-      }
-
-      setSearchLoading(true);
-      try {
-        const response = await searchItems(query);
-        setItems(response || []);
-      } catch (error) {
-        console.error("Search failed:", error);
-        setItems([]);
-      } finally {
-        setSearchLoading(false);
-      }
-    }, 300),
-    []
-  );
-
-  useEffect(() => {
-    debouncedSearch(searchTerm);
-  }, [searchTerm, debouncedSearch]);
-
-  const handleSubmit = async () => {
-    if (!selectedItem) {
-      toast.error("Please select an item", errorStyles);
-      return;
-    }
-
-    try {
-      setLoading(true);
-      const itemData = {
-        productId: selectedItem.id.toString(),
-        quantity: 1,
-        notes: "",
-        productName: selectedItem.name || "Unknown Item",
-        sku: selectedItem.articleNumber || "",
-        category: "",
-        price: 0,
-        supplier: "",
-        itemId: selectedItem.id.toString(),
-        listId: listId,
-        imageUrl: selectedItem.imageUrl || "",
-      };
-
-      await onAddItem(itemData);
-      setSelectedItem(null);
-      setSearchTerm("");
-      setItems([]);
-      onClose();
-    } catch (error) {
-      console.error("Failed to add item:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <Dialog
-      open={open}
-      onClose={onClose}
-      maxWidth="md"
-      fullWidth
-      fullScreen={isMobile}
-      PaperProps={{
-        sx: {
-          borderRadius: isMobile ? 0 : 2,
-          boxShadow: "0 20px 40px rgba(0, 0, 0, 0.1)",
-          margin: isMobile ? 0 : 2,
-        },
-      }}
-    >
-      <DialogTitle sx={{ px: { xs: 2, sm: 3 }, py: { xs: 2, sm: 2.5 } }}>
-        <Box
-          sx={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-          }}
-        >
-          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-            <ShoppingCart sx={{ color: "primary.main" }} />
-            <Typography variant="h6" fontWeight={600}>
-              Add Item to List
-            </Typography>
-          </Box>
-          <IconButton onClick={onClose} size={isMobile ? "medium" : "small"}>
-            <Close fontSize="small" />
-          </IconButton>
-        </Box>
-      </DialogTitle>
-
-      <DialogContent sx={{ p: { xs: 2, sm: 3 } }}>
-        <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
-          <Autocomplete
-            options={items}
-            getOptionLabel={(option) => option.name || ""}
-            value={selectedItem}
-            onChange={(_, newValue) => setSelectedItem(newValue)}
-            inputValue={searchTerm}
-            onInputChange={(_, newInputValue) => setSearchTerm(newInputValue)}
-            loading={searchLoading}
-            filterOptions={(x) => x}
-            clearOnBlur={false}
-            clearOnEscape={false}
-            renderOption={(props, option) => (
-              <Box
-                component="li"
-                sx={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 2,
-                  p: 2,
-                  cursor: "pointer",
-                  borderRadius: 1,
-                  "&:hover": {
-                    backgroundColor: alpha(theme.palette.primary.main, 0.05),
-                  },
-                }}
-                onClick={() => {
-                  setSelectedItem(option);
-                  setItems([]);
-                }}
-              >
-                <Avatar
-                  sx={{
-                    width: { xs: 50, sm: 70 },
-                    height: { xs: 50, sm: 70 },
-                    borderRadius: 2,
-                  }}
-                >
-                  {option.imageUrl ? (
-                    <img
-                      src={`https://system.gtech.de/storage/${option.imageUrl}`}
-                      alt={option.name}
-                      style={{
-                        width: "100%",
-                        height: "100%",
-                        objectFit: "cover",
-                      }}
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).style.display = "none";
-                      }}
-                    />
-                  ) : (
-                    <Package />
-                  )}
-                </Avatar>
-                <Box sx={{ flex: 1 }}>
-                  <Typography variant="body1" fontWeight={500}>
-                    {option.name}
-                  </Typography>
-                  {option.articleNumber && (
-                    <Typography variant="caption" color="text.secondary">
-                      Art#: {option.articleNumber}
-                    </Typography>
-                  )}
-                </Box>
-              </Box>
-            )}
-            renderInput={(params) => (
-              <TextField
-                {...params}
-                placeholder="Search items by name..."
-                variant="outlined"
-                InputProps={{
-                  ...params.InputProps,
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <Search sx={{ color: "primary.main" }} />
-                    </InputAdornment>
-                  ),
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      {searchLoading && <CircularProgress size={20} />}
-                      {params.InputProps.endAdornment}
-                    </InputAdornment>
-                  ),
-                }}
-                sx={{
-                  "& .MuiOutlinedInput-root": {
-                    borderRadius: 2,
-                  },
-                }}
-              />
-            )}
-          />
-
-          {selectedItem && (
-            <Card
-              sx={{
-                p: 2,
-                bgcolor: alpha(theme.palette.primary.main, 0.04),
-                borderRadius: 2,
-              }}
-            >
-              <Box sx={{ display: "flex", gap: 2, alignItems: "center" }}>
-                <Avatar
-                  sx={{
-                    width: { xs: 80, sm: 100 },
-                    height: { xs: 80, sm: 100 },
-                    borderRadius: 2,
-                  }}
-                >
-                  {selectedItem.imageUrl ? (
-                    <img
-                      src={`https://system.gtech.de/storage/${selectedItem.imageUrl}`}
-                      alt={selectedItem.name}
-                      style={{
-                        width: "100%",
-                        height: "100%",
-                        objectFit: "cover",
-                      }}
-                    />
-                  ) : (
-                    <Package />
-                  )}
-                </Avatar>
-                <Box sx={{ flex: 1 }}>
-                  <Typography variant="h6" fontWeight={600}>
-                    {selectedItem.name}
-                  </Typography>
-                  {selectedItem.articleNumber && (
-                    <Typography variant="body2" color="text.secondary">
-                      Article Number: {selectedItem.articleNumber}
-                    </Typography>
-                  )}
-                </Box>
-              </Box>
-            </Card>
-          )}
-
-          {!searchTerm && (
-            <Box
-              sx={{
-                textAlign: "center",
-                py: 4,
-                px: 3,
-                borderRadius: 2,
-                border: "2px dashed #e0e0e0",
-                bgcolor: "#fafafa",
-              }}
-            >
-              <Search sx={{ fontSize: 40, color: "text.disabled", mb: 1 }} />
-              <Typography variant="body1" color="text.secondary">
-                Start typing to search for items
-              </Typography>
-            </Box>
-          )}
-        </Box>
-      </DialogContent>
-
-      <DialogActions
-        sx={{
-          p: { xs: 2, sm: 3 },
-          gap: { xs: 1, sm: 2 },
-          flexDirection: { xs: "column", sm: "row" },
-        }}
-      >
-        <CustomButton
-          variant="outlined"
-          onClick={onClose}
-          fullWidth={isMobile}
-          sx={{
-            minHeight: { xs: 48, sm: 36 },
-            order: { xs: 2, sm: 1 },
-            borderRadius: 2,
-          }}
-        >
-          Cancel
-        </CustomButton>
-        <CustomButton
-          variant="contained"
-          gradient={true}
-          onClick={handleSubmit}
-          disabled={!selectedItem}
-          loading={loading}
-          fullWidth={isMobile}
-          sx={{
-            minHeight: { xs: 48, sm: 36 },
-            order: { xs: 1, sm: 2 },
-            borderRadius: 2,
-          }}
-        >
-          Add Item
-        </CustomButton>
-      </DialogActions>
-    </Dialog>
-  );
-}
 
 // Horizontal List Tabs Component - Attached to Main Content
 function ListTabs({ currentListId, customerId, onListChange }: any) {
@@ -1322,7 +871,7 @@ function ListTabs({ currentListId, customerId, onListChange }: any) {
                   backgroundColor: isActive
                     ? alpha(theme.palette.primary.main, 0.08)
                     : "background.paper",
-                  borderRadius: 2,
+                  borderRadius: 1,
                   transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
                   "&:hover": {
                     borderColor: theme.palette.primary.main,
@@ -1391,100 +940,7 @@ function ListTabs({ currentListId, customerId, onListChange }: any) {
   );
 }
 
-// Debounce utility
-function debounce<T extends (...args: any[]) => any>(
-  func: T,
-  delay: number
-): (...args: Parameters<T>) => void {
-  let timeoutId: NodeJS.Timeout;
-  return (...args: Parameters<T>) => {
-    clearTimeout(timeoutId);
-    timeoutId = setTimeout(() => func(...args), delay);
-  };
-}
-function EditableQuantityCell({ row, onUpdateItem }: any) {
-  const [isEditing, setIsEditing] = useState(false);
-  const [value, setValue] = useState(row.quantity || 0);
-  const [saving, setSaving] = useState(false);
-
-  const handleSave = async () => {
-    if (value === row.quantity) {
-      setIsEditing(false);
-      return;
-    }
-
-    try {
-      setSaving(true);
-      await onUpdateItem(row.id, { quantity: Number(value) });
-      setIsEditing(false);
-    } catch (error) {
-      console.error("Failed to update quantity:", error);
-      setValue(row.quantity);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleCancel = () => {
-    setValue(row.quantity);
-    setIsEditing(false);
-  };
-
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") {
-      handleSave();
-    } else if (e.key === "Escape") {
-      handleCancel();
-    }
-  };
-
-  if (isEditing) {
-    return (
-      <Box
-        sx={{ display: "flex", alignItems: "center", gap: 1, width: "100%" }}
-      >
-        <TextField
-          size="small"
-          type="number"
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          onKeyDown={handleKeyPress}
-          disabled={saving}
-          sx={{
-            width: 80,
-            "& .MuiOutlinedInput-root": { height: 32, fontSize: "0.875rem" },
-          }}
-          autoFocus
-          onBlur={handleSave}
-        />
-        {saving && <CircularProgress size={16} />}
-      </Box>
-    );
-  }
-
-  return (
-    <Box
-      sx={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        width: "100%",
-        height: "100%",
-        cursor: "pointer",
-        borderRadius: 1,
-        "&:hover": { backgroundColor: alpha(theme.palette.primary.main, 0.05) },
-        transition: "background-color 0.2s",
-      }}
-      onClick={() => setIsEditing(true)}
-    >
-      <Typography variant="body2" fontWeight={600} sx={{ fontSize: "16px" }}>
-        {row.quantity || 0}
-      </Typography>
-    </Box>
-  );
-}
-
-function formatPeriodLabel(period: string, cargoNo: string): string {
+export function formatPeriodLabel(period: string, cargoNo: string): string {
   const monthMap: { [key: string]: string } = {
     "01": "Januar",
     "02": "Februar",
@@ -1504,87 +960,6 @@ function formatPeriodLabel(period: string, cargoNo: string): string {
   const monthName = monthMap[periodNum] || `Period ${periodNum}`;
 
   return `Lieferung ${monthName} ${cargoNo}`;
-}
-function EditableIntervalCell({ row, onUpdateItem }: any) {
-  const [isEditing, setIsEditing] = useState(false);
-  const [value, setValue] = useState(row.interval || "monthly");
-  const [saving, setSaving] = useState(false);
-
-  const handleSave = async (newValue: string) => {
-    if (newValue === row.interval) {
-      setIsEditing(false);
-      return;
-    }
-
-    try {
-      setSaving(true);
-      await onUpdateItem(row.id, { interval: newValue });
-      setIsEditing(false);
-    } catch (error) {
-      console.error("Failed to update interval:", error);
-      setValue(row.interval);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const getCurrentLabel = () => {
-    const option = INTERVAL_OPTIONS.find(
-      (opt) => opt.value === (row.interval || "monthly")
-    );
-    return option ? option.label : "Monatlich";
-  };
-
-  if (isEditing) {
-    return (
-      <Box
-        sx={{ display: "flex", alignItems: "center", gap: 1, width: "100%" }}
-      >
-        <FormControl size="small" sx={{ minWidth: 120 }}>
-          <Select
-            value={value}
-            onChange={(e) => {
-              setValue(e.target.value);
-              handleSave(e.target.value);
-            }}
-            disabled={saving}
-            sx={{ fontSize: "0.875rem", height: 32 }}
-            onClose={() => setIsEditing(false)}
-            autoFocus
-            open={isEditing}
-          >
-            {INTERVAL_OPTIONS.map((option) => (
-              <MenuItem key={option.value} value={option.value}>
-                {option.label}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-        {saving && <CircularProgress size={16} />}
-      </Box>
-    );
-  }
-
-  return (
-    <Box
-      sx={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        width: "100%",
-        height: "100%",
-        cursor: "pointer",
-        borderRadius: 1,
-        "&:hover": { backgroundColor: alpha(theme.palette.primary.main, 0.05) },
-        transition: "background-color 0.2s",
-      }}
-      onClick={() => setIsEditing(true)}
-    >
-      <Typography variant="body2" sx={{ fontSize: "14px" }}>
-        {getCurrentLabel()}
-      </Typography>
-    </Box>
-  );
 }
 
 // Main Component
@@ -1717,6 +1092,7 @@ const ListManagementPage = () => {
       //   width: 100,
       //   resizable: true,
       // },
+
       {
         key: "item_no_de",
         name: "Item No. DE",
@@ -1776,7 +1152,7 @@ const ListManagementPage = () => {
                   sx={{
                     width: 50,
                     height: 50,
-                    borderRadius: 2,
+                    borderRadius: 1,
                     overflow: "hidden",
                     display: "flex",
                     alignItems: "center",
@@ -2077,10 +1453,8 @@ const ListManagementPage = () => {
         ...prev,
         items: [...prev.items, response],
       }));
-      toast.success("Item added successfully!", successStyles);
     } catch (error) {
       console.error("Failed to add item:", error);
-      toast.error("Failed to add item", errorStyles);
     } finally {
       setSaving(false);
     }
@@ -2161,7 +1535,7 @@ const ListManagementPage = () => {
   if (!listData) {
     return (
       <Container maxWidth="xl" sx={{ py: 3 }}>
-        <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>
+        <Alert severity="error" sx={{ mb: 2, borderRadius: 1 }}>
           List not found or failed to load
         </Alert>
         <CustomButton onClick={() => router.back()} startIcon={<ArrowBack />}>
@@ -2237,7 +1611,7 @@ const ListManagementPage = () => {
                   "& .MuiOutlinedInput-root": {
                     height: { xs: 36, sm: 40 },
                     backgroundColor: "background.paper",
-                    borderRadius: 2,
+                    borderRadius: 1,
                     fontSize: { xs: "1rem", sm: "1.1rem" },
                   },
                 }}
@@ -2323,33 +1697,51 @@ const ListManagementPage = () => {
         <Box
           sx={{
             display: "flex",
+            justifyContent: "flex-end",
+            flexDirection: "row-reverse",
             alignItems: "center",
-            gap: { xs: 1, sm: 2 },
-            flexWrap: "wrap",
+            gap: "0px",
           }}
         >
-          <Chip
-            label={`${listData.items?.length || 0} items`}
-            size="small"
-            color="primary"
-            variant="outlined"
-            sx={{ borderRadius: 2 }}
-          />
-          {/* <Chip
-            label={listData.customer?.email || "Unknown Customer"}
-            size="small"
-            variant="outlined"
-            sx={{ borderRadius: 2 }}
-          /> */}
-          {selectedRows.size > 0 && (
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              gap: { xs: 1, sm: 2 },
+              flexWrap: "wrap",
+            }}
+          >
+            <Hash fontSize="small" color="primary" />
+            <Typography variant="body2" color="text.secondary">
+              List Number:{" "}
+              <strong>{listData.listNumber || "Not assigned"}</strong>
+            </Typography>
+          </Box>
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              gap: { xs: 1, sm: 2 },
+              flexWrap: "wrap",
+            }}
+          >
             <Chip
-              label={`${selectedRows.size} selected`}
+              label={`${listData.items?.length || 0} items`}
               size="small"
-              color="secondary"
-              variant="filled"
-              sx={{ borderRadius: 2 }}
+              color="primary"
+              variant="outlined"
+              sx={{ borderRadius: 1 }}
             />
-          )}
+            {selectedRows.size > 0 && (
+              <Chip
+                label={`${selectedRows.size} selected`}
+                size="small"
+                color="secondary"
+                variant="filled"
+                sx={{ borderRadius: 1 }}
+              />
+            )}
+          </Box>
         </Box>
       </Box>
 
@@ -2396,7 +1788,7 @@ const ListManagementPage = () => {
                   width: { xs: "100%", sm: 300 },
                   "& .MuiOutlinedInput-root": {
                     backgroundColor: alpha(theme.palette.background.paper, 0.8),
-                    borderRadius: 2,
+                    borderRadius: 1,
                     border: `1px solid ${alpha("#E2E8F0", 0.8)}`,
                     "&:hover": {
                       borderColor: alpha(theme.palette.primary.main, 0.3),
@@ -2411,6 +1803,15 @@ const ListManagementPage = () => {
                   },
                 }}
               />
+              <CustomButton
+                variant="contained"
+                startIcon={<Add />}
+                onClick={() => setAddItemDialog(true)}
+                gradient={true}
+                hoverEffect="scale"
+              >
+                Add Item
+              </CustomButton>
             </Box>
 
             <Box
@@ -2431,7 +1832,7 @@ const ListManagementPage = () => {
                   size={isSmallMobile ? "medium" : "small"}
                   sx={{
                     flex: { xs: 1, sm: "none" },
-                    borderRadius: 2,
+                    borderRadius: 1,
                   }}
                 >
                   Delete ({selectedRows.size})
@@ -2445,7 +1846,7 @@ const ListManagementPage = () => {
                 size={isSmallMobile ? "medium" : "small"}
                 sx={{
                   flex: { xs: 1, sm: "none" },
-                  borderRadius: 2,
+                  borderRadius: 1,
                 }}
               >
                 Refresh
@@ -2463,7 +1864,7 @@ const ListManagementPage = () => {
                     textAlign: "center",
                     py: 6,
                     px: 3,
-                    borderRadius: 2,
+                    borderRadius: 1,
                     border: "2px dashed #e0e0e0",
                     bgcolor: "#fafafa",
                   }}
@@ -2490,7 +1891,7 @@ const ListManagementPage = () => {
                       startIcon={<Add />}
                       onClick={() => setAddItemDialog(true)}
                       gradient={true}
-                      sx={{ borderRadius: 2 }}
+                      sx={{ borderRadius: 1 }}
                     >
                       Add First Item
                     </CustomButton>
@@ -2511,11 +1912,11 @@ const ListManagementPage = () => {
               )}
             </Box>
           ) : (
-            // Desktop Table View (simplified)
+            // Desktop Table View
             <Paper
               elevation={2}
               sx={{
-                borderRadius: 2,
+                borderRadius: 1,
                 overflow: "hidden",
                 border: `1px solid ${alpha("#E2E8F0", 0.8)}`,
               }}
@@ -2544,7 +1945,7 @@ const ListManagementPage = () => {
                       startIcon={<Add />}
                       onClick={() => setAddItemDialog(true)}
                       gradient={true}
-                      sx={{ borderRadius: 2 }}
+                      sx={{ borderRadius: 1 }}
                     >
                       Add First Item
                     </CustomButton>
@@ -2681,7 +2082,7 @@ const ListManagementPage = () => {
                 px: 3,
                 py: 2,
                 backgroundColor: alpha("#F8FAFC", 0.8),
-                borderRadius: 2,
+                borderRadius: 1,
                 border: `1px solid ${alpha("#E2E8F0", 0.6)}`,
               }}
             >

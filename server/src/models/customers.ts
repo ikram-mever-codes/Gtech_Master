@@ -11,7 +11,7 @@ export class Customer {
   @PrimaryGeneratedColumn("uuid")
   id!: string;
 
-  @Column()
+  @Column({ unique: true })
   companyName!: string;
 
   @Column({ nullable: true })
