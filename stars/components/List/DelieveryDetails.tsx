@@ -119,7 +119,6 @@ export default function DeliveryDetailsModal({
   const cargoStatusConfig: any = getCargoStatusConfig(
     delivery?.cargoStatus || "preparing"
   );
-
   return (
     <Dialog
       open={open}
@@ -421,7 +420,7 @@ export default function DeliveryDetailsModal({
                   </Typography>
                 </Box>
                 <Chip
-                  label={delivery.cargoStatus}
+                  label={delivery.status}
                   color={cargoStatusConfig.color}
                   size="medium"
                   sx={{
@@ -812,6 +811,7 @@ export function DeliveryCell({ row, period }: any) {
     setModalOpen(true);
   };
 
+  if (!delivery) return;
   return (
     <>
       <Tooltip

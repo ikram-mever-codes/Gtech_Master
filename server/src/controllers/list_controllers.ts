@@ -26,6 +26,7 @@ async function fetchItemData(itemId: number) {
       SELECT 
         i.*, 
         os.cargo_id, 
+        os.status as order_status, 
         oi.qty AS quantity,
         c.cargo_no,
         c.pickup_date, 
@@ -80,7 +81,7 @@ async function fetchItemData(itemId: number) {
             if (!deliveryMap.has(dateKey)) {
               deliveryMap.set(dateKey, {
                 quantity,
-                status: row.cargo_status || "Open",
+                status: row.order_status || "Open",
                 deliveredAt: date,
                 cargoNo: row.cargo_no ? [row.cargo_no] : [],
                 cargoStatus: row.cargo_status || "",
@@ -137,7 +138,7 @@ async function fetchItemData(itemId: number) {
 
       deliveries[dateKey] = {
         quantity: value.quantity,
-        status: value.status,
+        status: value.status, // Include order status in the output
         deliveredAt: value.deliveredAt,
         cargoNo: uniqueCargoNo || "",
         cargoStatus: value.cargoStatus,
@@ -166,7 +167,6 @@ async function fetchItemData(itemId: number) {
     connection.release();
   }
 }
-
 async function updateLocalListItem(item: ListItem): Promise<ListItem> {
   const listItemRepository = AppDataSource.getRepository(ListItem);
 
@@ -1421,10 +1421,15 @@ export const getListsByCompanyName = async (
     }
 
     const customerRepository = AppDataSource.getRepository(Customer);
-    const customer = await customerRepository.findOne({
-      where: { companyName },
-      select: ["id"],
-    });
+
+    // Case-insensitive search using ILIKE (PostgreSQL) or LOWER (other databases)
+    const customer = await customerRepository
+      .createQueryBuilder("customer")
+      .where("LOWER(customer.companyName) = LOWER(:companyName)", {
+        companyName,
+      })
+      .select(["customer.id"])
+      .getOne();
 
     if (!customer) {
       return next(new ErrorHandler("Customer not found", 404));

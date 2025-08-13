@@ -89,7 +89,7 @@ export function formatPeriodLabel(period: string, cargoNo: string): string {
   const [yearPart, periodNum] = period.split("-");
   const monthName = monthMap[periodNum] || `Period ${periodNum}`;
 
-  return `Lieferung ${monthName} ${cargoNo}`;
+  return `Lieferung  ${cargoNo}`;
 }
 
 export const DELIVERY_STATUS_CONFIG: any = {

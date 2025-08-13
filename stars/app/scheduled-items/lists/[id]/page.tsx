@@ -75,7 +75,7 @@ import {
 } from "@/utils/constants";
 import { useSelector } from "react-redux";
 import { RootState } from "@/app/Redux/store";
-import DeliveryDetailsModal, {
+import {
   DeliveryCell,
   EditableCommentCell,
   EditableIntervalCell,
@@ -990,26 +990,44 @@ const ListManagementPage = () => {
       toast.error("Failed to update item", errorStyles);
     }
   };
+  // Utility function to extract delivery periods
   function extractDeliveryPeriods(items: any[]): { sortedPeriods: string[] } {
-    const periodsSet = new Set<string>();
+    const periodsWithEta: { period: string; eta?: string }[] = [];
 
     items.forEach((item) => {
       if (item.deliveries) {
-        Object.keys(item.deliveries).forEach((period) => {
-          periodsSet.add(period);
-        });
+        Object.entries(item.deliveries).forEach(
+          ([period, delivery]: [string, any]) => {
+            periodsWithEta.push({
+              period,
+              eta: delivery.eta,
+            });
+          }
+        );
       }
     });
 
-    const sortedPeriods = Array.from(periodsSet).sort((a, b) => {
-      const [yearA, periodA] = a.split("-").map((p) => p.replace("T", ""));
-      const [yearB, periodB] = b.split("-").map((p) => p.replace("T", ""));
+    // Remove duplicates and sort by eta date
+    const uniquePeriods = Array.from(
+      new Set(periodsWithEta.map((p) => p.period))
+    )
+      .map((period) => {
+        return {
+          period,
+          eta: periodsWithEta.find((p) => p.period === period)?.eta,
+        };
+      })
+      .sort((a, b) => {
+        // If either doesn't have an eta, put it at the end
+        if (!a.eta && !b.eta) return 0;
+        if (!a.eta) return 1;
+        if (!b.eta) return -1;
 
-      if (yearA !== yearB) return parseInt(yearA) - parseInt(yearB);
-      return parseInt(periodA) - parseInt(periodB);
-    });
+        // Compare dates
+        return new Date(a.eta).getTime() - new Date(b.eta).getTime();
+      });
 
-    return { sortedPeriods };
+    return { sortedPeriods: uniquePeriods.map((p) => p.period) };
   }
 
   useEffect(() => {
@@ -1089,7 +1107,7 @@ const ListManagementPage = () => {
       {
         key: "imageUrl",
         name: "Bild",
-        width: 80,
+        width: 150,
         resizable: true,
         frozen: true,
         renderCell: (props: any) => {
@@ -1104,7 +1122,7 @@ const ListManagementPage = () => {
                   justifyContent: "center",
                   color: "text.disabled",
                   width: "100%",
-                  height: 60,
+                  height: 80,
                 }}
               >
                 <Image fontSize="small" />
@@ -1126,8 +1144,8 @@ const ListManagementPage = () => {
               >
                 <Box
                   sx={{
-                    width: 50,
-                    height: 50,
+                    width: 80,
+                    height: 80,
                     borderRadius: 1,
                     overflow: "hidden",
                     display: "flex",
@@ -1152,8 +1170,6 @@ const ListManagementPage = () => {
                     }}
                     onError={(e) => {
                       (e.target as HTMLImageElement).style.display = "none";
-                      (e.target as HTMLImageElement).parentElement!.innerHTML =
-                        '<div style="display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; color: #999;"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg></div>';
                     }}
                   />
                 </Box>
@@ -1293,28 +1309,6 @@ const ListManagementPage = () => {
       },
     ];
 
-    function extractDeliveryPeriods(items: any[]): { sortedPeriods: string[] } {
-      const periodsSet = new Set<string>();
-
-      items.forEach((item) => {
-        if (item.deliveries) {
-          Object.keys(item.deliveries).forEach((period) => {
-            periodsSet.add(period);
-          });
-        }
-      });
-
-      const sortedPeriods = Array.from(periodsSet).sort((a, b) => {
-        const [yearA, periodA] = a.split("-").map((p) => p.replace("T", ""));
-        const [yearB, periodB] = b.split("-").map((p) => p.replace("T", ""));
-
-        if (yearA !== yearB) return parseInt(yearA) - parseInt(yearB);
-        return parseInt(periodA) - parseInt(periodB);
-      });
-
-      return { sortedPeriods };
-    }
-
     // Add delivery columns dynamically (read-only)
     const deliveryColumns = deliveryPeriodsData.sortedPeriods.map(
       (period: any) => {
@@ -1322,10 +1316,18 @@ const ListManagementPage = () => {
           .map((item: any) => item.deliveries?.[period]?.cargoNo)
           .find((cn: string) => cn);
 
+        const cargoStatus = listData?.items
+          .map((item: any) => item.deliveries?.[period]?.cargoStatus)
+          .find((cn: string) => cn);
+
+        const eta = listData?.items
+          .map((item: any) => item.deliveries?.[period]?.eta)
+          .find((cn: string) => cn);
+
         return {
           key: `delivery_${period}`,
           name: formatPeriodLabel(period, cargoNo || ""),
-          width: 140,
+          width: 190,
           resizable: false,
           renderCell: (props: any) => (
             <DeliveryCell row={props.row} period={period} />
@@ -1343,7 +1345,15 @@ const ListManagementPage = () => {
                 textWrap: "wrap",
               }}
             >
-              <div>{formatPeriodLabel(period, cargoNo || "")}</div>
+              <div className="flex  gap-0 text-sm flex-col ">
+                <span>{formatPeriodLabel(period, cargoNo || "")}</span>
+                <span>
+                  Eta: <span className="font-medium">{eta || "-"}</span>
+                </span>
+                <span className="w-max h-max p-1 px-3 text-xs bg-yellow-500 text-white rounded-full">
+                  {cargoStatus}
+                </span>
+              </div>{" "}
             </Box>
           ),
         };
@@ -1351,48 +1361,6 @@ const ListManagementPage = () => {
     );
 
     const endColumns = [
-      {
-        key: "changeStatus",
-        name: "Status",
-        width: 150,
-        resizable: true,
-        renderCell: (props: any) => {
-          const getStatusColor = (status: string) => {
-            switch (status?.toLowerCase()) {
-              case "confirmed":
-                return "success";
-              case "pending":
-                return "warning";
-              case "rejected":
-                return "error";
-              default:
-                return "default";
-            }
-          };
-
-          const getStatusLabel = (status: string) => {
-            switch (status?.toLowerCase()) {
-              case "confirmed":
-                return "Bestätigt";
-              case "pending":
-                return "Ausstehend";
-              case "rejected":
-                return "Abgelehnt";
-              default:
-                return "Ausstehend";
-            }
-          };
-
-          return (
-            <Chip
-              label={getStatusLabel(props.row.changeStatus)}
-              size="small"
-              color={getStatusColor(props.row.changeStatus)}
-              sx={{ minWidth: 100, borderRadius: "10px" }}
-            />
-          );
-        },
-      },
       {
         key: "marked",
         name: "Markiert",

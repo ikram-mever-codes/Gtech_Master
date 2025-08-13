@@ -160,25 +160,40 @@ const successStyles = {
 
 // Utility function to extract delivery periods
 function extractDeliveryPeriods(items: any[]): { sortedPeriods: string[] } {
-  const periodsSet = new Set<string>();
+  const periodsWithEta: { period: string; eta?: string }[] = [];
 
   items.forEach((item) => {
     if (item.deliveries) {
-      Object.keys(item.deliveries).forEach((period) => {
-        periodsSet.add(period);
-      });
+      Object.entries(item.deliveries).forEach(
+        ([period, delivery]: [string, any]) => {
+          periodsWithEta.push({
+            period,
+            eta: delivery.eta,
+          });
+        }
+      );
     }
   });
 
-  const sortedPeriods = Array.from(periodsSet).sort((a, b) => {
-    const [yearA, periodA] = a.split("-").map((p) => p.replace("T", ""));
-    const [yearB, periodB] = b.split("-").map((p) => p.replace("T", ""));
+  // Remove duplicates and sort by eta date
+  const uniquePeriods = Array.from(new Set(periodsWithEta.map((p) => p.period)))
+    .map((period) => {
+      return {
+        period,
+        eta: periodsWithEta.find((p) => p.period === period)?.eta,
+      };
+    })
+    .sort((a, b) => {
+      // If either doesn't have an eta, put it at the end
+      if (!a.eta && !b.eta) return 0;
+      if (!a.eta) return 1;
+      if (!b.eta) return -1;
 
-    if (yearA !== yearB) return parseInt(yearA) - parseInt(yearB);
-    return parseInt(periodA) - parseInt(periodB);
-  });
+      // Compare dates
+      return new Date(a.eta).getTime() - new Date(b.eta).getTime();
+    });
 
-  return { sortedPeriods };
+  return { sortedPeriods: uniquePeriods.map((p) => p.period) };
 }
 
 // Delivery Cell Component
@@ -202,9 +217,25 @@ const DeliveryCell = ({ row, period }: any) => {
     );
   }
 
-  const statusConfig =
-    DELIVERY_STATUS_CONFIG[delivery.status] ||
-    DELIVERY_STATUS_CONFIG[DELIVERY_STATUS.PENDING];
+  const status = delivery.status || "NSO";
+  const statusConfig = {
+    color:
+      status === "confirmed"
+        ? "success"
+        : status === "pending"
+        ? "warning"
+        : status === "rejected"
+        ? "error"
+        : "default",
+    label:
+      status === "confirmed"
+        ? "Bestätigt"
+        : status === "pending"
+        ? "Ausstehend"
+        : status === "rejected"
+        ? "Abgelehnt"
+        : status,
+  };
 
   return (
     <>
@@ -231,25 +262,15 @@ const DeliveryCell = ({ row, period }: any) => {
         <Chip
           label={statusConfig.label}
           size="small"
-          color={statusConfig.color}
+          color={"primary"}
           sx={{
             fontSize: "0.65rem",
             height: 18,
             borderRadius: 1,
           }}
         />
-        {delivery.cargoNo && (
-          <Typography
-            variant="caption"
-            color="text.secondary"
-            sx={{ fontSize: "0.6rem" }}
-          >
-            #{delivery.cargoNo}
-          </Typography>
-        )}
       </Box>
 
-      {/* Delivery Details Modal */}
       <Dialog
         open={deliveryModalOpen}
         onClose={() => setDeliveryModalOpen(false)}
@@ -304,9 +325,15 @@ const DeliveryCell = ({ row, period }: any) => {
                 <Chip
                   label={statusConfig.label}
                   size="small"
-                  color={statusConfig.color}
+                  color={"primary"}
                 />
               </Typography>
+              {delivery.eta && (
+                <Typography variant="body2" color="text.secondary">
+                  <strong>ETA:</strong>{" "}
+                  {new Date(delivery.eta).toLocaleDateString()}
+                </Typography>
+              )}
               <Typography variant="body2" color="text.secondary">
                 <strong>Cargo Number:</strong>{" "}
                 {delivery.cargoNo || "Not assigned"}
@@ -1066,7 +1093,7 @@ const MobileItemCard = ({
           <Grid item xs="auto">
             <Avatar
               sx={{
-                width: 56,
+                width: 70,
                 height: 56,
                 borderRadius: 1,
                 border: `2px solid ${alpha("#FFFFFF", 0.8)}`,
@@ -1900,7 +1927,7 @@ const ListManagerPage: React.FC = () => {
       {
         key: "imageUrl",
         name: "Bild",
-        width: 80,
+        width: 150,
         resizable: true,
         frozen: true,
         renderCell: (props: any) => {
@@ -1915,7 +1942,7 @@ const ListManagerPage: React.FC = () => {
                   justifyContent: "center",
                   color: "text.disabled",
                   width: "100%",
-                  height: 60,
+                  height: 80,
                 }}
               >
                 <Image fontSize="small" />
@@ -1937,8 +1964,8 @@ const ListManagerPage: React.FC = () => {
               >
                 <Box
                   sx={{
-                    width: 50,
-                    height: 50,
+                    width: 80,
+                    height: 80,
                     borderRadius: 1,
                     overflow: "hidden",
                     display: "flex",
@@ -2087,16 +2114,25 @@ const ListManagerPage: React.FC = () => {
     ];
 
     // Add delivery columns dynamically
+    // In the columns configuration:
     const deliveryColumns = deliveryPeriodsData.sortedPeriods.map(
       (period: any) => {
         const cargoNo = currentList?.items
           .map((item: any) => item.deliveries?.[period]?.cargoNo)
           .find((cn: string) => cn);
 
+        const cargoStatus = currentList?.items
+          .map((item: any) => item.deliveries?.[period]?.cargoStatus)
+          .find((cn: string) => cn);
+
+        const eta = currentList?.items
+          .map((item: any) => item.deliveries?.[period]?.eta)
+          .find((cn: string) => cn);
+
         return {
           key: `delivery_${period}`,
           name: formatPeriodLabel(period, cargoNo || ""),
-          width: 140,
+          width: 180,
           resizable: false,
           renderCell: (props: any) => (
             <DeliveryCell row={props.row} period={period} />
@@ -2114,7 +2150,19 @@ const ListManagerPage: React.FC = () => {
                 textWrap: "wrap",
               }}
             >
-              <div>{formatPeriodLabel(period, cargoNo || "")}</div>
+              <div className="flex gap-0 text-sm flex-col">
+                <span>{formatPeriodLabel(period, cargoNo || "")}</span>
+                {cargoStatus && (
+                  <span className="w-max h-max p-1 px-3 text-xs bg-yellow-500 text-white rounded-full">
+                    {cargoStatus}
+                  </span>
+                )}
+                {eta && (
+                  <span>
+                    Eta: <span className="font-medium">{eta}</span>
+                  </span>
+                )}
+              </div>
             </Box>
           ),
         };
@@ -2122,48 +2170,48 @@ const ListManagerPage: React.FC = () => {
     );
 
     const endColumns = [
-      {
-        key: "changeStatus",
-        name: "Status",
-        width: 150,
-        resizable: true,
-        renderCell: (props: any) => {
-          const getStatusColor = (status: string) => {
-            switch (status?.toLowerCase()) {
-              case "confirmed":
-                return "success";
-              case "pending":
-                return "warning";
-              case "rejected":
-                return "error";
-              default:
-                return "default";
-            }
-          };
+      // {
+      //   key: "changeStatus",
+      //   name: "Status",
+      //   width: 150,
+      //   resizable: true,
+      //   renderCell: (props: any) => {
+      //     const getStatusColor = (status: string) => {
+      //       switch (status?.toLowerCase()) {
+      //         case "confirmed":
+      //           return "success";
+      //         case "pending":
+      //           return "warning";
+      //         case "rejected":
+      //           return "error";
+      //         default:
+      //           return "default";
+      //       }
+      //     };
 
-          const getStatusLabel = (status: string) => {
-            switch (status?.toLowerCase()) {
-              case "confirmed":
-                return "Bestätigt";
-              case "pending":
-                return "Ausstehend";
-              case "rejected":
-                return "Abgelehnt";
-              default:
-                return "Ausstehend";
-            }
-          };
+      //     const getStatusLabel = (status: string) => {
+      //       switch (status?.toLowerCase()) {
+      //         case "confirmed":
+      //           return "Bestätigt";
+      //         case "pending":
+      //           return "Ausstehend";
+      //         case "rejected":
+      //           return "Abgelehnt";
+      //         default:
+      //           return "Ausstehend";
+      //       }
+      //     };
 
-          return (
-            <Chip
-              label={getStatusLabel(props.row.changeStatus)}
-              size="small"
-              color={getStatusColor(props.row.changeStatus)}
-              sx={{ minWidth: 100, borderRadius: "10px" }}
-            />
-          );
-        },
-      },
+      //     return (
+      //       <Chip
+      //         label={getStatusLabel(props.row.changeStatus)}
+      //         size="small"
+      //         color={getStatusColor(props.row.changeStatus)}
+      //         sx={{ minWidth: 100, borderRadius: "10px" }}
+      //       />
+      //     );
+      //   },
+      // },
       {
         key: "marked",
         name: "Markiert",
@@ -2560,7 +2608,7 @@ const ListManagerPage: React.FC = () => {
                     },
                   }}
                 />
-                {isEditable && (
+                {/* {isEditable && (
                   <Button
                     variant="contained"
                     startIcon={<Add />}
@@ -2576,7 +2624,7 @@ const ListManagerPage: React.FC = () => {
                   >
                     Add Item
                   </Button>
-                )}
+                )} */}
               </Box>
 
               <Box
