@@ -1089,7 +1089,8 @@ const ListManagementPage = () => {
 
       {
         key: "item_no_de",
-        name: "Item No. DE",
+
+        name: "Artikelnr",
         width: 120,
         resizable: true,
         renderCell: (props: any) => (
@@ -1098,12 +1099,7 @@ const ListManagementPage = () => {
           </Typography>
         ),
       },
-      {
-        key: "articleNumber",
-        name: "Artikelnummer",
-        width: 140,
-        resizable: true,
-      },
+
       {
         key: "imageUrl",
         name: "Bild",
@@ -1225,7 +1221,7 @@ const ListManagementPage = () => {
       {
         key: "articleName",
         name: "Artikelname",
-        width: 350, // Increased width for better visibility
+        width: 500, // Increased width for better visibility
         resizable: true,
         renderCell: (props: any) => (
           <Tooltip
@@ -1324,6 +1320,26 @@ const ListManagementPage = () => {
           .map((item: any) => item.deliveries?.[period]?.eta)
           .find((cn: string) => cn);
 
+        function formatEta(etaDate: any) {
+          if (!etaDate) return null; // Handle empty/null dates
+
+          const now = new Date();
+          const eta = new Date(etaDate);
+
+          // Check if the date is invalid
+          if (isNaN(eta.getTime())) return etaDate; // Return original if invalid date
+
+          const isCurrentYear = eta.getFullYear() === now.getFullYear();
+
+          if (isCurrentYear) {
+            return eta.toLocaleDateString("de-DE", {
+              day: "2-digit",
+              month: "2-digit",
+            });
+          } else {
+            return eta.toLocaleDateString("de-DE");
+          }
+        }
         return {
           key: `delivery_${period}`,
           name: formatPeriodLabel(period, cargoNo || ""),
@@ -1347,11 +1363,11 @@ const ListManagementPage = () => {
             >
               <div className="flex  gap-0 text-sm flex-col ">
                 <span>{formatPeriodLabel(period, cargoNo || "")}</span>
-                <span>
-                  Eta: <span className="font-medium">{eta || "-"}</span>
-                </span>
                 <span className="w-max h-max p-1 px-3 text-xs bg-yellow-500 text-white rounded-full">
                   {cargoStatus}
+                </span>
+                <span>
+                  Eta: <span className="font-medium">{formatEta(eta)}</span>
                 </span>
               </div>{" "}
             </Box>
@@ -1360,28 +1376,28 @@ const ListManagementPage = () => {
       }
     );
 
-    const endColumns = [
-      {
-        key: "marked",
-        name: "Markiert",
-        width: 120,
-        resizable: true,
-        renderCell: (props: any) => (
-          <EditableMarkedCell row={props.row} onUpdateItem={handleUpdateItem} />
-        ),
-      },
-      {
-        key: "comment",
-        name: "Kommentar",
-        width: 200,
-        resizable: true,
-        renderCell: (props: any) => (
-          <EditableCommentCell
-            row={props.row}
-            onUpdateItem={handleUpdateItem}
-          />
-        ),
-      },
+    const endColumns: any = [
+      // {
+      //   key: "marked",
+      //   name: "Markiert",
+      //   width: 120,
+      //   resizable: true,
+      //   renderCell: (props: any) => (
+      //     <EditableMarkedCell row={props.row} onUpdateItem={handleUpdateItem} />
+      //   ),
+      // },
+      // {
+      //   key: "comment",
+      //   name: "Kommentar",
+      //   width: 200,
+      //   resizable: true,
+      //   renderCell: (props: any) => (
+      //     <EditableCommentCell
+      //       row={props.row}
+      //       onUpdateItem={handleUpdateItem}
+      //     />
+      //   ),
+      // },
     ];
 
     return [...baseColumns, ...deliveryColumns, ...endColumns];

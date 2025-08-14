@@ -310,7 +310,7 @@ const DeliveryCell = ({ row, period }: any) => {
                 <strong>Article Number:</strong> {row.articleNumber}
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                <strong>Item No. DE:</strong> {row.item_no_de}
+                <strong>Artikelnr:</strong> {row.item_no_de}
               </Typography>
             </Grid>
             <Grid item xs={12} md={6}>
@@ -737,7 +737,7 @@ const AddItemDialog = ({ open, onClose, onAddItem, listId }: any) => {
           <Grid item xs={12} md={6}>
             <TextField
               fullWidth
-              label="Item No. DE"
+              label="Artikelnr"
               value={formData.item_no_de}
               onChange={(e) =>
                 setFormData((prev) => ({ ...prev, item_no_de: e.target.value }))
@@ -1909,7 +1909,7 @@ const ListManagerPage: React.FC = () => {
       },
       {
         key: "item_no_de",
-        name: "Item No. DE",
+        name: "Artikelnr",
         width: 120,
         resizable: true,
         renderCell: (props: any) => (
@@ -1918,12 +1918,12 @@ const ListManagerPage: React.FC = () => {
           </Typography>
         ),
       },
-      {
-        key: "articleNumber",
-        name: "Artikelnummer",
-        width: 140,
-        resizable: true,
-      },
+      // {
+      //   key: "articleNumber",
+      //   name: "Artikelnummer",
+      //   width: 140,
+      //   resizable: true,
+      // },
       {
         key: "imageUrl",
         name: "Bild",
@@ -2045,7 +2045,7 @@ const ListManagerPage: React.FC = () => {
       {
         key: "articleName",
         name: "Artikelname",
-        width: 350,
+        width: 500,
         resizable: true,
         renderCell: (props: any) => (
           <Tooltip
@@ -2129,6 +2129,26 @@ const ListManagerPage: React.FC = () => {
           .map((item: any) => item.deliveries?.[period]?.eta)
           .find((cn: string) => cn);
 
+        function formatEta(etaDate: any) {
+          if (!etaDate) return null; // Handle empty/null dates
+
+          const now = new Date();
+          const eta = new Date(etaDate);
+
+          // Check if the date is invalid
+          if (isNaN(eta.getTime())) return etaDate; // Return original if invalid date
+
+          const isCurrentYear = eta.getFullYear() === now.getFullYear();
+
+          if (isCurrentYear) {
+            return eta.toLocaleDateString("de-DE", {
+              day: "2-digit",
+              month: "2-digit",
+            });
+          } else {
+            return eta.toLocaleDateString("de-DE");
+          }
+        }
         return {
           key: `delivery_${period}`,
           name: formatPeriodLabel(period, cargoNo || ""),
@@ -2159,7 +2179,7 @@ const ListManagerPage: React.FC = () => {
                 )}
                 {eta && (
                   <span>
-                    Eta: <span className="font-medium">{eta}</span>
+                    Eta: <span className="font-medium">{formatEta(eta)}</span>
                   </span>
                 )}
               </div>
@@ -2169,7 +2189,7 @@ const ListManagerPage: React.FC = () => {
       }
     );
 
-    const endColumns = [
+    const endColumns: any = [
       // {
       //   key: "changeStatus",
       //   name: "Status",
@@ -2188,7 +2208,6 @@ const ListManagerPage: React.FC = () => {
       //           return "default";
       //       }
       //     };
-
       //     const getStatusLabel = (status: string) => {
       //       switch (status?.toLowerCase()) {
       //         case "confirmed":
@@ -2201,7 +2220,6 @@ const ListManagerPage: React.FC = () => {
       //           return "Ausstehend";
       //       }
       //     };
-
       //     return (
       //       <Chip
       //         label={getStatusLabel(props.row.changeStatus)}
@@ -2212,32 +2230,32 @@ const ListManagerPage: React.FC = () => {
       //     );
       //   },
       // },
-      {
-        key: "marked",
-        name: "Markiert",
-        width: 120,
-        resizable: true,
-        renderCell: (props: any) => (
-          <EditableMarkedCell
-            row={props.row}
-            onUpdateItem={handleUpdateItem}
-            isEditable={isEditable}
-          />
-        ),
-      },
-      {
-        key: "comment",
-        name: "Kommentar",
-        width: 200,
-        resizable: true,
-        renderCell: (props: any) => (
-          <EditableCommentCell
-            row={props.row}
-            onUpdateItem={handleUpdateItem}
-            isEditable={isEditable}
-          />
-        ),
-      },
+      // {
+      //   key: "marked",
+      //   name: "Markiert",
+      //   width: 120,
+      //   resizable: true,
+      //   renderCell: (props: any) => (
+      //     <EditableMarkedCell
+      //       row={props.row}
+      //       onUpdateItem={handleUpdateItem}
+      //       isEditable={isEditable}
+      //     />
+      //   ),
+      // },
+      // {
+      //   key: "comment",
+      //   name: "Kommentar",
+      //   width: 200,
+      //   resizable: true,
+      //   renderCell: (props: any) => (
+      //     <EditableCommentCell
+      //       row={props.row}
+      //       onUpdateItem={handleUpdateItem}
+      //       isEditable={isEditable}
+      //     />
+      //   ),
+      // },
     ];
 
     return [...baseColumns, ...deliveryColumns, ...endColumns];
