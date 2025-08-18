@@ -405,7 +405,6 @@ export const updateListItem = async (
       imageUrl,
       item_no_de,
     } = req.body;
-    let refresh = true;
     const userId = (req as any).user?.id;
     const customerId = (req as any).customer?.id;
 
@@ -433,16 +432,6 @@ export const updateListItem = async (
     });
     if (!list) {
       return next(new ErrorHandler("Associated list not found", 404));
-    }
-
-    // If refresh is requested, fetch fresh data from MIS first
-    if (refresh) {
-      const refreshedItem = await updateLocalListItem(item);
-      return res.status(200).json({
-        success: true,
-        message: "Item refreshed successfully",
-        data: refreshedItem,
-      });
     }
 
     // Store original values and track changes

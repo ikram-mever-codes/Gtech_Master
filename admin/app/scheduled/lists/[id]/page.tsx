@@ -1458,11 +1458,11 @@ function AddItemDialog({ open, onClose, onAddItem, listId }: any) {
                   <Typography variant="h6" fontWeight={600}>
                     {selectedItem.name}
                   </Typography>
-                  {selectedItem.articleNumber && (
+                  {/* {selectedItem.articleNumber && (
                     <Typography variant="body2" color="text.secondary">
                       Article Number: {selectedItem.articleNumber}
                     </Typography>
-                  )}
+                  )} */}
                 </Box>
               </Box>
             </Card>
@@ -1840,16 +1840,16 @@ const AdminListDetailPage = () => {
       //   width: 100,
       //   resizable: true,
       // },
-      {
-        key: "articleNumber",
-        name: "Article Number",
-        width: 140,
-        resizable: true,
-      },
+      // {
+      //   key: "articleNumber",
+      //   name: "Article Number",
+      //   width: 140,
+      //   resizable: true,
+      // },
       {
         key: "imageUrl",
         name: "Image",
-        width: 80,
+        width: 100,
         resizable: true,
         frozen: true,
         renderCell: (props: any) => {
@@ -1886,8 +1886,8 @@ const AdminListDetailPage = () => {
               >
                 <Box
                   sx={{
-                    width: 50,
-                    height: 50,
+                    width: 65,
+                    height: 65,
                     borderRadius: 2,
                     overflow: "hidden",
                     display: "flex",
@@ -2078,21 +2078,21 @@ const AdminListDetailPage = () => {
           );
         },
       },
-      {
-        key: "marked",
-        name: "Marked",
-        width: 80,
-        resizable: true,
-        renderCell: (props: any) => (
-          <Checkbox
-            size="small"
-            checked={props.row.marked}
-            icon={<CheckBoxOutlineBlank />}
-            checkedIcon={<CheckBox />}
-            onChange={() => {}}
-          />
-        ),
-      },
+      // {
+      //   key: "marked",
+      //   name: "Marked",
+      //   width: 80,
+      //   resizable: true,
+      //   renderCell: (props: any) => (
+      //     <Checkbox
+      //       size="small"
+      //       checked={props.row.marked}
+      //       icon={<CheckBoxOutlineBlank />}
+      //       checkedIcon={<CheckBox />}
+      //       onChange={() => {}}
+      //     />
+      //   ),
+      // },
       {
         key: "comment",
         name: "Comment",
@@ -2160,7 +2160,7 @@ const AdminListDetailPage = () => {
 
   return (
     <Box sx={{ width: "100%", py: 3, px: 0, pt: 0 }}>
-      <Box sx={{ maxWidth: "75vw", mx: "auto" }}>
+      <Box sx={{ maxWidth: "85vw", mx: "auto" }}>
         {/* Header */}
         <Box
           sx={{
@@ -2359,17 +2359,6 @@ const AdminListDetailPage = () => {
                     onClick={() => window.location.reload()}
                   >
                     Refresh
-                  </CustomButton>
-
-                  <CustomButton
-                    variant="contained"
-                    startIcon={<Save />}
-                    color="primary"
-                    gradient={true}
-                    loading={saving}
-                    onClick={() => toast.success("Changes saved!")}
-                  >
-                    Save Changes
                   </CustomButton>
                 </Box>
               </Box>
@@ -2661,7 +2650,7 @@ const AdminListDetailPage = () => {
                         ).length
                       }
                     </Typography>
-                    <Typography
+                    {/* <Typography
                       variant="body2"
                       sx={{ display: "flex", alignItems: "center" }}
                     >
@@ -2682,7 +2671,7 @@ const AdminListDetailPage = () => {
                       />
                       <strong>Marked:</strong>{" "}
                       {listData.items.filter((item: any) => item.marked).length}
-                    </Typography>
+                    </Typography> */}
                   </Box>
                 </Box>
               )}

@@ -117,34 +117,6 @@ const DELIVERY_STATUS_CONFIG: any = {
   [DELIVERY_STATUS.CANCELLED]: { color: "error", label: "Cancelled" },
 };
 
-const CARGO_STATUS_OPTIONS = [
-  {
-    value: "preparing",
-    label: "Preparing",
-    color: "warning",
-    icon: <Schedule />,
-  },
-  {
-    value: "shipped",
-    label: "Shipped",
-    color: "info",
-    icon: <LocalShipping />,
-  },
-  {
-    value: "in_transit",
-    label: "In Transit",
-    color: "primary",
-    icon: <LocationOn />,
-  },
-  {
-    value: "arrived",
-    label: "Arrived",
-    color: "success",
-    icon: <CheckCircle />,
-  },
-  { value: "delayed", label: "Delayed", color: "error", icon: <Schedule /> },
-];
-
 const errorStyles = {
   style: {
     background: "#fee2e2",
@@ -219,24 +191,6 @@ const DeliveryCell = ({ row, period }: any) => {
   }
 
   const status = delivery.status || "NSO";
-  const statusConfig = {
-    color:
-      status === "confirmed"
-        ? "success"
-        : status === "pending"
-        ? "warning"
-        : status === "rejected"
-        ? "error"
-        : "default",
-    label:
-      status === "confirmed"
-        ? "Bestätigt"
-        : status === "pending"
-        ? "Ausstehend"
-        : status === "rejected"
-        ? "Abgelehnt"
-        : status,
-  };
 
   return (
     <>
@@ -261,7 +215,7 @@ const DeliveryCell = ({ row, period }: any) => {
           {delivery.quantity || 0}
         </Typography>
         <Chip
-          label={statusConfig.label}
+          label={status}
           size="small"
           color={"primary"}
           sx={{
@@ -323,11 +277,7 @@ const DeliveryCell = ({ row, period }: any) => {
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 <strong>Status:</strong>{" "}
-                <Chip
-                  label={statusConfig.label}
-                  size="small"
-                  color={"primary"}
-                />
+                <Chip label={status} size="small" color={"primary"} />
               </Typography>
               {delivery.eta && (
                 <Typography variant="body2" color="text.secondary">
@@ -2112,8 +2062,6 @@ const ListManagerPage: React.FC = () => {
       },
     ];
 
-    // Add delivery columns dynamically
-    // In the columns configuration:
     const deliveryColumns = deliveryPeriodsData.sortedPeriods.map(
       (period: any) => {
         const cargoNo = currentList?.items
@@ -2129,13 +2077,10 @@ const ListManagerPage: React.FC = () => {
           .find((cn: string) => cn);
 
         function formatEta(etaDate: any) {
-          if (!etaDate) return null; // Handle empty/null dates
-
+          if (!etaDate) return null;
           const now = new Date();
           const eta = new Date(etaDate);
-
-          // Check if the date is invalid
-          if (isNaN(eta.getTime())) return etaDate; // Return original if invalid date
+          if (isNaN(eta.getTime())) return etaDate;
 
           const isCurrentYear = eta.getFullYear() === now.getFullYear();
 
@@ -2148,41 +2093,104 @@ const ListManagerPage: React.FC = () => {
             return eta.toLocaleDateString("de-DE");
           }
         }
+
+        // Status descriptions mapping
+        const statusDescriptions: Record<string, string> = {
+          open: "Cargo planned - The shipment is in the planning phase",
+          packed:
+            "Goods are packed - Items have been prepared and packaged for shipment",
+          shipped:
+            "Cargo is sent out - The shipment has left the origin facility",
+          arrived:
+            "Arrived in Germany - The shipment has reached its destination in Germany",
+        };
+
+        const renderTooltipContent = () => (
+          <Box sx={{ p: 1 }}>
+            <Typography variant="body2" sx={{ fontWeight: "bold", mb: 1 }}>
+              {cargoStatus ? `${cargoStatus.toUpperCase()}` : "No Status"}
+            </Typography>
+            <Typography variant="body2">
+              {cargoStatus
+                ? statusDescriptions[cargoStatus.toLowerCase()]
+                : "No status information available"}
+            </Typography>
+            {eta && (
+              <Typography variant="body2" sx={{ mt: 1, fontStyle: "italic" }}>
+                Estimated arrival: {formatEta(eta)}
+              </Typography>
+            )}
+          </Box>
+        );
+
+        const tooltipProps = {
+          title: renderTooltipContent(),
+          arrow: true,
+          placement: "top" as const,
+          componentsProps: {
+            tooltip: {
+              sx: {
+                bgcolor: "common.white",
+                color: "text.primary",
+                boxShadow: 1,
+                border: "1px solid",
+                borderColor: "divider",
+                maxWidth: 300,
+              },
+            },
+            arrow: {
+              sx: {
+                color: "common.white",
+                "&:before": {
+                  border: "1px solid",
+                  borderColor: "divider",
+                },
+              },
+            },
+          },
+        };
+
         return {
           key: `delivery_${period}`,
           name: formatPeriodLabel(period, cargoNo || ""),
           width: 180,
           resizable: false,
           renderCell: (props: any) => (
-            <DeliveryCell row={props.row} period={period} />
+            <Tooltip {...tooltipProps}>
+              <span>
+                <DeliveryCell row={props.row} period={period} />
+              </span>
+            </Tooltip>
           ),
           renderHeaderCell: (props: any) => (
-            <Box
-              sx={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                height: "100%",
-                padding: "8px 4px",
-                maxWidth: "500px",
-                textWrap: "wrap",
-              }}
-            >
-              <div className="flex gap-0 text-sm flex-col">
-                <span>{formatPeriodLabel(period, cargoNo || "")}</span>
-                {cargoStatus && (
-                  <span className="w-max h-max p-1 px-3 text-xs bg-yellow-500 text-white rounded-full">
-                    {cargoStatus}
-                  </span>
-                )}
-                {eta && (
-                  <span>
-                    Eta: <span className="font-medium">{formatEta(eta)}</span>
-                  </span>
-                )}
-              </div>
-            </Box>
+            <Tooltip {...tooltipProps}>
+              <Box
+                sx={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  height: "100%",
+                  padding: "8px 4px",
+                  maxWidth: "500px",
+                  textWrap: "wrap",
+                }}
+              >
+                <div className="flex gap-0 text-sm flex-col">
+                  <span>{formatPeriodLabel(period, cargoNo || "")}</span>
+                  {cargoStatus && (
+                    <span className="w-max h-max p-1 px-3 text-xs bg-yellow-500 text-white rounded-full">
+                      {cargoStatus}
+                    </span>
+                  )}
+                  {eta && (
+                    <span>
+                      Eta: <span className="font-medium">{formatEta(eta)}</span>
+                    </span>
+                  )}
+                </div>
+              </Box>
+            </Tooltip>
           ),
         };
       }
