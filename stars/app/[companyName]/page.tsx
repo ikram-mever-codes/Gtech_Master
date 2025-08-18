@@ -65,6 +65,7 @@ import { RootState } from "../Redux/store";
 import { useSelector } from "react-redux";
 import { toast } from "react-hot-toast";
 import { formatPeriodLabel } from "@/utils/constants";
+import CustomButton from "@/components/UI/CustomButton";
 
 // Types
 interface ListItem {
@@ -833,7 +834,7 @@ function ListTabs({ currentListId, allLists, onListChange, loading }: any) {
         backdropFilter: "blur(10px)",
       }}
     >
-      <Box
+      {/* <Box
         sx={{
           px: { xs: 2, sm: 3 },
           py: 2,
@@ -848,15 +849,12 @@ function ListTabs({ currentListId, allLists, onListChange, loading }: any) {
         >
           Switch Between Lists
         </Typography>
-        <Typography variant="caption" color="text.secondary">
-          Quick navigation between your product lists
-        </Typography>
-      </Box>
+      </Box> */}
 
       <Box
         sx={{
           px: { xs: 1, sm: 2 },
-          py: 2,
+          py: 1,
           overflowX: "auto",
           "&::-webkit-scrollbar": {
             height: 6,
@@ -890,6 +888,7 @@ function ListTabs({ currentListId, allLists, onListChange, loading }: any) {
                 sx={{
                   minWidth: { xs: 200, sm: 240 },
                   p: 2,
+                  py: 1,
                   cursor: "pointer",
                   border: "1px solid",
                   borderColor: isActive
@@ -2316,48 +2315,76 @@ const ListManagerPage: React.FC = () => {
             gap: 1,
           }}
         >
-          <IconButton
-            onClick={() => window.history.back()}
-            sx={{
-              mr: { xs: 1, sm: 1.5 },
-              bgcolor: "background.paper",
-              boxShadow: "0 2px 12px rgba(0,0,0,0.08)",
-              width: { xs: 40, sm: 48 },
-              height: { xs: 40, sm: 48 },
-              border: `1px solid ${alpha("#E2E8F0", 0.8)}`,
-              "&:hover": {
-                bgcolor: "background.paper",
-                transform: "translateY(-2px)",
-                boxShadow: "0 6px 20px rgba(0,0,0,0.12)",
-              },
-              transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-            }}
-          >
-            <ArrowBack fontSize={isSmallMobile ? "small" : "medium"} />
-          </IconButton>
-
           {/* Company and List Info */}
           <Box sx={{ flex: 1 }}>
             <Box
-              sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5 }}
+              sx={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
             >
-              <Business color="primary" fontSize="small" />
-              <Typography
-                variant="h4"
-                component="h1"
-                sx={{
-                  fontWeight: 700,
-                  fontSize: { xs: "1.3rem", sm: "1.8rem", md: "2.2rem" },
-                  background:
-                    "linear-gradient(45deg, #8CC21B 30%, #4CAF50 90%)",
-                  backgroundClip: "text",
-                  WebkitBackgroundClip: "text",
-                  WebkitTextFillColor: "transparent",
-                  letterSpacing: "-0.5px",
-                }}
+              <Box
+                sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5 }}
               >
-                {companyName}
-              </Typography>
+                <IconButton
+                  onClick={() => window.history.back()}
+                  sx={{
+                    mr: { xs: 1, sm: 1.5 },
+                    bgcolor: "background.paper",
+                    boxShadow: "0 2px 12px rgba(0,0,0,0.08)",
+                    width: { xs: 40, sm: 48 },
+                    height: { xs: 40, sm: 48 },
+                    border: `1px solid ${alpha("#E2E8F0", 0.8)}`,
+                    "&:hover": {
+                      bgcolor: "background.paper",
+                      transform: "translateY(-2px)",
+                      boxShadow: "0 6px 20px rgba(0,0,0,0.12)",
+                    },
+                    transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                  }}
+                >
+                  <ArrowBack fontSize={isSmallMobile ? "small" : "medium"} />
+                </IconButton>
+                <Business color="primary" fontSize="small" />
+                <Typography
+                  variant="h4"
+                  component="h1"
+                  sx={{
+                    fontWeight: 700,
+                    fontSize: { xs: "1.3rem", sm: "1.8rem", md: "2.2rem" },
+                    background:
+                      "linear-gradient(45deg, #8CC21B 30%, #4CAF50 90%)",
+                    backgroundClip: "text",
+                    WebkitBackgroundClip: "text",
+                    WebkitTextFillColor: "transparent",
+                    letterSpacing: "-0.5px",
+                  }}
+                >
+                  {companyName}
+                </Typography>
+              </Box>
+              <div className="flex gap-3 justify-center flex-row-reverse items-center ">
+                {!isEditable && (
+                  <CustomButton
+                    gradient={true}
+                    onClick={() => {
+                      router.push("/login");
+                    }}
+                  >
+                    Login
+                  </CustomButton>
+                )}
+                {!isEditable && (
+                  <Chip
+                    label="Read Only"
+                    size="small"
+                    color="warning"
+                    variant="outlined"
+                    sx={{ borderRadius: 1 }}
+                  />
+                )}
+              </div>
             </Box>
 
             {currentList && (
@@ -2429,11 +2456,13 @@ const ListManagerPage: React.FC = () => {
                       sx={{
                         fontWeight: 500,
                         color: "text.secondary",
-                        fontSize: { xs: "0.9rem", sm: "1.1rem" },
+                        fontSize: { xs: "1rem", sm: "1.4rem" },
                         cursor: isEditable ? "pointer" : "default",
                         "&:hover": {
                           opacity: isEditable ? 0.8 : 1,
                         },
+                        mx: 2,
+                        my: 1,
                       }}
                       onClick={() => {
                         if (isEditable) {
@@ -2470,73 +2499,14 @@ const ListManagerPage: React.FC = () => {
                 )}
               </Box>
             )}
-          </Box>
-
-          {/* Auth Status */}
-          {!isEditable && (
-            <Chip
-              label="Read Only"
-              size="small"
-              color="warning"
-              variant="outlined"
-              sx={{ borderRadius: 1 }}
+            <ListTabs
+              currentListId={currentListId}
+              allLists={allLists}
+              onListChange={handleListChange}
+              loading={isLoading}
             />
-          )}
-        </Box>
-
-        {/* Quick Info */}
-        {currentList && (
-          <Box
-            sx={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              gap: 2,
-              flexWrap: "wrap",
-            }}
-          >
-            <Box
-              sx={{
-                display: "flex",
-                alignItems: "center",
-                gap: { xs: 1, sm: 2 },
-                flexWrap: "wrap",
-              }}
-            >
-              <Chip
-                label={`${currentList.items?.length || 0} items`}
-                size="small"
-                color="primary"
-                variant="outlined"
-                sx={{ borderRadius: 1 }}
-              />
-              {selectedRows.size > 0 && (
-                <Chip
-                  label={`${selectedRows.size} selected`}
-                  size="small"
-                  color="secondary"
-                  variant="filled"
-                  sx={{ borderRadius: 1 }}
-                />
-              )}
-            </Box>
-
-            <Box
-              sx={{
-                display: "flex",
-                alignItems: "center",
-                gap: { xs: 1, sm: 2 },
-                flexWrap: "wrap",
-              }}
-            >
-              <Hash fontSize="small" color="primary" />
-              <Typography variant="body2" color="text.secondary">
-                List Number:{" "}
-                <strong>{currentList.listNumber || "Not assigned"}</strong>
-              </Typography>
-            </Box>
           </Box>
-        )}
+        </Box>
       </Box>
 
       {/* Error State */}
@@ -2976,12 +2946,6 @@ const ListManagerPage: React.FC = () => {
           </Box>
 
           {/* List Tabs - Show at bottom of current list */}
-          <ListTabs
-            currentListId={currentListId}
-            allLists={allLists}
-            onListChange={handleListChange}
-            loading={isLoading}
-          />
         </Card>
       )}
 

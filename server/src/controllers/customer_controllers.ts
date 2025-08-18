@@ -19,6 +19,7 @@ export const requestCustomerAccount = async (
   try {
     const {
       companyName,
+      legalName,
       email,
       contactEmail,
       contactPhoneNumber,
@@ -87,6 +88,7 @@ export const requestCustomerAccount = async (
     // Create customer
     const customer = customerRepository.create({
       companyName,
+      legalName,
       email,
       contactEmail,
       contactPhoneNumber,
@@ -111,9 +113,10 @@ export const requestCustomerAccount = async (
 
     // Send verification email
     const verificationUrl = `${process.env.STAR_URL}/verify-email?code=${emailVerificationCode}`;
+    const displayName = legalName || companyName;
     const message = `
       <h2>Welcome to Our Platform</h2>
-      <p>Thank you for registering your company ${companyName}.</p>
+      <p>Thank you for registering your company ${displayName}.</p>
       <p>Please verify your email by clicking the link below:</p>
       <a href="${verificationUrl}">Verify Email</a>
       <p>This link will expire in 24 hours.</p>
@@ -132,6 +135,7 @@ export const requestCustomerAccount = async (
       data: {
         id: customer.id,
         companyName: customer.companyName,
+        legalName: customer.legalName,
         email: customer.email,
       },
     });
@@ -235,6 +239,7 @@ export const login = async (
     const customerData = {
       id: customer.id,
       companyName: customer.companyName,
+      legalName: customer.legalName,
       email: customer.email,
       contactEmail: customer.contactEmail,
       avatar: customer.avatar,
@@ -293,6 +298,7 @@ export const editCustomerProfile = async (
     const customerId = (req as any).customer.id;
     const {
       companyName,
+      legalName,
       contactEmail,
       contactPhoneNumber,
       taxNumber,
@@ -346,6 +352,7 @@ export const editCustomerProfile = async (
 
     // Update fields
     if (companyName) customer.companyName = companyName;
+    if (legalName) customer.legalName = legalName;
     if (contactEmail) customer.contactEmail = contactEmail;
     if (contactPhoneNumber) customer.contactPhoneNumber = contactPhoneNumber;
     if (taxNumber) customer.taxNumber = taxNumber;
@@ -368,6 +375,7 @@ export const editCustomerProfile = async (
     const customerData = {
       id: customer.id,
       companyName: customer.companyName,
+      legalName: customer.legalName,
       email: customer.email,
       contactEmail: customer.contactEmail,
       contactPhoneNumber: customer.contactPhoneNumber,
@@ -420,6 +428,7 @@ export const refresh = async (
     const customerData = {
       id: customer.id,
       companyName: customer.companyName,
+      legalName: customer.legalName,
       email: customer.email,
       contactEmail: customer.contactEmail,
       avatar: customer.avatar,
@@ -766,6 +775,7 @@ export const getAllCustomers = async (
     const allowedSortColumns = [
       "createdAt",
       "companyName",
+      "legalName",
       "email",
       "contactEmail",
       "contactPhoneNumber",
@@ -796,6 +806,7 @@ export const getAllCustomers = async (
     const customersData = customers.map((customer) => ({
       id: customer.id,
       companyName: customer.companyName,
+      legalName: customer.legalName,
       email: customer.email,
       contactEmail: customer.contactEmail,
       contactPhoneNumber: customer.contactPhoneNumber,
@@ -825,7 +836,6 @@ export const getSingleUser = async (
 ) => {
   try {
     const { customerId } = req.params;
-    console.log(customerId);
     const customerRepo = AppDataSource.getRepository(Customer);
     const customer = await customerRepo.findOne({ where: { id: customerId } });
 
@@ -833,7 +843,35 @@ export const getSingleUser = async (
       return next(new ErrorHandler("Customer Not Found!", 404));
     }
 
-    return res.status(200).json({ data: customer, success: true });
+    // Filter sensitive data
+    const customerData = {
+      id: customer.id,
+      companyName: customer.companyName,
+      legalName: customer.legalName,
+      email: customer.email,
+      contactEmail: customer.contactEmail,
+      contactPhoneNumber: customer.contactPhoneNumber,
+      taxNumber: customer.taxNumber,
+      addressLine1: customer.addressLine1,
+      addressLine2: customer.addressLine2,
+      postalCode: customer.postalCode,
+      city: customer.city,
+      country: customer.country,
+      deliveryAddressLine1: customer.deliveryAddressLine1,
+      deliveryAddressLine2: customer.deliveryAddressLine2,
+      deliveryPostalCode: customer.deliveryPostalCode,
+      deliveryCity: customer.deliveryCity,
+      deliveryCountry: customer.deliveryCountry,
+      createdAt: customer.createdAt,
+      updatedAt: customer.updatedAt,
+      accountVerificationStatus: customer.accountVerificationStatus,
+      avatar: customer.avatar,
+    };
+
+    return res.status(200).json({
+      data: customerData,
+      success: true,
+    });
   } catch (error) {
     return next(error);
   }

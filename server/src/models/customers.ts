@@ -17,6 +17,9 @@ export class Customer {
   companyName!: string;
 
   @Column({ nullable: true })
+  legalName?: string;
+
+  @Column({ nullable: true })
   avatar?: string;
 
   @Column({ unique: true })

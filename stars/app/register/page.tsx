@@ -70,6 +70,7 @@ interface CustomerSignupPayload {
   contactPhoneNumber: string;
   taxNumber: string;
   addressLine1: string;
+  legalName: string;
   addressLine2?: string;
   postalCode: string;
   city: string;
@@ -86,6 +87,9 @@ interface CustomerSignupPayload {
 const validationSchema = Yup.object({
   companyName: Yup.string()
     .required("Company name is required")
+    .min(2, "Company name must be at least 2 characters"),
+  legalName: Yup.string()
+    .required("Company Legal name is required")
     .min(2, "Company name must be at least 2 characters"),
   email: Yup.string()
     .email("Invalid email address")
@@ -538,6 +542,13 @@ const RegistrationPage = () => {
                           label="Company Name"
                           name="companyName"
                           placeholder="Enter your company name"
+                          tooltip="Your company display Name"
+                        />
+                        <FormInput
+                          icon={<Building2 size={18} />}
+                          label="Company Legal Name"
+                          name="legalName"
+                          placeholder="Enter your company Legal name"
                           tooltip="Your registered company name as it appears on official documents"
                         />
                         <FormInput

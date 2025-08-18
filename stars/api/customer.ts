@@ -85,6 +85,7 @@ interface CustomerSignupPayload {
   deliveryCity: string;
   deliveryCountry: string;
   password: string;
+  legalName: string;
 }
 
 export const requestCustomerAccount = async (

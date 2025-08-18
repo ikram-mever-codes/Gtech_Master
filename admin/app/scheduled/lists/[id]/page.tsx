@@ -278,7 +278,7 @@ function DeliveryCell({ row, period, onUpdateDelivery }: any) {
             Quantity: {delivery?.quantity || 0}
           </Typography>
           <Typography color="white" variant="caption" display="block">
-            Status: {config.label}
+            {/* Status: {config.label} */}
           </Typography>
           {delivery?.deliveredAt && (
             <Typography color="white" variant="caption" display="block">
@@ -331,7 +331,7 @@ function DeliveryCell({ row, period, onUpdateDelivery }: any) {
             {Number(delivery?.quantity || 0).toFixed(0) || 0}
           </Typography>
         </Box>
-        <Chip
+        {/* <Chip
           label={config.label}
           size="small"
           color={config.color}
@@ -342,7 +342,7 @@ function DeliveryCell({ row, period, onUpdateDelivery }: any) {
               px: 1,
             },
           }}
-        />
+        /> */}
       </Box>
     </Tooltip>
   );

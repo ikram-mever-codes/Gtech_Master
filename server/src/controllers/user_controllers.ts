@@ -603,6 +603,7 @@ export const createCompany = async (
       country,
       deliveryAddressLine1,
       deliveryAddressLine2,
+      legalName,
       deliveryPostalCode,
       deliveryCity,
       deliveryCountry,
@@ -611,6 +612,7 @@ export const createCompany = async (
     // Validations
     if (
       !companyName ||
+      !legalName ||
       !email ||
       !contactEmail ||
       !contactPhoneNumber ||
@@ -618,7 +620,7 @@ export const createCompany = async (
     ) {
       return next(
         new ErrorHandler(
-          "Company name, email, contact email, contact phone number and tax number are required",
+          "Company name, legal Name, email, contact email, contact phone number and tax number are required",
           400
         )
       );
@@ -644,6 +646,7 @@ export const createCompany = async (
       contactEmail,
       contactPhoneNumber,
       taxNumber,
+      legalName,
       addressLine1,
       addressLine2,
       postalCode,

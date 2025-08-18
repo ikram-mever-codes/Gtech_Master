@@ -17,6 +17,8 @@ export type CustomerData = {
   city: string;
   country: string;
   createdAt: string;
+  legalName: string;
+
   accountVerificationStatus: CustomerVerificationStatus;
   avatar?: string;
 };
@@ -31,6 +33,7 @@ export type CreateCustomerPayload = {
   addressLine2?: string;
   postalCode?: string;
   city?: string;
+  legalName: string;
   country?: string;
   deliveryAddressLine1?: string;
   deliveryAddressLine2?: string;

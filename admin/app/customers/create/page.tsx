@@ -49,6 +49,7 @@ interface FormValues {
   taxNumber: string;
   addressLine1?: string;
   addressLine2?: string;
+  legalName: string;
   postalCode?: string;
   city?: string;
   country?: string;
@@ -62,6 +63,8 @@ interface FormValues {
 
 const validationSchema = Yup.object({
   companyName: Yup.string().required("Company name is required"),
+  legalName: Yup.string().required("Legal name is required"),
+
   email: Yup.string().email("Invalid email").required("Email is required"),
   contactEmail: Yup.string()
     .email("Invalid contact email")
@@ -140,6 +143,7 @@ const CustomerCreatePage: React.FC = () => {
       contactEmail: "",
       contactPhoneNumber: "",
       taxNumber: "",
+      legalName: "",
       addressLine1: "",
       addressLine2: "",
       postalCode: "",
@@ -295,6 +299,15 @@ const CustomerCreatePage: React.FC = () => {
                 icon={<LucideBuilding size={20} />}
                 formik={formik}
                 placeholder="Acme Inc."
+              />
+            </div>
+            <div>
+              <FormInput
+                name="legalName"
+                label="Legal Name"
+                icon={<LucideBuilding size={20} />}
+                formik={formik}
+                placeholder="Gtech Industries Gmbh"
               />
             </div>
 
