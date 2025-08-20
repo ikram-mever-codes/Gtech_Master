@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Formik, Form, Field, ErrorMessage } from "formik";
 import * as Yup from "yup";
 import {
@@ -17,9 +17,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
 import { loginCustomer } from "@/api/customer";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { BASE_URL, loadingStyles, successStyles } from "@/utils/constants";
-import { AppDispatch } from "../Redux/store";
+import { AppDispatch, RootState } from "../Redux/store";
 import { customerLogin } from "../Redux/features/customerSlice";
 import { handleApiError } from "@/utils/api";
 import axios from "axios";
@@ -89,6 +89,7 @@ const LoginPage = () => {
   const router = useRouter();
   const [authError, setAuthError] = useState("");
   const dispatch = useDispatch();
+  const { customer } = useSelector((state: RootState) => state.customer);
   // Initial form values
   const initialValues = {
     email: "",
@@ -161,6 +162,19 @@ const LoginPage = () => {
     }
   };
 
+  useEffect(() => {
+    const checkCus = async () => {
+      if (customer !== null) {
+        const listsResponse = await getAllListForACustomer(customer.id);
+        if (listsResponse && listsResponse.length > 0) {
+          router.push(`/scheduled-items/lists/${listsResponse[0].id}`);
+        } else {
+          router.push("/");
+        }
+      }
+    };
+    checkCus();
+  }, []);
   // Benefits section items
   const benefits = [
     {

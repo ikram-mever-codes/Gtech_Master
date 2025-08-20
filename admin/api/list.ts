@@ -73,7 +73,7 @@ export const createNewList = async (listData: CreateListPayload) => {
 
 export const getCustomerLists = async (customerId: string) => {
   try {
-    const response = await api.get(`/lists/customer/${customerId}`);
+    const response = await api.get(`/lists/customer/all/${customerId}`);
     return response.data;
   } catch (error) {
     handleApiError(error, "Failed to fetch customer lists");
@@ -268,6 +268,26 @@ export const rejectActivityLog = async (
     return response.data;
   } catch (error) {
     handleApiError(error, "Rejection failed");
+    throw error;
+  }
+};
+
+export const bulkAcknowledgeChanges = async (
+  listId: string,
+  itemIds?: string[],
+  acknowledgeComments?: boolean
+) => {
+  try {
+    toast.loading("Acknowledging changes...", loadingStyles);
+    const response = await api.put(`/lists/${listId}/bulk-acknowledge`, {
+      itemIds,
+      acknowledgeComments,
+    });
+    toast.dismiss();
+    toast.success("Changes acknowledged", successStyles);
+    return response.data;
+  } catch (error) {
+    handleApiError(error, "Bulk acknowledgment failed");
     throw error;
   }
 };

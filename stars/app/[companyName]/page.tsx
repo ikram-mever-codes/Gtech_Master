@@ -30,6 +30,7 @@ import {
   Grid,
   FormControl,
   Button,
+  Badge,
 } from "@mui/material";
 import {
   ArrowBack,
@@ -50,6 +51,9 @@ import {
   Schedule,
   LocationOn,
   Info,
+  Visibility,
+  NotificationImportant,
+  Warning,
 } from "@mui/icons-material";
 import { DataGrid } from "react-data-grid";
 import "react-data-grid/lib/styles.css";
@@ -60,12 +64,19 @@ import {
   deleteListItem,
   addItemToList,
   updateList,
+  acknowledgeListItemChanges,
+  bulkAcknowledgeChanges,
 } from "@/api/lists";
 import { RootState } from "../Redux/store";
-import { useSelector } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { toast } from "react-hot-toast";
-import { formatPeriodLabel } from "@/utils/constants";
+import {
+  errorStyles,
+  formatPeriodLabel,
+  successStyles,
+} from "@/utils/constants";
 import CustomButton from "@/components/UI/CustomButton";
+import { logoutCustomer, updateCustomerProfile } from "@/api/customer";
 
 // Types
 interface ListItem {
@@ -83,16 +94,24 @@ interface ListItem {
   changeStatus?: string;
   deliveries?: any;
   interval?: string;
+  changesNeedAcknowledgment?: boolean;
+  hasChanges?: boolean;
+  shouldHighlight?: boolean;
+  lastModifiedBy?: "company" | "customer";
+  lastModifiedAt?: string;
+  changedFields?: string[];
 }
 
 interface ListData {
   id: string;
   name: string;
   description: string;
-  items: ListItem[];
+  items: any[];
   createdAt: string;
   lastModified: string;
   listNumber?: string;
+  changesNeedingAcknowledgment?: number;
+  pendingChangesCount?: number;
 }
 
 const INTERVAL_OPTIONS = [
@@ -117,18 +136,43 @@ const DELIVERY_STATUS_CONFIG: any = {
   [DELIVERY_STATUS.CANCELLED]: { color: "error", label: "Cancelled" },
 };
 
-const errorStyles = {
-  style: {
-    background: "#fee2e2",
-    color: "#dc2626",
-  },
-};
+// Enhanced FieldHighlight Component
+const FieldHighlight = ({
+  hasChanges,
+  fieldName,
+  children,
+  onClick,
+}: {
+  hasChanges: boolean;
+  fieldName?: string;
+  children: React.ReactNode;
+  onClick?: () => void;
+}) => {
+  const theme = useTheme();
 
-const successStyles = {
-  style: {
-    background: "#dcfce7",
-    color: "#16a34a",
-  },
+  return (
+    <Box
+      sx={{
+        position: "relative",
+        borderRadius: 1,
+        backgroundColor: hasChanges ? "#ffebee" : "transparent",
+        border: hasChanges ? `2px solid #f44336` : "2px solid transparent",
+        transition: "all 0.2s ease",
+        "&:hover": {
+          backgroundColor: hasChanges
+            ? "#ffcdd2"
+            : alpha(theme.palette.primary.main, 0.04),
+          borderColor: hasChanges
+            ? "#f44336"
+            : alpha(theme.palette.primary.main, 0.2),
+        },
+        cursor: onClick ? "pointer" : "default",
+      }}
+      onClick={onClick}
+    >
+      {children}
+    </Box>
+  );
 };
 
 // Utility function to extract delivery periods
@@ -300,12 +344,15 @@ const DeliveryCell = ({ row, period }: any) => {
   );
 };
 
-// Editable Quantity Cell
-function EditableQuantityCell({ row, onUpdateItem, isEditable }: any) {
+// Enhanced Editable Quantity Cell with FieldHighlight
+function EditableQuantityCell({ row, onUpdateItem, isEditable, router }: any) {
   const [isEditing, setIsEditing] = useState(false);
   const [value, setValue] = useState(row.quantity || 0);
   const [saving, setSaving] = useState(false);
-  const theme = useTheme();
+
+  const hasChanges =
+    (row.changesNeedAcknowledgment || row.hasChanges || row.shouldHighlight) &&
+    row.changedFields?.includes("quantity");
 
   const handleSave = async () => {
     if (!isEditable || value === row.quantity) {
@@ -363,37 +410,38 @@ function EditableQuantityCell({ row, onUpdateItem, isEditable }: any) {
   }
 
   return (
-    <Box
-      sx={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        width: "100%",
-        height: "100%",
-        cursor: isEditable ? "pointer" : "default",
-        borderRadius: 1,
-        "&:hover": {
-          backgroundColor: isEditable
-            ? alpha(theme.palette.primary.main, 0.05)
-            : "transparent",
-        },
-        transition: "background-color 0.2s",
-      }}
-      onClick={() => isEditable && setIsEditing(true)}
+    <FieldHighlight
+      hasChanges={hasChanges}
+      fieldName="Menge"
+      onClick={() => (isEditable ? setIsEditing(true) : router.push("/login"))}
     >
-      <Typography variant="body2" fontWeight={600} sx={{ fontSize: "16px" }}>
-        {row.quantity || 0}
-      </Typography>
-    </Box>
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          width: "100%",
+          height: "100%",
+          p: 1,
+        }}
+      >
+        <Typography variant="body2" fontWeight={600} sx={{ fontSize: "16px" }}>
+          {row.quantity || 0}
+        </Typography>
+      </Box>
+    </FieldHighlight>
   );
 }
 
-// Editable Comment Cell
-function EditableCommentCell({ row, onUpdateItem, isEditable }: any) {
+// Enhanced Editable Comment Cell with FieldHighlight
+function EditableCommentCell({ row, onUpdateItem, isEditable, router }: any) {
   const [isEditing, setIsEditing] = useState(false);
   const [value, setValue] = useState(row.comment || "");
   const [saving, setSaving] = useState(false);
-  const theme = useTheme();
+
+  const hasChanges =
+    (row.changesNeedAcknowledgment || row.hasChanges || row.shouldHighlight) &&
+    row.changedFields?.includes("comment");
 
   const handleSave = async () => {
     if (!isEditable || value === row.comment) {
@@ -450,34 +498,36 @@ function EditableCommentCell({ row, onUpdateItem, isEditable }: any) {
   }
 
   return (
-    <Box
-      sx={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        width: "100%",
-        height: "100%",
-        cursor: isEditable ? "pointer" : "default",
-        borderRadius: 1,
-        "&:hover": {
-          backgroundColor: isEditable
-            ? alpha(theme.palette.primary.main, 0.05)
-            : "transparent",
-        },
-        transition: "background-color 0.2s",
-      }}
-      onClick={() => isEditable && setIsEditing(true)}
+    <FieldHighlight
+      hasChanges={hasChanges}
+      fieldName="Kommentar"
+      onClick={() => (isEditable ? setIsEditing(true) : router.push("/login"))}
     >
-      <Typography variant="body2" sx={{ fontSize: "14px" }}>
-        {row.comment || "Add comment..."}
-      </Typography>
-    </Box>
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          width: "100%",
+          height: "100%",
+          p: 1,
+        }}
+      >
+        <Typography variant="body2" sx={{ fontSize: "14px" }}>
+          {row.comment || "Add comment..."}
+        </Typography>
+      </Box>
+    </FieldHighlight>
   );
 }
 
-// Editable Marked Cell
+// Enhanced Editable Marked Cell with FieldHighlight
 function EditableMarkedCell({ row, onUpdateItem, isEditable }: any) {
   const [saving, setSaving] = useState(false);
+
+  const hasChanges =
+    (row.changesNeedAcknowledgment || row.hasChanges || row.shouldHighlight) &&
+    row.changedFields?.includes("marked");
 
   const handleToggle = async () => {
     if (!isEditable) return;
@@ -493,31 +543,41 @@ function EditableMarkedCell({ row, onUpdateItem, isEditable }: any) {
   };
 
   return (
-    <Box
-      sx={{ display: "flex", alignItems: "center", justifyContent: "center" }}
-    >
-      {saving ? (
-        <CircularProgress size={20} />
-      ) : (
-        <Checkbox
-          size="small"
-          checked={row.marked || false}
-          disabled={!isEditable}
-          icon={<CheckBoxOutlineBlank />}
-          checkedIcon={<CheckBox />}
-          onChange={handleToggle}
-        />
-      )}
-    </Box>
+    <FieldHighlight hasChanges={hasChanges} fieldName="Markiert">
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          p: 0.5,
+        }}
+      >
+        {saving ? (
+          <CircularProgress size={20} />
+        ) : (
+          <Checkbox
+            size="small"
+            checked={row.marked || false}
+            disabled={!isEditable}
+            icon={<CheckBoxOutlineBlank />}
+            checkedIcon={<CheckBox />}
+            onChange={handleToggle}
+          />
+        )}
+      </Box>
+    </FieldHighlight>
   );
 }
 
-// Editable Interval Cell
-function EditableIntervalCell({ row, onUpdateItem, isEditable }: any) {
+// Enhanced Editable Interval Cell with FieldHighlight
+function EditableIntervalCell({ row, onUpdateItem, isEditable, router }: any) {
   const [isEditing, setIsEditing] = useState(false);
   const [value, setValue] = useState(row.interval || "monthly");
   const [saving, setSaving] = useState(false);
-  const theme = useTheme();
+
+  const hasChanges =
+    (row.changesNeedAcknowledgment || row.hasChanges || row.shouldHighlight) &&
+    row.changedFields?.includes("interval");
 
   const handleSave = async (newValue: string) => {
     if (!isEditable || newValue === row.interval) {
@@ -575,28 +635,26 @@ function EditableIntervalCell({ row, onUpdateItem, isEditable }: any) {
   }
 
   return (
-    <Box
-      sx={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        width: "100%",
-        height: "100%",
-        cursor: isEditable ? "pointer" : "default",
-        borderRadius: 1,
-        "&:hover": {
-          backgroundColor: isEditable
-            ? alpha(theme.palette.primary.main, 0.05)
-            : "transparent",
-        },
-        transition: "background-color 0.2s",
-      }}
-      onClick={() => isEditable && setIsEditing(true)}
+    <FieldHighlight
+      hasChanges={hasChanges}
+      fieldName="Intervall"
+      onClick={() => (isEditable ? setIsEditing(true) : router.push("/login"))}
     >
-      <Typography variant="body2" sx={{ fontSize: "14px" }}>
-        {getCurrentLabel()}
-      </Typography>
-    </Box>
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          width: "100%",
+          height: "100%",
+          p: 1,
+        }}
+      >
+        <Typography variant="body2" sx={{ fontSize: "14px" }}>
+          {getCurrentLabel()}
+        </Typography>
+      </Box>
+    </FieldHighlight>
   );
 }
 
@@ -630,10 +688,8 @@ const AddItemDialog = ({ open, onClose, onAddItem, listId }: any) => {
         comment: "",
       });
       onClose();
-      toast.success("Item added successfully", successStyles);
     } catch (error) {
       console.error("Failed to add item:", error);
-      toast.error("Failed to add item", errorStyles);
     } finally {
       setSaving(false);
     }
@@ -784,23 +840,6 @@ function ListTabs({ currentListId, allLists, onListChange, loading }: any) {
         backdropFilter: "blur(10px)",
       }}
     >
-      {/* <Box
-        sx={{
-          px: { xs: 2, sm: 3 },
-          py: 2,
-          borderBottom: `1px solid ${alpha("#E2E8F0", 0.6)}`,
-        }}
-      >
-        <Typography
-          variant="subtitle2"
-          fontWeight={600}
-          color="primary.main"
-          sx={{ mb: 0.5 }}
-        >
-          Switch Between Lists
-        </Typography>
-      </Box> */}
-
       <Box
         sx={{
           px: { xs: 1, sm: 2 },
@@ -916,7 +955,7 @@ function ListTabs({ currentListId, allLists, onListChange, loading }: any) {
   );
 }
 
-// Enhanced Mobile Item Card Component
+// Enhanced Mobile Item Card Component with change highlighting
 const MobileItemCard = ({
   item,
   onUpdateItem,
@@ -932,6 +971,9 @@ const MobileItemCard = ({
     interval: item.interval || "monthly",
   });
   const theme = useTheme();
+
+  const hasAnyChanges =
+    item.changesNeedAcknowledgment || item.hasChanges || item.shouldHighlight;
 
   const handleFieldSave = async (field: string, value: any) => {
     if (!isEditable) return;
@@ -985,31 +1027,56 @@ const MobileItemCard = ({
     <Card
       sx={{
         mb: 2,
-        border: "1px solid",
-        borderColor: isSelected
+        border: "2px solid",
+        borderColor: hasAnyChanges
+          ? "#f44336"
+          : isSelected
           ? theme.palette.primary.main
           : alpha("#E0E7FF", 0.8),
-        borderRadius: 1,
+        borderRadius: 2,
         overflow: "hidden",
         transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-        backgroundColor: isSelected
+        backgroundColor: hasAnyChanges
+          ? "#ffebee"
+          : isSelected
           ? alpha(theme.palette.primary.main, 0.02)
           : "background.paper",
-        boxShadow: isSelected
+        boxShadow: hasAnyChanges
+          ? `0 4px 20px ${alpha("#f44336", 0.15)}`
+          : isSelected
           ? `0 4px 20px ${alpha(theme.palette.primary.main, 0.15)}`
           : "0 2px 12px rgba(0,0,0,0.04)",
         "&:hover": {
-          boxShadow: `0 8px 32px ${alpha(theme.palette.primary.main, 0.12)}`,
-          borderColor: alpha(theme.palette.primary.main, 0.4),
+          boxShadow: hasAnyChanges
+            ? `0 8px 32px ${alpha("#f44336", 0.2)}`
+            : `0 8px 32px ${alpha(theme.palette.primary.main, 0.12)}`,
           transform: "translateY(-2px)",
         },
       }}
     >
+      {/* Enhanced change indicator */}
+      {hasAnyChanges && (
+        <Box
+          sx={{
+            backgroundColor: "#f44336",
+            color: "white",
+            p: 1,
+            textAlign: "center",
+          }}
+        >
+          <Typography variant="caption" fontWeight={600} fontSize="0.75rem">
+            🔴 ARTIKEL GEÄNDERT
+          </Typography>
+        </Box>
+      )}
+
       {/* Header Section */}
       <Box
         sx={{
           p: 2,
-          background: isSelected
+          background: hasAnyChanges
+            ? `#ffcdd2`
+            : isSelected
             ? `linear-gradient(135deg, ${alpha(
                 theme.palette.primary.main,
                 0.04
@@ -1045,7 +1112,9 @@ const MobileItemCard = ({
                 width: 70,
                 height: 56,
                 borderRadius: 1,
-                border: `2px solid ${alpha("#FFFFFF", 0.8)}`,
+                border: hasAnyChanges
+                  ? `2px solid #f44336`
+                  : `2px solid ${alpha("#FFFFFF", 0.8)}`,
                 boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
                 background: alpha("#F8FAFC", 0.9),
               }}
@@ -1072,88 +1141,112 @@ const MobileItemCard = ({
 
           {/* Product Info */}
           <Grid item xs>
-            <Typography
-              variant="subtitle1"
-              fontWeight={600}
-              sx={{
-                fontSize: "0.95rem",
-                lineHeight: 1.4,
-                mb: 0.5,
-                color: theme.palette.text.primary,
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                display: "-webkit-box",
-                WebkitLineClamp: 2,
-                WebkitBoxOrient: "vertical",
-              }}
-            >
-              {item.articleName}
-            </Typography>
-
-            {/* Article Info Row */}
-            <Stack
-              direction="row"
-              spacing={1}
-              sx={{ mb: 1, flexWrap: "wrap", gap: 0.5 }}
-            >
-              {item.articleNumber && (
+            <Box sx={{ position: "relative" }}>
+              {hasAnyChanges && (
                 <Chip
-                  label={`${item.articleNumber}`}
+                  label="Geändert"
                   size="small"
-                  variant="outlined"
-                  sx={{
-                    fontSize: "0.7rem",
-                    height: 22,
-                    borderRadius: 1,
-                    backgroundColor: alpha(theme.palette.info.main, 0.08),
-                    borderColor: alpha(theme.palette.info.main, 0.2),
-                    color: theme.palette.info.main,
-                  }}
-                />
-              )}
-              {item.item_no_de && (
-                <Chip
-                  label={`DE: ${item.item_no_de}`}
-                  size="small"
-                  variant="outlined"
-                  sx={{
-                    fontSize: "0.7rem",
-                    height: 22,
-                    borderRadius: 1,
-                    backgroundColor: alpha(theme.palette.secondary.main, 0.08),
-                    borderColor: alpha(theme.palette.secondary.main, 0.2),
-                    color: theme.palette.secondary.main,
-                  }}
-                />
-              )}
-            </Stack>
-
-            {/* Status and Marked Row */}
-            <Stack direction="row" spacing={1} alignItems="center">
-              <Chip
-                label={getStatusLabel(item.changeStatus)}
-                size="small"
-                color={getStatusColor(item.changeStatus)}
-                sx={{
-                  fontWeight: 500,
-                  borderRadius: 1,
-                  fontSize: "0.75rem",
-                }}
-              />
-              {item.marked && (
-                <Chip
-                  label="Markiert"
-                  size="small"
-                  color="primary"
+                  color="error"
                   variant="filled"
+                  icon={<Warning fontSize="small" />}
                   sx={{
+                    position: "absolute",
+                    top: -8,
+                    right: 0,
+                    fontSize: "0.65rem",
+                    height: 18,
                     borderRadius: 1,
-                    fontSize: "0.7rem",
-                    height: 22,
+                    zIndex: 1,
                   }}
                 />
               )}
-            </Stack>
+              <Typography
+                variant="subtitle1"
+                fontWeight={600}
+                sx={{
+                  fontSize: "0.95rem",
+                  lineHeight: 1.4,
+                  mb: 0.5,
+                  color: theme.palette.text.primary,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  display: "-webkit-box",
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: "vertical",
+                  pr: hasAnyChanges ? 8 : 0,
+                }}
+              >
+                {item.articleName}
+              </Typography>
+
+              {/* Article Info Row */}
+              <Stack
+                direction="row"
+                spacing={1}
+                sx={{ mb: 1, flexWrap: "wrap", gap: 0.5 }}
+              >
+                {item.articleNumber && (
+                  <Chip
+                    label={`${item.articleNumber}`}
+                    size="small"
+                    variant="outlined"
+                    sx={{
+                      fontSize: "0.7rem",
+                      height: 22,
+                      borderRadius: 1,
+                      backgroundColor: alpha(theme.palette.info.main, 0.08),
+                      borderColor: alpha(theme.palette.info.main, 0.2),
+                      color: theme.palette.info.main,
+                    }}
+                  />
+                )}
+                {item.item_no_de && (
+                  <Chip
+                    label={`DE: ${item.item_no_de}`}
+                    size="small"
+                    variant="outlined"
+                    sx={{
+                      fontSize: "0.7rem",
+                      height: 22,
+                      borderRadius: 1,
+                      backgroundColor: alpha(
+                        theme.palette.secondary.main,
+                        0.08
+                      ),
+                      borderColor: alpha(theme.palette.secondary.main, 0.2),
+                      color: theme.palette.secondary.main,
+                    }}
+                  />
+                )}
+              </Stack>
+
+              {/* Status and Marked Row */}
+              <Stack direction="row" spacing={1} alignItems="center">
+                <Chip
+                  label={getStatusLabel(item.changeStatus)}
+                  size="small"
+                  color={getStatusColor(item.changeStatus)}
+                  sx={{
+                    fontWeight: 500,
+                    borderRadius: 1,
+                    fontSize: "0.75rem",
+                  }}
+                />
+                {item.marked && (
+                  <Chip
+                    label="Markiert"
+                    size="small"
+                    color="primary"
+                    variant="filled"
+                    sx={{
+                      borderRadius: 1,
+                      fontSize: "0.7rem",
+                      height: 22,
+                    }}
+                  />
+                )}
+              </Stack>
+            </Box>
           </Grid>
 
           {/* Action Buttons */}
@@ -1215,301 +1308,301 @@ const MobileItemCard = ({
         </Grid>
       </Box>
 
-      {/* Expanded Details Section */}
+      {/* Expanded Details Section with Enhanced Highlighting */}
       <Collapse in={expanded}>
         <Box sx={{ p: 2, backgroundColor: alpha("#FAFBFC", 0.5) }}>
-          {/* Editable Fields Grid */}
           <Grid container spacing={2}>
-            {/* Quantity Field */}
+            {/* Quantity Field with Enhanced Highlighting */}
             <Grid item xs={6}>
-              <Box
-                sx={{
-                  p: 1.5,
-                  borderRadius: 1,
-                  backgroundColor: "background.paper",
-                  border: `1px solid ${alpha("#E2E8F0", 0.8)}`,
-                  transition: "all 0.2s ease",
-                  "&:hover": {
-                    borderColor: isEditable
-                      ? alpha(theme.palette.primary.main, 0.3)
-                      : "transparent",
-                    boxShadow: isEditable
-                      ? `0 2px 8px ${alpha(theme.palette.primary.main, 0.08)}`
-                      : "none",
-                  },
-                }}
+              <FieldHighlight
+                hasChanges={
+                  (item.changesNeedAcknowledgment ||
+                    item.hasChanges ||
+                    item.shouldHighlight) &&
+                  item.changedFields?.includes("quantity")
+                }
+                fieldName="Menge"
               >
-                <Typography
-                  variant="caption"
+                <Box
                   sx={{
-                    fontWeight: 600,
-                    color: theme.palette.text.secondary,
-                    textTransform: "uppercase",
-                    letterSpacing: 0.5,
-                    mb: 0.5,
-                    display: "block",
+                    p: 1.5,
+                    borderRadius: 1,
+                    backgroundColor: "background.paper",
                   }}
                 >
-                  Menge
-                </Typography>
-                {editingField === "quantity" && isEditable ? (
-                  <TextField
-                    size="small"
-                    type="number"
-                    value={values.quantity}
-                    onChange={(e) =>
-                      setValues((prev) => ({
-                        ...prev,
-                        quantity: e.target.value,
-                      }))
-                    }
-                    onBlur={() =>
-                      handleFieldSave("quantity", Number(values.quantity))
-                    }
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        handleFieldSave("quantity", Number(values.quantity));
-                      } else if (e.key === "Escape") {
-                        setValues((prev) => ({
-                          ...prev,
-                          quantity: item.quantity,
-                        }));
-                        setEditingField(null);
-                      }
-                    }}
-                    fullWidth
-                    autoFocus
-                    sx={{
-                      "& .MuiOutlinedInput-root": {
-                        borderRadius: 1,
-                        height: 32,
-                      },
-                    }}
-                  />
-                ) : (
                   <Typography
-                    variant="body2"
-                    fontWeight={600}
+                    variant="caption"
                     sx={{
-                      cursor: isEditable ? "pointer" : "default",
-                      p: 0.8,
-                      borderRadius: 1,
-                      minHeight: 32,
-                      display: "flex",
-                      alignItems: "center",
-                      "&:hover": {
-                        backgroundColor: isEditable
-                          ? alpha(theme.palette.primary.main, 0.04)
-                          : "transparent",
-                      },
-                    }}
-                    onClick={() => {
-                      if (isEditable) {
-                        setEditingField("quantity");
-                        setValues((prev) => ({
-                          ...prev,
-                          quantity: item.quantity,
-                        }));
-                      }
+                      fontWeight: 600,
+                      color: theme.palette.text.secondary,
+                      textTransform: "uppercase",
+                      letterSpacing: 0.5,
+                      mb: 0.5,
+                      display: "block",
                     }}
                   >
-                    {item.quantity || 0}
+                    Menge
                   </Typography>
-                )}
-              </Box>
-            </Grid>
-
-            {/* Interval Field */}
-            <Grid item xs={6}>
-              <Box
-                sx={{
-                  p: 1.5,
-                  borderRadius: 1,
-                  backgroundColor: "background.paper",
-                  border: `1px solid ${alpha("#E2E8F0", 0.8)}`,
-                  transition: "all 0.2s ease",
-                  "&:hover": {
-                    borderColor: isEditable
-                      ? alpha(theme.palette.primary.main, 0.3)
-                      : "transparent",
-                    boxShadow: isEditable
-                      ? `0 2px 8px ${alpha(theme.palette.primary.main, 0.08)}`
-                      : "none",
-                  },
-                }}
-              >
-                <Typography
-                  variant="caption"
-                  sx={{
-                    fontWeight: 600,
-                    color: theme.palette.text.secondary,
-                    textTransform: "uppercase",
-                    letterSpacing: 0.5,
-                    mb: 0.5,
-                    display: "block",
-                  }}
-                >
-                  Intervall
-                </Typography>
-                {editingField === "interval" && isEditable ? (
-                  <FormControl size="small" fullWidth>
-                    <Select
-                      value={values.interval}
-                      onChange={(e) => {
+                  {editingField === "quantity" && isEditable ? (
+                    <TextField
+                      size="small"
+                      type="number"
+                      value={values.quantity}
+                      onChange={(e) =>
                         setValues((prev) => ({
                           ...prev,
-                          interval: e.target.value,
-                        }));
-                        handleFieldSave("interval", e.target.value);
+                          quantity: e.target.value,
+                        }))
+                      }
+                      onBlur={() =>
+                        handleFieldSave("quantity", Number(values.quantity))
+                      }
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          handleFieldSave("quantity", Number(values.quantity));
+                        } else if (e.key === "Escape") {
+                          setValues((prev) => ({
+                            ...prev,
+                            quantity: item.quantity,
+                          }));
+                          setEditingField(null);
+                        }
                       }}
-                      onClose={() => setEditingField(null)}
+                      fullWidth
                       autoFocus
-                      open={editingField === "interval"}
                       sx={{
+                        "& .MuiOutlinedInput-root": {
+                          borderRadius: 1,
+                          height: 32,
+                        },
+                      }}
+                    />
+                  ) : (
+                    <Typography
+                      variant="body2"
+                      fontWeight={600}
+                      sx={{
+                        cursor: isEditable ? "pointer" : "default",
+                        p: 0.8,
                         borderRadius: 1,
-                        height: 32,
+                        minHeight: 32,
+                        display: "flex",
+                        alignItems: "center",
+                        "&:hover": {
+                          backgroundColor: isEditable
+                            ? alpha(theme.palette.primary.main, 0.04)
+                            : "transparent",
+                        },
+                      }}
+                      onClick={() => {
+                        if (isEditable) {
+                          setEditingField("quantity");
+                          setValues((prev) => ({
+                            ...prev,
+                            quantity: item.quantity,
+                          }));
+                        }
                       }}
                     >
-                      {INTERVAL_OPTIONS.map((option) => (
-                        <MenuItem key={option.value} value={option.value}>
-                          {option.label}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
-                ) : (
-                  <Typography
-                    variant="body2"
-                    fontWeight={500}
-                    sx={{
-                      cursor: isEditable ? "pointer" : "default",
-                      p: 0.8,
-                      borderRadius: 1,
-                      minHeight: 32,
-                      display: "flex",
-                      alignItems: "center",
-                      "&:hover": {
-                        backgroundColor: isEditable
-                          ? alpha(theme.palette.primary.main, 0.04)
-                          : "transparent",
-                      },
-                    }}
-                    onClick={() => {
-                      if (isEditable) {
-                        setEditingField("interval");
-                        setValues((prev) => ({
-                          ...prev,
-                          interval: item.interval,
-                        }));
-                      }
-                    }}
-                  >
-                    {INTERVAL_OPTIONS.find((opt) => opt.value === item.interval)
-                      ?.label || "Monatlich"}
-                  </Typography>
-                )}
-              </Box>
+                      {item.quantity || 0}
+                    </Typography>
+                  )}
+                </Box>
+              </FieldHighlight>
             </Grid>
 
-            {/* Comment Field - Full Width */}
-            <Grid item xs={12}>
-              <Box
-                sx={{
-                  p: 1.5,
-                  borderRadius: 1,
-                  backgroundColor: "background.paper",
-                  border: `1px solid ${alpha("#E2E8F0", 0.8)}`,
-                  transition: "all 0.2s ease",
-                  "&:hover": {
-                    borderColor: isEditable
-                      ? alpha(theme.palette.primary.main, 0.3)
-                      : "transparent",
-                    boxShadow: isEditable
-                      ? `0 2px 8px ${alpha(theme.palette.primary.main, 0.08)}`
-                      : "none",
-                  },
-                }}
+            {/* Interval Field with Enhanced Highlighting */}
+            <Grid item xs={6}>
+              <FieldHighlight
+                hasChanges={
+                  (item.changesNeedAcknowledgment ||
+                    item.hasChanges ||
+                    item.shouldHighlight) &&
+                  item.changedFields?.includes("interval")
+                }
+                fieldName="Intervall"
               >
-                <Typography
-                  variant="caption"
+                <Box
                   sx={{
-                    fontWeight: 600,
-                    color: theme.palette.text.secondary,
-                    textTransform: "uppercase",
-                    letterSpacing: 0.5,
-                    mb: 0.5,
-                    display: "block",
+                    p: 1.5,
+                    borderRadius: 1,
+                    backgroundColor: "background.paper",
                   }}
                 >
-                  Kommentar
-                </Typography>
-                {editingField === "comment" && isEditable ? (
-                  <TextField
-                    size="small"
-                    multiline
-                    rows={2}
-                    value={values.comment}
-                    onChange={(e) =>
-                      setValues((prev) => ({
-                        ...prev,
-                        comment: e.target.value,
-                      }))
-                    }
-                    onBlur={() => handleFieldSave("comment", values.comment)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && !e.shiftKey) {
-                        e.preventDefault();
-                        handleFieldSave("comment", values.comment);
-                      } else if (e.key === "Escape") {
-                        setValues((prev) => ({
-                          ...prev,
-                          comment: item.comment,
-                        }));
-                        setEditingField(null);
-                      }
-                    }}
-                    fullWidth
-                    autoFocus
-                    sx={{
-                      "& .MuiOutlinedInput-root": {
-                        borderRadius: 1,
-                      },
-                    }}
-                  />
-                ) : (
                   <Typography
-                    variant="body2"
+                    variant="caption"
                     sx={{
-                      cursor: isEditable ? "pointer" : "default",
-                      p: 0.8,
-                      borderRadius: 1,
-                      minHeight: 40,
-                      display: "flex",
-                      alignItems: "center",
-                      color: item.comment
-                        ? theme.palette.text.primary
-                        : theme.palette.text.secondary,
-                      fontStyle: item.comment ? "normal" : "italic",
-                      "&:hover": {
-                        backgroundColor: isEditable
-                          ? alpha(theme.palette.primary.main, 0.04)
-                          : "transparent",
-                      },
-                    }}
-                    onClick={() => {
-                      if (isEditable) {
-                        setEditingField("comment");
-                        setValues((prev) => ({
-                          ...prev,
-                          comment: item.comment,
-                        }));
-                      }
+                      fontWeight: 600,
+                      color: theme.palette.text.secondary,
+                      textTransform: "uppercase",
+                      letterSpacing: 0.5,
+                      mb: 0.5,
+                      display: "block",
                     }}
                   >
-                    {item.comment || "Kommentar hinzufügen..."}
+                    Intervall
                   </Typography>
-                )}
-              </Box>
+                  {editingField === "interval" && isEditable ? (
+                    <FormControl size="small" fullWidth>
+                      <Select
+                        value={values.interval}
+                        onChange={(e) => {
+                          setValues((prev) => ({
+                            ...prev,
+                            interval: e.target.value,
+                          }));
+                          handleFieldSave("interval", e.target.value);
+                        }}
+                        onClose={() => setEditingField(null)}
+                        autoFocus
+                        open={editingField === "interval"}
+                        sx={{
+                          borderRadius: 1,
+                          height: 32,
+                        }}
+                      >
+                        {INTERVAL_OPTIONS.map((option) => (
+                          <MenuItem key={option.value} value={option.value}>
+                            {option.label}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                  ) : (
+                    <Typography
+                      variant="body2"
+                      fontWeight={500}
+                      sx={{
+                        cursor: isEditable ? "pointer" : "default",
+                        p: 0.8,
+                        borderRadius: 1,
+                        minHeight: 32,
+                        display: "flex",
+                        alignItems: "center",
+                        "&:hover": {
+                          backgroundColor: isEditable
+                            ? alpha(theme.palette.primary.main, 0.04)
+                            : "transparent",
+                        },
+                      }}
+                      onClick={() => {
+                        if (isEditable) {
+                          setEditingField("interval");
+                          setValues((prev) => ({
+                            ...prev,
+                            interval: item.interval,
+                          }));
+                        }
+                      }}
+                    >
+                      {INTERVAL_OPTIONS.find(
+                        (opt) => opt.value === item.interval
+                      )?.label || "Monatlich"}
+                    </Typography>
+                  )}
+                </Box>
+              </FieldHighlight>
+            </Grid>
+
+            {/* Comment Field with Enhanced Highlighting */}
+            <Grid item xs={12}>
+              <FieldHighlight
+                hasChanges={
+                  (item.changesNeedAcknowledgment ||
+                    item.hasChanges ||
+                    item.shouldHighlight) &&
+                  item.changedFields?.includes("comment")
+                }
+                fieldName="Kommentar"
+              >
+                <Box
+                  sx={{
+                    p: 1.5,
+                    borderRadius: 1,
+                    backgroundColor: "background.paper",
+                  }}
+                >
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      fontWeight: 600,
+                      color: theme.palette.text.secondary,
+                      textTransform: "uppercase",
+                      letterSpacing: 0.5,
+                      mb: 0.5,
+                      display: "block",
+                    }}
+                  >
+                    Kommentar
+                  </Typography>
+                  {editingField === "comment" && isEditable ? (
+                    <TextField
+                      size="small"
+                      multiline
+                      rows={2}
+                      value={values.comment}
+                      onChange={(e) =>
+                        setValues((prev) => ({
+                          ...prev,
+                          comment: e.target.value,
+                        }))
+                      }
+                      onBlur={() => handleFieldSave("comment", values.comment)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !e.shiftKey) {
+                          e.preventDefault();
+                          handleFieldSave("comment", values.comment);
+                        } else if (e.key === "Escape") {
+                          setValues((prev) => ({
+                            ...prev,
+                            comment: item.comment,
+                          }));
+                          setEditingField(null);
+                        }
+                      }}
+                      fullWidth
+                      autoFocus
+                      sx={{
+                        "& .MuiOutlinedInput-root": {
+                          borderRadius: 1,
+                        },
+                      }}
+                    />
+                  ) : (
+                    <Typography
+                      variant="body2"
+                      sx={{
+                        cursor: isEditable ? "pointer" : "default",
+                        p: 0.8,
+                        borderRadius: 1,
+                        minHeight: 40,
+                        display: "flex",
+                        alignItems: "center",
+                        color: item.comment
+                          ? theme.palette.text.primary
+                          : theme.palette.text.secondary,
+                        fontStyle: item.comment ? "normal" : "italic",
+                        "&:hover": {
+                          backgroundColor: isEditable
+                            ? alpha(theme.palette.primary.main, 0.04)
+                            : "transparent",
+                        },
+                      }}
+                      onClick={() => {
+                        if (isEditable) {
+                          setEditingField("comment");
+                          setValues((prev) => ({
+                            ...prev,
+                            comment: item.comment,
+                          }));
+                        }
+                      }}
+                    >
+                      {item.comment || "Kommentar hinzufügen..."}
+                    </Typography>
+                  )}
+                </Box>
+              </FieldHighlight>
             </Grid>
 
             {/* Delivery Information */}
@@ -1614,6 +1707,7 @@ const ListManagerPage: React.FC = () => {
   const [editedTitle, setEditedTitle] = useState<string>("");
   const [saving, setSaving] = useState<boolean>(false);
   const [addItemDialog, setAddItemDialog] = useState(false);
+  const [acknowledgingSaving, setAcknowledgingSaving] = useState(false);
 
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
@@ -1621,6 +1715,12 @@ const ListManagerPage: React.FC = () => {
 
   // Check if user is authenticated and can edit
   const isEditable = customer !== null;
+
+  // Count items with unacknowledged changes
+  const itemsWithChanges = useMemo(() => {
+    if (!currentList?.items) return [];
+    return currentList.items.filter((item) => item.hasChanges);
+  }, [currentList?.items]);
 
   // Fetch all lists for the company
   useEffect(() => {
@@ -1650,6 +1750,14 @@ const ListManagerPage: React.FC = () => {
                 changeStatus: item.changeStatus || "pending",
                 marked: item.marked || false,
                 interval: item.interval || "monthly",
+                // Use the correct field names from API
+                changesNeedAcknowledgment:
+                  item.changesNeedAcknowledgment || false,
+                hasChanges: item.hasChanges || false,
+                shouldHighlight: item.shouldHighlight || false,
+                lastModifiedBy: item.lastModifiedBy || "customer",
+                lastModifiedAt: item.lastModifiedAt,
+                changedFields: item.changedFields || [],
               })) || [],
           }));
 
@@ -1742,10 +1850,8 @@ const ListManagerPage: React.FC = () => {
       );
 
       setIsEditingTitle(false);
-      toast.success("Title updated successfully", successStyles);
     } catch (error) {
       console.error("Failed to update title:", error);
-      toast.error("Failed to update title", errorStyles);
     } finally {
       setSaving(false);
     }
@@ -1769,7 +1875,6 @@ const ListManagerPage: React.FC = () => {
       );
     } catch (error) {
       console.error("Failed to add item:", error);
-      toast.error("Failed to add item", errorStyles);
     } finally {
       setSaving(false);
     }
@@ -1812,6 +1917,23 @@ const ListManagerPage: React.FC = () => {
     }
   };
 
+  // Enhanced handle acknowledging all changes function
+  const handleAcknowledgeAllChanges = async () => {
+    if (!currentList || itemsWithChanges.length === 0) return;
+
+    try {
+      setAcknowledgingSaving(true);
+
+      await bulkAcknowledgeChanges(currentList.id);
+
+      window.location.reload();
+    } catch (error) {
+      console.error("Failed to acknowledge changes:", error);
+    } finally {
+      setAcknowledgingSaving(false);
+    }
+  };
+
   const filteredItems = useMemo(() => {
     if (!currentList?.items) return [];
 
@@ -1830,49 +1952,30 @@ const ListManagerPage: React.FC = () => {
     return extractDeliveryPeriods(currentList.items);
   }, [currentList?.items]);
 
-  // Desktop columns configuration
+  const dispatch = useDispatch();
+  // Enhanced Desktop columns configuration with FieldHighlight
   const columns = useMemo(() => {
     const baseColumns = [
-      {
-        key: "selection",
-        name: "",
-        width: 50,
-        frozen: true,
-        renderCell: (props: any) => (
-          <Checkbox
-            size="small"
-            checked={selectedRows.has(props.row.id)}
-            disabled={!isEditable}
-            onChange={() => {
-              if (!isEditable) return;
-              const newSelectedRows = new Set(selectedRows);
-              if (newSelectedRows.has(props.row.id)) {
-                newSelectedRows.delete(props.row.id);
-              } else {
-                newSelectedRows.add(props.row.id);
-              }
-              setSelectedRows(newSelectedRows);
-            }}
-          />
-        ),
-      },
       {
         key: "item_no_de",
         name: "Artikelnr",
         width: 120,
         resizable: true,
-        renderCell: (props: any) => (
-          <Typography variant="body2" sx={{ fontSize: "14px" }}>
-            {props.row.item_no_de || "-"}
-          </Typography>
-        ),
+        renderCell: (props: any) => {
+          const hasChanges =
+            (props.row.changesNeedAcknowledgment ||
+              props.row.hasChanges ||
+              props.row.shouldHighlight) &&
+            props.row.changedFields?.includes("item_no_de");
+          return (
+            <FieldHighlight hasChanges={hasChanges} fieldName="Artikelnr">
+              <Typography variant="body2" sx={{ fontSize: "14px", p: 1 }}>
+                {props.row.item_no_de || "-"}
+              </Typography>
+            </FieldHighlight>
+          );
+        },
       },
-      // {
-      //   key: "articleNumber",
-      //   name: "Artikelnummer",
-      //   width: 140,
-      //   resizable: true,
-      // },
       {
         key: "imageUrl",
         name: "Bild",
@@ -1996,43 +2099,54 @@ const ListManagerPage: React.FC = () => {
         name: "Artikelname",
         width: 500,
         resizable: true,
-        renderCell: (props: any) => (
-          <Tooltip
-            title={props.row.articleName || ""}
-            arrow
-            placement="top-start"
-          >
-            <Box
-              sx={{
-                width: "100%",
-                height: "100%",
-                display: "flex",
-                alignItems: "center",
-                cursor: "help",
-                py: 1,
-                px: 0.5,
-              }}
-            >
-              <Typography
-                variant="body2"
-                sx={{
-                  fontSize: "14px",
-                  lineHeight: 1.4,
-                  width: "100%",
-                  wordBreak: "break-word",
-                  whiteSpace: "pre-wrap",
-                  overflow: "visible",
-                  textOverflow: "unset",
-                  display: "block",
-                  maxHeight: "none",
-                  fontWeight: 500,
-                }}
+        renderCell: (props: any) => {
+          const hasChanges =
+            (props.row.changesNeedAcknowledgment ||
+              props.row.hasChanges ||
+              props.row.shouldHighlight) &&
+            props.row.changedFields?.includes("articleName");
+          return (
+            <FieldHighlight hasChanges={hasChanges} fieldName="Artikelname">
+              <Tooltip
+                title={props.row.articleName || ""}
+                arrow
+                placement="top-start"
               >
-                {props.row.articleName || "-"}
-              </Typography>
-            </Box>
-          </Tooltip>
-        ),
+                <Box
+                  sx={{
+                    width: "100%",
+                    height: "100%",
+                    display: "flex",
+                    alignItems: "center",
+                    cursor: "help",
+                    py: 1,
+                    px: 0.5,
+                    position: "relative",
+                  }}
+                >
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      fontSize: "14px",
+                      lineHeight: 1.4,
+                      width: "100%",
+                      wordBreak: "break-word",
+                      whiteSpace: "pre-wrap",
+                      overflow: "visible",
+                      textOverflow: "unset",
+                      display: "block",
+                      maxHeight: "none",
+                      fontWeight: hasChanges ? 600 : 500,
+                      color: hasChanges ? "#d32f2f" : "inherit",
+                    }}
+                  >
+                    {props.row.articleName || "-"}
+                  </Typography>
+                </Box>
+              </Tooltip>
+            </FieldHighlight>
+          );
+        },
       },
       {
         key: "quantity",
@@ -2043,6 +2157,7 @@ const ListManagerPage: React.FC = () => {
           <EditableQuantityCell
             row={props.row}
             onUpdateItem={handleUpdateItem}
+            router={router}
             isEditable={isEditable}
           />
         ),
@@ -2055,6 +2170,7 @@ const ListManagerPage: React.FC = () => {
         renderCell: (props: any) => (
           <EditableIntervalCell
             row={props.row}
+            router={router}
             onUpdateItem={handleUpdateItem}
             isEditable={isEditable}
           />
@@ -2197,72 +2313,20 @@ const ListManagerPage: React.FC = () => {
     );
 
     const endColumns: any = [
-      // {
-      //   key: "changeStatus",
-      //   name: "Status",
-      //   width: 150,
-      //   resizable: true,
-      //   renderCell: (props: any) => {
-      //     const getStatusColor = (status: string) => {
-      //       switch (status?.toLowerCase()) {
-      //         case "confirmed":
-      //           return "success";
-      //         case "pending":
-      //           return "warning";
-      //         case "rejected":
-      //           return "error";
-      //         default:
-      //           return "default";
-      //       }
-      //     };
-      //     const getStatusLabel = (status: string) => {
-      //       switch (status?.toLowerCase()) {
-      //         case "confirmed":
-      //           return "Bestätigt";
-      //         case "pending":
-      //           return "Ausstehend";
-      //         case "rejected":
-      //           return "Abgelehnt";
-      //         default:
-      //           return "Ausstehend";
-      //       }
-      //     };
-      //     return (
-      //       <Chip
-      //         label={getStatusLabel(props.row.changeStatus)}
-      //         size="small"
-      //         color={getStatusColor(props.row.changeStatus)}
-      //         sx={{ minWidth: 100, borderRadius: "10px" }}
-      //       />
-      //     );
-      //   },
-      // },
-      // {
-      //   key: "marked",
-      //   name: "Markiert",
-      //   width: 120,
-      //   resizable: true,
-      //   renderCell: (props: any) => (
-      //     <EditableMarkedCell
-      //       row={props.row}
-      //       onUpdateItem={handleUpdateItem}
-      //       isEditable={isEditable}
-      //     />
-      //   ),
-      // },
-      // {
-      //   key: "comment",
-      //   name: "Kommentar",
-      //   width: 200,
-      //   resizable: true,
-      //   renderCell: (props: any) => (
-      //     <EditableCommentCell
-      //       row={props.row}
-      //       onUpdateItem={handleUpdateItem}
-      //       isEditable={isEditable}
-      //     />
-      //   ),
-      // },
+      {
+        key: "comment",
+        name: "Remark",
+        width: 200,
+        resizable: true,
+        renderCell: (props: any) => (
+          <EditableCommentCell
+            row={props.row}
+            router={router}
+            onUpdateItem={handleUpdateItem}
+            isEditable={isEditable}
+          />
+        ),
+      },
     ];
 
     return [...baseColumns, ...deliveryColumns, ...endColumns];
@@ -2355,35 +2419,213 @@ const ListManagerPage: React.FC = () => {
                   <ArrowBack fontSize={isSmallMobile ? "small" : "medium"} />
                 </IconButton>
                 <Business color="primary" fontSize="small" />
-                <Typography
-                  variant="h4"
-                  component="h1"
-                  sx={{
-                    fontWeight: 700,
-                    fontSize: { xs: "1.3rem", sm: "1.8rem", md: "2.2rem" },
-                    background:
-                      "linear-gradient(45deg, #8CC21B 30%, #4CAF50 90%)",
-                    backgroundClip: "text",
-                    WebkitBackgroundClip: "text",
-                    WebkitTextFillColor: "transparent",
-                    letterSpacing: "-0.5px",
-                  }}
-                >
-                  {companyName}
-                </Typography>
-              </Box>
-              <div className="flex gap-3 justify-center flex-row-reverse items-center ">
-                {!isEditable && (
-                  <CustomButton
-                    gradient={true}
-                    onClick={() => {
-                      router.push("/login");
-                    }}
-                  >
-                    Login
-                  </CustomButton>
+                {currentList && (
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                    {isEditingTitle ? (
+                      <Box
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 1,
+                          flex: 1,
+                        }}
+                      >
+                        <TextField
+                          value={editedTitle}
+                          onChange={(e) => setEditedTitle(e.target.value)}
+                          size="small"
+                          sx={{
+                            "& .MuiOutlinedInput-root": {
+                              height: { xs: 32, sm: 36 },
+                              backgroundColor: "background.paper",
+                              borderRadius: 1,
+                              fontSize: { xs: "0.8rem", sm: "0.9rem" },
+                            },
+                          }}
+                        />
+                        <IconButton
+                          size="small"
+                          onClick={handleUpdateTitle}
+                          disabled={saving || !isEditable}
+                          sx={{
+                            color: "success.main",
+                            backgroundColor: alpha(
+                              theme.palette.success.main,
+                              0.1
+                            ),
+                            border: `1px solid ${alpha(
+                              theme.palette.success.main,
+                              0.2
+                            )}`,
+                          }}
+                        >
+                          {saving ? (
+                            <CircularProgress size={16} />
+                          ) : (
+                            <CheckCircle />
+                          )}
+                        </IconButton>
+                        <IconButton
+                          size="small"
+                          onClick={() => {
+                            setIsEditingTitle(false);
+                            setEditedTitle(currentList.name);
+                          }}
+                          disabled={saving}
+                          sx={{
+                            color: "error.main",
+                            backgroundColor: alpha(
+                              theme.palette.error.main,
+                              0.1
+                            ),
+                            border: `1px solid ${alpha(
+                              theme.palette.error.main,
+                              0.2
+                            )}`,
+                          }}
+                        >
+                          <Cancel />
+                        </IconButton>
+                      </Box>
+                    ) : (
+                      <Box
+                        sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                      >
+                        <Typography
+                          variant="h6"
+                          sx={{
+                            fontWeight: 700,
+                            fontSize: {
+                              xs: "1.3rem",
+                              sm: "1.8rem",
+                              md: "2.2rem",
+                            },
+                            background:
+                              "linear-gradient(45deg, #8CC21B 30%, #4CAF50 90%)",
+                            backgroundClip: "text",
+                            WebkitBackgroundClip: "text",
+                            WebkitTextFillColor: "transparent",
+                            letterSpacing: "-0.5px",
+                          }}
+                          onClick={() => {
+                            if (isEditable) {
+                              setEditedTitle(currentList.name);
+                              setIsEditingTitle(true);
+                            }
+                          }}
+                        >
+                          {currentList.name}
+                        </Typography>
+                        <IconButton
+                          size="small"
+                          onClick={() => {
+                            if (isEditable) {
+                              setEditedTitle(currentList.name);
+                              setIsEditingTitle(true);
+                            } else {
+                              router.push("/login");
+                            }
+                          }}
+                          sx={{
+                            color: "primary.main",
+                            backgroundColor: alpha(
+                              theme.palette.primary.main,
+                              0.1
+                            ),
+                            border: `1px solid ${alpha(
+                              theme.palette.primary.main,
+                              0.2
+                            )}`,
+                          }}
+                        >
+                          <Edit fontSize="small" />
+                        </IconButton>
+                      </Box>
+                    )}
+                  </Box>
                 )}
-                {!isEditable && (
+              </Box>
+              <div className="flex gap-3 justify-center flex-row-reverse items-center">
+                {isEditable ? (
+                  <div className="flex items-center gap-3">
+                    {/* Logged In Label */}
+                    <Chip
+                      label="Logged In as:"
+                      size="small"
+                      color="success"
+                      variant="outlined"
+                      sx={{ borderRadius: 1 }}
+                    />
+
+                    {/* User Profile Section */}
+                    <div className="relative group">
+                      {/* Profile Image and Display Name */}
+                      <div className="flex items-center gap-2 cursor-pointer p-2 rounded-lg hover:bg-gray-100">
+                        <Avatar
+                          src={customer?.avatar}
+                          alt="Profile"
+                          className="w-8 h-8 rounded-full object-cover"
+                        />
+                        <span className="text-sm font-medium text-gray-700">
+                          {customer?.companyName || "User"}
+                        </span>
+                        <svg
+                          className="w-4 h-4 text-gray-500"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M19 9l-7 7-7-7"
+                          />
+                        </svg>
+                      </div>
+
+                      {/* Dropdown Menu */}
+                      <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-md shadow-lg border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                        <div className="p-3 border-b border-gray-100">
+                          <div className="flex items-center gap-2 mb-2">
+                            <div>
+                              <p className="text-sm font-medium text-gray-900">
+                                {customer?.companyName}
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                {customer?.email}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Settings Menu */}
+                        <div className="p-1">
+                          <button
+                            onClick={() => {
+                              router.push("/settings");
+                            }}
+                            className="w-full text-left px-3 py-2 text-sm cursor-pointer text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
+                          >
+                            Edit Profile
+                          </button>
+                        </div>
+
+                        {/* Logout Button */}
+                        <div className="p-2 border-t border-gray-100">
+                          <button
+                            onClick={async () => {
+                              await logoutCustomer(dispatch);
+                            }}
+                            className="w-full px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-md transition-colors font-medium"
+                          >
+                            🚪 Log Out
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
                   <Chip
                     label="Read Only"
                     size="small"
@@ -2395,118 +2637,6 @@ const ListManagerPage: React.FC = () => {
               </div>
             </Box>
 
-            {currentList && (
-              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                {isEditingTitle ? (
-                  <Box
-                    sx={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 1,
-                      flex: 1,
-                    }}
-                  >
-                    <TextField
-                      value={editedTitle}
-                      onChange={(e) => setEditedTitle(e.target.value)}
-                      size="small"
-                      sx={{
-                        "& .MuiOutlinedInput-root": {
-                          height: { xs: 32, sm: 36 },
-                          backgroundColor: "background.paper",
-                          borderRadius: 1,
-                          fontSize: { xs: "0.8rem", sm: "0.9rem" },
-                        },
-                      }}
-                    />
-                    <IconButton
-                      size="small"
-                      onClick={handleUpdateTitle}
-                      disabled={saving || !isEditable}
-                      sx={{
-                        color: "success.main",
-                        backgroundColor: alpha(theme.palette.success.main, 0.1),
-                        border: `1px solid ${alpha(
-                          theme.palette.success.main,
-                          0.2
-                        )}`,
-                      }}
-                    >
-                      {saving ? (
-                        <CircularProgress size={16} />
-                      ) : (
-                        <CheckCircle />
-                      )}
-                    </IconButton>
-                    <IconButton
-                      size="small"
-                      onClick={() => {
-                        setIsEditingTitle(false);
-                        setEditedTitle(currentList.name);
-                      }}
-                      disabled={saving}
-                      sx={{
-                        color: "error.main",
-                        backgroundColor: alpha(theme.palette.error.main, 0.1),
-                        border: `1px solid ${alpha(
-                          theme.palette.error.main,
-                          0.2
-                        )}`,
-                      }}
-                    >
-                      <Cancel />
-                    </IconButton>
-                  </Box>
-                ) : (
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                    <Typography
-                      variant="h6"
-                      sx={{
-                        fontWeight: 500,
-                        color: "text.secondary",
-                        fontSize: { xs: "1rem", sm: "1.4rem" },
-                        cursor: isEditable ? "pointer" : "default",
-                        "&:hover": {
-                          opacity: isEditable ? 0.8 : 1,
-                        },
-                        mx: 2,
-                        my: 1,
-                      }}
-                      onClick={() => {
-                        if (isEditable) {
-                          setEditedTitle(currentList.name);
-                          setIsEditingTitle(true);
-                        }
-                      }}
-                    >
-                      {currentList.name}
-                    </Typography>
-                    {isEditable && (
-                      <IconButton
-                        size="small"
-                        onClick={() => {
-                          setEditedTitle(currentList.name);
-                          setIsEditingTitle(true);
-                        }}
-                        sx={{
-                          color: "primary.main",
-                          backgroundColor: alpha(
-                            theme.palette.primary.main,
-                            0.1
-                          ),
-                          border: `1px solid ${alpha(
-                            theme.palette.primary.main,
-                            0.2
-                          )}`,
-                        }}
-                      >
-                        <Edit fontSize="small" />
-                      </IconButton>
-                    )}
-                  </Box>
-                )}
-              </Box>
-            )}
             <ListTabs
               currentListId={currentListId}
               allLists={allLists}
@@ -2604,23 +2734,6 @@ const ListManagerPage: React.FC = () => {
                     },
                   }}
                 />
-                {/* {isEditable && (
-                  <Button
-                    variant="contained"
-                    startIcon={<Add />}
-                    onClick={() => setAddItemDialog(true)}
-                    sx={{
-                      background:
-                        "linear-gradient(45deg, #8CC21B 30%, #4CAF50 90%)",
-                      "&:hover": {
-                        background:
-                          "linear-gradient(45deg, #7AB819 30%, #45A047 90%)",
-                      },
-                    }}
-                  >
-                    Add Item
-                  </Button>
-                )} */}
               </Box>
 
               <Box
@@ -2631,6 +2744,43 @@ const ListManagerPage: React.FC = () => {
                   justifyContent: { xs: "stretch", sm: "flex-end" },
                 }}
               >
+                {/* Acknowledge Changes Button - Show only if there are changes */}
+                {itemsWithChanges.length > 0 && (
+                  <Button
+                    variant="contained"
+                    color="error"
+                    size="large"
+                    onClick={handleAcknowledgeAllChanges}
+                    disabled={acknowledgingSaving}
+                    startIcon={
+                      acknowledgingSaving ? (
+                        <CircularProgress size={18} />
+                      ) : (
+                        <Visibility />
+                      )
+                    }
+                    sx={{
+                      backgroundColor: "#f44336",
+                      color: "white",
+                      fontWeight: 600,
+                      px: 3,
+                      py: 1,
+                      fontSize: "0.9rem",
+                      "&:hover": {
+                        backgroundColor: "#d32f2f",
+                        transform: "scale(1.02)",
+                      },
+                      whiteSpace: "nowrap",
+                      borderRadius: 2,
+                      boxShadow: "0 4px 12px rgba(244, 67, 54, 0.3)",
+                    }}
+                  >
+                    {acknowledgingSaving
+                      ? "Bestätige..."
+                      : `🔴 Bestätige Änderungen (${itemsWithChanges.length})`}
+                  </Button>
+                )}
+
                 {selectedRows.size > 0 && isEditable && (
                   <Button
                     variant="outlined"
@@ -2899,61 +3049,7 @@ const ListManagerPage: React.FC = () => {
                 )}
               </Paper>
             )}
-
-            {/* Stats Footer */}
-            {currentList.items.length > 0 && (
-              <Box
-                sx={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  flexWrap: "wrap",
-                  gap: 2,
-                  mt: 3,
-                  px: 3,
-                  py: 2,
-                  backgroundColor: alpha("#F8FAFC", 0.8),
-                  borderRadius: 1,
-                  border: `1px solid ${alpha("#E2E8F0", 0.6)}`,
-                }}
-              >
-                <Typography variant="body2" color="text.secondary">
-                  Showing {filteredItems.length} of {currentList.items.length}{" "}
-                  items
-                </Typography>
-
-                <Box
-                  sx={{
-                    display: "flex",
-                    gap: { xs: 2, sm: 4 },
-                    flexWrap: "wrap",
-                    fontSize: { xs: "0.8rem", sm: "0.875rem" },
-                  }}
-                >
-                  <Typography variant="body2">
-                    <strong>Total:</strong> {currentList.items.length}
-                  </Typography>
-                  <Typography variant="body2">
-                    <strong>Confirmed:</strong>{" "}
-                    {
-                      currentList.items.filter(
-                        (item: any) => item.changeStatus === "confirmed"
-                      ).length
-                    }
-                  </Typography>
-                  <Typography variant="body2">
-                    <strong>Marked:</strong>{" "}
-                    {
-                      currentList.items.filter((item: any) => item.marked)
-                        .length
-                    }
-                  </Typography>
-                </Box>
-              </Box>
-            )}
           </Box>
-
-          {/* List Tabs - Show at bottom of current list */}
         </Card>
       )}
 
@@ -2987,24 +3083,6 @@ const ListManagerPage: React.FC = () => {
         onAddItem={handleAddItem}
         listId={currentListId}
       />
-
-      {/* Authentication Notice */}
-      {!isEditable && currentList && (
-        <Alert
-          severity="info"
-          sx={{
-            mt: 3,
-            borderRadius: 1,
-            backgroundColor: "#E3F2FD",
-            border: "1px solid #BBDEFB",
-          }}
-        >
-          <Typography fontWeight={600}>Read-only mode.</Typography>
-          {!customer
-            ? "Please log in to edit lists and manage items."
-            : "You don't have permission to edit this content."}
-        </Alert>
-      )}
     </Box>
   );
 };

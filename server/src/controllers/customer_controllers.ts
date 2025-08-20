@@ -349,7 +349,7 @@ export const editCustomerProfile = async (
         return next(new ErrorHandler("Error uploading avatar", 500));
       }
     }
-
+    console.log(legalName);
     // Update fields
     if (companyName) customer.companyName = companyName;
     if (legalName) customer.legalName = legalName;

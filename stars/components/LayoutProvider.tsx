@@ -43,12 +43,13 @@ const LayoutProvider = ({ children }: { children: ReactNode }) => {
           >
             <div className="flex-1 flex flex-col">
               {/* Header */}
-              <header className="sticky top-0 z-50">
-                <Header />
-              </header>
 
-              <main className="flex-1 p-2 sm:p-6 bg-gray-50">
-                <div className="w-full p-3 sm:p-6 overflow-x-hidden px-3 sm:px-5 mb-[2rem] mx-auto">
+              {/* <header className="sticky top-0 z-50">
+                <Header />
+              </header> */}
+
+              <main className="flex-1 p-2 py-0 bg-gray-50">
+                <div className="w-full p-3  sm:p-6 overflow-x-hidden px-3 sm:px-5 mb-[2rem] mx-auto">
                   {children}
                 </div>
               </main>

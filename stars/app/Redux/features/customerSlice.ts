@@ -7,6 +7,7 @@ export interface CustomerState {
   email: string;
   contactEmail: string;
   contactPhoneNumber: string;
+  legalName: string;
   taxNumber: string;
   avatar?: string;
   addressLine1: string;

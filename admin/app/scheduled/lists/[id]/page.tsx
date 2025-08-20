@@ -50,6 +50,8 @@ import {
   Accordion,
   AccordionSummary,
   AccordionDetails,
+  Stack,
+  useTheme,
 } from "@mui/material";
 import {
   ArrowBack,
@@ -106,7 +108,15 @@ import "react-data-grid/lib/styles.css";
 import theme from "@/styles/theme";
 import CustomButton from "@/components/UI/CustomButton";
 import { useDropzone } from "react-dropzone";
-import { ImageIcon, X, Clock, FileText, User, Shield } from "lucide-react";
+import {
+  ImageIcon,
+  X,
+  Clock,
+  FileText,
+  User,
+  Shield,
+  Package,
+} from "lucide-react";
 import { useRouter, useParams } from "next/navigation";
 import { toast } from "react-hot-toast";
 
@@ -122,6 +132,8 @@ import {
   approveActivityLog,
   rejectActivityLog,
   Item,
+  getCustomerLists,
+  bulkAcknowledgeChanges,
 } from "@/api/list";
 import { DELIVERY_STATUS, INTERVAL_OPTIONS } from "@/utils/interfaces";
 import { successStyles } from "@/utils/constants";
@@ -154,6 +166,86 @@ interface ActivityLog {
   performedAt?: Date | string;
   approvalStatus?: "pending" | "approved" | "rejected";
 }
+
+// Enhanced FieldHighlight Component for change tracking
+const FieldHighlight = ({
+  hasChanges,
+  fieldName,
+  children,
+  onClick,
+}: {
+  hasChanges: boolean;
+  fieldName?: string;
+  children: React.ReactNode;
+  onClick?: () => void;
+}) => {
+  return (
+    <Box
+      sx={{
+        position: "relative",
+        borderRadius: 1,
+        backgroundColor: hasChanges ? "#ffebee" : "transparent",
+        border: hasChanges ? `2px solid #f44336` : "2px solid transparent",
+        transition: "all 0.2s ease",
+        "&:hover": {
+          backgroundColor: hasChanges
+            ? "#ffcdd2"
+            : alpha(theme.palette.primary.main, 0.04),
+          borderColor: hasChanges
+            ? "#f44336"
+            : alpha(theme.palette.primary.main, 0.2),
+        },
+        cursor: onClick ? "pointer" : "default",
+      }}
+      onClick={onClick}
+    >
+      {children}
+      {hasChanges && (
+        <>
+          <Warning
+            sx={{
+              position: "absolute",
+              top: -6,
+              right: -6,
+              fontSize: 16,
+              color: "#f44336",
+              backgroundColor: "white",
+              borderRadius: "50%",
+              zIndex: 1,
+            }}
+          />
+          {fieldName && (
+            <Tooltip
+              title={`Feld "${fieldName}" wurde vom Kunden geändert`}
+              arrow
+            >
+              <Box
+                sx={{
+                  position: "absolute",
+                  top: -12,
+                  left: 8,
+                  backgroundColor: "#f44336",
+                  color: "white",
+                  px: 1,
+                  py: 0.25,
+                  borderRadius: 1,
+                  fontSize: "0.65rem",
+                  fontWeight: 600,
+                  textTransform: "uppercase",
+                  letterSpacing: 0.5,
+                  boxShadow: "0 2px 4px rgba(0,0,0,0.2)",
+                  zIndex: 2,
+                }}
+              >
+                Geändert
+              </Box>
+            </Tooltip>
+          )}
+        </>
+      )}
+    </Box>
+  );
+};
 
 // Tab Panel Component
 interface TabPanelProps {
@@ -197,7 +289,151 @@ const DELIVERY_STATUS_CONFIG: any = {
   },
 };
 
-// Modified DeliveryCell component - removed quantity editing
+// List Tabs Component
+function ListTabs({ currentListId, allLists, onListChange, loading }: any) {
+  const theme = useTheme();
+
+  if (loading || allLists.length <= 1) return null;
+
+  return (
+    <Box
+      sx={{
+        borderTop: `1px solid ${alpha("#E2E8F0", 0.8)}`,
+        backgroundColor: alpha("#F8FAFC", 0.6),
+        backdropFilter: "blur(10px)",
+      }}
+    >
+      <Box
+        sx={{
+          px: { xs: 1, sm: 2 },
+          py: 1,
+          overflowX: "auto",
+          "&::-webkit-scrollbar": {
+            height: 6,
+          },
+          "&::-webkit-scrollbar-track": {
+            backgroundColor: alpha("#f1f1f1", 0.5),
+            borderRadius: 3,
+          },
+          "&::-webkit-scrollbar-thumb": {
+            backgroundColor: alpha(theme.palette.primary.main, 0.3),
+            borderRadius: 3,
+            "&:hover": {
+              backgroundColor: alpha(theme.palette.primary.main, 0.5),
+            },
+          },
+        }}
+      >
+        <Stack
+          direction="row"
+          spacing={2}
+          sx={{
+            minWidth: "max-content",
+            pb: 1,
+          }}
+        >
+          {allLists.map((list: any) => {
+            const isActive = list.id === currentListId;
+            const hasChanges = list.items?.some(
+              (item: any) =>
+                item.changesNeedAcknowledgment ||
+                item.hasChanges ||
+                item.shouldHighlight
+            );
+
+            return (
+              <Card
+                key={list.id}
+                sx={{
+                  minWidth: { xs: 200, sm: 240 },
+                  p: 2,
+                  py: 1,
+                  cursor: "pointer",
+                  border: "1px solid",
+                  borderColor: isActive
+                    ? theme.palette.primary.main
+                    : alpha("#E2E8F0", 0.8),
+                  backgroundColor: isActive
+                    ? alpha(theme.palette.primary.main, 0.08)
+                    : "background.paper",
+                  borderRadius: 1,
+                  transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                  "&:hover": {
+                    borderColor: theme.palette.primary.main,
+                    backgroundColor: alpha(theme.palette.primary.main, 0.04),
+                    transform: "translateY(-2px)",
+                    boxShadow: `0 8px 24px ${alpha(
+                      theme.palette.primary.main,
+                      0.12
+                    )}`,
+                  },
+                }}
+                onClick={() => !isActive && onListChange(list.id)}
+              >
+                <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+                  <Avatar
+                    sx={{
+                      width: 36,
+                      height: 36,
+                      backgroundColor: isActive
+                        ? theme.palette.primary.main
+                        : alpha(theme.palette.primary.main, 0.1),
+                      color: isActive ? "white" : "primary.main",
+                    }}
+                  >
+                    <Package size={18} />
+                  </Avatar>
+
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <Typography
+                      variant="subtitle2"
+                      fontWeight={isActive ? 600 : 500}
+                      sx={{
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                        mb: 0.3,
+                      }}
+                    >
+                      {list.name}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {list.items?.length || 0} items
+                      {hasChanges && (
+                        <Chip
+                          label="Has Changes"
+                          size="small"
+                          color="error"
+                          sx={{ ml: 1, fontSize: "0.6rem", height: 16 }}
+                        />
+                      )}
+                    </Typography>
+                  </Box>
+
+                  {isActive && (
+                    <Chip
+                      label="Current"
+                      size="small"
+                      color="primary"
+                      sx={{
+                        fontWeight: 500,
+                        fontSize: "0.7rem",
+                        height: 20,
+                        borderRadius: 1,
+                      }}
+                    />
+                  )}
+                </Box>
+              </Card>
+            );
+          })}
+        </Stack>
+      </Box>
+    </Box>
+  );
+}
+
+// Modified DeliveryCell component with change highlighting
 function DeliveryCell({ row, period, onUpdateDelivery }: any) {
   const delivery = row.deliveries?.[period];
   const [isEditing, setIsEditing] = useState(false);
@@ -205,9 +441,13 @@ function DeliveryCell({ row, period, onUpdateDelivery }: any) {
     delivery?.status || DELIVERY_STATUS.PENDING
   );
 
+  const hasChanges =
+    (row.changesNeedAcknowledgment || row.hasChanges || row.shouldHighlight) &&
+    row.changedFields?.includes(`deliveries.${period}`);
+
   const handleSave = () => {
     onUpdateDelivery(row.id, period, {
-      quantity: delivery?.quantity || 0, // Keep existing quantity, don't allow editing
+      quantity: delivery?.quantity || 0,
       status,
       deliveredAt:
         status === DELIVERY_STATUS.DELIVERED ? new Date() : undefined,
@@ -243,7 +483,6 @@ function DeliveryCell({ row, period, onUpdateDelivery }: any) {
             {Object.values(DELIVERY_STATUS).map((statusOption: any) => (
               <MenuItem key={statusOption} value={statusOption}>
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                  {DELIVERY_STATUS_CONFIG[statusOption].icon}
                   <Typography variant="caption">
                     {DELIVERY_STATUS_CONFIG[statusOption].label}
                   </Typography>
@@ -268,90 +507,82 @@ function DeliveryCell({ row, period, onUpdateDelivery }: any) {
     DELIVERY_STATUS_CONFIG[delivery?.status || DELIVERY_STATUS.PENDING];
 
   return (
-    <Tooltip
-      title={
-        <Box sx={{ color: "white" }}>
-          <Typography color="white" variant="caption" display="block">
-            Period: {period}
-          </Typography>
-          <Typography color="white" variant="caption" display="block">
-            Quantity: {delivery?.quantity || 0}
-          </Typography>
-          <Typography color="white" variant="caption" display="block">
-            {/* Status: {config.label} */}
-          </Typography>
-          {delivery?.deliveredAt && (
+    <FieldHighlight hasChanges={hasChanges} fieldName={`Lieferung ${period}`}>
+      <Tooltip
+        title={
+          <Box sx={{ color: "white" }}>
             <Typography color="white" variant="caption" display="block">
-              Delivered: {new Date(delivery.deliveredAt).toLocaleDateString()}
+              Period: {period}
             </Typography>
-          )}
-          {delivery?.cargoNo && (
             <Typography color="white" variant="caption" display="block">
-              Cargo: {delivery.cargoNo}
+              Quantity: {delivery?.quantity || 0}
             </Typography>
-          )}
-        </Box>
-      }
-    >
-      <Box
-        sx={{
-          display: "flex",
-          width: "100%",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: 0.5,
-          p: 1,
-          cursor: "pointer",
-          borderRadius: 1,
-          minHeight: 60,
-          "&:hover": {
-            backgroundColor: alpha("#f5f5f5", 0.5),
-          },
-        }}
-        onClick={() => setIsEditing(true)}
+            {delivery?.deliveredAt && (
+              <Typography color="white" variant="caption" display="block">
+                Delivered: {new Date(delivery.deliveredAt).toLocaleDateString()}
+              </Typography>
+            )}
+            {delivery?.cargoNo && (
+              <Typography color="white" variant="caption" display="block">
+                Cargo: {delivery.cargoNo}
+              </Typography>
+            )}
+          </Box>
+        }
       >
         <Box
           sx={{
             display: "flex",
+            width: "100%",
+            flexDirection: "column",
             alignItems: "center",
             justifyContent: "center",
-            width: "100%",
             gap: 0.5,
-          }}
-        >
-          <Typography
-            fontSize={"16px"}
-            variant="caption"
-            fontWeight={600}
-            width={"100%"}
-            display={"flex"}
-            justifyContent={"center"}
-          >
-            {Number(delivery?.quantity || 0).toFixed(0) || 0}
-          </Typography>
-        </Box>
-        {/* <Chip
-          label={config.label}
-          size="small"
-          color={config.color}
-          sx={{
-            fontSize: "0.65rem",
-            height: 20,
-            "& .MuiChip-label": {
-              px: 1,
+            p: 1,
+            cursor: "pointer",
+            borderRadius: 1,
+            minHeight: 60,
+            "&:hover": {
+              backgroundColor: alpha("#f5f5f5", 0.5),
             },
           }}
-        /> */}
-      </Box>
-    </Tooltip>
+          onClick={() => setIsEditing(true)}
+        >
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: "100%",
+              gap: 0.5,
+            }}
+          >
+            <Typography
+              fontSize={"16px"}
+              variant="caption"
+              fontWeight={600}
+              width={"100%"}
+              display={"flex"}
+              justifyContent={"center"}
+            >
+              {Number(delivery?.quantity || 0).toFixed(0) || 0}
+            </Typography>
+          </Box>
+        </Box>
+      </Tooltip>
+    </FieldHighlight>
   );
 }
 
+// Enhanced Editable Quantity Cell with change highlighting
 function EditableQuantityCell({ row, onUpdateItem }: any) {
   const [isEditing, setIsEditing] = useState(false);
   const [value, setValue] = useState(row.quantity || 0);
   const [saving, setSaving] = useState(false);
+
+  const hasChanges =
+    (row.changesNeedAcknowledgment || row.hasChanges || row.shouldHighlight) &&
+    row.changedFields?.includes("quantity");
 
   const handleSave = async () => {
     if (value === row.quantity) {
@@ -417,34 +648,44 @@ function EditableQuantityCell({ row, onUpdateItem }: any) {
   }
 
   return (
-    <Box
-      sx={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        width: "100%",
-        height: "100%",
-        cursor: "pointer",
-        borderRadius: 1,
-        "&:hover": {
-          backgroundColor: alpha(theme.palette.primary.main, 0.05),
-        },
-        transition: "background-color 0.2s",
-      }}
+    <FieldHighlight
+      hasChanges={hasChanges}
+      fieldName="Menge"
       onClick={() => setIsEditing(true)}
     >
-      <Typography variant="body2" fontWeight={600} sx={{ fontSize: "16px" }}>
-        {row.quantity || 0}
-      </Typography>
-    </Box>
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          width: "100%",
+          height: "100%",
+          cursor: "pointer",
+          borderRadius: 1,
+          "&:hover": {
+            backgroundColor: alpha(theme.palette.primary.main, 0.05),
+          },
+          transition: "background-color 0.2s",
+          p: 1,
+        }}
+      >
+        <Typography variant="body2" fontWeight={600} sx={{ fontSize: "16px" }}>
+          {row.quantity || 0}
+        </Typography>
+      </Box>
+    </FieldHighlight>
   );
 }
 
-// Editable Comment Cell
+// Enhanced Editable Comment Cell with change highlighting
 function EditableCommentCell({ row, onUpdateItem }: any) {
   const [isEditing, setIsEditing] = useState(false);
   const [value, setValue] = useState(row.comment || "");
   const [saving, setSaving] = useState(false);
+
+  const hasChanges =
+    (row.changesNeedAcknowledgment || row.hasChanges || row.shouldHighlight) &&
+    row.changedFields?.includes("comment");
 
   const handleSave = async () => {
     if (value === row.comment) {
@@ -511,34 +752,39 @@ function EditableCommentCell({ row, onUpdateItem }: any) {
   }
 
   return (
-    <Box
-      sx={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "flex-start",
-        width: "100%",
-        height: "100%",
-        cursor: "pointer",
-        borderRadius: 1,
-        "&:hover": {
-          backgroundColor: alpha(theme.palette.primary.main, 0.05),
-        },
-        transition: "background-color 0.2s",
-        p: 1,
-      }}
+    <FieldHighlight
+      hasChanges={hasChanges}
+      fieldName="Kommentar"
       onClick={() => setIsEditing(true)}
     >
-      <Typography
-        variant="body2"
+      <Box
         sx={{
-          fontSize: "14px",
-          color: row.comment ? "text.primary" : "text.secondary",
-          fontStyle: row.comment ? "normal" : "italic",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "flex-start",
+          width: "100%",
+          height: "100%",
+          cursor: "pointer",
+          borderRadius: 1,
+          "&:hover": {
+            backgroundColor: alpha(theme.palette.primary.main, 0.05),
+          },
+          transition: "background-color 0.2s",
+          p: 1,
         }}
       >
-        {row.comment || "Click to add comment..."}
-      </Typography>
-    </Box>
+        <Typography
+          variant="body2"
+          sx={{
+            fontSize: "14px",
+            color: row.comment ? "text.primary" : "text.secondary",
+            fontStyle: row.comment ? "normal" : "italic",
+          }}
+        >
+          {row.comment || "Click to add comment..."}
+        </Typography>
+      </Box>
+    </FieldHighlight>
   );
 }
 
@@ -568,7 +814,6 @@ function extractDeliveryPeriods(items: any[]): {
                     .map((c: string) => c.trim())
                 : [deliveryDetails.cargoNo];
 
-            // Add unique cargo numbers for this period
             const existingCargos = periodCargoMap.get(period)!;
             cargoNos.forEach((cargoNo: string) => {
               if (cargoNo && !existingCargos.includes(cargoNo)) {
@@ -581,7 +826,6 @@ function extractDeliveryPeriods(items: any[]): {
     }
   });
 
-  // Sort periods chronologically
   const sortedPeriods = Array.from(periodsSet).sort((a, b) => {
     const [yearA, periodA] = a.split("-").map((p) => p.replace("T", ""));
     const [yearB, periodB] = b.split("-").map((p) => p.replace("T", ""));
@@ -596,10 +840,15 @@ function extractDeliveryPeriods(items: any[]): {
   };
 }
 
+// Enhanced Editable Interval Cell with change highlighting
 function EditableIntervalCell({ row, onUpdateItem }: any) {
   const [isEditing, setIsEditing] = useState(false);
   const [value, setValue] = useState(row.interval || "monthly");
   const [saving, setSaving] = useState(false);
+
+  const hasChanges =
+    (row.changesNeedAcknowledgment || row.hasChanges || row.shouldHighlight) &&
+    row.changedFields?.includes("interval");
 
   const handleSave = async (newValue: string) => {
     if (newValue === row.interval) {
@@ -670,26 +919,32 @@ function EditableIntervalCell({ row, onUpdateItem }: any) {
   }
 
   return (
-    <Box
-      sx={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        width: "100%",
-        height: "100%",
-        cursor: "pointer",
-        borderRadius: 1,
-        "&:hover": {
-          backgroundColor: alpha(theme.palette.primary.main, 0.05),
-        },
-        transition: "background-color 0.2s",
-      }}
+    <FieldHighlight
+      hasChanges={hasChanges}
+      fieldName="Intervall"
       onClick={() => setIsEditing(true)}
     >
-      <Typography variant="body2" sx={{ fontSize: "14px" }}>
-        {getCurrentLabel()}
-      </Typography>
-    </Box>
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          width: "100%",
+          height: "100%",
+          cursor: "pointer",
+          borderRadius: 1,
+          "&:hover": {
+            backgroundColor: alpha(theme.palette.primary.main, 0.05),
+          },
+          transition: "background-color 0.2s",
+          p: 1,
+        }}
+      >
+        <Typography variant="body2" sx={{ fontSize: "14px" }}>
+          {getCurrentLabel()}
+        </Typography>
+      </Box>
+    </FieldHighlight>
   );
 }
 
@@ -872,7 +1127,6 @@ function ActivityLogCard({
         }),
       }}
     >
-      {/* Priority indicator for pending items */}
       {isPending && (
         <Box
           sx={{
@@ -889,7 +1143,6 @@ function ActivityLogCard({
 
       <CardContent sx={{ p: 4 }}>
         <Box sx={{ display: "flex", gap: 3 }}>
-          {/* Enhanced Activity Icon */}
           <Box
             sx={{
               p: 2,
@@ -927,7 +1180,6 @@ function ActivityLogCard({
             {getActivityIcon(log.action)}
           </Box>
 
-          {/* Enhanced Activity Details */}
           <Box sx={{ flex: 1 }}>
             <Box
               sx={{
@@ -954,7 +1206,6 @@ function ActivityLogCard({
                     .replace(/\b\w/g, (l: any) => l.toUpperCase())}
                 </Typography>
 
-                {/* Enhanced metadata display */}
                 {log.itemName && (
                   <Typography
                     variant="body2"
@@ -975,7 +1226,6 @@ function ActivityLogCard({
               {getStatusChip(log.approvalStatus)}
             </Box>
 
-            {/* Enhanced Change Details */}
             {log.changes && Object.keys(log.changes).length > 0 && (
               <Paper
                 elevation={0}
@@ -1065,7 +1315,6 @@ function ActivityLogCard({
               </Paper>
             )}
 
-            {/* Enhanced Rejection Reason */}
             {log.rejectionReason && (
               <Alert
                 severity="error"
@@ -1090,7 +1339,6 @@ function ActivityLogCard({
               </Alert>
             )}
 
-            {/* Enhanced User and Timestamp */}
             <Box
               sx={{
                 display: "flex",
@@ -1144,7 +1392,6 @@ function ActivityLogCard({
               </Box>
             </Box>
 
-            {/* Enhanced Approval Actions */}
             {requiresApproval && (
               <Box
                 sx={{
@@ -1212,7 +1459,7 @@ function ActivityLogCard({
   );
 }
 
-// Add Item Dialog Component - FIXED
+// Add Item Dialog Component
 function AddItemDialog({ open, onClose, onAddItem, listId }: any) {
   const [items, setItems] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -1220,7 +1467,6 @@ function AddItemDialog({ open, onClose, onAddItem, listId }: any) {
   const [loading, setLoading] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
 
-  // Debounced search function
   const debouncedSearch = useCallback(
     debounce(async (query: string) => {
       if (!query.trim()) {
@@ -1270,7 +1516,6 @@ function AddItemDialog({ open, onClose, onAddItem, listId }: any) {
 
       await onAddItem(itemData);
 
-      // Reset form
       setSelectedItem(null);
       setSearchTerm("");
       setItems([]);
@@ -1317,7 +1562,6 @@ function AddItemDialog({ open, onClose, onAddItem, listId }: any) {
 
       <DialogContent sx={{ p: 3 }}>
         <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
-          {/* Search Field */}
           <Autocomplete
             options={items}
             getOptionLabel={(option) => option.name || ""}
@@ -1421,7 +1665,6 @@ function AddItemDialog({ open, onClose, onAddItem, listId }: any) {
             }}
           />
 
-          {/* Selected Item Preview */}
           {selectedItem && (
             <Card
               sx={{ p: 2, bgcolor: alpha(theme.palette.primary.main, 0.05) }}
@@ -1458,17 +1701,11 @@ function AddItemDialog({ open, onClose, onAddItem, listId }: any) {
                   <Typography variant="h6" fontWeight={600}>
                     {selectedItem.name}
                   </Typography>
-                  {/* {selectedItem.articleNumber && (
-                    <Typography variant="body2" color="text.secondary">
-                      Article Number: {selectedItem.articleNumber}
-                    </Typography>
-                  )} */}
                 </Box>
               </Box>
             </Card>
           )}
 
-          {/* Empty State */}
           {!searchTerm && (
             <Box
               sx={{
@@ -1579,88 +1816,186 @@ function EnhancedBreadcrumbs({ listTitle }: { listTitle: string }) {
 const AdminListDetailPage = () => {
   const router = useRouter();
   const params = useParams();
-  const listId = params?.id as string;
+  const customerId = params?.id as string;
 
   // State management
-  const [listData, setListData] = useState<any>(null);
+  const [allLists, setAllLists] = useState<any[]>([]);
+  const [currentListId, setCurrentListId] = useState<string>("");
+  const [currentList, setCurrentList] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   const [searchTerm, setSearchTerm] = useState("");
   const [addItemDialog, setAddItemDialog] = useState(false);
   const [tabValue, setTabValue] = useState(0);
-  const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
+  const [activityLogs, setActivityLogs] = useState<any[]>([]);
   const [pendingApprovals, setPendingApprovals] = useState(0);
+  const [acknowledgingSaving, setAcknowledgingSaving] = useState(false);
+
+  // Count items with unacknowledged changes
+  const itemsWithChanges = useMemo(() => {
+    if (!currentList?.items) return [];
+    return currentList.items.filter(
+      (item: any) =>
+        item.changesNeedAcknowledgment ||
+        item.hasChanges ||
+        item.shouldHighlight
+    );
+  }, [currentList?.items]);
 
   const deliveryPeriodsData = useMemo(() => {
-    if (!listData?.items) return { sortedPeriods: [], cargoNumbers: [] };
-    return extractDeliveryPeriods(listData.items);
-  }, [listData?.items]);
+    if (!currentList?.items) return { sortedPeriods: [], cargoNumbers: [] };
+    return extractDeliveryPeriods(currentList.items);
+  }, [currentList?.items]);
 
   // Sort activity logs with pending ones at the top
   const sortedActivityLogs = useMemo(() => {
     return [...activityLogs].sort((a, b) => {
-      // First sort by approval status (pending first)
       if (a.approvalStatus === "pending" && b.approvalStatus !== "pending")
         return -1;
       if (a.approvalStatus !== "pending" && b.approvalStatus === "pending")
         return 1;
 
-      // Then sort by timestamp (most recent first)
       const dateA = new Date(a.performedAt || a.timestamp);
       const dateB = new Date(b.performedAt || b.timestamp);
       return dateB.getTime() - dateA.getTime();
     });
   }, [activityLogs]);
 
-  // Load list data and activity logs
+  // Load customer lists
   useEffect(() => {
-    const loadListData = async () => {
-      if (!listId) {
+    const loadCustomerLists = async () => {
+      if (!customerId) {
         setLoading(false);
         return;
       }
 
       try {
         setLoading(true);
-        const response = await getListDetails(listId);
-        setListData(response);
+        const response = await getCustomerLists(customerId);
+        if (response && response.length > 0) {
+          // Transform data to include change tracking
+          const transformedLists = response.map((list: any) => ({
+            ...list,
+            items:
+              list.items?.map((item: any) => ({
+                ...item,
+                // Add change tracking properties
+                changesNeedAcknowledgment:
+                  item.changesNeedAcknowledgment || false,
+                hasChanges: item.hasChanges || false,
+                shouldHighlight: item.shouldHighlight || false,
+                changedFields: item.changedFields || [],
+              })) || [],
+          }));
 
-        // Extract activity logs from response if available
-        if (response.activityLogs) {
-          setActivityLogs(response.activityLogs);
+          setAllLists(transformedLists);
+          setCurrentListId(transformedLists[0].id);
+          setCurrentList(transformedLists[0]);
+
+          // Mock activity logs - replace with real API call
+          const mockActivityLogs = [
+            {
+              id: "1",
+              action: "item_updated",
+              itemName:
+                transformedLists[0].items?.[0]?.articleName || "Test Item",
+              changes: { quantity: "5", comment: "Updated comment" },
+              performedByType: "customer",
+              performedAt: new Date().toISOString(),
+              approvalStatus: "pending",
+            },
+          ];
+          setActivityLogs(mockActivityLogs);
           setPendingApprovals(
-            response.activityLogs.filter(
-              (log: ActivityLog) =>
-                (log.status === "pending" ||
-                  log.approvalStatus === "pending") &&
-                log.requiresApproval
-            ).length
+            mockActivityLogs.filter((log) => log.approvalStatus === "pending")
+              .length
           );
         }
       } catch (error) {
-        console.error("Failed to load list:", error);
+        console.error("Failed to load customer lists:", error);
       } finally {
         setLoading(false);
       }
     };
 
-    loadListData();
-  }, [listId]);
+    loadCustomerLists();
+  }, [customerId]);
+
+  // Handle list change
+  const handleListChange = (listId: string) => {
+    const selectedList = allLists.find((list) => list.id === listId);
+    if (selectedList) {
+      setCurrentListId(listId);
+      setCurrentList(selectedList);
+      setSelectedRows(new Set());
+    }
+  };
+
+  // Handle acknowledging all changes
+  const handleAcknowledgeAllChanges = async () => {
+    if (!currentList || itemsWithChanges.length === 0) return;
+
+    try {
+      setAcknowledgingSaving(true);
+      await bulkAcknowledgeChanges(currentList.id);
+
+      // Update local state to clear changes
+      setCurrentList((prev: any) => ({
+        ...prev,
+        items: prev.items.map((item: any) => ({
+          ...item,
+          changesNeedAcknowledgment: false,
+          hasChanges: false,
+          shouldHighlight: false,
+          changedFields: [],
+        })),
+      }));
+
+      // Update allLists as well
+      setAllLists((prev) =>
+        prev.map((list) =>
+          list.id === currentListId
+            ? {
+                ...list,
+                items: list.items.map((item: any) => ({
+                  ...item,
+                  changesNeedAcknowledgment: false,
+                  hasChanges: false,
+                  shouldHighlight: false,
+                  changedFields: [],
+                })),
+              }
+            : list
+        )
+      );
+    } catch (error) {
+      console.error("Failed to acknowledge changes:", error);
+    } finally {
+      setAcknowledgingSaving(false);
+    }
+  };
 
   // Handle adding new item to list
   const handleAddItem = async (itemData: any) => {
-    if (!listData) return;
+    if (!currentList) return;
 
     try {
       setSaving(true);
-      const response = await addItemToList(listData.id, itemData);
+      const response = await addItemToList(currentList.id, itemData);
 
-      // Update local state
-      setListData((prev: any) => ({
+      setCurrentList((prev: any) => ({
         ...prev,
         items: [...prev.items, response],
       }));
+
+      setAllLists((prev) =>
+        prev.map((list) =>
+          list.id === currentListId
+            ? { ...list, items: [...list.items, response] }
+            : list
+        )
+      );
     } catch (error) {
       console.error("Failed to add item:", error);
     } finally {
@@ -1673,13 +2008,25 @@ const AdminListDetailPage = () => {
     try {
       const response = await updateListItem(itemId, updateData);
 
-      // Update local state
-      setListData((prev: any) => ({
+      setCurrentList((prev: any) => ({
         ...prev,
         items: prev.items.map((item: any) =>
           item.id === itemId ? { ...item, ...updateData } : item
         ),
       }));
+
+      setAllLists((prev) =>
+        prev.map((list) =>
+          list.id === currentListId
+            ? {
+                ...list,
+                items: list.items.map((item: any) =>
+                  item.id === itemId ? { ...item, ...updateData } : item
+                ),
+              }
+            : list
+        )
+      );
     } catch (error) {
       console.error("Failed to update item:", error);
     }
@@ -1687,7 +2034,7 @@ const AdminListDetailPage = () => {
 
   // Handle deleting selected items
   const handleDeleteSelectedItems = async () => {
-    if (!listData || selectedRows.size === 0) return;
+    if (!currentList || selectedRows.size === 0) return;
 
     try {
       setSaving(true);
@@ -1697,11 +2044,23 @@ const AdminListDetailPage = () => {
 
       await Promise.all(deletePromises);
 
-      // Update local state
-      setListData((prev: any) => ({
+      setCurrentList((prev: any) => ({
         ...prev,
         items: prev.items.filter((item: any) => !selectedRows.has(item.id)),
       }));
+
+      setAllLists((prev) =>
+        prev.map((list) =>
+          list.id === currentListId
+            ? {
+                ...list,
+                items: list.items.filter(
+                  (item: any) => !selectedRows.has(item.id)
+                ),
+              }
+            : list
+        )
+      );
 
       setSelectedRows(new Set());
       toast.success(
@@ -1718,8 +2077,7 @@ const AdminListDetailPage = () => {
   const handleUpdateDelivery = useCallback(
     async (itemId: string, period: string, deliveryData: any) => {
       try {
-        // Update local state immediately for better UX
-        setListData((prev: any) => ({
+        setCurrentList((prev: any) => ({
           ...prev,
           items: prev.items.map((item: any) => {
             if (item.id === itemId) {
@@ -1742,12 +2100,41 @@ const AdminListDetailPage = () => {
             return item;
           }),
         }));
+
+        setAllLists((prev) =>
+          prev.map((list) =>
+            list.id === currentListId
+              ? {
+                  ...list,
+                  items: list.items.map((item: any) => {
+                    if (item.id === itemId) {
+                      const updatedDeliveries = {
+                        ...item.deliveries,
+                        [period]: {
+                          ...item.deliveries?.[period],
+                          ...deliveryData,
+                          cargoNo:
+                            deliveryData.cargoNo ||
+                            item.deliveries?.[period]?.cargoNo ||
+                            "",
+                        },
+                      };
+                      return {
+                        ...item,
+                        deliveries: updatedDeliveries,
+                      };
+                    }
+                    return item;
+                  }),
+                }
+              : list
+          )
+        );
       } catch (error) {
         console.error("Failed to update delivery:", error);
-        // Revert the local state change if API call fails
       }
     },
-    []
+    [currentListId]
   );
 
   // Handle activity log approval/rejection
@@ -1768,10 +2155,8 @@ const AdminListDetailPage = () => {
       );
 
       setPendingApprovals((prev) => prev - 1);
-      toast.success("Activity approved successfully!", successStyles);
     } catch (error) {
       console.error("Failed to approve activity:", error);
-      toast.error("Failed to approve activity");
     }
   };
 
@@ -1792,10 +2177,8 @@ const AdminListDetailPage = () => {
       );
 
       setPendingApprovals((prev) => prev - 1);
-      toast.success("Activity rejected successfully!", successStyles);
     } catch (error) {
       console.error("Failed to reject activity:", error);
-      toast.error("Failed to reject activity");
     }
   };
 
@@ -1828,24 +2211,21 @@ const AdminListDetailPage = () => {
         name: "Item No. DE",
         width: 120,
         resizable: true,
-        renderCell: (props: any) => (
-          <Typography variant="body2" sx={{ fontSize: "14px" }}>
-            {props.row.item_no_de || "-"}
-          </Typography>
-        ),
+        renderCell: (props: any) => {
+          const hasChanges =
+            (props.row.changesNeedAcknowledgment ||
+              props.row.hasChanges ||
+              props.row.shouldHighlight) &&
+            props.row.changedFields?.includes("item_no_de");
+          return (
+            <FieldHighlight hasChanges={hasChanges} fieldName="Artikelnr">
+              <Typography variant="body2" sx={{ fontSize: "14px", p: 1 }}>
+                {props.row.item_no_de || "-"}
+              </Typography>
+            </FieldHighlight>
+          );
+        },
       },
-      // {
-      //   key: "itemNumber",
-      //   name: "Item #",
-      //   width: 100,
-      //   resizable: true,
-      // },
-      // {
-      //   key: "articleNumber",
-      //   name: "Article Number",
-      //   width: 140,
-      //   resizable: true,
-      // },
       {
         key: "imageUrl",
         name: "Image",
@@ -1971,6 +2351,20 @@ const AdminListDetailPage = () => {
         name: "Article Name",
         width: 300,
         resizable: true,
+        renderCell: (props: any) => {
+          const hasChanges =
+            (props.row.changesNeedAcknowledgment ||
+              props.row.hasChanges ||
+              props.row.shouldHighlight) &&
+            props.row.changedFields?.includes("articleName");
+          return (
+            <FieldHighlight hasChanges={hasChanges} fieldName="Artikelname">
+              <Typography variant="body2" sx={{ fontSize: "14px", p: 1 }}>
+                {props.row.articleName}
+              </Typography>
+            </FieldHighlight>
+          );
+        },
       },
       {
         key: "quantity",
@@ -1998,9 +2392,8 @@ const AdminListDetailPage = () => {
       },
     ];
 
-    // Add delivery columns dynamically (without duplication)
     const deliveryColumns = deliveryPeriodsData.sortedPeriods.map((period) => {
-      const cargoNo = listData?.items
+      const cargoNo = currentList?.items
         .map((item: any) => item.deliveries?.[period]?.cargoNo)
         .find((cn: string) => cn);
 
@@ -2078,21 +2471,6 @@ const AdminListDetailPage = () => {
           );
         },
       },
-      // {
-      //   key: "marked",
-      //   name: "Marked",
-      //   width: 80,
-      //   resizable: true,
-      //   renderCell: (props: any) => (
-      //     <Checkbox
-      //       size="small"
-      //       checked={props.row.marked}
-      //       icon={<CheckBoxOutlineBlank />}
-      //       checkedIcon={<CheckBox />}
-      //       onChange={() => {}}
-      //     />
-      //   ),
-      // },
       {
         key: "comment",
         name: "Comment",
@@ -2113,21 +2491,21 @@ const AdminListDetailPage = () => {
     selectedRows,
     handleUpdateDelivery,
     handleUpdateItem,
-    listData?.items,
+    currentList?.items,
   ]);
 
   // Filter items based on search
   const filteredItems = useMemo(() => {
-    if (!listData?.items) return [];
+    if (!currentList?.items) return [];
 
-    return listData.items.filter(
+    return currentList.items.filter(
       (item: any) =>
         item.articleName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         item.articleNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         item.itemNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.item_no_de?.toLowerCase().includes(searchTerm.toLowerCase()) // Add this line
+        item.item_no_de?.toLowerCase().includes(searchTerm.toLowerCase())
     );
-  }, [listData?.items, searchTerm]);
+  }, [currentList?.items, searchTerm]);
 
   if (loading) {
     return (
@@ -2144,12 +2522,12 @@ const AdminListDetailPage = () => {
     );
   }
 
-  // Show error if no list data
-  if (!listData) {
+  // Show error if no lists
+  if (!allLists.length) {
     return (
       <Box sx={{ p: 3 }}>
         <Alert severity="error" sx={{ mb: 2 }}>
-          List not found or failed to load
+          No lists found for this customer
         </Alert>
         <CustomButton onClick={() => router.back()} startIcon={<ArrowBack />}>
           Go Back
@@ -2194,48 +2572,130 @@ const AdminListDetailPage = () => {
             >
               <ArrowBack />
             </IconButton>
-
             <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
               <AdminPanelSettings
                 sx={{ color: "primary.main", fontSize: 28 }}
               />
-              <Typography
-                variant="h4"
-                component="h1"
-                sx={{
-                  fontWeight: 700,
-                  background:
-                    "linear-gradient(45deg, #8CC21B 30%, #4CAF50 90%)",
-                  backgroundClip: "text",
-                  textFillColor: "transparent",
-                  letterSpacing: "-0.5px",
-                }}
-              >
-                {listData.name}
-              </Typography>
+              <Box sx={{ display: "flex", flexDirection: "column" }}>
+                <Typography
+                  variant="h4"
+                  component="h1"
+                  sx={{
+                    fontWeight: 700,
+                    background:
+                      "linear-gradient(45deg, #8CC21B 30%, #4CAF50 90%)",
+                    backgroundClip: "text",
+                    textFillColor: "transparent",
+                    letterSpacing: "-0.5px",
+                    fontSize: 30,
+                    lineHeight: 1.2,
+                  }}
+                >
+                  {currentList.customer.companyName ||
+                    currentList.customer.legalName ||
+                    "Unknown Customer"}
+                </Typography>
+              </Box>
             </Box>
-
-            <Chip
-              label={listData.status}
-              color={listData.status === "active" ? "success" : "default"}
-              sx={{ ml: 2 }}
-            />
-
-            {pendingApprovals > 0 && (
-              <Badge
-                badgeContent={pendingApprovals}
-                color="error"
-                sx={{ ml: 2 }}
-              >
-                <NotificationsActive sx={{ color: "warning.main" }} />
-              </Badge>
-            )}
 
             {saving && <CircularProgress size={20} sx={{ ml: 2 }} />}
           </Box>
 
-          <EnhancedBreadcrumbs listTitle={listData.name} />
+          <EnhancedBreadcrumbs
+            listTitle={currentList?.name || "Customer Lists"}
+          />
+
+          {/* List Tabs */}
+          <ListTabs
+            currentListId={currentListId}
+            allLists={allLists}
+            onListChange={handleListChange}
+            loading={loading}
+          />
         </Box>
+
+        {/* Changes Alert */}
+        {itemsWithChanges.length > 0 && (
+          <Alert
+            severity="warning"
+            sx={{
+              mb: 3,
+              borderRadius: 2,
+              backgroundColor: alpha("#ff9800", 0.05),
+              border: "2px solid #ff9800",
+              borderLeft: "6px solid #ff9800",
+              boxShadow: "0 6px 20px rgba(255, 152, 0, 0.2)",
+            }}
+          >
+            <Box
+              sx={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                width: "100%",
+              }}
+            >
+              <Box sx={{ flex: 1 }}>
+                <Typography
+                  variant="h6"
+                  sx={{
+                    fontWeight: 700,
+                    color: "#e65100",
+                    mb: 1,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 1,
+                    fontSize: "1.1rem",
+                  }}
+                >
+                  <Warning fontSize="small" />
+                  🟠 Unbestätigte Änderungen
+                </Typography>
+                <Typography
+                  variant="body2"
+                  sx={{ color: "#ef6c00", mb: 1.5, fontWeight: 500 }}
+                >
+                  {itemsWithChanges.length} Artikel wurden vom Kunden geändert
+                  und benötigen Admin-Bestätigung.
+                </Typography>
+              </Box>
+
+              <Button
+                variant="contained"
+                size="large"
+                onClick={handleAcknowledgeAllChanges}
+                disabled={acknowledgingSaving}
+                startIcon={
+                  acknowledgingSaving ? (
+                    <CircularProgress size={18} />
+                  ) : (
+                    <Visibility />
+                  )
+                }
+                sx={{
+                  ml: 3,
+                  backgroundColor: "#ff9800",
+                  color: "white",
+                  fontWeight: 600,
+                  px: 3,
+                  py: 1.5,
+                  fontSize: "0.9rem",
+                  "&:hover": {
+                    backgroundColor: "#f57c00",
+                    transform: "scale(1.02)",
+                  },
+                  whiteSpace: "nowrap",
+                  borderRadius: 2,
+                  boxShadow: "0 4px 12px rgba(255, 152, 0, 0.3)",
+                }}
+              >
+                {acknowledgingSaving
+                  ? "Bestätige..."
+                  : `🟠 Alle Bestätigen (${itemsWithChanges.length})`}
+              </Button>
+            </Box>
+          </Alert>
+        )}
 
         {/* Tabs */}
         <Card
@@ -2274,6 +2734,19 @@ const AdminListDetailPage = () => {
                   <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                     <Assignment />
                     Items Management
+                    {itemsWithChanges.length > 0 && (
+                      <Badge
+                        badgeContent={itemsWithChanges.length}
+                        color="error"
+                        sx={{
+                          ml: 1,
+                          "& .MuiBadge-badge": {
+                            animation: "pulse 2s infinite",
+                            fontWeight: 700,
+                          },
+                        }}
+                      />
+                    )}
                   </Box>
                 }
               />
@@ -2449,20 +2922,17 @@ const AdminListDetailPage = () => {
                       borderColor: "rgba(140, 194, 27, 0.2)",
                     },
                   },
-                  // Special styling for delivery columns
                   "& .rdg-cell[aria-colindex]": {
                     "&:nth-of-type(n+6)": {
                       padding: "8px !important",
                       backgroundColor: "rgba(248, 255, 248, 0.7)",
                     },
                   },
-                  // Enhanced focus states
                   "& .rdg-cell:focus-within": {
                     outline: "2px solid rgba(140, 194, 27, 0.4)",
                     outlineOffset: "-2px",
                     backgroundColor: "rgba(140, 194, 27, 0.05)",
                   },
-                  // Beautiful scrollbar
                   "& .rdg-viewport": {
                     "&::-webkit-scrollbar": {
                       width: "8px",
@@ -2507,174 +2977,6 @@ const AdminListDetailPage = () => {
                   }}
                 />
               </Paper>
-
-              {/* Footer */}
-              {listData.items.length > 0 && (
-                <Box
-                  sx={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    mt: 2.5,
-                    px: 3,
-                    py: 2,
-                    backgroundColor: alpha(
-                      theme.palette.background.default,
-                      0.6
-                    ),
-                    borderRadius: 3,
-                    border: "1px solid",
-                    borderColor: alpha("#ADB5BD", 0.1),
-                    backdropFilter: "blur(10px)",
-                  }}
-                >
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                    sx={{
-                      display: "flex",
-                      alignItems: "center",
-                      "&::before": {
-                        content: '""',
-                        display: "inline-block",
-                        width: 8,
-                        height: 8,
-                        borderRadius: "50%",
-                        backgroundColor: theme.palette.info.main,
-                        marginRight: 1,
-                      },
-                    }}
-                  >
-                    Showing {filteredItems.length} of {listData.items.length}{" "}
-                    items
-                  </Typography>
-
-                  <Box sx={{ display: "flex", gap: 4 }}>
-                    <Typography
-                      variant="body2"
-                      sx={{ display: "flex", alignItems: "center" }}
-                    >
-                      <Box
-                        component="span"
-                        sx={{
-                          width: 8,
-                          height: 8,
-                          borderRadius: "50%",
-                          backgroundColor: theme.palette.info.main,
-                          display: "inline-block",
-                          mr: 1,
-                          boxShadow: `0 0 0 2px ${alpha(
-                            theme.palette.info.main,
-                            0.2
-                          )}`,
-                        }}
-                      />
-                      <strong>Total Items:</strong> {listData.items.length}
-                    </Typography>
-                    <Typography
-                      variant="body2"
-                      sx={{ display: "flex", alignItems: "center" }}
-                    >
-                      <Box
-                        component="span"
-                        sx={{
-                          width: 8,
-                          height: 8,
-                          borderRadius: "50%",
-                          backgroundColor: theme.palette.success.main,
-                          display: "inline-block",
-                          mr: 1,
-                          boxShadow: `0 0 0 2px ${alpha(
-                            theme.palette.success.main,
-                            0.2
-                          )}`,
-                        }}
-                      />
-                      <strong>Confirmed:</strong>{" "}
-                      {
-                        listData.items.filter(
-                          (item: any) => item.changeStatus === "confirmed"
-                        ).length
-                      }
-                    </Typography>
-                    <Typography
-                      variant="body2"
-                      sx={{ display: "flex", alignItems: "center" }}
-                    >
-                      <Box
-                        component="span"
-                        sx={{
-                          width: 8,
-                          height: 8,
-                          borderRadius: "50%",
-                          backgroundColor: theme.palette.warning.main,
-                          display: "inline-block",
-                          mr: 1,
-                          boxShadow: `0 0 0 2px ${alpha(
-                            theme.palette.warning.main,
-                            0.2
-                          )}`,
-                        }}
-                      />
-                      <strong>Pending:</strong>{" "}
-                      {
-                        listData.items.filter(
-                          (item: any) =>
-                            !item.changeStatus ||
-                            item.changeStatus === "pending"
-                        ).length
-                      }
-                    </Typography>
-                    <Typography
-                      variant="body2"
-                      sx={{ display: "flex", alignItems: "center" }}
-                    >
-                      <Box
-                        component="span"
-                        sx={{
-                          width: 8,
-                          height: 8,
-                          borderRadius: "50%",
-                          backgroundColor: theme.palette.error.main,
-                          display: "inline-block",
-                          mr: 1,
-                          boxShadow: `0 0 0 2px ${alpha(
-                            theme.palette.error.main,
-                            0.2
-                          )}`,
-                        }}
-                      />
-                      <strong>Rejected:</strong>{" "}
-                      {
-                        listData.items.filter(
-                          (item: any) => item.changeStatus === "rejected"
-                        ).length
-                      }
-                    </Typography>
-                    {/* <Typography
-                      variant="body2"
-                      sx={{ display: "flex", alignItems: "center" }}
-                    >
-                      <Box
-                        component="span"
-                        sx={{
-                          width: 8,
-                          height: 8,
-                          borderRadius: "50%",
-                          backgroundColor: theme.palette.primary.main,
-                          display: "inline-block",
-                          mr: 1,
-                          boxShadow: `0 0 0 2px ${alpha(
-                            theme.palette.primary.main,
-                            0.2
-                          )}`,
-                        }}
-                      />
-                      <strong>Marked:</strong>{" "}
-                      {listData.items.filter((item: any) => item.marked).length}
-                    </Typography> */}
-                  </Box>
-                </Box>
-              )}
             </Box>
           </TabPanel>
 
@@ -2722,7 +3024,6 @@ const AdminListDetailPage = () => {
                     variant="outlined"
                     startIcon={<Refresh />}
                     onClick={() => {
-                      // Refresh activity logs
                       window.location.reload();
                     }}
                   >
@@ -2778,7 +3079,7 @@ const AdminListDetailPage = () => {
           open={addItemDialog}
           onClose={() => setAddItemDialog(false)}
           onAddItem={handleAddItem}
-          listId={listId}
+          listId={currentList?.id}
         />
 
         {/* Add CSS animations */}

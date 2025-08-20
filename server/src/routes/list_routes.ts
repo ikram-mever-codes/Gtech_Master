@@ -18,104 +18,75 @@ import {
   getCustomerDeliveries,
   searchListsByNumber,
   getListsByCompanyName,
+  acknowledgeListItemChanges,
+  bulkAcknowledgeChanges,
 } from "../controllers/list_controllers";
 import { authenticateUser, AuthorizedRequest } from "../middlewares/authorized";
 import { authenticateCustomer } from "../middlewares/authenticateCustomer";
 
 const router: any = Router();
 
+// Authentication middleware for mixed routes
+const authenticateMixed = (
+  req: AuthorizedRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  if (req.cookies?.token) {
+    try {
+      authenticateUser(req, res, (err?: any) => {
+        if (err || !req.user) {
+          authenticateCustomer(req, res, next);
+        } else {
+          next();
+        }
+      });
+    } catch {
+      authenticateCustomer(req, res, next);
+    }
+  } else {
+    return res.status(401).json({ error: "Authentication required" });
+  }
+};
+
+// Public routes
+router.get("/search/:listNumber", searchListsByNumber);
+
+// Customer-specific routes
 router.get("/customer/:companyName", getListsByCompanyName);
 
+// Mixed authentication routes (both admin and customer)
+router.get("/items/search", authenticateMixed, searchItems);
+router.post("/", authenticateMixed, createList);
+router.post("/:listId/items", authenticateMixed, addListItem);
+router.put("/items/:itemId", authenticateMixed, updateListItem);
+router.delete("/items/:itemId", authenticateMixed, deleteListItem);
+router.delete("/list/:listId", authenticateMixed, deleteList);
+router.put("/items/:itemId/delivery", authenticateMixed, updateDeliveryInfo);
+router.get("/:listId", authenticateMixed, getListWithItems);
+router.get("/customer/all/:customerId", authenticateMixed, getCustomerLists);
 router.get(
-  "/items/search",
-  (req: AuthorizedRequest, res: Response, next: NextFunction) => {
-    if (req.cookies?.token) {
-      try {
-        authenticateUser(req, res, (err?: any) => {
-          if (err || !req.user) {
-            authenticateCustomer(req, res, next);
-          } else {
-            next();
-          }
-        });
-      } catch {
-        authenticateCustomer(req, res, next);
-      }
-    } else {
-      return res.status(401).json({ error: "Authentication required" });
-    }
-  },
-  searchItems
+  "/customers/:customerId/lists/:listId",
+  authenticateMixed,
+  getCustomerList
 );
-
-// Combined routes for both admins and customers ==============================
-router.post(
-  "/",
-  (req: AuthorizedRequest, res: Response, next: NextFunction) => {
-    if (req.cookies?.token) {
-      try {
-        authenticateUser(req, res, (err?: any) => {
-          if (err || !req.user) {
-            authenticateCustomer(req, res, next);
-          } else {
-            next();
-          }
-        });
-      } catch {
-        authenticateCustomer(req, res, next);
-      }
-    } else {
-      return res.status(401).json({ error: "Authentication required" });
-    }
-  },
-  createList
-);
-
-router.post(
-  "/:listId/items",
-  (req: AuthorizedRequest, res: Response, next: NextFunction) => {
-    if (req.cookies?.token) {
-      try {
-        authenticateUser(req, res, (err?: any) => {
-          if (err || !req.user) {
-            authenticateCustomer(req, res, next);
-          } else {
-            next();
-          }
-        });
-      } catch {
-        authenticateCustomer(req, res, next);
-      }
-    } else {
-      return res.status(401).json({ error: "Authentication required" });
-    }
-  },
-  addListItem
+router.post("/:listId/duplicate", authenticateMixed, duplicateList);
+router.put("/:listId", authenticateMixed, updateList);
+router.get("/:customerId/deliveries", authenticateMixed, getCustomerDeliveries);
+router.put(
+  "/items/:itemId/acknowledge",
+  authenticateMixed,
+  // acknowledgeListItemChanges
+  bulkAcknowledgeChanges
 );
 
 router.put(
-  "/items/:itemId",
-  (req: AuthorizedRequest, res: Response, next: NextFunction) => {
-    if (req.cookies?.token) {
-      try {
-        authenticateUser(req, res, (err?: any) => {
-          if (err || !req.user) {
-            authenticateCustomer(req, res, next);
-          } else {
-            next();
-          }
-        });
-      } catch {
-        authenticateCustomer(req, res, next);
-      }
-    } else {
-      return res.status(401).json({ error: "Authentication required" });
-    }
-  },
-  updateListItem
+  "/:listId/bulk-acknowledge",
+  authenticateMixed,
+  bulkAcknowledgeChanges
 );
 
-// Admin-only approval routes ================================================
+// Admin-only routes
 router.put(
   "/admin/items/:logId/approve",
   authenticateUser,
@@ -126,209 +97,6 @@ router.put(
   authenticateUser,
   rejectListItemChanges
 );
-
-// Shared routes ============================================================
-router.delete(
-  "/items/:itemId",
-  (req: AuthorizedRequest, res: Response, next: NextFunction) => {
-    if (req.cookies?.token) {
-      try {
-        authenticateUser(req, res, (err?: any) => {
-          if (err || !req.user) {
-            authenticateCustomer(req, res, next);
-          } else {
-            next();
-          }
-        });
-      } catch {
-        authenticateCustomer(req, res, next);
-      }
-    } else {
-      return res.status(401).json({ error: "Authentication required" });
-    }
-  },
-  deleteListItem
-);
-
-router.delete(
-  "/list/:listId",
-  (req: AuthorizedRequest, res: Response, next: NextFunction) => {
-    if (req.cookies?.token) {
-      try {
-        authenticateUser(req, res, (err?: any) => {
-          if (err || !req.user) {
-            authenticateCustomer(req, res, next);
-          } else {
-            next();
-          }
-        });
-      } catch {
-        authenticateCustomer(req, res, next);
-      }
-    } else {
-      return res.status(401).json({ error: "Authentication required" });
-    }
-  },
-  deleteList
-);
-
-router.put(
-  "/items/:itemId/delivery",
-  (req: AuthorizedRequest, res: Response, next: NextFunction) => {
-    if (req.cookies?.token) {
-      try {
-        authenticateUser(req, res, (err?: any) => {
-          if (err || !req.user) {
-            authenticateCustomer(req, res, next);
-          } else {
-            next();
-          }
-        });
-      } catch {
-        authenticateCustomer(req, res, next);
-      }
-    } else {
-      return res.status(401).json({ error: "Authentication required" });
-    }
-  },
-  updateDeliveryInfo
-);
-
-router.get(
-  "/:listId",
-  (req: AuthorizedRequest, res: Response, next: NextFunction) => {
-    if (req.cookies?.token) {
-      try {
-        authenticateUser(req, res, (err?: any) => {
-          if (err || !req.user) {
-            authenticateCustomer(req, res, next);
-          } else {
-            next();
-          }
-        });
-      } catch {
-        authenticateCustomer(req, res, next);
-      }
-    } else {
-      return res.status(401).json({ error: "Authentication required" });
-    }
-  },
-  getListWithItems
-);
-
-router.get(
-  "/customer/all/:customerId",
-  (req: AuthorizedRequest, res: Response, next: NextFunction) => {
-    if (req.cookies?.token) {
-      try {
-        authenticateUser(req, res, (err?: any) => {
-          if (err || !req.user) {
-            authenticateCustomer(req, res, next);
-          } else {
-            next();
-          }
-        });
-      } catch {
-        authenticateCustomer(req, res, next);
-      }
-    } else {
-      return res.status(401).json({ error: "Authentication required" });
-    }
-  },
-  getCustomerLists
-);
-
-// Get single list for a customer
-router.get(
-  "/customers/:customerId/lists/:listId",
-  (req: AuthorizedRequest, res: Response, next: NextFunction) => {
-    if (req.cookies?.token) {
-      try {
-        authenticateUser(req, res, (err?: any) => {
-          if (err || !req.user) {
-            authenticateCustomer(req, res, next);
-          } else {
-            next();
-          }
-        });
-      } catch {
-        authenticateCustomer(req, res, next);
-      }
-    } else {
-      return res.status(401).json({ error: "Authentication required" });
-    }
-  },
-  getCustomerList
-);
-
-router.post(
-  "/:listId/duplicate",
-  (req: AuthorizedRequest, res: Response, next: NextFunction) => {
-    if (req.cookies?.token) {
-      try {
-        authenticateUser(req, res, (err?: any) => {
-          if (err || !req.user) {
-            authenticateCustomer(req, res, next);
-          } else {
-            next();
-          }
-        });
-      } catch {
-        authenticateCustomer(req, res, next);
-      }
-    } else {
-      return res.status(401).json({ error: "Authentication required" });
-    }
-  },
-  duplicateList
-);
-
-router.put(
-  "/:listId",
-  (req: AuthorizedRequest, res: Response, next: NextFunction) => {
-    if (req.cookies?.token) {
-      try {
-        authenticateUser(req, res, (err?: any) => {
-          if (err || !req.user) {
-            authenticateCustomer(req, res, next);
-          } else {
-            next();
-          }
-        });
-      } catch {
-        authenticateCustomer(req, res, next);
-      }
-    } else {
-      return res.status(401).json({ error: "Authentication required" });
-    }
-  },
-  updateList
-);
-
 router.get("/admin/all-lists", authenticateUser, getAllLists);
-
-router.get(
-  "/:customerId/deliveries",
-  (req: AuthorizedRequest, res: Response, next: NextFunction) => {
-    if (req.cookies?.token) {
-      try {
-        authenticateUser(req, res, (err?: any) => {
-          if (err || !req.user) {
-            authenticateCustomer(req, res, next);
-          } else {
-            next();
-          }
-        });
-      } catch {
-        authenticateCustomer(req, res, next);
-      }
-    } else {
-      return res.status(401).json({ error: "Authentication required" });
-    }
-  },
-  getCustomerDeliveries
-);
-
-router.get("/search/:listNumber", searchListsByNumber);
 
 export default router;

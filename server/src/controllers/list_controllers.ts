@@ -10,6 +10,9 @@ import {
   ListActivityLog,
   LOG_APPROVAL_STATUS,
   DELIVERY_STATUS,
+  CHANGE_ORIGIN,
+  createListItemDTOForRole,
+  getOriginFromUserType,
 } from "../models/list";
 import { ListItem } from "../models/list";
 import ErrorHandler from "../utils/errorHandler";
@@ -138,7 +141,7 @@ async function fetchItemData(itemId: number) {
 
       deliveries[dateKey] = {
         quantity: value.quantity,
-        status: value.status, // Include order status in the output
+        status: value.status,
         deliveredAt: value.deliveredAt,
         cargoNo: uniqueCargoNo || "",
         cargoStatus: value.cargoStatus,
@@ -167,15 +170,14 @@ async function fetchItemData(itemId: number) {
     connection.release();
   }
 }
+
 async function updateLocalListItem(item: ListItem): Promise<ListItem> {
   const listItemRepository = AppDataSource.getRepository(ListItem);
 
   try {
-    // Fetch fresh data from MIS
     const itemData = await fetchItemData(parseInt(item.itemNumber));
     if (itemData.deliveries && Object.keys(itemData.deliveries).length > 0) {
       const currentDeliveries = item.deliveries || {};
-
       const mergedDeliveries: any = {};
 
       for (const [dateKey, delivery] of Object.entries(itemData.deliveries)) {
@@ -201,7 +203,6 @@ async function updateLocalListItem(item: ListItem): Promise<ListItem> {
 async function refreshListItemsDeliveryData(items: any[]) {
   if (!items || items.length === 0) return items;
 
-  // Refresh delivery data for each item
   const refreshedItems = await Promise.all(
     items.map(async (item) => {
       try {
@@ -266,7 +267,6 @@ export const createList = async (
     const listRepository = AppDataSource.getRepository(List);
     const customerRepository = AppDataSource.getRepository(Customer);
 
-    // Verify customer exists
     const customer = await customerRepository.findOne({
       where: { id: customerId },
     });
@@ -274,7 +274,6 @@ export const createList = async (
       return next(new ErrorHandler("Customer not found", 404));
     }
 
-    // Create creator entity
     const createdBy = await createCreator(null, customerId);
 
     const list = listRepository.create({
@@ -316,7 +315,6 @@ export const addListItem = async (
     const listRepository = AppDataSource.getRepository(List);
     const listItemRepository = AppDataSource.getRepository(ListItem);
 
-    // Verify list exists
     const list = await listRepository.findOne({
       where: { id: listId },
       relations: ["items", "customer"],
@@ -325,19 +323,18 @@ export const addListItem = async (
       return next(new ErrorHandler("List not found", 404));
     }
 
-    // Create creator entity
     const createdBy = await createCreator(
       userId !== undefined ? userId : null,
       customerId !== undefined ? customerId : null
     );
 
-    // Fetch item data from MIS database
     const itemData = await fetchItemData(itemId);
+    const userType = userId ? "user" : "customer";
+    const origin = getOriginFromUserType(userType);
 
-    // Create new list item
     const listItem = listItemRepository.create({
       itemNumber: itemId.toString(),
-      item_no_de: itemData.itemNoDe, // Add the item_no_de field
+      item_no_de: itemData.itemNoDe,
       articleName: itemData.articleName,
       articleNumber: itemData.articleNumber,
       quantity: quantity,
@@ -346,18 +343,17 @@ export const addListItem = async (
       imageUrl: itemData.imageUrl,
       list,
       createdBy,
+      changeStatus: CHANGE_STATUS.CONFIRMED,
     });
 
     if (itemData.deliveries && Object.keys(itemData.deliveries).length > 0) {
       const deliveries: any = { ...itemData.deliveries };
-
       for (const dateKey in deliveries) {
         deliveries[dateKey] = {
           ...deliveries[dateKey],
           quantity: deliveries[dateKey].quantity,
         };
       }
-
       listItem.deliveries = deliveries;
     }
 
@@ -366,14 +362,16 @@ export const addListItem = async (
     list.items = [...(list.items || []), listItem];
     await listRepository.save(list);
 
+    const performerId = userId ? userId : customerId;
     list.logActivity(
       "ITEM_ADDED",
       {
         itemId: listItem.id,
         itemName: itemData.articleName,
+        origin,
       },
-      userId ? userId : customerId,
-      userId ? "user" : "customer"
+      performerId,
+      userType
     );
     await listRepository.save(list);
 
@@ -387,6 +385,7 @@ export const addListItem = async (
   }
 };
 
+// 3. Update List Item with bidirectional change tracking
 export const updateListItem = async (
   req: Request,
   res: Response,
@@ -415,7 +414,6 @@ export const updateListItem = async (
     const listItemRepository = AppDataSource.getRepository(ListItem);
     const listRepository = AppDataSource.getRepository(List);
 
-    // Find item with list relation for activity logging
     const item = await listItemRepository.findOne({
       where: { id: itemId },
       relations: ["list", "list.items"],
@@ -425,7 +423,6 @@ export const updateListItem = async (
       return next(new ErrorHandler("List item not found", 404));
     }
 
-    // Verify list exists
     const list = await listRepository.findOne({
       where: { id: item.list.id },
       relations: ["customer"],
@@ -434,73 +431,104 @@ export const updateListItem = async (
       return next(new ErrorHandler("Associated list not found", 404));
     }
 
-    // Store original values and track changes
-    const changes: Record<string, any> = {};
     const performerId = userId || customerId;
     const performerType = userId ? "user" : "customer";
+    const origin = getOriginFromUserType(performerType);
+    const changes: Record<string, any> = {};
 
-    // Helper function to track changes
-    const trackChange = (field: string, newValue: any, currentValue: any) => {
-      if (newValue !== undefined && newValue !== currentValue) {
-        changes[field] = { from: currentValue, to: newValue };
-        item.originalValues = {
-          ...(item.originalValues || {}),
-          [field]: currentValue,
-        };
-        item.changeStatus = CHANGE_STATUS.PENDING;
-        item.changedAt = new Date();
-        item.changedById = performerId;
-        item.changedByType = performerType;
-        return true;
-      }
-      return false;
-    };
-
-    // Update fields if they are provided and different
-    if (trackChange("quantity", quantity, item.quantity)) {
-      item.quantity = quantity;
+    // Update fields with change tracking
+    if (quantity !== undefined && quantity !== item.quantity) {
+      item.updateField(
+        "quantity",
+        quantity,
+        performerId,
+        performerType,
+        origin
+      );
+      changes.quantity = { from: item.originalValues?.quantity, to: quantity };
     }
 
-    if (trackChange("interval", interval, item.interval)) {
-      item.interval = interval;
+    if (interval !== undefined && interval !== item.interval) {
+      item.updateField(
+        "interval",
+        interval,
+        performerId,
+        performerType,
+        origin
+      );
+      changes.interval = { from: item.originalValues?.interval, to: interval };
     }
 
-    if (trackChange("comment", comment, item.comment)) {
-      item.comment = comment;
+    if (comment !== undefined && comment !== item.comment) {
+      item.addComment(comment, performerId, performerType, origin);
+      changes.comment = { from: item.originalValues?.comment, to: comment };
     }
 
-    if (trackChange("articleName", articleName, item.articleName)) {
-      item.articleName = articleName;
+    if (articleName !== undefined && articleName !== item.articleName) {
+      item.updateField(
+        "articleName",
+        articleName,
+        performerId,
+        performerType,
+        origin
+      );
+      changes.articleName = {
+        from: item.originalValues?.articleName,
+        to: articleName,
+      };
     }
 
-    if (trackChange("articleNumber", articleNumber, item.articleNumber)) {
-      item.articleNumber = articleNumber;
+    if (articleNumber !== undefined && articleNumber !== item.articleNumber) {
+      item.updateField(
+        "articleNumber",
+        articleNumber,
+        performerId,
+        performerType,
+        origin
+      );
+      changes.articleNumber = {
+        from: item.originalValues?.articleNumber,
+        to: articleNumber,
+      };
     }
 
-    if (trackChange("imageUrl", imageUrl, item.imageUrl)) {
-      item.imageUrl = imageUrl;
+    if (imageUrl !== undefined && imageUrl !== item.imageUrl) {
+      item.updateField(
+        "imageUrl",
+        imageUrl,
+        performerId,
+        performerType,
+        origin
+      );
+      changes.imageUrl = { from: item.originalValues?.imageUrl, to: imageUrl };
     }
 
-    if (trackChange("item_no_de", item_no_de, item.item_no_de)) {
-      item.item_no_de = item_no_de;
+    if (item_no_de !== undefined && item_no_de !== item.item_no_de) {
+      item.updateField(
+        "item_no_de",
+        item_no_de,
+        performerId,
+        performerType,
+        origin
+      );
+      changes.item_no_de = {
+        from: item.originalValues?.item_no_de,
+        to: item_no_de,
+      };
     }
 
     if (marked !== undefined) {
       item.marked = marked;
     }
 
-    // Update deliveries if provided
     if (deliveries) {
       item.deliveries = item.deliveries || {};
-
       Object.entries(deliveries).forEach(
         ([period, deliveryData]: [string, any]) => {
           const currentDelivery = item.deliveries[period] || {};
-
           item.deliveries[period] = {
             ...currentDelivery,
             ...deliveryData,
-            // Ensure critical fields are always set
             status: deliveryData.status || currentDelivery.status || "Open",
             cargoStatus:
               deliveryData.cargoStatus || currentDelivery.cargoStatus || "",
@@ -517,7 +545,6 @@ export const updateListItem = async (
 
     await listItemRepository.save(item);
 
-    // Log activity if there were changes
     if (Object.keys(changes).length > 0) {
       list.logActivity(
         "ITEM_UPDATED",
@@ -525,6 +552,7 @@ export const updateListItem = async (
           itemId: item.id,
           itemName: item.articleName,
           changes,
+          origin,
         },
         performerId,
         performerType,
@@ -533,16 +561,18 @@ export const updateListItem = async (
       await listRepository.save(list);
     }
 
+    const role = getOriginFromUserType(performerType);
     return res.status(200).json({
       success: true,
       message: "List item updated successfully",
-      data: item,
+      data: createListItemDTOForRole(item, role),
     });
   } catch (error) {
     return next(error);
   }
 };
 
+// 4. Update Delivery Info
 export const updateDeliveryInfo = async (
   req: Request,
   res: Response,
@@ -561,6 +591,8 @@ export const updateDeliveryInfo = async (
       cargoType,
     } = req.body;
     const userId = (req as any).user.id;
+    const userType = "user";
+    const origin = CHANGE_ORIGIN.ADMIN;
 
     if (!itemId || !period) {
       return next(new ErrorHandler("Item ID and period are required", 400));
@@ -569,7 +601,6 @@ export const updateDeliveryInfo = async (
     const listItemRepository = AppDataSource.getRepository(ListItem);
     const listRepository = AppDataSource.getRepository(List);
 
-    // Find item with list relation
     const item = await listItemRepository.findOne({
       where: { id: itemId },
       relations: ["list"],
@@ -579,13 +610,9 @@ export const updateDeliveryInfo = async (
       return next(new ErrorHandler("List item not found", 404));
     }
 
-    // Initialize deliveries if not exists
     item.deliveries = item.deliveries || {};
-
-    // Get existing delivery data for the period
     const existingDelivery = item.deliveries[period] || {};
 
-    // Update delivery info
     item.deliveries[period] = {
       ...existingDelivery,
       quantity: quantity !== undefined ? quantity : existingDelivery.quantity,
@@ -602,7 +629,6 @@ export const updateDeliveryInfo = async (
 
     await listItemRepository.save(item);
 
-    // Reload the list to ensure we have the latest data for logging
     const list = await listRepository.findOne({
       where: { id: item.list.id },
       relations: ["activityLogs"],
@@ -612,7 +638,6 @@ export const updateDeliveryInfo = async (
       return next(new ErrorHandler("Associated list not found", 404));
     }
 
-    // Log delivery update
     list.logActivity(
       "DELIVERY_UPDATED",
       {
@@ -627,9 +652,10 @@ export const updateDeliveryInfo = async (
           eta,
           cargoType,
         },
+        origin,
       },
       userId,
-      "user"
+      userType
     );
 
     await listRepository.save(list);
@@ -643,6 +669,8 @@ export const updateDeliveryInfo = async (
     return next(error);
   }
 };
+
+// 5. Get List with Items (with role-based change tracking)
 export const getListWithItems = async (
   req: Request,
   res: Response,
@@ -650,6 +678,8 @@ export const getListWithItems = async (
 ) => {
   try {
     const { listId } = req.params;
+    const userType = (req as any).user?.type || (req as any).customer?.type;
+    const role = getOriginFromUserType(userType);
 
     if (!listId) {
       return next(new ErrorHandler("List ID is required", 400));
@@ -665,7 +695,6 @@ export const getListWithItems = async (
       return next(new ErrorHandler("List not found", 404));
     }
 
-    // Refresh and update delivery data for all items
     if (list.items && list.items.length > 0) {
       const updatedItems = [];
       for (const item of list.items) {
@@ -675,15 +704,27 @@ export const getListWithItems = async (
       await listRepository.save(list);
     }
 
+    // Enhance items with role-based change information
+    const itemsWithChanges = list.items.map((item) =>
+      createListItemDTOForRole(item, role)
+    );
+
     return res.status(200).json({
       success: true,
-      data: list,
+      data: {
+        ...list,
+        items: itemsWithChanges,
+        pendingChangesCount: list.getItemsWithPendingChanges().length,
+        changesNeedingAcknowledgment:
+          list.getChangesForAcknowledgment(role).length,
+      },
     });
   } catch (error) {
     return next(error);
   }
 };
 
+// 6. Get Customer Deliveries
 export const getCustomerDeliveries = async (
   req: Request,
   res: Response,
@@ -745,7 +786,6 @@ export const getCustomerDeliveries = async (
             );
           }
         }
-        // Save the updated items back to the list
         list.items = updatedItems;
         await listRepository.save(list);
       }
@@ -766,6 +806,7 @@ export const getCustomerDeliveries = async (
   }
 };
 
+// 7. Get Customer List
 export const getCustomerList = async (
   req: Request,
   res: Response,
@@ -773,6 +814,8 @@ export const getCustomerList = async (
 ) => {
   try {
     const { customerId, listId } = req.params;
+    const userType = "customer";
+    const role = CHANGE_ORIGIN.CUSTOMER;
 
     if (!customerId || !listId) {
       return next(
@@ -782,10 +825,7 @@ export const getCustomerList = async (
 
     const listRepository = AppDataSource.getRepository(List);
     const list = await listRepository.findOne({
-      where: {
-        id: listId,
-        customer: { id: customerId },
-      },
+      where: { id: listId, customer: { id: customerId } },
       relations: ["items", "customer"],
     });
 
@@ -793,7 +833,6 @@ export const getCustomerList = async (
       return next(new ErrorHandler("List not found for this customer", 404));
     }
 
-    // Refresh and update delivery data for all items
     if (list.items && list.items.length > 0) {
       const updatedItems = [];
       for (const item of list.items) {
@@ -803,16 +842,25 @@ export const getCustomerList = async (
       await listRepository.save(list);
     }
 
+    const itemsWithChanges = list.items.map((item) =>
+      createListItemDTOForRole(item, role)
+    );
+
     return res.status(200).json({
       success: true,
-      data: list,
+      data: {
+        ...list,
+        items: itemsWithChanges,
+        changesNeedingAcknowledgment:
+          list.getChangesForAcknowledgment(role).length,
+      },
     });
   } catch (error) {
     return next(error);
   }
 };
 
-// 4. Delete List Item
+// 8. Delete List Item
 export const deleteListItem = async (
   req: Request,
   res: Response,
@@ -822,6 +870,7 @@ export const deleteListItem = async (
     const { itemId } = req.params;
     const userId = (req as any).user?.id;
     const customerId = (req as any).customer?.id;
+
     if (!itemId) {
       return next(new ErrorHandler("Item ID is required", 400));
     }
@@ -833,7 +882,6 @@ export const deleteListItem = async (
     const listItemRepository = AppDataSource.getRepository(ListItem);
     const listRepository = AppDataSource.getRepository(List);
 
-    // Find item with list relation for activity logging
     const item = await listItemRepository.findOne({
       where: { id: itemId },
       relations: ["list", "list.customer"],
@@ -843,28 +891,21 @@ export const deleteListItem = async (
       return next(new ErrorHandler("List item not found", 404));
     }
 
-    // Verify permissions
-    if (customerId) {
-      // Check if the customer owns the list
-      if (item.list.customer.id !== customerId) {
-        return next(
-          new ErrorHandler("Not authorized to delete this item", 403)
-        );
-      }
+    if (customerId && item.list.customer.id !== customerId) {
+      return next(new ErrorHandler("Not authorized to delete this item", 403));
     }
-    // Users don't need additional checks since they have admin privileges
 
-    // Determine who is performing the action
     const performerId = userId || customerId;
     const performerType = userId ? "user" : "customer";
+    const origin = getOriginFromUserType(performerType);
 
-    // Log deletion activity
     item.list.logActivity(
       "ITEM_DELETED",
       {
         itemId: item.id,
         itemName: item.articleName,
         deletedBy: performerType,
+        origin,
       },
       performerId,
       performerType
@@ -872,6 +913,7 @@ export const deleteListItem = async (
 
     await listItemRepository.remove(item);
     await listRepository.save(item.list);
+
     return res.status(200).json({
       success: true,
       message: "List item deleted successfully",
@@ -881,7 +923,689 @@ export const deleteListItem = async (
   }
 };
 
-// 5. Get List with Items
+// 9. Acknowledge List Item Changes
+export const acknowledgeListItemChanges = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { itemId } = req.params;
+    const { acknowledgeComments } = req.body;
+    const userId = (req as any).user?.id;
+    const customerId = (req as any).customer?.id;
+
+    if (!itemId) {
+      return next(new ErrorHandler("Item ID is required", 400));
+    }
+
+    const performerId = userId || customerId;
+    const performerType = userId ? "user" : "customer";
+    const origin = getOriginFromUserType(performerType);
+
+    const listItemRepository = AppDataSource.getRepository(ListItem);
+    const listRepository = AppDataSource.getRepository(List);
+
+    const item = await listItemRepository.findOne({
+      where: { id: itemId },
+      relations: ["list"],
+    });
+
+    if (!item) {
+      return next(new ErrorHandler("List item not found", 404));
+    }
+
+    // Acknowledge changes
+    if (item.changeStatus === CHANGE_STATUS.PENDING) {
+      item.confirmChange(performerId, performerType);
+    }
+
+    // Acknowledge comments if requested
+    if (acknowledgeComments && item.hasUnacknowledgedComments()) {
+      item.acknowledgeCommentsFromOrigin(
+        origin === CHANGE_ORIGIN.ADMIN
+          ? CHANGE_ORIGIN.CUSTOMER
+          : CHANGE_ORIGIN.ADMIN,
+        performerId,
+        performerType,
+        origin
+      );
+    }
+
+    await listItemRepository.save(item);
+
+    // Log acknowledgment activity
+    item.list.logActivity(
+      "CHANGES_ACKNOWLEDGED",
+      {
+        itemId: item.id,
+        itemName: item.articleName,
+        acknowledgedChanges: item.getChangedFields(),
+        acknowledgedComments: acknowledgeComments,
+      },
+      performerId,
+      performerType
+    );
+    await listRepository.save(item.list);
+
+    return res.status(200).json({
+      success: true,
+      message: "Changes acknowledged successfully",
+      data: createListItemDTOForRole(item, origin),
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+// 10. Reject List Item Changes
+export const rejectListItemChanges = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { itemId } = req.params;
+    const { reason } = req.body;
+    const userId = (req as any).user?.id;
+    const customerId = (req as any).customer?.id;
+
+    if (!itemId || !reason) {
+      return next(new ErrorHandler("Item ID and reason are required", 400));
+    }
+
+    const performerId = userId || customerId;
+    const performerType = userId ? "user" : "customer";
+
+    const listItemRepository = AppDataSource.getRepository(ListItem);
+    const listRepository = AppDataSource.getRepository(List);
+
+    const item = await listItemRepository.findOne({
+      where: { id: itemId },
+      relations: ["list"],
+    });
+
+    if (!item) {
+      return next(new ErrorHandler("List item not found", 404));
+    }
+
+    if (item.changeStatus !== CHANGE_STATUS.PENDING) {
+      return next(new ErrorHandler("No pending changes to reject", 400));
+    }
+
+    item.rejectChange(performerId, performerType);
+    await listItemRepository.save(item);
+
+    // Log rejection activity
+    item.list.logActivity(
+      "CHANGES_REJECTED",
+      {
+        itemId: item.id,
+        itemName: item.articleName,
+        reason,
+        rejectedChanges: item.getChangedFields(),
+      },
+      performerId,
+      performerType
+    );
+    await listRepository.save(item.list);
+
+    return res.status(200).json({
+      success: true,
+      message: "Changes rejected successfully",
+      data: item,
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+// 11. Search Items
+export const searchItems = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { q } = req.query;
+
+    if (!q || typeof q !== "string") {
+      return next(new ErrorHandler("Search query is required", 400));
+    }
+
+    const connection = await getConnection();
+    const searchTerm = `%${q}%`;
+
+    try {
+      const [items]: any = await connection.query(
+        `SELECT 
+          id, 
+          item_name AS name,
+          ItemID_DE AS articleNumber,
+          photo AS imageUrl
+         FROM items 
+         WHERE item_name LIKE ? 
+         AND photo IS NOT NULL
+         AND photo != ''
+         LIMIT 10`,
+        [searchTerm]
+      );
+
+      const results = items.map((item: any) => ({
+        ...item,
+        imageUrl: item.imageUrl,
+      }));
+
+      return res.status(200).json({
+        success: true,
+        data: results,
+      });
+    } finally {
+      connection.release();
+    }
+  } catch (error) {
+    return next(error);
+  }
+};
+
+// 12. Get Customer Lists
+export const getCustomerLists = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { customerId } = req.params;
+    const userType = "customer";
+    const role = CHANGE_ORIGIN.CUSTOMER;
+    console.log(customerId);
+    if (!customerId) {
+      return next(new ErrorHandler("Customer ID is required", 400));
+    }
+
+    const customerRepository = AppDataSource.getRepository(Customer);
+    const customer = await customerRepository.findOne({
+      where: { id: customerId },
+    });
+
+    if (!customer) {
+      return next(new ErrorHandler("Customer not found", 404));
+    }
+
+    const listRepository = AppDataSource.getRepository(List);
+    const lists = await listRepository.find({
+      where: { customer: { id: customerId } },
+      relations: [
+        "createdBy",
+        "createdBy.user",
+        "createdBy.customer",
+        "items",
+        "customer",
+        "activityLogs",
+      ],
+    });
+
+    // Enhance lists with change information
+    const listsWithChanges = lists.map((list) => ({
+      ...list,
+      items:
+        list.items?.map((item) => createListItemDTOForRole(item, role)) || [],
+      pendingChangesCount: list.getItemsWithPendingChanges().length,
+      changesNeedingAcknowledgment:
+        list.getChangesForAcknowledgment(role).length,
+    }));
+
+    return res.status(200).json({
+      success: true,
+      data: listsWithChanges,
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+// 13. Get All Lists (Admin view)
+export const getAllLists = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const userType = "user";
+    const role = CHANGE_ORIGIN.ADMIN;
+
+    const listRepository = AppDataSource.getRepository(List);
+    const lists = await listRepository.find({
+      relations: [
+        "customer",
+        "items",
+        "createdBy.user",
+        "createdBy.customer",
+        "activityLogs",
+      ],
+      order: { createdAt: "DESC" },
+    });
+
+    // Enhance lists with change information for admin view
+    const listsWithChanges = lists.map((list) => ({
+      ...list,
+      items:
+        list.items?.map((item) => createListItemDTOForRole(item, role)) || [],
+      pendingChangesCount: list.getItemsWithPendingChanges().length,
+      changesNeedingAcknowledgment:
+        list.getChangesForAcknowledgment(role).length,
+    }));
+
+    return res.status(200).json({
+      success: true,
+      data: listsWithChanges,
+    });
+  } catch (error) {
+    return next(new ErrorHandler("Failed to fetch lists", 500));
+  }
+};
+
+// 14. Duplicate List
+export const duplicateList = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { listId } = req.params;
+    const userId = (req as any).user?.id;
+    const customerId = (req as any).customer?.id;
+
+    if (!listId) {
+      return next(new ErrorHandler("List ID is required", 400));
+    }
+
+    const listRepository = AppDataSource.getRepository(List);
+    const listItemRepository = AppDataSource.getRepository(ListItem);
+
+    const originalList = await listRepository.findOne({
+      where: { id: listId },
+      relations: ["items", "customer"],
+    });
+
+    if (!originalList) {
+      return next(new ErrorHandler("List not found", 404));
+    }
+
+    const createdBy = await createCreator(
+      userId !== undefined ? userId : null,
+      customerId !== undefined ? customerId : null
+    );
+
+    const newList = listRepository.create({
+      name: `${originalList.name} (Copy)`,
+      description: originalList.description,
+      templateType: originalList.templateType,
+      customer: originalList.customer,
+      createdBy,
+      status: LIST_STATUS.DRAFTED,
+    });
+
+    await listRepository.save(newList);
+
+    if (originalList.items && originalList.items.length > 0) {
+      for (const item of originalList.items) {
+        const newItem = listItemRepository.create({
+          itemNumber: item.itemNumber || item.articleNumber,
+          item_no_de: item.item_no_de,
+          articleName: item.articleName,
+          articleNumber: item.articleNumber,
+          quantity: item.quantity,
+          interval: item.interval,
+          comment: item.comment,
+          imageUrl: item.imageUrl,
+          deliveries: item.deliveries,
+          list: newList,
+          createdBy,
+          marked: item.marked || false,
+          changeStatus: CHANGE_STATUS.CONFIRMED,
+          originalValues: undefined,
+        });
+        await listItemRepository.save(newItem);
+      }
+    }
+
+    const performerId = userId ? userId : customerId;
+    const performerType = userId ? "user" : "customer";
+    newList.logActivity(
+      "LIST_DUPLICATED",
+      {
+        originalListId: originalList.id,
+        originalListName: originalList.name,
+      },
+      performerId,
+      performerType
+    );
+    await listRepository.save(newList);
+
+    return res.status(201).json({
+      success: true,
+      message: "List duplicated successfully",
+      data: newList,
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+// 15. Update List
+export const updateList = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { listId } = req.params;
+    const { name, description, status } = req.body;
+    const userId = (req as any).user?.id;
+    const customerId = (req as any).customer?.id;
+
+    if (!listId) {
+      return next(new ErrorHandler("List ID is required", 400));
+    }
+
+    const listRepository = AppDataSource.getRepository(List);
+
+    const list = await listRepository.findOne({
+      where: { id: listId },
+      relations: ["customer"],
+    });
+
+    if (!list) {
+      return next(new ErrorHandler("List not found", 404));
+    }
+
+    const changes: Record<string, any> = {};
+    if (name !== undefined && name !== list.name) {
+      changes.name = { from: list.name, to: name };
+      list.name = name;
+    }
+
+    if (description !== undefined && description !== list.description) {
+      changes.description = { from: list.description, to: description };
+      list.description = description;
+    }
+
+    if (status !== undefined && status !== list.status) {
+      changes.status = { from: list.status, to: status };
+      list.status = status;
+    }
+
+    if (Object.keys(changes).length === 0) {
+      return res.status(200).json({
+        success: true,
+        message: "No changes detected",
+        data: list,
+      });
+    }
+
+    await listRepository.save(list);
+
+    if (Object.keys(changes).length > 0) {
+      const performerId = userId ? userId : customerId;
+      const performerType = userId ? "user" : "customer";
+      list.logActivity("LIST_UPDATED", { changes }, performerId, performerType);
+      await listRepository.save(list);
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "List updated successfully",
+      data: list,
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+// 16. Delete List
+export const deleteList = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { listId } = req.params;
+    const userId = (req as any).user?.id;
+    const customerId = (req as any).customer?.id;
+
+    if (!listId) {
+      return next(new ErrorHandler("List ID is required", 400));
+    }
+
+    if (!userId && !customerId) {
+      return next(new ErrorHandler("Authentication required", 401));
+    }
+
+    const listRepository = AppDataSource.getRepository(List);
+    const listItemRepository = AppDataSource.getRepository(ListItem);
+    const listActivityLogRepository =
+      AppDataSource.getRepository(ListActivityLog);
+
+    const list = await listRepository.findOne({
+      where: { id: listId },
+      relations: ["items", "activityLogs", "customer"],
+    });
+
+    if (!list) {
+      return next(new ErrorHandler("List not found", 404));
+    }
+
+    if (customerId && list.customer.id !== customerId) {
+      return next(new ErrorHandler("Not authorized to delete this list", 403));
+    }
+
+    if (list.items && list.items.length > 0) {
+      await listItemRepository.remove(list.items);
+    }
+
+    if (list.activityLogs && list.activityLogs.length > 0) {
+      await listActivityLogRepository.remove(list.activityLogs);
+    }
+
+    await listRepository.remove(list);
+
+    return res.status(200).json({
+      success: true,
+      message: "List and all associated items deleted successfully",
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+// 17. Search Lists by List Number
+export const searchListsByNumber = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { listNumber } = req.params;
+    const userType = (req as any).user?.type || (req as any).customer?.type;
+    const role = getOriginFromUserType(userType);
+
+    const listRepository = AppDataSource.getRepository(List);
+    const list = await listRepository.findOne({
+      where: { listNumber },
+      relations: [
+        "items",
+        "activityLogs",
+        "customer",
+        "createdBy.user",
+        "createdBy.customer",
+      ],
+    });
+
+    if (!list) {
+      return next(new ErrorHandler("List not found", 404));
+    }
+
+    // Enhance items with role-based change information
+    const itemsWithChanges = list.items.map((item) =>
+      createListItemDTOForRole(item, role)
+    );
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        ...list,
+        items: itemsWithChanges,
+        pendingChangesCount: list.getItemsWithPendingChanges().length,
+        changesNeedingAcknowledgment:
+          list.getChangesForAcknowledgment(role).length,
+      },
+    });
+  } catch (error) {
+    return next(new ErrorHandler("Failed to search lists", 500));
+  }
+};
+
+// 18. Get Lists by Company Name
+export const getListsByCompanyName = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { companyName } = req.params;
+    const userType = "user";
+    const role = CHANGE_ORIGIN.ADMIN;
+
+    if (!companyName) {
+      return next(new ErrorHandler("Company name is required", 400));
+    }
+
+    const customerRepository = AppDataSource.getRepository(Customer);
+    const customer = await customerRepository
+      .createQueryBuilder("customer")
+      .where("LOWER(customer.companyName) = LOWER(:companyName)", {
+        companyName,
+      })
+      .select(["customer.id"])
+      .getOne();
+
+    if (!customer) {
+      return next(new ErrorHandler("Customer not found", 404));
+    }
+
+    const listRepository = AppDataSource.getRepository(List);
+    const lists = await listRepository.find({
+      where: { customer: { id: customer.id } },
+      relations: [
+        "items",
+        "customer",
+        "activityLogs",
+        "createdBy.user",
+        "createdBy.customer",
+      ],
+      order: { createdAt: "DESC" },
+    });
+
+    // Enhance lists with change information for admin view
+    const listsWithChanges = lists.map((list) => ({
+      ...list,
+      items:
+        list.items?.map((item) => createListItemDTOForRole(item, role)) || [],
+      pendingChangesCount: list.getItemsWithPendingChanges().length,
+      changesNeedingAcknowledgment:
+        list.getChangesForAcknowledgment(role).length,
+    }));
+
+    return res.status(200).json({
+      success: true,
+      data: listsWithChanges,
+    });
+  } catch (error) {
+    return next(new ErrorHandler("Failed to fetch lists by company name", 500));
+  }
+};
+
+// 19. Bulk Acknowledge Changes
+export const bulkAcknowledgeChanges = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { listId } = req.params;
+    const { itemIds, acknowledgeComments } = req.body;
+    const userId = (req as any).user?.id;
+    const customerId = (req as any).customer?.id;
+
+    if (!listId) {
+      return next(new ErrorHandler("List ID is required", 400));
+    }
+
+    const performerId = userId || customerId;
+    const performerType = userId ? "user" : "customer";
+    const origin = getOriginFromUserType(performerType);
+
+    const listRepository = AppDataSource.getRepository(List);
+    const listItemRepository = AppDataSource.getRepository(ListItem);
+
+    const list = await listRepository.findOne({
+      where: { id: listId },
+      relations: ["items"],
+    });
+
+    if (!list) {
+      return next(new ErrorHandler("List not found", 404));
+    }
+
+    const itemsToAcknowledge = itemIds
+      ? list.items.filter((item) => itemIds.includes(item.id))
+      : list.items;
+
+    let acknowledgedCount = 0;
+
+    for (const item of itemsToAcknowledge) {
+      if (item.changeStatus === CHANGE_STATUS.PENDING) {
+        item.confirmChange(performerId, performerType);
+        acknowledgedCount++;
+      }
+
+      if (acknowledgeComments && item.hasUnacknowledgedComments()) {
+        item.acknowledgeCommentsFromOrigin(
+          origin === CHANGE_ORIGIN.ADMIN
+            ? CHANGE_ORIGIN.CUSTOMER
+            : CHANGE_ORIGIN.ADMIN,
+          performerId,
+          performerType,
+          origin
+        );
+      }
+    }
+
+    await listItemRepository.save(itemsToAcknowledge);
+
+    // Log bulk acknowledgment activity
+    list.logActivity(
+      "BULK_CHANGES_ACKNOWLEDGED",
+      {
+        acknowledgedItems: itemsToAcknowledge.map((item) => item.id),
+        acknowledgedCount,
+        acknowledgeComments,
+      },
+      performerId,
+      performerType
+    );
+    await listRepository.save(list);
+
+    return res.status(200).json({
+      success: true,
+      message: `Acknowledged changes for ${acknowledgedCount} items`,
+      data: { acknowledgedCount },
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
 
 export const approveListItemChanges = async (
   req: Request,
@@ -936,512 +1660,5 @@ export const approveListItemChanges = async (
     });
   } catch (error) {
     return next(error);
-  }
-};
-
-export const rejectListItemChanges = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
-  try {
-    const { logId } = req.params;
-    const { reason } = req.body;
-    const userId = (req as any).user.id;
-
-    if (!logId || !reason) {
-      return next(new ErrorHandler("Log ID and reason are required", 400));
-    }
-
-    const listActivityLogRepository =
-      AppDataSource.getRepository(ListActivityLog);
-    const log = await listActivityLogRepository.findOne({
-      where: { id: logId },
-      relations: ["list", "list.activityLogs"], // Ensure relations are loaded
-    });
-
-    if (!log) {
-      return next(new ErrorHandler("Activity log not found", 404));
-    }
-
-    if (log.approvalStatus !== LOG_APPROVAL_STATUS.PENDING) {
-      return next(new ErrorHandler("No pending changes to reject", 400));
-    }
-
-    // Reject the activity log
-    log.approvalStatus = LOG_APPROVAL_STATUS.REJECTED;
-    log.rejectionReason = reason;
-    log.approvedAt = new Date();
-
-    await listActivityLogRepository.save(log);
-
-    // If this log was for a change approval, revert the corresponding list item
-    if (log.action === "CHANGE_REQUESTED" && log.changes?.itemId) {
-      const listItemRepository = AppDataSource.getRepository(ListItem);
-      const item = await listItemRepository.findOne({
-        where: { id: log.changes.itemId },
-        relations: ["list"],
-      });
-
-      if (item) {
-        // Revert to original values
-        if (item.originalValues) {
-          if (item.originalValues.quantity !== undefined) {
-            item.quantity = item.originalValues.quantity;
-          }
-          if (item.originalValues.interval !== undefined) {
-            item.interval = item.originalValues.interval;
-          }
-          if (item.originalValues.comment !== undefined) {
-            item.comment = item.originalValues.comment;
-          }
-        }
-
-        item.changeStatus = CHANGE_STATUS.REJECTED;
-        item.confirmedAt = new Date();
-        item.originalValues = {};
-
-        await listItemRepository.save(item);
-      }
-    }
-
-    return res.status(200).json({
-      success: true,
-      message: "Changes rejected successfully",
-      data: log,
-    });
-  } catch (error) {
-    return next(error);
-  }
-};
-
-// 9. Search Items
-export const searchItems = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
-  try {
-    const { q } = req.query;
-
-    if (!q || typeof q !== "string") {
-      return next(new ErrorHandler("Search query is required", 400));
-    }
-
-    const connection = await getConnection();
-    const searchTerm = `%${q}%`;
-
-    try {
-      const [items]: any = await connection.query(
-        `SELECT 
-          id, 
-          item_name AS name,
-          ItemID_DE AS articleNumber,
-          photo AS imageUrl
-         FROM items 
-         WHERE item_name LIKE ? 
-         AND photo IS NOT NULL
-         AND photo != ''
-         LIMIT 10`,
-        [searchTerm]
-      );
-
-      const results = items.map((item: any) => ({
-        ...item,
-        imageUrl: item.imageUrl,
-      }));
-
-      return res.status(200).json({
-        success: true,
-        data: results,
-      });
-    } finally {
-      connection.release();
-    }
-  } catch (error) {
-    return next(error);
-  }
-};
-
-export const getCustomerLists = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
-  try {
-    const { customerId } = req.params;
-
-    if (!customerId) {
-      return next(new ErrorHandler("Customer ID is required", 400));
-    }
-
-    // Validate customer exists
-    const customerRepository = AppDataSource.getRepository(Customer);
-    const customer = await customerRepository.findOne({
-      where: { id: customerId },
-    });
-
-    if (!customer) {
-      return next(new ErrorHandler("Customer not found", 404));
-    }
-
-    const listRepository = AppDataSource.getRepository(List);
-    const lists = await listRepository.find({
-      where: { customer: { id: customerId } },
-      relations: [
-        "createdBy",
-        "createdBy.user",
-        "createdBy.customer",
-        "items",
-        "customer",
-        "activityLogs",
-      ],
-    });
-    return res.status(200).json({
-      success: true,
-      data: lists,
-    });
-  } catch (error) {
-    return next(error);
-  }
-};
-
-export const getAllLists = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
-  try {
-    const listRepository = AppDataSource.getRepository(List);
-    const lists = await listRepository.find({
-      relations: [
-        "customer",
-        "items",
-        "createdBy.user",
-        "createdBy.customer",
-        "activityLogs",
-      ],
-      order: { createdAt: "DESC" },
-    });
-
-    return res.status(200).json({
-      success: true,
-      data: lists,
-    });
-  } catch (error) {
-    return next(new ErrorHandler("Failed to fetch lists", 500));
-  }
-};
-
-// 10. Duplicate List
-export const duplicateList = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
-  try {
-    const { listId } = req.params;
-    const userId = (req as any).user?.id;
-    const customerId = (req as any).customer?.id;
-
-    if (!listId) {
-      return next(new ErrorHandler("List ID is required", 400));
-    }
-
-    const listRepository = AppDataSource.getRepository(List);
-    const listItemRepository = AppDataSource.getRepository(ListItem);
-
-    // Get the original list with items
-    const originalList = await listRepository.findOne({
-      where: { id: listId },
-      relations: ["items", "customer"],
-    });
-
-    if (!originalList) {
-      return next(new ErrorHandler("List not found", 404));
-    }
-
-    // Create creator entity
-    const createdBy = await createCreator(
-      userId !== undefined ? userId : null,
-      customerId !== undefined ? customerId : null
-    );
-
-    // Create new list with "(Copy)" suffix
-    const newList = listRepository.create({
-      name: `${originalList.name} (Copy)`,
-      description: originalList.description,
-      templateType: originalList.templateType,
-      customer: originalList.customer,
-      createdBy,
-      status: LIST_STATUS.DRAFTED,
-    });
-
-    await listRepository.save(newList);
-
-    // Duplicate all items from the original list
-    if (originalList.items && originalList.items.length > 0) {
-      for (const item of originalList.items) {
-        const newItem = listItemRepository.create({
-          itemNumber: item.itemNumber || item.articleNumber,
-          item_no_de: item.item_no_de, // Include the item_no_de field
-          articleName: item.articleName,
-          articleNumber: item.articleNumber,
-          quantity: item.quantity,
-          interval: item.interval,
-          comment: item.comment,
-          imageUrl: item.imageUrl,
-          deliveries: item.deliveries,
-          list: newList,
-          createdBy,
-          marked: item.marked || false,
-          changeStatus: item.changeStatus || CHANGE_STATUS.CONFIRMED,
-          originalValues: item.originalValues || null,
-        });
-        await listItemRepository.save(newItem);
-      }
-    }
-
-    // Log activity
-    newList.logActivity(
-      "LIST_DUPLICATED",
-      {
-        originalListId: originalList.id,
-        originalListName: originalList.name,
-      },
-      userId ? userId : customerId,
-      userId ? "user" : "customer"
-    );
-    await listRepository.save(newList);
-
-    return res.status(201).json({
-      success: true,
-      message: "List duplicated successfully",
-      data: newList,
-    });
-  } catch (error) {
-    return next(error);
-  }
-};
-
-// 11. Update List
-export const updateList = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
-  try {
-    const { listId } = req.params;
-    const { name, description, status } = req.body;
-    const userId = (req as any).user?.id;
-    const customerId = (req as any).customer?.id;
-
-    if (!listId) {
-      return next(new ErrorHandler("List ID is required", 400));
-    }
-
-    const listRepository = AppDataSource.getRepository(List);
-
-    // Get the existing list
-    const list = await listRepository.findOne({
-      where: { id: listId },
-      relations: ["customer"],
-    });
-
-    if (!list) {
-      return next(new ErrorHandler("List not found", 404));
-    }
-
-    // Track changes
-    const changes: Record<string, any> = {};
-    if (name !== undefined && name !== list.name) {
-      changes.name = { from: list.name, to: name };
-      list.name = name;
-    }
-
-    if (description !== undefined && description !== list.description) {
-      changes.description = { from: list.description, to: description };
-      list.description = description;
-    }
-
-    if (status !== undefined && status !== list.status) {
-      changes.status = { from: list.status, to: status };
-      list.status = status;
-    }
-
-    // If no changes were made
-    if (Object.keys(changes).length === 0) {
-      return res.status(200).json({
-        success: true,
-        message: "No changes detected",
-        data: list,
-      });
-    }
-
-    await listRepository.save(list);
-
-    // Log activity if there were changes
-    if (Object.keys(changes).length > 0) {
-      list.logActivity(
-        "LIST_UPDATED",
-        {
-          changes,
-        },
-        userId ? userId : customerId,
-        userId ? "user" : "customer"
-      );
-      await listRepository.save(list);
-    }
-
-    return res.status(200).json({
-      success: true,
-      message: "List updated successfully",
-      data: list,
-    });
-  } catch (error) {
-    return next(error);
-  }
-};
-
-// 12. Delete List
-export const deleteList = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
-  try {
-    const { listId } = req.params;
-    const userId = (req as any).user?.id;
-    const customerId = (req as any).customer?.id;
-
-    if (!listId) {
-      return next(new ErrorHandler("List ID is required", 400));
-    }
-
-    if (!userId && !customerId) {
-      return next(new ErrorHandler("Authentication required", 401));
-    }
-
-    const listRepository = AppDataSource.getRepository(List);
-    const listItemRepository = AppDataSource.getRepository(ListItem);
-    const listActivityLogRepository =
-      AppDataSource.getRepository(ListActivityLog);
-
-    const list = await listRepository.findOne({
-      where: { id: listId },
-      relations: ["items", "activityLogs", "customer"],
-    });
-
-    if (!list) {
-      return next(new ErrorHandler("List not found", 404));
-    }
-
-    if (customerId) {
-      // Check if the customer owns the list
-      if (list.customer.id !== customerId) {
-        return next(
-          new ErrorHandler("Not authorized to delete this list", 403)
-        );
-      }
-    }
-    const performerId = userId || customerId;
-    const performerType = userId ? "user" : "customer";
-
-    if (list.items && list.items.length > 0) {
-      await listItemRepository.remove(list.items);
-    }
-
-    if (list.activityLogs && list.activityLogs.length > 0) {
-      await listActivityLogRepository.remove(list.activityLogs);
-    }
-
-    await listRepository.remove(list);
-
-    return res.status(200).json({
-      success: true,
-      message: "List and all associated items deleted successfully",
-    });
-  } catch (error) {
-    return next(error);
-  }
-};
-
-// Search Lists by List Number
-export const searchListsByNumber = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
-  try {
-    const { listNumber } = req.params;
-
-    const listRepository = AppDataSource.getRepository(List);
-    const list = await listRepository.findOne({
-      where: { listNumber: listNumber },
-      relations: [
-        "items",
-        "activityLogs",
-        "customer",
-        "createdBy.user",
-        "createdBy.customer",
-      ],
-    });
-    console.log(list);
-
-    return res.status(200).json({
-      success: true,
-      data: list,
-    });
-  } catch (error) {
-    return next(new ErrorHandler("Failed to search lists", 500));
-  }
-};
-
-export const getListsByCompanyName = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
-  try {
-    const { companyName } = req.params;
-
-    if (!companyName) {
-      return next(new ErrorHandler("Company name is required", 400));
-    }
-
-    const customerRepository = AppDataSource.getRepository(Customer);
-
-    // Case-insensitive search using ILIKE (PostgreSQL) or LOWER (other databases)
-    const customer = await customerRepository
-      .createQueryBuilder("customer")
-      .where("LOWER(customer.companyName) = LOWER(:companyName)", {
-        companyName,
-      })
-      .select(["customer.id"])
-      .getOne();
-
-    if (!customer) {
-      return next(new ErrorHandler("Customer not found", 404));
-    }
-
-    const listRepository = AppDataSource.getRepository(List);
-    const lists = await listRepository.find({
-      where: { customer: { id: customer.id } },
-      relations: [
-        "items",
-        "customer",
-        "activityLogs",
-        "createdBy.user",
-        "createdBy.customer",
-      ],
-      order: { createdAt: "DESC" },
-    });
-
-    return res.status(200).json({
-      success: true,
-      data: lists,
-    });
-  } catch (error) {
-    return next(new ErrorHandler("Failed to fetch lists by company name", 500));
   }
 };

@@ -181,6 +181,7 @@ export const resetCustomerPassword = async (
 // Customer Profile Management
 interface UpdateCustomerProfilePayload {
   companyName?: string;
+  legalName?: string;
   contactEmail?: string;
   contactPhoneNumber?: string;
   taxNumber?: string;
@@ -223,6 +224,7 @@ export const prepareCustomerProfileFormData = (
   const formData = new FormData();
 
   if (data.companyName) formData.append("companyName", data.companyName);
+  if (data.legalName) formData.append("legalName", data.legalName);
   if (data.contactEmail) formData.append("contactEmail", data.contactEmail);
   if (data.contactPhoneNumber)
     formData.append("contactPhoneNumber", data.contactPhoneNumber);

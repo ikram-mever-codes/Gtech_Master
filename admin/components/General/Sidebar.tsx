@@ -100,7 +100,7 @@ const allMenuItems = [
 
 const Sidebar = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(true);
   const dispatch = useDispatch();
   const { user } = useSelector((state: RootState) => state.user);
   const isMobile = useMediaQuery((theme: Theme) =>

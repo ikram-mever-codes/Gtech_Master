@@ -54,6 +54,7 @@ import {
 // Validation Schemas
 const profileSchema = Yup.object({
   companyName: Yup.string(),
+  legalName: Yup.string(),
   contactEmail: Yup.string().email("Invalid email"),
   contactPhoneNumber: Yup.string(),
   taxNumber: Yup.string(),
@@ -236,7 +237,7 @@ const SettingsPage = () => {
       return;
     }
 
-    setFieldValue("avatar", file);
+    setFieldValue("file", file);
     try {
       const base64 = await fileToBase64(file);
       setAvatarPreview(base64);
@@ -247,10 +248,8 @@ const SettingsPage = () => {
 
   const handleProfileSubmit = async (values: any, { setSubmitting }: any) => {
     try {
-      setLoading(true);
       const formData = prepareCustomerProfileFormData(values);
       await updateCustomerProfile(formData, dispatch);
-      setMessage({ type: "success", text: "Profile updated successfully!" });
     } catch (error: any) {
       setMessage({
         type: "error",
@@ -321,9 +320,7 @@ const SettingsPage = () => {
             <IconButton sx={{ bgcolor: "background.paper" }}>
               <HelpCircle size={18} />
             </IconButton>
-            <IconButton sx={{ bgcolor: "background.paper" }}>
-              <Bell size={18} />
-            </IconButton>
+
             <Button
               variant="outlined"
               startIcon={<LogOut size={16} />}
@@ -382,6 +379,7 @@ const SettingsPage = () => {
                 <Formik
                   initialValues={{
                     companyName: customer.companyName || "",
+                    legalName: customer.legalName || "",
                     contactEmail: customer.contactEmail || "",
                     contactPhoneNumber: customer.contactPhoneNumber || "",
                     taxNumber: customer.taxNumber || "",
@@ -464,6 +462,13 @@ const SettingsPage = () => {
                             label="Company Name"
                             name="companyName"
                             placeholder="Enter company name"
+                            formik={formik}
+                          />{" "}
+                          <FormInput
+                            icon={<Building />}
+                            label="Company Legal Name"
+                            name="legalName"
+                            placeholder="Enter the legal name of your company"
                             formik={formik}
                           />
                           <FormInput

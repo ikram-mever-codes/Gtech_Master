@@ -37,6 +37,7 @@ import {
   CircularProgress,
   Alert,
   Autocomplete,
+  Avatar,
 } from "@mui/material";
 import {
   ArrowBack,
@@ -62,6 +63,10 @@ import {
   CloudDownload,
   Print,
   Close,
+  Email,
+  Phone,
+  Business,
+  LocationOn,
 } from "@mui/icons-material";
 import {
   X,
@@ -78,240 +83,13 @@ import CustomButton from "@/components/UI/CustomButton";
 import theme from "@/styles/theme";
 import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
-import { createNewList, getAllLists, deleteList } from "@/api/list";
 import { api, handleApiError } from "@/utils/api";
 import { getAllCustomers } from "@/api/customers";
 
-// Create List Dialog Component
-const CreateListDialog = ({ open, onClose, onSuccess }: any) => {
-  const [listName, setListName] = useState("");
-  const [description, setDescription] = useState("");
-  const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
-  const [customers, setCustomers] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [customersLoading, setCustomersLoading] = useState(false);
-
-  // Fetch customers when dialog opens
-  useEffect(() => {
-    if (open) {
-      fetchCustomers();
-    }
-  }, [open]);
-
-  const fetchCustomers = async () => {
-    setCustomersLoading(true);
-    try {
-      // Replace with actual API call
-      const response = await getAllCustomers();
-      setCustomers(response?.data || []);
-    } catch (error) {
-      console.error("Failed to fetch customers:", error);
-      handleApiError(error, "Failed to load customers");
-      // Fallback sample data
-    } finally {
-      setCustomersLoading(false);
-    }
-  };
-
-  const handleSubmit = async () => {
-    if (!listName.trim()) {
-      toast.error("Please enter a list name");
-      return;
-    }
-
-    if (!selectedCustomer) {
-      toast.error("Please select a customer");
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const listData = {
-        name: listName.trim(),
-        description: description.trim() || undefined,
-        customerId: selectedCustomer.id,
-      };
-
-      const result = await createNewList(listData);
-
-      // Reset form
-      setListName("");
-      setDescription("");
-      setSelectedCustomer(null);
-
-      onSuccess(result);
-      onClose();
-    } catch (error) {
-      console.error("Failed to create list:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleClose = () => {
-    if (!loading) {
-      setListName("");
-      setDescription("");
-      setSelectedCustomer(null);
-      onClose();
-    }
-  };
-
-  return (
-    <Dialog
-      open={open}
-      onClose={handleClose}
-      maxWidth="sm"
-      fullWidth
-      PaperProps={{
-        sx: {
-          borderRadius: 3,
-          boxShadow: "0 10px 40px rgba(0, 0, 0, 0.1)",
-          overflow: "hidden",
-        },
-      }}
-    >
-      <DialogTitle
-        sx={{
-          fontWeight: 600,
-          pb: 1.5,
-          borderBottom: "1px solid",
-          borderColor: alpha("#ADB5BD", 0.15),
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-        }}
-      >
-        <Box sx={{ display: "flex", alignItems: "center" }}>
-          <FolderPlus
-            style={{ marginRight: 10, color: theme.palette.primary.main }}
-          />
-          Create New List for Customer
-        </Box>
-        <IconButton onClick={handleClose} size="small" disabled={loading}>
-          <Close fontSize="small" />
-        </IconButton>
-      </DialogTitle>
-
-      <DialogContent sx={{ py: 3 }}>
-        <Box
-          sx={{ display: "flex", flexDirection: "column", gap: 3, mt: "2rem" }}
-        >
-          <Autocomplete
-            options={customers}
-            getOptionLabel={(option) =>
-              `${option.companyName} (${option.email})`
-            }
-            value={selectedCustomer}
-            onChange={(event, newValue) => setSelectedCustomer(newValue)}
-            loading={customersLoading}
-            disabled={loading}
-            renderInput={(params) => (
-              <TextField
-                {...params}
-                label="Select Customer"
-                required
-                variant="outlined"
-                sx={{
-                  "& .MuiOutlinedInput-root": {
-                    borderRadius: 2,
-                  },
-                }}
-                InputProps={{
-                  ...params.InputProps,
-                  endAdornment: (
-                    <>
-                      {customersLoading ? (
-                        <CircularProgress color="inherit" size={20} />
-                      ) : null}
-                      {params.InputProps.endAdornment}
-                    </>
-                  ),
-                }}
-              />
-            )}
-            renderOption={(props, option) => (
-              <Box component="li" {...props}>
-                <UserCircle size={20} style={{ marginRight: 10 }} />
-                <Box>
-                  <Typography variant="body2" fontWeight={600}>
-                    {option.companyName}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {option.email}
-                  </Typography>
-                </Box>
-              </Box>
-            )}
-          />
-
-          <TextField
-            label="List Name"
-            value={listName}
-            onChange={(e) => setListName(e.target.value)}
-            fullWidth
-            required
-            variant="outlined"
-            disabled={loading}
-            sx={{
-              "& .MuiOutlinedInput-root": {
-                borderRadius: 2,
-              },
-            }}
-          />
-
-          <TextField
-            label="Description (Optional)"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            fullWidth
-            multiline
-            rows={3}
-            variant="outlined"
-            disabled={loading}
-            sx={{
-              "& .MuiOutlinedInput-root": {
-                borderRadius: 2,
-              },
-            }}
-          />
-        </Box>
-      </DialogContent>
-
-      <DialogActions
-        sx={{
-          px: 3,
-          pb: 3,
-          borderTop: "1px solid",
-          borderColor: alpha("#ADB5BD", 0.15),
-        }}
-      >
-        <CustomButton
-          variant="outlined"
-          onClick={handleClose}
-          rounded="medium"
-          disabled={loading}
-        >
-          Cancel
-        </CustomButton>
-        <CustomButton
-          variant="contained"
-          onClick={handleSubmit}
-          startIcon={loading ? <CircularProgress size={16} /> : <FolderPlus />}
-          rounded="medium"
-          hoverEffect="scale"
-          disabled={loading}
-        >
-          {loading ? "Creating..." : "Create List"}
-        </CustomButton>
-      </DialogActions>
-    </Dialog>
-  );
-};
-
-// List view item component
-const ListViewItem = ({ list, onEdit, onDelete, onDuplicate, router }: any) => {
+// Customer view item component
+const CustomerViewItem = ({ customer, onViewLists, router }: any) => {
   // State for more menu
+
   const [menuAnchor, setMenuAnchor] = useState<any>(null);
   const menuOpen = Boolean(menuAnchor);
 
@@ -322,8 +100,6 @@ const ListViewItem = ({ list, onEdit, onDelete, onDuplicate, router }: any) => {
       year: "numeric",
       month: "short",
       day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
     }).format(date);
   };
 
@@ -337,324 +113,50 @@ const ListViewItem = ({ list, onEdit, onDelete, onDuplicate, router }: any) => {
         },
       }}
     >
-      <TableCell
-        sx={{
-          pl: 3,
-        }}
-      >
+      <TableCell sx={{ pl: 3 }}>
         <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-          <Box
-            sx={{
-              p: 1,
-              borderRadius: 1.5,
-              backgroundColor: alpha(theme.palette.primary.main, 0.1),
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
+          <Avatar
+            src={customer.avatar}
+            sx={{ width: 40, height: 40, bgcolor: theme.palette.primary.main }}
           >
-            <FolderOpen style={{ color: theme.palette.primary.main }} />
-          </Box>
+            {customer.companyName?.charAt(0) || "C"}
+          </Avatar>
           <Box>
             <Typography variant="subtitle2" component="div" fontWeight={600}>
-              {list.name}
+              {customer.companyName}
             </Typography>
             <Typography variant="caption" color="text.secondary">
-              {list.description || "No description"}
+              {customer.companyName || "No legal name"}
             </Typography>
           </Box>
         </Box>
       </TableCell>
 
       <TableCell>
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-          <UserCircle size={20} color={theme.palette.text.secondary} />
-          <Box>
-            <Typography variant="body2" fontWeight={500}>
-              {list.customer?.companyName || "Unknown Customer"}
-            </Typography>
-            <Typography variant="caption" color="text.secondary">
-              {list.customer?.email || "No email"}
-            </Typography>
-          </Box>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <Email fontSize="small" color="action" />
+          <Typography variant="body2">{customer.email}</Typography>
         </Box>
-      </TableCell>
-
-      <TableCell className=" flex justify-center items-center">
-        <Typography
-          variant="body2"
-          className=" text-center self-center"
-          fontWeight={600}
-        >
-          {list?.items?.length || 0}
-        </Typography>
-      </TableCell>
-
-      <TableCell>
-        <Box>
-          <Typography variant="body2">
-            {formatDate(list.updatedAt || list.createdAt)}
-          </Typography>
-          <Typography variant="caption" color="text.secondary">
-            by {list.createdBy?.name || "Admin"}
-          </Typography>
-        </Box>
-      </TableCell>
-
-      <TableCell>
-        <Chip
-          label={list.status || "Active"}
-          size="small"
-          color={
-            list.status === "Active"
-              ? "success"
-              : list.status === "Draft"
-              ? "default"
-              : list.status === "Archived"
-              ? "error"
-              : "primary"
-          }
-          sx={{
-            fontWeight: 500,
-            minWidth: 70,
-          }}
-        />
       </TableCell>
 
       <TableCell align="right" sx={{ pr: 3 }}>
-        <Box sx={{ display: "flex", gap: 1, justifyContent: "flex-end" }}>
-          <Tooltip title="View List">
-            <IconButton
-              size="small"
-              onClick={() => router.push(`/scheduled/lists/${list.id}`)}
-              sx={{
-                color: theme.palette.info.main,
-                backgroundColor: alpha(theme.palette.info.main, 0.1),
-                "&:hover": {
-                  backgroundColor: alpha(theme.palette.info.main, 0.2),
-                },
-              }}
-            >
-              <VisibilityOutlined fontSize="small" />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Edit List">
-            <IconButton
-              size="small"
-              onClick={() => onEdit(list)}
-              sx={{
-                color: theme.palette.primary.main,
-                backgroundColor: alpha(theme.palette.primary.main, 0.1),
-                "&:hover": {
-                  backgroundColor: alpha(theme.palette.primary.main, 0.2),
-                },
-              }}
-            >
-              <EditOutlined fontSize="small" />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="More Options">
-            <IconButton
-              size="small"
-              onClick={(e) => setMenuAnchor(e.currentTarget)}
-              sx={{
-                color: theme.palette.text.secondary,
-                "&:hover": {
-                  backgroundColor: alpha(theme.palette.divider, 0.2),
-                },
-              }}
-            >
-              <MoreHoriz fontSize="small" />
-            </IconButton>
-          </Tooltip>
+        <Box>
+          <CustomButton
+            onClick={() => {
+              router.push(`/scheduled/lists/${customer.id}`);
+            }}
+            gradient={true}
+          >
+            View Lists
+          </CustomButton>
         </Box>
-
-        {/* More options menu */}
-        <Menu
-          anchorEl={menuAnchor}
-          open={menuOpen}
-          onClose={() => setMenuAnchor(null)}
-          anchorOrigin={{
-            vertical: "bottom",
-            horizontal: "right",
-          }}
-          transformOrigin={{
-            vertical: "top",
-            horizontal: "right",
-          }}
-          PaperProps={{
-            sx: {
-              borderRadius: 2,
-              boxShadow: "0 4px 20px rgba(0,0,0,0.1)",
-              border: `1px solid ${alpha("#ADB5BD", 0.15)}`,
-              width: 180,
-            },
-          }}
-        >
-          {/* <MenuItem
-            onClick={() => {
-              onDuplicate(list);
-              setMenuAnchor(null);
-            }}
-            sx={{
-              py: 1.5,
-              display: "flex",
-              alignItems: "center",
-              gap: 1.5,
-            }}
-          >
-            <ContentCopy
-              fontSize="small"
-              sx={{ color: theme.palette.secondary.main }}
-            />
-            <Typography variant="body2">Duplicate</Typography>
-          </MenuItem> */}
-          <MenuItem
-            onClick={() => {
-              setMenuAnchor(null);
-              // Handle print
-            }}
-            sx={{
-              py: 1.5,
-              display: "flex",
-              alignItems: "center",
-              gap: 1.5,
-            }}
-          >
-            <Print
-              fontSize="small"
-              sx={{ color: theme.palette.secondary.main }}
-            />
-            <Typography variant="body2">Print</Typography>
-          </MenuItem>
-          <MenuItem
-            onClick={() => {
-              setMenuAnchor(null);
-              // Handle export
-            }}
-            sx={{
-              py: 1.5,
-              display: "flex",
-              alignItems: "center",
-              gap: 1.5,
-            }}
-          >
-            <CloudDownload
-              fontSize="small"
-              sx={{ color: theme.palette.secondary.main }}
-            />
-            <Typography variant="body2">Export</Typography>
-          </MenuItem>
-          <Divider sx={{ my: 1, borderColor: alpha("#ADB5BD", 0.15) }} />
-          <MenuItem
-            onClick={() => {
-              onDelete(list);
-              setMenuAnchor(null);
-            }}
-            sx={{
-              py: 1.5,
-              display: "flex",
-              alignItems: "center",
-              gap: 1.5,
-              color: theme.palette.error.main,
-            }}
-          >
-            <DeleteOutlined
-              fontSize="small"
-              sx={{ color: theme.palette.error.main }}
-            />
-            <Typography variant="body2">Delete</Typography>
-          </MenuItem>
-        </Menu>
       </TableCell>
     </TableRow>
   );
 };
 
-// Delete confirmation dialog
-const DeleteDialog = ({
-  open,
-  onClose,
-  onConfirm,
-  listName,
-  isDeleting,
-}: any) => {
-  return (
-    <Dialog
-      open={open}
-      onClose={onClose}
-      maxWidth="xs"
-      PaperProps={{
-        sx: {
-          borderRadius: 3,
-          boxShadow: "0 10px 40px rgba(0, 0, 0, 0.1)",
-          overflow: "hidden",
-        },
-      }}
-    >
-      <DialogTitle
-        sx={{
-          fontWeight: 600,
-          pb: 1.5,
-          borderBottom: "1px solid",
-          borderColor: alpha("#ADB5BD", 0.15),
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-        }}
-      >
-        <Box sx={{ display: "flex", alignItems: "center" }}>
-          <Delete
-            style={{ marginRight: 10, color: theme.palette.error.main }}
-          />
-          Delete List
-        </Box>
-        <IconButton onClick={onClose} size="small" disabled={isDeleting}>
-          <X size={20} />
-        </IconButton>
-      </DialogTitle>
-      <DialogContent sx={{ py: 3 }}>
-        <Typography variant="body1" sx={{ mb: 2 }}>
-          Are you sure you want to delete <strong>{listName}</strong>?
-        </Typography>
-        <Typography variant="body2" sx={{ color: "text.secondary" }}>
-          This action cannot be undone. All items in this list will be removed.
-        </Typography>
-      </DialogContent>
-      <DialogActions
-        sx={{
-          px: 3,
-          pb: 3,
-          borderTop: "1px solid",
-          borderColor: alpha("#ADB5BD", 0.15),
-        }}
-      >
-        <CustomButton
-          variant="outlined"
-          onClick={onClose}
-          rounded="medium"
-          disabled={isDeleting}
-        >
-          Cancel
-        </CustomButton>
-        <CustomButton
-          variant="contained"
-          onClick={onConfirm}
-          color="error"
-          startIcon={isDeleting ? <CircularProgress size={16} /> : <Delete />}
-          rounded="medium"
-          hoverEffect="scale"
-          disabled={isDeleting}
-        >
-          {isDeleting ? "Deleting..." : "Delete"}
-        </CustomButton>
-      </DialogActions>
-    </Dialog>
-  );
-};
-
 // Empty state component
-const EmptyState = ({ onCreateList }: any) => {
+const EmptyState = () => {
   return (
     <Box
       sx={{
@@ -678,44 +180,29 @@ const EmptyState = ({ onCreateList }: any) => {
           textFillColor: "transparent",
         }}
       >
-        No Lists Found
+        No Customers Found
       </Typography>
 
       <Typography variant="body1" sx={{ mb: 3, color: "text.secondary" }}>
-        Start by creating lists for your customers. Lists help organize products
-        for different customers, projects, or purposes.
+        It looks like there are no customers in the system yet. Customers will
+        appear here once they register.
       </Typography>
-
-      <CustomButton
-        variant="contained"
-        size="large"
-        startIcon={<FolderPlus />}
-        onClick={onCreateList}
-        gradient={true}
-        rounded="medium"
-        hoverEffect="scale"
-        sx={{ px: 4 }}
-      >
-        Create First List
-      </CustomButton>
     </Box>
   );
 };
 
 // Main Page Component
-const AdminListsPage = () => {
-  // State for lists
-  const [lists, setLists] = useState<any[]>([]);
+const AdminCustomersPage = () => {
+  // State for customers
+  const [customers, setCustomers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // UI state
-  const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [selectedList, setSelectedList] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState("");
-  const [isDeleting, setIsDeleting] = useState(false);
+  const [viewListsDialogOpen, setViewListsDialogOpen] = useState(false);
+  const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
 
   // Pagination state
   const [page, setPage] = useState(0);
@@ -723,8 +210,8 @@ const AdminListsPage = () => {
 
   const router = useRouter();
 
-  // Fetch lists from backend
-  const fetchLists = async (showLoading = true) => {
+  // Fetch customers from backend
+  const fetchCustomers = async (showLoading = true) => {
     try {
       if (showLoading) {
         setLoading(true);
@@ -733,93 +220,45 @@ const AdminListsPage = () => {
       }
       setError(null);
 
-      const response = await getAllLists();
-      setLists(response || []);
+      const response = await getAllCustomers();
+      setCustomers(response?.data || []);
     } catch (error) {
-      console.error("Failed to fetch lists:", error);
-      setError("Failed to load lists. Please try again.");
-      handleApiError(error, "Failed to load lists");
+      console.error("Failed to fetch customers:", error);
+      setError("Failed to load customers. Please try again.");
+      handleApiError(error, "Failed to load customers");
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   };
 
-  // Load lists on component mount
+  // Load customers on component mount
   useEffect(() => {
-    fetchLists();
+    fetchCustomers();
   }, []);
 
-  // Filter lists based on search term
-  const filteredLists = lists.filter(
-    (list: any) =>
-      list.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      list.customer?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      list.customer?.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      list.description?.toLowerCase().includes(searchTerm.toLowerCase())
+  // Filter customers based on search term
+  const filteredCustomers = customers.filter(
+    (customer: any) =>
+      customer.companyName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      customer.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      customer.legalName?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Paginated lists
-  const paginatedLists = filteredLists.slice(
+  // Paginated customers
+  const paginatedCustomers = filteredCustomers.slice(
     page * rowsPerPage,
     page * rowsPerPage + rowsPerPage
   );
 
   // Event handlers
-  const handleCreateListSuccess = async (newList: any) => {
-    // Refresh the lists to show the new one
-    await fetchLists(false);
-  };
-
-  const handleEditList = (list: any) => {
-    // Navigate to list edit page
-    router.push(`/scheduled/lists/${list.id}`);
-  };
-
-  const handleDeleteList = (list: any) => {
-    setSelectedList(list);
-    setDeleteDialogOpen(true);
-  };
-
-  const confirmDelete = async () => {
-    if (selectedList) {
-      setIsDeleting(true);
-      try {
-        const data = await deleteList(selectedList.id);
-        // Remove from local state
-        if (data?.success) {
-          setLists(lists.filter((list: any) => list.id !== selectedList.id));
-          setDeleteDialogOpen(false);
-          setSelectedList(null);
-        }
-      } catch (error) {
-        console.error("Failed to delete list:", error);
-        handleApiError(error, "Failed to delete list");
-      } finally {
-        setIsDeleting(false);
-      }
-    }
-  };
-
-  const handleDuplicateList = async (list: any) => {
-    try {
-      // Create a duplicate with a modified name
-      const duplicateData = {
-        name: `${list.name} (Copy)`,
-        description: list.description,
-        customerId: list.customer?.id || list.customerId,
-      };
-
-      await createNewList(duplicateData);
-      await fetchLists(false);
-    } catch (error) {
-      console.error("Failed to duplicate list:", error);
-      handleApiError(error, "Failed to duplicate list");
-    }
+  const handleViewLists = (customer: any) => {
+    setSelectedCustomer(customer);
+    setViewListsDialogOpen(true);
   };
 
   const handleRefresh = () => {
-    fetchLists(false);
+    fetchCustomers(false);
   };
 
   // Loading state
@@ -865,11 +304,11 @@ const AdminListsPage = () => {
               variant="h4"
               sx={{ color: "secondary.main", fontSize: "30px" }}
             >
-              Lists Management
+              List Management
             </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Manage all customer lists and create new ones
-            </Typography>
+            <h3 className="font-roboto mt-1">
+              View and manage all registered customers
+            </h3>
           </div>
 
           <div className="flex gap-4 w-full md:w-auto">
@@ -883,7 +322,7 @@ const AdminListsPage = () => {
             >
               <Search className="text-gray-400 mr-2" />
               <InputBase
-                placeholder="Search lists, customers..."
+                placeholder="Search customers, companies..."
                 className="flex-1"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -896,17 +335,18 @@ const AdminListsPage = () => {
             </Paper>
 
             <CustomButton
-              startIcon={<PlusIcon color="white" size={18} />}
+              startIcon={<RefreshCw color="white" size={18} />}
               gradient
               shadow="large"
-              onClick={() => setCreateDialogOpen(true)}
+              onClick={handleRefresh}
+              disabled={refreshing}
             >
-              Create List
+              {refreshing ? "Refreshing..." : "Refresh"}
             </CustomButton>
           </div>
         </div>
 
-        {/* Filters and Refresh Button */}
+        {/* Filters and Stats */}
         <div className="flex flex-wrap gap-4 mb-6 items-center">
           <FormControl sx={{ minWidth: 180 }} size="small">
             <InputLabel sx={{ color: "text.secondary" }}>Status</InputLabel>
@@ -929,32 +369,13 @@ const AdminListsPage = () => {
               }}
             >
               <MenuItem value="">All Status</MenuItem>
-              <MenuItem value="Active">Active</MenuItem>
-              <MenuItem value="Draft">Draft</MenuItem>
-              <MenuItem value="Archived">Archived</MenuItem>
+              <MenuItem value="verified">Verified</MenuItem>
+              <MenuItem value="pending">Pending</MenuItem>
+              <MenuItem value="rejected">Rejected</MenuItem>
             </Select>
           </FormControl>
 
-          {/* Refresh Button */}
-          <Button
-            variant="outlined"
-            startIcon={<RefreshCw size={16} />}
-            onClick={handleRefresh}
-            disabled={refreshing}
-            sx={{
-              borderRadius: "8px",
-              borderColor: theme.palette.primary.light,
-              color: theme.palette.primary.main,
-              "&:hover": {
-                borderColor: theme.palette.primary.main,
-                backgroundColor: alpha(theme.palette.primary.main, 0.05),
-              },
-            }}
-          >
-            {refreshing ? "Refreshing..." : "Refresh"}
-          </Button>
-
-          {/* Total Lists Count */}
+          {/* Total Customers Count */}
           <Typography
             variant="body2"
             color="text.secondary"
@@ -967,7 +388,7 @@ const AdminListsPage = () => {
               fontWeight: 500,
             }}
           >
-            Total Lists: {lists.length}
+            Total Customers: {customers.length}
           </Typography>
         </div>
 
@@ -981,9 +402,9 @@ const AdminListsPage = () => {
           </Alert>
         )}
 
-        {/* Lists Table */}
-        {lists.length === 0 ? (
-          <EmptyState onCreateList={() => setCreateDialogOpen(true)} />
+        {/* Customers Table */}
+        {customers.length === 0 ? (
+          <EmptyState />
         ) : (
           <>
             <TableContainer
@@ -1022,26 +443,21 @@ const AdminListsPage = () => {
                 >
                   <TableRow>
                     <TableCell sx={{ pl: 3, fontWeight: 600 }}>
-                      List Name
+                      Company
                     </TableCell>
-                    <TableCell sx={{ fontWeight: 600 }}>Customer</TableCell>
-                    <TableCell sx={{ fontWeight: 600 }}>Items</TableCell>
-                    <TableCell sx={{ fontWeight: 600 }}>Last Updated</TableCell>
-                    <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
+                    <TableCell sx={{ fontWeight: 600 }}>Email</TableCell>
                     <TableCell align="right" sx={{ pr: 3, fontWeight: 600 }}>
                       Actions
                     </TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {paginatedLists.map((list: any) => (
-                    <ListViewItem
-                      key={list.id}
-                      list={list}
+                  {paginatedCustomers.map((customer: any) => (
+                    <CustomerViewItem
+                      key={customer.id}
+                      customer={customer}
                       router={router}
-                      onEdit={handleEditList}
-                      onDelete={handleDeleteList}
-                      onDuplicate={handleDuplicateList}
+                      onViewLists={handleViewLists}
                     />
                   ))}
                 </TableBody>
@@ -1059,14 +475,15 @@ const AdminListsPage = () => {
               }}
             >
               <Typography variant="body2" color="text.secondary">
-                Showing {Math.min(filteredLists.length, page * rowsPerPage + 1)}{" "}
-                to {Math.min(filteredLists.length, (page + 1) * rowsPerPage)} of{" "}
-                {filteredLists.length} lists
+                Showing{" "}
+                {Math.min(filteredCustomers.length, page * rowsPerPage + 1)} to{" "}
+                {Math.min(filteredCustomers.length, (page + 1) * rowsPerPage)}{" "}
+                of {filteredCustomers.length} customers
               </Typography>
 
               <TablePagination
                 component="div"
-                count={filteredLists.length}
+                count={filteredCustomers.length}
                 page={page}
                 onPageChange={(e, newPage) => setPage(newPage)}
                 rowsPerPage={rowsPerPage}
@@ -1092,24 +509,101 @@ const AdminListsPage = () => {
           </>
         )}
 
-        {/* Create List Dialog */}
-        <CreateListDialog
-          open={createDialogOpen}
-          onClose={() => setCreateDialogOpen(false)}
-          onSuccess={handleCreateListSuccess}
-        />
+        {/* View Lists Dialog */}
+        <Dialog
+          open={viewListsDialogOpen}
+          onClose={() => setViewListsDialogOpen(false)}
+          maxWidth="md"
+          fullWidth
+          PaperProps={{
+            sx: {
+              borderRadius: 3,
+              boxShadow: "0 10px 40px rgba(0, 0, 0, 0.1)",
+              overflow: "hidden",
+            },
+          }}
+        >
+          <DialogTitle
+            sx={{
+              fontWeight: 600,
+              pb: 1.5,
+              borderBottom: "1px solid",
+              borderColor: alpha("#ADB5BD", 0.15),
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
+            <Box sx={{ display: "flex", alignItems: "center" }}>
+              <Business
+                style={{ marginRight: 10, color: theme.palette.primary.main }}
+              />
+              {selectedCustomer?.companyName}'s Lists
+            </Box>
+            <IconButton
+              onClick={() => setViewListsDialogOpen(false)}
+              size="small"
+            >
+              <Close fontSize="small" />
+            </IconButton>
+          </DialogTitle>
 
-        {/* Delete Dialog */}
-        <DeleteDialog
-          open={deleteDialogOpen}
-          onClose={() => setDeleteDialogOpen(false)}
-          onConfirm={confirmDelete}
-          listName={selectedList?.name}
-          isDeleting={isDeleting}
-        />
+          <DialogContent sx={{ py: 3 }}>
+            {selectedCustomer?.lists && selectedCustomer.lists.length > 0 ? (
+              <Box>
+                <Typography variant="body1" sx={{ mb: 2 }}>
+                  This customer has {selectedCustomer.lists.length} list(s).
+                </Typography>
+                {/* You can add more detailed list information here if needed */}
+              </Box>
+            ) : (
+              <Box sx={{ textAlign: "center", py: 4 }}>
+                <FolderOpen
+                  sx={{ fontSize: 48, color: "text.secondary", mb: 2 }}
+                />
+                <Typography variant="h6" color="text.secondary">
+                  No Lists Found
+                </Typography>
+                <Typography variant="body2" sx={{ mt: 1 }}>
+                  This customer hasn't created any lists yet.
+                </Typography>
+              </Box>
+            )}
+          </DialogContent>
+
+          <DialogActions
+            sx={{
+              px: 3,
+              pb: 3,
+              borderTop: "1px solid",
+              borderColor: alpha("#ADB5BD", 0.15),
+            }}
+          >
+            <CustomButton
+              variant="outlined"
+              onClick={() => setViewListsDialogOpen(false)}
+              rounded="medium"
+            >
+              Close
+            </CustomButton>
+            <CustomButton
+              variant="contained"
+              onClick={() => {
+                setViewListsDialogOpen(false);
+                router.push(
+                  `/scheduled/lists?customerId=${selectedCustomer?.id}`
+                );
+              }}
+              rounded="medium"
+              hoverEffect="scale"
+            >
+              View All Lists
+            </CustomButton>
+          </DialogActions>
+        </Dialog>
       </div>
     </div>
   );
 };
 
-export default AdminListsPage;
+export default AdminCustomersPage;
