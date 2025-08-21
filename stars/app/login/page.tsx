@@ -14,7 +14,7 @@ import {
   X,
 } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "react-hot-toast";
 import { loginCustomer } from "@/api/customer";
 import { useDispatch, useSelector } from "react-redux";
@@ -90,6 +90,7 @@ const LoginPage = () => {
   const [authError, setAuthError] = useState("");
   const dispatch = useDispatch();
   const { customer } = useSelector((state: RootState) => state.customer);
+  const searchParams = useSearchParams();
   // Initial form values
   const initialValues = {
     email: "",
@@ -143,14 +144,13 @@ const LoginPage = () => {
       );
 
       try {
-        const listsResponse = await getAllListForACustomer(response.data.id);
-        if (listsResponse && listsResponse.length > 0) {
-          // Redirect to the first list page
-          router.push(`/scheduled-items/lists/${listsResponse[0].id}`);
-        } else {
-          // No lists found, redirect to home page
-          router.push("/");
-        }
+        // const listsResponse = await getAllListForACustomer(response.data.id);
+        // if (listsResponse && listsResponse.length > 0) {
+        // Redirect to the first list page
+        const queryString = searchParams.toString();
+        router.push(
+          `/${response.data.companyName}${queryString ? `?${queryString}` : ""}`
+        );
       } catch (listError) {
         console.error("Error fetching lists:", listError);
         router.push("/");

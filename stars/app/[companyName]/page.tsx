@@ -344,77 +344,14 @@ const DeliveryCell = ({ row, period }: any) => {
   );
 };
 
-// Enhanced Editable Quantity Cell with FieldHighlight
-function EditableQuantityCell({ row, onUpdateItem, isEditable, router }: any) {
-  const [isEditing, setIsEditing] = useState(false);
-  const [value, setValue] = useState(row.quantity || 0);
-  const [saving, setSaving] = useState(false);
-
+// Static Quantity Cell (No longer editable)
+function StaticQuantityCell({ row }: any) {
   const hasChanges =
     (row.changesNeedAcknowledgment || row.hasChanges || row.shouldHighlight) &&
     row.changedFields?.includes("quantity");
 
-  const handleSave = async () => {
-    if (!isEditable || value === row.quantity) {
-      setIsEditing(false);
-      return;
-    }
-
-    try {
-      setSaving(true);
-      await onUpdateItem(row.id, { quantity: Number(value) });
-      setIsEditing(false);
-    } catch (error) {
-      console.error("Failed to update quantity:", error);
-      setValue(row.quantity);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleCancel = () => {
-    setValue(row.quantity);
-    setIsEditing(false);
-  };
-
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") {
-      handleSave();
-    } else if (e.key === "Escape") {
-      handleCancel();
-    }
-  };
-
-  if (isEditing && isEditable) {
-    return (
-      <Box
-        sx={{ display: "flex", alignItems: "center", gap: 1, width: "100%" }}
-      >
-        <TextField
-          size="small"
-          type="number"
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          onKeyDown={handleKeyPress}
-          disabled={saving}
-          sx={{
-            width: 80,
-            "& .MuiOutlinedInput-root": { height: 32, fontSize: "0.875rem" },
-          }}
-          autoFocus
-          onBlur={handleSave}
-        />
-        {saving && <CircularProgress size={16} />}
-      </Box>
-    );
-  }
-
   return (
-    <FieldHighlight
-      hasChanges={hasChanges}
-      fieldName="Menge"
-      onClick={() => (isEditable ? setIsEditing(true) : router.push("/login"))}
-    >
+    <FieldHighlight hasChanges={hasChanges} fieldName="Menge">
       <Box
         sx={{
           display: "flex",
@@ -433,8 +370,48 @@ function EditableQuantityCell({ row, onUpdateItem, isEditable, router }: any) {
   );
 }
 
-// Enhanced Editable Comment Cell with FieldHighlight
-function EditableCommentCell({ row, onUpdateItem, isEditable, router }: any) {
+// Static Interval Cell (No longer editable)
+function StaticIntervalCell({ row }: any) {
+  const hasChanges =
+    (row.changesNeedAcknowledgment || row.hasChanges || row.shouldHighlight) &&
+    row.changedFields?.includes("interval");
+
+  const getCurrentLabel = () => {
+    const option = INTERVAL_OPTIONS.find(
+      (opt) => opt.value === (row.interval || "monthly")
+    );
+    return option ? option.label : "Monatlich";
+  };
+
+  return (
+    <FieldHighlight hasChanges={hasChanges} fieldName="Intervall">
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          width: "100%",
+          height: "100%",
+          p: 1,
+        }}
+      >
+        <Typography variant="body2" sx={{ fontSize: "14px" }}>
+          {getCurrentLabel()}
+        </Typography>
+      </Box>
+    </FieldHighlight>
+  );
+}
+
+// Enhanced Editable Comment Cell with FieldHighlight (Only editable field)
+function EditableCommentCell({
+  row,
+  onUpdateItem,
+  isEditable,
+  router,
+  companyName,
+  listId,
+}: any) {
   const [isEditing, setIsEditing] = useState(false);
   const [value, setValue] = useState(row.comment || "");
   const [saving, setSaving] = useState(false);
@@ -442,6 +419,20 @@ function EditableCommentCell({ row, onUpdateItem, isEditable, router }: any) {
   const hasChanges =
     (row.changesNeedAcknowledgment || row.hasChanges || row.shouldHighlight) &&
     row.changedFields?.includes("comment");
+
+  // Check for auto-edit on mount
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const editItemId = urlParams.get("editItem");
+    const editField = urlParams.get("editField");
+
+    if (editItemId === row.id && editField === "comment" && isEditable) {
+      setTimeout(() => {
+        setIsEditing(true);
+        setValue(row.comment || "");
+      }, 300);
+    }
+  }, [row.id, isEditable, row.comment]);
 
   const handleSave = async () => {
     if (!isEditable || value === row.comment) {
@@ -474,6 +465,21 @@ function EditableCommentCell({ row, onUpdateItem, isEditable, router }: any) {
     }
   };
 
+  const handleEditAttempt = () => {
+    if (isEditable) {
+      setIsEditing(true);
+    } else {
+      // Store edit information in query params
+      const editParams = new URLSearchParams({
+        redirect: `/${companyName}`,
+        editItem: row.id,
+        editField: "comment",
+        listId: listId || "",
+      });
+      router.push(`/login?${editParams.toString()}`);
+    }
+  };
+
   if (isEditing && isEditable) {
     return (
       <Box
@@ -501,7 +507,7 @@ function EditableCommentCell({ row, onUpdateItem, isEditable, router }: any) {
     <FieldHighlight
       hasChanges={hasChanges}
       fieldName="Kommentar"
-      onClick={() => (isEditable ? setIsEditing(true) : router.push("/login"))}
+      onClick={handleEditAttempt}
     >
       <Box
         sx={{
@@ -515,143 +521,6 @@ function EditableCommentCell({ row, onUpdateItem, isEditable, router }: any) {
       >
         <Typography variant="body2" sx={{ fontSize: "14px" }}>
           {row.comment || "Add comment..."}
-        </Typography>
-      </Box>
-    </FieldHighlight>
-  );
-}
-
-// Enhanced Editable Marked Cell with FieldHighlight
-function EditableMarkedCell({ row, onUpdateItem, isEditable }: any) {
-  const [saving, setSaving] = useState(false);
-
-  const hasChanges =
-    (row.changesNeedAcknowledgment || row.hasChanges || row.shouldHighlight) &&
-    row.changedFields?.includes("marked");
-
-  const handleToggle = async () => {
-    if (!isEditable) return;
-
-    try {
-      setSaving(true);
-      await onUpdateItem(row.id, { marked: !row.marked });
-    } catch (error) {
-      console.error("Failed to update marked status:", error);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <FieldHighlight hasChanges={hasChanges} fieldName="Markiert">
-      <Box
-        sx={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          p: 0.5,
-        }}
-      >
-        {saving ? (
-          <CircularProgress size={20} />
-        ) : (
-          <Checkbox
-            size="small"
-            checked={row.marked || false}
-            disabled={!isEditable}
-            icon={<CheckBoxOutlineBlank />}
-            checkedIcon={<CheckBox />}
-            onChange={handleToggle}
-          />
-        )}
-      </Box>
-    </FieldHighlight>
-  );
-}
-
-// Enhanced Editable Interval Cell with FieldHighlight
-function EditableIntervalCell({ row, onUpdateItem, isEditable, router }: any) {
-  const [isEditing, setIsEditing] = useState(false);
-  const [value, setValue] = useState(row.interval || "monthly");
-  const [saving, setSaving] = useState(false);
-
-  const hasChanges =
-    (row.changesNeedAcknowledgment || row.hasChanges || row.shouldHighlight) &&
-    row.changedFields?.includes("interval");
-
-  const handleSave = async (newValue: string) => {
-    if (!isEditable || newValue === row.interval) {
-      setIsEditing(false);
-      return;
-    }
-
-    try {
-      setSaving(true);
-      await onUpdateItem(row.id, { interval: newValue });
-      setIsEditing(false);
-    } catch (error) {
-      console.error("Failed to update interval:", error);
-      setValue(row.interval);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const getCurrentLabel = () => {
-    const option = INTERVAL_OPTIONS.find(
-      (opt) => opt.value === (row.interval || "monthly")
-    );
-    return option ? option.label : "Monatlich";
-  };
-
-  if (isEditing && isEditable) {
-    return (
-      <Box
-        sx={{ display: "flex", alignItems: "center", gap: 1, width: "100%" }}
-      >
-        <FormControl size="small" sx={{ minWidth: 120 }}>
-          <Select
-            value={value}
-            onChange={(e) => {
-              setValue(e.target.value);
-              handleSave(e.target.value);
-            }}
-            disabled={saving}
-            sx={{ fontSize: "0.875rem", height: 32 }}
-            onClose={() => setIsEditing(false)}
-            autoFocus
-            open={isEditing}
-          >
-            {INTERVAL_OPTIONS.map((option) => (
-              <MenuItem key={option.value} value={option.value}>
-                {option.label}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-        {saving && <CircularProgress size={16} />}
-      </Box>
-    );
-  }
-
-  return (
-    <FieldHighlight
-      hasChanges={hasChanges}
-      fieldName="Intervall"
-      onClick={() => (isEditable ? setIsEditing(true) : router.push("/login"))}
-    >
-      <Box
-        sx={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          width: "100%",
-          height: "100%",
-          p: 1,
-        }}
-      >
-        <Typography variant="body2" sx={{ fontSize: "14px" }}>
-          {getCurrentLabel()}
         </Typography>
       </Box>
     </FieldHighlight>
@@ -825,10 +694,45 @@ const AddItemDialog = ({ open, onClose, onAddItem, listId }: any) => {
   );
 };
 
-// Horizontal List Tabs Component
-function ListTabs({ currentListId, allLists, onListChange, loading }: any) {
+// Enhanced List Tabs Component with editable list names
+function ListTabs({
+  currentListId,
+  allLists,
+  onListChange,
+  onListNameUpdate,
+  loading,
+  isEditable,
+}: any) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
+  const [editingListId, setEditingListId] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const handleEditStart = (listId: string, currentName: string) => {
+    if (!isEditable) return;
+    setEditingListId(listId);
+    setEditingName(currentName);
+  };
+
+  const handleEditSave = async (listId: string) => {
+    if (!editingName.trim()) return;
+
+    try {
+      setSaving(true);
+      await onListNameUpdate(listId, editingName);
+      setEditingListId(null);
+    } catch (error) {
+      console.error("Failed to update list name:", error);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleEditCancel = () => {
+    setEditingListId(null);
+    setEditingName("");
+  };
 
   if (loading || allLists.length <= 1) return null;
 
@@ -871,14 +775,16 @@ function ListTabs({ currentListId, allLists, onListChange, loading }: any) {
         >
           {allLists.map((list: any) => {
             const isActive = list.id === currentListId;
+            const isEditing = editingListId === list.id;
+
             return (
               <Card
                 key={list.id}
                 sx={{
-                  minWidth: { xs: 200, sm: 240 },
+                  minWidth: { xs: 220, sm: 260 },
                   p: 2,
                   py: 1,
-                  cursor: "pointer",
+                  cursor: isEditing ? "default" : "pointer",
                   border: "1px solid",
                   borderColor: isActive
                     ? theme.palette.primary.main
@@ -891,14 +797,14 @@ function ListTabs({ currentListId, allLists, onListChange, loading }: any) {
                   "&:hover": {
                     borderColor: theme.palette.primary.main,
                     backgroundColor: alpha(theme.palette.primary.main, 0.04),
-                    transform: "translateY(-2px)",
+                    transform: isEditing ? "none" : "translateY(-2px)",
                     boxShadow: `0 8px 24px ${alpha(
                       theme.palette.primary.main,
                       0.12
                     )}`,
                   },
                 }}
-                onClick={() => !isActive && onListChange(list.id)}
+                onClick={() => !isActive && !isEditing && onListChange(list.id)}
               >
                 <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
                   <Avatar
@@ -915,24 +821,98 @@ function ListTabs({ currentListId, allLists, onListChange, loading }: any) {
                   </Avatar>
 
                   <Box sx={{ flex: 1, minWidth: 0 }}>
-                    <Typography
-                      variant="subtitle2"
-                      fontWeight={isActive ? 600 : 500}
-                      sx={{
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                        mb: 0.3,
-                      }}
-                    >
-                      {list.name}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {list.items?.length || 0} items
-                    </Typography>
+                    {isEditing ? (
+                      <Box
+                        sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                      >
+                        <TextField
+                          size="small"
+                          value={editingName}
+                          onChange={(e) => setEditingName(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              handleEditSave(list.id);
+                            } else if (e.key === "Escape") {
+                              handleEditCancel();
+                            }
+                          }}
+                          disabled={saving}
+                          sx={{
+                            "& .MuiOutlinedInput-root": {
+                              height: 28,
+                              fontSize: "0.85rem",
+                            },
+                          }}
+                          autoFocus
+                        />
+                        <IconButton
+                          size="small"
+                          onClick={() => handleEditSave(list.id)}
+                          disabled={saving || !editingName.trim()}
+                          sx={{ p: 0.5 }}
+                        >
+                          {saving ? (
+                            <CircularProgress size={14} />
+                          ) : (
+                            <CheckCircle fontSize="small" />
+                          )}
+                        </IconButton>
+                        <IconButton
+                          size="small"
+                          onClick={handleEditCancel}
+                          disabled={saving}
+                          sx={{ p: 0.5 }}
+                        >
+                          <Cancel fontSize="small" />
+                        </IconButton>
+                      </Box>
+                    ) : (
+                      <>
+                        <Box
+                          sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 0.5,
+                          }}
+                        >
+                          <Typography
+                            variant="subtitle2"
+                            fontWeight={isActive ? 600 : 500}
+                            sx={{
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                              mb: 0.3,
+                              flex: 1,
+                            }}
+                          >
+                            {list.name}
+                          </Typography>
+                          {isEditable && (
+                            <IconButton
+                              size="small"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEditStart(list.id, list.name);
+                              }}
+                              sx={{
+                                p: 0.3,
+                                opacity: 0.7,
+                                "&:hover": { opacity: 1 },
+                              }}
+                            >
+                              <Edit fontSize="small" />
+                            </IconButton>
+                          )}
+                        </Box>
+                        <Typography variant="caption" color="text.secondary">
+                          {list.items?.length || 0} items
+                        </Typography>
+                      </>
+                    )}
                   </Box>
 
-                  {isActive && (
+                  {isActive && !isEditing && (
                     <Chip
                       label="Current"
                       size="small"
@@ -955,35 +935,65 @@ function ListTabs({ currentListId, allLists, onListChange, loading }: any) {
   );
 }
 
-// Enhanced Mobile Item Card Component with change highlighting
+// Enhanced Mobile Item Card Component (only comment editable)
 const MobileItemCard = ({
   item,
   onUpdateItem,
   onSelect,
   isSelected,
   isEditable,
+  companyName,
+  listId,
+  router,
 }: any) => {
   const [expanded, setExpanded] = useState(false);
-  const [editingField, setEditingField] = useState<string | null>(null);
-  const [values, setValues] = useState({
-    quantity: item.quantity || 0,
-    comment: item.comment || "",
-    interval: item.interval || "monthly",
-  });
+  const [editingComment, setEditingComment] = useState(false);
+  const [commentValue, setCommentValue] = useState(item.comment || "");
   const theme = useTheme();
 
   const hasAnyChanges =
     item.changesNeedAcknowledgment || item.hasChanges || item.shouldHighlight;
 
-  const handleFieldSave = async (field: string, value: any) => {
+  // Check for auto-edit on mount
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const editItemId = urlParams.get("editItem");
+    const editField = urlParams.get("editField");
+
+    if (editItemId === item.id && editField === "comment" && isEditable) {
+      setExpanded(true);
+      setTimeout(() => {
+        setEditingComment(true);
+        setCommentValue(item.comment || "");
+      }, 300);
+    }
+  }, [item.id, isEditable, item.comment]);
+
+  const handleCommentSave = async () => {
     if (!isEditable) return;
 
     try {
-      await onUpdateItem(item.id, { [field]: value });
-      setEditingField(null);
+      await onUpdateItem(item.id, { comment: commentValue });
+      setEditingComment(false);
     } catch (error) {
-      console.error(`Failed to update ${field}:`, error);
-      setValues((prev) => ({ ...prev, [field]: item[field] }));
+      console.error("Failed to update comment:", error);
+      setCommentValue(item.comment || "");
+    }
+  };
+
+  const handleCommentEditAttempt = () => {
+    if (isEditable) {
+      setEditingComment(true);
+      setCommentValue(item.comment || "");
+    } else {
+      // Store edit information in query params
+      const editParams = new URLSearchParams({
+        redirect: `/${companyName}`,
+        editItem: item.id,
+        editField: "comment",
+        listId: listId || "",
+      });
+      router.push(`/login?${editParams.toString()}`);
     }
   };
 
@@ -1025,6 +1035,7 @@ const MobileItemCard = ({
 
   return (
     <Card
+      data-testid={`item-${item.id}`}
       sx={{
         mb: 2,
         border: "2px solid",
@@ -1308,203 +1319,88 @@ const MobileItemCard = ({
         </Grid>
       </Box>
 
-      {/* Expanded Details Section with Enhanced Highlighting */}
+      {/* Expanded Details Section */}
       <Collapse in={expanded}>
         <Box sx={{ p: 2, backgroundColor: alpha("#FAFBFC", 0.5) }}>
           <Grid container spacing={2}>
-            {/* Quantity Field with Enhanced Highlighting */}
+            {/* Quantity Field (Static) */}
             <Grid item xs={6}>
-              <FieldHighlight
-                hasChanges={
-                  (item.changesNeedAcknowledgment ||
-                    item.hasChanges ||
-                    item.shouldHighlight) &&
-                  item.changedFields?.includes("quantity")
-                }
-                fieldName="Menge"
+              <Box
+                sx={{
+                  p: 1.5,
+                  borderRadius: 1,
+                  backgroundColor: "background.paper",
+                }}
               >
-                <Box
+                <Typography
+                  variant="caption"
                   sx={{
-                    p: 1.5,
-                    borderRadius: 1,
-                    backgroundColor: "background.paper",
+                    fontWeight: 600,
+                    color: theme.palette.text.secondary,
+                    textTransform: "uppercase",
+                    letterSpacing: 0.5,
+                    mb: 0.5,
+                    display: "block",
                   }}
                 >
-                  <Typography
-                    variant="caption"
-                    sx={{
-                      fontWeight: 600,
-                      color: theme.palette.text.secondary,
-                      textTransform: "uppercase",
-                      letterSpacing: 0.5,
-                      mb: 0.5,
-                      display: "block",
-                    }}
-                  >
-                    Menge
-                  </Typography>
-                  {editingField === "quantity" && isEditable ? (
-                    <TextField
-                      size="small"
-                      type="number"
-                      value={values.quantity}
-                      onChange={(e) =>
-                        setValues((prev) => ({
-                          ...prev,
-                          quantity: e.target.value,
-                        }))
-                      }
-                      onBlur={() =>
-                        handleFieldSave("quantity", Number(values.quantity))
-                      }
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          handleFieldSave("quantity", Number(values.quantity));
-                        } else if (e.key === "Escape") {
-                          setValues((prev) => ({
-                            ...prev,
-                            quantity: item.quantity,
-                          }));
-                          setEditingField(null);
-                        }
-                      }}
-                      fullWidth
-                      autoFocus
-                      sx={{
-                        "& .MuiOutlinedInput-root": {
-                          borderRadius: 1,
-                          height: 32,
-                        },
-                      }}
-                    />
-                  ) : (
-                    <Typography
-                      variant="body2"
-                      fontWeight={600}
-                      sx={{
-                        cursor: isEditable ? "pointer" : "default",
-                        p: 0.8,
-                        borderRadius: 1,
-                        minHeight: 32,
-                        display: "flex",
-                        alignItems: "center",
-                        "&:hover": {
-                          backgroundColor: isEditable
-                            ? alpha(theme.palette.primary.main, 0.04)
-                            : "transparent",
-                        },
-                      }}
-                      onClick={() => {
-                        if (isEditable) {
-                          setEditingField("quantity");
-                          setValues((prev) => ({
-                            ...prev,
-                            quantity: item.quantity,
-                          }));
-                        }
-                      }}
-                    >
-                      {item.quantity || 0}
-                    </Typography>
-                  )}
-                </Box>
-              </FieldHighlight>
-            </Grid>
-
-            {/* Interval Field with Enhanced Highlighting */}
-            <Grid item xs={6}>
-              <FieldHighlight
-                hasChanges={
-                  (item.changesNeedAcknowledgment ||
-                    item.hasChanges ||
-                    item.shouldHighlight) &&
-                  item.changedFields?.includes("interval")
-                }
-                fieldName="Intervall"
-              >
-                <Box
+                  Menge
+                </Typography>
+                <Typography
+                  variant="body2"
+                  fontWeight={600}
                   sx={{
-                    p: 1.5,
+                    p: 0.8,
                     borderRadius: 1,
-                    backgroundColor: "background.paper",
+                    minHeight: 32,
+                    display: "flex",
+                    alignItems: "center",
                   }}
                 >
-                  <Typography
-                    variant="caption"
-                    sx={{
-                      fontWeight: 600,
-                      color: theme.palette.text.secondary,
-                      textTransform: "uppercase",
-                      letterSpacing: 0.5,
-                      mb: 0.5,
-                      display: "block",
-                    }}
-                  >
-                    Intervall
-                  </Typography>
-                  {editingField === "interval" && isEditable ? (
-                    <FormControl size="small" fullWidth>
-                      <Select
-                        value={values.interval}
-                        onChange={(e) => {
-                          setValues((prev) => ({
-                            ...prev,
-                            interval: e.target.value,
-                          }));
-                          handleFieldSave("interval", e.target.value);
-                        }}
-                        onClose={() => setEditingField(null)}
-                        autoFocus
-                        open={editingField === "interval"}
-                        sx={{
-                          borderRadius: 1,
-                          height: 32,
-                        }}
-                      >
-                        {INTERVAL_OPTIONS.map((option) => (
-                          <MenuItem key={option.value} value={option.value}>
-                            {option.label}
-                          </MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
-                  ) : (
-                    <Typography
-                      variant="body2"
-                      fontWeight={500}
-                      sx={{
-                        cursor: isEditable ? "pointer" : "default",
-                        p: 0.8,
-                        borderRadius: 1,
-                        minHeight: 32,
-                        display: "flex",
-                        alignItems: "center",
-                        "&:hover": {
-                          backgroundColor: isEditable
-                            ? alpha(theme.palette.primary.main, 0.04)
-                            : "transparent",
-                        },
-                      }}
-                      onClick={() => {
-                        if (isEditable) {
-                          setEditingField("interval");
-                          setValues((prev) => ({
-                            ...prev,
-                            interval: item.interval,
-                          }));
-                        }
-                      }}
-                    >
-                      {INTERVAL_OPTIONS.find(
-                        (opt) => opt.value === item.interval
-                      )?.label || "Monatlich"}
-                    </Typography>
-                  )}
-                </Box>
-              </FieldHighlight>
+                  {item.quantity || 0}
+                </Typography>
+              </Box>
             </Grid>
 
-            {/* Comment Field with Enhanced Highlighting */}
+            {/* Interval Field (Static) */}
+            <Grid item xs={6}>
+              <Box
+                sx={{
+                  p: 1.5,
+                  borderRadius: 1,
+                  backgroundColor: "background.paper",
+                }}
+              >
+                <Typography
+                  variant="caption"
+                  sx={{
+                    fontWeight: 600,
+                    color: theme.palette.text.secondary,
+                    textTransform: "uppercase",
+                    letterSpacing: 0.5,
+                    mb: 0.5,
+                    display: "block",
+                  }}
+                >
+                  Intervall
+                </Typography>
+                <Typography
+                  variant="body2"
+                  fontWeight={500}
+                  sx={{
+                    p: 0.8,
+                    borderRadius: 1,
+                    minHeight: 32,
+                    display: "flex",
+                    alignItems: "center",
+                  }}
+                >
+                  {INTERVAL_OPTIONS.find((opt) => opt.value === item.interval)
+                    ?.label || "Monatlich"}
+                </Typography>
+              </Box>
+            </Grid>
+
+            {/* Comment Field (Editable) */}
             <Grid item xs={12}>
               <FieldHighlight
                 hasChanges={
@@ -1535,29 +1431,21 @@ const MobileItemCard = ({
                   >
                     Kommentar
                   </Typography>
-                  {editingField === "comment" && isEditable ? (
+                  {editingComment && isEditable ? (
                     <TextField
                       size="small"
                       multiline
                       rows={2}
-                      value={values.comment}
-                      onChange={(e) =>
-                        setValues((prev) => ({
-                          ...prev,
-                          comment: e.target.value,
-                        }))
-                      }
-                      onBlur={() => handleFieldSave("comment", values.comment)}
+                      value={commentValue}
+                      onChange={(e) => setCommentValue(e.target.value)}
+                      onBlur={handleCommentSave}
                       onKeyDown={(e) => {
                         if (e.key === "Enter" && !e.shiftKey) {
                           e.preventDefault();
-                          handleFieldSave("comment", values.comment);
+                          handleCommentSave();
                         } else if (e.key === "Escape") {
-                          setValues((prev) => ({
-                            ...prev,
-                            comment: item.comment,
-                          }));
-                          setEditingField(null);
+                          setCommentValue(item.comment || "");
+                          setEditingComment(false);
                         }
                       }}
                       fullWidth
@@ -1589,13 +1477,7 @@ const MobileItemCard = ({
                         },
                       }}
                       onClick={() => {
-                        if (isEditable) {
-                          setEditingField("comment");
-                          setValues((prev) => ({
-                            ...prev,
-                            comment: item.comment,
-                          }));
-                        }
+                        handleCommentEditAttempt();
                       }}
                     >
                       {item.comment || "Kommentar hinzufügen..."}
@@ -1703,11 +1585,11 @@ const ListManagerPage: React.FC = () => {
   const [error, setError] = useState<string>("");
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   const [searchTerm, setSearchTerm] = useState<string>("");
-  const [isEditingTitle, setIsEditingTitle] = useState<boolean>(false);
-  const [editedTitle, setEditedTitle] = useState<string>("");
+  const [isEditingCompanyName, setIsEditingCompanyName] =
+    useState<boolean>(false);
+  const [editedCompanyName, setEditedCompanyName] = useState<string>("");
   const [saving, setSaving] = useState<boolean>(false);
   const [addItemDialog, setAddItemDialog] = useState(false);
-  const [acknowledgingSaving, setAcknowledgingSaving] = useState(false);
 
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
@@ -1722,6 +1604,52 @@ const ListManagerPage: React.FC = () => {
     return currentList.items.filter((item) => item.hasChanges);
   }, [currentList?.items]);
 
+  // Check for auto-edit parameters from URL
+  useEffect(() => {
+    const handleAutoEdit = () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const editItemId = urlParams.get("editItem");
+      const editField = urlParams.get("editField");
+      const editListId = urlParams.get("listId");
+
+      if (editItemId && editField && isEditable && currentList?.items) {
+        // Find the item to edit
+        const itemToEdit = currentList.items.find(
+          (item: any) => item.id === editItemId
+        );
+
+        if (itemToEdit && editField === "comment") {
+          // Auto-enable editing for comment field
+          setTimeout(() => {
+            // Scroll to the item
+            const targetElement =
+              document.querySelector(`[data-testid="item-${editItemId}"]`) ||
+              document.querySelector(`[data-row-key="${editItemId}"]`);
+            if (targetElement) {
+              targetElement.scrollIntoView({
+                behavior: "smooth",
+                block: "center",
+              });
+            }
+
+            // Clear the URL parameters after a short delay
+            setTimeout(() => {
+              const newUrl = new URL(window.location.href);
+              newUrl.searchParams.delete("editItem");
+              newUrl.searchParams.delete("editField");
+              newUrl.searchParams.delete("listId");
+              window.history.replaceState({}, "", newUrl.toString());
+            }, 1000);
+          }, 500);
+        }
+      }
+    };
+
+    if (currentList && isEditable) {
+      handleAutoEdit();
+    }
+  }, [currentList, isEditable, isMobile]);
+
   // Fetch all lists for the company
   useEffect(() => {
     const fetchCompanyLists = async () => {
@@ -1729,6 +1657,7 @@ const ListManagerPage: React.FC = () => {
 
       setIsLoading(true);
       setError("");
+      setEditedCompanyName(companyName);
 
       try {
         const result = await searchListsByCustomerNamee(companyName);
@@ -1750,7 +1679,6 @@ const ListManagerPage: React.FC = () => {
                 changeStatus: item.changeStatus || "pending",
                 marked: item.marked || false,
                 interval: item.interval || "monthly",
-                // Use the correct field names from API
                 changesNeedAcknowledgment:
                   item.changesNeedAcknowledgment || false,
                 hasChanges: item.hasChanges || false,
@@ -1766,7 +1694,6 @@ const ListManagerPage: React.FC = () => {
           if (transformedLists[0]) {
             setCurrentListId(transformedLists[0].id);
             setCurrentList(transformedLists[0]);
-            setEditedTitle(transformedLists[0].name);
           }
         } else {
           setError("No lists found for this company.");
@@ -1788,8 +1715,30 @@ const ListManagerPage: React.FC = () => {
     if (selectedList) {
       setCurrentListId(listId);
       setCurrentList(selectedList);
-      setEditedTitle(selectedList.name);
       setSelectedRows(new Set());
+    }
+  };
+
+  const handleListNameUpdate = async (listId: string, newName: string) => {
+    if (!isEditable || !newName.trim()) return;
+
+    try {
+      await updateList(listId, { name: newName });
+      // Update list name in state
+      const updatedLists = allLists.map((list) =>
+        list.id === listId ? { ...list, name: newName } : list
+      );
+      setAllLists(updatedLists);
+
+      // Update current list if it's the one being edited
+      if (currentListId === listId) {
+        setCurrentList((prev) => (prev ? { ...prev, name: newName } : null));
+      }
+
+      toast.success("List name updated successfully!", successStyles);
+    } catch (error) {
+      console.error("Failed to update list name:", error);
+      toast.error("Failed to update list name", errorStyles);
     }
   };
 
@@ -1832,26 +1781,20 @@ const ListManagerPage: React.FC = () => {
     setSelectedRows(newSelectedRows);
   };
 
-  const handleUpdateTitle = async () => {
-    if (!isEditable || !editedTitle.trim()) {
+  const handleUpdateCompanyName = async () => {
+    if (!isEditable || !editedCompanyName.trim()) {
       return;
     }
 
     try {
       setSaving(true);
-      await updateList(currentList!.id, { name: editedTitle });
-      // Update title in current list
-      const updatedList = { ...currentList!, name: editedTitle };
-      setCurrentList(updatedList);
-
-      // Update in allLists array
-      setAllLists((prev) =>
-        prev.map((list) => (list.id === currentListId ? updatedList : list))
-      );
-
-      setIsEditingTitle(false);
+      // Here you would typically call an API to update the company name
+      // For now, we'll just update the local state
+      setIsEditingCompanyName(false);
+      toast.success("Company name updated successfully!", successStyles);
     } catch (error) {
-      console.error("Failed to update title:", error);
+      console.error("Failed to update company name:", error);
+      toast.error("Failed to update company name", errorStyles);
     } finally {
       setSaving(false);
     }
@@ -1917,23 +1860,6 @@ const ListManagerPage: React.FC = () => {
     }
   };
 
-  // Enhanced handle acknowledging all changes function
-  const handleAcknowledgeAllChanges = async () => {
-    if (!currentList || itemsWithChanges.length === 0) return;
-
-    try {
-      setAcknowledgingSaving(true);
-
-      await bulkAcknowledgeChanges(currentList.id);
-
-      window.location.reload();
-    } catch (error) {
-      console.error("Failed to acknowledge changes:", error);
-    } finally {
-      setAcknowledgingSaving(false);
-    }
-  };
-
   const filteredItems = useMemo(() => {
     if (!currentList?.items) return [];
 
@@ -1953,7 +1879,8 @@ const ListManagerPage: React.FC = () => {
   }, [currentList?.items]);
 
   const dispatch = useDispatch();
-  // Enhanced Desktop columns configuration with FieldHighlight
+
+  // Enhanced Desktop columns configuration (only comment editable)
   const columns = useMemo(() => {
     const baseColumns = [
       {
@@ -2153,28 +2080,14 @@ const ListManagerPage: React.FC = () => {
         name: "Gesamtmenge",
         width: 120,
         resizable: true,
-        renderCell: (props: any) => (
-          <EditableQuantityCell
-            row={props.row}
-            onUpdateItem={handleUpdateItem}
-            router={router}
-            isEditable={isEditable}
-          />
-        ),
+        renderCell: (props: any) => <StaticQuantityCell row={props.row} />,
       },
       {
         key: "interval",
         name: "Intervall",
         width: 130,
         resizable: true,
-        renderCell: (props: any) => (
-          <EditableIntervalCell
-            row={props.row}
-            router={router}
-            onUpdateItem={handleUpdateItem}
-            isEditable={isEditable}
-          />
-        ),
+        renderCell: (props: any) => <StaticIntervalCell row={props.row} />,
       },
     ];
 
@@ -2324,6 +2237,8 @@ const ListManagerPage: React.FC = () => {
             router={router}
             onUpdateItem={handleUpdateItem}
             isEditable={isEditable}
+            companyName={companyName}
+            listId={currentListId}
           />
         ),
       },
@@ -2387,7 +2302,7 @@ const ListManagerPage: React.FC = () => {
             gap: 1,
           }}
         >
-          {/* Company and List Info */}
+          {/* Company Name Section */}
           <Box sx={{ flex: 1 }}>
             <Box
               sx={{
@@ -2419,131 +2334,126 @@ const ListManagerPage: React.FC = () => {
                   <ArrowBack fontSize={isSmallMobile ? "small" : "medium"} />
                 </IconButton>
                 <Business color="primary" fontSize="small" />
-                {currentList && (
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                    {isEditingTitle ? (
-                      <Box
+
+                {/* Company Name with Edit Functionality */}
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  {isEditingCompanyName ? (
+                    <Box
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 1,
+                        flex: 1,
+                      }}
+                    >
+                      <TextField
+                        value={editedCompanyName}
+                        onChange={(e) => setEditedCompanyName(e.target.value)}
+                        size="small"
                         sx={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 1,
-                          flex: 1,
+                          "& .MuiOutlinedInput-root": {
+                            height: { xs: 32, sm: 36 },
+                            backgroundColor: "background.paper",
+                            borderRadius: 1,
+                            fontSize: { xs: "0.8rem", sm: "0.9rem" },
+                          },
+                        }}
+                      />
+                      <IconButton
+                        size="small"
+                        onClick={handleUpdateCompanyName}
+                        disabled={saving || !isEditable}
+                        sx={{
+                          color: "success.main",
+                          backgroundColor: alpha(
+                            theme.palette.success.main,
+                            0.1
+                          ),
+                          border: `1px solid ${alpha(
+                            theme.palette.success.main,
+                            0.2
+                          )}`,
                         }}
                       >
-                        <TextField
-                          value={editedTitle}
-                          onChange={(e) => setEditedTitle(e.target.value)}
-                          size="small"
-                          sx={{
-                            "& .MuiOutlinedInput-root": {
-                              height: { xs: 32, sm: 36 },
-                              backgroundColor: "background.paper",
-                              borderRadius: 1,
-                              fontSize: { xs: "0.8rem", sm: "0.9rem" },
-                            },
-                          }}
-                        />
-                        <IconButton
-                          size="small"
-                          onClick={handleUpdateTitle}
-                          disabled={saving || !isEditable}
-                          sx={{
-                            color: "success.main",
-                            backgroundColor: alpha(
-                              theme.palette.success.main,
-                              0.1
-                            ),
-                            border: `1px solid ${alpha(
-                              theme.palette.success.main,
-                              0.2
-                            )}`,
-                          }}
-                        >
-                          {saving ? (
-                            <CircularProgress size={16} />
-                          ) : (
-                            <CheckCircle />
-                          )}
-                        </IconButton>
-                        <IconButton
-                          size="small"
-                          onClick={() => {
-                            setIsEditingTitle(false);
-                            setEditedTitle(currentList.name);
-                          }}
-                          disabled={saving}
-                          sx={{
-                            color: "error.main",
-                            backgroundColor: alpha(
-                              theme.palette.error.main,
-                              0.1
-                            ),
-                            border: `1px solid ${alpha(
-                              theme.palette.error.main,
-                              0.2
-                            )}`,
-                          }}
-                        >
-                          <Cancel />
-                        </IconButton>
-                      </Box>
-                    ) : (
-                      <Box
-                        sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                        {saving ? (
+                          <CircularProgress size={16} />
+                        ) : (
+                          <CheckCircle />
+                        )}
+                      </IconButton>
+                      <IconButton
+                        size="small"
+                        onClick={() => {
+                          setIsEditingCompanyName(false);
+                          setEditedCompanyName(companyName);
+                        }}
+                        disabled={saving}
+                        sx={{
+                          color: "error.main",
+                          backgroundColor: alpha(theme.palette.error.main, 0.1),
+                          border: `1px solid ${alpha(
+                            theme.palette.error.main,
+                            0.2
+                          )}`,
+                        }}
                       >
-                        <Typography
-                          variant="h6"
-                          sx={{
-                            fontWeight: 700,
-                            fontSize: {
-                              xs: "1.3rem",
-                              sm: "1.8rem",
-                              md: "2.2rem",
-                            },
-                            background:
-                              "linear-gradient(45deg, #8CC21B 30%, #4CAF50 90%)",
-                            backgroundClip: "text",
-                            WebkitBackgroundClip: "text",
-                            WebkitTextFillColor: "transparent",
-                            letterSpacing: "-0.5px",
-                          }}
-                          onClick={() => {
-                            if (isEditable) {
-                              setEditedTitle(currentList.name);
-                              setIsEditingTitle(true);
-                            }
-                          }}
-                        >
-                          {currentList.name}
-                        </Typography>
-                        <IconButton
-                          size="small"
-                          onClick={() => {
-                            if (isEditable) {
-                              setEditedTitle(currentList.name);
-                              setIsEditingTitle(true);
-                            } else {
-                              router.push("/login");
-                            }
-                          }}
-                          sx={{
-                            color: "primary.main",
-                            backgroundColor: alpha(
-                              theme.palette.primary.main,
-                              0.1
-                            ),
-                            border: `1px solid ${alpha(
-                              theme.palette.primary.main,
-                              0.2
-                            )}`,
-                          }}
-                        >
-                          <Edit fontSize="small" />
-                        </IconButton>
-                      </Box>
-                    )}
-                  </Box>
-                )}
+                        <Cancel />
+                      </IconButton>
+                    </Box>
+                  ) : (
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                      <Typography
+                        variant="h6"
+                        sx={{
+                          fontWeight: 700,
+                          fontSize: {
+                            xs: "1.3rem",
+                            sm: "1.8rem",
+                            md: "2.2rem",
+                          },
+                          background:
+                            "linear-gradient(45deg, #8CC21B 30%, #4CAF50 90%)",
+                          backgroundClip: "text",
+                          WebkitBackgroundClip: "text",
+                          WebkitTextFillColor: "transparent",
+                          letterSpacing: "-0.5px",
+                        }}
+                        onClick={() => {
+                          if (isEditable) {
+                            setEditedCompanyName(companyName);
+                            setIsEditingCompanyName(true);
+                          }
+                        }}
+                      >
+                        {editedCompanyName || companyName}
+                      </Typography>
+                      <IconButton
+                        size="small"
+                        onClick={() => {
+                          if (isEditable) {
+                            setEditedCompanyName(companyName);
+                            setIsEditingCompanyName(true);
+                          } else {
+                            router.push("/login");
+                          }
+                        }}
+                        sx={{
+                          color: "primary.main",
+                          backgroundColor: alpha(
+                            theme.palette.primary.main,
+                            0.1
+                          ),
+                          border: `1px solid ${alpha(
+                            theme.palette.primary.main,
+                            0.2
+                          )}`,
+                        }}
+                      >
+                        <Edit fontSize="small" />
+                      </IconButton>
+                    </Box>
+                  )}
+                </Box>
               </Box>
               <div className="flex gap-3 justify-center flex-row-reverse items-center">
                 {isEditable ? (
@@ -2637,11 +2547,14 @@ const ListManagerPage: React.FC = () => {
               </div>
             </Box>
 
+            {/* List Tabs with Editable Names */}
             <ListTabs
               currentListId={currentListId}
               allLists={allLists}
               onListChange={handleListChange}
+              onListNameUpdate={handleListNameUpdate}
               loading={isLoading}
+              isEditable={isEditable}
             />
           </Box>
         </Box>
@@ -2744,43 +2657,6 @@ const ListManagerPage: React.FC = () => {
                   justifyContent: { xs: "stretch", sm: "flex-end" },
                 }}
               >
-                {/* Acknowledge Changes Button - Show only if there are changes */}
-                {itemsWithChanges.length > 0 && (
-                  <Button
-                    variant="contained"
-                    color="error"
-                    size="large"
-                    onClick={handleAcknowledgeAllChanges}
-                    disabled={acknowledgingSaving}
-                    startIcon={
-                      acknowledgingSaving ? (
-                        <CircularProgress size={18} />
-                      ) : (
-                        <Visibility />
-                      )
-                    }
-                    sx={{
-                      backgroundColor: "#f44336",
-                      color: "white",
-                      fontWeight: 600,
-                      px: 3,
-                      py: 1,
-                      fontSize: "0.9rem",
-                      "&:hover": {
-                        backgroundColor: "#d32f2f",
-                        transform: "scale(1.02)",
-                      },
-                      whiteSpace: "nowrap",
-                      borderRadius: 2,
-                      boxShadow: "0 4px 12px rgba(244, 67, 54, 0.3)",
-                    }}
-                  >
-                    {acknowledgingSaving
-                      ? "Bestätige..."
-                      : `🔴 Bestätige Änderungen (${itemsWithChanges.length})`}
-                  </Button>
-                )}
-
                 {selectedRows.size > 0 && isEditable && (
                   <Button
                     variant="outlined"
@@ -2875,6 +2751,9 @@ const ListManagerPage: React.FC = () => {
                         onSelect={handleItemSelect}
                         isSelected={selectedRows.has(item.id)}
                         isEditable={isEditable}
+                        companyName={companyName}
+                        listId={currentListId}
+                        router={router}
                       />
                     ))}
                   </Box>
