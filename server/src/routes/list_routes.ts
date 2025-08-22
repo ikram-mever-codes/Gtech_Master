@@ -20,6 +20,10 @@ import {
   getListsByCompanyName,
   acknowledgeListItemChanges,
   bulkAcknowledgeChanges,
+  // Add the new imports
+  fetchAllListsAndItems,
+  refreshItemsFromMIS,
+  getListItemWithRefresh,
 } from "../controllers/list_controllers";
 import { authenticateUser, AuthorizedRequest } from "../middlewares/authorized";
 import { authenticateCustomer } from "../middlewares/authenticateCustomer";
@@ -76,14 +80,21 @@ router.get("/:customerId/deliveries", authenticateMixed, getCustomerDeliveries);
 router.put(
   "/items/:itemId/acknowledge",
   authenticateMixed,
-  // acknowledgeListItemChanges
-  bulkAcknowledgeChanges
+  acknowledgeListItemChanges
 );
-
 router.put(
   "/:listId/bulk-acknowledge",
   authenticateMixed,
   bulkAcknowledgeChanges
+);
+
+// Add the new routes
+router.get("/admin/all-with-items", authenticateUser, fetchAllListsAndItems);
+router.post("/items/refresh-from-mis", authenticateUser, refreshItemsFromMIS);
+router.get(
+  "/items/:itemId/with-refresh",
+  authenticateMixed,
+  getListItemWithRefresh
 );
 
 // Admin-only routes

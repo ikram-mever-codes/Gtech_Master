@@ -19,6 +19,7 @@ import ErrorHandler from "../utils/errorHandler";
 import { getConnection } from "../config/misDb";
 import { Customer } from "../models/customers";
 import { User } from "../models/users";
+import { In } from "typeorm";
 
 async function fetchItemData(itemId: number) {
   const connection = await getConnection();
@@ -1657,6 +1658,267 @@ export const approveListItemChanges = async (
       success: true,
       message: "Changes approved successfully",
       data: log,
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const fetchAllListsAndItems = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { refreshFromMIS = "true" } = req.query;
+    const shouldRefresh = refreshFromMIS === "true";
+    const userType = (req as any).user?.type || (req as any).customer?.type;
+    const role = getOriginFromUserType(userType);
+
+    const listRepository = AppDataSource.getRepository(List);
+    const listItemRepository = AppDataSource.getRepository(ListItem);
+
+    console.log(
+      `Fetching all lists and items. Refresh from MIS: ${shouldRefresh}`
+    );
+
+    // Fetch all lists with their relationships
+    const lists = await listRepository.find({
+      relations: [
+        "customer",
+        "items",
+        "createdBy.user",
+        "createdBy.customer",
+        "activityLogs",
+      ],
+      order: { createdAt: "DESC" },
+    });
+
+    console.log(`Found ${lists.length} lists`);
+
+    let totalItems = 0;
+    let refreshedItems = 0;
+    let failedRefreshes = 0;
+
+    // Process each list and its items
+    for (const list of lists) {
+      if (list.items && list.items.length > 0) {
+        totalItems += list.items.length;
+        console.log(
+          `Processing list ${list.name} with ${list.items.length} items`
+        );
+
+        if (shouldRefresh) {
+          const updatedItems = [];
+
+          for (const item of list.items) {
+            try {
+              // Refresh item data from MIS
+              const refreshedItem = await updateLocalListItem(item);
+              updatedItems.push(refreshedItem);
+              refreshedItems++;
+
+              // Also update the item in the database
+              await listItemRepository.save(refreshedItem);
+            } catch (error) {
+              console.error(`Failed to refresh item ${item.id}:`, error);
+              updatedItems.push(item); // Keep the original item if refresh fails
+              failedRefreshes++;
+            }
+          }
+
+          list.items = updatedItems;
+
+          // Save the updated list
+          await listRepository.save(list);
+        }
+      }
+    }
+
+    // Enhance lists with role-based change information
+    const listsWithChanges = lists.map((list) => ({
+      ...list,
+      items:
+        list.items?.map((item) => createListItemDTOForRole(item, role)) || [],
+      pendingChangesCount: list.getItemsWithPendingChanges().length,
+      changesNeedingAcknowledgment:
+        list.getChangesForAcknowledgment(role).length,
+    }));
+
+    console.log(
+      `Successfully processed ${lists.length} lists with ${totalItems} items`
+    );
+    if (shouldRefresh) {
+      console.log(
+        `Refreshed ${refreshedItems} items from MIS, ${failedRefreshes} failed`
+      );
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: shouldRefresh
+        ? `Fetched all lists and refreshed ${refreshedItems} items from MIS`
+        : "Fetched all lists with current data",
+      data: {
+        lists: listsWithChanges,
+        statistics: {
+          totalLists: lists.length,
+          totalItems,
+          refreshedItems: shouldRefresh ? refreshedItems : undefined,
+          failedRefreshes: shouldRefresh ? failedRefreshes : undefined,
+          refreshTimestamp: shouldRefresh
+            ? new Date().toISOString()
+            : undefined,
+        },
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching all lists and items:", error);
+    return next(new ErrorHandler("Failed to fetch all lists and items", 500));
+  }
+};
+
+// 21. Refresh Specific Items from MIS
+export const refreshItemsFromMIS = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { itemIds } = req.body;
+
+    if (!itemIds || !Array.isArray(itemIds) || itemIds.length === 0) {
+      return next(new ErrorHandler("Array of item IDs is required", 400));
+    }
+
+    const listItemRepository = AppDataSource.getRepository(ListItem);
+    const listRepository = AppDataSource.getRepository(List);
+
+    console.log(`Refreshing ${itemIds.length} items from MIS`);
+
+    const items = await listItemRepository.find({
+      where: { id: In(itemIds) },
+      relations: ["list"],
+    });
+
+    if (items.length === 0) {
+      return next(
+        new ErrorHandler("No items found with the provided IDs", 404)
+      );
+    }
+
+    let refreshedCount = 0;
+    let failedCount = 0;
+    const refreshedItems = [];
+
+    for (const item of items) {
+      try {
+        const refreshedItem = await updateLocalListItem(item);
+        await listItemRepository.save(refreshedItem);
+        refreshedItems.push(refreshedItem);
+        refreshedCount++;
+
+        // Log the refresh activity
+        if (item.list) {
+          item.list.logActivity(
+            "ITEM_REFRESHED_FROM_MIS",
+            {
+              itemId: item.id,
+              itemName: item.articleName,
+              refreshedAt: new Date(),
+            },
+            "system", // System user
+            "user"
+          );
+          await listRepository.save(item.list);
+        }
+      } catch (error) {
+        console.error(`Failed to refresh item ${item.id}:`, error);
+        failedCount++;
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: `Refreshed ${refreshedCount} items from MIS${
+        failedCount > 0 ? `, ${failedCount} failed` : ""
+      }`,
+      data: {
+        refreshedItems,
+        statistics: {
+          totalRequested: itemIds.length,
+          successfullyRefreshed: refreshedCount,
+          failed: failedCount,
+          refreshTimestamp: new Date().toISOString(),
+        },
+      },
+    });
+  } catch (error) {
+    console.error("Error refreshing items from MIS:", error);
+    return next(new ErrorHandler("Failed to refresh items from MIS", 500));
+  }
+};
+
+// 22. Get List Item with MIS Refresh
+export const getListItemWithRefresh = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { itemId } = req.params;
+    const { refresh = "true" } = req.query;
+    const shouldRefresh = refresh === "true";
+    const userType = (req as any).user?.type || (req as any).customer?.type;
+    const role = getOriginFromUserType(userType);
+
+    if (!itemId) {
+      return next(new ErrorHandler("Item ID is required", 400));
+    }
+
+    const listItemRepository = AppDataSource.getRepository(ListItem);
+
+    const item = await listItemRepository.findOne({
+      where: { id: itemId },
+      relations: ["list", "list.customer"],
+    });
+
+    if (!item) {
+      return next(new ErrorHandler("List item not found", 404));
+    }
+
+    let refreshedItem = item;
+
+    if (shouldRefresh) {
+      try {
+        refreshedItem = await updateLocalListItem(item);
+        await listItemRepository.save(refreshedItem);
+
+        // Log the refresh activity
+        if (refreshedItem.list) {
+          refreshedItem.list.logActivity(
+            "ITEM_REFRESHED_FROM_MIS",
+            {
+              itemId: refreshedItem.id,
+              itemName: refreshedItem.articleName,
+              refreshedAt: new Date(),
+            },
+            "system", // System user
+            "user"
+          );
+          await AppDataSource.getRepository(List).save(refreshedItem.list);
+        }
+      } catch (error) {
+        console.error(`Failed to refresh item ${itemId}:`, error);
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: shouldRefresh
+        ? "Item fetched and refreshed from MIS"
+        : "Item fetched",
+      data: createListItemDTOForRole(refreshedItem, role),
     });
   } catch (error) {
     return next(error);

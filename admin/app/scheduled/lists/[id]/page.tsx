@@ -1460,7 +1460,7 @@ function ActivityLogCard({
 }
 
 // Add Item Dialog Component
-function AddItemDialog({ open, onClose, onAddItem, listId }: any) {
+export function AddItemDialog({ open, onClose, onAddItem, listId }: any) {
   const [items, setItems] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedItem, setSelectedItem] = useState<any>(null);

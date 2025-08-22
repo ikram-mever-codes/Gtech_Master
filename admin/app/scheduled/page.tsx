@@ -52,6 +52,10 @@ import {
   AccordionDetails,
   Stack,
   useTheme,
+  debounce,
+  Stepper,
+  Step,
+  StepLabel,
 } from "@mui/material";
 import {
   ArrowBack,
@@ -102,6 +106,7 @@ import {
   PriorityHigh,
   FilterList,
   Clear,
+  Close,
 } from "@mui/icons-material";
 import { Formik, Form, Field } from "formik";
 import * as Yup from "yup";
@@ -137,11 +142,393 @@ import {
   getCustomerLists,
   bulkAcknowledgeChanges,
   getAllLists,
+  fetchAllListsWithMISRefresh,
+  refreshItemsFromMIS,
 } from "@/api/list";
 import { DELIVERY_STATUS, INTERVAL_OPTIONS } from "@/utils/interfaces";
 import { successStyles } from "@/utils/constants";
 
-// Enhanced FieldHighlight Component for change tracking
+export function AddItemDialog({
+  open,
+  onClose,
+  onAddItem,
+  customers,
+  lists,
+  onRefresh,
+}: any) {
+  const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
+  const [selectedList, setSelectedList] = useState<any>(null);
+  const [selectedItem, setSelectedItem] = useState<any>(null);
+  const [items, setItems] = useState<any[]>([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [saving, setSaving] = useState<any>(false);
+
+  useEffect(() => {
+    if (!open) {
+      setSelectedCustomer(null);
+      setSelectedList(null);
+      setSelectedItem(null);
+      setItems([]);
+      setSearchTerm("");
+    }
+  }, [open]);
+
+  const availableLists = React.useMemo(() => {
+    if (!selectedCustomer) return [];
+    return lists.filter((list: any) => list.customerId === selectedCustomer.id);
+  }, [lists, selectedCustomer]);
+
+  // Debounced search for items
+  const debouncedSearch = useCallback(
+    debounce(async (query: string) => {
+      if (!query.trim()) {
+        setItems([]);
+        return;
+      }
+
+      setSearchLoading(true);
+      try {
+        const response = await searchItems(query);
+        setItems(response || []);
+      } catch (error) {
+        console.error("Search failed:", error);
+        setItems([]);
+        toast.error("Failed to search items");
+      } finally {
+        setSearchLoading(false);
+      }
+    }, 300),
+    []
+  );
+
+  useEffect(() => {
+    debouncedSearch(searchTerm);
+  }, [searchTerm, debouncedSearch]);
+
+  const handleAddItem = async () => {
+    if (!selectedItem || !selectedList || !selectedCustomer) {
+      toast.error("Please complete all fields");
+      return;
+    }
+
+    try {
+      setSaving(true);
+
+      const itemData = {
+        productId: selectedItem.id.toString(),
+        quantity: 1,
+        notes: "",
+        productName: selectedItem.name || "Unknown Item",
+        sku: selectedItem.articleNumber || "",
+        category: "",
+        price: 0,
+        supplier: "",
+        itemId: selectedItem.id.toString(),
+        listId: selectedList.id,
+        customerId: selectedCustomer.id,
+        imageUrl: selectedItem.imageUrl || "",
+      };
+
+      const response = await addItemToList(selectedList.id, itemData);
+
+      if (onRefresh) {
+        await onRefresh();
+      }
+
+      onClose();
+    } catch (error) {
+      console.error("Failed to add item:", error);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      maxWidth="md"
+      fullWidth
+      PaperProps={{
+        sx: {
+          borderRadius: 3,
+          boxShadow: "0 20px 40px rgba(0, 0, 0, 0.1)",
+        },
+      }}
+    >
+      <DialogTitle>
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+            <ShoppingCart sx={{ color: "primary.main" }} />
+            <Typography variant="h6" fontWeight={600}>
+              Add Item to List
+            </Typography>
+          </Box>
+          <IconButton onClick={onClose} size="small">
+            <Close fontSize="small" />
+          </IconButton>
+        </Box>
+      </DialogTitle>
+
+      <DialogContent sx={{ p: 3 }}>
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
+          {/* Customer Selection */}
+          <FormControl fullWidth>
+            <InputLabel>Select Customer</InputLabel>
+            <Select
+              value={selectedCustomer?.id || ""}
+              onChange={(e) => {
+                const customer = customers.find(
+                  (c: any) => c.id === e.target.value
+                );
+                setSelectedCustomer(customer);
+                setSelectedList(null);
+              }}
+              label="Select Customer"
+            >
+              {customers.map((customer: any) => (
+                <MenuItem key={customer.id} value={customer.id}>
+                  {customer.name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          {/* List Selection */}
+          <FormControl fullWidth disabled={!selectedCustomer}>
+            <InputLabel>Select List</InputLabel>
+            <Select
+              value={selectedList?.id || ""}
+              onChange={(e) => {
+                const list = availableLists.find(
+                  (l: any) => l.id === e.target.value
+                );
+                setSelectedList(list);
+              }}
+              label="Select List"
+            >
+              {availableLists.map((list: any) => (
+                <MenuItem key={list.id} value={list.id}>
+                  {list.name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          {availableLists.length === 0 && selectedCustomer && (
+            <Alert severity="warning">
+              No lists found for the selected customer.
+            </Alert>
+          )}
+
+          {/* Item Search */}
+          <Autocomplete
+            options={items}
+            getOptionLabel={(option) => option.name || ""}
+            value={selectedItem}
+            onChange={(_, newValue) => setSelectedItem(newValue)}
+            inputValue={searchTerm}
+            onInputChange={(_, newInputValue) => setSearchTerm(newInputValue)}
+            loading={searchLoading}
+            filterOptions={(x) => x}
+            clearOnBlur={false}
+            clearOnEscape={false}
+            disabled={!selectedList}
+            renderOption={(props, option) => (
+              <Box
+                component="li"
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 2,
+                  p: 2,
+                  cursor: "pointer",
+                  "&:hover": {
+                    backgroundColor: alpha(theme.palette.primary.main, 0.05),
+                  },
+                }}
+                onClick={() => {
+                  setSelectedItem(option);
+                  setItems([]);
+                }}
+              >
+                <Box
+                  sx={{
+                    width: 50,
+                    height: 50,
+                    borderRadius: 1,
+                    overflow: "hidden",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    backgroundColor: alpha("#f5f5f5", 0.5),
+                    border: "1px solid #e0e0e0",
+                  }}
+                >
+                  {option.imageUrl ? (
+                    <img
+                      src={`https://system.gtech.de/storage/${option.imageUrl}`}
+                      alt={option.name}
+                      style={{
+                        width: "100%",
+                        height: "100%",
+                        objectFit: "cover",
+                      }}
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = "none";
+                      }}
+                    />
+                  ) : (
+                    <ImageIcon size={20} />
+                  )}
+                </Box>
+
+                <Box sx={{ flex: 1 }}>
+                  <Typography variant="body1" fontWeight={500}>
+                    {option.name}
+                  </Typography>
+                  {option.articleNumber && (
+                    <Typography variant="caption" color="text.secondary">
+                      {option.articleNumber}
+                    </Typography>
+                  )}
+                </Box>
+              </Box>
+            )}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                placeholder="Search items by name..."
+                variant="outlined"
+                label="Search Items"
+                InputProps={{
+                  ...params.InputProps,
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Search sx={{ color: "primary.main" }} />
+                    </InputAdornment>
+                  ),
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      {searchLoading && <CircularProgress size={20} />}
+                      {params.InputProps.endAdornment}
+                    </InputAdornment>
+                  ),
+                }}
+              />
+            )}
+            ListboxProps={{
+              sx: {
+                maxHeight: 300,
+                "& .MuiAutocomplete-option": {
+                  padding: 0,
+                },
+              },
+            }}
+          />
+
+          {/* Selected Item Preview */}
+          {selectedItem && (
+            <Card
+              sx={{
+                p: 2,
+                bgcolor: alpha(theme.palette.success.main, 0.05),
+                border: `1px solid ${alpha(theme.palette.success.main, 0.2)}`,
+              }}
+            >
+              <Box sx={{ display: "flex", gap: 2, alignItems: "center" }}>
+                <Box
+                  sx={{
+                    width: 80,
+                    height: 80,
+                    borderRadius: 2,
+                    overflow: "hidden",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    backgroundColor: "white",
+                    border: "1px solid #e0e0e0",
+                  }}
+                >
+                  {selectedItem.imageUrl ? (
+                    <img
+                      src={`https://system.gtech.de/storage/${selectedItem.imageUrl}`}
+                      alt={selectedItem.name}
+                      style={{
+                        width: "100%",
+                        height: "100%",
+                        objectFit: "cover",
+                      }}
+                    />
+                  ) : (
+                    <ImageIcon size={32} />
+                  )}
+                </Box>
+                <Box sx={{ flex: 1 }}>
+                  <Typography variant="h6" fontWeight={600}>
+                    {selectedItem.name}
+                  </Typography>
+                  {selectedItem.articleNumber && (
+                    <Typography variant="body2" color="text.secondary">
+                      {selectedItem.articleNumber}
+                    </Typography>
+                  )}
+                  <Typography
+                    variant="caption"
+                    color="success.main"
+                    fontWeight={500}
+                  >
+                    Ready to add to: {selectedList?.name}
+                  </Typography>
+                </Box>
+              </Box>
+            </Card>
+          )}
+
+          {!searchTerm && selectedList && (
+            <Box
+              sx={{
+                textAlign: "center",
+                py: 3,
+                px: 2,
+                borderRadius: 2,
+                border: "2px dashed #e0e0e0",
+                bgcolor: "#fafafa",
+              }}
+            >
+              <Search sx={{ fontSize: 32, color: "text.disabled", mb: 1 }} />
+              <Typography variant="body2" color="text.secondary">
+                Start typing to search for items
+              </Typography>
+            </Box>
+          )}
+        </Box>
+      </DialogContent>
+
+      <DialogActions sx={{ p: 3, gap: 2 }}>
+        <CustomButton variant="outlined" onClick={onClose}>
+          Cancel
+        </CustomButton>
+        <CustomButton
+          variant="contained"
+          onClick={handleAddItem}
+          disabled={!selectedItem || !selectedList || !selectedCustomer}
+          loading={saving}
+        >
+          Add Item
+        </CustomButton>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
 const FieldHighlight = ({
   hasChanges,
   fieldName,
@@ -849,6 +1236,8 @@ const AdminAllItemsPage = () => {
   const [saving, setSaving] = useState(false);
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   const [searchTerm, setSearchTerm] = useState("");
+  const [addItemDialog, setAddItemDialog] = useState(false);
+  const [showOnlyChanges, setShowOnlyChanges] = useState(false);
 
   // Filter states
   const [selectedCustomer, setSelectedCustomer] = useState<string>("");
@@ -870,77 +1259,82 @@ const AdminAllItemsPage = () => {
     if (!allItems.length) return { sortedPeriods: [], cargoNumbers: [] };
     return extractDeliveryPeriods(allItems);
   }, [allItems]);
+  const loadAllItems = async () => {
+    try {
+      setLoading(true);
+      const response = await getAllLists();
 
-  // Load all items from all lists
-  useEffect(() => {
-    const loadAllItems = async () => {
-      try {
-        setLoading(true);
-        const response = await getAllLists();
+      if (response && response.length > 0) {
+        // Extract all items from all lists and add company/list info
+        const allCombinedItems: any[] = [];
+        const uniqueCustomers: any[] = [];
+        const allListsData: any[] = [];
 
-        if (response && response.length > 0) {
-          // Extract all items from all lists and add company/list info
-          const allCombinedItems: any[] = [];
-          const uniqueCustomers: any[] = [];
-          const allListsData: any[] = [];
-
-          response.forEach((list: any) => {
-            // Add list to lists array
-            allListsData.push({
-              id: list.id,
-              name: list.name,
-              customerId: list.customer?.id,
-              customerName:
-                list.customer?.companyName || list.customer?.legalName,
-            });
-
-            // Add customer to customers array if not exists
-            if (
-              list.customer &&
-              !uniqueCustomers.find((c) => c.id === list.customer.id)
-            ) {
-              uniqueCustomers.push({
-                id: list.customer.id,
-                name: list.customer.companyName || list.customer.legalName,
-                email: list.customer.email,
-              });
-            }
-
-            // Process each item in the list
-            if (list.items && list.items.length > 0) {
-              list.items.forEach((item: any) => {
-                allCombinedItems.push({
-                  ...item,
-                  // Add company/list information
-                  companyName:
-                    list.customer?.companyName ||
-                    list.customer?.legalName ||
-                    "Unknown Company",
-                  listName: list.name || "Unknown List",
-                  listId: list.id,
-                  customerId: list.customer?.id,
-                  // Add change tracking properties
-                  changesNeedAcknowledgment:
-                    item.changesNeedAcknowledgment || false,
-                  hasChanges: item.hasChanges || false,
-                  shouldHighlight: item.shouldHighlight || false,
-                  changedFields: item.changedFields || [],
-                });
-              });
-            }
+        response.forEach((list: any) => {
+          // Add list to lists array
+          allListsData.push({
+            id: list.id,
+            name: list.name,
+            customerId: list.customer?.id,
+            customerName:
+              list.customer?.companyName || list.customer?.legalName,
           });
 
-          setAllItems(allCombinedItems);
-          setCustomers(uniqueCustomers);
-          setLists(allListsData);
-        }
-      } catch (error) {
-        console.error("Failed to load all items:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
+          // Add customer to customers array if not exists
+          if (
+            list.customer &&
+            !uniqueCustomers.find((c) => c.id === list.customer.id)
+          ) {
+            uniqueCustomers.push({
+              id: list.customer.id,
+              name: list.customer.companyName || list.customer.legalName,
+              email: list.customer.email,
+            });
+          }
 
+          // Process each item in the list
+          if (list.items && list.items.length > 0) {
+            list.items.forEach((item: any) => {
+              allCombinedItems.push({
+                ...item,
+                // Add company/list information
+                companyName:
+                  list.customer?.companyName ||
+                  list.customer?.legalName ||
+                  "Unknown Company",
+                listName: list.name || "Unknown List",
+                listId: list.id,
+                customerId: list.customer?.id,
+                // Add change tracking properties
+                changesNeedAcknowledgment:
+                  item.changesNeedAcknowledgment || false,
+                hasChanges: item.hasChanges || false,
+                shouldHighlight: item.shouldHighlight || false,
+                changedFields: item.changedFields || [],
+              });
+            });
+          }
+        });
+
+        setAllItems(allCombinedItems);
+        setCustomers(uniqueCustomers);
+        setLists(allListsData);
+      }
+    } catch (error) {
+      console.error("Failed to load all items:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRefetchItemData = async () => {
+    const data = await fetchAllListsWithMISRefresh(true);
+    if (data.success) {
+      await loadAllItems();
+    }
+  };
+  // Load all items from all lists
+  useEffect(() => {
     loadAllItems();
   }, []);
 
@@ -1051,8 +1445,18 @@ const AdminAllItemsPage = () => {
       filtered = filtered.filter((item: any) => item.listId === selectedList);
     }
 
+    // Filter by changes only
+    if (showOnlyChanges) {
+      filtered = filtered.filter(
+        (item: any) =>
+          item.changesNeedAcknowledgment ||
+          item.hasChanges ||
+          item.shouldHighlight
+      );
+    }
+
     return filtered;
-  }, [allItems, searchTerm, selectedCustomer, selectedList]);
+  }, [allItems, searchTerm, selectedCustomer, selectedList, showOnlyChanges]);
 
   // Get available lists for selected customer
   const availableLists = useMemo(() => {
@@ -1333,48 +1737,48 @@ const AdminAllItemsPage = () => {
     });
 
     const endColumns = [
-      {
-        key: "changeStatus",
-        name: "Status",
-        width: 150,
-        resizable: true,
-        renderCell: (props: any) => {
-          const getStatusColor = (status: string) => {
-            switch (status?.toLowerCase()) {
-              case "confirmed":
-                return "success";
-              case "pending":
-                return "warning";
-              case "rejected":
-                return "error";
-              default:
-                return "default";
-            }
-          };
+      // {
+      //   key: "changeStatus",
+      //   name: "Status",
+      //   width: 150,
+      //   resizable: true,
+      //   renderCell: (props: any) => {
+      //     const getStatusColor = (status: string) => {
+      //       switch (status?.toLowerCase()) {
+      //         case "confirmed":
+      //           return "success";
+      //         case "pending":
+      //           return "warning";
+      //         case "rejected":
+      //           return "error";
+      //         default:
+      //           return "default";
+      //       }
+      //     };
 
-          const getStatusLabel = (status: string) => {
-            switch (status?.toLowerCase()) {
-              case "confirmed":
-                return "Confirmed";
-              case "pending":
-                return "Pending";
-              case "rejected":
-                return "Rejected";
-              default:
-                return "Pending";
-            }
-          };
+      //     const getStatusLabel = (status: string) => {
+      //       switch (status?.toLowerCase()) {
+      //         case "confirmed":
+      //           return "Confirmed";
+      //         case "pending":
+      //           return "Pending";
+      //         case "rejected":
+      //           return "Rejected";
+      //         default:
+      //           return "Pending";
+      //       }
+      //     };
 
-          return (
-            <Chip
-              label={getStatusLabel(props.row.changeStatus)}
-              size="small"
-              color={getStatusColor(props.row.changeStatus)}
-              sx={{ minWidth: 100, borderRadius: "10px" }}
-            />
-          );
-        },
-      },
+      //     return (
+      //       <Chip
+      //         label={getStatusLabel(props.row.changeStatus)}
+      //         size="small"
+      //         color={getStatusColor(props.row.changeStatus)}
+      //         sx={{ minWidth: 100, borderRadius: "10px" }}
+      //       />
+      //     );
+      //   },
+      // },
       {
         key: "comment",
         name: "Comment",
@@ -1415,7 +1819,7 @@ const AdminAllItemsPage = () => {
 
   return (
     <Box sx={{ width: "100%", py: 3, px: 0, pt: 0 }}>
-      <Box sx={{ maxWidth: "85vw", mx: "auto" }}>
+      <Box sx={{ maxWidth: "90vw", mx: "auto" }}>
         {/* Header */}
         <Box
           sx={{
@@ -1545,8 +1949,8 @@ const AdminAllItemsPage = () => {
             </Box>
 
             <Grid container spacing={3} alignItems="center">
-              <Grid item xs={12} sm={4} sx={{ width: "200px" }}>
-                <FormControl fullWidth size="small">
+              <Grid item xs={12} sm={3}>
+                <FormControl fullWidth size="small" sx={{ width: "200px" }}>
                   <InputLabel>Filter by Customer</InputLabel>
                   <Select
                     value={selectedCustomer}
@@ -1568,7 +1972,8 @@ const AdminAllItemsPage = () => {
                 </FormControl>
               </Grid>
 
-              <Grid item xs={12} sm={4}>
+              <Grid item xs={12} sm={3}>
+                {" "}
                 <FormControl fullWidth size="small" sx={{ width: "200px" }}>
                   <InputLabel>Filter by List</InputLabel>
                   <Select
@@ -1589,8 +1994,42 @@ const AdminAllItemsPage = () => {
                 </FormControl>
               </Grid>
 
-              <Grid item xs={12} sm={4}>
-                <Box sx={{ display: "flex", gap: 1 }}>
+              <Grid item xs={12} sm={3}>
+                <FormControl fullWidth size="small" sx={{ width: "250px" }}>
+                  <InputLabel>Show Items</InputLabel>
+                  <Select
+                    value={showOnlyChanges ? "changes" : "all"}
+                    onChange={(e) =>
+                      setShowOnlyChanges(e.target.value === "changes")
+                    }
+                    label="Show Items"
+                  >
+                    <MenuItem value="all">All Items</MenuItem>
+                    <MenuItem value="changes">
+                      <Box
+                        sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                      >
+                        <Warning
+                          fontSize="small"
+                          sx={{ color: "warning.main" }}
+                        />
+                        Items with Changes
+                        {itemsWithChanges.length > 0 && (
+                          <Chip
+                            label={itemsWithChanges.length}
+                            size="small"
+                            color="warning"
+                            sx={{ ml: 1 }}
+                          />
+                        )}
+                      </Box>
+                    </MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+
+              <Grid item xs={12} sm={3}>
+                <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
                   <Button
                     variant="outlined"
                     startIcon={<Clear />}
@@ -1598,6 +2037,7 @@ const AdminAllItemsPage = () => {
                       setSelectedCustomer("");
                       setSelectedList("");
                       setSearchTerm("");
+                      setShowOnlyChanges(false);
                     }}
                     size="small"
                   >
@@ -1661,9 +2101,23 @@ const AdminAllItemsPage = () => {
                     Delete ({selectedRows.size})
                   </CustomButton>
                 )}
+                <CustomButton
+                  variant="contained"
+                  startIcon={<Add />}
+                  onClick={() => setAddItemDialog(true)}
+                >
+                  Add Item
+                </CustomButton>
               </Box>
 
               <Box sx={{ display: "flex", gap: 1.5 }}>
+                <CustomButton
+                  variant="contained"
+                  startIcon={<Refresh />}
+                  onClick={async () => await handleRefetchItemData()}
+                >
+                  Refetch Item Data
+                </CustomButton>
                 <CustomButton
                   variant="outlined"
                   startIcon={<Refresh />}
@@ -1809,6 +2263,13 @@ const AdminAllItemsPage = () => {
           </Box>
         </Card>
       </Box>
+      <AddItemDialog
+        open={addItemDialog}
+        onClose={() => setAddItemDialog(false)}
+        customers={customers}
+        lists={lists}
+        onRefresh={loadAllItems}
+      />
     </Box>
   );
 };

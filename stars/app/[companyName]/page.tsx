@@ -702,6 +702,7 @@ function ListTabs({
   onListNameUpdate,
   loading,
   isEditable,
+  router,
 }: any) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
@@ -710,7 +711,10 @@ function ListTabs({
   const [saving, setSaving] = useState(false);
 
   const handleEditStart = (listId: string, currentName: string) => {
-    if (!isEditable) return;
+    if (!isEditable) {
+      router.push("/login");
+      return;
+    }
     setEditingListId(listId);
     setEditingName(currentName);
   };
@@ -817,7 +821,20 @@ function ListTabs({
                       color: isActive ? "white" : "primary.main",
                     }}
                   >
-                    <Package size={18} />
+                    <IconButton
+                      size="small"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleEditStart(list.id, list.name);
+                      }}
+                      sx={{
+                        p: 0.3,
+                        opacity: 0.7,
+                        "&:hover": { opacity: 1 },
+                      }}
+                    >
+                      <Edit fontSize="small" />
+                    </IconButton>
                   </Avatar>
 
                   <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -888,22 +905,6 @@ function ListTabs({
                           >
                             {list.name}
                           </Typography>
-                          {isEditable && (
-                            <IconButton
-                              size="small"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleEditStart(list.id, list.name);
-                              }}
-                              sx={{
-                                p: 0.3,
-                                opacity: 0.7,
-                                "&:hover": { opacity: 1 },
-                              }}
-                            >
-                              <Edit fontSize="small" />
-                            </IconButton>
-                          )}
                         </Box>
                         <Typography variant="caption" color="text.secondary">
                           {list.items?.length || 0} items
@@ -1730,12 +1731,9 @@ const ListManagerPage: React.FC = () => {
       );
       setAllLists(updatedLists);
 
-      // Update current list if it's the one being edited
       if (currentListId === listId) {
         setCurrentList((prev) => (prev ? { ...prev, name: newName } : null));
       }
-
-      toast.success("List name updated successfully!", successStyles);
     } catch (error) {
       console.error("Failed to update list name:", error);
       toast.error("Failed to update list name", errorStyles);
@@ -1788,10 +1786,12 @@ const ListManagerPage: React.FC = () => {
 
     try {
       setSaving(true);
-      // Here you would typically call an API to update the company name
-      // For now, we'll just update the local state
+      const formData = new FormData();
+
+      formData.append("companyName", editedCompanyName);
+      const data = await updateCustomerProfile(formData, dispatch);
+      router.push(`/${editedCompanyName}`);
       setIsEditingCompanyName(false);
-      toast.success("Company name updated successfully!", successStyles);
     } catch (error) {
       console.error("Failed to update company name:", error);
       toast.error("Failed to update company name", errorStyles);
@@ -2495,7 +2495,7 @@ const ListManagerPage: React.FC = () => {
                       </div>
 
                       {/* Dropdown Menu */}
-                      <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-md shadow-lg border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                      <div className="absolute right-0 top-full mt-1 w-48  bg-white rounded-md shadow-lg border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-[100000]">
                         <div className="p-3 border-b border-gray-100">
                           <div className="flex items-center gap-2 mb-2">
                             <div>
@@ -2554,6 +2554,7 @@ const ListManagerPage: React.FC = () => {
               onListChange={handleListChange}
               onListNameUpdate={handleListNameUpdate}
               loading={isLoading}
+              router={router}
               isEditable={isEditable}
             />
           </Box>
@@ -2602,7 +2603,7 @@ const ListManagerPage: React.FC = () => {
               direction={{ xs: "column", sm: "row" }}
               spacing={2}
               alignItems={{ xs: "stretch", sm: "center" }}
-              justifyContent="space-between"
+              justifyContent="flex-start"
               sx={{ mb: 3 }}
             >
               <Box
@@ -2632,8 +2633,9 @@ const ListManagerPage: React.FC = () => {
                         theme.palette.background.paper,
                         0.8
                       ),
+                      outline: "none",
+                      border: "none",
                       borderRadius: 1,
-                      border: `1px solid ${alpha("#E2E8F0", 0.8)}`,
                       "&:hover": {
                         borderColor: alpha(theme.palette.primary.main, 0.3),
                       },

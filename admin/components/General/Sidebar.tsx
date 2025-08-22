@@ -67,7 +67,7 @@ const allMenuItems = [
   {
     icon: Timer,
     text: "Scheduled Items",
-    path: "/scheduled/lists",
+    path: "/scheduled",
     resource: "Users",
   },
   {

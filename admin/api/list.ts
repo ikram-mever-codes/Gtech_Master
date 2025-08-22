@@ -102,6 +102,7 @@ export const addItemToList = async (
   itemData: ListItemPayload
 ) => {
   try {
+    console.log(itemData);
     toast.loading("Adding item...", loadingStyles);
     const response = await api.post(`/lists/${listId}/items`, itemData);
     toast.dismiss();
@@ -288,6 +289,64 @@ export const bulkAcknowledgeChanges = async (
     return response.data;
   } catch (error) {
     handleApiError(error, "Bulk acknowledgment failed");
+    throw error;
+  }
+};
+
+export const fetchAllListsWithMISRefresh = async (
+  refreshFromMIS: boolean = true
+) => {
+  try {
+    toast.loading("Fetching all lists...", loadingStyles);
+    const response = await api.get(
+      `/lists/admin/all-with-items?refreshFromMIS=${refreshFromMIS}`
+    );
+    toast.dismiss();
+    if (refreshFromMIS) {
+      toast.success("Lists fetched and refreshed from MIS", successStyles);
+    } else {
+      toast.success("Lists fetched successfully", successStyles);
+    }
+    return response.data;
+  } catch (error) {
+    handleApiError(error, "Failed to fetch lists");
+    throw error;
+  }
+};
+
+export const refreshItemsFromMIS = async (itemIds: string[]) => {
+  try {
+    toast.loading("Refreshing items from MIS...", loadingStyles);
+    const response = await api.post("/lists/items/refresh-from-mis", {
+      itemIds,
+    });
+    toast.dismiss();
+    toast.success("Items refreshed from MIS", successStyles);
+    return response.data;
+  } catch (error) {
+    handleApiError(error, "Failed to refresh items from MIS");
+    throw error;
+  }
+};
+
+export const getListItemWithMISRefresh = async (
+  itemId: string,
+  refresh: boolean = true
+) => {
+  try {
+    if (refresh) {
+      toast.loading("Refreshing item data...", loadingStyles);
+    }
+    const response = await api.get(
+      `/lists/items/${itemId}/with-refresh?refresh=${refresh}`
+    );
+    toast.dismiss();
+    if (refresh) {
+      toast.success("Item data refreshed", successStyles);
+    }
+    return response.data;
+  } catch (error) {
+    handleApiError(error, "Failed to fetch item");
     throw error;
   }
 };
