@@ -144,6 +144,7 @@ import {
   getAllLists,
   fetchAllListsWithMISRefresh,
   refreshItemsFromMIS,
+  acknowledgeItemChanges,
 } from "@/api/list";
 import { DELIVERY_STATUS, INTERVAL_OPTIONS } from "@/utils/interfaces";
 import { successStyles } from "@/utils/constants";
@@ -629,6 +630,215 @@ function TabPanel(props: TabPanelProps) {
     >
       {value === index && <Box sx={{ py: 3 }}>{children}</Box>}
     </div>
+  );
+}
+
+// Activity Log Card Component
+function ActivityLogCard({ log, customerName, listName }: any) {
+  const getActionIcon = (action: string) => {
+    switch (action.toLowerCase()) {
+      case "item_added":
+      case "add":
+        return <Add sx={{ color: "success.main", fontSize: 18 }} />;
+      case "item_updated":
+      case "update":
+        return <Edit sx={{ color: "info.main", fontSize: 18 }} />;
+      case "item_deleted":
+      case "delete":
+        return <Delete sx={{ color: "error.main", fontSize: 18 }} />;
+      case "comment_added":
+        return <FileText />;
+      case "quantity_changed":
+        return <Inventory sx={{ color: "warning.main", fontSize: 18 }} />;
+      case "status_changed":
+        return <Timeline sx={{ color: "info.main", fontSize: 18 }} />;
+      default:
+        return <History sx={{ color: "text.secondary", fontSize: 18 }} />;
+    }
+  };
+
+  const getActionColor = (action: string) => {
+    switch (action.toLowerCase()) {
+      case "item_added":
+      case "add":
+        return "success";
+      case "item_updated":
+      case "update":
+        return "info";
+      case "item_deleted":
+      case "delete":
+        return "error";
+      case "comment_added":
+        return "primary";
+      case "quantity_changed":
+        return "warning";
+      case "status_changed":
+        return "info";
+      default:
+        return "default";
+    }
+  };
+
+  const formatActionDescription = () => {
+    const { action, changes, performedByType } = log;
+    const userType = performedByType === "user" ? "Admin" : "Customer";
+
+    if (changes) {
+      const changeKeys = Object.keys(changes);
+      if (changeKeys.length > 0) {
+        const mainChange = changeKeys[0];
+        const changeData = changes[mainChange];
+
+        switch (action) {
+          case "item_updated":
+            if (changeData.from !== undefined && changeData.to !== undefined) {
+              return `${userType} changed ${mainChange} from "${changeData.from}" to "${changeData.to}"`;
+            }
+            return `${userType} updated ${mainChange}`;
+          case "comment_added":
+            return `${userType} added a comment: "${
+              changeData.to || changeData
+            }"`;
+          case "quantity_changed":
+            return `${userType} changed quantity from ${changeData.from} to ${changeData.to}`;
+          case "status_changed":
+            return `${userType} changed status from ${changeData.from} to ${changeData.to}`;
+          default:
+            return `${userType} performed ${action.replace("_", " ")}`;
+        }
+      }
+    }
+
+    return `${userType} performed ${action.replace("_", " ")}`;
+  };
+
+  const getApprovalStatus = () => {
+    switch (log.approvalStatus) {
+      case "approved":
+        return { color: "success", label: "Approved", icon: <CheckCircle /> };
+      case "rejected":
+        return { color: "error", label: "Rejected", icon: <Cancel /> };
+      default:
+        return { color: "warning", label: "Pending", icon: <HourglassEmpty /> };
+    }
+  };
+
+  const approvalStatus = getApprovalStatus();
+
+  return (
+    <Card
+      sx={{
+        mb: 2,
+        borderRadius: 2,
+        border: "1px solid",
+        borderColor: alpha("#E2E8F0", 0.8),
+        transition: "all 0.2s ease",
+        "&:hover": {
+          borderColor: alpha(theme.palette.primary.main, 0.3),
+          boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
+          transform: "translateY(-1px)",
+        },
+      }}
+    >
+      <CardContent sx={{ p: 2.5 }}>
+        <Box sx={{ display: "flex", alignItems: "flex-start", gap: 2 }}>
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: 40,
+              height: 40,
+              borderRadius: "50%",
+              bgcolor: alpha(
+                theme.palette[getActionColor(log.action)]?.main ||
+                  theme.palette.grey[500],
+                0.1
+              ),
+              flexShrink: 0,
+            }}
+          >
+            {getActionIcon(log.action)}
+          </Box>
+
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
+              <Typography
+                variant="body1"
+                fontWeight={600}
+                sx={{ fontSize: "0.95rem" }}
+              >
+                {formatActionDescription()}
+              </Typography>
+              <Chip
+                size="small"
+                color={approvalStatus.color as any}
+                variant="outlined"
+                icon={React.cloneElement(approvalStatus.icon, {
+                  fontSize: "small",
+                })}
+                label={approvalStatus.label}
+                sx={{ ml: "auto", fontSize: "0.7rem" }}
+              />
+            </Box>
+
+            <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 1 }}>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                <Business sx={{ fontSize: 14, color: "text.secondary" }} />
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  fontWeight={500}
+                >
+                  {customerName}
+                </Typography>
+              </Box>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                <Assignment sx={{ fontSize: 14, color: "text.secondary" }} />
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  fontWeight={500}
+                >
+                  {listName}
+                </Typography>
+              </Box>
+            </Box>
+
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+              }}
+            >
+              <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                <AccessTime sx={{ fontSize: 14, color: "text.secondary" }} />
+                <Typography variant="caption" color="text.secondary">
+                  {new Date(log.performedAt).toLocaleString()}
+                </Typography>
+              </Box>
+
+              {log.performedByType && (
+                <Chip
+                  size="small"
+                  variant="filled"
+                  color={
+                    log.performedByType === "user" ? "primary" : "secondary"
+                  }
+                  label={log.performedByType === "user" ? "Admin" : "Customer"}
+                  sx={{
+                    fontSize: "0.65rem",
+                    height: 20,
+                    "& .MuiChip-label": { px: 1 },
+                  }}
+                />
+              )}
+            </Box>
+          </Box>
+        </Box>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -1232,6 +1442,7 @@ const AdminAllItemsPage = () => {
 
   // State management
   const [allItems, setAllItems] = useState<any[]>([]);
+  const [allActivityLogs, setAllActivityLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
@@ -1239,6 +1450,7 @@ const AdminAllItemsPage = () => {
   const [addItemDialog, setAddItemDialog] = useState(false);
   const [showOnlyChanges, setShowOnlyChanges] = useState(false);
   const [bulkAcknowledging, setBulkAcknowledging] = useState(false);
+  const [currentTab, setCurrentTab] = useState(0);
 
   // Filter states
   const [selectedCustomer, setSelectedCustomer] = useState<string>("");
@@ -1248,18 +1460,49 @@ const AdminAllItemsPage = () => {
 
   // Count items with unacknowledged changes
   const itemsWithChanges = useMemo(() => {
-    return allItems.filter(
-      (item: any) =>
-        item.changesNeedAcknowledgment ||
-        item.hasChanges ||
-        item.shouldHighlight
-    );
+    return allItems.filter((item: any) => item.hasChanges);
   }, [allItems]);
 
   const deliveryPeriodsData = useMemo(() => {
     if (!allItems.length) return { sortedPeriods: [], cargoNumbers: [] };
     return extractDeliveryPeriods(allItems);
   }, [allItems]);
+
+  // Filter activity logs based on current filters
+  const filteredActivityLogs = useMemo(() => {
+    let filtered = allActivityLogs;
+
+    // Filter by customer
+    if (selectedCustomer) {
+      filtered = filtered.filter(
+        (log: any) => log.customerId === selectedCustomer
+      );
+    }
+
+    // Filter by list
+    if (selectedList) {
+      filtered = filtered.filter((log: any) => log.listId === selectedList);
+    }
+
+    // Filter by search term
+    if (searchTerm) {
+      filtered = filtered.filter(
+        (log: any) =>
+          log.action?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          log.customerName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          log.listName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          JSON.stringify(log.changes)
+            ?.toLowerCase()
+            .includes(searchTerm.toLowerCase())
+      );
+    }
+
+    // Sort by most recent first
+    return filtered.sort(
+      (a: any, b: any) =>
+        new Date(b.performedAt).getTime() - new Date(a.performedAt).getTime()
+    );
+  }, [allActivityLogs, selectedCustomer, selectedList, searchTerm]);
 
   const loadAllItems = async () => {
     try {
@@ -1269,6 +1512,7 @@ const AdminAllItemsPage = () => {
       if (response && response.length > 0) {
         // Extract all items from all lists and add company/list info
         const allCombinedItems: any[] = [];
+        const allCombinedActivityLogs: any[] = [];
         const uniqueCustomers: any[] = [];
         const allListsData: any[] = [];
 
@@ -1291,6 +1535,22 @@ const AdminAllItemsPage = () => {
               id: list.customer.id,
               name: list.customer.companyName || list.customer.legalName,
               email: list.customer.email,
+            });
+          }
+
+          // Process activity logs for this list
+          if (list.activityLogs && list.activityLogs.length > 0) {
+            list.activityLogs.forEach((log: any) => {
+              allCombinedActivityLogs.push({
+                ...log,
+                customerId: list.customer?.id,
+                listId: list.id,
+                customerName:
+                  list.customer?.companyName ||
+                  list.customer?.legalName ||
+                  "Unknown Company",
+                listName: list.name || "Unknown List",
+              });
             });
           }
 
@@ -1319,6 +1579,7 @@ const AdminAllItemsPage = () => {
         });
 
         setAllItems(allCombinedItems);
+        setAllActivityLogs(allCombinedActivityLogs);
         setCustomers(uniqueCustomers);
         setLists(allListsData);
       }
@@ -1358,44 +1619,12 @@ const AdminAllItemsPage = () => {
       await bulkAcknowledgeChanges(itemIdsWithChanges);
 
       await loadAllItems();
-
-      toast.success(
-        `Successfully acknowledged changes for ${itemsWithChanges.length} items!`,
-        successStyles
-      );
     } catch (error) {
       console.error("Failed to bulk acknowledge changes:", error);
       toast.error("Failed to acknowledge changes. Please try again.");
     } finally {
       setBulkAcknowledging(false);
     }
-  };
-
-  // Handle individual item acknowledge
-  const handleAcknowledgeItem = async (itemId: any) => {
-    // try {
-    //   // Call the acknowledge API for single item
-    //   await bulkAcknowledgeChanges([itemId);
-    //   // Update local state
-    //   setAllItems((prevItems) =>
-    //     prevItems.map((item) => {
-    //       if (item.id === itemId) {
-    //         return {
-    //           ...item,
-    //           changesNeedAcknowledgment: false,
-    //           hasChanges: false,
-    //           shouldHighlight: false,
-    //           changedFields: [],
-    //         };
-    //       }
-    //       return item;
-    //     })
-    //   );
-    //   toast.success("Item changes acknowledged successfully!", successStyles);
-    // } catch (error) {
-    //   console.error("Failed to acknowledge item:", error);
-    //   throw error; // Re-throw to be handled by the calling component
-    // }
   };
 
   // Handle updating item
@@ -1479,44 +1708,51 @@ const AdminAllItemsPage = () => {
   const filteredItems = useMemo(() => {
     let filtered = allItems;
 
-    // // Filter by search term
-    // if (searchTerm) {
-    //   filtered = filtered.filter(
-    //     (item: any) =>
-    //       item.articleName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    //       item.articleNumber
-    //         ?.toLowerCase()
-    //         .includes(searchTerm.toLowerCase()) ||
-    //       item.item_no_de?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    //       item.companyName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    //       item.listName?.toLowerCase().includes(searchTerm.toLowerCase())
-    //   );
-    // }
+    // Filter by search term
+    if (searchTerm && currentTab === 0) {
+      filtered = filtered.filter(
+        (item: any) =>
+          item.articleName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          item.articleNumber
+            ?.toLowerCase()
+            .includes(searchTerm.toLowerCase()) ||
+          item.item_no_de?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          item.companyName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          item.listName?.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
 
-    // // Filter by customer
-    // if (selectedCustomer) {
-    //   filtered = filtered.filter(
-    //     (item: any) => item.customerId === selectedCustomer
-    //   );
-    // }
+    // Filter by customer
+    if (selectedCustomer) {
+      filtered = filtered.filter(
+        (item: any) => item.customerId === selectedCustomer
+      );
+    }
 
-    // // Filter by list
-    // if (selectedList) {
-    //   filtered = filtered.filter((item: any) => item.listId === selectedList);
-    // }
+    // Filter by list
+    if (selectedList) {
+      filtered = filtered.filter((item: any) => item.listId === selectedList);
+    }
 
-    // // Filter by changes only
-    // if (showOnlyChanges) {
-    //   filtered = filtered.filter(
-    //     (item: any) =>
-    //       item.changesNeedAcknowledgment ||
-    //       item.hasChanges ||
-    //       item.shouldHighlight
-    //   );
-    // }
+    // Filter by changes only
+    if (showOnlyChanges) {
+      filtered = filtered.filter(
+        (item: any) =>
+          item.changesNeedAcknowledgment ||
+          item.hasChanges ||
+          item.shouldHighlight
+      );
+    }
 
-    return allItems;
-  }, [allItems, searchTerm, selectedCustomer, selectedList, showOnlyChanges]);
+    return filtered;
+  }, [
+    allItems,
+    searchTerm,
+    selectedCustomer,
+    selectedList,
+    showOnlyChanges,
+    currentTab,
+  ]);
 
   // Get available lists for selected customer
   const availableLists = useMemo(() => {
@@ -1796,48 +2032,6 @@ const AdminAllItemsPage = () => {
     });
 
     const endColumns = [
-      // {
-      //   key: "changeStatus",
-      //   name: "Status",
-      //   width: 150,
-      //   resizable: true,
-      //   renderCell: (props: any) => {
-      //     const getStatusColor = (status: string) => {
-      //       switch (status?.toLowerCase()) {
-      //         case "confirmed":
-      //           return "success";
-      //         case "pending":
-      //           return "warning";
-      //         case "rejected":
-      //           return "error";
-      //         default:
-      //           return "default";
-      //       }
-      //     };
-
-      //     const getStatusLabel = (status: string) => {
-      //       switch (status?.toLowerCase()) {
-      //         case "confirmed":
-      //           return "Confirmed";
-      //         case "pending":
-      //           return "Pending";
-      //         case "rejected":
-      //           return "Rejected";
-      //         default:
-      //           return "Pending";
-      //       }
-      //     };
-
-      //     return (
-      //       <Chip
-      //         label={getStatusLabel(props.row.changeStatus)}
-      //         size="small"
-      //         color={getStatusColor(props.row.changeStatus)}
-      //         sx={{ minWidth: 100, borderRadius: "10px" }}
-      //       />
-      //     );
-      //   },
-      // },
       {
         key: "comment",
         name: "Comment",
@@ -1860,7 +2054,22 @@ const AdminAllItemsPage = () => {
             variant="contained"
             color="warning"
             size="small"
-            onClick={handleAcknowledgeItem}
+            onClick={async () => {
+              if (
+                props.row.hasChanges === false &&
+                props.row.changesNeedAcknowledgment === false
+              ) {
+                return;
+              }
+
+              const data = await acknowledgeItemChanges(
+                props.row.listId,
+                props.row.id
+              );
+              if (data?.success) {
+                await loadAllItems();
+              }
+            }}
             startIcon={<Done />}
             sx={{
               minWidth: "auto",
@@ -2156,7 +2365,11 @@ const AdminAllItemsPage = () => {
                     Clear Filters
                   </Button>
                   <Chip
-                    label={`${filteredItems.length} items`}
+                    label={`${
+                      currentTab === 0
+                        ? filteredItems.length
+                        : filteredActivityLogs.length
+                    } ${currentTab === 0 ? "items" : "logs"}`}
                     color="primary"
                     variant="outlined"
                   />
@@ -2166,214 +2379,361 @@ const AdminAllItemsPage = () => {
           </CardContent>
         </Card>
 
-        {/* Main Content */}
+        {/* Tabs Section */}
         <Card
           sx={{
-            mb: 4,
-            maxWidth: "95vw",
+            mb: 2,
             borderRadius: 1,
-            boxShadow: "0 8px 30px rgba(0, 0, 0, 0.06)",
+            boxShadow: "0 4px 20px rgba(0, 0, 0, 0.08)",
             border: "1px solid",
-            borderColor: alpha("#ADB5BD", 0.15),
+            borderColor: alpha("#E2E8F0", 0.8),
           }}
         >
-          <Box sx={{ p: 3 }}>
-            {/* Action Bar */}
-            <Box
-              sx={{ display: "flex", justifyContent: "space-between", mb: 2 }}
-            >
-              <Box sx={{ display: "flex", gap: 1.5, alignItems: "center" }}>
-                <TextField
-                  placeholder="Search items, companies, lists..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  size="small"
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <Search fontSize="small" />
-                      </InputAdornment>
-                    ),
-                  }}
-                  sx={{
-                    width: 300,
-                    "& .MuiOutlinedInput-root": {
-                      borderRadius: 1,
-                    },
-                  }}
-                />
-
-                {selectedRows.size > 0 && (
-                  <CustomButton
-                    variant="outlined"
-                    color="error"
-                    startIcon={<Delete />}
-                    onClick={handleDeleteSelectedItems}
-                    loading={saving}
-                  >
-                    Delete ({selectedRows.size})
-                  </CustomButton>
-                )}
-                <CustomButton
-                  variant="contained"
-                  startIcon={<Add />}
-                  onClick={() => setAddItemDialog(true)}
-                >
-                  Add Item
-                </CustomButton>
-              </Box>
-
-              <Box sx={{ display: "flex", gap: 1.5 }}>
-                <CustomButton
-                  variant="contained"
-                  startIcon={<Refresh />}
-                  onClick={async () => await handleRefetchItemData()}
-                >
-                  Refetch Item Data
-                </CustomButton>
-                <CustomButton
-                  variant="outlined"
-                  startIcon={<Refresh />}
-                  onClick={() => window.location.reload()}
-                >
-                  Refresh
-                </CustomButton>
-              </Box>
-            </Box>
-
-            {/* Items Grid */}
-            <Paper
-              elevation={3}
+          <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
+            <Tabs
+              value={currentTab}
+              onChange={(_, newValue) => setCurrentTab(newValue)}
               sx={{
-                height: "600px",
-                width: "100%",
-                backgroundColor: "#ffffff",
-                borderRadius: "16px",
-                border: "1px solid #e8f0fe",
-                overflow: "hidden",
-                boxShadow: "0 8px 32px rgba(0, 0, 0, 0.08)",
-                "& .rdg": {
-                  border: "none !important",
-                  "--rdg-selection-color":
-                    "rgba(140, 194, 27, 0.15) !important",
-                  "--rdg-background-color": "#ffffff !important",
-                  "--rdg-header-background-color":
-                    "linear-gradient(135deg, #f8fffe 0%, #e8f5e8 100%) !important",
-                  fontFamily:
-                    '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                },
-                "& .rdg-header-row": {
-                  background:
-                    "linear-gradient(135deg, #f8fffe 0%, #e8f5e8 100%)",
-                  borderBottom: "2px solid rgba(140, 194, 27, 0.2)",
+                px: 2,
+                "& .MuiTab-root": {
+                  textTransform: "none",
                   fontWeight: 600,
-                  minHeight: "75px !important",
-                  color: "#2d3748",
-                  boxShadow: "0 2px 8px rgba(0, 0, 0, 0.04)",
-                },
-                "& .rdg-header-cell": {
-                  padding: "8px 12px !important",
-                  display: "flex !important",
-                  alignItems: "center !important",
-                  justifyContent: "center !important",
-                  borderRight: "1px solid rgba(140, 194, 27, 0.1)",
-                  background: "transparent",
-                  color: "#2d3748",
-                  fontWeight: 600,
-                  fontSize: "0.85rem",
-                  "&:hover": {
-                    background: "rgba(140, 194, 27, 0.05)",
+                  fontSize: "0.95rem",
+                  minHeight: 56,
+                  "&.Mui-selected": {
+                    color: "primary.main",
                   },
                 },
-                "& .rdg-cell": {
-                  padding: "12px 16px !important",
-                  display: "flex !important",
-                  alignItems: "center !important",
-                  borderRight: "1px solid rgba(226, 232, 240, 0.8)",
-                  borderBottom: "1px solid rgba(226, 232, 240, 0.6)",
-                  backgroundColor: "#ffffff",
-                  color: "#374151",
-                  fontSize: "0.875rem",
-                  transition: "all 0.2s ease",
-                },
-                "& .rdg-row": {
-                  minHeight: "80px !important",
-                  "&:hover": {
-                    backgroundColor: "rgba(140, 194, 27, 0.04) !important",
-                    transform: "translateY(-1px)",
-                    boxShadow: "0 4px 12px rgba(140, 194, 27, 0.08)",
-                    "& .rdg-cell": {
-                      backgroundColor: "rgba(140, 194, 27, 0.04)",
-                      borderColor: "rgba(140, 194, 27, 0.15)",
-                    },
-                  },
-                },
-                "& .rdg-row:nth-of-type(even)": {
-                  backgroundColor: "rgba(248, 250, 252, 0.5)",
-                  "& .rdg-cell": {
-                    backgroundColor: "rgba(248, 250, 252, 0.5)",
-                  },
-                },
-                "& .rdg-row:nth-of-type(odd)": {
-                  backgroundColor: "#ffffff",
-                  "& .rdg-cell": {
-                    backgroundColor: "#ffffff",
-                  },
-                },
-                "& .rdg-row.rdg-row-selected": {
-                  backgroundColor: "rgba(140, 194, 27, 0.08) !important",
-                  "& .rdg-cell": {
-                    backgroundColor: "rgba(140, 194, 27, 0.08)",
-                    borderColor: "rgba(140, 194, 27, 0.2)",
-                  },
+                "& .MuiTabs-indicator": {
+                  backgroundColor: "primary.main",
+                  height: 3,
+                  borderRadius: "2px 2px 0 0",
                 },
               }}
             >
-              {filteredItems.length === 0 ? (
-                <Box sx={{ textAlign: "center", py: 8, px: 3 }}>
-                  <Package
-                    size={64}
-                    style={{ color: "#ccc", marginBottom: 24 }}
+              <Tab
+                icon={<Inventory />}
+                iconPosition="start"
+                label={`Items Management (${filteredItems.length})`}
+                sx={{ gap: 1 }}
+              />
+              <Tab
+                icon={<History />}
+                iconPosition="start"
+                label={`Activity Logs (${filteredActivityLogs.length})`}
+                sx={{ gap: 1 }}
+              />
+            </Tabs>
+          </Box>
+
+          {/* Tab Panel 0: Items Management */}
+          <TabPanel value={currentTab} index={0}>
+            <Box sx={{ p: 3 }}>
+              {/* Action Bar */}
+              <Box
+                sx={{ display: "flex", justifyContent: "space-between", mb: 2 }}
+              >
+                <Box sx={{ display: "flex", gap: 1.5, alignItems: "center" }}>
+                  <TextField
+                    placeholder="Search items, companies, lists..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    size="small"
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <Search fontSize="small" />
+                        </InputAdornment>
+                      ),
+                    }}
+                    sx={{
+                      width: 300,
+                      "& .MuiOutlinedInput-root": {
+                        borderRadius: 1,
+                      },
+                    }}
                   />
-                  <Typography variant="h6" color="text.secondary" gutterBottom>
-                    No items found
-                  </Typography>
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                    sx={{ mb: 2 }}
+
+                  {selectedRows.size > 0 && (
+                    <CustomButton
+                      variant="outlined"
+                      color="error"
+                      startIcon={<Delete />}
+                      onClick={handleDeleteSelectedItems}
+                      loading={saving}
+                    >
+                      Delete ({selectedRows.size})
+                    </CustomButton>
+                  )}
+                  <CustomButton
+                    variant="contained"
+                    startIcon={<Add />}
+                    onClick={() => setAddItemDialog(true)}
                   >
-                    {searchTerm || selectedCustomer || selectedList
-                      ? "Try adjusting your filters or search terms"
-                      : "No items available"}
-                  </Typography>
+                    Add Item
+                  </CustomButton>
                 </Box>
-              ) : (
-                <DataGrid
-                  columns={columns}
-                  rows={filteredItems}
-                  rowKeyGetter={(row: any) => row.id}
-                  selectedRows={selectedRows}
-                  onSelectedRowsChange={setSelectedRows}
-                  rowHeight={80}
-                  headerRowHeight={75}
-                  className="fill-grid"
-                  style={{
-                    height: "100%",
-                    border: "none",
-                    fontSize: "0.875rem",
-                    backgroundColor: "#ffffff",
+
+                <Box sx={{ display: "flex", gap: 1.5 }}>
+                  <CustomButton
+                    variant="contained"
+                    startIcon={<Refresh />}
+                    onClick={async () => await handleRefetchItemData()}
+                  >
+                    Refetch Item Data
+                  </CustomButton>
+                  <CustomButton
+                    variant="outlined"
+                    startIcon={<Refresh />}
+                    onClick={() => window.location.reload()}
+                  >
+                    Refresh
+                  </CustomButton>
+                </Box>
+              </Box>
+
+              {/* Items Grid */}
+              <Paper
+                elevation={3}
+                sx={{
+                  height: "600px",
+                  width: "100%",
+                  backgroundColor: "#ffffff",
+                  borderRadius: "16px",
+                  border: "1px solid #e8f0fe",
+                  overflow: "hidden",
+                  boxShadow: "0 8px 32px rgba(0, 0, 0, 0.08)",
+                  "& .rdg": {
+                    border: "none !important",
+                    "--rdg-selection-color":
+                      "rgba(140, 194, 27, 0.15) !important",
+                    "--rdg-background-color": "#ffffff !important",
+                    "--rdg-header-background-color":
+                      "linear-gradient(135deg, #f8fffe 0%, #e8f5e8 100%) !important",
                     fontFamily:
                       '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                  }}
-                  defaultColumnOptions={{
-                    sortable: true,
-                    resizable: true,
-                  }}
-                />
-              )}
-            </Paper>
-          </Box>
+                  },
+                  "& .rdg-header-row": {
+                    background:
+                      "linear-gradient(135deg, #f8fffe 0%, #e8f5e8 100%)",
+                    borderBottom: "2px solid rgba(140, 194, 27, 0.2)",
+                    fontWeight: 600,
+                    minHeight: "75px !important",
+                    color: "#2d3748",
+                    boxShadow: "0 2px 8px rgba(0, 0, 0, 0.04)",
+                  },
+                  "& .rdg-header-cell": {
+                    padding: "8px 12px !important",
+                    display: "flex !important",
+                    alignItems: "center !important",
+                    justifyContent: "center !important",
+                    borderRight: "1px solid rgba(140, 194, 27, 0.1)",
+                    background: "transparent",
+                    color: "#2d3748",
+                    fontWeight: 600,
+                    fontSize: "0.85rem",
+                    "&:hover": {
+                      background: "rgba(140, 194, 27, 0.05)",
+                    },
+                  },
+                  "& .rdg-cell": {
+                    padding: "12px 16px !important",
+                    display: "flex !important",
+                    alignItems: "center !important",
+                    borderRight: "1px solid rgba(226, 232, 240, 0.8)",
+                    borderBottom: "1px solid rgba(226, 232, 240, 0.6)",
+                    backgroundColor: "#ffffff",
+                    color: "#374151",
+                    fontSize: "0.875rem",
+                    transition: "all 0.2s ease",
+                  },
+                  "& .rdg-row": {
+                    minHeight: "80px !important",
+                    "&:hover": {
+                      backgroundColor: "rgba(140, 194, 27, 0.04) !important",
+                      transform: "translateY(-1px)",
+                      boxShadow: "0 4px 12px rgba(140, 194, 27, 0.08)",
+                      "& .rdg-cell": {
+                        backgroundColor: "rgba(140, 194, 27, 0.04)",
+                        borderColor: "rgba(140, 194, 27, 0.15)",
+                      },
+                    },
+                  },
+                  "& .rdg-row:nth-of-type(even)": {
+                    backgroundColor: "rgba(248, 250, 252, 0.5)",
+                    "& .rdg-cell": {
+                      backgroundColor: "rgba(248, 250, 252, 0.5)",
+                    },
+                  },
+                  "& .rdg-row:nth-of-type(odd)": {
+                    backgroundColor: "#ffffff",
+                    "& .rdg-cell": {
+                      backgroundColor: "#ffffff",
+                    },
+                  },
+                  "& .rdg-row.rdg-row-selected": {
+                    backgroundColor: "rgba(140, 194, 27, 0.08) !important",
+                    "& .rdg-cell": {
+                      backgroundColor: "rgba(140, 194, 27, 0.08)",
+                      borderColor: "rgba(140, 194, 27, 0.2)",
+                    },
+                  },
+                }}
+              >
+                {filteredItems.length === 0 ? (
+                  <Box sx={{ textAlign: "center", py: 8, px: 3 }}>
+                    <Package
+                      size={64}
+                      style={{ color: "#ccc", marginBottom: 24 }}
+                    />
+                    <Typography
+                      variant="h6"
+                      color="text.secondary"
+                      gutterBottom
+                    >
+                      No items found
+                    </Typography>
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      sx={{ mb: 2 }}
+                    >
+                      {searchTerm || selectedCustomer || selectedList
+                        ? "Try adjusting your filters or search terms"
+                        : "No items available"}
+                    </Typography>
+                  </Box>
+                ) : (
+                  <DataGrid
+                    columns={columns}
+                    rows={filteredItems}
+                    rowKeyGetter={(row: any) => row.id}
+                    selectedRows={selectedRows}
+                    onSelectedRowsChange={setSelectedRows}
+                    rowHeight={80}
+                    headerRowHeight={75}
+                    className="fill-grid"
+                    style={{
+                      height: "100%",
+                      border: "none",
+                      fontSize: "0.875rem",
+                      backgroundColor: "#ffffff",
+                      fontFamily:
+                        '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                    }}
+                    defaultColumnOptions={{
+                      sortable: true,
+                      resizable: true,
+                    }}
+                  />
+                )}
+              </Paper>
+            </Box>
+          </TabPanel>
+
+          {/* Tab Panel 1: Activity Logs */}
+          <TabPanel value={currentTab} index={1}>
+            <Box sx={{ p: 3 }}>
+              {/* Activity Logs Action Bar */}
+              <Box
+                sx={{ display: "flex", justifyContent: "space-between", mb: 2 }}
+              >
+                <Box sx={{ display: "flex", gap: 1.5, alignItems: "center" }}>
+                  <TextField
+                    placeholder="Search activity logs..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    size="small"
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <Search fontSize="small" />
+                        </InputAdornment>
+                      ),
+                    }}
+                    sx={{
+                      width: 300,
+                      "& .MuiOutlinedInput-root": {
+                        borderRadius: 1,
+                      },
+                    }}
+                  />
+
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                    <History sx={{ color: "primary.main", fontSize: 20 }} />
+                    <Typography variant="h6" fontWeight={600}>
+                      Activity Timeline
+                    </Typography>
+                  </Box>
+                </Box>
+
+                <CustomButton
+                  variant="outlined"
+                  startIcon={<Refresh />}
+                  onClick={() => loadAllItems()}
+                >
+                  Refresh Logs
+                </CustomButton>
+              </Box>
+
+              {/* Activity Logs Content */}
+              <Box
+                sx={{
+                  height: "600px",
+                  overflowY: "auto",
+                  border: "1px solid #e8f0fe",
+                  borderRadius: 2,
+                  bgcolor: "#fafafa",
+                  p: 2,
+                  "& ::-webkit-scrollbar": {
+                    width: "8px",
+                  },
+                  "& ::-webkit-scrollbar-track": {
+                    backgroundColor: "rgba(0,0,0,0.05)",
+                    borderRadius: "4px",
+                  },
+                  "& ::-webkit-scrollbar-thumb": {
+                    backgroundColor: "rgba(140, 194, 27, 0.3)",
+                    borderRadius: "4px",
+                    "&:hover": {
+                      backgroundColor: "rgba(140, 194, 27, 0.5)",
+                    },
+                  },
+                }}
+              >
+                {filteredActivityLogs.length === 0 ? (
+                  <Box sx={{ textAlign: "center", py: 8, px: 3 }}>
+                    <History style={{ color: "#ccc", marginBottom: 24 }} />
+                    <Typography
+                      variant="h6"
+                      color="text.secondary"
+                      gutterBottom
+                    >
+                      No activity logs found
+                    </Typography>
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      sx={{ mb: 2 }}
+                    >
+                      {searchTerm || selectedCustomer || selectedList
+                        ? "Try adjusting your filters or search terms"
+                        : "No activity logs available"}
+                    </Typography>
+                  </Box>
+                ) : (
+                  filteredActivityLogs.map((log) => (
+                    <ActivityLogCard
+                      key={log.id}
+                      log={log}
+                      customerName={log.customerName}
+                      listName={log.listName}
+                    />
+                  ))
+                )}
+              </Box>
+            </Box>
+          </TabPanel>
         </Card>
       </Box>
 

@@ -353,7 +353,7 @@ export const acknowledgeItemChanges = async (
 ) => {
   try {
     toast.loading("Acknowledging changes...", loadingStyles);
-    const response = await api.put(
+    const response: ResponseInterface = await api.put(
       `/lists/${listId}/items/${itemId}/acknowledge`,
       {
         acknowledgeComments,
@@ -361,7 +361,7 @@ export const acknowledgeItemChanges = async (
     );
     toast.dismiss();
     toast.success("Changes acknowledged", successStyles);
-    return response.data;
+    return response;
   } catch (error) {
     handleApiError(error, "Failed to acknowledge changes");
     throw error;

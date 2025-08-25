@@ -1,6 +1,6 @@
 import { createTheme } from "@mui/material/styles";
 
-const theme = createTheme({
+const theme: any = createTheme({
   palette: {
     primary: {
       main: "#8CC21B",

@@ -1088,20 +1088,34 @@ export const searchItems = async (
     const connection = await getConnection();
     const searchTerm = `%${q}%`;
 
+    // Check if the search query is a numeric value (potentially an ItemID_DE)
+    const isNumericSearch = !isNaN(Number(q));
+
     try {
-      const [items]: any = await connection.query(
-        `SELECT 
+      let query = `
+        SELECT 
           id, 
           item_name AS name,
           ItemID_DE AS articleNumber,
           photo AS imageUrl
-         FROM items 
-         WHERE item_name LIKE ? 
-         AND photo IS NOT NULL
-         AND photo != ''
-         LIMIT 10`,
-        [searchTerm]
-      );
+        FROM items 
+        WHERE (item_name LIKE ? 
+      `;
+
+      const params: any[] = [searchTerm];
+
+      // If it's a numeric search, also search by ItemID_DE
+      if (isNumericSearch) {
+        query += ` OR ItemID_DE = ?`;
+        params.push(Number(q));
+      }
+
+      query += `)
+        AND photo IS NOT NULL
+        AND photo != ''
+        LIMIT 10`;
+
+      const [items]: any = await connection.query(query, params);
 
       const results = items.map((item: any) => ({
         ...item,
@@ -1119,7 +1133,6 @@ export const searchItems = async (
     return next(error);
   }
 };
-
 // 12. Get Customer Lists
 export const getCustomerLists = async (
   req: Request,
