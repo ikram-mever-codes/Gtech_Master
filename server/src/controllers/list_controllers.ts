@@ -28,29 +28,29 @@ async function fetchItemData(itemId: number) {
     const [itemRows]: any = await connection.query(
       `
       SELECT 
-        i.*, 
-        os.cargo_id, 
-        os.status as order_status, 
+        i.*,
+        os.cargo_id,
+        os.status as order_status,
         oi.qty AS quantity,
         c.cargo_no,
-        c.pickup_date, 
+        c.pickup_date,
         c.dep_date,
-        c.cargo_status, 
+        c.cargo_status,
         c.shipped_at,
         c.eta,
         c.remark,
         c.cargo_type_id,
         ct.cargo_type,
-        wi.item_no_de
+        wi.item_name_de,
+        wi.item_no_de -- 👈 Added item_no_de here
       FROM items i
       LEFT JOIN order_items oi ON i.ItemID_DE = oi.ItemID_DE
-      LEFT JOIN order_statuses os ON oi.master_id = os.master_id 
-                                  AND oi.ItemID_DE = os.ItemID_DE
+      LEFT JOIN order_statuses os ON oi.master_id = os.master_id AND oi.ItemID_DE = os.ItemID_DE
       LEFT JOIN cargos c ON os.cargo_id = c.id
       LEFT JOIN cargo_types ct ON c.cargo_type_id = ct.id
       LEFT JOIN warehouse_items wi ON i.ItemID_DE = wi.ItemID_DE
       WHERE i.id = ?
-    `,
+      `,
       [itemId]
     );
 
@@ -154,7 +154,7 @@ async function fetchItemData(itemId: number) {
     });
 
     return {
-      articleName: itemData.item_name || "",
+      articleName: itemData.item_name_de || "",
       articleNumber: itemData.ItemID_DE || "",
       itemNoDe: itemData.item_no_de || "",
       quantity: itemData.FOQ || 0,
@@ -176,7 +176,39 @@ async function updateLocalListItem(item: ListItem): Promise<ListItem> {
   const listItemRepository = AppDataSource.getRepository(ListItem);
 
   try {
+    console.log(`Updating item ${item.id} from MIS...`);
     const itemData = await fetchItemData(parseInt(item.itemNumber));
+    console.log(itemData);
+    if (!itemData) {
+      console.warn(`No data returned from MIS for item ${item.id}`);
+      return item;
+    }
+
+    // Store original values for comparison
+    const originalValues = {
+      articleName: item.articleName,
+      articleNumber: item.articleNumber,
+      item_no_de: item.item_no_de,
+      quantity: item.quantity,
+      imageUrl: item.imageUrl,
+    };
+
+    // Update all fields from MIS data
+    item.articleName = itemData.articleName || item.articleName;
+    item.articleNumber = itemData.articleNumber || item.articleNumber;
+    item.item_no_de = itemData.itemNoDe || item.item_no_de;
+    item.quantity = itemData.quantity || item.quantity;
+    item.imageUrl = itemData.imageUrl || item.imageUrl;
+
+    // Check if any values actually changed
+    const hasChanges =
+      item.articleName !== originalValues.articleName ||
+      item.articleNumber !== originalValues.articleNumber ||
+      item.item_no_de !== originalValues.item_no_de ||
+      item.quantity !== originalValues.quantity ||
+      item.imageUrl !== originalValues.imageUrl;
+
+    // Update deliveries if available
     if (itemData.deliveries && Object.keys(itemData.deliveries).length > 0) {
       const currentDeliveries = item.deliveries || {};
       const mergedDeliveries: any = {};
@@ -192,6 +224,13 @@ async function updateLocalListItem(item: ListItem): Promise<ListItem> {
       }
 
       item.deliveries = mergedDeliveries;
+      console.log(`Updated deliveries for item ${item.id}`);
+    }
+
+    if (hasChanges) {
+      console.log(`Item ${item.id} updated with new data from MIS`);
+    } else {
+      console.log(`Item ${item.id} already has latest data from MIS`);
     }
 
     return await listItemRepository.save(item);
@@ -199,34 +238,6 @@ async function updateLocalListItem(item: ListItem): Promise<ListItem> {
     console.error(`Failed to update local item ${item.id}:`, error);
     return item;
   }
-}
-
-async function refreshListItemsDeliveryData(items: any[]) {
-  if (!items || items.length === 0) return items;
-
-  const refreshedItems = await Promise.all(
-    items.map(async (item) => {
-      try {
-        const itemData = await fetchItemData(parseInt(item.itemNumber));
-        return {
-          ...item,
-          deliveries: itemData.deliveries || {},
-          articleName: itemData.articleName || item.articleName,
-          articleNumber: itemData.articleNumber || item.articleNumber,
-          item_no_de: itemData.itemNoDe || item.item_no_de,
-          imageUrl: itemData.imageUrl || item.imageUrl,
-        };
-      } catch (error) {
-        console.error(
-          `Failed to refresh delivery data for item ${item.id}:`,
-          error
-        );
-        return item;
-      }
-    })
-  );
-
-  return refreshedItems;
 }
 
 async function createCreator(userId: string | null, customerId: string | null) {
@@ -1184,10 +1195,8 @@ export const getAllLists = async (
         "createdBy.customer",
         "activityLogs",
       ],
-      order: { createdAt: "DESC" },
     });
 
-    // Enhance lists with change information for admin view
     const listsWithChanges = lists.map((list) => ({
       ...list,
       items:
@@ -1534,13 +1543,13 @@ export const bulkAcknowledgeChanges = async (
   next: NextFunction
 ) => {
   try {
-    const { listId } = req.params;
+    const { listIds } = req.body; // Now receiving multiple list IDs
     const { itemIds, acknowledgeComments } = req.body;
     const userId = (req as any).user?.id;
     const customerId = (req as any).customer?.id;
 
-    if (!listId) {
-      return next(new ErrorHandler("List ID is required", 400));
+    if (!listIds || !Array.isArray(listIds) || listIds.length === 0) {
+      return next(new ErrorHandler("List IDs array is required", 400));
     }
 
     const performerId = userId || customerId;
@@ -1550,64 +1559,91 @@ export const bulkAcknowledgeChanges = async (
     const listRepository = AppDataSource.getRepository(List);
     const listItemRepository = AppDataSource.getRepository(ListItem);
 
-    const list = await listRepository.findOne({
-      where: { id: listId },
+    // Find all lists with their items
+    const lists = await listRepository.find({
+      where: { id: In(listIds) },
       relations: ["items"],
     });
 
-    if (!list) {
-      return next(new ErrorHandler("List not found", 404));
+    if (lists.length === 0) {
+      return next(new ErrorHandler("No lists found", 404));
     }
 
-    const itemsToAcknowledge = itemIds
-      ? list.items.filter((item) => itemIds.includes(item.id))
-      : list.items;
+    // Check if any requested lists were not found
+    const foundListIds = lists.map((list) => list.id);
+    const missingListIds = listIds.filter((id) => !foundListIds.includes(id));
 
-    let acknowledgedCount = 0;
+    if (missingListIds.length > 0) {
+      console.warn(`Some lists not found: ${missingListIds.join(", ")}`);
+    }
 
-    for (const item of itemsToAcknowledge) {
-      if (item.changeStatus === CHANGE_STATUS.PENDING) {
-        item.confirmChange(performerId, performerType);
-        acknowledgedCount++;
+    let totalAcknowledgedCount = 0;
+    const results = [];
+
+    for (const list of lists) {
+      const itemsToAcknowledge = itemIds
+        ? list.items.filter((item) => itemIds.includes(item.id))
+        : list.items;
+
+      let acknowledgedCount = 0;
+
+      for (const item of itemsToAcknowledge) {
+        if (item.changeStatus === CHANGE_STATUS.PENDING) {
+          item.confirmChange(performerId, performerType);
+          acknowledgedCount++;
+        }
+
+        if (acknowledgeComments && item.hasUnacknowledgedComments()) {
+          item.acknowledgeCommentsFromOrigin(
+            origin === CHANGE_ORIGIN.ADMIN
+              ? CHANGE_ORIGIN.CUSTOMER
+              : CHANGE_ORIGIN.ADMIN,
+            performerId,
+            performerType,
+            origin
+          );
+        }
       }
 
-      if (acknowledgeComments && item.hasUnacknowledgedComments()) {
-        item.acknowledgeCommentsFromOrigin(
-          origin === CHANGE_ORIGIN.ADMIN
-            ? CHANGE_ORIGIN.CUSTOMER
-            : CHANGE_ORIGIN.ADMIN,
+      if (acknowledgedCount > 0) {
+        await listItemRepository.save(itemsToAcknowledge);
+
+        // Log bulk acknowledgment activity for each list
+        list.logActivity(
+          "BULK_CHANGES_ACKNOWLEDGED",
+          {
+            acknowledgedItems: itemsToAcknowledge.map((item) => item.id),
+            acknowledgedCount,
+            acknowledgeComments,
+          },
           performerId,
-          performerType,
-          origin
+          performerType
         );
+        await listRepository.save(list);
       }
-    }
 
-    await listItemRepository.save(itemsToAcknowledge);
-
-    // Log bulk acknowledgment activity
-    list.logActivity(
-      "BULK_CHANGES_ACKNOWLEDGED",
-      {
-        acknowledgedItems: itemsToAcknowledge.map((item) => item.id),
+      totalAcknowledgedCount += acknowledgedCount;
+      results.push({
+        listId: list.id,
         acknowledgedCount,
-        acknowledgeComments,
-      },
-      performerId,
-      performerType
-    );
-    await listRepository.save(list);
+        totalItems: list.items.length,
+      });
+    }
 
     return res.status(200).json({
       success: true,
-      message: `Acknowledged changes for ${acknowledgedCount} items`,
-      data: { acknowledgedCount },
+      message: `Acknowledged changes across ${lists.length} lists for ${totalAcknowledgedCount} items total`,
+      data: {
+        totalAcknowledgedCount,
+        processedLists: lists.length,
+        missingLists: missingListIds,
+        results,
+      },
     });
   } catch (error) {
     return next(error);
   }
 };
-
 export const approveListItemChanges = async (
   req: Request,
   res: Response,
@@ -1670,8 +1706,7 @@ export const fetchAllListsAndItems = async (
   next: NextFunction
 ) => {
   try {
-    const { refreshFromMIS = "true" } = req.query;
-    const shouldRefresh = refreshFromMIS === "true";
+    const shouldRefresh = true;
     const userType = (req as any).user?.type || (req as any).customer?.type;
     const role = getOriginFromUserType(userType);
 
@@ -1919,6 +1954,123 @@ export const getListItemWithRefresh = async (
         ? "Item fetched and refreshed from MIS"
         : "Item fetched",
       data: createListItemDTOForRole(refreshedItem, role),
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+// Individual Item Acknowledge Changes Controller
+export const acknowledgeItemChanges = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { listId, itemId } = req.params;
+    const { acknowledgeComments } = req.body;
+    const userId = (req as any).user?.id;
+    const customerId = (req as any).customer?.id;
+
+    if (!listId) {
+      return next(new ErrorHandler("List ID is required", 400));
+    }
+
+    if (!itemId) {
+      return next(new ErrorHandler("Item ID is required", 400));
+    }
+
+    const performerId = userId || customerId;
+    const performerType = userId ? "user" : "customer";
+    const origin = getOriginFromUserType(performerType);
+
+    const listRepository = AppDataSource.getRepository(List);
+    const listItemRepository = AppDataSource.getRepository(ListItem);
+
+    // Find the list and ensure it exists
+    const list = await listRepository.findOne({
+      where: { id: listId },
+      relations: ["items"],
+    });
+
+    if (!list) {
+      return next(new ErrorHandler("List not found", 404));
+    }
+
+    // Find the specific item within the list
+    const item = list.items.find((listItem) => listItem.id === itemId);
+
+    if (!item) {
+      return next(
+        new ErrorHandler("Item not found in the specified list", 404)
+      );
+    }
+
+    let changeAcknowledged = false;
+    let commentsAcknowledged = false;
+
+    // Acknowledge pending changes if any
+    if (item.changeStatus === CHANGE_STATUS.PENDING) {
+      item.confirmChange(performerId, performerType);
+      changeAcknowledged = true;
+    }
+
+    // Acknowledge comments if requested and there are unacknowledged comments
+    if (acknowledgeComments && item.hasUnacknowledgedComments()) {
+      item.acknowledgeCommentsFromOrigin(
+        origin === CHANGE_ORIGIN.ADMIN
+          ? CHANGE_ORIGIN.CUSTOMER
+          : CHANGE_ORIGIN.ADMIN,
+        performerId,
+        performerType,
+        origin
+      );
+      commentsAcknowledged = true;
+    }
+
+    // Save the item changes
+    await listItemRepository.save(item);
+
+    // Log the acknowledgment activity on the list
+    list.logActivity(
+      "ITEM_CHANGES_ACKNOWLEDGED",
+      {
+        itemId: item.id,
+        itemNumber: item.itemNumber,
+        articleName: item.articleName,
+        changeAcknowledged,
+        commentsAcknowledged,
+        acknowledgeComments,
+      },
+      performerId,
+      performerType
+    );
+
+    await listRepository.save(list);
+
+    // Prepare response message
+    const actions = [];
+    if (changeAcknowledged) actions.push("changes");
+    if (commentsAcknowledged) actions.push("comments");
+
+    const message =
+      actions.length > 0
+        ? `Successfully acknowledged ${actions.join(" and ")} for item ${
+            item.itemNumber
+          }`
+        : "No pending changes or comments to acknowledge";
+
+    return res.status(200).json({
+      success: true,
+      message,
+      data: {
+        itemId: item.id,
+        itemNumber: item.itemNumber,
+        changeAcknowledged,
+        commentsAcknowledged,
+        currentChangeStatus: item.changeStatus,
+        hasUnacknowledgedComments: item.hasUnacknowledgedComments(),
+      },
     });
   } catch (error) {
     return next(error);

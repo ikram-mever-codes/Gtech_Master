@@ -273,16 +273,11 @@ export const rejectActivityLog = async (
   }
 };
 
-export const bulkAcknowledgeChanges = async (
-  listId: string,
-  itemIds?: string[],
-  acknowledgeComments?: boolean
-) => {
+export const bulkAcknowledgeChanges = async (listIds?: string[]) => {
   try {
     toast.loading("Acknowledging changes...", loadingStyles);
-    const response = await api.put(`/lists/${listId}/bulk-acknowledge`, {
-      itemIds,
-      acknowledgeComments,
+    const response = await api.put(`/lists/all/bulk-acknowledge`, {
+      listIds,
     });
     toast.dismiss();
     toast.success("Changes acknowledged", successStyles);
@@ -347,6 +342,28 @@ export const getListItemWithMISRefresh = async (
     return response.data;
   } catch (error) {
     handleApiError(error, "Failed to fetch item");
+    throw error;
+  }
+};
+
+export const acknowledgeItemChanges = async (
+  listId: string,
+  itemId: string,
+  acknowledgeComments?: boolean
+) => {
+  try {
+    toast.loading("Acknowledging changes...", loadingStyles);
+    const response = await api.put(
+      `/lists/${listId}/items/${itemId}/acknowledge`,
+      {
+        acknowledgeComments,
+      }
+    );
+    toast.dismiss();
+    toast.success("Changes acknowledged", successStyles);
+    return response.data;
+  } catch (error) {
+    handleApiError(error, "Failed to acknowledge changes");
     throw error;
   }
 };

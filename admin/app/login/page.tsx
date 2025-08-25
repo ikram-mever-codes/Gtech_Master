@@ -46,7 +46,7 @@ const Login = () => {
       toast.dismiss();
       toast.success(`Welcome ${response.data.data.name}!`, successStyles);
 
-      router.push("/dashboard");
+      router.push("/scheduled");
       window.location.reload();
 
       return response.data;
@@ -56,7 +56,7 @@ const Login = () => {
   };
 
   if (user && !loading) {
-    return router.push("/");
+    return router.push("/scheduled");
   }
 
   return (

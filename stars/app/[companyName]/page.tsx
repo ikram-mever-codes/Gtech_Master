@@ -57,7 +57,7 @@ import {
 } from "@mui/icons-material";
 import { DataGrid } from "react-data-grid";
 import "react-data-grid/lib/styles.css";
-import { Package, Hash, X, ImageIcon } from "lucide-react";
+import { Package, Hash, X, ImageIcon, EditIcon } from "lucide-react";
 import {
   searchListsByCustomerNamee,
   updateListItem,
@@ -346,12 +346,8 @@ const DeliveryCell = ({ row, period }: any) => {
 
 // Static Quantity Cell (No longer editable)
 function StaticQuantityCell({ row }: any) {
-  const hasChanges =
-    (row.changesNeedAcknowledgment || row.hasChanges || row.shouldHighlight) &&
-    row.changedFields?.includes("quantity");
-
   return (
-    <FieldHighlight hasChanges={hasChanges} fieldName="Menge">
+    <FieldHighlight hasChanges={false} fieldName="Menge">
       <Box
         sx={{
           display: "flex",
@@ -402,8 +398,7 @@ function StaticIntervalCell({ row }: any) {
     </FieldHighlight>
   );
 }
-
-// Enhanced Editable Comment Cell with FieldHighlight (Only editable field)
+// Enhanced Editable Comment Cell with FieldHighlight and Edit Icon
 function EditableCommentCell({
   row,
   onUpdateItem,
@@ -415,6 +410,7 @@ function EditableCommentCell({
   const [isEditing, setIsEditing] = useState(false);
   const [value, setValue] = useState(row.comment || "");
   const [saving, setSaving] = useState(false);
+  const [showEditIcon, setShowEditIcon] = useState(false);
 
   const hasChanges =
     (row.changesNeedAcknowledgment || row.hasChanges || row.shouldHighlight) &&
@@ -513,15 +509,33 @@ function EditableCommentCell({
         sx={{
           display: "flex",
           alignItems: "center",
-          justifyContent: "center",
+          justifyContent: "space-between",
           width: "100%",
           height: "100%",
           p: 1,
+          position: "relative",
+          "&:hover": {
+            backgroundColor: isEditable ? "action.hover" : "transparent",
+          },
+          cursor: isEditable ? "pointer" : "default",
         }}
+        onMouseEnter={() => isEditable && setShowEditIcon(true)}
+        onMouseLeave={() => setShowEditIcon(false)}
       >
-        <Typography variant="body2" sx={{ fontSize: "14px" }}>
+        <Typography variant="body2" sx={{ fontSize: "14px", flex: 1 }}>
           {row.comment || "Add comment..."}
         </Typography>
+
+        <Box
+          sx={{
+            transition: "opacity 0.2s ease",
+            display: "flex",
+            alignItems: "center",
+            ml: 1,
+          }}
+        >
+          <Edit sx={{ fontSize: "16px" }} />
+        </Box>
       </Box>
     </FieldHighlight>
   );
@@ -2023,17 +2037,12 @@ const ListManagerPage: React.FC = () => {
       },
       {
         key: "articleName",
-        name: "Artikelname",
+        name: "Item Name DE",
         width: 500,
         resizable: true,
         renderCell: (props: any) => {
-          const hasChanges =
-            (props.row.changesNeedAcknowledgment ||
-              props.row.hasChanges ||
-              props.row.shouldHighlight) &&
-            props.row.changedFields?.includes("articleName");
           return (
-            <FieldHighlight hasChanges={hasChanges} fieldName="Artikelname">
+            <FieldHighlight hasChanges={false} fieldName="Artikelname">
               <Tooltip
                 title={props.row.articleName || ""}
                 arrow
@@ -2063,8 +2072,8 @@ const ListManagerPage: React.FC = () => {
                       textOverflow: "unset",
                       display: "block",
                       maxHeight: "none",
-                      fontWeight: hasChanges ? 600 : 500,
-                      color: hasChanges ? "#d32f2f" : "inherit",
+                      fontWeight: 500,
+                      color: "inherit",
                     }}
                   >
                     {props.row.articleName || "-"}

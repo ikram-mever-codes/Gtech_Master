@@ -107,10 +107,11 @@ import {
   FilterList,
   Clear,
   Close,
+  Done,
+  DoneAll,
 } from "@mui/icons-material";
 import { Formik, Form, Field } from "formik";
 import * as Yup from "yup";
-import { DataGrid, renderHeaderCell } from "react-data-grid";
 import "react-data-grid/lib/styles.css";
 import theme from "@/styles/theme";
 import CustomButton from "@/components/UI/CustomButton";
@@ -127,7 +128,6 @@ import {
 import { useRouter, useParams } from "next/navigation";
 import { toast } from "react-hot-toast";
 
-// Import API functions
 import {
   addItemToList,
   updateListItem,
@@ -147,6 +147,7 @@ import {
 } from "@/api/list";
 import { DELIVERY_STATUS, INTERVAL_OPTIONS } from "@/utils/interfaces";
 import { successStyles } from "@/utils/constants";
+import { DataGrid } from "react-data-grid";
 
 export function AddItemDialog({
   open,
@@ -160,7 +161,7 @@ export function AddItemDialog({
   const [selectedList, setSelectedList] = useState<any>(null);
   const [selectedItem, setSelectedItem] = useState<any>(null);
   const [items, setItems] = useState<any[]>([]);
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchTerm, setSearchTerm] = useState<any>("");
   const [searchLoading, setSearchLoading] = useState(false);
   const [saving, setSaving] = useState<any>(false);
 
@@ -1165,7 +1166,6 @@ function EditableIntervalCell({ row, onUpdateItem }: any) {
   );
 }
 
-// Function to format period for display
 function formatPeriodLabel(period: string, cargoNo: string): string {
   const monthMap: { [key: string]: string } = {
     "01": "January",
@@ -1238,6 +1238,7 @@ const AdminAllItemsPage = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [addItemDialog, setAddItemDialog] = useState(false);
   const [showOnlyChanges, setShowOnlyChanges] = useState(false);
+  const [bulkAcknowledging, setBulkAcknowledging] = useState(false);
 
   // Filter states
   const [selectedCustomer, setSelectedCustomer] = useState<string>("");
@@ -1259,6 +1260,7 @@ const AdminAllItemsPage = () => {
     if (!allItems.length) return { sortedPeriods: [], cargoNumbers: [] };
     return extractDeliveryPeriods(allItems);
   }, [allItems]);
+
   const loadAllItems = async () => {
     try {
       setLoading(true);
@@ -1329,14 +1331,72 @@ const AdminAllItemsPage = () => {
 
   const handleRefetchItemData = async () => {
     const data = await fetchAllListsWithMISRefresh(true);
-    if (data.success) {
+    if (data) {
       await loadAllItems();
     }
   };
+
   // Load all items from all lists
   useEffect(() => {
     loadAllItems();
   }, []);
+
+  // Handle bulk acknowledge all changes
+  const handleBulkAcknowledgeAllChanges = async () => {
+    if (itemsWithChanges.length === 0) {
+      toast.error("No changes to acknowledge");
+      return;
+    }
+
+    try {
+      setBulkAcknowledging(true);
+
+      // Get all item IDs that have changes
+      const itemIdsWithChanges: any = lists.map((list) => list.id);
+
+      // Call bulk acknowledge API
+      await bulkAcknowledgeChanges(itemIdsWithChanges);
+
+      await loadAllItems();
+
+      toast.success(
+        `Successfully acknowledged changes for ${itemsWithChanges.length} items!`,
+        successStyles
+      );
+    } catch (error) {
+      console.error("Failed to bulk acknowledge changes:", error);
+      toast.error("Failed to acknowledge changes. Please try again.");
+    } finally {
+      setBulkAcknowledging(false);
+    }
+  };
+
+  // Handle individual item acknowledge
+  const handleAcknowledgeItem = async (itemId: any) => {
+    // try {
+    //   // Call the acknowledge API for single item
+    //   await bulkAcknowledgeChanges([itemId);
+    //   // Update local state
+    //   setAllItems((prevItems) =>
+    //     prevItems.map((item) => {
+    //       if (item.id === itemId) {
+    //         return {
+    //           ...item,
+    //           changesNeedAcknowledgment: false,
+    //           hasChanges: false,
+    //           shouldHighlight: false,
+    //           changedFields: [],
+    //         };
+    //       }
+    //       return item;
+    //     })
+    //   );
+    //   toast.success("Item changes acknowledged successfully!", successStyles);
+    // } catch (error) {
+    //   console.error("Failed to acknowledge item:", error);
+    //   throw error; // Re-throw to be handled by the calling component
+    // }
+  };
 
   // Handle updating item
   const handleUpdateItem = async (itemId: string, updateData: any) => {
@@ -1419,43 +1479,43 @@ const AdminAllItemsPage = () => {
   const filteredItems = useMemo(() => {
     let filtered = allItems;
 
-    // Filter by search term
-    if (searchTerm) {
-      filtered = filtered.filter(
-        (item: any) =>
-          item.articleName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          item.articleNumber
-            ?.toLowerCase()
-            .includes(searchTerm.toLowerCase()) ||
-          item.item_no_de?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          item.companyName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          item.listName?.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
+    // // Filter by search term
+    // if (searchTerm) {
+    //   filtered = filtered.filter(
+    //     (item: any) =>
+    //       item.articleName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    //       item.articleNumber
+    //         ?.toLowerCase()
+    //         .includes(searchTerm.toLowerCase()) ||
+    //       item.item_no_de?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    //       item.companyName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    //       item.listName?.toLowerCase().includes(searchTerm.toLowerCase())
+    //   );
+    // }
 
-    // Filter by customer
-    if (selectedCustomer) {
-      filtered = filtered.filter(
-        (item: any) => item.customerId === selectedCustomer
-      );
-    }
+    // // Filter by customer
+    // if (selectedCustomer) {
+    //   filtered = filtered.filter(
+    //     (item: any) => item.customerId === selectedCustomer
+    //   );
+    // }
 
-    // Filter by list
-    if (selectedList) {
-      filtered = filtered.filter((item: any) => item.listId === selectedList);
-    }
+    // // Filter by list
+    // if (selectedList) {
+    //   filtered = filtered.filter((item: any) => item.listId === selectedList);
+    // }
 
-    // Filter by changes only
-    if (showOnlyChanges) {
-      filtered = filtered.filter(
-        (item: any) =>
-          item.changesNeedAcknowledgment ||
-          item.hasChanges ||
-          item.shouldHighlight
-      );
-    }
+    // // Filter by changes only
+    // if (showOnlyChanges) {
+    //   filtered = filtered.filter(
+    //     (item: any) =>
+    //       item.changesNeedAcknowledgment ||
+    //       item.hasChanges ||
+    //       item.shouldHighlight
+    //   );
+    // }
 
-    return filtered;
+    return allItems;
   }, [allItems, searchTerm, selectedCustomer, selectedList, showOnlyChanges]);
 
   // Get available lists for selected customer
@@ -1464,7 +1524,6 @@ const AdminAllItemsPage = () => {
     return lists.filter((list) => list.customerId === selectedCustomer);
   }, [lists, selectedCustomer]);
 
-  // Define columns
   const columns = useMemo(() => {
     const baseColumns = [
       {
@@ -1791,6 +1850,34 @@ const AdminAllItemsPage = () => {
           />
         ),
       },
+      {
+        key: "acknowledge",
+        name: "Acknowledge",
+        width: 120,
+        resizable: false,
+        renderCell: (props: any) => (
+          <CustomButton
+            variant="contained"
+            color="warning"
+            size="small"
+            onClick={handleAcknowledgeItem}
+            startIcon={<Done />}
+            sx={{
+              minWidth: "auto",
+              px: 2,
+              py: 0.5,
+              fontSize: "0.75rem",
+              textTransform: "none",
+              borderRadius: 2,
+              "&:hover": {
+                backgroundColor: "#ed6c02",
+              },
+            }}
+          >
+            Ack
+          </CustomButton>
+        ),
+      },
     ];
 
     return [...baseColumns, ...deliveryColumns, ...endColumns];
@@ -1882,12 +1969,12 @@ const AdminAllItemsPage = () => {
 
           <EnhancedBreadcrumbs />
         </Box>
-        {/* Changes Alert
+
         {itemsWithChanges.length > 0 && (
           <Alert
             severity="warning"
             sx={{
-              mb : 2,
+              mb: 2,
               borderRadius: 1,
               backgroundColor: alpha("#ff9800", 0.05),
               border: "2px solid #ff9800",
@@ -1917,7 +2004,7 @@ const AdminAllItemsPage = () => {
                   }}
                 >
                   <Warning fontSize="small" />
-                  🟠 Unconfirmed Changes
+                  Unconfirmed Changes
                 </Typography>
                 <Typography
                   variant="body2"
@@ -1927,9 +2014,35 @@ const AdminAllItemsPage = () => {
                   and require admin confirmation.
                 </Typography>
               </Box>
+              <CustomButton
+                variant="contained"
+                color="warning"
+                startIcon={<DoneAll />}
+                onClick={handleBulkAcknowledgeAllChanges}
+                loading={bulkAcknowledging}
+                sx={{
+                  ml: 2,
+                  textTransform: "none",
+                  fontWeight: 600,
+                  px: 3,
+                  py: 1,
+                  fontSize: "0.9rem",
+                  borderRadius: 2,
+                  boxShadow: "0 4px 12px rgba(255, 152, 0, 0.3)",
+                  "&:hover": {
+                    backgroundColor: "#f57c00",
+                    boxShadow: "0 6px 16px rgba(255, 152, 0, 0.4)",
+                  },
+                }}
+              >
+                {bulkAcknowledging
+                  ? "Acknowledging..."
+                  : `Acknowledge All (${itemsWithChanges.length})`}
+              </CustomButton>
             </Box>
           </Alert>
-        )} */}
+        )}
+
         {/* Filter Section */}
         <Card
           sx={{
@@ -1973,7 +2086,6 @@ const AdminAllItemsPage = () => {
               </Grid>
 
               <Grid item xs={12} sm={3}>
-                {" "}
                 <FormControl fullWidth size="small" sx={{ width: "200px" }}>
                   <InputLabel>Filter by List</InputLabel>
                   <Select
@@ -2053,6 +2165,7 @@ const AdminAllItemsPage = () => {
             </Grid>
           </CardContent>
         </Card>
+
         {/* Main Content */}
         <Card
           sx={{
@@ -2263,6 +2376,7 @@ const AdminAllItemsPage = () => {
           </Box>
         </Card>
       </Box>
+
       <AddItemDialog
         open={addItemDialog}
         onClose={() => setAddItemDialog(false)}

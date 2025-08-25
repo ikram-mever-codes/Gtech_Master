@@ -20,7 +20,7 @@ import {
   getListsByCompanyName,
   acknowledgeListItemChanges,
   bulkAcknowledgeChanges,
-  // Add the new imports
+  acknowledgeItemChanges,
   fetchAllListsAndItems,
   refreshItemsFromMIS,
   getListItemWithRefresh,
@@ -77,16 +77,23 @@ router.get(
 router.post("/:listId/duplicate", authenticateMixed, duplicateList);
 router.put("/:listId", authenticateMixed, updateList);
 router.get("/:customerId/deliveries", authenticateMixed, getCustomerDeliveries);
+
+// Individual item acknowledge route
+router.put(
+  "/:listId/items/:itemId/acknowledge",
+  authenticateMixed,
+  acknowledgeItemChanges
+);
+
+// Legacy individual item acknowledge route (for backward compatibility)
 router.put(
   "/items/:itemId/acknowledge",
   authenticateMixed,
   acknowledgeListItemChanges
 );
-router.put(
-  "/:listId/bulk-acknowledge",
-  authenticateMixed,
-  bulkAcknowledgeChanges
-);
+
+// Bulk acknowledge route
+router.put("/all/bulk-acknowledge", authenticateMixed, bulkAcknowledgeChanges);
 
 // Add the new routes
 router.get("/admin/all-with-items", authenticateUser, fetchAllListsAndItems);
@@ -108,6 +115,7 @@ router.put(
   authenticateUser,
   rejectListItemChanges
 );
+
 router.get("/admin/all-lists", authenticateUser, getAllLists);
 
 export default router;
