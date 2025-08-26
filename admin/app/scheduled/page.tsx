@@ -145,6 +145,7 @@ import {
   fetchAllListsWithMISRefresh,
   refreshItemsFromMIS,
   acknowledgeItemChanges,
+  createNewList,
 } from "@/api/list";
 import { DELIVERY_STATUS, INTERVAL_OPTIONS } from "@/utils/interfaces";
 import { successStyles } from "@/utils/constants";
@@ -1436,11 +1437,231 @@ function EnhancedBreadcrumbs() {
   );
 }
 
+export function CreateListDialog({
+  open,
+  onClose,
+  customers,
+  onRefresh,
+}: {
+  open: boolean;
+  onClose: () => void;
+  customers: any[];
+  onRefresh?: () => void;
+}) {
+  const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
+  const [listName, setListName] = useState("");
+  const [description, setDescription] = useState("");
+  const [deliveryDate, setDeliveryDate] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!open) {
+      setSelectedCustomer(null);
+      setListName("");
+      setDescription("");
+      setDeliveryDate("");
+    }
+  }, [open]);
+
+  const handleCreateList = async () => {
+    if (!selectedCustomer || !listName.trim()) {
+      toast.error("Please select a customer and enter a list name");
+      return;
+    }
+
+    try {
+      setSaving(true);
+
+      const listData = {
+        name: listName.trim(),
+        description: description.trim() || undefined,
+        deliveryDate: deliveryDate || undefined,
+        customerId: selectedCustomer.id,
+      };
+
+      await createNewList(listData);
+
+      if (onRefresh) {
+        await onRefresh();
+      }
+
+      onClose();
+    } catch (error) {
+      console.error("Failed to create list:", error);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      maxWidth="md"
+      fullWidth
+      PaperProps={{
+        sx: {
+          borderRadius: 3,
+          boxShadow: "0 20px 40px rgba(0, 0, 0, 0.1)",
+        },
+      }}
+    >
+      <DialogTitle>
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+            <Assignment sx={{ color: "primary.main" }} />
+            <Typography variant="h6" fontWeight={600}>
+              Create New List
+            </Typography>
+          </Box>
+          <IconButton onClick={onClose} size="small">
+            <Close fontSize="small" />
+          </IconButton>
+        </Box>
+      </DialogTitle>
+
+      <DialogContent sx={{ p: 3 }}>
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
+          {/* Customer Selection */}
+          <FormControl fullWidth>
+            <InputLabel>Select Customer *</InputLabel>
+            <Select
+              value={selectedCustomer?.id || ""}
+              onChange={(e) => {
+                const customer = customers.find(
+                  (c: any) => c.id === e.target.value
+                );
+                setSelectedCustomer(customer);
+              }}
+              label="Select Customer *"
+              required
+            >
+              {customers.map((customer: any) => (
+                <MenuItem key={customer.id} value={customer.id}>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                    <Business fontSize="small" />
+                    <Typography>{customer.name}</Typography>
+                  </Box>
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          {/* List Name */}
+          <TextField
+            label="List Name *"
+            value={listName}
+            onChange={(e) => setListName(e.target.value)}
+            placeholder="Enter list name (e.g., Q1 2024 Orders, Monthly Supplies)"
+            fullWidth
+            required
+            variant="outlined"
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <Assignment sx={{ color: "primary.main" }} />
+                </InputAdornment>
+              ),
+            }}
+          />
+
+          {/* Description */}
+          <TextField
+            label="Description"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="Optional description for the list..."
+            fullWidth
+            multiline
+            rows={3}
+            variant="outlined"
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <FileText
+                    size={20}
+                    style={{ color: theme.palette.primary.main }}
+                  />
+                </InputAdornment>
+              ),
+            }}
+          />
+
+          {/* Selected Customer Preview */}
+          {selectedCustomer && (
+            <Card
+              sx={{
+                p: 2,
+                bgcolor: alpha(theme.palette.success.main, 0.05),
+                border: `1px solid ${alpha(theme.palette.success.main, 0.2)}`,
+              }}
+            >
+              <Box sx={{ display: "flex", gap: 2, alignItems: "center" }}>
+                <Box
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    width: 50,
+                    height: 50,
+                    borderRadius: "50%",
+                    bgcolor: alpha(theme.palette.primary.main, 0.1),
+                  }}
+                >
+                  <Business sx={{ color: "primary.main" }} />
+                </Box>
+                <Box sx={{ flex: 1 }}>
+                  <Typography variant="h6" fontWeight={600}>
+                    {selectedCustomer.name}
+                  </Typography>
+                  {selectedCustomer.email && (
+                    <Typography variant="body2" color="text.secondary">
+                      {selectedCustomer.email}
+                    </Typography>
+                  )}
+                  <Typography
+                    variant="caption"
+                    color="success.main"
+                    fontWeight={500}
+                  >
+                    Selected Customer
+                  </Typography>
+                </Box>
+              </Box>
+            </Card>
+          )}
+        </Box>
+      </DialogContent>
+
+      <DialogActions sx={{ p: 3, gap: 2 }}>
+        <CustomButton variant="outlined" onClick={onClose}>
+          Cancel
+        </CustomButton>
+        <CustomButton
+          variant="contained"
+          onClick={handleCreateList}
+          disabled={!selectedCustomer || !listName.trim()}
+          loading={saving}
+          startIcon={<Add />}
+        >
+          Create List
+        </CustomButton>
+      </DialogActions>
+    </Dialog>
+  );
+}
 // Main Admin All Items Page Component
 const AdminAllItemsPage = () => {
   const router = useRouter();
 
   // State management
+  const [createListDialog, setCreateListDialog] = useState(false);
   const [allItems, setAllItems] = useState<any[]>([]);
   const [allActivityLogs, setAllActivityLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -2253,6 +2474,7 @@ const AdminAllItemsPage = () => {
         )}
 
         {/* Filter Section */}
+        {/* Filter Section */}
         <Card
           sx={{
             mb: 2,
@@ -2266,119 +2488,133 @@ const AdminAllItemsPage = () => {
             <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
               <FilterList sx={{ color: "primary.main", mr: 1 }} />
               <Typography variant="h6" fontWeight={600}>
-                Filters
+                Filters & Actions
               </Typography>
             </Box>
 
-            <Grid container spacing={3} alignItems="center">
-              <Grid item xs={12} sm={3}>
-                <FormControl fullWidth size="small" sx={{ width: "200px" }}>
-                  <InputLabel>Filter by Customer</InputLabel>
-                  <Select
-                    value={selectedCustomer}
-                    onChange={(e) => {
-                      setSelectedCustomer(e.target.value);
-                      setSelectedList("");
-                    }}
-                    label="Filter by Customer"
-                  >
-                    <MenuItem value="">
-                      <em>All Customers</em>
-                    </MenuItem>
-                    {customers.map((customer) => (
-                      <MenuItem key={customer.id} value={customer.id}>
-                        {customer.name}
+            <div className="w-full flex justify-between items-center">
+              <Grid container spacing={3} alignItems="center">
+                <Grid item xs={12} sm={2.5}>
+                  <FormControl sx={{ width: "200px" }} fullWidth size="small">
+                    <InputLabel>Filter by Customer</InputLabel>
+                    <Select
+                      value={selectedCustomer}
+                      onChange={(e) => {
+                        setSelectedCustomer(e.target.value);
+                        setSelectedList("");
+                      }}
+                      label="Filter by Customer"
+                    >
+                      <MenuItem value="">
+                        <em>All Customers</em>
                       </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
+                      {customers.map((customer) => (
+                        <MenuItem key={customer.id} value={customer.id}>
+                          {customer.name}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
 
-              <Grid item xs={12} sm={3}>
-                <FormControl fullWidth size="small" sx={{ width: "200px" }}>
-                  <InputLabel>Filter by List</InputLabel>
-                  <Select
-                    value={selectedList}
-                    onChange={(e) => setSelectedList(e.target.value)}
-                    label="Filter by List"
-                    disabled={!selectedCustomer}
-                  >
-                    <MenuItem value="">
-                      <em>All Lists</em>
-                    </MenuItem>
-                    {availableLists.map((list) => (
-                      <MenuItem key={list.id} value={list.id}>
-                        {list.name}
+                <Grid item xs={12} sm={2.5}>
+                  <FormControl sx={{ width: "200px" }} fullWidth size="small">
+                    <InputLabel>Filter by List</InputLabel>
+                    <Select
+                      value={selectedList}
+                      onChange={(e) => setSelectedList(e.target.value)}
+                      label="Filter by List"
+                      disabled={!selectedCustomer}
+                    >
+                      <MenuItem value="">
+                        <em>All Lists</em>
                       </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
+                      {availableLists.map((list) => (
+                        <MenuItem key={list.id} value={list.id}>
+                          {list.name}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
 
-              <Grid item xs={12} sm={3}>
-                <FormControl fullWidth size="small" sx={{ width: "250px" }}>
-                  <InputLabel>Show Items</InputLabel>
-                  <Select
-                    value={showOnlyChanges ? "changes" : "all"}
-                    onChange={(e) =>
-                      setShowOnlyChanges(e.target.value === "changes")
-                    }
-                    label="Show Items"
-                  >
-                    <MenuItem value="all">All Items</MenuItem>
-                    <MenuItem value="changes">
-                      <Box
-                        sx={{ display: "flex", alignItems: "center", gap: 1 }}
-                      >
-                        <Warning
-                          fontSize="small"
-                          sx={{ color: "warning.main" }}
-                        />
-                        Items with Changes
-                        {itemsWithChanges.length > 0 && (
-                          <Chip
-                            label={itemsWithChanges.length}
-                            size="small"
-                            color="warning"
-                            sx={{ ml: 1 }}
+                <Grid item xs={12} sm={2.5}>
+                  <FormControl sx={{ width: "200px" }} fullWidth size="small">
+                    <InputLabel>Show Items</InputLabel>
+                    <Select
+                      value={showOnlyChanges ? "changes" : "all"}
+                      onChange={(e) =>
+                        setShowOnlyChanges(e.target.value === "changes")
+                      }
+                      label="Show Items"
+                    >
+                      <MenuItem value="all">All Items</MenuItem>
+                      <MenuItem value="changes">
+                        <Box
+                          sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                        >
+                          <Warning
+                            fontSize="small"
+                            sx={{ color: "warning.main" }}
                           />
-                        )}
-                      </Box>
-                    </MenuItem>
-                  </Select>
-                </FormControl>
-              </Grid>
+                          Items with Changes
+                          {itemsWithChanges.length > 0 && (
+                            <Chip
+                              label={itemsWithChanges.length}
+                              size="small"
+                              color="warning"
+                              sx={{ ml: 1 }}
+                            />
+                          )}
+                        </Box>
+                      </MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
 
-              <Grid item xs={12} sm={3}>
-                <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
-                  <Button
-                    variant="outlined"
-                    startIcon={<Clear />}
-                    onClick={() => {
-                      setSelectedCustomer("");
-                      setSelectedList("");
-                      setSearchTerm("");
-                      setShowOnlyChanges(false);
-                    }}
-                    size="small"
+                <Grid item xs={12} sm={2.5}>
+                  <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
+                    <Button
+                      variant="outlined"
+                      startIcon={<Clear />}
+                      onClick={() => {
+                        setSelectedCustomer("");
+                        setSelectedList("");
+                        setSearchTerm("");
+                        setShowOnlyChanges(false);
+                      }}
+                      size="small"
+                    >
+                      Clear Filters
+                    </Button>
+                    <Chip
+                      label={`${
+                        currentTab === 0
+                          ? filteredItems.length
+                          : filteredActivityLogs.length
+                      } ${currentTab === 0 ? "items" : "logs"}`}
+                      color="primary"
+                      variant="outlined"
+                    />
+                  </Box>
+                </Grid>
+              </Grid>
+              <Grid item xs={12} sm={2}>
+                <Box
+                  sx={{ display: "flex", gap: 1, justifyContent: "flex-end" }}
+                >
+                  <CustomButton
+                    variant="contained"
+                    startIcon={<Add />}
+                    onClick={() => setCreateListDialog(true)}
                   >
-                    Clear Filters
-                  </Button>
-                  <Chip
-                    label={`${
-                      currentTab === 0
-                        ? filteredItems.length
-                        : filteredActivityLogs.length
-                    } ${currentTab === 0 ? "items" : "logs"}`}
-                    color="primary"
-                    variant="outlined"
-                  />
+                    Create List
+                  </CustomButton>
                 </Box>
               </Grid>
-            </Grid>
+            </div>
           </CardContent>
         </Card>
-
         {/* Tabs Section */}
         <Card
           sx={{
@@ -2736,7 +2972,12 @@ const AdminAllItemsPage = () => {
           </TabPanel>
         </Card>
       </Box>
-
+      <CreateListDialog
+        open={createListDialog}
+        onClose={() => setCreateListDialog(false)}
+        customers={customers}
+        onRefresh={loadAllItems}
+      />
       <AddItemDialog
         open={addItemDialog}
         onClose={() => setAddItemDialog(false)}

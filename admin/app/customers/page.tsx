@@ -49,6 +49,7 @@ import {
   Mail,
   Settings,
   PlusIcon,
+  Edit,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
@@ -615,6 +616,16 @@ const CustomersPage = () => {
             },
           }}
         >
+          <MenuItem
+            onClick={() => {
+              router.push(`/customers/create?id=${selectedCustomerId}`);
+              handleActionClose();
+            }}
+          >
+            <Edit className="mr-2" size={18} color="#666" />
+            <Typography variant="body2">Edit Customer</Typography>
+          </MenuItem>
+
           <MenuItem
             onClick={() => {
               router.push(`/customers/${selectedCustomerId}`);

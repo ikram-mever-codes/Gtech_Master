@@ -112,7 +112,7 @@ const Section = ({ title, icon, children, action }: any) => {
     <Card
       sx={{
         mb: 4,
-        borderRadius: 3,
+        borderRadius: 2,
         boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
         border: "1px solid #f0f0f0",
         overflow: "visible",
@@ -143,7 +143,7 @@ const Section = ({ title, icon, children, action }: any) => {
                 mr: 2,
                 p: 1.2,
                 bgcolor: alpha(theme.palette.primary.main, 0.1),
-                borderRadius: 2,
+                borderRadius: 1,
               }}
             >
               {icon}
@@ -459,7 +459,7 @@ const CustomerProfilePage = () => {
         <Alert
           severity="error"
           sx={{
-            borderRadius: 2,
+            borderRadius: 1,
             mb: 2,
           }}
         >
@@ -512,7 +512,7 @@ const CustomerProfilePage = () => {
             hoverEffect="scale"
             color="primary"
             size="small"
-            sx={{ mb: 1 }}
+            sx={{ mb: 2 }}
           >
             Back to Customers
           </CustomButton>
@@ -564,21 +564,6 @@ const CustomerProfilePage = () => {
         >
           <CustomButton
             variant="outlined"
-            startIcon={<Share2 size={16} />}
-            color="secondary"
-            rounded="medium"
-            hoverEffect="scale"
-            shadow="small"
-            onClick={() => {
-              navigator.clipboard.writeText(window.location.href);
-              toast.success("Link copied to clipboard");
-            }}
-          >
-            Share
-          </CustomButton>
-
-          <CustomButton
-            variant="outlined"
             startIcon={<Settings size={16} />}
             onClick={() => setChangeStatusDialogOpen(true)}
             color="secondary"
@@ -589,17 +574,17 @@ const CustomerProfilePage = () => {
             Change Status
           </CustomButton>
 
-          {/* <CustomButton
+          <CustomButton
             variant="outlined"
             color="primary"
             startIcon={<Pencil size={16} />}
-            onClick={() => router.push(`/customers/${customerId}/edit`)}
+            onClick={() => router.push(`/customers/create?id=${customerId}`)}
             rounded="medium"
             hoverEffect="scale"
             shadow="small"
           >
             Edit
-          </CustomButton> */}
+          </CustomButton>
 
           <CustomButton
             variant="contained"
@@ -616,7 +601,7 @@ const CustomerProfilePage = () => {
       </Box>
 
       {/* Main content with tabs */}
-      <Box
+      {/* <Box
         sx={{
           borderBottom: 1,
           borderColor: "divider",
@@ -657,13 +642,13 @@ const CustomerProfilePage = () => {
             label="Profile"
           />
         </Tabs>
-      </Box>
+      </Box> */}
 
       {/* Profile Tab */}
       {currentTab === 0 && (
         <Box>
           <Grid container spacing={3}>
-            <Grid item xs={12} md={4}>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-[4rem]">
               {/* Company Card */}
               <Section
                 title="Company"
@@ -678,7 +663,7 @@ const CustomerProfilePage = () => {
                       )}&background=8CC21B&color=fff`
                     }
                     variant="rounded"
-                    sx={{ width: 70, height: 70, mr: 2, borderRadius: 2 }}
+                    sx={{ width: 70, height: 70, mr: 2, borderRadius: 1 }}
                   >
                     <Building2 size={36} />
                   </Avatar>
@@ -841,9 +826,9 @@ const CustomerProfilePage = () => {
                   </Grid>
                 </Box>
               </Section>
-            </Grid>
+            </div>
 
-            <Grid item xs={12} md={8}>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-[4rem]">
               {/* Billing Address */}
               <Section
                 title="Billing Address"
@@ -892,7 +877,7 @@ const CustomerProfilePage = () => {
                       sx={{
                         mt: 2,
                         p: 2,
-                        borderRadius: 2,
+                        borderRadius: 1,
                         bgcolor: alpha(theme.palette.primary.main, 0.05),
                         border: `1px solid ${alpha(
                           theme.palette.primary.main,
@@ -979,7 +964,7 @@ const CustomerProfilePage = () => {
                       sx={{
                         mt: 2,
                         p: 2,
-                        borderRadius: 2,
+                        borderRadius: 1,
                         bgcolor: alpha(theme.palette.primary.main, 0.05),
                         border: `1px solid ${alpha(
                           theme.palette.primary.main,
@@ -1027,7 +1012,7 @@ const CustomerProfilePage = () => {
                   </CustomButton>
                 </Box>
               </Section>
-            </Grid>
+            </div>
           </Grid>
         </Box>
       )}
@@ -1038,7 +1023,7 @@ const CustomerProfilePage = () => {
         onClose={() => setChangeStatusDialogOpen(false)}
         PaperProps={{
           sx: {
-            borderRadius: 3,
+            borderRadius: 2,
             width: "100%",
             maxWidth: "500px",
           },
@@ -1065,7 +1050,7 @@ const CustomerProfilePage = () => {
               value={newStatus}
               label="Status"
               onChange={(e) => setNewStatus(e.target.value)}
-              sx={{ borderRadius: 2 }}
+              sx={{ borderRadius: 1 }}
             >
               <MenuItem value={CustomerVerificationStatus.PENDING}>
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
@@ -1092,7 +1077,7 @@ const CustomerProfilePage = () => {
             <Alert
               severity="warning"
               icon={<AlertTriangle size={16} />}
-              sx={{ mt: 2, borderRadius: 2 }}
+              sx={{ mt: 2, borderRadius: 1 }}
             >
               Rejecting a customer will prevent them from placing new orders.
             </Alert>
@@ -1102,7 +1087,7 @@ const CustomerProfilePage = () => {
             <Alert
               severity="info"
               icon={<Info size={16} />}
-              sx={{ mt: 2, borderRadius: 2 }}
+              sx={{ mt: 2, borderRadius: 1 }}
             >
               The customer will be notified via email about their approval.
             </Alert>
@@ -1135,7 +1120,7 @@ const CustomerProfilePage = () => {
         onClose={() => setDeleteDialogOpen(false)}
         PaperProps={{
           sx: {
-            borderRadius: 3,
+            borderRadius: 2,
             width: "100%",
             maxWidth: "500px",
           },
@@ -1157,7 +1142,7 @@ const CustomerProfilePage = () => {
             cannot be undone and all associated data will be permanently
             removed.
           </DialogContentText>
-          <Alert severity="error" sx={{ mt: 2, borderRadius: 2 }}>
+          <Alert severity="error" sx={{ mt: 2, borderRadius: 1 }}>
             <AlertTitle>Warning</AlertTitle>
             This will also remove all order history, billing information, and
             other customer data.

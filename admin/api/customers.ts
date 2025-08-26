@@ -73,7 +73,9 @@ export const updateCustomerStatus = async (
 
 export const getSingleCustomer = async (customerId: string) => {
   try {
-    const res = await api.get(`/customers/single/${customerId}`);
+    const res: ResponseInterface = await api.get(
+      `/customers/single/${customerId}`
+    );
     return res;
   } catch (error) {
     handleApiError(error);
@@ -85,6 +87,21 @@ export const createCompany = async (payload: CreateCustomerPayload) => {
     toast.loading("Creating company...", loadingStyles);
     const res: ResponseInterface = await api.post(
       "/auth/customers/create",
+      payload
+    );
+    toast.dismiss();
+    toast.success(res.message, successStyles);
+    return res;
+  } catch (error) {
+    handleApiError(error);
+  }
+};
+
+export const updateCustomerProfile = async (payload: any) => {
+  try {
+    toast.loading("Updating company...", loadingStyles);
+    const res: ResponseInterface = await api.put(
+      "/auth/customers/edit",
       payload
     );
     toast.dismiss();

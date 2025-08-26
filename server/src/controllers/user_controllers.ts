@@ -11,6 +11,7 @@ import cloudinary from "../config/cloudinary";
 import fs from "fs";
 import { AppDataSource } from "../config/database";
 import { Customer } from "../models/customers";
+import { AuthorizedRequest } from "../middlewares/authorized";
 
 // Create User with Permissions (Admin/Super Admin only)
 export const createUser = async (
@@ -820,6 +821,112 @@ export const updateUser = async (
       success: true,
       message: "User updated successfully",
       data: userData,
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const updateCustomer = async (
+  req: AuthorizedRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const {
+      companyName,
+      legalName,
+      contactEmail,
+      contactPhoneNumber,
+      taxNumber,
+      addressLine1,
+      addressLine2,
+      postalCode,
+      city,
+      country,
+      deliveryAddressLine1,
+      deliveryAddressLine2,
+      deliveryPostalCode,
+      deliveryCity,
+      deliveryCountry,
+      id,
+    } = req.body;
+    const customerId = id;
+
+    const customerRepository = AppDataSource.getRepository(Customer);
+    const customer = await customerRepository.findOne({
+      where: { id: customerId },
+    });
+
+    if (!customer) {
+      return next(new ErrorHandler("Customer not found", 404));
+    }
+
+    // Handle avatar upload
+    if (req.file) {
+      if (!fs.existsSync(req.file.path)) {
+        return next(new ErrorHandler("File not found", 404));
+      }
+
+      try {
+        // Delete old avatar if exists
+        if (customer.avatar) {
+          const publicId = customer.avatar.split("/").pop()?.split(".")[0];
+          if (publicId) {
+            await cloudinary.uploader.destroy(publicId);
+          }
+        }
+
+        const result = await cloudinary.uploader.upload(req.file.path, {
+          folder: "customer_avatars",
+          width: 150,
+          crop: "scale",
+        });
+        fs.unlinkSync(req.file.path);
+        customer.avatar = result.secure_url;
+      } catch (uploadError) {
+        return next(new ErrorHandler("Error uploading avatar", 500));
+      }
+    }
+    console.log(legalName);
+    // Update fields
+    if (companyName) customer.companyName = companyName;
+    if (legalName) customer.legalName = legalName;
+    if (contactEmail) customer.contactEmail = contactEmail;
+    if (contactPhoneNumber) customer.contactPhoneNumber = contactPhoneNumber;
+    if (taxNumber) customer.taxNumber = taxNumber;
+    if (addressLine1) customer.addressLine1 = addressLine1;
+    if (addressLine2) customer.addressLine2 = addressLine2;
+    if (postalCode) customer.postalCode = postalCode;
+    if (city) customer.city = city;
+    if (country) customer.country = country;
+    if (deliveryAddressLine1)
+      customer.deliveryAddressLine1 = deliveryAddressLine1;
+    if (deliveryAddressLine2)
+      customer.deliveryAddressLine2 = deliveryAddressLine2;
+    if (deliveryPostalCode) customer.deliveryPostalCode = deliveryPostalCode;
+    if (deliveryCity) customer.deliveryCity = deliveryCity;
+    if (deliveryCountry) customer.deliveryCountry = deliveryCountry;
+
+    await customerRepository.save(customer);
+
+    // Filter sensitive data
+    const customerData = {
+      id: customer.id,
+      companyName: customer.companyName,
+      legalName: customer.legalName,
+      email: customer.email,
+      contactEmail: customer.contactEmail,
+      contactPhoneNumber: customer.contactPhoneNumber,
+      taxNumber: customer.taxNumber,
+      avatar: customer.avatar,
+      accountVerificationStatus: customer.accountVerificationStatus,
+    };
+
+    return res.status(200).json({
+      success: true,
+      message: "Profile updated successfully",
+      data: customerData,
     });
   } catch (error) {
     return next(error);

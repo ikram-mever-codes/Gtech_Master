@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useFormik } from "formik";
 import * as Yup from "yup";
 import {
@@ -37,8 +37,12 @@ import {
 } from "@mui/material";
 import theme from "@/styles/theme";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { createCompany } from "@/api/customers";
+import { useRouter, useSearchParams } from "next/navigation";
+import {
+  createCompany,
+  updateCustomerProfile,
+  getSingleCustomer,
+} from "@/api/customers";
 import CustomButton from "@/components/UI/CustomButton";
 
 interface FormValues {
@@ -124,8 +128,13 @@ const countries = [
 
 const CustomerCreatePage: React.FC = () => {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const customerId = searchParams.get("id");
+  const isEditMode = Boolean(customerId);
+
   const muiTheme = useTheme();
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(isEditMode);
   const [alertInfo, setAlertInfo] = useState<{
     show: boolean;
     message: string;
@@ -176,13 +185,22 @@ const CustomerCreatePage: React.FC = () => {
             : {}),
         };
 
-        // Call the API
-        const data = await createCompany(payload);
+        let data;
+        if (isEditMode && customerId) {
+          // Update existing customer
+          data = await updateCustomerProfile({ ...payload, id: customerId });
+        } else {
+          // Create new customer
+          data = await createCompany(payload);
+        }
+
         if (data?.success) {
           // Show success message
           setAlertInfo({
             show: true,
-            message: "Company created successfully!",
+            message: isEditMode
+              ? "Company updated successfully!"
+              : "Company created successfully!",
             severity: "success",
           });
 
@@ -191,7 +209,9 @@ const CustomerCreatePage: React.FC = () => {
       } catch (error) {
         setAlertInfo({
           show: true,
-          message: "Error creating company. Please try again.",
+          message: isEditMode
+            ? "Error updating company. Please try again."
+            : "Error creating company. Please try again.",
           severity: "error",
         });
       } finally {
@@ -199,6 +219,60 @@ const CustomerCreatePage: React.FC = () => {
       }
     },
   });
+
+  // Fetch customer data if in edit mode
+  useEffect(() => {
+    const fetchCustomerData = async () => {
+      if (isEditMode && customerId) {
+        try {
+          setIsLoading(true);
+          const data = await getSingleCustomer(customerId);
+
+          if (data?.success) {
+            const customer = data.data;
+
+            // Check if delivery address is same as billing
+            const sameAsBilling =
+              customer.deliveryAddressLine1 === customer.addressLine1 &&
+              customer.deliveryPostalCode === customer.postalCode &&
+              customer.deliveryCity === customer.city &&
+              customer.deliveryCountry === customer.country;
+
+            // Pre-fill form with customer data
+            formik.setValues({
+              companyName: customer.companyName || "",
+              email: customer.email || "",
+              contactEmail: customer.contactEmail || "",
+              contactPhoneNumber: customer.contactPhoneNumber || "",
+              taxNumber: customer.taxNumber || "",
+              legalName: customer.legalName || "",
+              addressLine1: customer.addressLine1 || "",
+              addressLine2: customer.addressLine2 || "",
+              postalCode: customer.postalCode || "",
+              city: customer.city || "",
+              country: customer.country || "",
+              deliveryAddressLine1: customer.deliveryAddressLine1 || "",
+              deliveryAddressLine2: customer.deliveryAddressLine2 || "",
+              deliveryPostalCode: customer.deliveryPostalCode || "",
+              deliveryCity: customer.deliveryCity || "",
+              deliveryCountry: customer.deliveryCountry || "",
+              sameAsBilling,
+            });
+          }
+        } catch (error) {
+          setAlertInfo({
+            show: true,
+            message: "Error loading customer data. Please try again.",
+            severity: "error",
+          });
+        } finally {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    fetchCustomerData();
+  }, [isEditMode, customerId]);
 
   // Handle alert close
   const handleAlertClose = (): void => {
@@ -211,6 +285,14 @@ const CustomerCreatePage: React.FC = () => {
   ) => {
     formik.setFieldValue("sameAsBilling", event.target.checked);
   };
+
+  if (isLoading) {
+    return (
+      <div className="w-full h-screen flex items-center justify-center">
+        <CircularProgress />
+      </div>
+    );
+  }
 
   return (
     <div className="w-full mx-auto">
@@ -264,10 +346,12 @@ const CustomerCreatePage: React.FC = () => {
                 fontWeight: 600,
               }}
             >
-              Create New Company
+              {isEditMode ? "Edit Company" : "Create New Company"}
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Add a new company account with billing and delivery information
+              {isEditMode
+                ? "Update company account information"
+                : "Add a new company account with billing and delivery information"}
             </Typography>
           </Box>
         </Box>
@@ -527,7 +611,13 @@ const CustomerCreatePage: React.FC = () => {
                 )
               }
             >
-              {isSubmitting ? "Creating..." : "Create Company"}
+              {isSubmitting
+                ? isEditMode
+                  ? "Updating..."
+                  : "Creating..."
+                : isEditMode
+                ? "Update Company"
+                : "Create Company"}
             </CustomButton>
           </div>
         </Box>

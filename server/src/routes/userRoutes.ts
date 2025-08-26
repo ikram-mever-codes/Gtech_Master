@@ -13,6 +13,7 @@ import {
   createCompany,
   getUserById,
   updateUser,
+  updateCustomer,
 } from "../controllers/user_controllers";
 import { authenticateUser } from "../middlewares/authorized";
 
@@ -41,5 +42,11 @@ router.post("/reset-password", resetPassword);
 // Customer Routes
 
 router.post("/customers/create", authenticateUser, createCompany);
+router.put(
+  "/customers/edit",
+  authenticateUser,
+  uploadSingleFile,
+  updateCustomer
+);
 
 export default router;
