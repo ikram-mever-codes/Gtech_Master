@@ -111,3 +111,17 @@ export const updateCustomerProfile = async (payload: any) => {
     handleApiError(error);
   }
 };
+
+export const deleteCustomer = async (customerId: string) => {
+  try {
+    toast.loading("Deleting customer...", loadingStyles);
+    const res: ResponseInterface = await api.delete(
+      `/auth/customers/${customerId}`
+    );
+    toast.dismiss();
+    toast.success(res.message, successStyles);
+    return res;
+  } catch (error) {
+    handleApiError(error);
+  }
+};

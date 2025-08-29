@@ -56,8 +56,13 @@ import { toast } from "react-hot-toast";
 import CustomButton from "@/components/UI/CustomButton";
 import CustomTable from "@/components/UI/CustomTable";
 import theme from "@/styles/theme";
-import { getAllCustomers, updateCustomerStatus } from "@/api/customers";
+import {
+  deleteCustomer,
+  getAllCustomers,
+  updateCustomerStatus,
+} from "@/api/customers";
 import { CustomerVerificationStatus } from "@/utils/interfaces";
+import { successStyles } from "@/utils/constants";
 
 // Main customer page component
 const CustomersPage = () => {
@@ -171,11 +176,11 @@ const CustomersPage = () => {
 
   const handleDelete = async () => {
     try {
-      toast.success(
-        `Customer ${selectedCustomer.companyName} would be deleted`
-      );
-      setDeleteDialogOpen(false);
-      handleActionClose();
+      const data = await deleteCustomer(selectedCustomer.id);
+      if (data?.success) {
+        await fetchCustomers();
+        toast.success("Customer deleted successfully", successStyles);
+      }
     } catch (error) {
       console.error("Error deleting customer:", error);
     }

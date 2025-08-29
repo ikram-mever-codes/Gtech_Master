@@ -14,6 +14,7 @@ import {
   getUserById,
   updateUser,
   updateCustomer,
+  deleteCustomer,
 } from "../controllers/user_controllers";
 import { authenticateUser } from "../middlewares/authorized";
 
@@ -48,5 +49,7 @@ router.put(
   uploadSingleFile,
   updateCustomer
 );
+
+router.delete("/customers/:customerId", deleteCustomer);
 
 export default router;

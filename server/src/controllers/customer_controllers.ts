@@ -114,18 +114,59 @@ export const requestCustomerAccount = async (
     // Send verification email
     const verificationUrl = `${process.env.STAR_URL}/verify-email?code=${emailVerificationCode}`;
     const displayName = legalName || companyName;
-    const message = `
-      <h2>Welcome to Our Platform</h2>
-      <p>Thank you for registering your company ${displayName}.</p>
-      <p>Please verify your email by clicking the link below:</p>
-      <a href="${verificationUrl}">Verify Email</a>
-      <p>This link will expire in 24 hours.</p>
+
+    const htmlMessage = `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Email Verification</title>
+</head>
+<body>
+    <h2>Welcome to Our Platform</h2>
+    <p>Hello ${displayName},</p>
+    
+    <p>Thank you for registering your company <strong>${companyName}</strong>.</p>
+    
+    <p>Please verify your email by clicking the link below:</p>
+    
+    <p><a href="${verificationUrl}">Verify Email Address</a></p>
+    
+    <p>Or copy and paste this link into your browser:</p>
+    <p>${verificationUrl}</p>
+    
+    <p>This link will expire in 24 hours for security reasons.</p>
+    
+    <hr>
+    <p><small>This is an automated message. Please do not reply to this email.</small></p>
+</body>
+</html>
+    `;
+
+    const textMessage = `
+Welcome to Our Platform
+
+Hello ${displayName},
+
+Thank you for registering your company ${companyName}.
+
+Please verify your email by clicking this link:
+${verificationUrl}
+
+This link will expire in 24 hours for security reasons.
+
+This is an automated message. Please do not reply to this email.
     `;
 
     await sendEmail({
       to: email,
-      subject: "Verify Your Email",
-      html: message,
+      subject: "Verify Your Email Address",
+      html: htmlMessage,
+      text: textMessage,
+      headers: {
+        "X-Priority": "3",
+        "X-Mailer": "Gtech Industries Gmbh",
+      },
     });
 
     return res.status(201).json({
@@ -140,7 +181,8 @@ export const requestCustomerAccount = async (
       },
     });
   } catch (error) {
-    return next(error);
+    console.error("Request customer account error:", error);
+    return next(new ErrorHandler("Failed to create customer account", 500));
   }
 };
 
@@ -507,6 +549,7 @@ export const changePassword = async (
 };
 
 // 7. Forgot Password
+// 7. Forgot Password
 export const forgotPassword = async (
   req: Request,
   res: Response,
@@ -523,9 +566,11 @@ export const forgotPassword = async (
     const customer = await customerRepository.findOne({ where: { email } });
 
     if (!customer) {
-      return next(
-        new ErrorHandler("Customer with this email does not exist", 404)
-      );
+      // Don't reveal that email doesn't exist for security
+      return res.status(200).json({
+        success: true,
+        message: "If the email exists, a password reset link has been sent",
+      });
     }
 
     // Generate reset token
@@ -536,28 +581,88 @@ export const forgotPassword = async (
     customer.resetPasswordExp = resetPasswordExp;
     await customerRepository.save(customer);
 
-    // Send reset email
+    // Send reset email with improved content
     const resetUrl = `${process.env.STAR_URL}/reset-password?token=${resetToken}`;
+
     const message = `
-      <h2>Password Reset Request</h2>
-      <p>You requested a password reset. Click the link below to reset your password:</p>
-      <a href="${resetUrl}">Reset Password</a>
-      <p>This link will expire in 30 minutes.</p>
-      <p>If you didn't request this, please ignore this email.</p>
+      <!DOCTYPE html>
+      <html>
+      <head>
+          <meta charset="UTF-8">
+          <title>Password Reset</title>
+      </head>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6;">
+          <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+              <h2 style="color: #333;">Password Reset Request</h2>
+              <p>Hello ${customer.companyName || "there"},</p>
+              <p>We received a request to reset your password. Click the button below to proceed:</p>
+              
+              <div style="text-align: center; margin: 30px 0;">
+                  <a href="${resetUrl}" 
+                     style="background-color: #007bff; color: white; padding: 12px 24px; 
+                            text-decoration: none; border-radius: 4px; display: inline-block;">
+                      Reset Your Password
+                  </a>
+              </div>
+              
+              <p>Or copy and paste this link into your browser:</p>
+              <p style="word-break: break-all; color: #666;">${resetUrl}</p>
+              
+              <p>This link will expire in 30 minutes for security reasons.</p>
+              
+              <p>If you didn't request this password reset, please ignore this email or 
+                 contact our support team if you have concerns.</p>
+                 
+              <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+              
+              <p style="color: #999; font-size: 12px;">
+                  This is an automated message. Please do not reply to this email.<br>
+                  If you need assistance, contact our support team.
+              </p>
+          </div>
+      </body>
+      </html>
+    `;
+
+    const textVersion = `
+Password Reset Request
+
+Hello ${customer.companyName || "there"},
+
+We received a request to reset your password for your account.
+
+Reset your password here: ${resetUrl}
+
+This link will expire in 30 minutes for security reasons.
+
+If you didn't request this password reset, please ignore this email or contact our support team if you have concerns.
+
+This is an automated message. Please do not reply to this email.
     `;
 
     await sendEmail({
       to: email,
-      subject: "Password Reset Request",
+      subject: "Reset Your Password - Action Required", // More professional subject
       html: message,
+      text: textVersion, // Add text version for better deliverability
+      headers: {
+        "X-Priority": "3",
+        "X-Mailer": "Gtech Industries Gmbh",
+        "List-Unsubscribe": `<mailto:${
+          process.env.SUPPORT_EMAIL || "contact@gtech.de"
+        }>`,
+      },
     });
 
     return res.status(200).json({
       success: true,
-      message: "Password reset link sent to your email",
+      message: "If the email exists, a password reset link has been sent",
     });
   } catch (error) {
-    return next(error);
+    console.error("Forgot password error:", error);
+    return next(
+      new ErrorHandler("Failed to process password reset request", 500)
+    );
   }
 };
 
@@ -645,65 +750,48 @@ export const updateCustomerStatus = async (
     await customerRepository.save(customer);
 
     // Send status update notification
-    const message = `
-  <div style="font-family: Arial, sans-serif; line-height: 1.6;">
-    <h2 style="color: #1a365d;">Account Status Update</h2>
+    const htmlMessage = `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Account Status Update</title>
+</head>
+<body>
+    <h2>Account Status Update</h2>
     
-    <p>Dear Valued Customer,</p>
+    <p>Dear ${customer.companyName},</p>
 
-    <p>We're writing to inform you that your account status for <strong>${
-      customer.companyName
-    }</strong> has been updated to: 
-    <span style="color: ${
-      status === "verified" ? "#2d7a45" : "#b21a17"
-    }; font-weight: bold;">
-      ${status.toUpperCase()}
-    </span></p>
+    <p>We're writing to inform you that your account status has been updated to: <strong>${status.toUpperCase()}</strong></p>
 
     ${
       status === "verified"
         ? `
-      <div style="background: #f0faf4; padding: 15px; border-radius: 5px; margin: 20px 0;">
-        <h3 style="color: #2d7a45; margin-top: 0;">Welcome Aboard!</h3>
-        <p>Your account is now fully activated. You can access our platform using the button below:</p>
-        <p style="margin: 25px 0;">
-          <a href="${process.env.STAR_URL}/login" 
-             style="background: #2d7a45; color: white; padding: 12px 25px; 
-                    text-decoration: none; border-radius: 4px; font-weight: bold;">
-            Login to Your Account
-          </a>
-        </p>
-        <p><strong>First-time login instructions:</strong></p>
-        <ol>
-          <li>Use your registered email: ${customer.email}</li>
-          <li>Click "Forgot Password" if you need to set/reset your credentials</li>
-          <li>Contact support if you experience any issues</li>
-        </ol>
-      </div>
+      <h3>Welcome Aboard!</h3>
+      <p>Your account is now fully activated. You can access our platform using the link below:</p>
+      <p><a href="${process.env.STAR_URL}/login">Login to Your Account</a></p>
+      
+      <p><strong>First-time login instructions:</strong></p>
+      <ol>
+        <li>Use your registered email: ${customer.email}</li>
+        <li>Click "Forgot Password" if you need to set/reset your credentials</li>
+        <li>Contact support if you experience any issues</li>
+      </ol>
     `
         : ""
     }
 
     ${
-      status === "suspended"
+      status === "rejected"
         ? `
-      <div style="background: #fdf0f0; padding: 15px; border-radius: 5px; margin: 20px 0;">
-        <h3 style="color: #b21a17; margin-top: 0;">Account Access Temporarily Restricted</h3>
-        <p>Your account has been suspended due to:</p>
-        <ul>
-          <li>Unusual activity detected</li>
-          <li>Outstanding documentation requirements</li>
-          <li>Policy violation concerns</li>
-        </ul>
-        <p><strong>Next Steps:</strong></p>
-        <ol>
-          <li>Contact our support team immediately at 
-            <a href="mailto:support@accez.cloud">support@accez.cloud</a>
-          </li>
-          <li>Provide any requested documentation</li>
-          <li>Allow 24-48 hours for reinstatement review</li>
-        </ol>
-      </div>
+      <h3>Account Verification Required</h3>
+      <p>We were unable to verify your account. Please contact our support team for more information.</p>
+      <p><strong>Next Steps:</strong></p>
+      <ol>
+        <li>Contact our support team at support@accez.cloud</li>
+        <li>Provide any requested documentation</li>
+        <li>We'll assist you with the verification process</li>
+      </ol>
     `
         : ""
     }
@@ -711,41 +799,94 @@ export const updateCustomerStatus = async (
     ${
       status === "pending"
         ? `
-      <div style="background: #fff8e6; padding: 15px; border-radius: 5px; margin: 20px 0;">
-        <h3 style="color: #8a6d3b; margin-top: 0;">Verification in Progress</h3>
-        <p>We're currently reviewing your submitted documents. You can:</p>
-        <ul>
-          <li>Check your verification status at 
-            <a href="${process.env.APP_URL}/dashboard">${process.env.APP_URL}/dashboard</a>
-          </li>
-          <li>Upload additional documents through our portal</li>
-          <li>Expect resolution within 3-5 business days</li>
-        </ul>
-      </div>
+      <h3>Verification in Progress</h3>
+      <p>We're currently reviewing your submitted documents.</p>
+      <p>You can check your verification status at: <a href="${process.env.STAR_URL}/dashboard">${process.env.STAR_URL}/dashboard</a></p>
+      <p>Expect resolution within 3-5 business days.</p>
     `
         : ""
     }
 
-    <p style="margin-top: 25px;"><strong>Security Note:</strong> Never share your login credentials. Our team will never ask for your password.</p>
+    <p><strong>Security Note:</strong> Never share your login credentials. Our team will never ask for your password.</p>
 
-    <div style="margin-top: 30px; border-top: 1px solid #eee; padding-top: 15px;">
-      <p>Best regards,<br>
-      The Accez Platform Team</p>
-      
-      <p style="font-size: 0.9em; color: #666;">
-        Contact Support:<br>
-        📞 +1 (800) 123-4567<br>
-        📧 <a href="mailto:support@accez.cloud">support@accez.cloud</a><br>
-        🏢 123 Business Street, Tech City, TX 75001
-      </p>
-    </div>
-  </div>
-`;
+    <hr>
+    <p>Best regards,<br>
+    The Platform Team</p>
+    
+    <p><small>Contact Support: support@accez.cloud</small></p>
+</body>
+</html>
+    `;
+
+    const textMessage = `
+Account Status Update
+
+Dear ${customer.companyName},
+
+We're writing to inform you that your account status has been updated to: ${status.toUpperCase()}
+
+${
+  status === "verified"
+    ? `
+Welcome Aboard!
+
+Your account is now fully activated. You can access our platform here:
+${process.env.STAR_URL}/login
+
+First-time login instructions:
+1. Use your registered email: ${customer.email}
+2. Click "Forgot Password" if you need to set/reset your credentials
+3. Contact support if you experience any issues
+`
+    : ""
+}
+
+${
+  status === "rejected"
+    ? `
+Account Verification Required
+
+We were unable to verify your account. Please contact our support team for more information.
+
+Next Steps:
+1. Contact our support team at support@accez.cloud
+2. Provide any requested documentation
+3. We'll assist you with the verification process
+`
+    : ""
+}
+
+${
+  status === "pending"
+    ? `
+Verification in Progress
+
+We're currently reviewing your submitted documents.
+
+You can check your verification status at: ${process.env.STAR_URL}/dashboard
+
+Expect resolution within 3-5 business days.
+`
+    : ""
+}
+
+Security Note: Never share your login credentials. Our team will never ask for your password.
+
+Best regards,
+The Platform Team
+
+Contact Support: support@accez.cloud
+    `;
 
     await sendEmail({
       to: customer.email,
-      subject: "Account Status Update",
-      html: message,
+      subject: `Account Status Update: ${status.toUpperCase()}`,
+      html: htmlMessage,
+      text: textMessage,
+      headers: {
+        "X-Priority": "3",
+        "X-Mailer": "Gtech Industries Gmbh",
+      },
     });
 
     return res.status(200).json({
@@ -757,7 +898,8 @@ export const updateCustomerStatus = async (
       },
     });
   } catch (error) {
-    return next(error);
+    console.error("Update customer status error:", error);
+    return next(new ErrorHandler("Failed to update customer status", 500));
   }
 };
 

@@ -42,8 +42,8 @@ async function fetchItemData(itemId: number) {
         c.cargo_type_id,
         ct.cargo_type,
         wi.item_name_de,
-        wi.item_no_de -- 👈 Added item_no_de here
-      FROM items i
+        wi.item_no_de 
+             FROM items i
       LEFT JOIN order_items oi ON i.ItemID_DE = oi.ItemID_DE
       LEFT JOIN order_statuses os ON oi.master_id = os.master_id AND oi.ItemID_DE = os.ItemID_DE
       LEFT JOIN cargos c ON os.cargo_id = c.id
@@ -1423,19 +1423,28 @@ export const deleteList = async (
       return next(new ErrorHandler("Not authorized to delete this list", 403));
     }
 
+    // Check if list has any items
     if (list.items && list.items.length > 0) {
-      await listItemRepository.remove(list.items);
+      return next(
+        new ErrorHandler(
+          "Cannot delete list. List contains items. Please delete all items first.",
+          400
+        )
+      );
     }
 
+    // Only proceed with deletion if list has no items
+    // Delete activity logs (if any)
     if (list.activityLogs && list.activityLogs.length > 0) {
       await listActivityLogRepository.remove(list.activityLogs);
     }
 
+    // Delete the list
     await listRepository.remove(list);
 
     return res.status(200).json({
       success: true,
-      message: "List and all associated items deleted successfully",
+      message: "List deleted successfully",
     });
   } catch (error) {
     return next(error);

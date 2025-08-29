@@ -12,6 +12,7 @@ import fs from "fs";
 import { AppDataSource } from "../config/database";
 import { Customer } from "../models/customers";
 import { AuthorizedRequest } from "../middlewares/authorized";
+import { CustomerCreator, List, LIST_STATUS, ListItem } from "../models/list";
 
 // Create User with Permissions (Admin/Super Admin only)
 export const createUser = async (
@@ -628,6 +629,7 @@ export const createCompany = async (
     }
 
     const customerRepository = AppDataSource.getRepository(Customer);
+    const listRepository = AppDataSource.getRepository(List);
     const existingCustomer = await customerRepository.findOne({
       where: { email },
     });
@@ -640,30 +642,54 @@ export const createCompany = async (
     const tempPassword = crypto.randomBytes(8).toString("hex");
     const hashedPassword = await bcrypt.hash(tempPassword, 10);
 
-    // Create customer (company)
-    const customer = customerRepository.create({
-      companyName,
-      email,
-      contactEmail,
-      contactPhoneNumber,
-      taxNumber,
-      legalName,
-      addressLine1,
-      addressLine2,
-      postalCode,
-      city,
-      country,
-      deliveryAddressLine1,
-      deliveryAddressLine2,
-      deliveryPostalCode,
-      deliveryCity,
-      deliveryCountry,
-      password: hashedPassword,
-      accountVerificationStatus: "verified",
-      isEmailVerified: true,
-    });
+    // Use transaction to ensure both customer and list are created together
+    const result = await AppDataSource.transaction(
+      async (transactionalEntityManager) => {
+        // Create customer (company)
+        const customer = customerRepository.create({
+          companyName,
+          email,
+          contactEmail,
+          contactPhoneNumber,
+          taxNumber,
+          legalName,
+          addressLine1,
+          addressLine2,
+          postalCode,
+          city,
+          country,
+          deliveryAddressLine1,
+          deliveryAddressLine2,
+          deliveryPostalCode,
+          deliveryCity,
+          deliveryCountry,
+          password: hashedPassword,
+          accountVerificationStatus: "verified",
+          isEmailVerified: true,
+        });
 
-    await customerRepository.save(customer);
+        // Save customer
+        const savedCustomer = await transactionalEntityManager.save(customer);
+
+        // Create default list for the customer
+        const defaultList = listRepository.create({
+          name: `${companyName} - Default List`,
+          description: `Default list for ${companyName}`,
+          customer: savedCustomer,
+          createdBy: {
+            customer: savedCustomer,
+          } as CustomerCreator,
+          status: LIST_STATUS.ACTIVE,
+        });
+
+        // Save the default list
+        const savedList = await transactionalEntityManager.save(defaultList);
+
+        return { customer: savedCustomer, list: savedList };
+      }
+    );
+
+    const { customer, list } = result;
 
     const loginLink = `${process.env.STAR_URL}/login`;
     const message = `
@@ -674,6 +700,7 @@ export const createCompany = async (
       <p><strong>Temporary Password:</strong> ${tempPassword}</p>
       <p>Please login <a href="${loginLink}">here</a> and change your password.</p>
       <p>You can now start using our platform with your company account.</p>
+      <p>A default list "${list.name}" has been created for your company.</p>
     `;
 
     await sendEmail({
@@ -699,15 +726,22 @@ export const createCompany = async (
       contactEmail: customer.contactEmail,
       contactPhoneNumber: customer.contactPhoneNumber,
       createdAt: customer.createdAt,
+      defaultList: {
+        id: list.id,
+        name: list.name,
+        listNumber: list.listNumber,
+      },
     };
 
     return res.status(201).json({
       success: true,
-      message: "Company created successfully. Credentials sent to email.",
+      message:
+        "Company created successfully with default list. Credentials sent to email.",
       data: customerData,
     });
   } catch (error) {
-    return next(error);
+    console.error("Error creating company:", error);
+    return next(new ErrorHandler("Failed to create company account", 500));
   }
 };
 
@@ -930,5 +964,128 @@ export const updateCustomer = async (
     });
   } catch (error) {
     return next(error);
+  }
+};
+
+export const deleteCustomer = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { customerId } = req.params;
+
+    if (!customerId) {
+      return next(new ErrorHandler("Customer ID is required", 400));
+    }
+
+    const customerRepository = AppDataSource.getRepository(Customer);
+    const listRepository = AppDataSource.getRepository(List);
+    const listItemRepository = AppDataSource.getRepository(ListItem);
+
+    // Check if customer exists
+    const customer = await customerRepository.findOne({
+      where: { id: customerId },
+    });
+
+    if (!customer) {
+      return next(new ErrorHandler("Customer not found", 404));
+    }
+
+    // Check for any related entities that would prevent deletion
+    const [
+      listsWithItemsCount,
+      invoiceCount,
+      // Add other entity counts here as needed
+    ] = await Promise.all([
+      // Check for lists with items
+      listRepository
+        .createQueryBuilder("list")
+        .innerJoin("list.items", "item")
+        .where("list.customerId = :customerId", { customerId })
+        .getCount(),
+
+      // Check for invoices
+      AppDataSource.getRepository("Invoice") // Replace "Invoice" with your actual invoice entity name
+        .createQueryBuilder("invoice")
+        .where("invoice.customerId = :customerId", { customerId })
+        .getCount(),
+
+      // Add checks for other related entities here
+    ]);
+
+    if (listsWithItemsCount > 0) {
+      return next(
+        new ErrorHandler(
+          "Cannot delete customer. Customer has lists with items. Please delete all items first.",
+          400
+        )
+      );
+    }
+
+    if (invoiceCount > 0) {
+      return next(
+        new ErrorHandler(
+          "Cannot delete customer. Customer has associated invoices. Please delete all invoices first.",
+          400
+        )
+      );
+    }
+
+    // Add other entity checks here
+
+    // Use a transaction to ensure data consistency
+    await AppDataSource.transaction(async (transactionalEntityManager) => {
+      // Delete all related entities in the correct order
+
+      // 1. First delete list items (though we already checked there are none with items)
+      await transactionalEntityManager
+        .createQueryBuilder()
+        .delete()
+        .from(ListItem)
+        .where(
+          "listId IN (SELECT id FROM list WHERE customerId = :customerId)",
+          { customerId }
+        )
+        .execute();
+
+      // 2. Delete empty lists
+      await transactionalEntityManager
+        .createQueryBuilder()
+        .delete()
+        .from(List)
+        .where("customerId = :customerId", { customerId })
+        .execute();
+
+      // 3. Delete any other related entities (invoices, etc.)
+      // Example for invoices - you might want to handle this differently
+      // await transactionalEntityManager
+      //   .createQueryBuilder()
+      //   .delete()
+      //   .from(Invoice)
+      //   .where("customerId = :customerId", { customerId })
+      //   .execute();
+
+      // 4. Finally delete the customer
+      await transactionalEntityManager
+        .createQueryBuilder()
+        .delete()
+        .from(Customer)
+        .where("id = :customerId", { customerId })
+        .execute();
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Customer deleted successfully",
+    });
+  } catch (error) {
+    console.error("Error deleting customer:", error);
+    return next(
+      new ErrorHandler(
+        "Failed to delete customer. Please check all associated data has been removed.",
+        500
+      )
+    );
   }
 };

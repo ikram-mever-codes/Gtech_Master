@@ -104,6 +104,9 @@ export class Customer {
   @Column({ type: "timestamp", nullable: true })
   resetPasswordExp?: Date;
 
+  @Column({ nullable: true })
+  deletedAt!: Date;
+
   @CreateDateColumn()
   createdAt!: Date;
 

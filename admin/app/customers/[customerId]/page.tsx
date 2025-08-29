@@ -74,10 +74,15 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { toast } from "react-hot-toast";
-import { getSingleCustomer, updateCustomerStatus } from "@/api/customers";
+import {
+  deleteCustomer,
+  getSingleCustomer,
+  updateCustomerStatus,
+} from "@/api/customers";
 import theme from "@/styles/theme";
 import CustomButton from "@/components/UI/CustomButton";
 import { CustomerVerificationStatus } from "@/utils/interfaces";
+import { successStyles } from "@/utils/constants";
 
 // Interface for customer data
 interface CustomerDetails {
@@ -361,14 +366,13 @@ const CustomerProfilePage = () => {
   // Handle delete
   const handleDelete = async () => {
     try {
-      // This would be your actual API call
-      // await deleteCustomer(customerId);
-      toast.success(`Customer ${customer?.companyName} has been deleted`);
-      setDeleteDialogOpen(false);
-      // Navigate back to customers list
-      router.push("/customers");
+      const data = await deleteCustomer(customerId as string);
+      if (data?.success) {
+        setDeleteDialogOpen(false);
+        toast.success("Customer deleted successfully", successStyles);
+      }
     } catch (error) {
-      toast.error("Failed to delete customer");
+      console.error("Error deleting customer:", error);
     }
   };
 

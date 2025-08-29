@@ -1,10 +1,19 @@
 import nodemailer from "nodemailer";
 
+interface EmailOptions {
+  from?: string;
+  to: string;
+  subject: string;
+  text?: string;
+  html?: string;
+  headers?: Record<string, string>;
+}
+
 const createTransporter = () => {
   return nodemailer.createTransport({
-    service: "gmail",
-    secure: true,
+    host: "smtp.strato.de",
     port: 465,
+    secure: true,
     auth: {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_PASS,
@@ -15,35 +24,35 @@ const createTransporter = () => {
   });
 };
 
-const sendEmail = async (options: {
-  from?: string;
-  to: string;
-  encoding?: string;
-  subject: string;
-  headers?: any;
-  text?: string;
-  html?: string;
-}) => {
+const sendEmail = async (options: EmailOptions) => {
   const transporter = createTransporter();
 
   try {
-    await transporter.sendMail({
-      from: options.from || process.env.EMAIL_USER,
+    // Use a proper from format with name and email
+    const fromAddress =
+      options.from || `"Gtech Industires Gmbh" <${process.env.EMAIL_USER}>`;
+
+    const mailOptions = {
+      from: fromAddress,
       to: options.to,
       subject: options.subject,
       text: options.text,
       html: options.html,
-
-      encoding: options.encoding,
       headers: {
-        "Content-Type": 'text/html; charset="UTF-8"',
-        "Content-Transfer-Encoding": "base64",
+        "X-Priority": "3",
+        "X-Mailer": "Your App",
         ...options.headers,
       },
-    });
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+    console.log("Email sent successfully to:", options.to);
+    console.log("Message ID:", info.messageId);
+
+    return info;
   } catch (error) {
     console.error("Error sending email:", error);
-    throw new Error("Failed to Send Email! Please Try Again.");
+    throw new Error("Failed to send email. Please try again.");
   }
 };
 

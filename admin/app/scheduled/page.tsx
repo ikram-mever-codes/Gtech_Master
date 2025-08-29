@@ -611,6 +611,189 @@ const FieldHighlight = ({
   );
 };
 
+// Item Activity Logs Dialog Component
+function ItemActivityLogsDialog({
+  open,
+  onClose,
+  item,
+  activityLogs,
+  onSwitchToMainActivityTab,
+}: {
+  open: boolean;
+  onClose: () => void;
+  item: any;
+  activityLogs: any[];
+  onSwitchToMainActivityTab: () => void;
+}) {
+  const itemLogs = useMemo(() => {
+    return activityLogs.filter((log) => log.changes.itemId === item?.id);
+  }, [activityLogs, item]);
+
+  console.log(activityLogs);
+
+  const formatLogDescription = (log: any) => {
+    const date = new Date(log.performedAt).toLocaleDateString();
+    const userType = log.performedByType === "user" ? "Admin" : "Customer";
+    const userName = log.performedByName || userType;
+
+    if (log.changes) {
+      const changes = log.changes;
+
+      const changeKeys = Object.keys(changes);
+
+      if (changeKeys.length === 0) {
+        return `${date} ${userName} made changes`;
+      }
+
+      // Handle multiple changes
+      if (changeKeys.length > 1) {
+        const changedFields = changeKeys.join(", ");
+        return `${date} ${userName} changed multiple fields: ${changedFields}`;
+      }
+
+      // Handle single change
+      const field = changeKeys[0];
+      const changeData = changes[field];
+      const from = changeData.from ?? "(empty)";
+      const to = changeData.to ?? "(empty)";
+
+      // Special formatting for different field types
+      switch (field) {
+        case "comment":
+          return `${date} ${userName} changed comment from "${from}" to "${to}"`;
+
+        case "quantity":
+          return `${date} ${userName} changed quantity from ${from} to ${to}`;
+
+        case "articleName":
+          return `${date} ${userName} changed article name from "${from}" to "${to}"`;
+
+        case "articleNumber":
+          return `${date} ${userName} changed article number from "${from}" to "${to}"`;
+
+        case "interval":
+          return `${date} ${userName} changed interval from "${from}" to "${to}"`;
+
+        case "marked":
+          return `${date} ${userName} ${
+            to === "true" ? "marked" : "unmarked"
+          } the item`;
+
+        case "status":
+          return `${date} ${userName} changed status from "${from}" to "${to}"`;
+
+        case "deliveries":
+          return `${date} ${userName} updated delivery information`;
+
+        case "imageUrl":
+          if (from === "(empty)" && to !== "(empty)") {
+            return `${date} ${userName} added an image`;
+          } else if (to === "(empty)" && from !== "(empty)") {
+            return `${date} ${userName} removed the image`;
+          } else {
+            return `${date} ${userName} changed the image`;
+          }
+
+        default:
+          // For any other fields
+          return `${date} ${userName} changed ${field} from "${from}" to "${to}"`;
+      }
+    }
+
+    // Fallback if no changes are detected
+    return `${date} ${userName} performed action: ${log.action || "unknown"}`;
+  };
+
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      maxWidth="md"
+      fullWidth
+      PaperProps={{
+        sx: {
+          borderRadius: 3,
+          boxShadow: "0 20px 40px rgba(0, 0, 0, 0.1)",
+        },
+      }}
+    >
+      <DialogTitle>
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+            <History sx={{ color: "primary.main" }} />
+            <Box>
+              <Typography variant="h6" fontWeight={600}>
+                Activity Logs
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {item?.articleName || "Item"}
+              </Typography>
+            </Box>
+          </Box>
+          <IconButton onClick={onClose} size="small">
+            <Close fontSize="small" />
+          </IconButton>
+        </Box>
+      </DialogTitle>
+
+      <DialogContent sx={{ p: 3 }}>
+        <Box sx={{ maxHeight: 400, overflowY: "auto" }}>
+          {itemLogs.length === 0 ? (
+            <Box sx={{ textAlign: "center", py: 4 }}>
+              <History sx={{ fontSize: 48, color: "text.disabled", mb: 2 }} />
+              <Typography variant="h6" color="text.secondary" gutterBottom>
+                No activity logs found
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                This item has no recorded activities yet.
+              </Typography>
+            </Box>
+          ) : (
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+              {itemLogs.map((log, index) => (
+                <Card
+                  key={index}
+                  sx={{
+                    p: 2,
+                    border: "1px solid",
+                    borderColor: alpha("#E2E8F0", 0.8),
+                    "&:hover": {
+                      borderColor: alpha(theme.palette.primary.main, 0.3),
+                    },
+                  }}
+                >
+                  <Typography variant="body2" sx={{ fontSize: "14px" }}>
+                    {formatLogDescription(log)}
+                  </Typography>
+                </Card>
+              ))}
+            </Box>
+          )}
+        </Box>
+      </DialogContent>
+
+      <DialogActions sx={{ p: 3, gap: 2 }}>
+        <CustomButton
+          gradient={true}
+          onClick={onSwitchToMainActivityTab}
+          startIcon={<History />}
+        >
+          View All Activity Logs
+        </CustomButton>
+        <CustomButton variant="contained" onClick={onClose}>
+          Close
+        </CustomButton>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
 // Tab Panel Component
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -1656,6 +1839,7 @@ export function CreateListDialog({
     </Dialog>
   );
 }
+
 // Main Admin All Items Page Component
 const AdminAllItemsPage = () => {
   const router = useRouter();
@@ -1672,6 +1856,10 @@ const AdminAllItemsPage = () => {
   const [showOnlyChanges, setShowOnlyChanges] = useState(false);
   const [bulkAcknowledging, setBulkAcknowledging] = useState(false);
   const [currentTab, setCurrentTab] = useState(0);
+
+  // Activity logs dialog state
+  const [activityLogsDialog, setActivityLogsDialog] = useState(false);
+  const [selectedItemForLogs, setSelectedItemForLogs] = useState<any>(null);
 
   // Filter states
   const [selectedCustomer, setSelectedCustomer] = useState<string>("");
@@ -1924,6 +2112,18 @@ const AdminAllItemsPage = () => {
     },
     []
   );
+
+  // Handle opening activity logs for specific item
+  const handleOpenItemActivityLogs = (item: any) => {
+    setSelectedItemForLogs(item);
+    setActivityLogsDialog(true);
+  };
+
+  // Handle switching to main activity tab from item dialog
+  const handleSwitchToMainActivityTab = () => {
+    setActivityLogsDialog(false);
+    setCurrentTab(1); // Switch to activity logs tab
+  };
 
   // Filter items based on search term, customer, and list
   const filteredItems = useMemo(() => {
@@ -2266,6 +2466,31 @@ const AdminAllItemsPage = () => {
         ),
       },
       {
+        key: "activity_logs",
+        name: "Activity Logs",
+        width: 120,
+        resizable: false,
+        renderCell: (props: any) => (
+          <CustomButton
+            variant="outlined"
+            color="primary"
+            size="small"
+            onClick={() => handleOpenItemActivityLogs(props.row)}
+            startIcon={<History />}
+            sx={{
+              minWidth: "auto",
+              px: 2,
+              py: 0.5,
+              fontSize: "0.75rem",
+              textTransform: "none",
+              borderRadius: 2,
+            }}
+          >
+            Logs
+          </CustomButton>
+        ),
+      },
+      {
         key: "acknowledge",
         name: "Acknowledge",
         width: 120,
@@ -2400,80 +2625,6 @@ const AdminAllItemsPage = () => {
           <EnhancedBreadcrumbs />
         </Box>
 
-        {itemsWithChanges.length > 0 && (
-          <Alert
-            severity="warning"
-            sx={{
-              mb: 2,
-              borderRadius: 1,
-              backgroundColor: alpha("#ff9800", 0.05),
-              border: "2px solid #ff9800",
-              borderLeft: "6px solid #ff9800",
-              boxShadow: "0 6px 20px rgba(255, 152, 0, 0.2)",
-            }}
-          >
-            <Box
-              sx={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                width: "100%",
-              }}
-            >
-              <Box sx={{ flex: 1 }}>
-                <Typography
-                  variant="h6"
-                  sx={{
-                    fontWeight: 700,
-                    color: "#e65100",
-                    mb: 1,
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 1,
-                    fontSize: "1.1rem",
-                  }}
-                >
-                  <Warning fontSize="small" />
-                  Unconfirmed Changes
-                </Typography>
-                <Typography
-                  variant="body2"
-                  sx={{ color: "#ef6c00", mb: 1.5, fontWeight: 500 }}
-                >
-                  {itemsWithChanges.length} items have been changed by customers
-                  and require admin confirmation.
-                </Typography>
-              </Box>
-              <CustomButton
-                variant="contained"
-                color="warning"
-                startIcon={<DoneAll />}
-                onClick={handleBulkAcknowledgeAllChanges}
-                loading={bulkAcknowledging}
-                sx={{
-                  ml: 2,
-                  textTransform: "none",
-                  fontWeight: 600,
-                  px: 3,
-                  py: 1,
-                  fontSize: "0.9rem",
-                  borderRadius: 2,
-                  boxShadow: "0 4px 12px rgba(255, 152, 0, 0.3)",
-                  "&:hover": {
-                    backgroundColor: "#f57c00",
-                    boxShadow: "0 6px 16px rgba(255, 152, 0, 0.4)",
-                  },
-                }}
-              >
-                {bulkAcknowledging
-                  ? "Acknowledging..."
-                  : `Acknowledge All (${itemsWithChanges.length})`}
-              </CustomButton>
-            </Box>
-          </Alert>
-        )}
-
-        {/* Filter Section */}
         {/* Filter Section */}
         <Card
           sx={{
@@ -2615,6 +2766,7 @@ const AdminAllItemsPage = () => {
             </div>
           </CardContent>
         </Card>
+
         {/* Tabs Section */}
         <Card
           sx={{
@@ -2972,18 +3124,29 @@ const AdminAllItemsPage = () => {
           </TabPanel>
         </Card>
       </Box>
+
+      {/* Dialogs */}
       <CreateListDialog
         open={createListDialog}
         onClose={() => setCreateListDialog(false)}
         customers={customers}
         onRefresh={loadAllItems}
       />
+
       <AddItemDialog
         open={addItemDialog}
         onClose={() => setAddItemDialog(false)}
         customers={customers}
         lists={lists}
         onRefresh={loadAllItems}
+      />
+
+      <ItemActivityLogsDialog
+        open={activityLogsDialog}
+        onClose={() => setActivityLogsDialog(false)}
+        item={selectedItemForLogs}
+        activityLogs={allActivityLogs}
+        onSwitchToMainActivityTab={handleSwitchToMainActivityTab}
       />
     </Box>
   );
