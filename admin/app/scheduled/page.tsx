@@ -158,31 +158,41 @@ export function AddItemDialog({
   customers,
   lists,
   onRefresh,
+  selectedCustomerId,
+  selectedListId,
+  setSelectedCustomerId,
+  setSelectedListId,
 }: any) {
-  const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
-  const [selectedList, setSelectedList] = useState<any>(null);
+  const theme = useTheme();
   const [selectedItem, setSelectedItem] = useState<any>(null);
   const [items, setItems] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState<any>("");
   const [searchLoading, setSearchLoading] = useState(false);
   const [saving, setSaving] = useState<any>(false);
+  const [quantity, setQuantity] = useState<number | string>("");
+  const [interval, setInterval] = useState<string>("");
 
   useEffect(() => {
     if (!open) {
-      setSelectedCustomer(null);
-      setSelectedList(null);
       setSelectedItem(null);
       setItems([]);
       setSearchTerm("");
+      setQuantity("");
+      setInterval("");
     }
-  }, [open]);
+  }, [open, setSelectedCustomerId, setSelectedListId]);
 
   const availableLists = React.useMemo(() => {
-    if (!selectedCustomer) return [];
-    return lists.filter((list: any) => list.customerId === selectedCustomer.id);
-  }, [lists, selectedCustomer]);
+    if (!selectedCustomerId) return [];
+    return lists.filter((list: any) => list.customerId === selectedCustomerId);
+  }, [lists, selectedCustomerId]);
 
-  // Debounced search for items
+  const selectedCustomer =
+    customers.find((c: any) => c.id === selectedCustomerId) || null;
+
+  const selectedList =
+    availableLists.find((l: any) => l.id === selectedListId) || null;
+
   const debouncedSearch = useCallback(
     debounce(async (query: string) => {
       if (!query.trim()) {
@@ -210,8 +220,8 @@ export function AddItemDialog({
   }, [searchTerm, debouncedSearch]);
 
   const handleAddItem = async () => {
-    if (!selectedItem || !selectedList || !selectedCustomer) {
-      toast.error("Please complete all fields");
+    if (!selectedItem || !selectedListId || !selectedCustomerId) {
+      toast.error("Please complete all required fields");
       return;
     }
 
@@ -220,7 +230,8 @@ export function AddItemDialog({
 
       const itemData = {
         productId: selectedItem.id.toString(),
-        quantity: 1,
+        quantity: quantity ? Number(quantity) : 1,
+        interval: interval || "",
         notes: "",
         productName: selectedItem.name || "Unknown Item",
         sku: selectedItem.articleNumber || "",
@@ -228,12 +239,12 @@ export function AddItemDialog({
         price: 0,
         supplier: "",
         itemId: selectedItem.id.toString(),
-        listId: selectedList.id,
-        customerId: selectedCustomer.id,
+        listId: selectedListId,
+        customerId: selectedCustomerId,
         imageUrl: selectedItem.imageUrl || "",
       };
 
-      const response = await addItemToList(selectedList.id, itemData);
+      const response = await addItemToList(selectedListId, itemData);
 
       if (onRefresh) {
         await onRefresh();
@@ -242,6 +253,7 @@ export function AddItemDialog({
       onClose();
     } catch (error) {
       console.error("Failed to add item:", error);
+      toast.error("Failed to add item");
     } finally {
       setSaving(false);
     }
@@ -286,13 +298,10 @@ export function AddItemDialog({
           <FormControl fullWidth>
             <InputLabel>Select Customer</InputLabel>
             <Select
-              value={selectedCustomer?.id || ""}
+              value={selectedCustomerId || ""}
               onChange={(e) => {
-                const customer = customers.find(
-                  (c: any) => c.id === e.target.value
-                );
-                setSelectedCustomer(customer);
-                setSelectedList(null);
+                setSelectedCustomerId(e.target.value);
+                setSelectedListId(null);
               }}
               label="Select Customer"
             >
@@ -305,15 +314,12 @@ export function AddItemDialog({
           </FormControl>
 
           {/* List Selection */}
-          <FormControl fullWidth disabled={!selectedCustomer}>
+          <FormControl fullWidth disabled={!selectedCustomerId}>
             <InputLabel>Select List</InputLabel>
             <Select
-              value={selectedList?.id || ""}
+              value={selectedListId || ""}
               onChange={(e) => {
-                const list = availableLists.find(
-                  (l: any) => l.id === e.target.value
-                );
-                setSelectedList(list);
+                setSelectedListId(e.target.value);
               }}
               label="Select List"
             >
@@ -325,7 +331,7 @@ export function AddItemDialog({
             </Select>
           </FormControl>
 
-          {availableLists.length === 0 && selectedCustomer && (
+          {availableLists.length === 0 && selectedCustomerId && (
             <Alert severity="warning">
               No lists found for the selected customer.
             </Alert>
@@ -343,7 +349,7 @@ export function AddItemDialog({
             filterOptions={(x) => x}
             clearOnBlur={false}
             clearOnEscape={false}
-            disabled={!selectedList}
+            disabled={!selectedListId}
             renderOption={(props, option) => (
               <Box
                 component="li"
@@ -437,8 +443,41 @@ export function AddItemDialog({
             }}
           />
 
+          <div className="w-full h-max flex justify-between items-center gap-4">
+            {/* Quantity Input */}
+            <TextField
+              fullWidth
+              label="Quantity"
+              type="number"
+              value={quantity}
+              onChange={(e) => setQuantity(e.target.value)}
+              variant="outlined"
+              placeholder="Enter quantity"
+              InputProps={{
+                inputProps: { min: 0 },
+              }}
+            />
+
+            {/* Interval Selection */}
+            <FormControl fullWidth>
+              <InputLabel>Interval</InputLabel>
+              <Select
+                value={interval}
+                onChange={(e) => setInterval(e.target.value)}
+                label="Interval"
+              >
+                <MenuItem value="">None</MenuItem>
+                <MenuItem value="daily">Daily</MenuItem>
+                <MenuItem value="weekly">Weekly</MenuItem>
+                <MenuItem value="monthly">Monthly</MenuItem>
+                <MenuItem value="quarterly">Quarterly</MenuItem>
+                <MenuItem value="yearly">Yearly</MenuItem>
+              </Select>
+            </FormControl>
+          </div>
+
           {/* Selected Item Preview */}
-          {selectedItem && (
+          {selectedItem && selectedList && (
             <Card
               sx={{
                 p: 2,
@@ -488,14 +527,14 @@ export function AddItemDialog({
                     color="success.main"
                     fontWeight={500}
                   >
-                    Ready to add to: {selectedList?.name}
+                    Ready to add to: {selectedList.name}
                   </Typography>
                 </Box>
               </Box>
             </Card>
           )}
 
-          {!searchTerm && selectedList && (
+          {!searchTerm && selectedListId && (
             <Box
               sx={{
                 textAlign: "center",
@@ -522,7 +561,7 @@ export function AddItemDialog({
         <CustomButton
           variant="contained"
           onClick={handleAddItem}
-          disabled={!selectedItem || !selectedList || !selectedCustomer}
+          disabled={!selectedItem || !selectedListId || !selectedCustomerId}
           loading={saving}
         >
           Add Item
@@ -612,6 +651,7 @@ const FieldHighlight = ({
 };
 
 // Item Activity Logs Dialog Component
+
 function ItemActivityLogsDialog({
   open,
   onClose,
@@ -625,83 +665,21 @@ function ItemActivityLogsDialog({
   activityLogs: any[];
   onSwitchToMainActivityTab: () => void;
 }) {
+  const theme = useTheme();
+
   const itemLogs = useMemo(() => {
-    return activityLogs.filter((log) => log.changes.itemId === item?.id);
+    // Filter logs for the specific item and sort by timestamp (newest first)
+    return activityLogs
+      .filter((log) => log.itemId === item?.id)
+      .sort(
+        (a, b) =>
+          new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+      );
   }, [activityLogs, item]);
 
-  console.log(activityLogs);
-
   const formatLogDescription = (log: any) => {
-    const date = new Date(log.performedAt).toLocaleDateString();
-    const userType = log.performedByType === "user" ? "Admin" : "Customer";
-    const userName = log.performedByName || userType;
-
-    if (log.changes) {
-      const changes = log.changes;
-
-      const changeKeys = Object.keys(changes);
-
-      if (changeKeys.length === 0) {
-        return `${date} ${userName} made changes`;
-      }
-
-      // Handle multiple changes
-      if (changeKeys.length > 1) {
-        const changedFields = changeKeys.join(", ");
-        return `${date} ${userName} changed multiple fields: ${changedFields}`;
-      }
-
-      // Handle single change
-      const field = changeKeys[0];
-      const changeData = changes[field];
-      const from = changeData.from ?? "(empty)";
-      const to = changeData.to ?? "(empty)";
-
-      // Special formatting for different field types
-      switch (field) {
-        case "comment":
-          return `${date} ${userName} changed comment from "${from}" to "${to}"`;
-
-        case "quantity":
-          return `${date} ${userName} changed quantity from ${from} to ${to}`;
-
-        case "articleName":
-          return `${date} ${userName} changed article name from "${from}" to "${to}"`;
-
-        case "articleNumber":
-          return `${date} ${userName} changed article number from "${from}" to "${to}"`;
-
-        case "interval":
-          return `${date} ${userName} changed interval from "${from}" to "${to}"`;
-
-        case "marked":
-          return `${date} ${userName} ${
-            to === "true" ? "marked" : "unmarked"
-          } the item`;
-
-        case "status":
-          return `${date} ${userName} changed status from "${from}" to "${to}"`;
-
-        case "deliveries":
-          return `${date} ${userName} updated delivery information`;
-
-        case "imageUrl":
-          if (from === "(empty)" && to !== "(empty)") {
-            return `${date} ${userName} added an image`;
-          } else if (to === "(empty)" && from !== "(empty)") {
-            return `${date} ${userName} removed the image`;
-          } else {
-            return `${date} ${userName} changed the image`;
-          }
-
-        default:
-          // For any other fields
-          return `${date} ${userName} changed ${field} from "${from}" to "${to}"`;
-      }
-    }
-
-    // Fallback if no changes are detected
-    return `${date} ${userName} performed action: ${log.action || "unknown"}`;
+    // Use the pre-formatted message from the ActivityLog interface
+    return log.message;
   };
 
   return (
@@ -771,6 +749,15 @@ function ItemActivityLogsDialog({
                   <Typography variant="body2" sx={{ fontSize: "14px" }}>
                     {formatLogDescription(log)}
                   </Typography>
+                  {!log.acknowledged && log.userRole === "customer" && (
+                    <Typography
+                      variant="caption"
+                      color="warning.main"
+                      sx={{ mt: 1, display: "block" }}
+                    >
+                      Pending acknowledgment
+                    </Typography>
+                  )}
                 </Card>
               ))}
             </Box>
@@ -818,96 +805,34 @@ function TabPanel(props: TabPanelProps) {
 }
 
 // Activity Log Card Component
+
 function ActivityLogCard({ log, customerName, listName }: any) {
-  const getActionIcon = (action: string) => {
-    switch (action.toLowerCase()) {
-      case "item_added":
-      case "add":
-        return <Add sx={{ color: "success.main", fontSize: 18 }} />;
-      case "item_updated":
-      case "update":
-        return <Edit sx={{ color: "info.main", fontSize: 18 }} />;
-      case "item_deleted":
-      case "delete":
-        return <Delete sx={{ color: "error.main", fontSize: 18 }} />;
-      case "comment_added":
-        return <FileText />;
-      case "quantity_changed":
-        return <Inventory sx={{ color: "warning.main", fontSize: 18 }} />;
-      case "status_changed":
-        return <Timeline sx={{ color: "info.main", fontSize: 18 }} />;
-      default:
-        return <History sx={{ color: "text.secondary", fontSize: 18 }} />;
-    }
+  const theme = useTheme();
+
+  const getActionIcon = () => {
+    // Since the schema uses a pre-formatted message, we use a generic icon
+    // Adjust based on userRole for visual distinction
+    return log.userRole === "admin" ? (
+      <CheckCircle sx={{ color: "primary.main", fontSize: 18 }} />
+    ) : (
+      <History sx={{ color: "text.secondary", fontSize: 18 }} />
+    );
   };
 
-  const getActionColor = (action: string) => {
-    switch (action.toLowerCase()) {
-      case "item_added":
-      case "add":
-        return "success";
-      case "item_updated":
-      case "update":
-        return "info";
-      case "item_deleted":
-      case "delete":
-        return "error";
-      case "comment_added":
-        return "primary";
-      case "quantity_changed":
-        return "warning";
-      case "status_changed":
-        return "info";
-      default:
-        return "default";
-    }
+  const getActionColor = () => {
+    return log.userRole === "admin" ? "primary" : "secondary";
   };
 
-  const formatActionDescription = () => {
-    const { action, changes, performedByType } = log;
-    const userType = performedByType === "user" ? "Admin" : "Customer";
-
-    if (changes) {
-      const changeKeys = Object.keys(changes);
-      if (changeKeys.length > 0) {
-        const mainChange = changeKeys[0];
-        const changeData = changes[mainChange];
-
-        switch (action) {
-          case "item_updated":
-            if (changeData.from !== undefined && changeData.to !== undefined) {
-              return `${userType} changed ${mainChange} from "${changeData.from}" to "${changeData.to}"`;
-            }
-            return `${userType} updated ${mainChange}`;
-          case "comment_added":
-            return `${userType} added a comment: "${
-              changeData.to || changeData
-            }"`;
-          case "quantity_changed":
-            return `${userType} changed quantity from ${changeData.from} to ${changeData.to}`;
-          case "status_changed":
-            return `${userType} changed status from ${changeData.from} to ${changeData.to}`;
-          default:
-            return `${userType} performed ${action.replace("_", " ")}`;
-        }
-      }
+  const getAcknowledgmentStatus = () => {
+    if (log.userRole === "admin") {
+      return { color: "success", label: "Acknowledged", icon: <CheckCircle /> };
     }
-
-    return `${userType} performed ${action.replace("_", " ")}`;
+    return log.acknowledged
+      ? { color: "success", label: "Acknowledged", icon: <CheckCircle /> }
+      : { color: "warning", label: "Pending", icon: <HourglassEmpty /> };
   };
 
-  const getApprovalStatus = () => {
-    switch (log.approvalStatus) {
-      case "approved":
-        return { color: "success", label: "Approved", icon: <CheckCircle /> };
-      case "rejected":
-        return { color: "error", label: "Rejected", icon: <Cancel /> };
-      default:
-        return { color: "warning", label: "Pending", icon: <HourglassEmpty /> };
-    }
-  };
-
-  const approvalStatus = getApprovalStatus();
+  const acknowledgmentStatus = getAcknowledgmentStatus();
 
   return (
     <Card
@@ -935,14 +860,14 @@ function ActivityLogCard({ log, customerName, listName }: any) {
               height: 40,
               borderRadius: "50%",
               bgcolor: alpha(
-                theme.palette[getActionColor(log.action)]?.main ||
+                theme.palette[getActionColor()]?.main ||
                   theme.palette.grey[500],
                 0.1
               ),
               flexShrink: 0,
             }}
           >
-            {getActionIcon(log.action)}
+            {getActionIcon()}
           </Box>
 
           <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -952,16 +877,16 @@ function ActivityLogCard({ log, customerName, listName }: any) {
                 fontWeight={600}
                 sx={{ fontSize: "0.95rem" }}
               >
-                {formatActionDescription()}
+                {log.message}
               </Typography>
               <Chip
                 size="small"
-                color={approvalStatus.color as any}
+                color={acknowledgmentStatus.color as any}
                 variant="outlined"
-                icon={React.cloneElement(approvalStatus.icon, {
+                icon={React.cloneElement(acknowledgmentStatus.icon, {
                   fontSize: "small",
                 })}
-                label={approvalStatus.label}
+                label={acknowledgmentStatus.label}
                 sx={{ ml: "auto", fontSize: "0.7rem" }}
               />
             </Box>
@@ -999,25 +924,21 @@ function ActivityLogCard({ log, customerName, listName }: any) {
               <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
                 <AccessTime sx={{ fontSize: 14, color: "text.secondary" }} />
                 <Typography variant="caption" color="text.secondary">
-                  {new Date(log.performedAt).toLocaleString()}
+                  {new Date(log.timestamp).toLocaleString()}
                 </Typography>
               </Box>
 
-              {log.performedByType && (
-                <Chip
-                  size="small"
-                  variant="filled"
-                  color={
-                    log.performedByType === "user" ? "primary" : "secondary"
-                  }
-                  label={log.performedByType === "user" ? "Admin" : "Customer"}
-                  sx={{
-                    fontSize: "0.65rem",
-                    height: 20,
-                    "& .MuiChip-label": { px: 1 },
-                  }}
-                />
-              )}
+              <Chip
+                size="small"
+                variant="filled"
+                color={log.userRole === "admin" ? "primary" : "secondary"}
+                label={log.userRole === "admin" ? "Admin" : "Customer"}
+                sx={{
+                  fontSize: "0.65rem",
+                  height: 20,
+                  "& .MuiChip-label": { px: 1 },
+                }}
+              />
             </Box>
           </Box>
         </Box>
@@ -1625,21 +1546,27 @@ export function CreateListDialog({
   onClose,
   customers,
   onRefresh,
+  selectedCustomerId,
+  setSelectedCustomerId,
 }: {
   open: boolean;
   onClose: () => void;
   customers: any[];
   onRefresh?: () => void;
+  selectedCustomerId: string | null;
+  setSelectedCustomerId: any;
 }) {
-  const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
   const [listName, setListName] = useState("");
   const [description, setDescription] = useState("");
   const [deliveryDate, setDeliveryDate] = useState("");
   const [saving, setSaving] = useState(false);
 
+  const selectedCustomer =
+    customers.find((c: any) => c.id === selectedCustomerId) || null;
+
   useEffect(() => {
     if (!open) {
-      setSelectedCustomer(null);
+      setSelectedCustomerId(null);
       setListName("");
       setDescription("");
       setDeliveryDate("");
@@ -1647,7 +1574,7 @@ export function CreateListDialog({
   }, [open]);
 
   const handleCreateList = async () => {
-    if (!selectedCustomer || !listName.trim()) {
+    if (!selectedCustomerId || !listName.trim()) {
       toast.error("Please select a customer and enter a list name");
       return;
     }
@@ -1659,7 +1586,7 @@ export function CreateListDialog({
         name: listName.trim(),
         description: description.trim() || undefined,
         deliveryDate: deliveryDate || undefined,
-        customerId: selectedCustomer.id,
+        customerId: selectedCustomerId,
       };
 
       await createNewList(listData);
@@ -1715,12 +1642,9 @@ export function CreateListDialog({
           <FormControl fullWidth>
             <InputLabel>Select Customer *</InputLabel>
             <Select
-              value={selectedCustomer?.id || ""}
+              value={selectedCustomerId || ""}
               onChange={(e) => {
-                const customer = customers.find(
-                  (c: any) => c.id === e.target.value
-                );
-                setSelectedCustomer(customer);
+                setSelectedCustomerId(e.target.value);
               }}
               label="Select Customer *"
               required
@@ -1829,7 +1753,7 @@ export function CreateListDialog({
         <CustomButton
           variant="contained"
           onClick={handleCreateList}
-          disabled={!selectedCustomer || !listName.trim()}
+          disabled={!selectedCustomerId || !listName.trim()}
           loading={saving}
           startIcon={<Add />}
         >
@@ -1839,7 +1763,6 @@ export function CreateListDialog({
     </Dialog>
   );
 }
-
 // Main Admin All Items Page Component
 const AdminAllItemsPage = () => {
   const router = useRouter();
@@ -1880,7 +1803,6 @@ const AdminAllItemsPage = () => {
   // Filter activity logs based on current filters
   const filteredActivityLogs = useMemo(() => {
     let filtered = allActivityLogs;
-
     // Filter by customer
     if (selectedCustomer) {
       filtered = filtered.filter(
@@ -2040,7 +1962,7 @@ const AdminAllItemsPage = () => {
   const handleUpdateItem = async (itemId: string, updateData: any) => {
     try {
       await updateListItem(itemId, updateData);
-
+      await loadAllItems();
       setAllItems((prev) =>
         prev.map((item) =>
           item.id === itemId ? { ...item, ...updateData } : item
@@ -2165,7 +2087,11 @@ const AdminAllItemsPage = () => {
       );
     }
 
-    return filtered;
+    // Sort by createdAt in descending order to show the last added item at the top
+    return filtered.sort(
+      (a: any, b: any) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
   }, [
     allItems,
     searchTerm,
@@ -2972,15 +2898,13 @@ const AdminAllItemsPage = () => {
                   <Box sx={{ textAlign: "center", py: 8, px: 3 }}>
                     <Package
                       size={64}
-                      style={{ color: "#ccc", marginBottom: 24 }}
+                      style={{
+                        color: "#ccc",
+                        marginBottom: 24,
+                        margin: "0 auto",
+                      }}
                     />
-                    <Typography
-                      variant="h6"
-                      color="text.secondary"
-                      gutterBottom
-                    >
-                      No items found
-                    </Typography>
+
                     <Typography
                       variant="body2"
                       color="text.secondary"
@@ -3127,6 +3051,8 @@ const AdminAllItemsPage = () => {
 
       {/* Dialogs */}
       <CreateListDialog
+        setSelectedCustomerId={setSelectedCustomer}
+        selectedCustomerId={selectedCustomer}
         open={createListDialog}
         onClose={() => setCreateListDialog(false)}
         customers={customers}
@@ -3134,6 +3060,10 @@ const AdminAllItemsPage = () => {
       />
 
       <AddItemDialog
+        selectedCustomerId={selectedCustomer}
+        selectedListId={selectedList}
+        setSelectedCustomerId={setSelectedCustomer}
+        setSelectedListId={setSelectedList}
         open={addItemDialog}
         onClose={() => setAddItemDialog(false)}
         customers={customers}

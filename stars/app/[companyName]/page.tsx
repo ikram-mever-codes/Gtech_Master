@@ -1877,16 +1877,21 @@ const ListManagerPage: React.FC = () => {
   const filteredItems = useMemo(() => {
     if (!currentList?.items) return [];
 
-    return currentList.items.filter(
+    const filtered = currentList.items.filter(
       (item: any) =>
         item.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         item.articleName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         item.articleNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         item.item_no_de?.toLowerCase().includes(searchTerm.toLowerCase())
     );
+
+    // Sort by createdAt in descending order to show the last added item at the top
+    return filtered.sort(
+      (a: any, b: any) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
   }, [currentList?.items, searchTerm]);
 
-  // Extract delivery periods for columns
   const deliveryPeriodsData = useMemo(() => {
     if (!currentList?.items) return { sortedPeriods: [] };
     return extractDeliveryPeriods(currentList.items);

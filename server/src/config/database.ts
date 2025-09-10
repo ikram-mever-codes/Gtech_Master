@@ -8,7 +8,6 @@ import { Customer } from "../models/customers";
 import {
   CustomerCreator,
   List,
-  ListActivityLog,
   ListCreator,
   ListItem,
   UserCreator,
@@ -32,7 +31,6 @@ export const AppDataSource = new DataSource({
     Customer,
     List,
     ListItem,
-    ListActivityLog,
     ListCreator,
     UserCreator,
     CustomerCreator,
