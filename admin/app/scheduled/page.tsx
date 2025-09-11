@@ -146,6 +146,7 @@ import {
   refreshItemsFromMIS,
   acknowledgeItemChanges,
   createNewList,
+  updateListItemComment,
 } from "@/api/list";
 import { DELIVERY_STATUS, INTERVAL_OPTIONS } from "@/utils/interfaces";
 import { successStyles } from "@/utils/constants";
@@ -1210,7 +1211,7 @@ function EditableQuantityCell({ row, onUpdateItem }: any) {
   );
 }
 
-// Enhanced Editable Comment Cell with change highlighting
+// Enhanced Editable Comment Cell with dedicated comment update endpoint
 function EditableCommentCell({ row, onUpdateItem }: any) {
   const [isEditing, setIsEditing] = useState(false);
   const [value, setValue] = useState(row.comment || "");
@@ -1228,11 +1229,17 @@ function EditableCommentCell({ row, onUpdateItem }: any) {
 
     try {
       setSaving(true);
-      await onUpdateItem(row.id, { comment: value });
+      await updateListItemComment(row.id, { comment: value });
+
+      if (onUpdateItem) {
+        onUpdateItem(row.id, { comment: value });
+      }
+
       setIsEditing(false);
     } catch (error) {
       console.error("Failed to update comment:", error);
       setValue(row.comment);
+      toast.error("Failed to update comment");
     } finally {
       setSaving(false);
     }

@@ -130,6 +130,19 @@ export const updateListItem = async (
   }
 };
 
+export const updateListItemComment = async (itemId: string, itemData: any) => {
+  try {
+    toast.loading("Updating item...", loadingStyles);
+    const response = await api.put(`/lists/items/${itemId}/comment`, itemData);
+    toast.dismiss();
+    toast.success("Item updated", successStyles);
+    return response.data;
+  } catch (error) {
+    handleApiError(error, "Failed to update item");
+    throw error;
+  }
+};
+
 export const deleteListItem = async (itemId: string) => {
   try {
     toast.loading("Removing item...", loadingStyles);

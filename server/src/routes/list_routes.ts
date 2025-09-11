@@ -24,6 +24,7 @@ import {
   fetchAllListsAndItems,
   refreshItemsFromMIS,
   getListItemWithRefresh,
+  updateListItemComment,
 } from "../controllers/list_controllers";
 import { authenticateUser, AuthorizedRequest } from "../middlewares/authorized";
 import { authenticateCustomer } from "../middlewares/authenticateCustomer";
@@ -64,6 +65,7 @@ router.get("/items/search", authenticateMixed, searchItems);
 router.post("/", authenticateMixed, createList);
 router.post("/:listId/items", authenticateMixed, addListItem);
 router.put("/items/:itemId", authenticateMixed, updateListItem);
+router.put("/items/:itemId/comment", authenticateMixed, updateListItemComment);
 router.delete("/items/:itemId", authenticateMixed, deleteListItem);
 router.delete("/list/:listId", authenticateMixed, deleteList);
 router.put("/items/:itemId/delivery", authenticateMixed, updateDeliveryInfo);

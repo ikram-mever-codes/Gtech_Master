@@ -192,8 +192,7 @@ export class List {
     itemId?: string,
     itemName?: string
   ): void {
-    const itemInfo = itemId ? ` for item ${itemName || itemId}` : "";
-    const message = `${userRole} changed ${field} value from "${oldValue}" to "${newValue}" at ${new Date().toLocaleString()}${itemInfo}`;
+    const message = `${userRole} changed ${field} value from "${oldValue}" to "${newValue}" at ${new Date().toLocaleString()}`;
 
     this.addActivityLog(
       message,
@@ -310,10 +309,10 @@ export class ListItem {
     const oldValue = this[field];
 
     if (oldValue === newValue) {
-      return false; // No change needed
+      return false;
     }
 
-    // Update the field
+    // // Update the field
     (this as any)[field] = newValue;
 
     // Log the change in the parent list
@@ -420,8 +419,7 @@ export function formatActivityMessage(
   newValue: any,
   itemName?: string
 ): string {
-  const itemInfo = itemName ? ` for item ${itemName}` : "";
-  return `${userRole} changed ${field} value from "${oldValue}" to "${newValue}" at ${new Date().toLocaleString()}${itemInfo}`;
+  return `${userRole} changed ${field} value from "${oldValue}" to "${newValue}" at ${new Date().toLocaleString()}`;
 }
 
 export function getUnacknowledgedChangesCount(list: List): number {

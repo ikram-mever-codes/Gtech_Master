@@ -312,7 +312,6 @@ export const createList = async (
   }
 };
 
-// 2. Add List Item
 export const addListItem = async (
   req: Request,
   res: Response,
@@ -398,7 +397,6 @@ export const addListItem = async (
   }
 };
 
-// 3. Update List Item with bidirectional change tracking
 export const updateListItem = async (
   req: Request,
   res: Response,
@@ -409,7 +407,6 @@ export const updateListItem = async (
     const {
       quantity,
       interval,
-      comment,
       marked,
       deliveries,
       articleName,
@@ -424,7 +421,7 @@ export const updateListItem = async (
       return next(new ErrorHandler("Item ID is required", 400));
     }
 
-    console.log("Request body:", req.body); // Debug input data
+    console.log("Request body:", req.body);
 
     const listItemRepository = AppDataSource.getRepository(ListItem);
     const listRepository = AppDataSource.getRepository(List);
@@ -473,7 +470,6 @@ export const updateListItem = async (
           performerId
         )
       ) {
-        item.quantity = quantity;
         changedFields.push("quantity");
       }
     }
@@ -491,18 +487,6 @@ export const updateListItem = async (
       }
     }
 
-    if (comment !== undefined && normalizeValue(comment) !== item.comment) {
-      if (
-        item.updateField(
-          "comment",
-          normalizeValue(comment),
-          userRole,
-          performerId
-        )
-      ) {
-        changedFields.push("comment");
-      }
-    }
     if (
       articleName !== undefined &&
       normalizeValue(articleName) !== item.articleName
@@ -598,7 +582,6 @@ export const updateListItem = async (
     const existingLogIds = new Set(list.activityLogs.map((log: any) => log.id));
     const uniqueLogs = logss.filter((log: any) => !existingLogIds.has(log.id));
     list.activityLogs = [...list.activityLogs, ...uniqueLogs];
-    list.activityLogs = [...list.activityLogs];
 
     await AppDataSource.transaction(async (transactionalEntityManager) => {
       await transactionalEntityManager.save(ListItem, item);
@@ -617,6 +600,96 @@ export const updateListItem = async (
   }
 };
 
+// Separate controller for updating only comments with logging
+export const updateListItemComment = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { itemId } = req.params;
+    const { comment } = req.body;
+    const userId = (req as any).user?.id;
+    const customerId = (req as any).customer?.id;
+
+    if (!itemId) {
+      return next(new ErrorHandler("Item ID is required", 400));
+    }
+
+    console.log("Updating comment for item:", itemId);
+    console.log("New comment:", comment);
+
+    const listItemRepository = AppDataSource.getRepository(ListItem);
+    const listRepository = AppDataSource.getRepository(List);
+
+    // Fetch item with list relation
+    const item = await listItemRepository.findOne({
+      where: { id: itemId },
+      relations: ["list"],
+    });
+
+    if (!item) {
+      return next(new ErrorHandler("List item not found", 404));
+    }
+
+    // Fetch the associated list
+    const list = await listRepository.findOne({
+      where: { id: item.list.id },
+    });
+
+    if (!list) {
+      return next(new ErrorHandler("Associated list not found", 404));
+    }
+
+    const performerId = userId || customerId || "system";
+    const userRole = getUserRole(userId, customerId);
+
+    // Store old comment for logging
+    const oldComment = item.comment;
+
+    // Check if comment actually changed
+    if (comment === undefined || comment === item.comment) {
+      return res.status(200).json({
+        success: true,
+        message: "No changes detected",
+        data: item,
+      });
+    }
+
+    // Update the comment directly
+    item.comment = comment;
+
+    // Log the change to the list activity logs
+    if (list) {
+      list.logFieldChange(
+        "comment",
+        oldComment,
+        comment,
+        userRole,
+        performerId,
+        item.id,
+        item.articleName
+      );
+    }
+
+    // Save both item and list
+    await listItemRepository.save(item);
+    if (list) {
+      await listRepository.save(list);
+    }
+
+    console.log("Comment updated successfully:", item.comment);
+
+    return res.status(200).json({
+      success: true,
+      message: "Comment updated successfully",
+      data: item,
+    });
+  } catch (error) {
+    console.error("Error updating comment:", error);
+    return next(error);
+  }
+};
 // 4. Update Delivery Info
 export const updateDeliveryInfo = async (
   req: Request,

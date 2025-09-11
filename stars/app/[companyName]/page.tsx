@@ -31,6 +31,7 @@ import {
   FormControl,
   Button,
   Badge,
+  DialogActions,
 } from "@mui/material";
 import {
   ArrowBack,
@@ -54,6 +55,10 @@ import {
   Visibility,
   NotificationImportant,
   Warning,
+  History,
+  Close,
+  HourglassEmpty,
+  AccessTime,
 } from "@mui/icons-material";
 import { DataGrid } from "react-data-grid";
 import "react-data-grid/lib/styles.css";
@@ -66,6 +71,7 @@ import {
   updateList,
   acknowledgeListItemChanges,
   bulkAcknowledgeChanges,
+  updateListItemComment,
 } from "@/api/lists";
 import { RootState } from "../Redux/store";
 import { useDispatch, useSelector } from "react-redux";
@@ -112,6 +118,21 @@ interface ListData {
   listNumber?: string;
   changesNeedingAcknowledgment?: number;
   pendingChangesCount?: number;
+  activityLogs?: any[];
+}
+
+interface ActivityLog {
+  id: string;
+  itemId?: string;
+  listId: string;
+  customerId: string;
+  action: string;
+  message: string;
+  timestamp: string;
+  userRole: "admin" | "customer";
+  acknowledged: boolean;
+  performedAt?: string;
+  changes?: any;
 }
 
 const INTERVAL_OPTIONS = [
@@ -135,6 +156,197 @@ const DELIVERY_STATUS_CONFIG: any = {
   [DELIVERY_STATUS.DELIVERED]: { color: "success", label: "Delivered" },
   [DELIVERY_STATUS.CANCELLED]: { color: "error", label: "Cancelled" },
 };
+
+// Item Activity Logs Dialog Component
+function ItemActivityLogsDialog({
+  open,
+  onClose,
+  item,
+  activityLogs,
+}: {
+  open: boolean;
+  onClose: () => void;
+  item: any;
+  activityLogs: ActivityLog[];
+}) {
+  const theme = useTheme();
+
+  const itemLogs = useMemo(() => {
+    // Filter logs for the specific item and sort by timestamp (newest first)
+    return activityLogs
+      .filter((log) => log.itemId === item?.id)
+      .sort(
+        (a, b) =>
+          new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+      );
+  }, [activityLogs, item]);
+
+  const formatLogDescription = (log: ActivityLog) => {
+    // Use the pre-formatted message from the ActivityLog interface
+    return log.message;
+  };
+
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      maxWidth="md"
+      fullWidth
+      PaperProps={{
+        sx: {
+          borderRadius: 3,
+          boxShadow: "0 20px 40px rgba(0, 0, 0, 0.1)",
+        },
+      }}
+    >
+      <DialogTitle>
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+            <History sx={{ color: "primary.main" }} />
+            <Box>
+              <Typography variant="h6" fontWeight={600}>
+                Activity Logs
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {item?.articleName || "Item"}
+              </Typography>
+            </Box>
+          </Box>
+          <IconButton onClick={onClose} size="small">
+            <Close fontSize="small" />
+          </IconButton>
+        </Box>
+      </DialogTitle>
+
+      <DialogContent sx={{ p: 3 }}>
+        <Box sx={{ maxHeight: 400, overflowY: "auto" }}>
+          {itemLogs.length === 0 ? (
+            <Box sx={{ textAlign: "center", py: 4 }}>
+              <History sx={{ fontSize: 48, color: "text.disabled", mb: 2 }} />
+              <Typography variant="h6" color="text.secondary" gutterBottom>
+                No activity logs found
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                This item has no recorded activities yet.
+              </Typography>
+            </Box>
+          ) : (
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+              {itemLogs.map((log, index) => (
+                <Card
+                  key={index}
+                  sx={{
+                    p: 2,
+                    border: "1px solid",
+                    borderColor: alpha("#E2E8F0", 0.8),
+                    "&:hover": {
+                      borderColor: alpha(theme.palette.primary.main, 0.3),
+                    },
+                  }}
+                >
+                  <Box
+                    sx={{ display: "flex", alignItems: "flex-start", gap: 2 }}
+                  >
+                    <Box
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        width: 36,
+                        height: 36,
+                        borderRadius: "50%",
+                        bgcolor: alpha(
+                          log.userRole === "admin"
+                            ? theme.palette.primary.main
+                            : theme.palette.secondary.main,
+                          0.1
+                        ),
+                        flexShrink: 0,
+                      }}
+                    >
+                      {log.userRole === "admin" ? (
+                        <CheckCircle
+                          sx={{ color: "primary.main", fontSize: 18 }}
+                        />
+                      ) : (
+                        <History
+                          sx={{ color: "text.secondary", fontSize: 18 }}
+                        />
+                      )}
+                    </Box>
+
+                    <Box sx={{ flex: 1 }}>
+                      <Typography
+                        variant="body2"
+                        sx={{ fontSize: "14px", mb: 0.5 }}
+                      >
+                        {formatLogDescription(log)}
+                      </Typography>
+                      <Box
+                        sx={{ display: "flex", alignItems: "center", gap: 2 }}
+                      >
+                        <Box
+                          sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 0.5,
+                          }}
+                        >
+                          <AccessTime
+                            sx={{ fontSize: 14, color: "text.secondary" }}
+                          />
+                          <Typography variant="caption" color="text.secondary">
+                            {new Date(log.timestamp).toLocaleString()}
+                          </Typography>
+                        </Box>
+                        <Chip
+                          size="small"
+                          variant="filled"
+                          color={
+                            log.userRole === "admin" ? "primary" : "secondary"
+                          }
+                          label={
+                            log.userRole === "admin" ? "Admin" : "Customer"
+                          }
+                          sx={{
+                            fontSize: "0.65rem",
+                            height: 20,
+                            "& .MuiChip-label": { px: 1 },
+                          }}
+                        />
+                      </Box>
+                      {!log.acknowledged && log.userRole === "customer" && (
+                        <Typography
+                          variant="caption"
+                          color="warning.main"
+                          sx={{ mt: 0.5, display: "block" }}
+                        >
+                          Pending acknowledgment
+                        </Typography>
+                      )}
+                    </Box>
+                  </Box>
+                </Card>
+              ))}
+            </Box>
+          )}
+        </Box>
+      </DialogContent>
+
+      <DialogActions sx={{ p: 3, gap: 2 }}>
+        <CustomButton variant="contained" onClick={onClose}>
+          Close
+        </CustomButton>
+      </DialogActions>
+    </Dialog>
+  );
+}
 
 // Enhanced FieldHighlight Component
 const FieldHighlight = ({
@@ -398,7 +610,8 @@ function StaticIntervalCell({ row }: any) {
     </FieldHighlight>
   );
 }
-// Enhanced Editable Comment Cell with FieldHighlight and Edit Icon
+
+// Enhanced Editable Comment Cell with dedicated comment update endpoint
 function EditableCommentCell({
   row,
   onUpdateItem,
@@ -438,11 +651,20 @@ function EditableCommentCell({
 
     try {
       setSaving(true);
-      await onUpdateItem(row.id, { comment: value });
+
+      // Use the dedicated comment update endpoint
+      await updateListItemComment(row.id, { comment: value });
+
+      // Update local state
+      if (onUpdateItem) {
+        onUpdateItem(row.id, { comment: value });
+      }
+
       setIsEditing(false);
     } catch (error) {
       console.error("Failed to update comment:", error);
       setValue(row.comment);
+      toast.error("Failed to update comment");
     } finally {
       setSaving(false);
     }
@@ -526,16 +748,18 @@ function EditableCommentCell({
           {row.comment || "Add comment..."}
         </Typography>
 
-        <Box
-          sx={{
-            transition: "opacity 0.2s ease",
-            display: "flex",
-            alignItems: "center",
-            ml: 1,
-          }}
-        >
-          <Edit sx={{ fontSize: "16px" }} />
-        </Box>
+        {isEditable && (
+          <Box
+            sx={{
+              transition: "opacity 0.2s ease",
+              display: "flex",
+              alignItems: "center",
+              ml: 1,
+            }}
+          >
+            <Edit sx={{ fontSize: "16px" }} />
+          </Box>
+        )}
       </Box>
     </FieldHighlight>
   );
@@ -950,7 +1174,7 @@ function ListTabs({
   );
 }
 
-// Enhanced Mobile Item Card Component (only comment editable)
+// Enhanced Mobile Item Card Component (only comment editable) - with Activity Logs button
 const MobileItemCard = ({
   item,
   onUpdateItem,
@@ -960,6 +1184,7 @@ const MobileItemCard = ({
   companyName,
   listId,
   router,
+  onOpenActivityLogs,
 }: any) => {
   const [expanded, setExpanded] = useState(false);
   const [editingComment, setEditingComment] = useState(false);
@@ -1502,6 +1727,24 @@ const MobileItemCard = ({
               </FieldHighlight>
             </Grid>
 
+            {/* Activity Logs Button */}
+            <Grid item xs={12}>
+              <Button
+                variant="outlined"
+                color="primary"
+                fullWidth
+                startIcon={<History />}
+                onClick={() => onOpenActivityLogs(item)}
+                sx={{
+                  borderRadius: 1,
+                  textTransform: "none",
+                  fontWeight: 500,
+                }}
+              >
+                View Activity Logs
+              </Button>
+            </Grid>
+
             {/* Delivery Information */}
             {item.deliveries && Object.keys(item.deliveries).length > 0 && (
               <Grid item xs={12}>
@@ -1606,6 +1849,11 @@ const ListManagerPage: React.FC = () => {
   const [saving, setSaving] = useState<boolean>(false);
   const [addItemDialog, setAddItemDialog] = useState(false);
 
+  // Activity logs state
+  const [allActivityLogs, setAllActivityLogs] = useState<ActivityLog[]>([]);
+  const [activityLogsDialog, setActivityLogsDialog] = useState(false);
+  const [selectedItemForLogs, setSelectedItemForLogs] = useState<any>(null);
+
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
   const isSmallMobile = useMediaQuery(theme.breakpoints.down("sm"));
@@ -1702,6 +1950,7 @@ const ListManagerPage: React.FC = () => {
                 lastModifiedAt: item.lastModifiedAt,
                 changedFields: item.changedFields || [],
               })) || [],
+            activityLogs: list.activityLogs || [],
           }));
 
           setAllLists(transformedLists);
@@ -1709,6 +1958,21 @@ const ListManagerPage: React.FC = () => {
           if (transformedLists[0]) {
             setCurrentListId(transformedLists[0].id);
             setCurrentList(transformedLists[0]);
+
+            // Extract all activity logs
+            const allLogs: ActivityLog[] = [];
+            transformedLists.forEach((list: any) => {
+              if (list.activityLogs && list.activityLogs.length > 0) {
+                list.activityLogs.forEach((log: any) => {
+                  allLogs.push({
+                    ...log,
+                    listId: list.id,
+                    customerId: list.customerId || "",
+                  });
+                });
+              }
+            });
+            setAllActivityLogs(allLogs);
           }
         } else {
           setError("No lists found for this company.");
@@ -1726,11 +1990,21 @@ const ListManagerPage: React.FC = () => {
   }, [companyName]);
 
   const handleListChange = (listId: string) => {
-    const selectedList = allLists.find((list) => list.id === listId);
+    const selectedList: any = allLists.find((list) => list.id === listId);
     if (selectedList) {
       setCurrentListId(listId);
       setCurrentList(selectedList);
       setSelectedRows(new Set());
+
+      // Update activity logs for the selected list
+      if (selectedList.activityLogs) {
+        const logs = selectedList.activityLogs.map((log: any) => ({
+          ...log,
+          listId: selectedList.id,
+          customerId: selectedList.customer.id || "",
+        }));
+        setAllActivityLogs(logs);
+      }
     }
   };
 
@@ -1874,6 +2148,12 @@ const ListManagerPage: React.FC = () => {
     }
   };
 
+  // Handle opening activity logs for specific item
+  const handleOpenItemActivityLogs = (item: any) => {
+    setSelectedItemForLogs(item);
+    setActivityLogsDialog(true);
+  };
+
   const filteredItems = useMemo(() => {
     if (!currentList?.items) return [];
 
@@ -1899,7 +2179,7 @@ const ListManagerPage: React.FC = () => {
 
   const dispatch = useDispatch();
 
-  // Enhanced Desktop columns configuration (only comment editable)
+  // Enhanced Desktop columns configuration (only comment editable) - with Activity Logs
   const columns = useMemo(() => {
     const baseColumns = [
       {
@@ -2043,7 +2323,7 @@ const ListManagerPage: React.FC = () => {
       {
         key: "articleName",
         name: "Item Name DE",
-        width: 500,
+        width: 450,
         resizable: true,
         renderCell: (props: any) => {
           return (
@@ -2254,6 +2534,31 @@ const ListManagerPage: React.FC = () => {
             companyName={companyName}
             listId={currentListId}
           />
+        ),
+      },
+      {
+        key: "activity_logs",
+        name: "Activity",
+        width: 100,
+        resizable: false,
+        renderCell: (props: any) => (
+          <CustomButton
+            variant="outlined"
+            color="primary"
+            size="small"
+            onClick={() => handleOpenItemActivityLogs(props.row)}
+            startIcon={<History />}
+            sx={{
+              minWidth: "auto",
+              px: 1.5,
+              py: 0.5,
+              fontSize: "0.75rem",
+              textTransform: "none",
+              borderRadius: 1,
+            }}
+          >
+            Logs
+          </CustomButton>
         ),
       },
     ];
@@ -2770,6 +3075,7 @@ const ListManagerPage: React.FC = () => {
                         companyName={companyName}
                         listId={currentListId}
                         router={router}
+                        onOpenActivityLogs={handleOpenItemActivityLogs}
                       />
                     ))}
                   </Box>
@@ -2786,7 +3092,17 @@ const ListManagerPage: React.FC = () => {
                 }}
               >
                 {filteredItems.length === 0 ? (
-                  <Box sx={{ textAlign: "center", py: 8, px: 3 }}>
+                  <Box
+                    sx={{
+                      textAlign: "center",
+                      py: 8,
+                      px: 3,
+                      display: "flex",
+                      justifyContent: "center",
+                      alignItems: "center",
+                      flexDirection: "column",
+                    }}
+                  >
                     <Package
                       size={64}
                       style={{ color: "#ccc", marginBottom: 24 }}
@@ -2977,6 +3293,14 @@ const ListManagerPage: React.FC = () => {
         onClose={() => setAddItemDialog(false)}
         onAddItem={handleAddItem}
         listId={currentListId}
+      />
+
+      {/* Activity Logs Dialog */}
+      <ItemActivityLogsDialog
+        open={activityLogsDialog}
+        onClose={() => setActivityLogsDialog(false)}
+        item={selectedItemForLogs}
+        activityLogs={allActivityLogs}
       />
     </Box>
   );
