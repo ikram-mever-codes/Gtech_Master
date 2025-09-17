@@ -40,7 +40,7 @@ import theme from "@/styles/theme";
 import CustomButton from "@/components/UI/CustomButton";
 import CustomTable from "@/components/UI/CustomTable";
 import { useRouter } from "next/navigation";
-import { getAllUsers } from "@/api/user";
+import { deleteUser, getAllUsers } from "@/api/user";
 import { toast } from "react-hot-toast";
 
 const UsersPage = () => {
@@ -235,7 +235,7 @@ const UsersPage = () => {
   };
 
   return (
-    <div className="w-full mx-auto px-0">
+    <div className="w-full max-w-[80vw]  mx-auto px-0">
       <div
         className="bg-white rounded-lg shadow-sm pb-[7rem] p-8 px-9"
         style={{
@@ -425,8 +425,15 @@ const UsersPage = () => {
             pagination={true}
             onRowClick={(row) => router.push(`/users/${row.id}`)}
             onEdit={(row) => router.push(`/users/${row.id}/edit`)}
-            onDelete={(row) => {
-              toast.success(`User ${row.name} would be deleted`);
+            onDelete={async (row) => {
+              const cfs = window.confirm("Do you want to delete this User?");
+              if (!cfs) {
+                return;
+              }
+              const data = await deleteUser(row.id);
+              if (data?.success) {
+                await fetchUsers();
+              }
             }}
             onView={(row) => router.push(`/users/${row.id}`)}
           />

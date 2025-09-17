@@ -12,13 +12,14 @@ interface EmailOptions {
 const createTransporter = () => {
   return nodemailer.createTransport({
     host: "smtp.strato.de",
-    port: 465,
-    secure: true,
+    port: 587, // Alternative port
+    secure: false,
     auth: {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_PASS,
     },
     tls: {
+      // ⚠️ Only use this in development!
       rejectUnauthorized: false,
     },
   });

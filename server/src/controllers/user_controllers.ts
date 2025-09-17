@@ -82,7 +82,7 @@ export const createUser = async (
       await permissionRepository.save(permissionEntities);
     }
 
-    const loginLink = `${process.env.FRONTEND_URL}/login`;
+    const loginLink = `https://master.gtech.de/login`;
     const message = `
       <h2>Welcome to Our Platform</h2>
       <p>Your admin account has been created with the following credentials:</p>
@@ -1086,6 +1086,81 @@ export const deleteCustomer = async (
         "Failed to delete customer. Please check all associated data has been removed.",
         500
       )
+    );
+  }
+};
+
+export const deleteUser = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { userId } = req.params;
+
+    if (!userId) {
+      return next(new ErrorHandler("User ID is required", 400));
+    }
+
+    const userRepository = AppDataSource.getRepository(User);
+    const permissionRepository = AppDataSource.getRepository(Permission);
+
+    // Check if user exists
+    const user = await userRepository.findOne({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      return next(new ErrorHandler("User not found", 404));
+    }
+
+    // Prevent self-deletion (admin cannot delete themselves)
+    const currentUserId = (req as any).user?.id;
+    if (currentUserId && userId === currentUserId) {
+      return next(new ErrorHandler("You cannot delete your own account", 400));
+    }
+
+    // Check if user is the last admin (optional safety check)
+    if (user.role === UserRole.ADMIN) {
+      const adminCount = await userRepository.count({
+        where: { role: UserRole.ADMIN },
+      });
+
+      if (adminCount <= 1) {
+        return next(
+          new ErrorHandler("Cannot delete the last admin account", 400)
+        );
+      }
+    }
+
+    await userRepository.delete(user.id);
+
+    // Send notification email (optional)
+    try {
+      const message = `
+        <h2>Account Deletion Notification</h2>
+        <p>Your account (${user.email}) has been deleted by an administrator.</p>
+        <p>If you believe this was a mistake, please contact support immediately.</p>
+      `;
+
+      await sendEmail({
+        to: user.email,
+        subject: "Account Deletion Notification",
+        html: message,
+      });
+    } catch (emailError) {
+      console.error("Failed to send deletion notification email:", emailError);
+      // Continue with the response even if email fails
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "User deleted successfully",
+    });
+  } catch (error) {
+    console.error("Error deleting user:", error);
+    return next(
+      new ErrorHandler("Failed to delete user. Please try again later.", 500)
     );
   }
 };

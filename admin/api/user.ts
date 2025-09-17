@@ -10,6 +10,7 @@ import {
 import { AppDispatch } from "@/app/Redux/store";
 import { loadingStyles, successStyles } from "@/utils/constants";
 import { UserState } from "@/app/Redux/features/userSlice";
+import { ResponseInterface } from "@/utils/interfaces";
 
 interface LoginResponse {
   data: UserState;
@@ -226,7 +227,17 @@ export const updateUserFunction = async (userId: string, userData: any) => {
 
 export const deleteUser = async (userId: string) => {
   try {
-  } catch (error) {}
+    toast.loading("Deleting User...", loadingStyles);
+
+    const response: ResponseInterface = await api.delete(
+      `/auth/users/${userId}`
+    );
+    toast.dismiss();
+    toast.success(response.message, successStyles);
+    return response;
+  } catch (error) {
+    handleApiError(error);
+  }
 };
 
 export const resetPassword = async () => {
