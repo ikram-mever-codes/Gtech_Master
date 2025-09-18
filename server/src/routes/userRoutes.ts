@@ -16,6 +16,7 @@ import {
   updateCustomer,
   deleteCustomer,
   deleteUser,
+  verifyEmail,
 } from "../controllers/user_controllers";
 import { authenticateUser } from "../middlewares/authorized";
 
@@ -23,6 +24,7 @@ const router: any = express.Router();
 
 // Authentication Routes
 router.post("/login", login);
+router.post("/verify", verifyEmail);
 router.post("/logout", authenticateUser, logout);
 router.get("/refresh", authenticateUser, refresh);
 

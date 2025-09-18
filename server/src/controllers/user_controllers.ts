@@ -54,6 +54,12 @@ export const createUser = async (
     const tempPassword = crypto.randomBytes(8).toString("hex");
     const hashedPassword = await bcrypt.hash(tempPassword, 10);
 
+    // Generate email verification code (6-digit code)
+    const emailVerificationCode = Math.floor(
+      100000 + Math.random() * 900000
+    ).toString();
+    const emailVerificationExp = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours expiration
+
     // Create user
     const user = userRepository.create({
       name,
@@ -66,6 +72,9 @@ export const createUser = async (
       gender,
       dateOfBirth,
       address,
+      emailVerificationCode,
+      emailVerificationExp,
+      isEmailVerified: false, // Set to false initially
     });
 
     await userRepository.save(user);
@@ -82,30 +91,86 @@ export const createUser = async (
       await permissionRepository.save(permissionEntities);
     }
 
+    const verificationLink = `https://master.gtech.de/verify?email=${encodeURIComponent(
+      email
+    )}&verificationCode=${emailVerificationCode}`;
     const loginLink = `https://master.gtech.de/login`;
+
     const message = `
       <h2>Welcome to Our Platform</h2>
       <p>Your admin account has been created with the following credentials:</p>
       <p><strong>Email:</strong> ${email}</p>
       <p><strong>Temporary Password:</strong> ${tempPassword}</p>
-      <p>Please login <a href="${loginLink}">here</a> and change your password.</p>
+      <p>Please verify your email by clicking the link below:</p>
+      <p><a href="${verificationLink}" style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">Verify Email</a></p>
+      <p>Or copy and paste this link in your browser:</p>
+      <p>${verificationLink}</p>
+      <p>After verification, you can login <a href="${loginLink}">here</a> and change your password.</p>
+      <p><strong>Note:</strong> This verification code will expire in 24 hours.</p>
     `;
 
     await sendEmail({
       to: email,
-      subject: "Your Admin Account Credentials",
+      subject: "Your Admin Account Credentials - Verify Your Email",
       html: message,
     });
 
     return res.status(201).json({
       success: true,
-      message: "User created successfully. Credentials sent to email.",
+      message: "User created successfully. Verification email sent.",
       data: {
         id: user.id,
         name: user.name,
         email: user.email,
         role: user.role,
       },
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const verifyEmail = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { email, verificationCode } = req.query;
+
+    if (!email || !verificationCode) {
+      return next(
+        new ErrorHandler("Email and verification code are required", 400)
+      );
+    }
+
+    const userRepository = AppDataSource.getRepository(User);
+    const user = await userRepository.findOne({
+      where: {
+        email: email as string,
+        emailVerificationCode: verificationCode as string,
+      },
+    });
+
+    if (!user) {
+      return next(new ErrorHandler("Invalid verification code or email", 400));
+    }
+
+    // Check if verification code has expired
+    if (user.emailVerificationExp && user.emailVerificationExp < new Date()) {
+      return next(new ErrorHandler("Verification code has expired", 400));
+    }
+
+    // Update user verification status
+    user.isEmailVerified = true;
+    user.emailVerificationCode = undefined;
+    user.emailVerificationExp = null;
+
+    await userRepository.save(user);
+
+    return res.status(200).json({
+      success: true,
+      message: "Email verified successfully",
     });
   } catch (error) {
     return next(error);

@@ -40,6 +40,21 @@ export const loginUser = async (
   }
 };
 
+export const verifyEmail = async (email: string, verificationCode: string) => {
+  try {
+    toast.loading("Authenticating...", loadingStyles);
+    const response = await api.post(
+      `/auth/verify?email=${email}&verificationCode=${verificationCode}`
+    );
+
+    toast.dismiss();
+    toast.success(`Email Verified Successfully!`, successStyles);
+    return response.data;
+  } catch (error) {
+    handleApiError(error, "Login failed");
+    throw error;
+  }
+};
 export const logoutUser = async (dispatch: AppDispatch) => {
   try {
     dispatch(setLoading(true));

@@ -17,6 +17,7 @@ const LayoutProvider = ({ children }: { children: ReactNode }) => {
     "/register",
     "/forgot-password",
     "/reset-password",
+    "/verify",
   ];
 
   const shouldRenderLayout = !excludedPaths.includes(pathname || "");
