@@ -58,7 +58,7 @@ export const createUser = async (
     const emailVerificationCode = Math.floor(
       100000 + Math.random() * 900000
     ).toString();
-    const emailVerificationExp = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours expiration
+    const emailVerificationExp = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
     // Create user
     const user = userRepository.create({
@@ -74,7 +74,7 @@ export const createUser = async (
       address,
       emailVerificationCode,
       emailVerificationExp,
-      isEmailVerified: false, // Set to false initially
+      isEmailVerified: false,
     });
 
     await userRepository.save(user);
