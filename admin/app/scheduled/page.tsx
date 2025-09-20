@@ -152,7 +152,7 @@ import { DELIVERY_STATUS, INTERVAL_OPTIONS } from "@/utils/interfaces";
 import { successStyles } from "@/utils/constants";
 import { DataGrid } from "react-data-grid";
 
-export function AddItemDialog({
+function AddItemDialog({
   open,
   onClose,
   onAddItem,
@@ -247,8 +247,9 @@ export function AddItemDialog({
 
       const response = await addItemToList(selectedListId, itemData);
 
-      if (onRefresh) {
-        await onRefresh();
+      if (onAddItem) {
+        // Call the onAddItem callback to update state optimistically
+        onAddItem(response);
       }
 
       onClose();
@@ -583,21 +584,28 @@ const FieldHighlight = ({
   children: React.ReactNode;
   onClick?: () => void;
 }) => {
+  const theme = useTheme();
+
   return (
     <Box
       sx={{
         position: "relative",
         borderRadius: 1,
-        backgroundColor: hasChanges ? "#ffebee" : "transparent",
-        border: hasChanges ? `2px solid #f44336` : "2px solid transparent",
-        transition: "all 0.2s ease",
+        backgroundColor: hasChanges
+          ? alpha("#ff1744", 0.15) // Red background for unacknowledged changes
+          : "transparent",
+        border: hasChanges
+          ? `2px solid ${alpha("#ff1744", 0.5)}`
+          : "2px solid transparent",
+        transition: "all 0.3s ease",
         "&:hover": {
           backgroundColor: hasChanges
-            ? "#ffcdd2"
+            ? alpha("#ff1744", 0.25)
             : alpha(theme.palette.primary.main, 0.04),
           borderColor: hasChanges
-            ? "#f44336"
+            ? "#ff1744"
             : alpha(theme.palette.primary.main, 0.2),
+          transform: hasChanges ? "scale(1.02)" : "none",
         },
         cursor: onClick ? "pointer" : "default",
       }}
@@ -609,39 +617,55 @@ const FieldHighlight = ({
           <Warning
             sx={{
               position: "absolute",
-              top: -6,
-              right: -6,
-              fontSize: 16,
-              color: "#f44336",
+              top: -8,
+              right: -8,
+              fontSize: 18,
+              color: "#ff1744",
               backgroundColor: "white",
               borderRadius: "50%",
-              zIndex: 1,
+              zIndex: 2,
+              animation: "pulse 2s infinite",
+              "@keyframes pulse": {
+                "0%": {
+                  transform: "scale(1)",
+                  opacity: 1,
+                },
+                "50%": {
+                  transform: "scale(1.1)",
+                  opacity: 0.8,
+                },
+                "100%": {
+                  transform: "scale(1)",
+                  opacity: 1,
+                },
+              },
             }}
           />
           {fieldName && (
             <Tooltip
-              title={`Field "${fieldName}" was changed by customer`}
+              title={`Field "${fieldName}" has unacknowledged customer changes`}
               arrow
+              placement="top"
             >
               <Box
                 sx={{
                   position: "absolute",
-                  top: -12,
+                  top: -14,
                   left: 8,
-                  backgroundColor: "#f44336",
+                  backgroundColor: "#ff1744",
                   color: "white",
-                  px: 1,
-                  py: 0.25,
+                  px: 1.5,
+                  py: 0.5,
                   borderRadius: 1,
-                  fontSize: "0.65rem",
-                  fontWeight: 600,
+                  fontSize: "0.7rem",
+                  fontWeight: 700,
                   textTransform: "uppercase",
                   letterSpacing: 0.5,
-                  boxShadow: "0 2px 4px rgba(0,0,0,0.2)",
-                  zIndex: 2,
+                  boxShadow: "0 2px 8px rgba(255,23,68,0.3)",
+                  zIndex: 3,
                 }}
               >
-                Changed
+                Unacknowledged
               </Box>
             </Tooltip>
           )}
@@ -650,7 +674,6 @@ const FieldHighlight = ({
     </Box>
   );
 };
-
 // Item Activity Logs Dialog Component
 
 function ItemActivityLogsDialog({
@@ -1108,15 +1131,14 @@ function DeliveryCell({ row, period, onUpdateDelivery }: any) {
   );
 }
 
-// Enhanced Editable Quantity Cell with change highlighting
 function EditableQuantityCell({ row, onUpdateItem }: any) {
   const [isEditing, setIsEditing] = useState(false);
   const [value, setValue] = useState(row.quantity || 0);
   const [saving, setSaving] = useState(false);
 
-  const hasChanges =
-    (row.changesNeedAcknowledgment || row.hasChanges || row.shouldHighlight) &&
-    row.changedFields?.includes("quantity");
+  // Check if this specific field has unacknowledged changes
+  const hasUnacknowledgedChanges =
+    row.unacknowledgedFields?.includes("quantity");
 
   const handleSave = async () => {
     if (value === row.quantity) {
@@ -1126,11 +1148,18 @@ function EditableQuantityCell({ row, onUpdateItem }: any) {
 
     try {
       setSaving(true);
-      await onUpdateItem(row.id, { quantity: Number(value) });
+      await updateListItem(row.id, { quantity: Number(value) });
+
+      // Update state optimistically
+      if (onUpdateItem) {
+        onUpdateItem(row.id, { quantity: Number(value) });
+      }
+
       setIsEditing(false);
     } catch (error) {
       console.error("Failed to update quantity:", error);
       setValue(row.quantity);
+      toast.error("Failed to update quantity");
     } finally {
       setSaving(false);
     }
@@ -1152,12 +1181,7 @@ function EditableQuantityCell({ row, onUpdateItem }: any) {
   if (isEditing) {
     return (
       <Box
-        sx={{
-          display: "flex",
-          alignItems: "center",
-          gap: 1,
-          width: "100%",
-        }}
+        sx={{ display: "flex", alignItems: "center", gap: 1, width: "100%" }}
       >
         <TextField
           size="small"
@@ -1183,7 +1207,7 @@ function EditableQuantityCell({ row, onUpdateItem }: any) {
 
   return (
     <FieldHighlight
-      hasChanges={hasChanges}
+      hasChanges={hasUnacknowledgedChanges}
       fieldName="Quantity"
       onClick={() => setIsEditing(true)}
     >
@@ -1203,7 +1227,14 @@ function EditableQuantityCell({ row, onUpdateItem }: any) {
           p: 1,
         }}
       >
-        <Typography variant="body2" fontWeight={600} sx={{ fontSize: "16px" }}>
+        <Typography
+          variant="body2"
+          fontWeight={600}
+          sx={{
+            fontSize: "16px",
+            color: hasUnacknowledgedChanges ? "#d32f2f" : "inherit",
+          }}
+        >
           {row.quantity || 0}
         </Typography>
       </Box>
@@ -1231,6 +1262,7 @@ function EditableCommentCell({ row, onUpdateItem }: any) {
       setSaving(true);
       await updateListItemComment(row.id, { comment: value });
 
+      // Update state optimistically
       if (onUpdateItem) {
         onUpdateItem(row.id, { comment: value });
       }
@@ -1398,11 +1430,18 @@ function EditableIntervalCell({ row, onUpdateItem }: any) {
 
     try {
       setSaving(true);
-      await onUpdateItem(row.id, { interval: newValue });
+      await updateListItem(row.id, { interval: newValue });
+
+      // Update state optimistically
+      if (onUpdateItem) {
+        onUpdateItem(row.id, { interval: newValue });
+      }
+
       setIsEditing(false);
     } catch (error) {
       console.error("Failed to update interval:", error);
       setValue(row.interval);
+      toast.error("Failed to update interval");
     } finally {
       setSaving(false);
     }
@@ -1548,7 +1587,7 @@ function EnhancedBreadcrumbs() {
   );
 }
 
-export function CreateListDialog({
+function CreateListDialog({
   open,
   onClose,
   customers,
@@ -1848,23 +1887,21 @@ const AdminAllItemsPage = () => {
       const response = await getAllLists();
 
       if (response && response.length > 0) {
-        // Extract all items from all lists and add company/list info
         const allCombinedItems: any[] = [];
         const allCombinedActivityLogs: any[] = [];
         const uniqueCustomers: any[] = [];
         const allListsData: any[] = [];
 
         response.forEach((list: any) => {
-          // Add list to lists array
           allListsData.push({
             id: list.id,
             name: list.name,
             customerId: list.customer?.id,
             customerName:
               list.customer?.companyName || list.customer?.legalName,
+            unacknowledgedChangesCount: list.unacknowledgedChangesCount || 0,
           });
 
-          // Add customer to customers array if not exists
           if (
             list.customer &&
             !uniqueCustomers.find((c) => c.id === list.customer.id)
@@ -1895,9 +1932,13 @@ const AdminAllItemsPage = () => {
           // Process each item in the list
           if (list.items && list.items.length > 0) {
             list.items.forEach((item: any) => {
+              // Get unacknowledged fields for this item
+              const itemUnacknowledgedFields = item.unacknowledgedFields || [];
+              const hasUnacknowledgedChanges =
+                item.hasUnacknowledgedChanges || false;
+
               allCombinedItems.push({
                 ...item,
-                // Add company/list information
                 companyName:
                   list.customer?.companyName ||
                   list.customer?.legalName ||
@@ -1905,12 +1946,10 @@ const AdminAllItemsPage = () => {
                 listName: list.name || "Unknown List",
                 listId: list.id,
                 customerId: list.customer?.id,
-                // Add change tracking properties
-                changesNeedAcknowledgment:
-                  item.changesNeedAcknowledgment || false,
-                hasChanges: item.hasChanges || false,
-                shouldHighlight: item.shouldHighlight || false,
-                changedFields: item.changedFields || [],
+                // Enhanced change tracking
+                unacknowledgedFields: itemUnacknowledgedFields,
+                hasUnacknowledgedChanges: hasUnacknowledgedChanges,
+                changedFields: itemUnacknowledgedFields, // Map unacknowledged fields to changed fields
               });
             });
           }
@@ -1923,11 +1962,11 @@ const AdminAllItemsPage = () => {
       }
     } catch (error) {
       console.error("Failed to load all items:", error);
+      toast.error("Failed to load items");
     } finally {
       setLoading(false);
     }
   };
-
   const handleRefetchItemData = async () => {
     const data = await fetchAllListsWithMISRefresh(true);
     if (data) {
@@ -1965,21 +2004,36 @@ const AdminAllItemsPage = () => {
     }
   };
 
-  // Handle updating item
-  const handleUpdateItem = async (itemId: string, updateData: any) => {
-    try {
-      await updateListItem(itemId, updateData);
-      await loadAllItems();
-      setAllItems((prev) =>
-        prev.map((item) =>
-          item.id === itemId ? { ...item, ...updateData } : item
-        )
-      );
-    } catch (error) {
-      console.error("Failed to update item:", error);
-      toast.error("Failed to update item");
-    }
-  };
+  // Enhanced handleUpdateItem with optimistic state updates
+  const handleUpdateItem = useCallback((itemId: string, updateData: any) => {
+    // Optimistically update the state
+    setAllItems((prev) =>
+      prev.map((item) =>
+        item.id === itemId ? { ...item, ...updateData } : item
+      )
+    );
+  }, []);
+
+  // Handle adding item - optimistic update
+  const handleAddItemOptimistic = useCallback(
+    (newItem: any) => {
+      // Add the new item to the state with current timestamp
+      const itemWithMetadata = {
+        ...newItem,
+        id: newItem.id || `temp-${Date.now()}`,
+        createdAt: new Date().toISOString(),
+        companyName:
+          customers.find((c) => c.id === newItem.customerId)?.name ||
+          "Unknown Company",
+        listName:
+          lists.find((l) => l.id === newItem.listId)?.name || "Unknown List",
+      };
+
+      setAllItems((prev) => [itemWithMetadata, ...prev]);
+      toast.success("Item added successfully", successStyles);
+    },
+    [customers, lists]
+  );
 
   // Handle deleting selected items
   const handleDeleteSelectedItems = async () => {
@@ -1987,17 +2041,22 @@ const AdminAllItemsPage = () => {
 
     try {
       setSaving(true);
+
+      // Optimistically remove items from state
+      setAllItems((prev) =>
+        prev.filter((item: any) => !selectedRows.has(item.id))
+      );
+
+      // Clear selection
+      setSelectedRows(new Set());
+
+      // Make API calls in the background
       const deletePromises = Array.from(selectedRows).map((itemId) =>
         deleteListItem(itemId)
       );
 
       await Promise.all(deletePromises);
 
-      setAllItems((prev) =>
-        prev.filter((item: any) => !selectedRows.has(item.id))
-      );
-
-      setSelectedRows(new Set());
       toast.success(
         `${selectedRows.size} item(s) deleted successfully!`,
         successStyles
@@ -2005,6 +2064,8 @@ const AdminAllItemsPage = () => {
     } catch (error) {
       console.error("Failed to delete items:", error);
       toast.error("Failed to delete items");
+      // Reload data on error to restore correct state
+      await loadAllItems();
     } finally {
       setSaving(false);
     }
@@ -2013,6 +2074,7 @@ const AdminAllItemsPage = () => {
   const handleUpdateDelivery = useCallback(
     async (itemId: string, period: string, deliveryData: any) => {
       try {
+        // Optimistically update the state
         setAllItems((prev) =>
           prev.map((item: any) => {
             if (item.id === itemId) {
@@ -2035,8 +2097,12 @@ const AdminAllItemsPage = () => {
             return item;
           })
         );
+
+        // Make API call in background (you would add the actual API call here)
+        // await updateListItemDelivery(itemId, period, deliveryData);
       } catch (error) {
         console.error("Failed to update delivery:", error);
+        toast.error("Failed to update delivery");
       }
     },
     []
@@ -2057,6 +2123,12 @@ const AdminAllItemsPage = () => {
   // Filter items based on search term, customer, and list
   const filteredItems = useMemo(() => {
     let filtered = allItems;
+
+    // Always sort by createdAt first (newest first) before applying filters
+    filtered = [...filtered].sort(
+      (a: any, b: any) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
 
     // Filter by search term
     if (searchTerm && currentTab === 0) {
@@ -2094,11 +2166,7 @@ const AdminAllItemsPage = () => {
       );
     }
 
-    // Sort by createdAt in descending order to show the last added item at the top
-    return filtered.sort(
-      (a: any, b: any) =>
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    );
+    return filtered;
   }, [
     allItems,
     searchTerm,
@@ -2426,45 +2494,89 @@ const AdminAllItemsPage = () => {
       {
         key: "acknowledge",
         name: "Acknowledge",
-        width: 120,
+        width: 140,
         resizable: false,
-        renderCell: (props: any) => (
-          <CustomButton
-            variant="contained"
-            color="warning"
-            size="small"
-            onClick={async () => {
-              if (
-                props.row.hasChanges === false &&
-                props.row.changesNeedAcknowledgment === false
-              ) {
-                return;
-              }
+        renderCell: (props: any) => {
+          const hasUnacknowledged =
+            props.row.hasUnacknowledgedChanges ||
+            props.row.unacknowledgedFields?.length > 0;
 
-              const data = await acknowledgeItemChanges(
-                props.row.listId,
-                props.row.id
-              );
-              if (data?.success) {
-                await loadAllItems();
-              }
-            }}
-            startIcon={<Done />}
-            sx={{
-              minWidth: "auto",
-              px: 2,
-              py: 0.5,
-              fontSize: "0.75rem",
-              textTransform: "none",
-              borderRadius: 2,
-              "&:hover": {
-                backgroundColor: "#ed6c02",
-              },
-            }}
-          >
-            Ack
-          </CustomButton>
-        ),
+          return (
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+              {hasUnacknowledged && (
+                <Badge
+                  badgeContent={props.row.unacknowledgedFields?.length || 0}
+                  color="error"
+                >
+                  <CustomButton
+                    variant="contained"
+                    color="warning"
+                    size="small"
+                    onClick={async () => {
+                      try {
+                        // Call API to acknowledge all changes for this item
+                        const result = await acknowledgeItemChanges(
+                          props.row.listId,
+                          props.row.id
+                        );
+
+                        if (result?.success) {
+                          toast.success(
+                            `Acknowledged ${
+                              result.data?.acknowledgedCount || 0
+                            } changes`,
+                            successStyles
+                          );
+
+                          // Optimistically update the state
+                          setAllItems((prev) =>
+                            prev.map((item) =>
+                              item.id === props.row.id
+                                ? {
+                                    ...item,
+                                    hasUnacknowledgedChanges: false,
+                                    unacknowledgedFields: [],
+                                    changedFields: [],
+                                  }
+                                : item
+                            )
+                          );
+                        }
+                      } catch (error) {
+                        console.error("Failed to acknowledge changes:", error);
+                        toast.error("Failed to acknowledge changes");
+                      }
+                    }}
+                    startIcon={<DoneAll />}
+                    sx={{
+                      minWidth: "auto",
+                      px: 2,
+                      py: 0.5,
+                      fontSize: "0.75rem",
+                      textTransform: "none",
+                      borderRadius: 2,
+                      backgroundColor: "#ff9800",
+                      "&:hover": {
+                        backgroundColor: "#f57c00",
+                      },
+                    }}
+                  >
+                    Acknowledge All
+                  </CustomButton>
+                </Badge>
+              )}
+              {!hasUnacknowledged && (
+                <Chip
+                  label="Acknowledged"
+                  size="small"
+                  color="success"
+                  icon={<CheckCircle fontSize="small" />}
+                  sx={{ fontSize: "0.7rem" }}
+                />
+              )}
+            </Box>
+          );
+        },
       },
     ];
 
@@ -2806,7 +2918,7 @@ const AdminAllItemsPage = () => {
                   <CustomButton
                     variant="outlined"
                     startIcon={<Refresh />}
-                    onClick={() => window.location.reload()}
+                    onClick={() => loadAllItems()}
                   >
                     Refresh
                   </CustomButton>
@@ -3073,9 +3185,10 @@ const AdminAllItemsPage = () => {
         setSelectedListId={setSelectedList}
         open={addItemDialog}
         onClose={() => setAddItemDialog(false)}
+        onAddItem={handleAddItemOptimistic}
         customers={customers}
         lists={lists}
-        onRefresh={loadAllItems}
+        onRefresh={null}
       />
 
       <ItemActivityLogsDialog

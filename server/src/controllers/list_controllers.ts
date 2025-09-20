@@ -784,9 +784,19 @@ export const getListWithItems = async (
     }
 
     if (list.items && list.items.length > 0) {
-      const updatedItems = [];
+      const updatedItems: any = [];
       for (const item of list.items) {
-        updatedItems.push(await updateLocalListItem(item));
+        const updatedItem = await updateLocalListItem(item);
+
+        // Add unacknowledged fields information
+        const unacknowledgedFields = updatedItem.getUnacknowledgedFields();
+        const itemWithFieldStatus = {
+          ...updatedItem,
+          unacknowledgedFields: Array.from(unacknowledgedFields),
+          hasUnacknowledgedChanges: unacknowledgedFields.size > 0,
+        };
+
+        updatedItems.push(itemWithFieldStatus);
       }
       list.items = updatedItems;
       await listRepository.save(list);
@@ -799,7 +809,11 @@ export const getListWithItems = async (
       success: true,
       data: {
         ...list,
-        items: list.items,
+        items: list.items.map((item) => ({
+          ...item,
+          unacknowledgedFields: Array.from(item.getUnacknowledgedFields()),
+          hasUnacknowledgedChanges: item.hasUnacknowledgedCustomerChanges(),
+        })),
         unacknowledgedChangesCount: unacknowledgedChanges.length,
         activityLogs: list.getAllActivityLogs(),
       },
@@ -1923,6 +1937,71 @@ export const acknowledgeItemChanges = async (
         itemNumber: item.itemNumber,
         acknowledgedCount,
         remainingUnacknowledged: unacknowledgedAfter,
+      },
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const acknowledgeFieldChanges = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { listId, itemId } = req.params;
+    const { fields } = req.body; // Array of field names to acknowledge
+    const userId = (req as any).user?.id;
+
+    if (!listId || !itemId || !fields || !Array.isArray(fields)) {
+      return next(
+        new ErrorHandler("List ID, Item ID, and fields array are required", 400)
+      );
+    }
+
+    const userRole = getUserRole(userId, undefined);
+    if (userRole !== USER_ROLE.ADMIN) {
+      return next(new ErrorHandler("Only admins can acknowledge changes", 403));
+    }
+
+    const listRepository = AppDataSource.getRepository(List);
+    const list = await listRepository.findOne({
+      where: { id: listId },
+    });
+
+    if (!list) {
+      return next(new ErrorHandler("List not found", 404));
+    }
+
+    // Find and acknowledge logs for specific fields
+    let acknowledgedCount = 0;
+    if (list.activityLogs) {
+      list.activityLogs.forEach((log) => {
+        if (
+          log.itemId === itemId &&
+          log.userRole === USER_ROLE.CUSTOMER &&
+          !log.acknowledged &&
+          log.field &&
+          fields.includes(log.field)
+        ) {
+          log.acknowledged = true;
+          log.acknowledgedBy = userId;
+          log.acknowledgedAt = new Date();
+          acknowledgedCount++;
+        }
+      });
+    }
+
+    await listRepository.save(list);
+
+    return res.status(200).json({
+      success: true,
+      message: `Acknowledged ${acknowledgedCount} field changes`,
+      data: {
+        itemId,
+        acknowledgedFields: fields,
+        acknowledgedCount,
       },
     });
   } catch (error) {

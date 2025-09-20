@@ -13,6 +13,7 @@ import { AppDataSource } from "../config/database";
 import { Customer } from "../models/customers";
 import { AuthorizedRequest } from "../middlewares/authorized";
 import { CustomerCreator, List, LIST_STATUS, ListItem } from "../models/list";
+import { Invoice, InvoiceItem } from "../models/invoice";
 
 // Create User with Permissions (Admin/Super Admin only)
 export const createUser = async (
@@ -1046,7 +1047,6 @@ export const deleteCustomer = async (
 
     const customerRepository = AppDataSource.getRepository(Customer);
     const listRepository = AppDataSource.getRepository(List);
-    const listItemRepository = AppDataSource.getRepository(ListItem);
 
     // Check if customer exists
     const customer = await customerRepository.findOne({
@@ -1057,29 +1057,18 @@ export const deleteCustomer = async (
       return next(new ErrorHandler("Customer not found", 404));
     }
 
-    // Check for any related entities that would prevent deletion
-    const [
-      listsWithItemsCount,
-      invoiceCount,
-      // Add other entity counts here as needed
-    ] = await Promise.all([
-      // Check for lists with items
-      listRepository
-        .createQueryBuilder("list")
-        .innerJoin("list.items", "item")
-        .where("list.customerId = :customerId", { customerId })
-        .getCount(),
+    // Check for lists with items
+    const listsWithItems = await listRepository
+      .createQueryBuilder("list")
+      .innerJoinAndSelect("list.items", "items")
+      .where("list.customerId = :customerId", { customerId })
+      .getMany();
 
-      // Check for invoices
-      AppDataSource.getRepository("Invoice") // Replace "Invoice" with your actual invoice entity name
-        .createQueryBuilder("invoice")
-        .where("invoice.customerId = :customerId", { customerId })
-        .getCount(),
+    const hasListItems = listsWithItems.some(
+      (list) => list.items && list.items.length > 0
+    );
 
-      // Add checks for other related entities here
-    ]);
-
-    if (listsWithItemsCount > 0) {
+    if (hasListItems) {
       return next(
         new ErrorHandler(
           "Cannot delete customer. Customer has lists with items. Please delete all items first.",
@@ -1088,61 +1077,47 @@ export const deleteCustomer = async (
       );
     }
 
-    if (invoiceCount > 0) {
-      return next(
-        new ErrorHandler(
-          "Cannot delete customer. Customer has associated invoices. Please delete all invoices first.",
-          400
-        )
-      );
-    }
-
-    // Add other entity checks here
-
     // Use a transaction to ensure data consistency
     await AppDataSource.transaction(async (transactionalEntityManager) => {
-      // Delete all related entities in the correct order
+      // 1. First find all lists for this customer
+      const customerLists = await transactionalEntityManager.find(List, {
+        where: { customer: { id: customerId } },
+      });
 
-      // 1. First delete list items (though we already checked there are none with items)
-      await transactionalEntityManager
-        .createQueryBuilder()
-        .delete()
-        .from(ListItem)
-        .where(
-          "listId IN (SELECT id FROM list WHERE customerId = :customerId)",
-          { customerId }
-        )
-        .execute();
+      // 2. Delete list items for each list
+      for (const list of customerLists) {
+        await transactionalEntityManager.delete(ListItem, {
+          list: { id: list.id },
+        });
+      }
 
-      // 2. Delete empty lists
-      await transactionalEntityManager
-        .createQueryBuilder()
-        .delete()
-        .from(List)
-        .where("customerId = :customerId", { customerId })
-        .execute();
+      // 3. Delete all lists for this customer
+      await transactionalEntityManager.delete(List, {
+        customer: { id: customerId },
+      });
 
-      // 3. Delete any other related entities (invoices, etc.)
-      // Example for invoices - you might want to handle this differently
-      // await transactionalEntityManager
-      //   .createQueryBuilder()
-      //   .delete()
-      //   .from(Invoice)
-      //   .where("customerId = :customerId", { customerId })
-      //   .execute();
+      // 4. Find all invoices for this customer and delete their items first
+      const customerInvoices = await transactionalEntityManager.find(Invoice, {
+        where: { customer: { id: customerId } },
+        relations: ["items"],
+      });
 
-      // 4. Finally delete the customer
-      await transactionalEntityManager
-        .createQueryBuilder()
-        .delete()
-        .from(Customer)
-        .where("id = :customerId", { customerId })
-        .execute();
+      for (const invoice of customerInvoices) {
+        // Delete invoice items first
+        await transactionalEntityManager.delete(InvoiceItem, {
+          invoice: { id: invoice.id },
+        });
+        // Then delete the invoice
+        await transactionalEntityManager.delete(Invoice, invoice.id);
+      }
+
+      // 5. Finally delete the customer
+      await transactionalEntityManager.delete(Customer, customerId);
     });
 
     return res.status(200).json({
       success: true,
-      message: "Customer deleted successfully",
+      message: "Customer and all associated invoices deleted successfully",
     });
   } catch (error) {
     console.error("Error deleting customer:", error);

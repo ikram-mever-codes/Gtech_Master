@@ -397,6 +397,47 @@ export class ListItem {
     }
   }
 
+  getUnacknowledgedFields(): Set<string> {
+    const unacknowledgedFields = new Set<string>();
+    const itemLogs = this.getActivityLogs();
+
+    itemLogs.forEach((log) => {
+      if (
+        log.userRole === USER_ROLE.CUSTOMER &&
+        !log.acknowledged &&
+        log.field
+      ) {
+        // Check if this is a delivery field
+        if (log.field.startsWith("delivery_")) {
+          unacknowledgedFields.add(log.field);
+        } else {
+          unacknowledgedFields.add(log.field);
+        }
+      }
+    });
+
+    return unacknowledgedFields;
+  }
+
+  // Also add a method to get the latest unacknowledged value for a field
+  getLatestUnacknowledgedChange(field: string): any {
+    const itemLogs = this.getActivityLogs();
+
+    // Find the most recent unacknowledged change for this field
+    const relevantLogs = itemLogs
+      .filter(
+        (log) =>
+          log.userRole === USER_ROLE.CUSTOMER &&
+          !log.acknowledged &&
+          log.field === field
+      )
+      .sort(
+        (a, b) =>
+          new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+      );
+
+    return relevantLogs.length > 0 ? relevantLogs[0] : null;
+  }
   // Get all activity logs for this item
   getActivityLogs(): ActivityLog[] {
     return this.list?.getItemActivityLogs(this.id) || [];

@@ -472,7 +472,7 @@ const UserProfile = () => {
                 <Stack direction="row" spacing={1}>
                   <Tooltip title="Edit User" placement="top">
                     <IconButton
-                      onClick={() => router.push(`/users/edit/${userData.id}`)}
+                      onClick={() => router.push(`/users/${userData.id}/edit`)}
                       sx={{
                         backgroundColor: "#e3f2fd",
                         color: "#1565c0",
@@ -482,7 +482,7 @@ const UserProfile = () => {
                       <Edit size={20} />
                     </IconButton>
                   </Tooltip>
-                  <Tooltip title="Reset Password" placement="top">
+                  {/* <Tooltip title="Reset Password" placement="top">
                     <IconButton
                       onClick={() => handleConfirmAction("resetPassword")}
                       sx={{
@@ -517,7 +517,7 @@ const UserProfile = () => {
                     >
                       <Ban size={20} />
                     </IconButton>
-                  </Tooltip>
+                  </Tooltip> */}
                   <Tooltip title="Delete User" placement="top">
                     <IconButton
                       onClick={() => handleConfirmAction("delete")}
