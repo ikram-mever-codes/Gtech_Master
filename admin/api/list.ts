@@ -48,6 +48,7 @@ interface ListItemPayload {
 interface UpdateListItemPayload {
   quantity?: number;
   notes?: string;
+  interval?: any;
 }
 
 interface CreateListPayload {
