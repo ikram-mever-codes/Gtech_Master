@@ -9,13 +9,16 @@ import {
   DELIVERY_STATUS,
   USER_ROLE,
   ListItem,
+  CHANGE_STATUS,
+  acknowledgeItemChanges as acknowledgeItemChangesUtil,
+  getHighlightedFields,
+  getPendingChangesByField,
 } from "../models/list";
 import ErrorHandler from "../utils/errorHandler";
 import { getConnection } from "../config/misDb";
 import { Customer } from "../models/customers";
 import { User } from "../models/users";
 import { In } from "typeorm";
-import { list } from "pdfkit";
 
 async function fetchItemData(itemId: number) {
   const connection = await getConnection();
@@ -298,6 +301,7 @@ export const createList = async (
       createdBy,
       status: LIST_STATUS.ACTIVE,
       activityLogs: [],
+      pendingChanges: [],
     });
 
     await listRepository.save(list);
@@ -446,9 +450,12 @@ export const updateListItem = async (
       return next(new ErrorHandler("Associated list not found", 404));
     }
 
-    // Initialize activityLogs if null
+    // Initialize activityLogs and pendingChanges if null
     if (!list.activityLogs) {
       list.activityLogs = [];
+    }
+    if (!list.pendingChanges) {
+      list.pendingChanges = [];
     }
 
     const performerId = userId || customerId || "system";
@@ -588,10 +595,18 @@ export const updateListItem = async (
       await transactionalEntityManager.save(List, list);
     });
 
+    // Check if there are pending changes for highlighting
+    const hasPendingChanges = item.hasUnacknowledgedCustomerChanges();
+    const highlightedFields = getHighlightedFields(item);
+
     return res.status(200).json({
       success: true,
       message: "List item updated successfully",
-      data: item,
+      data: {
+        ...item,
+        hasPendingChanges,
+        highlightedFields,
+      },
       changedFields: changedFields.length > 0 ? changedFields : undefined,
     });
   } catch (error) {
@@ -680,16 +695,25 @@ export const updateListItemComment = async (
 
     console.log("Comment updated successfully:", item.comment);
 
+    // Check if there are pending changes for highlighting
+    const hasPendingChanges = item.hasUnacknowledgedCustomerChanges();
+    const highlightedFields = getHighlightedFields(item);
+
     return res.status(200).json({
       success: true,
       message: "Comment updated successfully",
-      data: item,
+      data: {
+        ...item,
+        hasPendingChanges,
+        highlightedFields,
+      },
     });
   } catch (error) {
     console.error("Error updating comment:", error);
     return next(error);
   }
 };
+
 // 4. Update Delivery Info
 export const updateDeliveryInfo = async (
   req: Request,
@@ -788,12 +812,15 @@ export const getListWithItems = async (
       for (const item of list.items) {
         const updatedItem = await updateLocalListItem(item);
 
-        // Add unacknowledged fields information
-        const unacknowledgedFields = updatedItem.getUnacknowledgedFields();
+        // Add unacknowledged fields information using new methods
+        const highlightedFields = getHighlightedFields(updatedItem);
+        const pendingChanges = updatedItem.getPendingChanges();
         const itemWithFieldStatus = {
           ...updatedItem,
-          unacknowledgedFields: Array.from(unacknowledgedFields),
-          hasUnacknowledgedChanges: unacknowledgedFields.size > 0,
+          highlightedFields,
+          pendingChanges,
+          hasPendingChanges: updatedItem.hasUnacknowledgedCustomerChanges(),
+          needsAttention: updatedItem.needsAttention(),
         };
 
         updatedItems.push(itemWithFieldStatus);
@@ -802,8 +829,9 @@ export const getListWithItems = async (
       await listRepository.save(list);
     }
 
-    // Get unacknowledged customer changes count
-    const unacknowledgedChanges = list.getUnacknowledgedCustomerChanges();
+    // Get pending changes using new method
+    const pendingChanges = list.getPendingFieldChanges();
+    const changesByField = getPendingChangesByField(list);
 
     return res.status(200).json({
       success: true,
@@ -811,11 +839,16 @@ export const getListWithItems = async (
         ...list,
         items: list.items.map((item) => ({
           ...item,
-          unacknowledgedFields: Array.from(item.getUnacknowledgedFields()),
-          hasUnacknowledgedChanges: item.hasUnacknowledgedCustomerChanges(),
+          highlightedFields: getHighlightedFields(item),
+          pendingChanges: item.getPendingChanges(),
+          hasPendingChanges: item.hasUnacknowledgedCustomerChanges(),
+          needsAttention: item.needsAttention(),
         })),
-        unacknowledgedChangesCount: unacknowledgedChanges.length,
+        pendingChangesCount: pendingChanges.length,
+        pendingChanges,
+        changesByField: Object.fromEntries(changesByField),
         activityLogs: list.getAllActivityLogs(),
+        hasPendingChanges: list.hasPendingChanges(),
       },
     });
   } catch (error) {
@@ -880,6 +913,9 @@ export const getCustomerDeliveries = async (
                   cargoType: delivery.cargoType || "",
                   interval: updatedItem.interval || "monthly",
                   imageUrl: updatedItem.imageUrl || null,
+                  hasPendingChanges:
+                    updatedItem.hasUnacknowledgedCustomerChanges(),
+                  highlightedFields: getHighlightedFields(updatedItem),
                 });
               }
             );
@@ -933,20 +969,26 @@ export const getCustomerList = async (
     if (list.items && list.items.length > 0) {
       const updatedItems = [];
       for (const item of list.items) {
-        updatedItems.push(await updateLocalListItem(item));
+        const updatedItem = await updateLocalListItem(item);
+        updatedItems.push(updatedItem);
       }
       list.items = updatedItems;
       await listRepository.save(list);
     }
 
-    const unacknowledgedChanges = list.getUnacknowledgedCustomerChanges();
+    const pendingChanges = list.getPendingFieldChanges();
 
     return res.status(200).json({
       success: true,
       data: {
         ...list,
-        items: list.items,
-        unacknowledgedChangesCount: unacknowledgedChanges.length,
+        items: list.items.map((item) => ({
+          ...item,
+          highlightedFields: getHighlightedFields(item),
+          hasPendingChanges: item.hasUnacknowledgedCustomerChanges(),
+        })),
+        pendingChangesCount: pendingChanges.length,
+        hasPendingChanges: list.hasPendingChanges(),
       },
     });
   } catch (error) {
@@ -1015,47 +1057,81 @@ export const deleteListItem = async (
   }
 };
 
-// 9. Acknowledge List Item Changes
+// 9. Acknowledge List Item Changes - UPDATED
 export const acknowledgeListItemChanges = async (
   req: Request,
   res: Response,
   next: NextFunction
 ) => {
   try {
-    const { itemId } = req.params;
-    const { logIds } = req.body; // Array of log IDs to acknowledge
+    const { listId, itemId } = req.params;
+    const { logIds, fields } = req.body; // Now supports both log IDs and field names
     const userId = (req as any).user?.id;
-    const customerId = (req as any).customer?.id;
+
+    if (!listId) {
+      return next(new ErrorHandler("List ID is required", 400));
+    }
 
     if (!itemId) {
       return next(new ErrorHandler("Item ID is required", 400));
     }
 
-    const performerId = userId || customerId || "system";
-    const userRole = getUserRole(userId, customerId);
+    const userRole = getUserRole(userId, undefined);
+    if (userRole !== USER_ROLE.ADMIN) {
+      return next(new ErrorHandler("Only admins can acknowledge changes", 403));
+    }
 
-    const listItemRepository = AppDataSource.getRepository(ListItem);
     const listRepository = AppDataSource.getRepository(List);
-
-    const item = await listItemRepository.findOne({
-      where: { id: itemId },
-      relations: ["list"],
+    const list = await listRepository.findOne({
+      where: { id: listId },
+      relations: ["items"],
     });
 
-    if (!item) {
-      return next(new ErrorHandler("List item not found", 404));
+    if (!list) {
+      return next(new ErrorHandler("List not found", 404));
     }
 
-    // Only admins can acknowledge customer changes
-    if (userRole === USER_ROLE.ADMIN) {
-      item.list.acknowledgeCustomerChanges(performerId, logIds);
-      await listRepository.save(item.list);
+    // Find the specific item
+    const item = list.items.find((listItem) => listItem.id === itemId);
+    if (!item) {
+      return next(
+        new ErrorHandler("Item not found in the specified list", 404)
+      );
     }
+
+    let acknowledgedCount = 0;
+
+    // Acknowledge by log IDs if provided
+    if (logIds && Array.isArray(logIds)) {
+      list.acknowledgeCustomerChanges(userId, logIds);
+      acknowledgedCount = logIds.length;
+    }
+
+    // Acknowledge by field names if provided
+    if (fields && Array.isArray(fields)) {
+      list.acknowledgeFieldChanges(userId, fields);
+      acknowledgedCount += fields.length;
+    }
+
+    // If neither provided, acknowledge all pending changes for the item
+    if (!logIds && !fields) {
+      const itemPendingChanges = list.getItemPendingChanges(itemId);
+      const fieldNames = itemPendingChanges.map((change) => change.field);
+      list.acknowledgeFieldChanges(userId, fieldNames);
+      acknowledgedCount = fieldNames.length;
+    }
+
+    await listRepository.save(list);
 
     return res.status(200).json({
       success: true,
-      message: "Changes acknowledged successfully",
-      data: item,
+      message: `Successfully acknowledged ${acknowledgedCount} changes for item ${item.articleName}`,
+      data: {
+        itemId: item.id,
+        itemNumber: item.itemNumber,
+        acknowledgedCount,
+        remainingPendingChanges: list.getItemPendingChanges(itemId).length,
+      },
     });
   } catch (error) {
     return next(error);
@@ -1149,7 +1225,7 @@ export const searchItems = async (
   }
 };
 
-// 12. Get Customer Lists
+// 12. Get Customer Lists - UPDATED
 export const getCustomerLists = async (
   req: Request,
   res: Response,
@@ -1183,11 +1259,11 @@ export const getCustomerLists = async (
       ],
     });
 
-    // Enhance lists with unacknowledged changes count
+    // Enhance lists with pending changes information
     const listsWithChanges = lists.map((list) => ({
       ...list,
-      unacknowledgedChangesCount:
-        list.getUnacknowledgedCustomerChanges().length,
+      pendingChangesCount: list.getPendingFieldChanges().length,
+      hasPendingChanges: list.hasPendingChanges(),
     }));
 
     return res.status(200).json({
@@ -1199,7 +1275,9 @@ export const getCustomerLists = async (
   }
 };
 
-// 13. Get All Lists (Admin view)
+// FIXED getAllLists Controller - Replace this in your list controller file
+
+// 13. Get All Lists (Admin view) - FIXED
 export const getAllLists = async (
   req: Request,
   res: Response,
@@ -1210,11 +1288,38 @@ export const getAllLists = async (
     const lists = await listRepository.find({
       relations: ["customer", "items", "createdBy.user", "createdBy.customer"],
     });
-    const listsWithChanges = lists.map((list) => ({
-      ...list,
-      unacknowledgedChangesCount:
-        list.getUnacknowledgedCustomerChanges().length,
-    }));
+
+    const listsWithChanges = lists.map((list) => {
+      // Process items with proper unacknowledged fields
+      const itemsWithChanges =
+        list.items?.map((item) => {
+          // Get pending changes for this specific item
+          const itemPendingChanges = list.getItemPendingChanges(item.id);
+
+          // Extract unacknowledged fields from pending changes
+          const unacknowledgedFields = itemPendingChanges
+            .filter((change) => change.changeStatus === CHANGE_STATUS.PENDING)
+            .map((change) => change.field);
+
+          // Return item with all necessary acknowledgment data
+          return {
+            ...item,
+            unacknowledgedFields,
+            hasUnacknowledgedChanges: unacknowledgedFields.length > 0,
+            pendingChanges: itemPendingChanges,
+            needsAttention: unacknowledgedFields.length > 0,
+          };
+        }) || [];
+
+      return {
+        ...list,
+        items: itemsWithChanges,
+        pendingChanges: list.pendingChanges || [], // Include the full pendingChanges array
+        pendingChangesCount: list.getPendingFieldChanges().length,
+        hasPendingChanges: list.hasPendingChanges(),
+        activityLogs: list.getAllActivityLogs(),
+      };
+    });
 
     return res.status(200).json({
       success: true,
@@ -1266,6 +1371,7 @@ export const duplicateList = async (
       createdBy,
       status: LIST_STATUS.DRAFTED,
       activityLogs: [],
+      pendingChanges: [],
     });
 
     await listRepository.save(newList);
@@ -1465,13 +1571,14 @@ export const searchListsByNumber = async (
       return next(new ErrorHandler("List not found", 404));
     }
 
-    const unacknowledgedChanges = list.getUnacknowledgedCustomerChanges();
+    const pendingChanges = list.getPendingFieldChanges();
 
     return res.status(200).json({
       success: true,
       data: {
         ...list,
-        unacknowledgedChangesCount: unacknowledgedChanges.length,
+        pendingChangesCount: pendingChanges.length,
+        hasPendingChanges: list.hasPendingChanges(),
       },
     });
   } catch (error) {
@@ -1514,8 +1621,8 @@ export const getListsByCompanyName = async (
 
     const listsWithChanges = lists.map((list) => ({
       ...list,
-      unacknowledgedChangesCount:
-        list.getUnacknowledgedCustomerChanges().length,
+      pendingChangesCount: list.getPendingFieldChanges().length,
+      hasPendingChanges: list.hasPendingChanges(),
     }));
 
     return res.status(200).json({
@@ -1527,34 +1634,26 @@ export const getListsByCompanyName = async (
   }
 };
 
-// 19. Bulk Acknowledge Changes
+// 19. Bulk Acknowledge Changes - UPDATED
 export const bulkAcknowledgeChanges = async (
   req: Request,
   res: Response,
   next: NextFunction
 ) => {
   try {
-    const { listIds, logIds } = req.body; // Now receiving multiple list IDs and optional log IDs
+    const { listIds, itemIds, fields } = req.body;
     const userId = (req as any).user?.id;
-    const customerId = (req as any).customer?.id;
 
     if (!listIds || !Array.isArray(listIds) || listIds.length === 0) {
       return next(new ErrorHandler("List IDs array is required", 400));
     }
 
-    const performerId = userId || customerId || "system";
-    const userRole = getUserRole(userId, customerId);
-
-    // Only admins can acknowledge customer changes
+    const userRole = getUserRole(userId, undefined);
     if (userRole !== USER_ROLE.ADMIN) {
-      return next(
-        new ErrorHandler("Only admins can acknowledge customer changes", 403)
-      );
+      return next(new ErrorHandler("Only admins can acknowledge changes", 403));
     }
 
     const listRepository = AppDataSource.getRepository(List);
-
-    // Find all lists
     const lists = await listRepository.find({
       where: { id: In(listIds) },
     });
@@ -1567,19 +1666,37 @@ export const bulkAcknowledgeChanges = async (
     const results = [];
 
     for (const list of lists) {
-      const unacknowledgedBefore =
-        list.getUnacknowledgedCustomerChanges().length;
-      list.acknowledgeCustomerChanges(performerId, logIds);
-      const unacknowledgedAfter =
-        list.getUnacknowledgedCustomerChanges().length;
-      const acknowledgedCount = unacknowledgedBefore - unacknowledgedAfter;
+      const pendingBefore = list.getPendingFieldChanges().length;
+
+      if (itemIds && Array.isArray(itemIds)) {
+        // Acknowledge changes for specific items
+        for (const itemId of itemIds) {
+          const itemPendingChanges = list.getItemPendingChanges(itemId);
+          const fieldNames = itemPendingChanges.map((change) => change.field);
+          list.acknowledgeFieldChanges(userId, fieldNames);
+          totalAcknowledgedCount += fieldNames.length;
+        }
+      } else if (fields && Array.isArray(fields)) {
+        // Acknowledge specific fields across the list
+        list.acknowledgeFieldChanges(userId, fields);
+        totalAcknowledgedCount += fields.length;
+      } else {
+        // Acknowledge all changes in the list
+        const pendingChanges = list.getPendingFieldChanges();
+        const fieldNames = pendingChanges.map((change) => change.field);
+        list.acknowledgeFieldChanges(userId, fieldNames);
+        totalAcknowledgedCount += fieldNames.length;
+      }
+
+      const pendingAfter = list.getPendingFieldChanges().length;
+      const acknowledgedCount = pendingBefore - pendingAfter;
 
       await listRepository.save(list);
 
-      totalAcknowledgedCount += acknowledgedCount;
       results.push({
         listId: list.id,
         acknowledgedCount,
+        remainingPending: pendingAfter,
       });
     }
 
@@ -1597,26 +1714,65 @@ export const bulkAcknowledgeChanges = async (
   }
 };
 
-// 20. Approve List Item Changes (Not applicable with new schema)
-export const approveListItemChanges = async (
+// 20. Get Pending Changes for Admin Dashboard
+export const getPendingChangesForAdmin = async (
   req: Request,
   res: Response,
   next: NextFunction
 ) => {
   try {
-    // With the new schema, changes are automatically applied and logged
-    // Approval is replaced by acknowledgment
+    const listRepository = AppDataSource.getRepository(List);
+    const lists = await listRepository.find({
+      relations: ["customer", "items"],
+    });
+
+    const pendingChangesSummary = lists.map((list) => {
+      const pendingChanges = list.getPendingFieldChanges();
+      const changesByField = getPendingChangesByField(list);
+
+      return {
+        listId: list.id,
+        listName: list.name,
+        customerName: list.customer?.companyName,
+        pendingChangesCount: pendingChanges.length,
+        changesByField: Object.fromEntries(changesByField),
+        itemsWithChanges: list.items
+          .filter((item) => item.hasUnacknowledgedCustomerChanges())
+          .map((item) => ({
+            itemId: item.id,
+            itemName: item.articleName,
+            highlightedFields: getHighlightedFields(item),
+            pendingChanges: item.getPendingChanges(),
+          })),
+      };
+    });
+
+    const totalPendingChanges = pendingChangesSummary.reduce(
+      (total, list) => total + list.pendingChangesCount,
+      0
+    );
+
     return res.status(200).json({
       success: true,
-      message:
-        "Changes are automatically applied. Use acknowledge endpoint for tracking.",
+      data: {
+        summary: {
+          totalLists: lists.length,
+          totalPendingChanges,
+          listsWithPendingChanges: pendingChangesSummary.filter(
+            (list) => list.pendingChangesCount > 0
+          ).length,
+        },
+        detailed: pendingChangesSummary.filter(
+          (list) => list.pendingChangesCount > 0
+        ),
+      },
     });
   } catch (error) {
-    return next(error);
+    return next(new ErrorHandler("Failed to fetch pending changes", 500));
   }
 };
 
-// 21. Fetch All Lists and Items
+// 21. Fetch All Lists and Items - UPDATED
 export const fetchAllListsAndItems = async (
   req: Request,
   res: Response,
@@ -1679,11 +1835,11 @@ export const fetchAllListsAndItems = async (
       }
     }
 
-    // Enhance lists with unacknowledged changes count
+    // Enhance lists with pending changes information
     const listsWithChanges = lists.map((list) => ({
       ...list,
-      unacknowledgedChangesCount:
-        list.getUnacknowledgedCustomerChanges().length,
+      pendingChangesCount: list.getPendingFieldChanges().length,
+      hasPendingChanges: list.hasPendingChanges(),
       activityLogs: list.getAllActivityLogs(),
     }));
 
@@ -1798,7 +1954,7 @@ export const refreshItemsFromMIS = async (
   }
 };
 
-// 23. Get List Item with MIS Refresh
+// 23. Get List Item with MIS Refresh - UPDATED
 export const getListItemWithRefresh = async (
   req: Request,
   res: Response,
@@ -1847,96 +2003,22 @@ export const getListItemWithRefresh = async (
       }
     }
 
+    // Add pending changes information
+    const hasPendingChanges = refreshedItem.hasUnacknowledgedCustomerChanges();
+    const highlightedFields = getHighlightedFields(refreshedItem);
+    const pendingChanges = refreshedItem.getPendingChanges();
+
     return res.status(200).json({
       success: true,
       message: shouldRefresh
         ? "Item fetched and refreshed from MIS"
         : "Item fetched",
-      data: refreshedItem,
-    });
-  } catch (error) {
-    return next(error);
-  }
-};
-
-// 24. Individual Item Acknowledge Changes Controller
-export const acknowledgeItemChanges = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
-  try {
-    const { listId, itemId } = req.params;
-    const { logIds } = req.body;
-    const userId = (req as any).user?.id;
-    const customerId = (req as any).customer?.id;
-
-    if (!listId) {
-      return next(new ErrorHandler("List ID is required", 400));
-    }
-
-    if (!itemId) {
-      return next(new ErrorHandler("Item ID is required", 400));
-    }
-
-    const performerId = userId || customerId || "system";
-    const userRole = getUserRole(userId, customerId);
-
-    // Only admins can acknowledge customer changes
-    if (userRole !== USER_ROLE.ADMIN) {
-      return next(
-        new ErrorHandler("Only admins can acknowledge customer changes", 403)
-      );
-    }
-
-    const listRepository = AppDataSource.getRepository(List);
-
-    // Find the list and ensure it exists
-    const list = await listRepository.findOne({
-      where: { id: listId },
-      relations: ["items"],
-    });
-
-    if (!list) {
-      return next(new ErrorHandler("List not found", 404));
-    }
-
-    // Find the specific item within the list
-    const item = list.items.find((listItem) => listItem.id === itemId);
-
-    if (!item) {
-      return next(
-        new ErrorHandler("Item not found in the specified list", 404)
-      );
-    }
-
-    // Get item-specific logs
-    const itemLogs = list.getItemActivityLogs(itemId);
-    const unacknowledgedBefore = itemLogs.filter(
-      (log) => log.userRole === USER_ROLE.CUSTOMER && !log.acknowledged
-    ).length;
-
-    // Acknowledge the changes
-    list.acknowledgeCustomerChanges(performerId, logIds);
-
-    const unacknowledgedAfter = list
-      .getItemActivityLogs(itemId)
-      .filter(
-        (log) => log.userRole === USER_ROLE.CUSTOMER && !log.acknowledged
-      ).length;
-
-    const acknowledgedCount = unacknowledgedBefore - unacknowledgedAfter;
-
-    await listRepository.save(list);
-
-    return res.status(200).json({
-      success: true,
-      message: `Successfully acknowledged ${acknowledgedCount} changes for item ${item.articleName}`,
       data: {
-        itemId: item.id,
-        itemNumber: item.itemNumber,
-        acknowledgedCount,
-        remainingUnacknowledged: unacknowledgedAfter,
+        ...refreshedItem,
+        hasPendingChanges,
+        highlightedFields,
+        pendingChanges,
+        needsAttention: refreshedItem.needsAttention(),
       },
     });
   } catch (error) {
@@ -1944,14 +2026,15 @@ export const acknowledgeItemChanges = async (
   }
 };
 
-export const acknowledgeFieldChanges = async (
+// 24. Acknowledge Field Changes for Specific Item
+export const acknowledgeItemFieldChanges = async (
   req: Request,
   res: Response,
   next: NextFunction
 ) => {
   try {
     const { listId, itemId } = req.params;
-    const { fields } = req.body; // Array of field names to acknowledge
+    const { fields } = req.body;
     const userId = (req as any).user?.id;
 
     if (!listId || !itemId || !fields || !Array.isArray(fields)) {
@@ -1974,34 +2057,17 @@ export const acknowledgeFieldChanges = async (
       return next(new ErrorHandler("List not found", 404));
     }
 
-    // Find and acknowledge logs for specific fields
-    let acknowledgedCount = 0;
-    if (list.activityLogs) {
-      list.activityLogs.forEach((log) => {
-        if (
-          log.itemId === itemId &&
-          log.userRole === USER_ROLE.CUSTOMER &&
-          !log.acknowledged &&
-          log.field &&
-          fields.includes(log.field)
-        ) {
-          log.acknowledged = true;
-          log.acknowledgedBy = userId;
-          log.acknowledgedAt = new Date();
-          acknowledgedCount++;
-        }
-      });
-    }
+    // Use the utility function to acknowledge item changes
+    acknowledgeItemChangesUtil(list, itemId, userId);
 
     await listRepository.save(list);
 
     return res.status(200).json({
       success: true,
-      message: `Acknowledged ${acknowledgedCount} field changes`,
+      message: `Acknowledged changes for ${fields.length} fields`,
       data: {
         itemId,
         acknowledgedFields: fields,
-        acknowledgedCount,
       },
     });
   } catch (error) {

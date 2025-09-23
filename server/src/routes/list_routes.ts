@@ -5,8 +5,6 @@ import {
   updateListItem,
   deleteListItem,
   getListWithItems,
-  approveListItemChanges,
-  rejectListItemChanges,
   updateDeliveryInfo,
   searchItems,
   getCustomerList,
@@ -20,11 +18,12 @@ import {
   getListsByCompanyName,
   acknowledgeListItemChanges,
   bulkAcknowledgeChanges,
-  acknowledgeItemChanges,
   fetchAllListsAndItems,
   refreshItemsFromMIS,
   getListItemWithRefresh,
   updateListItemComment,
+  getPendingChangesForAdmin,
+  acknowledgeItemFieldChanges,
 } from "../controllers/list_controllers";
 import { authenticateUser, AuthorizedRequest } from "../middlewares/authorized";
 import { authenticateCustomer } from "../middlewares/authenticateCustomer";
@@ -54,6 +53,20 @@ const authenticateMixed = (
   }
 };
 
+// Admin-only middleware
+const adminOnly = (
+  req: AuthorizedRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  authenticateUser(req, res, (err?: any) => {
+    if (err || !req.user) {
+      return res.status(403).json({ error: "Admin access required" });
+    }
+    next();
+  });
+};
+
 // Public routes
 router.get("/search/:listNumber", searchListsByNumber);
 
@@ -80,44 +93,69 @@ router.post("/:listId/duplicate", authenticateMixed, duplicateList);
 router.put("/:listId", authenticateMixed, updateList);
 router.get("/:customerId/deliveries", authenticateMixed, getCustomerDeliveries);
 
-// Individual item acknowledge route
+// Acknowledgment routes (Admin only)
 router.put(
   "/:listId/items/:itemId/acknowledge",
-  authenticateMixed,
-  acknowledgeItemChanges
-);
-
-// Legacy individual item acknowledge route (for backward compatibility)
-router.put(
-  "/items/:itemId/acknowledge",
-  authenticateMixed,
+  adminOnly,
   acknowledgeListItemChanges
 );
 
-// Bulk acknowledge route
-router.put("/all/bulk-acknowledge", authenticateMixed, bulkAcknowledgeChanges);
+router.put(
+  "/:listId/items/:itemId/acknowledge-fields",
+  adminOnly,
+  acknowledgeItemFieldChanges
+);
 
-// Add the new routes
-router.get("/admin/all-with-items", authenticateUser, fetchAllListsAndItems);
-router.post("/items/refresh-from-mis", authenticateUser, refreshItemsFromMIS);
+// Bulk acknowledge routes (Admin only)
+router.put("/bulk-acknowledge", adminOnly, bulkAcknowledgeChanges);
+
+// Admin dashboard routes
+router.get("/admin/pending-changes", adminOnly, getPendingChangesForAdmin);
+router.get("/admin/all-with-items", adminOnly, fetchAllListsAndItems);
+router.post("/admin/items/refresh-from-mis", adminOnly, refreshItemsFromMIS);
+
+// Item refresh routes (Mixed - both admin and customer can refresh their own items)
 router.get(
   "/items/:itemId/with-refresh",
   authenticateMixed,
   getListItemWithRefresh
 );
 
-// Admin-only routes
+// Admin-only list management
+router.get("/admin/all-lists", adminOnly, getAllLists);
+
+// Legacy routes for backward compatibility (to be deprecated)
 router.put(
-  "/admin/items/:logId/approve",
-  authenticateUser,
-  approveListItemChanges
-);
-router.put(
-  "/admin/items/:logId/reject",
-  authenticateUser,
-  rejectListItemChanges
+  "/items/:itemId/acknowledge",
+  authenticateMixed,
+  (req: Request, res: Response, next: NextFunction) => {
+    // Redirect to the new endpoint structure
+    const { itemId } = req.params;
+    const { listId } = req.body;
+
+    if (!listId) {
+      return res.status(400).json({
+        error: "listId is now required in the request body for this endpoint",
+      });
+    }
+
+    // Modify the request to match the new endpoint structure
+    req.params.listId = listId;
+    acknowledgeListItemChanges(req, res, next);
+  }
 );
 
-router.get("/admin/all-lists", authenticateUser, getAllLists);
+// Health check route
+router.get("/health", (req: Request, res: Response) => {
+  res.status(200).json({
+    status: "OK",
+    message: "List service is running",
+    features: {
+      acknowledgmentSystem: true,
+      pendingChangesTracking: true,
+      adminDashboard: true,
+    },
+  });
+});
 
 export default router;

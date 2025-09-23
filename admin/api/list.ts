@@ -58,6 +58,17 @@ interface CreateListPayload {
   customerId: string;
 }
 
+interface AcknowledgePayload {
+  logIds?: string[];
+  fields?: string[];
+}
+
+interface BulkAcknowledgePayload {
+  listIds: string[];
+  itemIds?: string[];
+  fields?: string[];
+}
+
 // ======================== List Management ========================
 export const createNewList = async (listData: CreateListPayload) => {
   try {
@@ -213,91 +224,79 @@ export const searchItems = async (query: string) => {
   }
 };
 
-// ======================== Admin Approval ========================
-export const approveListItem = async (itemId: string) => {
+// ======================== Acknowledgment System ========================
+export const acknowledgeListItemChanges = async (
+  listId: string,
+  itemId: string,
+  payload?: AcknowledgePayload
+) => {
   try {
-    toast.loading("Approving item...", loadingStyles);
-    const response = await api.put(`/lists/admin/items/${itemId}/approve`);
+    toast.loading("Acknowledging changes...", loadingStyles);
+    const response = await api.put(
+      `/lists/${listId}/items/${itemId}/acknowledge`,
+      payload
+    );
     toast.dismiss();
-    toast.success("Item approved", successStyles);
+    toast.success("Changes acknowledged successfully", successStyles);
     return response.data;
   } catch (error) {
-    handleApiError(error, "Approval failed");
+    handleApiError(error, "Failed to acknowledge changes");
     throw error;
   }
 };
 
-export const rejectListItem = async (itemId: string, reason?: string) => {
+export const acknowledgeItemFieldChanges = async (
+  listId: string,
+  itemId: string,
+  fields: string[]
+) => {
   try {
-    toast.loading("Rejecting item...", loadingStyles);
-    const response = await api.put(`/lists/admin/items/${itemId}/reject`, {
-      reason,
-    });
+    toast.loading("Acknowledging field changes...", loadingStyles);
+    const response = await api.put(
+      `/lists/${listId}/items/${itemId}/acknowledge-fields`,
+      { fields }
+    );
     toast.dismiss();
-    toast.success("Item rejected", successStyles);
+    toast.success("Field changes acknowledged", successStyles);
     return response.data;
   } catch (error) {
-    handleApiError(error, "Rejection failed");
+    handleApiError(error, "Failed to acknowledge field changes");
     throw error;
   }
 };
 
+export const bulkAcknowledgeChanges = async (
+  payload: BulkAcknowledgePayload
+) => {
+  try {
+    toast.loading("Acknowledging changes...", loadingStyles);
+    const response = await api.put(`/lists/bulk-acknowledge`, payload);
+    toast.dismiss();
+    toast.success("Changes acknowledged successfully", successStyles);
+    return response.data;
+  } catch (error) {
+    handleApiError(error, "Bulk acknowledgment failed");
+    throw error;
+  }
+};
+
+export const getPendingChangesForAdmin = async () => {
+  try {
+    const response = await api.get("/lists/admin/pending-changes");
+    return response.data;
+  } catch (error) {
+    handleApiError(error, "Failed to fetch pending changes");
+    throw error;
+  }
+};
+
+// ======================== Admin List Management ========================
 export const getAllLists = async () => {
   try {
     const response = await api.get("/lists/admin/all-lists");
     return response.data;
   } catch (error) {
     handleApiError(error, "Failed to fetch lists");
-    throw error;
-  }
-};
-
-// ======================== Activity Log Approval ========================
-export interface RejectionReason {
-  reason: string;
-}
-
-export const approveActivityLog = async (logId: string) => {
-  try {
-    toast.loading("Approving changes...", loadingStyles);
-    const response = await api.put(`/lists/admin/items/${logId}/approve`);
-    toast.dismiss();
-    return response.data;
-  } catch (error) {
-    handleApiError(error, "Approval failed");
-    throw error;
-  }
-};
-
-export const rejectActivityLog = async (
-  logId: string,
-  payload: RejectionReason
-) => {
-  try {
-    toast.loading("Rejecting changes...", loadingStyles);
-    const response = await api.put(
-      `/lists/admin/items/${logId}/reject`,
-      payload
-    );
-    toast.dismiss();
-    return response.data;
-  } catch (error) {
-    handleApiError(error, "Rejection failed");
-    throw error;
-  }
-};
-
-export const bulkAcknowledgeChanges = async (listIds?: string[]) => {
-  try {
-    toast.loading("Acknowledging changes...", loadingStyles);
-    const response = await api.put(`/lists/all/bulk-acknowledge`, {
-      listIds,
-    });
-    toast.dismiss();
-    toast.success("Changes acknowledged", successStyles);
-    return response.data;
-  } catch (error) {
-    handleApiError(error, "Bulk acknowledgment failed");
     throw error;
   }
 };
@@ -326,7 +325,7 @@ export const fetchAllListsWithMISRefresh = async (
 export const refreshItemsFromMIS = async (itemIds: string[]) => {
   try {
     toast.loading("Refreshing items from MIS...", loadingStyles);
-    const response = await api.post("/lists/items/refresh-from-mis", {
+    const response = await api.post("/lists/admin/items/refresh-from-mis", {
       itemIds,
     });
     toast.dismiss();
@@ -360,24 +359,109 @@ export const getListItemWithMISRefresh = async (
   }
 };
 
+// ======================== Legacy Functions (Deprecated) ========================
+/**
+ * @deprecated Use acknowledgeListItemChanges instead
+ */
+export const approveListItem = async (itemId: string) => {
+  console.warn(
+    "approveListItem is deprecated. Use acknowledgeListItemChanges instead."
+  );
+  try {
+    toast.loading("Acknowledging changes...", loadingStyles);
+    // This is a legacy function - redirect to new acknowledgment system
+    const response = await api.put(`/lists/items/${itemId}/acknowledge`, {});
+    toast.dismiss();
+    toast.success("Changes acknowledged", successStyles);
+    return response.data;
+  } catch (error) {
+    handleApiError(error, "Acknowledgment failed");
+    throw error;
+  }
+};
+
+/**
+ * @deprecated Changes are now automatically applied and only need acknowledgment
+ */
+export const rejectListItem = async (itemId: string, reason?: string) => {
+  console.warn(
+    "rejectListItem is deprecated. Changes are now automatically applied and only need acknowledgment."
+  );
+  try {
+    toast.loading("Processing...", loadingStyles);
+    // In the new system, we don't reject changes - we just don't acknowledge them
+    const response = await api.put(`/lists/items/${itemId}/acknowledge`, {
+      note: reason ? `Rejection noted: ${reason}` : "Change not acknowledged",
+    });
+    toast.dismiss();
+    toast.success("Change status updated", successStyles);
+    return response.data;
+  } catch (error) {
+    handleApiError(error, "Operation failed");
+    throw error;
+  }
+};
+
+/**
+ * @deprecated Use acknowledgeListItemChanges instead
+ */
+export const approveActivityLog = async (logId: string) => {
+  console.warn(
+    "approveActivityLog is deprecated. Use acknowledgeListItemChanges instead."
+  );
+  return approveListItem(logId);
+};
+
+/**
+ * @deprecated Changes are now automatically applied and only need acknowledgment
+ */
+export const rejectActivityLog = async (logId: string, payload: any) => {
+  console.warn(
+    "rejectActivityLog is deprecated. Changes are now automatically applied and only need acknowledgment."
+  );
+  return rejectListItem(logId, payload.reason);
+};
+
+/**
+ * @deprecated Use the new acknowledgeListItemChanges with listId parameter
+ */
 export const acknowledgeItemChanges = async (
   listId: string,
   itemId: string,
   acknowledgeComments?: boolean
 ) => {
+  console.warn(
+    "acknowledgeItemChanges is deprecated. Use acknowledgeListItemChanges instead."
+  );
+  const payload: AcknowledgePayload = {};
+  if (acknowledgeComments) {
+    payload.fields = ["comment"];
+  }
+  return acknowledgeListItemChanges(listId, itemId, payload);
+};
+
+// ======================== Utility Functions ========================
+export const checkServiceHealth = async () => {
   try {
-    toast.loading("Acknowledging changes...", loadingStyles);
-    const response: ResponseInterface = await api.put(
-      `/lists/${listId}/items/${itemId}/acknowledge`,
-      {
-        acknowledgeComments,
-      }
-    );
-    toast.dismiss();
-    toast.success("Changes acknowledged", successStyles);
-    return response;
+    const response = await api.get("/lists/health");
+    return response.data;
   } catch (error) {
-    handleApiError(error, "Failed to acknowledge changes");
+    handleApiError(error, "Service health check failed");
     throw error;
   }
+};
+
+// Helper function to get highlighted fields from item data
+export const getHighlightedFieldsFromItem = (item: any): string[] => {
+  return item.highlightedFields || item.unacknowledgedFields || [];
+};
+
+// Helper function to check if item has pending changes
+export const hasPendingChanges = (item: any): boolean => {
+  return item.hasPendingChanges || item.hasUnacknowledgedChanges || false;
+};
+
+// Helper function to get pending changes count from list data
+export const getPendingChangesCount = (list: any): number => {
+  return list.pendingChangesCount || list.unacknowledgedChangesCount || 0;
 };

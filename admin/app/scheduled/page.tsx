@@ -147,6 +147,8 @@ import {
   acknowledgeItemChanges,
   createNewList,
   updateListItemComment,
+  acknowledgeListItemChanges,
+  acknowledgeItemFieldChanges,
 } from "@/api/list";
 import { DELIVERY_STATUS, INTERVAL_OPTIONS } from "@/utils/interfaces";
 import { successStyles } from "@/utils/constants";
@@ -598,6 +600,21 @@ const FieldHighlight = ({
           ? `2px solid ${alpha("#ff1744", 0.5)}`
           : "2px solid transparent",
         transition: "all 0.3s ease",
+        animation: hasChanges ? "pulseRed 2s infinite" : "none",
+        "@keyframes pulseRed": {
+          "0%": {
+            backgroundColor: alpha("#ff1744", 0.15),
+            borderColor: alpha("#ff1744", 0.5),
+          },
+          "50%": {
+            backgroundColor: alpha("#ff1744", 0.25),
+            borderColor: "#ff1744",
+          },
+          "100%": {
+            backgroundColor: alpha("#ff1744", 0.15),
+            borderColor: alpha("#ff1744", 0.5),
+          },
+        },
         "&:hover": {
           backgroundColor: hasChanges
             ? alpha("#ff1744", 0.25)
@@ -674,8 +691,8 @@ const FieldHighlight = ({
     </Box>
   );
 };
-// Item Activity Logs Dialog Component
 
+// Item Activity Logs Dialog Component
 function ItemActivityLogsDialog({
   open,
   onClose,
@@ -829,7 +846,6 @@ function TabPanel(props: TabPanelProps) {
 }
 
 // Activity Log Card Component
-
 function ActivityLogCard({ log, customerName, listName }: any) {
   const theme = useTheme();
 
@@ -990,17 +1006,25 @@ const DELIVERY_STATUS_CONFIG: any = {
   },
 };
 
-// Modified DeliveryCell component with change highlighting
-function DeliveryCell({ row, period, onUpdateDelivery }: any) {
+// Fixed DeliveryCell component with proper props
+function DeliveryCell({
+  row,
+  period,
+  onUpdateDelivery,
+  onAcknowledgeField,
+}: any) {
   const delivery = row.deliveries?.[period];
   const [isEditing, setIsEditing] = useState(false);
   const [status, setStatus] = useState(
     delivery?.status || DELIVERY_STATUS.PENDING
   );
 
-  const hasChanges =
-    (row.changesNeedAcknowledgment || row.hasChanges || row.shouldHighlight) &&
-    row.changedFields?.includes(`deliveries.${period}`);
+  const hasUnacknowledgedChanges =
+    row.unacknowledgedFields?.includes(`delivery_${period}`) ||
+    row.pendingChanges?.some(
+      (c: any) =>
+        c.field === `delivery_${period}` && c.changeStatus === "pending"
+    );
 
   const handleSave = () => {
     onUpdateDelivery(row.id, period, {
@@ -1015,6 +1039,13 @@ function DeliveryCell({ row, period, onUpdateDelivery }: any) {
   const handleCancel = () => {
     setStatus(delivery?.status || DELIVERY_STATUS.PENDING);
     setIsEditing(false);
+  };
+
+  const handleAcknowledge = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onAcknowledgeField) {
+      await onAcknowledgeField(row.listId, row.id, [`delivery_${period}`]);
+    }
   };
 
   if (isEditing) {
@@ -1041,7 +1072,8 @@ function DeliveryCell({ row, period, onUpdateDelivery }: any) {
               <MenuItem key={statusOption} value={statusOption}>
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                   <Typography variant="caption">
-                    {DELIVERY_STATUS_CONFIG[statusOption].label}
+                    {DELIVERY_STATUS_CONFIG[statusOption]?.label ||
+                      statusOption}
                   </Typography>
                 </Box>
               </MenuItem>
@@ -1060,11 +1092,11 @@ function DeliveryCell({ row, period, onUpdateDelivery }: any) {
     );
   }
 
-  const config =
-    DELIVERY_STATUS_CONFIG[delivery?.status || DELIVERY_STATUS.PENDING];
-
   return (
-    <FieldHighlight hasChanges={hasChanges} fieldName={`Delivery ${period}`}>
+    <FieldHighlight
+      hasChanges={hasUnacknowledgedChanges}
+      fieldName={`Delivery ${period}`}
+    >
       <Tooltip
         title={
           <Box sx={{ color: "white" }}>
@@ -1084,6 +1116,16 @@ function DeliveryCell({ row, period, onUpdateDelivery }: any) {
                 Cargo: {delivery.cargoNo}
               </Typography>
             )}
+            {hasUnacknowledgedChanges && (
+              <Typography
+                color="white"
+                variant="caption"
+                display="block"
+                sx={{ mt: 1 }}
+              >
+                ⚠️ Unacknowledged changes
+              </Typography>
+            )}
           </Box>
         }
       >
@@ -1099,6 +1141,7 @@ function DeliveryCell({ row, period, onUpdateDelivery }: any) {
             cursor: "pointer",
             borderRadius: 1,
             minHeight: 60,
+            position: "relative",
             "&:hover": {
               backgroundColor: alpha("#f5f5f5", 0.5),
             },
@@ -1121,24 +1164,50 @@ function DeliveryCell({ row, period, onUpdateDelivery }: any) {
               width={"100%"}
               display={"flex"}
               justifyContent={"center"}
+              sx={{
+                color: hasUnacknowledgedChanges ? "#d32f2f" : "inherit",
+              }}
             >
               {Number(delivery?.quantity || 0).toFixed(0) || 0}
             </Typography>
           </Box>
+          {hasUnacknowledgedChanges && (
+            <IconButton
+              size="small"
+              onClick={handleAcknowledge}
+              sx={{
+                position: "absolute",
+                top: 2,
+                right: 2,
+                backgroundColor: "#ff1744",
+                color: "white",
+                width: 16,
+                height: 16,
+                "&:hover": {
+                  backgroundColor: "#d32f2f",
+                },
+              }}
+            >
+              <Done sx={{ fontSize: 12 }} />
+            </IconButton>
+          )}
         </Box>
       </Tooltip>
     </FieldHighlight>
   );
 }
 
-function EditableQuantityCell({ row, onUpdateItem }: any) {
+function EditableQuantityCell({ row, onUpdateItem, onAcknowledgeField }: any) {
   const [isEditing, setIsEditing] = useState(false);
   const [value, setValue] = useState(row.quantity || 0);
   const [saving, setSaving] = useState(false);
 
   // Check if this specific field has unacknowledged changes
   const hasUnacknowledgedChanges =
-    row.unacknowledgedFields?.includes("quantity");
+    row.unacknowledgedFields?.includes("quantity") ||
+    row.pendingChanges?.some(
+      (c: any) => c.field === "quantity" && c.changeStatus === "pending"
+    );
 
   const handleSave = async () => {
     if (value === row.quantity) {
@@ -1156,6 +1225,7 @@ function EditableQuantityCell({ row, onUpdateItem }: any) {
       }
 
       setIsEditing(false);
+      toast.success("Quantity updated", successStyles);
     } catch (error) {
       console.error("Failed to update quantity:", error);
       setValue(row.quantity);
@@ -1175,6 +1245,13 @@ function EditableQuantityCell({ row, onUpdateItem }: any) {
       handleSave();
     } else if (e.key === "Escape") {
       handleCancel();
+    }
+  };
+
+  const handleAcknowledge = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onAcknowledgeField) {
+      await onAcknowledgeField(row.listId, row.id, ["quantity"]);
     }
   };
 
@@ -1225,6 +1302,7 @@ function EditableQuantityCell({ row, onUpdateItem }: any) {
           },
           transition: "background-color 0.2s",
           p: 1,
+          position: "relative",
         }}
       >
         <Typography
@@ -1237,20 +1315,43 @@ function EditableQuantityCell({ row, onUpdateItem }: any) {
         >
           {row.quantity || 0}
         </Typography>
+        {hasUnacknowledgedChanges && (
+          <IconButton
+            size="small"
+            onClick={handleAcknowledge}
+            sx={{
+              position: "absolute",
+              right: 0,
+              top: "50%",
+              transform: "translateY(-50%)",
+              backgroundColor: "#ff1744",
+              color: "white",
+              width: 20,
+              height: 20,
+              "&:hover": {
+                backgroundColor: "#d32f2f",
+              },
+            }}
+          >
+            <Done sx={{ fontSize: 14 }} />
+          </IconButton>
+        )}
       </Box>
     </FieldHighlight>
   );
 }
 
 // Enhanced Editable Comment Cell with dedicated comment update endpoint
-function EditableCommentCell({ row, onUpdateItem }: any) {
+function EditableCommentCell({ row, onUpdateItem, onAcknowledgeField }: any) {
   const [isEditing, setIsEditing] = useState(false);
   const [value, setValue] = useState(row.comment || "");
   const [saving, setSaving] = useState(false);
 
-  const hasChanges =
-    (row.changesNeedAcknowledgment || row.hasChanges || row.shouldHighlight) &&
-    row.changedFields?.includes("comment");
+  const hasUnacknowledgedChanges =
+    row.unacknowledgedFields?.includes("comment") ||
+    row.pendingChanges?.some(
+      (c: any) => c.field === "comment" && c.changeStatus === "pending"
+    );
 
   const handleSave = async () => {
     if (value === row.comment) {
@@ -1268,6 +1369,7 @@ function EditableCommentCell({ row, onUpdateItem }: any) {
       }
 
       setIsEditing(false);
+      toast.success("Comment updated", successStyles);
     } catch (error) {
       console.error("Failed to update comment:", error);
       setValue(row.comment);
@@ -1283,10 +1385,17 @@ function EditableCommentCell({ row, onUpdateItem }: any) {
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") {
+    if (e.key === "Enter" && !e.shiftKey) {
       handleSave();
     } else if (e.key === "Escape") {
       handleCancel();
+    }
+  };
+
+  const handleAcknowledge = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onAcknowledgeField) {
+      await onAcknowledgeField(row.listId, row.id, ["comment"]);
     }
   };
 
@@ -1325,7 +1434,7 @@ function EditableCommentCell({ row, onUpdateItem }: any) {
 
   return (
     <FieldHighlight
-      hasChanges={hasChanges}
+      hasChanges={hasUnacknowledgedChanges}
       fieldName="Comment"
       onClick={() => setIsEditing(true)}
     >
@@ -1333,7 +1442,7 @@ function EditableCommentCell({ row, onUpdateItem }: any) {
         sx={{
           display: "flex",
           alignItems: "center",
-          justifyContent: "flex-start",
+          justifyContent: "space-between",
           width: "100%",
           height: "100%",
           cursor: "pointer",
@@ -1343,18 +1452,41 @@ function EditableCommentCell({ row, onUpdateItem }: any) {
           },
           transition: "background-color 0.2s",
           p: 1,
+          position: "relative",
         }}
       >
         <Typography
           variant="body2"
           sx={{
             fontSize: "14px",
-            color: row.comment ? "text.primary" : "text.secondary",
+            color: hasUnacknowledgedChanges
+              ? "#d32f2f"
+              : row.comment
+              ? "text.primary"
+              : "text.secondary",
             fontStyle: row.comment ? "normal" : "italic",
+            flex: 1,
           }}
         >
           {row.comment || "Click to add comment..."}
         </Typography>
+        {hasUnacknowledgedChanges && (
+          <IconButton
+            size="small"
+            onClick={handleAcknowledge}
+            sx={{
+              backgroundColor: "#ff1744",
+              color: "white",
+              width: 20,
+              height: 20,
+              "&:hover": {
+                backgroundColor: "#d32f2f",
+              },
+            }}
+          >
+            <Done sx={{ fontSize: 14 }} />
+          </IconButton>
+        )}
       </Box>
     </FieldHighlight>
   );
@@ -1413,14 +1545,16 @@ function extractDeliveryPeriods(items: any[]): {
 }
 
 // Enhanced Editable Interval Cell with change highlighting
-function EditableIntervalCell({ row, onUpdateItem }: any) {
+function EditableIntervalCell({ row, onUpdateItem, onAcknowledgeField }: any) {
   const [isEditing, setIsEditing] = useState(false);
   const [value, setValue] = useState(row.interval || "monthly");
   const [saving, setSaving] = useState(false);
 
-  const hasChanges =
-    (row.changesNeedAcknowledgment || row.hasChanges || row.shouldHighlight) &&
-    row.changedFields?.includes("interval");
+  const hasUnacknowledgedChanges =
+    row.unacknowledgedFields?.includes("interval") ||
+    row.pendingChanges?.some(
+      (c: any) => c.field === "interval" && c.changeStatus === "pending"
+    );
 
   const handleSave = async (newValue: string) => {
     if (newValue === row.interval) {
@@ -1438,6 +1572,7 @@ function EditableIntervalCell({ row, onUpdateItem }: any) {
       }
 
       setIsEditing(false);
+      toast.success("Interval updated", successStyles);
     } catch (error) {
       console.error("Failed to update interval:", error);
       setValue(row.interval);
@@ -1450,6 +1585,13 @@ function EditableIntervalCell({ row, onUpdateItem }: any) {
   const handleCancel = () => {
     setValue(row.interval);
     setIsEditing(false);
+  };
+
+  const handleAcknowledge = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onAcknowledgeField) {
+      await onAcknowledgeField(row.listId, row.id, ["interval"]);
+    }
   };
 
   const getCurrentLabel = () => {
@@ -1499,7 +1641,7 @@ function EditableIntervalCell({ row, onUpdateItem }: any) {
 
   return (
     <FieldHighlight
-      hasChanges={hasChanges}
+      hasChanges={hasUnacknowledgedChanges}
       fieldName="Interval"
       onClick={() => setIsEditing(true)}
     >
@@ -1507,7 +1649,7 @@ function EditableIntervalCell({ row, onUpdateItem }: any) {
         sx={{
           display: "flex",
           alignItems: "center",
-          justifyContent: "center",
+          justifyContent: "space-between",
           width: "100%",
           height: "100%",
           cursor: "pointer",
@@ -1517,11 +1659,36 @@ function EditableIntervalCell({ row, onUpdateItem }: any) {
           },
           transition: "background-color 0.2s",
           p: 1,
+          position: "relative",
         }}
       >
-        <Typography variant="body2" sx={{ fontSize: "14px" }}>
+        <Typography
+          variant="body2"
+          sx={{
+            fontSize: "14px",
+            color: hasUnacknowledgedChanges ? "#d32f2f" : "inherit",
+            flex: 1,
+          }}
+        >
           {getCurrentLabel()}
         </Typography>
+        {hasUnacknowledgedChanges && (
+          <IconButton
+            size="small"
+            onClick={handleAcknowledge}
+            sx={{
+              backgroundColor: "#ff1744",
+              color: "white",
+              width: 20,
+              height: 20,
+              "&:hover": {
+                backgroundColor: "#d32f2f",
+              },
+            }}
+          >
+            <Done sx={{ fontSize: 14 }} />
+          </IconButton>
+        )}
       </Box>
     </FieldHighlight>
   );
@@ -1809,6 +1976,7 @@ function CreateListDialog({
     </Dialog>
   );
 }
+
 // Main Admin All Items Page Component
 const AdminAllItemsPage = () => {
   const router = useRouter();
@@ -1838,7 +2006,10 @@ const AdminAllItemsPage = () => {
 
   // Count items with unacknowledged changes
   const itemsWithChanges = useMemo(() => {
-    return allItems.filter((item: any) => item.hasChanges);
+    return allItems.filter(
+      (item: any) =>
+        item.hasUnacknowledgedChanges || item.unacknowledgedFields?.length > 0
+    );
   }, [allItems]);
 
   const deliveryPeriodsData = useMemo(() => {
@@ -1877,7 +2048,8 @@ const AdminAllItemsPage = () => {
     // Sort by most recent first
     return filtered.sort(
       (a: any, b: any) =>
-        new Date(b.performedAt).getTime() - new Date(a.performedAt).getTime()
+        new Date(b.timestamp || b.performedAt).getTime() -
+        new Date(a.timestamp || a.performedAt).getTime()
     );
   }, [allActivityLogs, selectedCustomer, selectedList, searchTerm]);
 
@@ -1900,6 +2072,7 @@ const AdminAllItemsPage = () => {
             customerName:
               list.customer?.companyName || list.customer?.legalName,
             unacknowledgedChangesCount: list.unacknowledgedChangesCount || 0,
+            pendingChanges: list.pendingChanges || [],
           });
 
           if (
@@ -1929,13 +2102,14 @@ const AdminAllItemsPage = () => {
             });
           }
 
-          // Process each item in the list
+          // Process each item in the list with enhanced acknowledgment tracking
           if (list.items && list.items.length > 0) {
             list.items.forEach((item: any) => {
-              // Get unacknowledged fields for this item
+              // Get unacknowledged fields and pending changes for this item
               const itemUnacknowledgedFields = item.unacknowledgedFields || [];
               const hasUnacknowledgedChanges =
                 item.hasUnacknowledgedChanges || false;
+              const itemPendingChanges = item.pendingChanges || [];
 
               allCombinedItems.push({
                 ...item,
@@ -1949,6 +2123,7 @@ const AdminAllItemsPage = () => {
                 // Enhanced change tracking
                 unacknowledgedFields: itemUnacknowledgedFields,
                 hasUnacknowledgedChanges: hasUnacknowledgedChanges,
+                pendingChanges: itemPendingChanges,
                 changedFields: itemUnacknowledgedFields, // Map unacknowledged fields to changed fields
               });
             });
@@ -1967,6 +2142,7 @@ const AdminAllItemsPage = () => {
       setLoading(false);
     }
   };
+
   const handleRefetchItemData = async () => {
     const data = await fetchAllListsWithMISRefresh(true);
     if (data) {
@@ -2108,6 +2284,51 @@ const AdminAllItemsPage = () => {
     []
   );
 
+  // Handle acknowledge field changes
+  const handleAcknowledgeField = async (
+    listId: string,
+    itemId: string,
+    fields: string[]
+  ) => {
+    try {
+      await acknowledgeItemFieldChanges(listId, itemId, fields);
+
+      // Optimistically update the state
+      setAllItems((prev) =>
+        prev.map((item) => {
+          if (item.id === itemId) {
+            const updatedUnacknowledgedFields =
+              item.unacknowledgedFields?.filter(
+                (f: string) => !fields.includes(f)
+              ) || [];
+
+            return {
+              ...item,
+              unacknowledgedFields: updatedUnacknowledgedFields,
+              hasUnacknowledgedChanges: updatedUnacknowledgedFields.length > 0,
+              pendingChanges: item.pendingChanges?.map((change: any) =>
+                fields.includes(change.field)
+                  ? { ...change, changeStatus: "acknowledged" }
+                  : change
+              ),
+            };
+          }
+          return item;
+        })
+      );
+
+      toast.success(
+        `Field${fields.length > 1 ? "s" : ""} acknowledged`,
+        successStyles
+      );
+    } catch (error) {
+      console.error("Failed to acknowledge field:", error);
+      toast.error("Failed to acknowledge field");
+      // Reload data on error
+      await loadAllItems();
+    }
+  };
+
   // Handle opening activity logs for specific item
   const handleOpenItemActivityLogs = (item: any) => {
     setSelectedItemForLogs(item);
@@ -2160,9 +2381,7 @@ const AdminAllItemsPage = () => {
     if (showOnlyChanges) {
       filtered = filtered.filter(
         (item: any) =>
-          item.changesNeedAcknowledgment ||
-          item.hasChanges ||
-          item.shouldHighlight
+          item.hasUnacknowledgedChanges || item.unacknowledgedFields?.length > 0
       );
     }
 
@@ -2240,10 +2459,7 @@ const AdminAllItemsPage = () => {
         resizable: true,
         renderCell: (props: any) => {
           const hasChanges =
-            (props.row.changesNeedAcknowledgment ||
-              props.row.hasChanges ||
-              props.row.shouldHighlight) &&
-            props.row.changedFields?.includes("item_no_de");
+            props.row.unacknowledgedFields?.includes("item_no_de");
           return (
             <FieldHighlight hasChanges={hasChanges} fieldName="Item No.">
               <Typography variant="body2" sx={{ fontSize: "14px", p: 1 }}>
@@ -2378,10 +2594,7 @@ const AdminAllItemsPage = () => {
         resizable: true,
         renderCell: (props: any) => {
           const hasChanges =
-            (props.row.changesNeedAcknowledgment ||
-              props.row.hasChanges ||
-              props.row.shouldHighlight) &&
-            props.row.changedFields?.includes("articleName");
+            props.row.unacknowledgedFields?.includes("articleName");
           return (
             <FieldHighlight hasChanges={hasChanges} fieldName="Article Name">
               <Typography variant="body2" sx={{ fontSize: "14px", p: 1 }}>
@@ -2400,6 +2613,7 @@ const AdminAllItemsPage = () => {
           <EditableQuantityCell
             row={props.row}
             onUpdateItem={handleUpdateItem}
+            onAcknowledgeField={handleAcknowledgeField}
           />
         ),
       },
@@ -2412,6 +2626,7 @@ const AdminAllItemsPage = () => {
           <EditableIntervalCell
             row={props.row}
             onUpdateItem={handleUpdateItem}
+            onAcknowledgeField={handleAcknowledgeField}
           />
         ),
       },
@@ -2432,6 +2647,7 @@ const AdminAllItemsPage = () => {
             row={props.row}
             period={period}
             onUpdateDelivery={handleUpdateDelivery}
+            onAcknowledgeField={handleAcknowledgeField}
           />
         ),
         renderHeaderCell: (props: any) => (
@@ -2463,6 +2679,7 @@ const AdminAllItemsPage = () => {
           <EditableCommentCell
             row={props.row}
             onUpdateItem={handleUpdateItem}
+            onAcknowledgeField={handleAcknowledgeField}
           />
         ),
       },
@@ -2586,6 +2803,7 @@ const AdminAllItemsPage = () => {
     selectedRows,
     handleUpdateDelivery,
     handleUpdateItem,
+    handleAcknowledgeField,
     allItems,
   ]);
 

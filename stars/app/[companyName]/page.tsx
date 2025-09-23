@@ -32,6 +32,16 @@ import {
   Button,
   Badge,
   DialogActions,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  TableSortLabel,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
 } from "@mui/material";
 import {
   ArrowBack,
@@ -59,6 +69,9 @@ import {
   Close,
   HourglassEmpty,
   AccessTime,
+  LocalShippingOutlined,
+  Inventory,
+  CalendarToday,
 } from "@mui/icons-material";
 import { DataGrid } from "react-data-grid";
 import "react-data-grid/lib/styles.css";
@@ -148,6 +161,653 @@ const DELIVERY_STATUS = {
   PARTIAL: "partial",
   DELIVERED: "delivered",
   CANCELLED: "cancelled",
+};
+
+// Complete DeliveryHistoryTab Component
+const DeliveryHistoryTab = ({ items, isMobile }: any) => {
+  const theme = useTheme();
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
+  const [sortBy, setSortBy] = useState<"eta" | "period" | "cargo">("eta");
+  const [expandedPeriod, setExpandedPeriod] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+
+  // Utility function to format ETA dates
+  function formatEta(etaDate: any) {
+    if (!etaDate) return null;
+    const now = new Date();
+    const eta = new Date(etaDate);
+    if (isNaN(eta.getTime())) return etaDate;
+
+    const isCurrentYear = eta.getFullYear() === now.getFullYear();
+
+    if (isCurrentYear) {
+      return eta.toLocaleDateString("de-DE", {
+        day: "2-digit",
+        month: "2-digit",
+      });
+    } else {
+      return eta.toLocaleDateString("de-DE");
+    }
+  }
+
+  // Process and combine deliveries from all items
+  const deliveryHistory = useMemo(() => {
+    const deliveryMap = new Map();
+
+    items.forEach((item: any) => {
+      if (item.deliveries) {
+        Object.entries(item.deliveries).forEach(
+          ([period, delivery]: [string, any]) => {
+            const key = `${period}_${delivery.cargoNo || "no-cargo"}`;
+
+            if (!deliveryMap.has(key)) {
+              deliveryMap.set(key, {
+                period,
+                cargoNo: delivery.cargoNo || "",
+                cargoStatus: delivery.cargoStatus,
+                eta: delivery.eta,
+                totalQuantity: 0,
+                itemCount: 0,
+                items: [],
+              });
+            }
+
+            const historyItem = deliveryMap.get(key)!;
+            historyItem.totalQuantity += delivery.quantity || 0;
+            historyItem.itemCount += 1;
+            historyItem.items.push({
+              id: item.id,
+              articleName: item.articleName || "",
+              articleNumber: item.articleNumber || "",
+              item_no_de: item.item_no_de,
+              quantity: delivery.quantity || 0,
+              status: delivery.status || "pending",
+            });
+          }
+        );
+      }
+    });
+
+    // Convert map to array and sort
+    let historyArray = Array.from(deliveryMap.values());
+
+    // Apply search filter
+    if (searchTerm) {
+      historyArray = historyArray.filter(
+        (delivery: any) =>
+          delivery.period.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          delivery.cargoNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          delivery.cargoStatus
+            ?.toLowerCase()
+            .includes(searchTerm.toLowerCase()) ||
+          delivery.items.some(
+            (item: any) =>
+              item.articleName
+                .toLowerCase()
+                .includes(searchTerm.toLowerCase()) ||
+              item.articleNumber
+                .toLowerCase()
+                .includes(searchTerm.toLowerCase())
+          )
+      );
+    }
+
+    // Sort the array
+    historyArray.sort((a: any, b: any) => {
+      let comparison = 0;
+
+      switch (sortBy) {
+        case "eta":
+          if (!a.eta && !b.eta) comparison = 0;
+          else if (!a.eta) comparison = 1;
+          else if (!b.eta) comparison = -1;
+          else
+            comparison = new Date(a.eta).getTime() - new Date(b.eta).getTime();
+          break;
+        case "period":
+          comparison = a.period.localeCompare(b.period);
+          break;
+        case "cargo":
+          comparison = (a.cargoNo || "").localeCompare(b.cargoNo || "");
+          break;
+      }
+
+      return sortOrder === "asc" ? comparison : -comparison;
+    });
+
+    return historyArray;
+  }, [items, sortBy, sortOrder, searchTerm]);
+
+  const handleSort = (column: "eta" | "period" | "cargo") => {
+    if (sortBy === column) {
+      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+    } else {
+      setSortBy(column);
+      setSortOrder("asc");
+    }
+  };
+
+  const getStatusColor = (status?: string) => {
+    switch (status?.toLowerCase()) {
+      case "open":
+        return theme.palette.info.main;
+      case "packed":
+        return theme.palette.warning.main;
+      case "shipped":
+        return theme.palette.primary.main;
+      case "arrived":
+        return theme.palette.success.main;
+      default:
+        return theme.palette.grey[500];
+    }
+  };
+
+  const getStatusIcon = (status?: string) => {
+    switch (status?.toLowerCase()) {
+      case "open":
+        return <Schedule fontSize="small" />;
+      case "packed":
+        return <Inventory fontSize="small" />;
+      case "shipped":
+        return <LocalShipping fontSize="small" />;
+      case "arrived":
+        return <CheckCircle fontSize="small" />;
+      default:
+        return <HourglassEmpty fontSize="small" />;
+    }
+  };
+
+  if (isMobile) {
+    // Mobile view with accordions
+    return (
+      <Box sx={{ p: 2 }}>
+        {/* Search and Sort Controls */}
+        <Box sx={{ mb: 3 }}>
+          <TextField
+            fullWidth
+            placeholder="Search deliveries..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            size="small"
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <Search fontSize="small" />
+                </InputAdornment>
+              ),
+            }}
+            sx={{ mb: 2 }}
+          />
+
+          <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
+            <Chip
+              label="Sort by ETA"
+              onClick={() => handleSort("eta")}
+              color={sortBy === "eta" ? "primary" : "default"}
+              variant={sortBy === "eta" ? "filled" : "outlined"}
+              size="small"
+            />
+            <Chip
+              label="Sort by Period"
+              onClick={() => handleSort("period")}
+              color={sortBy === "period" ? "primary" : "default"}
+              variant={sortBy === "period" ? "filled" : "outlined"}
+              size="small"
+            />
+            <Chip
+              label="Sort by Cargo"
+              onClick={() => handleSort("cargo")}
+              color={sortBy === "cargo" ? "primary" : "default"}
+              variant={sortBy === "cargo" ? "filled" : "outlined"}
+              size="small"
+            />
+          </Stack>
+        </Box>
+
+        {/* Delivery Cards */}
+        {deliveryHistory.length === 0 ? (
+          <Card sx={{ p: 3, textAlign: "center" }}>
+            <LocalShipping
+              sx={{ fontSize: 48, color: "text.disabled", mb: 2 }}
+            />
+            <Typography variant="h6" color="text.secondary" gutterBottom>
+              No Deliveries Found
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              {searchTerm
+                ? "Try adjusting your search terms"
+                : "No delivery information available"}
+            </Typography>
+          </Card>
+        ) : (
+          deliveryHistory.map((delivery: any, index: number) => (
+            <Accordion
+              key={`${delivery.period}_${delivery.cargoNo}_${index}`}
+              expanded={
+                expandedPeriod === `${delivery.period}_${delivery.cargoNo}`
+              }
+              onChange={() =>
+                setExpandedPeriod(
+                  expandedPeriod === `${delivery.period}_${delivery.cargoNo}`
+                    ? null
+                    : `${delivery.period}_${delivery.cargoNo}`
+                )
+              }
+              sx={{
+                mb: 2,
+                borderRadius: 2,
+                "&:before": { display: "none" },
+                boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+              }}
+            >
+              <AccordionSummary
+                expandIcon={<ExpandMore />}
+                sx={{
+                  backgroundColor: alpha(theme.palette.primary.main, 0.04),
+                  borderRadius: 2,
+                }}
+              >
+                <Box sx={{ width: "100%", pr: 2 }}>
+                  <Stack
+                    direction="row"
+                    justifyContent="space-between"
+                    alignItems="center"
+                    sx={{ mb: 1 }}
+                  >
+                    <Typography variant="subtitle1" fontWeight={600}>
+                      {formatPeriodLabel(delivery.period, delivery.cargoNo)}
+                    </Typography>
+                    <Stack direction="row" spacing={0.5} alignItems="center">
+                      {getStatusIcon(delivery.cargoStatus)}
+                      <Chip
+                        label={delivery.cargoStatus || "Pending"}
+                        size="small"
+                        sx={{
+                          backgroundColor: alpha(
+                            getStatusColor(delivery.cargoStatus),
+                            0.1
+                          ),
+                          color: getStatusColor(delivery.cargoStatus),
+                          fontWeight: 500,
+                        }}
+                      />
+                    </Stack>
+                  </Stack>
+
+                  <Stack direction="row" spacing={2} alignItems="center">
+                    <Typography variant="body2" color="text.secondary">
+                      <strong>{delivery.itemCount}</strong> items
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Total Qty: <strong>{delivery.totalQuantity}</strong>
+                    </Typography>
+                    {delivery.eta && (
+                      <Typography variant="body2" color="text.secondary">
+                        ETA: <strong>{formatEta(delivery.eta)}</strong>
+                      </Typography>
+                    )}
+                  </Stack>
+                </Box>
+              </AccordionSummary>
+
+              <AccordionDetails>
+                <Box sx={{ pt: 2 }}>
+                  <Typography
+                    variant="subtitle2"
+                    gutterBottom
+                    sx={{ mb: 2, fontWeight: 600 }}
+                  >
+                    Items in this delivery:
+                  </Typography>
+                  {delivery.items.map((item: any, idx: number) => (
+                    <Card
+                      key={`${item.id}_${idx}`}
+                      sx={{
+                        p: 2,
+                        mb: 1,
+                        backgroundColor: alpha(
+                          theme.palette.background.paper,
+                          0.8
+                        ),
+                        border: `1px solid ${alpha("#E2E8F0", 0.8)}`,
+                      }}
+                    >
+                      <Typography variant="body2" fontWeight={500}>
+                        {item.articleName}
+                      </Typography>
+                      <Stack direction="row" spacing={1} sx={{ mt: 0.5 }}>
+                        <Chip
+                          label={`Art: ${item.articleNumber}`}
+                          size="small"
+                          variant="outlined"
+                        />
+                        {item.item_no_de && (
+                          <Chip
+                            label={`DE: ${item.item_no_de}`}
+                            size="small"
+                            variant="outlined"
+                          />
+                        )}
+                        <Chip
+                          label={`Qty: ${item.quantity}`}
+                          size="small"
+                          color="primary"
+                        />
+                      </Stack>
+                    </Card>
+                  ))}
+                </Box>
+              </AccordionDetails>
+            </Accordion>
+          ))
+        )}
+      </Box>
+    );
+  }
+
+  // Desktop table view
+  return (
+    <Box sx={{ p: 3 }}>
+      {/* Search and Info Bar */}
+      <Stack
+        direction="row"
+        justifyContent="space-between"
+        alignItems="center"
+        sx={{ mb: 3 }}
+      >
+        <TextField
+          placeholder="Search deliveries..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          size="small"
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <Search fontSize="small" />
+              </InputAdornment>
+            ),
+          }}
+          sx={{ width: 300 }}
+        />
+
+        <Stack direction="row" spacing={2} alignItems="center">
+          <Chip
+            icon={<LocalShipping fontSize="small" />}
+            label={`${deliveryHistory.length} Deliveries`}
+            color="primary"
+            variant="outlined"
+          />
+          <Chip
+            icon={<Inventory fontSize="small" />}
+            label={`${deliveryHistory.reduce(
+              (acc: number, d: any) => acc + d.itemCount,
+              0
+            )} Total Items`}
+            color="secondary"
+            variant="outlined"
+          />
+        </Stack>
+      </Stack>
+
+      {/* Table */}
+      <TableContainer
+        component={Paper}
+        sx={{ borderRadius: 2, boxShadow: "0 4px 12px rgba(0,0,0,0.08)" }}
+      >
+        <Table>
+          <TableHead>
+            <TableRow
+              sx={{ backgroundColor: alpha(theme.palette.primary.main, 0.04) }}
+            >
+              <TableCell>
+                <TableSortLabel
+                  active={sortBy === "period"}
+                  direction={sortBy === "period" ? sortOrder : "asc"}
+                  onClick={() => handleSort("period")}
+                >
+                  <Typography variant="subtitle2" fontWeight={600}>
+                    Period
+                  </Typography>
+                </TableSortLabel>
+              </TableCell>
+              <TableCell>
+                <TableSortLabel
+                  active={sortBy === "cargo"}
+                  direction={sortBy === "cargo" ? sortOrder : "asc"}
+                  onClick={() => handleSort("cargo")}
+                >
+                  <Typography variant="subtitle2" fontWeight={600}>
+                    Cargo No
+                  </Typography>
+                </TableSortLabel>
+              </TableCell>
+              <TableCell>
+                <Typography variant="subtitle2" fontWeight={600}>
+                  Status
+                </Typography>
+              </TableCell>
+              <TableCell>
+                <TableSortLabel
+                  active={sortBy === "eta"}
+                  direction={sortBy === "eta" ? sortOrder : "asc"}
+                  onClick={() => handleSort("eta")}
+                >
+                  <Typography variant="subtitle2" fontWeight={600}>
+                    ETA
+                  </Typography>
+                </TableSortLabel>
+              </TableCell>
+              <TableCell align="center">
+                <Typography variant="subtitle2" fontWeight={600}>
+                  Items
+                </Typography>
+              </TableCell>
+              <TableCell align="center">
+                <Typography variant="subtitle2" fontWeight={600}>
+                  Total Quantity
+                </Typography>
+              </TableCell>
+              <TableCell>
+                <Typography variant="subtitle2" fontWeight={600}>
+                  Details
+                </Typography>
+              </TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {deliveryHistory.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
+                  <LocalShipping
+                    sx={{ fontSize: 48, color: "text.disabled", mb: 2 }}
+                  />
+                  <Typography variant="h6" color="text.secondary" gutterBottom>
+                    No Deliveries Found
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {searchTerm
+                      ? "Try adjusting your search terms"
+                      : "No delivery information available"}
+                  </Typography>
+                </TableCell>
+              </TableRow>
+            ) : (
+              deliveryHistory.map((delivery: any, index: number) => (
+                <React.Fragment
+                  key={`${delivery.period}_${delivery.cargoNo}_${index}`}
+                >
+                  <TableRow
+                    hover
+                    onClick={() =>
+                      setExpandedPeriod(
+                        expandedPeriod ===
+                          `${delivery.period}_${delivery.cargoNo}`
+                          ? null
+                          : `${delivery.period}_${delivery.cargoNo}`
+                      )
+                    }
+                    sx={{
+                      cursor: "pointer",
+                      "&:hover": {
+                        backgroundColor: alpha(
+                          theme.palette.primary.main,
+                          0.02
+                        ),
+                      },
+                    }}
+                  >
+                    <TableCell>
+                      <Typography variant="body2" fontWeight={500}>
+                        {delivery.period}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2">
+                        {delivery.cargoNo || "-"}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Stack direction="row" spacing={0.5} alignItems="center">
+                        {getStatusIcon(delivery.cargoStatus)}
+                        <Chip
+                          label={delivery.cargoStatus || "Pending"}
+                          size="small"
+                          sx={{
+                            backgroundColor: alpha(
+                              getStatusColor(delivery.cargoStatus),
+                              0.1
+                            ),
+                            color: getStatusColor(delivery.cargoStatus),
+                            fontWeight: 500,
+                          }}
+                        />
+                      </Stack>
+                    </TableCell>
+                    <TableCell>
+                      <Stack direction="row" spacing={0.5} alignItems="center">
+                        <CalendarToday fontSize="small" color="action" />
+                        <Typography variant="body2">
+                          {delivery.eta ? formatEta(delivery.eta) : "-"}
+                        </Typography>
+                      </Stack>
+                    </TableCell>
+                    <TableCell align="center">
+                      <Chip
+                        label={delivery.itemCount}
+                        size="small"
+                        color="primary"
+                        variant="outlined"
+                      />
+                    </TableCell>
+                    <TableCell align="center">
+                      <Typography variant="body2" fontWeight={600}>
+                        {delivery.totalQuantity}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <IconButton size="small">
+                        {expandedPeriod ===
+                        `${delivery.period}_${delivery.cargoNo}` ? (
+                          <ExpandLess />
+                        ) : (
+                          <ExpandMore />
+                        )}
+                      </IconButton>
+                    </TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell colSpan={7} sx={{ p: 0, border: 0 }}>
+                      <Collapse
+                        in={
+                          expandedPeriod ===
+                          `${delivery.period}_${delivery.cargoNo}`
+                        }
+                      >
+                        <Box
+                          sx={{
+                            p: 3,
+                            backgroundColor: alpha(
+                              theme.palette.primary.main,
+                              0.02
+                            ),
+                          }}
+                        >
+                          <Typography
+                            variant="subtitle2"
+                            gutterBottom
+                            sx={{ mb: 2, fontWeight: 600 }}
+                          >
+                            Items in this delivery:
+                          </Typography>
+                          <Grid container spacing={2}>
+                            {delivery.items.map((item: any, idx: number) => (
+                              <Grid
+                                item
+                                xs={12}
+                                md={6}
+                                lg={4}
+                                key={`${item.id}_${idx}`}
+                              >
+                                <Card
+                                  sx={{
+                                    p: 2,
+                                    border: `1px solid ${alpha(
+                                      "#E2E8F0",
+                                      0.8
+                                    )}`,
+                                    backgroundColor: "background.paper",
+                                  }}
+                                >
+                                  <Typography
+                                    variant="body2"
+                                    fontWeight={500}
+                                    gutterBottom
+                                  >
+                                    {item.articleName}
+                                  </Typography>
+                                  <Stack
+                                    direction="row"
+                                    spacing={1}
+                                    flexWrap="wrap"
+                                    sx={{ gap: 0.5 }}
+                                  >
+                                    <Chip
+                                      label={`Art: ${item.articleNumber}`}
+                                      size="small"
+                                      variant="outlined"
+                                      sx={{ fontSize: "0.7rem" }}
+                                    />
+                                    {item.item_no_de && (
+                                      <Chip
+                                        label={`DE: ${item.item_no_de}`}
+                                        size="small"
+                                        variant="outlined"
+                                        sx={{ fontSize: "0.7rem" }}
+                                      />
+                                    )}
+                                    <Chip
+                                      label={`Quantity: ${item.quantity}`}
+                                      size="small"
+                                      color="primary"
+                                      sx={{ fontSize: "0.7rem" }}
+                                    />
+                                  </Stack>
+                                </Card>
+                              </Grid>
+                            ))}
+                          </Grid>
+                        </Box>
+                      </Collapse>
+                    </TableCell>
+                  </TableRow>
+                </React.Fragment>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </TableContainer>
+    </Box>
+  );
 };
 
 const DELIVERY_STATUS_CONFIG: any = {
@@ -347,7 +1007,6 @@ function ItemActivityLogsDialog({
     </Dialog>
   );
 }
-
 // Enhanced FieldHighlight Component
 const FieldHighlight = ({
   hasChanges,
@@ -1835,6 +2494,7 @@ const ListManagerPage: React.FC = () => {
   const router = useRouter();
   const { customer } = useSelector((state: RootState) => state.customer);
   const companyName = params?.companyName as string;
+  const [activeTab, setActiveTab] = useState<"items" | "deliveries">("items");
 
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [allLists, setAllLists] = useState<ListData[]>([]);
@@ -3009,230 +3669,235 @@ const ListManagerPage: React.FC = () => {
             </Stack>
 
             {/* Items Display */}
-            {isMobile ? (
-              // Mobile Card View
-              <Box>
-                {filteredItems.length === 0 ? (
-                  <Box
-                    sx={{
-                      textAlign: "center",
-                      py: 6,
-                      px: 3,
-                      borderRadius: 1,
-                      border: "2px dashed #e0e0e0",
-                      bgcolor: "#fafafa",
-                    }}
-                  >
-                    <Package
-                      size={48}
-                      style={{ color: "#ccc", marginBottom: 16 }}
-                    />
-                    <Typography
-                      variant="h6"
-                      color="text.secondary"
-                      gutterBottom
-                    >
-                      {searchTerm ? "No items found" : "No items in this list"}
-                    </Typography>
-                    <Typography
-                      variant="body2"
-                      color="text.secondary"
-                      sx={{ mb: 2 }}
-                    >
-                      {searchTerm
-                        ? "Try adjusting your search terms"
-                        : "Add your first item to get started"}
-                    </Typography>
-                    {!searchTerm && isEditable && (
-                      <Button
-                        variant="contained"
-                        startIcon={<Add />}
-                        onClick={() => setAddItemDialog(true)}
-                        sx={{
-                          background:
-                            "linear-gradient(45deg, #8CC21B 30%, #4CAF50 90%)",
-                          "&:hover": {
-                            background:
-                              "linear-gradient(45deg, #7AB819 30%, #45A047 90%)",
-                          },
-                          borderRadius: 1,
-                        }}
-                      >
-                        Add First Item
-                      </Button>
-                    )}
-                  </Box>
-                ) : (
-                  <Box>
-                    {filteredItems.map((item: any) => (
-                      <MobileItemCard
-                        key={item.id}
-                        item={item}
-                        onUpdateItem={handleUpdateItem}
-                        onSelect={handleItemSelect}
-                        isSelected={selectedRows.has(item.id)}
-                        isEditable={isEditable}
-                        companyName={companyName}
-                        listId={currentListId}
-                        router={router}
-                        onOpenActivityLogs={handleOpenItemActivityLogs}
-                      />
-                    ))}
-                  </Box>
-                )}
-              </Box>
-            ) : (
-              // Desktop Table View
-              <Paper
-                elevation={2}
+            {currentList && (
+              <Box
                 sx={{
-                  borderRadius: 1,
-                  overflow: "hidden",
-                  border: `1px solid ${alpha("#E2E8F0", 0.8)}`,
+                  mb: 2,
+                  borderBottom: `2px solid ${alpha("#E2E8F0", 0.8)}`,
+                  backgroundColor: alpha("#F8FAFC", 0.6),
                 }}
               >
-                {filteredItems.length === 0 ? (
-                  <Box
+                <Stack
+                  direction="row"
+                  spacing={0}
+                  sx={{
+                    px: { xs: 1, sm: 2 },
+                  }}
+                >
+                  <Button
+                    onClick={() => setActiveTab("items")}
                     sx={{
-                      textAlign: "center",
-                      py: 8,
                       px: 3,
-                      display: "flex",
-                      justifyContent: "center",
-                      alignItems: "center",
-                      flexDirection: "column",
+                      py: 1.5,
+                      borderRadius: 0,
+                      borderBottom:
+                        activeTab === "items"
+                          ? `3px solid ${theme.palette.primary.main}`
+                          : "none",
+                      color:
+                        activeTab === "items"
+                          ? "primary.main"
+                          : "text.secondary",
+                      fontWeight: activeTab === "items" ? 600 : 400,
+                      backgroundColor:
+                        activeTab === "items"
+                          ? alpha(theme.palette.primary.main, 0.05)
+                          : "transparent",
+                      "&:hover": {
+                        backgroundColor: alpha(
+                          theme.palette.primary.main,
+                          0.08
+                        ),
+                      },
                     }}
+                    startIcon={<Package size={18} />}
                   >
-                    <Package
-                      size={64}
-                      style={{ color: "#ccc", marginBottom: 24 }}
-                    />
-                    <Typography
-                      variant="h6"
-                      color="text.secondary"
-                      gutterBottom
-                    >
-                      {searchTerm ? "No items found" : "No items in this list"}
-                    </Typography>
-                    <Typography
-                      variant="body2"
-                      color="text.secondary"
-                      sx={{ mb: 3 }}
-                    >
-                      {searchTerm
-                        ? "Try adjusting your search terms"
-                        : "Add your first item to get started"}
-                    </Typography>
-                    {!searchTerm && isEditable && (
-                      <Button
-                        variant="contained"
-                        startIcon={<Add />}
-                        onClick={() => setAddItemDialog(true)}
-                        sx={{
-                          background:
-                            "linear-gradient(45deg, #8CC21B 30%, #4CAF50 90%)",
-                          "&:hover": {
-                            background:
-                              "linear-gradient(45deg, #7AB819 30%, #45A047 90%)",
-                          },
-                          borderRadius: 1,
-                        }}
-                      >
-                        Add First Item
-                      </Button>
+                    List Items
+                    {itemsWithChanges.length > 0 && (
+                      <Badge
+                        badgeContent={itemsWithChanges.length}
+                        color="error"
+                        sx={{ ml: 2 }}
+                      />
                     )}
-                  </Box>
-                ) : (
-                  <Box sx={{ height: "600px" }}>
-                    <Paper
-                      elevation={3}
+                  </Button>
+
+                  <Button
+                    onClick={() => setActiveTab("deliveries")}
+                    sx={{
+                      px: 3,
+                      py: 1.5,
+                      borderRadius: 0,
+                      borderBottom:
+                        activeTab === "deliveries"
+                          ? `3px solid ${theme.palette.primary.main}`
+                          : "none",
+                      color:
+                        activeTab === "deliveries"
+                          ? "primary.main"
+                          : "text.secondary",
+                      fontWeight: activeTab === "deliveries" ? 600 : 400,
+                      backgroundColor:
+                        activeTab === "deliveries"
+                          ? alpha(theme.palette.primary.main, 0.05)
+                          : "transparent",
+                      "&:hover": {
+                        backgroundColor: alpha(
+                          theme.palette.primary.main,
+                          0.08
+                        ),
+                      },
+                    }}
+                    startIcon={<LocalShippingOutlined />}
+                  >
+                    Delivery History
+                  </Button>
+                </Stack>
+              </Box>
+            )}
+
+            {/* Items Display */}
+            {activeTab === "items" ? (
+              // Items tab content
+              isMobile ? (
+                // Mobile Card View
+                <Box>
+                  {filteredItems.length === 0 ? (
+                    <Box
                       sx={{
-                        height: "600px",
-                        width: "100%",
-                        backgroundColor: "#ffffff",
-                        borderRadius: "16px",
-                        border: "1px solid #e8f0fe",
-                        overflow: "hidden",
-                        boxShadow: "0 8px 32px rgba(0, 0, 0, 0.08)",
-                        "& .rdg": {
-                          border: "none !important",
-                          "--rdg-selection-color":
-                            "rgba(140, 194, 27, 0.15) !important",
-                          "--rdg-background-color": "#ffffff !important",
-                          "--rdg-header-background-color":
-                            "linear-gradient(135deg, #f8fffe 0%, #e8f5e8 100%) !important",
-                          fontFamily:
-                            '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                        },
-                        "& .rdg-header-row": {
-                          background:
-                            "linear-gradient(135deg, #f8fffe 0%, #e8f5e8 100%)",
-                          borderBottom: "2px solid rgba(140, 194, 27, 0.2)",
-                          fontWeight: 600,
-                          minHeight: "75px !important",
-                          color: "#2d3748",
-                          boxShadow: "0 2px 8px rgba(0, 0, 0, 0.04)",
-                        },
-                        "& .rdg-header-cell": {
-                          padding: "8px 12px !important",
-                          display: "flex !important",
-                          alignItems: "center !important",
-                          justifyContent: "center !important",
-                          borderRight: "1px solid rgba(140, 194, 27, 0.1)",
-                          background: "transparent",
-                          color: "#2d3748",
-                          fontWeight: 600,
-                          fontSize: "0.85rem",
-                          "&:hover": {
-                            background: "rgba(140, 194, 27, 0.05)",
-                          },
-                        },
-                        "& .rdg-cell": {
-                          padding: "12px 16px !important",
-                          display: "flex !important",
-                          alignItems: "center !important",
-                          borderRight: "1px solid rgba(226, 232, 240, 0.8)",
-                          borderBottom: "1px solid rgba(226, 232, 240, 0.6)",
-                          backgroundColor: "#ffffff",
-                          color: "#374151",
-                          fontSize: "0.875rem",
-                          transition: "all 0.2s ease",
-                        },
-                        "& .rdg-row": {
-                          minHeight: "80px !important",
-                          "&:hover": {
-                            backgroundColor:
-                              "rgba(140, 194, 27, 0.04) !important",
-                            transform: "translateY(-1px)",
-                            boxShadow: "0 4px 12px rgba(140, 194, 27, 0.08)",
-                            "& .rdg-cell": {
-                              backgroundColor: "rgba(140, 194, 27, 0.04)",
-                              borderColor: "rgba(140, 194, 27, 0.15)",
-                            },
-                          },
-                        },
-                        "& .rdg-row:nth-of-type(even)": {
-                          backgroundColor: "rgba(248, 250, 252, 0.5)",
-                          "& .rdg-cell": {
-                            backgroundColor: "rgba(248, 250, 252, 0.5)",
-                          },
-                        },
-                        "& .rdg-row:nth-of-type(odd)": {
-                          backgroundColor: "#ffffff",
-                          "& .rdg-cell": {
-                            backgroundColor: "#ffffff",
-                          },
-                        },
-                        "& .rdg-row.rdg-row-selected": {
-                          backgroundColor:
-                            "rgba(140, 194, 27, 0.08) !important",
-                          "& .rdg-cell": {
-                            backgroundColor: "rgba(140, 194, 27, 0.08)",
-                            borderColor: "rgba(140, 194, 27, 0.2)",
-                          },
-                        },
+                        textAlign: "center",
+                        py: 6,
+                        px: 3,
+                        borderRadius: 1,
+                        border: "2px dashed #e0e0e0",
+                        bgcolor: "#fafafa",
                       }}
                     >
+                      <Package
+                        size={48}
+                        style={{ color: "#ccc", marginBottom: 16 }}
+                      />
+                      <Typography
+                        variant="h6"
+                        color="text.secondary"
+                        gutterBottom
+                      >
+                        {searchTerm
+                          ? "No items found"
+                          : "No items in this list"}
+                      </Typography>
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        sx={{ mb: 2 }}
+                      >
+                        {searchTerm
+                          ? "Try adjusting your search terms"
+                          : "Add your first item to get started"}
+                      </Typography>
+                      {!searchTerm && isEditable && (
+                        <Button
+                          variant="contained"
+                          startIcon={<Add />}
+                          onClick={() => setAddItemDialog(true)}
+                          sx={{
+                            background:
+                              "linear-gradient(45deg, #8CC21B 30%, #4CAF50 90%)",
+                            "&:hover": {
+                              background:
+                                "linear-gradient(45deg, #7AB819 30%, #45A047 90%)",
+                            },
+                            borderRadius: 1,
+                          }}
+                        >
+                          Add First Item
+                        </Button>
+                      )}
+                    </Box>
+                  ) : (
+                    <Box>
+                      {filteredItems.map((item: any) => (
+                        <MobileItemCard
+                          key={item.id}
+                          item={item}
+                          onUpdateItem={handleUpdateItem}
+                          onSelect={handleItemSelect}
+                          isSelected={selectedRows.has(item.id)}
+                          isEditable={isEditable}
+                          companyName={companyName}
+                          listId={currentListId}
+                          router={router}
+                          onOpenActivityLogs={handleOpenItemActivityLogs}
+                        />
+                      ))}
+                    </Box>
+                  )}
+                </Box>
+              ) : (
+                // Desktop Table View
+                <Paper
+                  elevation={2}
+                  sx={{
+                    borderRadius: 1,
+                    overflow: "hidden",
+                    border: `1px solid ${alpha("#E2E8F0", 0.8)}`,
+                  }}
+                >
+                  {filteredItems.length === 0 ? (
+                    <Box
+                      sx={{
+                        textAlign: "center",
+                        py: 8,
+                        px: 3,
+                        display: "flex",
+                        justifyContent: "center",
+                        alignItems: "center",
+                        flexDirection: "column",
+                      }}
+                    >
+                      <Package
+                        size={64}
+                        style={{ color: "#ccc", marginBottom: 24 }}
+                      />
+                      <Typography
+                        variant="h6"
+                        color="text.secondary"
+                        gutterBottom
+                      >
+                        {searchTerm
+                          ? "No items found"
+                          : "No items in this list"}
+                      </Typography>
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        sx={{ mb: 3 }}
+                      >
+                        {searchTerm
+                          ? "Try adjusting your search terms"
+                          : "Add your first item to get started"}
+                      </Typography>
+                      {!searchTerm && isEditable && (
+                        <Button
+                          variant="contained"
+                          startIcon={<Add />}
+                          onClick={() => setAddItemDialog(true)}
+                          sx={{
+                            background:
+                              "linear-gradient(45deg, #8CC21B 30%, #4CAF50 90%)",
+                            "&:hover": {
+                              background:
+                                "linear-gradient(45deg, #7AB819 30%, #45A047 90%)",
+                            },
+                            borderRadius: 1,
+                          }}
+                        >
+                          Add First Item
+                        </Button>
+                      )}
+                    </Box>
+                  ) : (
+                    <Box sx={{ height: "600px" }}>
                       <DataGrid
                         columns={columns}
                         rows={filteredItems}
@@ -3255,10 +3920,16 @@ const ListManagerPage: React.FC = () => {
                           resizable: true,
                         }}
                       />
-                    </Paper>
-                  </Box>
-                )}
-              </Paper>
+                    </Box>
+                  )}
+                </Paper>
+              )
+            ) : (
+              // Delivery History tab content
+              <DeliveryHistoryTab
+                items={currentList.items}
+                isMobile={isMobile}
+              />
             )}
           </Box>
         </Card>
