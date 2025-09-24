@@ -72,10 +72,9 @@ interface DeliveryInfo {
   cargoStatus?: string;
 }
 
-// FIXED: Field Change Tracking Interface with itemId
+// Field Change Tracking Interface
 interface FieldChange {
   field: string;
-  itemId?: string; // ADDED: Essential for tracking which item the change belongs to
   oldValue: any;
   newValue: any;
   changedBy: string;
@@ -210,7 +209,7 @@ export class List {
     this.activityLogs = [...this.activityLogs, log];
   }
 
-  // FIXED: Track field changes for acknowledgment system with itemId
+  // Track field changes for acknowledgment system
   trackFieldChange(
     field: string,
     oldValue: any,
@@ -227,7 +226,6 @@ export class List {
 
     const change: FieldChange = {
       field,
-      itemId, // ADDED: Now properly storing itemId
       oldValue,
       newValue,
       changedBy: userId,
@@ -238,8 +236,7 @@ export class List {
 
     // Remove any existing pending changes for the same field and item
     this.pendingChanges = this.pendingChanges.filter(
-      (existingChange: FieldChange) =>
-        !(existingChange.field === field && existingChange.itemId === itemId)
+      (change: any) => !(change.field === field && change.itemId === itemId)
     );
 
     this.pendingChanges.push(change);
@@ -267,7 +264,7 @@ export class List {
       newValue
     );
 
-    // Track for acknowledgment system - now with itemId
+    // Track for acknowledgment system
     this.trackFieldChange(field, oldValue, newValue, userRole, userId, itemId);
   }
 
@@ -287,7 +284,7 @@ export class List {
     );
   }
 
-  // FIXED: Acknowledge customer changes with itemId handling
+  // Acknowledge customer changes
   acknowledgeCustomerChanges(adminUserId: string, logIds?: string[]): void {
     if (!this.activityLogs) return;
 
@@ -327,20 +324,15 @@ export class List {
     }
   }
 
-  // FIXED: Acknowledge specific field changes for specific items
-  acknowledgeFieldChanges(
-    adminUserId: string,
-    fieldChanges: string[],
-    itemId?: string
-  ): void {
+  // Acknowledge specific field changes
+  acknowledgeFieldChanges(adminUserId: string, fieldChanges: string[]): void {
     if (!this.pendingChanges) return;
 
     const now = new Date();
     this.pendingChanges.forEach((change) => {
       if (
         fieldChanges.includes(change.field) &&
-        change.changeStatus === CHANGE_STATUS.PENDING &&
-        (!itemId || change.itemId === itemId) // Check itemId if provided
+        change.changeStatus === CHANGE_STATUS.PENDING
       ) {
         change.changeStatus = CHANGE_STATUS.ACKNOWLEDGED;
         change.acknowledgedBy = adminUserId;
@@ -355,8 +347,7 @@ export class List {
           log.userRole === USER_ROLE.CUSTOMER &&
           !log.acknowledged &&
           log.field &&
-          fieldChanges.includes(log.field) &&
-          (!itemId || log.itemId === itemId) // Check itemId if provided
+          fieldChanges.includes(log.field)
         ) {
           log.acknowledged = true;
           log.acknowledgedBy = adminUserId;
@@ -375,7 +366,6 @@ export class List {
       .filter(
         (log) =>
           log.field === change.field &&
-          log.itemId === change.itemId && // Also filter by itemId
           log.userRole === USER_ROLE.CUSTOMER &&
           !log.acknowledged
       )
@@ -399,10 +389,10 @@ export class List {
     return (this.activityLogs || []).filter((log) => log.itemId === itemId);
   }
 
-  // FIXED: Get pending changes for a specific item - now properly filters by itemId
+  // Get pending changes for a specific item
   getItemPendingChanges(itemId: string): FieldChange[] {
     return (this.pendingChanges || []).filter(
-      (change: FieldChange) => change.itemId === itemId
+      (change: any) => change.itemId === itemId
     );
   }
 
@@ -417,13 +407,6 @@ export class List {
   // Check if list has any pending changes
   hasPendingChanges(): boolean {
     return this.getPendingFieldChanges().length > 0;
-  }
-
-  // ADDED: Get unacknowledged changes count for specific item
-  getItemUnacknowledgedChangesCount(itemId: string): number {
-    return this.getItemPendingChanges(itemId).filter(
-      (change) => change.changeStatus === CHANGE_STATUS.PENDING
-    ).length;
   }
 }
 
@@ -498,7 +481,7 @@ export class ListItem {
     // Update the field
     (this as any)[field] = newValue;
 
-    // Log the change in the parent list - now properly passes itemId
+    // Log the change in the parent list
     if (this.list) {
       this.list.logFieldChange(
         field as string,
@@ -506,7 +489,7 @@ export class ListItem {
         newValue,
         userRole,
         userId,
-        this.id, // Pass this item's ID
+        this.id,
         this.articleName
       );
     }
@@ -565,7 +548,7 @@ export class ListItem {
         deliveryData.status || currentDelivery.status || DELIVERY_STATUS.OPEN,
     };
 
-    // Log the delivery changes - now properly passes itemId
+    // Log the delivery changes
     if (changes.length > 0 && this.list) {
       const message = `${userRole} updated delivery for period ${period}: ${changes.join(
         ", "
@@ -574,11 +557,11 @@ export class ListItem {
         message,
         userRole,
         userId,
-        this.id, // Pass this item's ID
+        this.id,
         `delivery_${period}`
       );
 
-      // Track delivery changes for acknowledgment - now properly passes itemId
+      // Track delivery changes for acknowledgment
       if (userRole === USER_ROLE.CUSTOMER) {
         this.list.trackFieldChange(
           `delivery_${period}`,
@@ -586,7 +569,7 @@ export class ListItem {
           this.deliveries[period],
           userRole,
           userId,
-          this.id // Pass this item's ID
+          this.id
         );
       }
     }
@@ -615,7 +598,7 @@ export class ListItem {
     );
   }
 
-  // Get the latest unacknowledged change for a field
+  // Get the latest unacknowledged value for a field
   getLatestUnacknowledgedChange(field: string): any {
     const pendingChanges = this.list?.getItemPendingChanges(this.id) || [];
 
@@ -691,7 +674,6 @@ export function getPendingChangesByField(
   return changesByField;
 }
 
-// FIXED: Acknowledge item changes utility now properly handles itemId
 export function acknowledgeItemChanges(
   list: List,
   itemId: string,
@@ -700,8 +682,7 @@ export function acknowledgeItemChanges(
   const itemChanges = list.getItemPendingChanges(itemId);
   const fieldNames = itemChanges.map((change) => change.field);
 
-  // Pass itemId to acknowledgeFieldChanges
-  list.acknowledgeFieldChanges(adminUserId, fieldNames, itemId);
+  list.acknowledgeFieldChanges(adminUserId, fieldNames);
 }
 
 export function getHighlightedFields(item: ListItem): string[] {

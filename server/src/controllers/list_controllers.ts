@@ -58,13 +58,14 @@ async function fetchItemData(itemId: number) {
     }
 
     const itemData = itemRows[0];
+    console.log("ItemData", itemData);
 
     const deliveryMap = new Map<
       string,
       {
         quantity: number;
         status: string;
-        deliveredAt: Date;
+        deliveredAt: Date | null;
         cargoNo: string[];
         cargoStatus: string;
         remark: string;
@@ -74,10 +75,65 @@ async function fetchItemData(itemId: number) {
       }
     >();
 
+    // Counter for cargos without dates
+    let noDateCounter = 0;
+
     itemRows.forEach((row: any) => {
-      if (row.cargo_id) {
-        [row.pickup_date, row.dep_date].forEach((date: Date | null) => {
-          if (date) {
+      if (row.cargo_id && row.cargo_no) {
+        // Get all possible dates, use fallbacks if primary dates are null
+        const possibleDates = [
+          row.pickup_date,
+          row.dep_date,
+          row.shipped_at,
+          row.eta,
+        ].filter((date) => date !== null);
+
+        // If no dates available, create a unique key for cargos without dates
+        if (possibleDates.length === 0) {
+          noDateCounter++;
+          const uniqueKey = `no-date-${noDateCounter}`;
+
+          const quantity = Number(row.quantity) || 0;
+
+          if (!deliveryMap.has(uniqueKey)) {
+            deliveryMap.set(uniqueKey, {
+              quantity,
+              status: row.order_status || "Open",
+              deliveredAt: null,
+              cargoNo: [row.cargo_no],
+              cargoStatus: row.cargo_status || "",
+              remark: row.remark || "",
+              shippedAt: row.shipped_at
+                ? new Date(row.shipped_at).toISOString().split("T")[0]
+                : "",
+              eta: row.eta ? new Date(row.eta).toISOString().split("T")[0] : "",
+              cargoType: row.cargo_type || "",
+            });
+          } else {
+            const existing = deliveryMap.get(uniqueKey)!;
+            const isUniqueDelivery = !existing.cargoNo.includes(row.cargo_no);
+
+            deliveryMap.set(uniqueKey, {
+              quantity: isUniqueDelivery
+                ? existing.quantity + quantity
+                : existing.quantity,
+              status: row.order_status || existing.status,
+              deliveredAt: existing.deliveredAt,
+              cargoNo: isUniqueDelivery
+                ? [...existing.cargoNo, row.cargo_no]
+                : existing.cargoNo,
+              cargoStatus: row.cargo_status || existing.cargoStatus,
+              remark: row.remark || existing.remark,
+              shippedAt: row.shipped_at || existing.shippedAt,
+              eta: row.eta
+                ? new Date(row.eta).toISOString().split("T")[0]
+                : existing.eta,
+              cargoType: row.cargo_type || existing.cargoType,
+            });
+          }
+        } else {
+          // Process each available date
+          possibleDates.forEach((date: Date) => {
             const dateKey = date.toISOString().split("T")[0];
             const quantity = Number(row.quantity) || 0;
 
@@ -86,7 +142,7 @@ async function fetchItemData(itemId: number) {
                 quantity,
                 status: row.order_status || "Open",
                 deliveredAt: date,
-                cargoNo: row.cargo_no ? [row.cargo_no] : [],
+                cargoNo: [row.cargo_no],
                 cargoStatus: row.cargo_status || "",
                 remark: row.remark || "",
                 shippedAt: row.shipped_at
@@ -105,20 +161,22 @@ async function fetchItemData(itemId: number) {
                 quantity: isUniqueDelivery
                   ? existing.quantity + quantity
                   : existing.quantity,
-                status: existing.status,
+                status: row.order_status || existing.status,
                 deliveredAt: existing.deliveredAt,
-                cargoNo: row.cargo_no,
+                cargoNo: isUniqueDelivery
+                  ? [...existing.cargoNo, row.cargo_no]
+                  : existing.cargoNo,
                 cargoStatus: row.cargo_status || existing.cargoStatus,
                 remark: row.remark || existing.remark,
-                shippedAt: row.shipped_at || "N/A",
+                shippedAt: row.shipped_at || existing.shippedAt,
                 eta: row.eta
                   ? new Date(row.eta).toISOString().split("T")[0]
                   : existing.eta,
                 cargoType: row.cargo_type || existing.cargoType,
               });
             }
-          }
-        });
+          });
+        }
       }
     });
 
@@ -126,7 +184,7 @@ async function fetchItemData(itemId: number) {
       [period: string]: {
         quantity?: number;
         status: string;
-        deliveredAt?: Date;
+        deliveredAt?: Date | null;
         cargoNo: string;
         cargoStatus?: string;
         remark: string;
@@ -1275,9 +1333,7 @@ export const getCustomerLists = async (
   }
 };
 
-// FIXED getAllLists Controller - Replace this in your list controller file
-
-// 13. Get All Lists (Admin view) - FIXED
+// 13. Get All Lists (Admin view) - UPDATED
 export const getAllLists = async (
   req: Request,
   res: Response,
@@ -1289,37 +1345,11 @@ export const getAllLists = async (
       relations: ["customer", "items", "createdBy.user", "createdBy.customer"],
     });
 
-    const listsWithChanges = lists.map((list) => {
-      // Process items with proper unacknowledged fields
-      const itemsWithChanges =
-        list.items?.map((item) => {
-          // Get pending changes for this specific item
-          const itemPendingChanges = list.getItemPendingChanges(item.id);
-
-          // Extract unacknowledged fields from pending changes
-          const unacknowledgedFields = itemPendingChanges
-            .filter((change) => change.changeStatus === CHANGE_STATUS.PENDING)
-            .map((change) => change.field);
-
-          // Return item with all necessary acknowledgment data
-          return {
-            ...item,
-            unacknowledgedFields,
-            hasUnacknowledgedChanges: unacknowledgedFields.length > 0,
-            pendingChanges: itemPendingChanges,
-            needsAttention: unacknowledgedFields.length > 0,
-          };
-        }) || [];
-
-      return {
-        ...list,
-        items: itemsWithChanges,
-        pendingChanges: list.pendingChanges || [], // Include the full pendingChanges array
-        pendingChangesCount: list.getPendingFieldChanges().length,
-        hasPendingChanges: list.hasPendingChanges(),
-        activityLogs: list.getAllActivityLogs(),
-      };
-    });
+    const listsWithChanges = lists.map((list) => ({
+      ...list,
+      pendingChangesCount: list.getPendingFieldChanges().length,
+      hasPendingChanges: list.hasPendingChanges(),
+    }));
 
     return res.status(200).json({
       success: true,

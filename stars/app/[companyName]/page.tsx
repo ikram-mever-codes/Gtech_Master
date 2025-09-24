@@ -3047,6 +3047,11 @@ const ListManagerPage: React.FC = () => {
 
     const deliveryColumns = deliveryPeriodsData.sortedPeriods.map(
       (period: any) => {
+        const filteredItems = currentList?.items.filter((item: any) => {
+      const delivery = item.deliveries?.[period];
+      return delivery && ['Open', 'Shipped', 'Packed'].includes(delivery.status);
+    }) || [];
+    
         const cargoNo = currentList?.items
           .map((item: any) => item.deliveries?.[period]?.cargoNo)
           .find((cn: string) => cn);

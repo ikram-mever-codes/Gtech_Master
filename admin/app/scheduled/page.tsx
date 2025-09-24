@@ -2634,7 +2634,17 @@ const AdminAllItemsPage = () => {
 
     const deliveryColumns = deliveryPeriodsData.sortedPeriods.map((period) => {
       const cargoNo = allItems
-        .map((item: any) => item.deliveries?.[period]?.cargoNo)
+        .map((item: any) => {
+          const delivery = item.deliveries?.[period];
+          // Only include cargo if status is Open, Shipped, or Packed
+          if (
+            delivery &&
+            ["Open", "Shipped", "Packed"].includes(delivery.status)
+          ) {
+            return delivery.cargoNo;
+          }
+          return null;
+        })
         .find((cn: string) => cn);
 
       return {
