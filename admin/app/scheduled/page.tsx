@@ -1009,11 +1009,32 @@ const DELIVERY_STATUS_CONFIG: any = {
 // Fixed DeliveryCell component with proper props
 function DeliveryCell({
   row,
-  period,
+  cargoNo,
   onUpdateDelivery,
   onAcknowledgeField,
 }: any) {
-  const delivery = row.deliveries?.[period];
+  // Find the delivery for this specific cargo number
+  const getDeliveryForCargo = () => {
+    if (!row.deliveries) return null;
+
+    for (const [period, delivery] of Object.entries(row.deliveries)) {
+      const deliveryInfo = delivery as any;
+      if (
+        deliveryInfo?.cargoNo &&
+        String(deliveryInfo.cargoNo).trim() === cargoNo
+      ) {
+        return { period, delivery: deliveryInfo };
+      }
+    }
+    return null;
+  };
+
+  const deliveryData = getDeliveryForCargo();
+  if (!deliveryData) {
+    return <Box sx={{ textAlign: "center", p: 1 }}>-</Box>;
+  }
+
+  const { period, delivery } = deliveryData;
   const [isEditing, setIsEditing] = useState(false);
   const [status, setStatus] = useState(
     delivery?.status || DELIVERY_STATUS.PENDING
@@ -1492,56 +1513,125 @@ function EditableCommentCell({ row, onUpdateItem, onAcknowledgeField }: any) {
   );
 }
 
-// Function to extract and format delivery periods from all items
-function extractDeliveryPeriods(items: any[]): {
-  sortedPeriods: string[];
-  periodCargoMap: Map<string, string[]>;
+// New function to extract unique cargo numbers with sorting
+function extractUniqueCargos(items: any[]): {
+  sortedCargos: string[];
+  cargoDataMap: Map<string, { period: string; eta?: number }>;
 } {
-  const periodsSet = new Set<string>();
-  const periodCargoMap = new Map<string, string[]>();
+  const cargoMap = new Map<string, { period: string; eta?: number }>();
 
   items.forEach((item) => {
     if (item.deliveries) {
       Object.entries(item.deliveries).forEach(
         ([period, deliveryDetails]: [string, any]) => {
-          periodsSet.add(period);
+          if (deliveryDetails?.cargoNo) {
+            const cargoNo = String(deliveryDetails.cargoNo).trim();
 
-          if (!periodCargoMap.has(period)) {
-            periodCargoMap.set(period, []);
-          }
+            // Skip invalid cargo numbers
+            if (
+              !cargoNo ||
+              cargoNo === "null" ||
+              cargoNo === "undefined" ||
+              cargoNo === ""
+            ) {
+              return;
+            }
 
-          if (deliveryDetails.cargoNo) {
-            const cargoNos =
-              typeof deliveryDetails.cargoNo === "string"
-                ? deliveryDetails.cargoNo
-                    .split(",")
-                    .map((c: string) => c.trim())
-                : [deliveryDetails.cargoNo];
-
-            const existingCargos = periodCargoMap.get(period)!;
-            cargoNos.forEach((cargoNo: string) => {
-              if (cargoNo && !existingCargos.includes(cargoNo)) {
-                existingCargos.push(cargoNo);
+            // If cargo doesn't exist or current ETA is earlier, update it
+            if (!cargoMap.has(cargoNo)) {
+              cargoMap.set(cargoNo, {
+                period: period,
+                eta: deliveryDetails.eta,
+              });
+            } else {
+              // Update if this instance has an earlier ETA
+              const existing = cargoMap.get(cargoNo)!;
+              if (
+                deliveryDetails.eta &&
+                (!existing.eta || deliveryDetails.eta < existing.eta)
+              ) {
+                cargoMap.set(cargoNo, {
+                  period: period,
+                  eta: deliveryDetails.eta,
+                });
               }
-            });
+            }
           }
         }
       );
     }
   });
 
-  const sortedPeriods = Array.from(periodsSet).sort((a, b) => {
-    const [yearA, periodA] = a.split("-").map((p) => p.replace("T", ""));
-    const [yearB, periodB] = b.split("-").map((p) => p.replace("T", ""));
+  // Sort cargo numbers by ETA, then alphabetically
+  const sortedCargos = Array.from(cargoMap.keys()).sort((a, b) => {
+    const dataA = cargoMap.get(a)!;
+    const dataB = cargoMap.get(b)!;
 
-    if (yearA !== yearB) return parseInt(yearA) - parseInt(yearB);
-    return parseInt(periodA) - parseInt(periodB);
+    // Sort by ETA first if both have it
+    if (dataA.eta && dataB.eta) {
+      return dataA.eta - dataB.eta;
+    }
+
+    // Cargos with ETA come before those without
+    if (dataA.eta && !dataB.eta) return -1;
+    if (!dataA.eta && dataB.eta) return 1;
+
+    // Finally sort alphabetically by cargo number
+    return a.localeCompare(b);
   });
 
   return {
-    sortedPeriods,
-    periodCargoMap,
+    sortedCargos,
+    cargoDataMap: cargoMap,
   };
+}
+
+// Format period label for cargo columns
+function formatCargoColumnLabel(
+  cargoNo: string,
+  period: string,
+  eta?: number
+): string {
+  const monthMap: { [key: string]: string } = {
+    "01": "January",
+    "02": "February",
+    "03": "March",
+    "04": "April",
+    "05": "May",
+    "06": "June",
+    "07": "July",
+    "08": "August",
+    "09": "September",
+    "10": "October",
+    "11": "November",
+    "12": "December",
+  };
+
+  let label = "";
+
+  // Format period first (like "September 2025")
+  const periodMatch = period.match(/(\d{4})-(\d{1,2})/);
+  if (periodMatch) {
+    const year = periodMatch[1];
+    const month = periodMatch[2].padStart(2, "0");
+    const monthName = monthMap[month] || `Month ${month}`;
+    label = `${monthName} ${year}`;
+  } else if (period && period.startsWith("no-date-")) {
+    // Handle no-date periods
+    const periodNum = period.replace("no-date-", "");
+    label = `Period ${periodNum}`;
+  } else if (period) {
+    label = period;
+  } else {
+    label = "No Date";
+  }
+
+  // Add cargo number in parentheses (like original format)
+  if (cargoNo) {
+    label += ` (${cargoNo})`;
+  }
+
+  return label;
 }
 
 // Enhanced Editable Interval Cell with change highlighting
@@ -1692,28 +1782,6 @@ function EditableIntervalCell({ row, onUpdateItem, onAcknowledgeField }: any) {
       </Box>
     </FieldHighlight>
   );
-}
-
-function formatPeriodLabel(period: string, cargoNo: string): string {
-  const monthMap: { [key: string]: string } = {
-    "01": "January",
-    "02": "February",
-    "03": "March",
-    "04": "April",
-    "05": "May",
-    "06": "June",
-    "07": "July",
-    "08": "August",
-    "09": "September",
-    "10": "October",
-    "11": "November",
-    "12": "December",
-  };
-
-  const [yearPart, periodNum] = period.split("-");
-  const monthName = monthMap[periodNum] || `Period ${periodNum}`;
-
-  return `${monthName} ${yearPart} ${cargoNo ? `(${cargoNo})` : ""}`;
 }
 
 // Enhanced Breadcrumbs
@@ -2012,9 +2080,10 @@ const AdminAllItemsPage = () => {
     );
   }, [allItems]);
 
-  const deliveryPeriodsData = useMemo(() => {
-    if (!allItems.length) return { sortedPeriods: [], cargoNumbers: [] };
-    return extractDeliveryPeriods(allItems);
+  // Extract unique cargo numbers for columns
+  const deliveryColumnsData = useMemo(() => {
+    if (!allItems.length) return { sortedCargos: [], cargoDataMap: new Map() };
+    return extractUniqueCargos(allItems);
   }, [allItems]);
 
   // Filter activity logs based on current filters
@@ -2632,35 +2701,28 @@ const AdminAllItemsPage = () => {
       },
     ];
 
-    const deliveryColumns = deliveryPeriodsData.sortedPeriods.map((period) => {
-      const cargoNo = allItems
-        .map((item: any) => {
-          const delivery = item.deliveries?.[period];
-          // Only include cargo if status is Open, Shipped, or Packed
-          if (
-            delivery &&
-            ["Open", "Shipped", "Packed"].includes(delivery.status)
-          ) {
-            return delivery.cargoNo;
-          }
-          return null;
-        })
-        .find((cn: string) => cn);
+    // Generate delivery columns based on unique cargo numbers
+    const deliveryColumns = deliveryColumnsData.sortedCargos.map((cargoNo) => {
+      const cargoData = deliveryColumnsData.cargoDataMap.get(cargoNo);
 
       return {
-        key: `delivery_${period}`,
-        name: formatPeriodLabel(period, cargoNo || ""),
+        key: `cargo_${cargoNo}`,
+        name: formatCargoColumnLabel(
+          cargoNo,
+          cargoData?.period || "",
+          cargoData?.eta
+        ),
         width: 140,
         resizable: false,
         renderCell: (props: any) => (
           <DeliveryCell
             row={props.row}
-            period={period}
+            cargoNo={cargoNo}
             onUpdateDelivery={handleUpdateDelivery}
             onAcknowledgeField={handleAcknowledgeField}
           />
         ),
-        renderHeaderCell: (props: any) => (
+        renderHeaderCell: () => (
           <Box
             sx={{
               display: "flex",
@@ -2669,11 +2731,16 @@ const AdminAllItemsPage = () => {
               justifyContent: "center",
               height: "100%",
               padding: "8px 4px",
-              maxWidth: "500px",
               textWrap: "wrap",
             }}
           >
-            <div>{formatPeriodLabel(period, cargoNo || "")}</div>
+            <div>
+              {formatCargoColumnLabel(
+                cargoNo,
+                cargoData?.period || "",
+                cargoData?.eta
+              )}
+            </div>
           </Box>
         ),
       };
@@ -2809,7 +2876,7 @@ const AdminAllItemsPage = () => {
 
     return [...baseColumns, ...deliveryColumns, ...endColumns];
   }, [
-    deliveryPeriodsData,
+    deliveryColumnsData,
     selectedRows,
     handleUpdateDelivery,
     handleUpdateItem,

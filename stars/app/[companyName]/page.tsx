@@ -190,7 +190,7 @@ const DeliveryHistoryTab = ({ items, isMobile }: any) => {
     }
   }
 
-  // Process and combine deliveries from all items
+  // Process and combine deliveries from all items - UPDATED to handle unique cargos
   const deliveryHistory = useMemo(() => {
     const deliveryMap = new Map();
 
@@ -198,12 +198,17 @@ const DeliveryHistoryTab = ({ items, isMobile }: any) => {
       if (item.deliveries) {
         Object.entries(item.deliveries).forEach(
           ([period, delivery]: [string, any]) => {
-            const key = `${period}_${delivery.cargoNo || "no-cargo"}`;
+            // Use cargo number as the primary key for uniqueness
+            const cargoNo = delivery.cargoNo || "no-cargo";
+            const key =
+              cargoNo !== "no-cargo"
+                ? cargoNo
+                : `${period}_no-cargo_${item.id}`;
 
             if (!deliveryMap.has(key)) {
               deliveryMap.set(key, {
                 period,
-                cargoNo: delivery.cargoNo || "",
+                cargoNo: cargoNo !== "no-cargo" ? cargoNo : "",
                 cargoStatus: delivery.cargoStatus,
                 eta: delivery.eta,
                 totalQuantity: 0,
@@ -557,7 +562,9 @@ const DeliveryHistoryTab = ({ items, isMobile }: any) => {
         <Table>
           <TableHead>
             <TableRow
-              sx={{ backgroundColor: alpha(theme.palette.primary.main, 0.04) }}
+              sx={{
+                backgroundColor: alpha(theme.palette.primary.main, 0.04),
+              }}
             >
               <TableCell>
                 <TableSortLabel
@@ -1046,44 +1053,132 @@ const FieldHighlight = ({
   );
 };
 
-// Utility function to extract delivery periods
-function extractDeliveryPeriods(items: any[]): { sortedPeriods: string[] } {
-  const periodsWithEta: { period: string; eta?: string }[] = [];
+// Enhanced function to extract unique cargo numbers with sorting
+function extractUniqueCargos(items: any[]): {
+  sortedCargos: string[];
+  cargoDataMap: Map<
+    string,
+    { period: string; eta?: number; cargoStatus?: string }
+  >;
+} {
+  const cargoMap = new Map<
+    string,
+    { period: string; eta?: number; cargoStatus?: string }
+  >();
 
   items.forEach((item) => {
     if (item.deliveries) {
       Object.entries(item.deliveries).forEach(
-        ([period, delivery]: [string, any]) => {
-          periodsWithEta.push({
-            period,
-            eta: delivery.eta,
-          });
+        ([period, deliveryDetails]: [string, any]) => {
+          if (deliveryDetails?.cargoNo) {
+            const cargoNo = String(deliveryDetails.cargoNo).trim();
+
+            // Skip invalid cargo numbers
+            if (
+              !cargoNo ||
+              cargoNo === "null" ||
+              cargoNo === "undefined" ||
+              cargoNo === ""
+            ) {
+              return;
+            }
+
+            // If cargo doesn't exist or current ETA is earlier, update it
+            if (!cargoMap.has(cargoNo)) {
+              cargoMap.set(cargoNo, {
+                period: period,
+                eta: deliveryDetails.eta,
+                cargoStatus: deliveryDetails.cargoStatus,
+              });
+            } else {
+              // Update if this instance has an earlier ETA
+              const existing = cargoMap.get(cargoNo)!;
+              if (
+                deliveryDetails.eta &&
+                (!existing.eta || deliveryDetails.eta < existing.eta)
+              ) {
+                cargoMap.set(cargoNo, {
+                  period: period,
+                  eta: deliveryDetails.eta,
+                  cargoStatus: deliveryDetails.cargoStatus,
+                });
+              }
+            }
+          }
         }
       );
     }
   });
 
-  // Remove duplicates and sort by eta date
-  const uniquePeriods = Array.from(new Set(periodsWithEta.map((p) => p.period)))
-    .map((period) => {
-      return {
-        period,
-        eta: periodsWithEta.find((p) => p.period === period)?.eta,
-      };
-    })
-    .sort((a, b) => {
-      // If either doesn't have an eta, put it at the end
-      if (!a.eta && !b.eta) return 0;
-      if (!a.eta) return 1;
-      if (!b.eta) return -1;
+  // Sort cargo numbers by ETA, then alphabetically
+  const sortedCargos = Array.from(cargoMap.keys()).sort((a, b) => {
+    const dataA = cargoMap.get(a)!;
+    const dataB = cargoMap.get(b)!;
 
-      // Compare dates
-      return new Date(a.eta).getTime() - new Date(b.eta).getTime();
-    });
+    // Sort by ETA first if both have it
+    if (dataA.eta && dataB.eta) {
+      return dataA.eta - dataB.eta;
+    }
 
-  return { sortedPeriods: uniquePeriods.map((p) => p.period) };
+    // Cargos with ETA come before those without
+    if (dataA.eta && !dataB.eta) return -1;
+    if (!dataA.eta && dataB.eta) return 1;
+
+    // Finally sort alphabetically by cargo number
+    return a.localeCompare(b);
+  });
+
+  return {
+    sortedCargos,
+    cargoDataMap: cargoMap,
+  };
 }
 
+function formatCargoColumnLabel(
+  cargoNo: string,
+  period: string,
+  eta?: number
+): string {
+  const monthMap: { [key: string]: string } = {
+    "01": "January",
+    "02": "February",
+    "03": "March",
+    "04": "April",
+    "05": "May",
+    "06": "June",
+    "07": "July",
+    "08": "August",
+    "09": "September",
+    "10": "October",
+    "11": "November",
+    "12": "December",
+  };
+
+  let label = "";
+
+  // Format period first (like "September 2025")
+  const periodMatch = period.match(/(\d{4})-(\d{1,2})/);
+  if (periodMatch) {
+    const year = periodMatch[1];
+    const month = periodMatch[2].padStart(2, "0");
+    const monthName = monthMap[month] || `Month ${month}`;
+    label = `${monthName} ${year}`;
+  } else if (period && period.startsWith("no-date-")) {
+    const periodNum = period.replace("no-date-", "");
+    label = `Period ${periodNum}`;
+  } else if (period) {
+    label = period;
+  } else {
+    label = "No Date";
+  }
+
+  // Add cargo number in parentheses
+  if (cargoNo) {
+    label += ` (${cargoNo})`;
+  }
+
+  return label;
+}
 // Delivery Cell Component
 const DeliveryCell = ({ row, period }: any) => {
   const [deliveryModalOpen, setDeliveryModalOpen] = useState(false);
@@ -1513,7 +1608,10 @@ const AddItemDialog = ({ open, onClose, onAddItem, listId }: any) => {
               label="Artikelnr"
               value={formData.item_no_de}
               onChange={(e) =>
-                setFormData((prev) => ({ ...prev, item_no_de: e.target.value }))
+                setFormData((prev) => ({
+                  ...prev,
+                  item_no_de: e.target.value,
+                }))
               }
               variant="outlined"
             />
@@ -1538,7 +1636,10 @@ const AddItemDialog = ({ open, onClose, onAddItem, listId }: any) => {
               <Select
                 value={formData.interval}
                 onChange={(e) =>
-                  setFormData((prev) => ({ ...prev, interval: e.target.value }))
+                  setFormData((prev) => ({
+                    ...prev,
+                    interval: e.target.value,
+                  }))
                 }
                 variant="outlined"
               >
@@ -2832,15 +2933,20 @@ const ListManagerPage: React.FC = () => {
     );
   }, [currentList?.items, searchTerm]);
 
-  const deliveryPeriodsData = useMemo(() => {
-    if (!currentList?.items) return { sortedPeriods: [] };
-    return extractDeliveryPeriods(currentList.items);
+  const deliveryColumnsData = useMemo(() => {
+    if (!currentList?.items)
+      return { sortedCargos: [], cargoDataMap: new Map() };
+    return extractUniqueCargos(currentList.items);
   }, [currentList?.items]);
 
   const dispatch = useDispatch();
 
-  // Enhanced Desktop columns configuration (only comment editable) - with Activity Logs
   const columns = useMemo(() => {
+    // Extract unique cargos instead of periods
+    const deliveryColumnsData = currentList?.items
+      ? extractUniqueCargos(currentList.items)
+      : { sortedCargos: [], cargoDataMap: new Map() };
+
     const baseColumns = [
       {
         key: "item_no_de",
@@ -3045,144 +3151,292 @@ const ListManagerPage: React.FC = () => {
       },
     ];
 
-    const deliveryColumns = deliveryPeriodsData.sortedPeriods.map(
-      (period: any) => {
-        const filteredItems = currentList?.items.filter((item: any) => {
-      const delivery = item.deliveries?.[period];
-      return delivery && ['Open', 'Shipped', 'Packed'].includes(delivery.status);
-    }) || [];
-    
-        const cargoNo = currentList?.items
-          .map((item: any) => item.deliveries?.[period]?.cargoNo)
-          .find((cn: string) => cn);
+    // Generate delivery columns based on unique cargo numbers
+    const deliveryColumns = deliveryColumnsData.sortedCargos.map((cargoNo) => {
+      const cargoData = deliveryColumnsData.cargoDataMap.get(cargoNo);
 
-        const cargoStatus = currentList?.items
-          .map((item: any) => item.deliveries?.[period]?.cargoStatus)
-          .find((cn: string) => cn);
+      function formatEta(etaDate: any) {
+        if (!etaDate) return null;
+        const eta = new Date(etaDate);
+        if (isNaN(eta.getTime())) return etaDate;
+        const now = new Date();
+        const isCurrentYear = eta.getFullYear() === now.getFullYear();
 
-        const eta = currentList?.items
-          .map((item: any) => item.deliveries?.[period]?.eta)
-          .find((cn: string) => cn);
-
-        function formatEta(etaDate: any) {
-          if (!etaDate) return null;
-          const now = new Date();
-          const eta = new Date(etaDate);
-          if (isNaN(eta.getTime())) return etaDate;
-
-          const isCurrentYear = eta.getFullYear() === now.getFullYear();
-
-          if (isCurrentYear) {
-            return eta.toLocaleDateString("de-DE", {
-              day: "2-digit",
-              month: "2-digit",
-            });
-          } else {
-            return eta.toLocaleDateString("de-DE");
-          }
+        if (isCurrentYear) {
+          return eta.toLocaleDateString("de-DE", {
+            day: "2-digit",
+            month: "2-digit",
+          });
+        } else {
+          return eta.toLocaleDateString("de-DE");
         }
+      }
 
-        // Status descriptions mapping
-        const statusDescriptions: Record<string, string> = {
-          open: "Cargo planned - The shipment is in the planning phase",
-          packed:
-            "Goods are packed - Items have been prepared and packaged for shipment",
-          shipped:
-            "Cargo is sent out - The shipment has left the origin facility",
-          arrived:
-            "Arrived in Germany - The shipment has reached its destination in Germany",
-        };
+      const statusDescriptions: Record<string, string> = {
+        open: "Cargo planned - The shipment is in the planning phase",
+        packed:
+          "Goods are packed - Items have been prepared and packaged for shipment",
+        shipped:
+          "Cargo is sent out - The shipment has left the origin facility",
+        arrived:
+          "Arrived in Germany - The shipment has reached its destination in Germany",
+      };
 
-        const renderTooltipContent = () => (
-          <Box sx={{ p: 1 }}>
-            <Typography variant="body2" sx={{ fontWeight: "bold", mb: 1 }}>
-              {cargoStatus ? `${cargoStatus.toUpperCase()}` : "No Status"}
+      const renderTooltipContent = () => (
+        <Box sx={{ p: 1 }}>
+          <Typography variant="body2" sx={{ fontWeight: "bold", mb: 1 }}>
+            {cargoData?.cargoStatus
+              ? `${cargoData.cargoStatus.toUpperCase()}`
+              : "No Status"}
+          </Typography>
+          <Typography variant="body2">
+            {cargoData?.cargoStatus
+              ? statusDescriptions[cargoData.cargoStatus.toLowerCase()]
+              : "No status information available"}
+          </Typography>
+          {cargoData?.eta && (
+            <Typography variant="body2" sx={{ mt: 1, fontStyle: "italic" }}>
+              Estimated arrival: {formatEta(cargoData.eta)}
             </Typography>
-            <Typography variant="body2">
-              {cargoStatus
-                ? statusDescriptions[cargoStatus.toLowerCase()]
-                : "No status information available"}
-            </Typography>
-            {eta && (
-              <Typography variant="body2" sx={{ mt: 1, fontStyle: "italic" }}>
-                Estimated arrival: {formatEta(eta)}
-              </Typography>
-            )}
-          </Box>
-        );
+          )}
+        </Box>
+      );
 
-        const tooltipProps = {
-          title: renderTooltipContent(),
-          arrow: true,
-          placement: "top" as const,
-          componentsProps: {
-            tooltip: {
-              sx: {
-                bgcolor: "common.white",
-                color: "text.primary",
-                boxShadow: 1,
+      const tooltipProps = {
+        title: renderTooltipContent(),
+        arrow: true,
+        placement: "top" as const,
+        componentsProps: {
+          tooltip: {
+            sx: {
+              bgcolor: "common.white",
+              color: "text.primary",
+              boxShadow: 1,
+              border: "1px solid",
+              borderColor: "divider",
+              maxWidth: 300,
+            },
+          },
+          arrow: {
+            sx: {
+              color: "common.white",
+              "&:before": {
                 border: "1px solid",
                 borderColor: "divider",
-                maxWidth: 300,
-              },
-            },
-            arrow: {
-              sx: {
-                color: "common.white",
-                "&:before": {
-                  border: "1px solid",
-                  borderColor: "divider",
-                },
               },
             },
           },
+        },
+      };
+
+      // Updated DeliveryCell to accept cargoNo prop
+      const DeliveryCellByCargo = ({ row, cargoNo }: any) => {
+        const [deliveryModalOpen, setDeliveryModalOpen] = useState(false);
+
+        // Find the delivery for this specific cargo number
+        const getDeliveryForCargo = () => {
+          if (!row.deliveries) return null;
+
+          for (const [period, delivery] of Object.entries(row.deliveries)) {
+            const deliveryInfo = delivery as any;
+            if (
+              deliveryInfo?.cargoNo &&
+              String(deliveryInfo.cargoNo).trim() === cargoNo
+            ) {
+              return { period, delivery: deliveryInfo };
+            }
+          }
+          return null;
         };
 
-        return {
-          key: `delivery_${period}`,
-          name: formatPeriodLabel(period, cargoNo || ""),
-          width: 180,
-          resizable: false,
-          renderCell: (props: any) => (
-            <Tooltip {...tooltipProps}>
-              <span>
-                <DeliveryCell row={props.row} period={period} />
-              </span>
-            </Tooltip>
-          ),
-          renderHeaderCell: (props: any) => (
-            <Tooltip {...tooltipProps}>
-              <Box
-                sx={{
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  height: "100%",
-                  padding: "8px 4px",
-                  maxWidth: "500px",
-                  textWrap: "wrap",
-                }}
+        const deliveryData = getDeliveryForCargo();
+
+        if (!deliveryData) {
+          return (
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                height: "100%",
+                color: "text.disabled",
+              }}
+            >
+              <Typography variant="caption">-</Typography>
+            </Box>
+          );
+        }
+
+        const { period, delivery } = deliveryData;
+        const status = delivery.status || "NSO";
+
+        return (
+          <>
+            <Box
+              sx={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 0.5,
+                height: "100%",
+                cursor: "pointer",
+                p: 1,
+                borderRadius: 1,
+                "&:hover": {
+                  backgroundColor: alpha("#8CC21B", 0.05),
+                },
+              }}
+              onClick={() => setDeliveryModalOpen(true)}
+            >
+              <Typography
+                variant="body2"
+                fontWeight={600}
+                sx={{ fontSize: "14px" }}
               >
-                <div className="flex gap-0 text-sm flex-col">
-                  <span>{formatPeriodLabel(period, cargoNo || "")}</span>
-                  {cargoStatus && (
-                    <span className="w-max h-max p-1 px-3 text-xs bg-yellow-500 text-white rounded-full">
-                      {cargoStatus}
-                    </span>
+                {delivery.quantity || 0}
+              </Typography>
+              <Chip
+                label={status}
+                size="small"
+                color={"primary"}
+                sx={{
+                  fontSize: "0.65rem",
+                  height: 18,
+                  borderRadius: 1,
+                }}
+              />
+            </Box>
+
+            <Dialog
+              open={deliveryModalOpen}
+              onClose={() => setDeliveryModalOpen(false)}
+              maxWidth="md"
+              fullWidth
+            >
+              <DialogTitle>
+                <Box
+                  sx={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                  }}
+                >
+                  <Typography variant="h6">
+                    Delivery Details -{" "}
+                    {formatCargoColumnLabel(cargoNo, period, delivery.eta)}
+                  </Typography>
+                  <IconButton
+                    onClick={() => setDeliveryModalOpen(false)}
+                    size="small"
+                  >
+                    <X />
+                  </IconButton>
+                </Box>
+              </DialogTitle>
+              <DialogContent>
+                <Grid container spacing={3} sx={{ mt: 1 }}>
+                  <Grid item xs={12} md={6}>
+                    <Typography variant="subtitle2" gutterBottom>
+                      Article Information
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      <strong>Name:</strong> {row.articleName}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      <strong>Article Number:</strong> {row.articleNumber}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      <strong>Artikelnr:</strong> {row.item_no_de}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <Typography variant="subtitle2" gutterBottom>
+                      Delivery Information
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      <strong>Quantity:</strong> {delivery.quantity || 0}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      <strong>Status:</strong>{" "}
+                      <Chip label={status} size="small" color={"primary"} />
+                    </Typography>
+                    {delivery.eta && (
+                      <Typography variant="body2" color="text.secondary">
+                        <strong>ETA:</strong>{" "}
+                        {new Date(delivery.eta).toLocaleDateString()}
+                      </Typography>
+                    )}
+                    <Typography variant="body2" color="text.secondary">
+                      <strong>Cargo Number:</strong> {cargoNo}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      <strong>Period:</strong> {period}
+                    </Typography>
+                  </Grid>
+                </Grid>
+              </DialogContent>
+            </Dialog>
+          </>
+        );
+      };
+
+      return {
+        key: `cargo_${cargoNo}`,
+        name: formatCargoColumnLabel(
+          cargoNo,
+          cargoData?.period || "",
+          cargoData?.eta
+        ),
+        width: 180,
+        resizable: false,
+        renderCell: (props: any) => (
+          <Tooltip {...tooltipProps}>
+            <span>
+              <DeliveryCellByCargo row={props.row} cargoNo={cargoNo} />
+            </span>
+          </Tooltip>
+        ),
+        renderHeaderCell: () => (
+          <Tooltip {...tooltipProps}>
+            <Box
+              sx={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                height: "100%",
+                padding: "8px 4px",
+                textWrap: "wrap",
+              }}
+            >
+              <div className="flex gap-0 text-sm flex-col">
+                <span>
+                  {formatCargoColumnLabel(
+                    cargoNo,
+                    cargoData?.period || "",
+                    cargoData?.eta
                   )}
-                  {eta && (
-                    <span>
-                      Eta: <span className="font-medium">{formatEta(eta)}</span>
+                </span>
+                {cargoData?.cargoStatus && (
+                  <span className="w-max h-max p-1 px-3 text-xs bg-yellow-500 text-white rounded-full">
+                    {cargoData.cargoStatus}
+                  </span>
+                )}
+                {cargoData?.eta && (
+                  <span>
+                    ETA:{" "}
+                    <span className="font-medium">
+                      {formatEta(cargoData.eta)}
                     </span>
-                  )}
-                </div>
-              </Box>
-            </Tooltip>
-          ),
-        };
-      }
-    );
+                  </span>
+                )}
+              </div>
+            </Box>
+          </Tooltip>
+        ),
+      };
+    });
 
     const endColumns: any = [
       {
@@ -3230,11 +3484,13 @@ const ListManagerPage: React.FC = () => {
 
     return [...baseColumns, ...deliveryColumns, ...endColumns];
   }, [
-    deliveryPeriodsData,
+    currentList?.items,
     selectedRows,
     handleUpdateItem,
     isEditable,
-    currentList,
+    companyName,
+    currentListId,
+    router,
   ]);
 
   if (isLoading) {
@@ -3296,7 +3552,12 @@ const ListManagerPage: React.FC = () => {
               }}
             >
               <Box
-                sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5 }}
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 1,
+                  mb: 0.5,
+                }}
               >
                 <IconButton
                   onClick={() => window.history.back()}
