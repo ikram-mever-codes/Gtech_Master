@@ -190,6 +190,51 @@ const DeliveryHistoryTab = ({ items, isMobile }: any) => {
     }
   }
 
+  // Utility function to parse ETA dates for proper sorting
+  function parseEtaForSorting(etaDate: any): number {
+    if (!etaDate) return Number.MAX_SAFE_INTEGER; // Put items without ETA at the end
+
+    try {
+      // Handle different date formats
+      if (typeof etaDate === "string") {
+        // Try parsing as ISO string first
+        const isoDate = new Date(etaDate);
+        if (!isNaN(isoDate.getTime())) {
+          return isoDate.getTime();
+        }
+
+        // Try parsing German date format (DD.MM.YYYY)
+        const germanFormatMatch = etaDate.match(
+          /(\d{1,2})\.(\d{1,2})\.(\d{4})/
+        );
+        if (germanFormatMatch) {
+          const [, day, month, year] = germanFormatMatch;
+          const date = new Date(
+            parseInt(year),
+            parseInt(month) - 1,
+            parseInt(day)
+          );
+          return date.getTime();
+        }
+
+        // Try parsing other common formats
+        const date = new Date(etaDate);
+        if (!isNaN(date.getTime())) {
+          return date.getTime();
+        }
+      } else if (typeof etaDate === "number") {
+        // Assume it's already a timestamp
+        return etaDate;
+      }
+
+      // If all parsing fails, put at the end
+      return Number.MAX_SAFE_INTEGER;
+    } catch (error) {
+      console.warn("Failed to parse ETA date:", etaDate, error);
+      return Number.MAX_SAFE_INTEGER;
+    }
+  }
+
   // Process and combine deliveries from all items - UPDATED to handle unique cargos
   const deliveryHistory = useMemo(() => {
     const deliveryMap = new Map();
@@ -214,6 +259,8 @@ const DeliveryHistoryTab = ({ items, isMobile }: any) => {
                 totalQuantity: 0,
                 itemCount: 0,
                 items: [],
+                // Add parsed ETA for sorting
+                parsedEta: parseEtaForSorting(delivery.eta),
               });
             }
 
@@ -257,17 +304,14 @@ const DeliveryHistoryTab = ({ items, isMobile }: any) => {
       );
     }
 
-    // Sort the array
+    // Sort the array with proper ETA handling
     historyArray.sort((a: any, b: any) => {
       let comparison = 0;
 
       switch (sortBy) {
         case "eta":
-          if (!a.eta && !b.eta) comparison = 0;
-          else if (!a.eta) comparison = 1;
-          else if (!b.eta) comparison = -1;
-          else
-            comparison = new Date(a.eta).getTime() - new Date(b.eta).getTime();
+          // Use the pre-parsed ETA values for consistent sorting
+          comparison = a.parsedEta - b.parsedEta;
           break;
         case "period":
           comparison = a.period.localeCompare(b.period);
@@ -322,6 +366,7 @@ const DeliveryHistoryTab = ({ items, isMobile }: any) => {
     }
   };
 
+  // Rest of the component remains the same...
   if (isMobile) {
     // Mobile view with accordions
     return (
@@ -510,7 +555,7 @@ const DeliveryHistoryTab = ({ items, isMobile }: any) => {
     );
   }
 
-  // Desktop table view
+  // Desktop table view (also needs the same ETA sorting fix)
   return (
     <Box sx={{ p: 3 }}>
       {/* Search and Info Bar */}
@@ -2941,6 +2986,197 @@ const ListManagerPage: React.FC = () => {
 
   const dispatch = useDispatch();
 
+  // Enhanced function to extract unique cargo numbers with proper ETA sorting
+  function extractUniqueCargos(items: any[]): {
+    sortedCargos: string[];
+    cargoDataMap: Map<
+      string,
+      { period: string; eta?: number; cargoStatus?: string; parsedEta: number }
+    >;
+  } {
+    const cargoMap = new Map<
+      string,
+      { period: string; eta?: number; cargoStatus?: string; parsedEta: number }
+    >();
+
+    // Utility function to parse ETA dates for proper sorting
+    function parseEtaForSorting(etaDate: any): number {
+      if (!etaDate) return Number.MAX_SAFE_INTEGER; // Put items without ETA at the end
+
+      try {
+        // Handle different date formats
+        if (typeof etaDate === "string") {
+          // Try parsing as ISO string first
+          const isoDate = new Date(etaDate);
+          if (!isNaN(isoDate.getTime())) {
+            return isoDate.getTime();
+          }
+
+          // Try parsing German date format (DD.MM.YYYY)
+          const germanFormatMatch = etaDate.match(
+            /(\d{1,2})\.(\d{1,2})\.(\d{4})/
+          );
+          if (germanFormatMatch) {
+            const [, day, month, year] = germanFormatMatch;
+            const date = new Date(
+              parseInt(year),
+              parseInt(month) - 1,
+              parseInt(day)
+            );
+            return date.getTime();
+          }
+
+          // Try parsing other common formats
+          const date = new Date(etaDate);
+          if (!isNaN(date.getTime())) {
+            return date.getTime();
+          }
+        } else if (typeof etaDate === "number") {
+          // Assume it's already a timestamp
+          return etaDate;
+        }
+
+        // If all parsing fails, put at the end
+        return Number.MAX_SAFE_INTEGER;
+      } catch (error) {
+        console.warn("Failed to parse ETA date:", etaDate, error);
+        return Number.MAX_SAFE_INTEGER;
+      }
+    }
+
+    items.forEach((item) => {
+      if (item.deliveries) {
+        Object.entries(item.deliveries).forEach(
+          ([period, deliveryDetails]: [string, any]) => {
+            if (deliveryDetails?.cargoNo) {
+              const cargoNo = String(deliveryDetails.cargoNo).trim();
+
+              // Skip invalid cargo numbers
+              if (
+                !cargoNo ||
+                cargoNo === "null" ||
+                cargoNo === "undefined" ||
+                cargoNo === ""
+              ) {
+                return;
+              }
+
+              const parsedEta = parseEtaForSorting(deliveryDetails.eta);
+
+              // If cargo doesn't exist or current ETA is earlier, update it
+              if (!cargoMap.has(cargoNo)) {
+                cargoMap.set(cargoNo, {
+                  period: period,
+                  eta: deliveryDetails.eta,
+                  cargoStatus: deliveryDetails.cargoStatus,
+                  parsedEta: parsedEta,
+                });
+              } else {
+                // Update if this instance has an earlier ETA
+                const existing = cargoMap.get(cargoNo)!;
+                if (parsedEta < existing.parsedEta) {
+                  cargoMap.set(cargoNo, {
+                    period: period,
+                    eta: deliveryDetails.eta,
+                    cargoStatus: deliveryDetails.cargoStatus,
+                    parsedEta: parsedEta,
+                  });
+                }
+              }
+            }
+          }
+        );
+      }
+    });
+
+    // Sort cargo numbers by parsed ETA, then alphabetically
+    const sortedCargos = Array.from(cargoMap.keys()).sort((a, b) => {
+      const dataA = cargoMap.get(a)!;
+      const dataB = cargoMap.get(b)!;
+
+      // Sort by parsed ETA first
+      const etaComparison = dataA.parsedEta - dataB.parsedEta;
+      if (etaComparison !== 0) {
+        return etaComparison;
+      }
+
+      // If same ETA, sort alphabetically by cargo number
+      return a.localeCompare(b);
+    });
+
+    return {
+      sortedCargos,
+      cargoDataMap: cargoMap,
+    };
+  }
+
+  // Utility function to format ETA dates for display
+  function formatEta(etaDate: any) {
+    if (!etaDate) return null;
+    const now = new Date();
+    const eta = new Date(etaDate);
+    if (isNaN(eta.getTime())) return etaDate;
+
+    const isCurrentYear = eta.getFullYear() === now.getFullYear();
+
+    if (isCurrentYear) {
+      return eta.toLocaleDateString("de-DE", {
+        day: "2-digit",
+        month: "2-digit",
+      });
+    } else {
+      return eta.toLocaleDateString("de-DE");
+    }
+  }
+
+  // Enhanced function to format cargo column labels with proper ETA display
+  function formatCargoColumnLabel(
+    cargoNo: string,
+    period: string,
+    eta?: number
+  ): string {
+    const monthMap: { [key: string]: string } = {
+      "01": "January",
+      "02": "February",
+      "03": "March",
+      "04": "April",
+      "05": "May",
+      "06": "June",
+      "07": "July",
+      "08": "August",
+      "09": "September",
+      "10": "October",
+      "11": "November",
+      "12": "December",
+    };
+
+    let label = "";
+
+    // Format period first (like "September 2025")
+    const periodMatch = period.match(/(\d{4})-(\d{1,2})/);
+    if (periodMatch) {
+      const year = periodMatch[1];
+      const month = periodMatch[2].padStart(2, "0");
+      const monthName = monthMap[month] || `Month ${month}`;
+      label = `${monthName} ${year}`;
+    } else if (period && period.startsWith("no-date-")) {
+      const periodNum = period.replace("no-date-", "");
+      label = `Period ${periodNum}`;
+    } else if (period) {
+      label = period;
+    } else {
+      label = "No Date";
+    }
+
+    // Add cargo number in parentheses
+    if (cargoNo) {
+      label += ` (${cargoNo})`;
+    }
+
+    return label;
+  }
+
+  // In your columns useMemo, update the deliveryColumns generation:
   const columns = useMemo(() => {
     // Extract unique cargos instead of periods
     const deliveryColumnsData = currentList?.items
@@ -3151,26 +3387,9 @@ const ListManagerPage: React.FC = () => {
       },
     ];
 
-    // Generate delivery columns based on unique cargo numbers
+    // Generate delivery columns based on unique cargo numbers - now properly sorted by ETA
     const deliveryColumns = deliveryColumnsData.sortedCargos.map((cargoNo) => {
       const cargoData = deliveryColumnsData.cargoDataMap.get(cargoNo);
-
-      function formatEta(etaDate: any) {
-        if (!etaDate) return null;
-        const eta = new Date(etaDate);
-        if (isNaN(eta.getTime())) return etaDate;
-        const now = new Date();
-        const isCurrentYear = eta.getFullYear() === now.getFullYear();
-
-        if (isCurrentYear) {
-          return eta.toLocaleDateString("de-DE", {
-            day: "2-digit",
-            month: "2-digit",
-          });
-        } else {
-          return eta.toLocaleDateString("de-DE");
-        }
-      }
 
       const statusDescriptions: Record<string, string> = {
         open: "Cargo planned - The shipment is in the planning phase",
@@ -3388,7 +3607,7 @@ const ListManagerPage: React.FC = () => {
           cargoData?.period || "",
           cargoData?.eta
         ),
-        width: 180,
+        width: 250,
         resizable: false,
         renderCell: (props: any) => (
           <Tooltip {...tooltipProps}>

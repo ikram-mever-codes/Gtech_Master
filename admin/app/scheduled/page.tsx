@@ -2470,6 +2470,199 @@ const AdminAllItemsPage = () => {
     return lists.filter((list) => list.customerId === selectedCustomer);
   }, [lists, selectedCustomer]);
 
+  // Enhanced function to extract unique cargo numbers with proper ETA sorting
+  function extractUniqueCargos(items: any[]): {
+    sortedCargos: string[];
+    cargoDataMap: Map<
+      string,
+      { period: string; eta?: number; cargoStatus?: string; parsedEta: number }
+    >;
+  } {
+    const cargoMap = new Map<
+      string,
+      { period: string; eta?: number; cargoStatus?: string; parsedEta: number }
+    >();
+
+    // Utility function to parse ETA dates for proper sorting
+    function parseEtaForSorting(etaDate: any): number {
+      if (!etaDate) return Number.MAX_SAFE_INTEGER; // Put items without ETA at the end
+
+      try {
+        // Handle different date formats
+        if (typeof etaDate === "string") {
+          // Try parsing as ISO string first
+          const isoDate = new Date(etaDate);
+          if (!isNaN(isoDate.getTime())) {
+            return isoDate.getTime();
+          }
+
+          // Try parsing German date format (DD.MM.YYYY)
+          const germanFormatMatch = etaDate.match(
+            /(\d{1,2})\.(\d{1,2})\.(\d{4})/
+          );
+          if (germanFormatMatch) {
+            const [, day, month, year] = germanFormatMatch;
+            const date = new Date(
+              parseInt(year),
+              parseInt(month) - 1,
+              parseInt(day)
+            );
+            return date.getTime();
+          }
+
+          // Try parsing other common formats
+          const date = new Date(etaDate);
+          if (!isNaN(date.getTime())) {
+            return date.getTime();
+          }
+        } else if (typeof etaDate === "number") {
+          // Assume it's already a timestamp
+          return etaDate;
+        }
+
+        // If all parsing fails, put at the end
+        return Number.MAX_SAFE_INTEGER;
+      } catch (error) {
+        console.warn("Failed to parse ETA date:", etaDate, error);
+        return Number.MAX_SAFE_INTEGER;
+      }
+    }
+
+    items.forEach((item) => {
+      if (item.deliveries) {
+        Object.entries(item.deliveries).forEach(
+          ([period, deliveryDetails]: [string, any]) => {
+            if (deliveryDetails?.cargoNo) {
+              const cargoNo = String(deliveryDetails.cargoNo).trim();
+
+              // Skip invalid cargo numbers
+              if (
+                !cargoNo ||
+                cargoNo === "null" ||
+                cargoNo === "undefined" ||
+                cargoNo === ""
+              ) {
+                return;
+              }
+
+              const parsedEta = parseEtaForSorting(deliveryDetails.eta);
+
+              // If cargo doesn't exist or current ETA is earlier, update it
+              if (!cargoMap.has(cargoNo)) {
+                cargoMap.set(cargoNo, {
+                  period: period,
+                  eta: deliveryDetails.eta,
+                  cargoStatus: deliveryDetails.cargoStatus,
+                  parsedEta: parsedEta,
+                });
+              } else {
+                // Update if this instance has an earlier ETA
+                const existing = cargoMap.get(cargoNo)!;
+                if (parsedEta < existing.parsedEta) {
+                  cargoMap.set(cargoNo, {
+                    period: period,
+                    eta: deliveryDetails.eta,
+                    cargoStatus: deliveryDetails.cargoStatus,
+                    parsedEta: parsedEta,
+                  });
+                }
+              }
+            }
+          }
+        );
+      }
+    });
+
+    // Sort cargo numbers by parsed ETA, then alphabetically
+    const sortedCargos = Array.from(cargoMap.keys()).sort((a, b) => {
+      const dataA = cargoMap.get(a)!;
+      const dataB = cargoMap.get(b)!;
+
+      // Sort by parsed ETA first
+      const etaComparison = dataA.parsedEta - dataB.parsedEta;
+      if (etaComparison !== 0) {
+        return etaComparison;
+      }
+
+      // If same ETA, sort alphabetically by cargo number
+      return a.localeCompare(b);
+    });
+
+    return {
+      sortedCargos,
+      cargoDataMap: cargoMap,
+    };
+  }
+
+  // Utility function to format ETA dates for display
+  function formatEta(etaDate: any) {
+    if (!etaDate) return null;
+    const now = new Date();
+    const eta = new Date(etaDate);
+    if (isNaN(eta.getTime())) return etaDate;
+
+    const isCurrentYear = eta.getFullYear() === now.getFullYear();
+
+    if (isCurrentYear) {
+      return eta.toLocaleDateString("de-DE", {
+        day: "2-digit",
+        month: "2-digit",
+      });
+    } else {
+      return eta.toLocaleDateString("de-DE");
+    }
+  }
+
+  // Enhanced function to format cargo column labels with proper ETA display
+  function formatCargoColumnLabel(
+    cargoNo: string,
+    period: string,
+    eta?: number,
+    cargoStatus?: string
+  ): string {
+    const monthMap: { [key: string]: string } = {
+      "01": "January",
+      "02": "February",
+      "03": "March",
+      "04": "April",
+      "05": "May",
+      "06": "June",
+      "07": "July",
+      "08": "August",
+      "09": "September",
+      "10": "October",
+      "11": "November",
+      "12": "December",
+    };
+
+    let label = "";
+
+    // Format period first (like "September 2025")
+    const periodMatch = period.match(/(\d{4})-(\d{1,2})/);
+    if (periodMatch) {
+      const year = periodMatch[1];
+      const month = periodMatch[2].padStart(2, "0");
+      const monthName = monthMap[month] || `Month ${month}`;
+      label = `${monthName} ${year}`;
+    } else if (period && period.startsWith("no-date-")) {
+      // Handle no-date periods
+      const periodNum = period.replace("no-date-", "");
+      label = `Period ${periodNum}`;
+    } else if (period) {
+      label = period;
+    } else {
+      label = "No Date";
+    }
+
+    // Add cargo number in parentheses (like original format)
+    if (cargoNo) {
+      label += ` (${cargoNo})`;
+    }
+
+    return label;
+  }
+
+  // In your columns useMemo, update the deliveryColumns generation with enhanced tooltips:
   const columns = useMemo(() => {
     const baseColumns = [
       {
@@ -2701,47 +2894,128 @@ const AdminAllItemsPage = () => {
       },
     ];
 
-    // Generate delivery columns based on unique cargo numbers
+    // Generate delivery columns based on unique cargo numbers - now properly sorted by ETA
     const deliveryColumns = deliveryColumnsData.sortedCargos.map((cargoNo) => {
       const cargoData = deliveryColumnsData.cargoDataMap.get(cargoNo);
+
+      const statusDescriptions: Record<string, string> = {
+        open: "Cargo planned - The shipment is in the planning phase",
+        packed:
+          "Goods are packed - Items have been prepared and packaged for shipment",
+        shipped:
+          "Cargo is sent out - The shipment has left the origin facility",
+        arrived:
+          "Arrived in Germany - The shipment has reached its destination in Germany",
+      };
+
+      const renderTooltipContent = () => (
+        <Box sx={{ p: 1 }}>
+          <Typography variant="body2" sx={{ fontWeight: "bold", mb: 1 }}>
+            {cargoData?.cargoStatus
+              ? `${cargoData.cargoStatus.toUpperCase()}`
+              : "No Status"}
+          </Typography>
+          <Typography variant="body2">
+            {cargoData?.cargoStatus
+              ? statusDescriptions[cargoData.cargoStatus.toLowerCase()]
+              : "No status information available"}
+          </Typography>
+          {cargoData?.eta && (
+            <Typography variant="body2" sx={{ mt: 1, fontStyle: "italic" }}>
+              Estimated arrival: {formatEta(cargoData.eta)}
+            </Typography>
+          )}
+        </Box>
+      );
+
+      const tooltipProps = {
+        title: renderTooltipContent(),
+        arrow: true,
+        placement: "top" as const,
+        componentsProps: {
+          tooltip: {
+            sx: {
+              bgcolor: "common.white",
+              color: "text.primary",
+              boxShadow: 1,
+              border: "1px solid",
+              borderColor: "divider",
+              maxWidth: 300,
+            },
+          },
+          arrow: {
+            sx: {
+              color: "common.white",
+              "&:before": {
+                border: "1px solid",
+                borderColor: "divider",
+              },
+            },
+          },
+        },
+      };
 
       return {
         key: `cargo_${cargoNo}`,
         name: formatCargoColumnLabel(
           cargoNo,
           cargoData?.period || "",
-          cargoData?.eta
+          cargoData?.eta,
+          cargoData?.cargoStatus
         ),
-        width: 140,
+        width: 250,
         resizable: false,
         renderCell: (props: any) => (
-          <DeliveryCell
-            row={props.row}
-            cargoNo={cargoNo}
-            onUpdateDelivery={handleUpdateDelivery}
-            onAcknowledgeField={handleAcknowledgeField}
-          />
+          <Tooltip {...tooltipProps}>
+            <span>
+              <DeliveryCell
+                row={props.row}
+                cargoNo={cargoNo}
+                onUpdateDelivery={handleUpdateDelivery}
+                onAcknowledgeField={handleAcknowledgeField}
+              />
+            </span>
+          </Tooltip>
         ),
         renderHeaderCell: () => (
-          <Box
-            sx={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-              height: "100%",
-              padding: "8px 4px",
-              textWrap: "wrap",
-            }}
-          >
-            <div>
-              {formatCargoColumnLabel(
-                cargoNo,
-                cargoData?.period || "",
-                cargoData?.eta
-              )}
-            </div>
-          </Box>
+          <Tooltip {...tooltipProps}>
+            <Box
+              sx={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                height: "100%",
+                padding: "8px 4px",
+                textWrap: "wrap",
+                cursor: "help",
+              }}
+            >
+              <div className="flex gap-0 text-sm flex-col items-start">
+                <span>
+                  {formatCargoColumnLabel(
+                    cargoNo,
+                    cargoData?.period || "",
+                    cargoData?.eta,
+                    cargoData?.cargoStatus
+                  )}
+                </span>
+                {cargoData?.cargoStatus && (
+                  <span className="w-max h-max p-1 px-3 text-xs bg-yellow-500 text-white rounded-full mt-1">
+                    {cargoData.cargoStatus}
+                  </span>
+                )}
+                {cargoData?.eta && (
+                  <span className="text-xs text-gray-600 mt-1">
+                    ETA:{" "}
+                    <span className="font-medium">
+                      {formatEta(cargoData.eta)}
+                    </span>
+                  </span>
+                )}
+              </div>
+            </Box>
+          </Tooltip>
         ),
       };
     });
