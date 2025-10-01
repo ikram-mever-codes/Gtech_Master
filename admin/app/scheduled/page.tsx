@@ -2991,7 +2991,7 @@ const AdminAllItemsPage = () => {
                 cursor: "help",
               }}
             >
-              <div className="flex gap-0 text-sm flex-col items-start">
+              <div className="flex gap-0 text-sm flex-col items-center">
                 <span>
                   {formatCargoColumnLabel(
                     cargoNo,

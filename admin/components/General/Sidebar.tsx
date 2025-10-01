@@ -3,7 +3,7 @@
 import { logoutUser } from "@/api/user";
 import { RootState } from "@/app/Redux/store";
 import theme from "@/styles/theme";
-import { Logout } from "@mui/icons-material";
+import { BusinessCenterSharp, Logout } from "@mui/icons-material";
 import {
   Box,
   List,
@@ -77,10 +77,10 @@ const allMenuItems = [
     resource: "Invoices",
   },
   {
-    icon: LucideShoppingCart,
-    text: "Orders",
-    path: "/orders",
-    resource: "Orders",
+    icon: BusinessCenterSharp,
+    text: "Bussinesses",
+    path: "/bussinesses",
+    resource: "Bussinesses",
   },
 
   {

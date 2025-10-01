@@ -26,30 +26,30 @@ async function fetchItemData(itemId: number) {
   try {
     const [itemRows]: any = await connection.query(
       `
-        SELECT 
-          i.*,
-          os.cargo_id,
-          os.status as order_status,
-          oi.qty AS quantity,
-          c.cargo_no,
-          c.pickup_date,
-          c.dep_date,
-          c.cargo_status,
-          c.shipped_at,
-          c.eta,
-          c.remark,
-          c.cargo_type_id,
-          ct.cargo_type,
-          wi.item_name_de,
-          wi.item_no_de 
-              FROM items i
-        LEFT JOIN order_items oi ON i.ItemID_DE = oi.ItemID_DE
-        LEFT JOIN order_statuses os ON oi.master_id = os.master_id AND oi.ItemID_DE = os.ItemID_DE
-        LEFT JOIN cargos c ON os.cargo_id = c.id
-        LEFT JOIN cargo_types ct ON c.cargo_type_id = ct.id
-        LEFT JOIN warehouse_items wi ON i.ItemID_DE = wi.ItemID_DE
-        WHERE i.id = ?
-        `,
+          SELECT 
+            i.*,
+            os.cargo_id,
+            os.status as order_status,
+            oi.qty AS quantity,
+            c.cargo_no,
+            c.pickup_date,
+            c.dep_date,
+            c.cargo_status,
+            c.shipped_at,
+            c.eta,
+            c.remark,
+            c.cargo_type_id,
+            ct.cargo_type,
+            wi.item_name_de,
+            wi.item_no_de 
+                FROM items i
+          LEFT JOIN order_items oi ON i.ItemID_DE = oi.ItemID_DE
+          LEFT JOIN order_statuses os ON oi.master_id = os.master_id AND oi.ItemID_DE = os.ItemID_DE
+          LEFT JOIN cargos c ON os.cargo_id = c.id
+          LEFT JOIN cargo_types ct ON c.cargo_type_id = ct.id
+          LEFT JOIN warehouse_items wi ON i.ItemID_DE = wi.ItemID_DE
+          WHERE i.id = ?
+          `,
       [itemId]
     );
 
@@ -228,7 +228,7 @@ async function fetchItemData(itemId: number) {
   }
 }
 
-async function updateLocalListItem(item: ListItem): Promise<ListItem> {
+export async function updateLocalListItem(item: ListItem): Promise<ListItem> {
   const listItemRepository = AppDataSource.getRepository(ListItem);
 
   try {
@@ -1242,14 +1242,14 @@ export const searchItems = async (
 
     try {
       let query = `
-          SELECT 
-            id, 
-            item_name AS name,
-            ItemID_DE AS articleNumber,
-            photo AS imageUrl
-          FROM items 
-          WHERE (item_name LIKE ? 
-        `;
+            SELECT 
+              id, 
+              item_name AS name,
+              ItemID_DE AS articleNumber,
+              photo AS imageUrl
+            FROM items 
+            WHERE (item_name LIKE ? 
+          `;
 
       const params: any[] = [searchTerm];
 
@@ -1260,9 +1260,9 @@ export const searchItems = async (
       }
 
       query += `)
-          AND photo IS NOT NULL
-          AND photo != ''
-          LIMIT 10`;
+            AND photo IS NOT NULL
+            AND photo != ''
+            LIMIT 10`;
 
       const [items]: any = await connection.query(query, params);
 
@@ -1333,30 +1333,118 @@ export const getCustomerLists = async (
   }
 };
 
-// 13. Get All Lists (Admin view) - UPDATED
 export const getAllLists = async (
   req: Request,
   res: Response,
   next: NextFunction
 ) => {
   try {
+    const { refresh = "true" } = req.query; // Add optional refresh parameter
+    const shouldRefresh = refresh === "true";
+
     const listRepository = AppDataSource.getRepository(List);
+    const listItemRepository = AppDataSource.getRepository(ListItem);
+
+    console.log(`Fetching all lists. Refresh from MIS: ${shouldRefresh}`);
+
+    // Fetch all lists with their relationships
     const lists = await listRepository.find({
       relations: ["customer", "items", "createdBy.user", "createdBy.customer"],
+      order: { createdAt: "DESC" },
     });
 
+    console.log(`Found ${lists.length} lists`);
+
+    let totalItems = 0;
+    let refreshedItems = 0;
+    let failedRefreshes = 0;
+
+    // Refresh all items from MIS if requested
+    if (shouldRefresh) {
+      console.log("Refreshing all items from MIS...");
+
+      for (const list of lists) {
+        if (list.items && list.items.length > 0) {
+          totalItems += list.items.length;
+          console.log(
+            `Refreshing ${list.items.length} items for list: ${list.name}`
+          );
+
+          const updatedItems = [];
+
+          for (const item of list.items) {
+            try {
+              // Refresh item data from MIS
+              const refreshedItem = await updateLocalListItem(item);
+              updatedItems.push(refreshedItem);
+              refreshedItems++;
+
+              // Update the item in the database
+              await listItemRepository.save(refreshedItem);
+
+              console.log(`Successfully refreshed item: ${item.articleName}`);
+            } catch (error) {
+              console.error(`Failed to refresh item ${item.id}:`, error);
+              updatedItems.push(item); // Keep the original item if refresh fails
+              failedRefreshes++;
+            }
+          }
+
+          // Update the list with refreshed items
+          list.items = updatedItems;
+
+          // Save the updated list
+          await listRepository.save(list);
+
+          // Log the refresh activity for the list
+          list.addActivityLog(
+            `System refreshed ${updatedItems.length} items from MIS`,
+            USER_ROLE.ADMIN,
+            "system",
+            undefined,
+            "list_refreshed"
+          );
+          await listRepository.save(list);
+        }
+      }
+
+      console.log(
+        `Refresh completed: ${refreshedItems} items refreshed, ${failedRefreshes} failed`
+      );
+    } else {
+      // Just count total items without refreshing
+      totalItems = lists.reduce(
+        (count, list) => count + (list.items?.length || 0),
+        0
+      );
+    }
+
+    // Enhance lists with pending changes information
     const listsWithChanges = lists.map((list) => ({
       ...list,
       pendingChangesCount: list.getPendingFieldChanges().length,
       hasPendingChanges: list.hasPendingChanges(),
+      // Include refresh statistics for each list
+      refreshStats: shouldRefresh
+        ? {
+            itemsRefreshed:
+              list.items?.filter(
+                (item) => item.updatedAt > new Date(Date.now() - 60000) // Items updated in last minute
+              ).length || 0,
+            totalItems: list.items?.length || 0,
+          }
+        : undefined,
     }));
 
     return res.status(200).json({
       success: true,
+      message: shouldRefresh
+        ? `Fetched all lists and refreshed ${refreshedItems} items from MIS`
+        : "Fetched all lists with current data",
       data: listsWithChanges,
     });
   } catch (error) {
-    console.log(error);
+    console.error("Error in getAllLists:", error);
     return next(new ErrorHandler("Failed to fetch lists", 500));
   }
 };

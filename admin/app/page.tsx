@@ -1,7 +1,11 @@
+"use client";
+import { useRouter } from "next/navigation";
 import React from "react";
 
 const page = () => {
-  return <div>page</div>;
+  const router = useRouter();
+
+  return router.push("/scheduled");
 };
 
 export default page;
