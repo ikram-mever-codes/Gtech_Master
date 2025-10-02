@@ -1,7 +1,11 @@
 // controllers/businessController.ts
 import { Request, Response, NextFunction } from "express";
 import { AppDataSource } from "../config/database";
-import { Business, BUSINESS_STATUS } from "../models/bussiness";
+import {
+  Business,
+  BUSINESS_STATUS,
+  BUSINESS_SOURCE,
+} from "../models/bussiness";
 import ErrorHandler from "../utils/errorHandler";
 import { In, Like } from "typeorm";
 
@@ -13,7 +17,7 @@ export const bulkImportBusinesses = async (
   let transactionFailed = false;
 
   try {
-    const { businesses } = req.body;
+    const { businesses, source = BUSINESS_SOURCE.GOOGLE_MAPS } = req.body;
 
     // Validate input
     if (!businesses || !Array.isArray(businesses)) {
@@ -24,7 +28,9 @@ export const bulkImportBusinesses = async (
       return next(new ErrorHandler("Businesses array cannot be empty", 400));
     }
 
-    console.log(`Starting bulk import of ${businesses.length} businesses...`);
+    console.log(
+      `Starting bulk import of ${businesses.length} businesses from source: ${source}...`
+    );
 
     const businessRepository = AppDataSource.getRepository(Business);
 
@@ -111,6 +117,9 @@ export const bulkImportBusinesses = async (
         business.website = normalizedWebsite;
         business.hasWebsite = !!normalizedWebsite; // This will be true if website exists, false otherwise
 
+        // Set source from import parameter or from business data
+        business.source = businessData.source || source;
+
         // Optional fields with proper sanitization
         business.description = businessData.description
           ? businessData.description.trim()
@@ -179,6 +188,7 @@ export const bulkImportBusinesses = async (
         console.log(`Prepared business for import: ${business.name}`, {
           hasWebsite: business.hasWebsite,
           website: business.website,
+          source: business.source,
         });
       } catch (error: any) {
         results.errors++;
@@ -241,6 +251,7 @@ export const bulkImportBusinesses = async (
       skippedInvalidData: results.skippedInvalidData,
       duplicates: results.duplicates,
       errors: results.errors,
+      source: source,
     });
 
     // Debug: Log what happened to each business
@@ -250,7 +261,11 @@ export const bulkImportBusinesses = async (
       const hasAddress = !!biz.address;
       const hasWebsite = !!biz.website;
       console.log(
-        `Business ${index}: ${biz.name} - name:${hasName} address:${hasAddress} website:${hasWebsite}`
+        `Business ${index}: ${
+          biz.name
+        } - name:${hasName} address:${hasAddress} website:${hasWebsite} source:${
+          biz.source || source
+        }`
       );
     });
 
@@ -274,62 +289,6 @@ export const bulkImportBusinesses = async (
     );
   }
 };
-
-// Helper functions (keep these the same)
-function sanitizeNumber(value: any): any {
-  if (value === null || value === undefined) return null;
-  const num = parseFloat(value);
-  return isNaN(num) ? null : num;
-}
-
-function sanitizeInteger(value: any): any {
-  if (value === null || value === undefined) return null;
-  const num = parseInt(value);
-  return isNaN(num) ? null : num;
-}
-
-function sanitizeRating(value: any): any {
-  const num = sanitizeNumber(value);
-  return num !== null && num >= 0 && num <= 5 ? Number(num.toFixed(2)) : null;
-}
-
-function sanitizeSocialMedia(socialMedia: any): any {
-  if (!socialMedia || typeof socialMedia !== "object") return null;
-
-  const sanitized: any = {};
-  const platforms = ["facebook", "instagram", "linkedin", "twitter"];
-
-  platforms.forEach((platform) => {
-    if (socialMedia[platform] && typeof socialMedia[platform] === "string") {
-      sanitized[platform] = socialMedia[platform].trim();
-    }
-  });
-
-  return Object.keys(sanitized).length > 0 ? sanitized : null;
-}
-
-function sanitizeBusinessHours(hours: any): any {
-  if (!hours || typeof hours !== "object") return null;
-
-  const sanitized: any = {};
-  const days = [
-    "monday",
-    "tuesday",
-    "wednesday",
-    "thursday",
-    "friday",
-    "saturday",
-    "sunday",
-  ];
-
-  days.forEach((day) => {
-    if (hours[day] && typeof hours[day] === "string") {
-      sanitized[day] = hours[day].trim();
-    }
-  });
-
-  return Object.keys(sanitized).length > 0 ? sanitized : null;
-}
 
 // 2. Create Single Business
 export const createBusiness = async (
@@ -359,6 +318,7 @@ export const createBusiness = async (
       additionalCategories,
       socialMedia,
       businessHours,
+      source = BUSINESS_SOURCE.MANUAL, // Default to MANUAL for single creation
     } = req.body;
 
     if (!name || !address) {
@@ -415,6 +375,7 @@ export const createBusiness = async (
       additionalCategories: additionalCategories || [],
       socialMedia: socialMedia || null,
       businessHours: businessHours || null,
+      source: source,
       status: BUSINESS_STATUS.ACTIVE,
       lastVerifiedAt: new Date(),
     });
@@ -442,11 +403,16 @@ export const getAllBusinesses = async (
       page = 1,
       limit = 10,
       search,
+      postalCode, // Add postalCode
       category,
       city,
       country,
       hasWebsite,
       status,
+      source,
+      minRating, // Add minRating
+      maxRating, // Add maxRating
+      verified, // Add verified
     } = req.query;
 
     const pageNum = parseInt(page as string);
@@ -459,9 +425,16 @@ export const getAllBusinesses = async (
     // Apply filters
     if (search) {
       queryBuilder.andWhere(
-        "(business.name LIKE :search OR business.description LIKE :search OR business.address LIKE :search)",
+        "(business.name LIKE :search OR business.description LIKE :search OR business.address LIKE :search OR business.email LIKE :search OR business.phoneNumber LIKE :search)",
         { search: `%${search}%` }
       );
+    }
+
+    // Add postal code filter - exact match for precision
+    if (postalCode) {
+      queryBuilder.andWhere("business.postalCode = :postalCode", {
+        postalCode: postalCode.toString().trim().toUpperCase(),
+      });
     }
 
     if (category) {
@@ -484,6 +457,58 @@ export const getAllBusinesses = async (
 
     if (status) {
       queryBuilder.andWhere("business.status = :status", { status });
+    }
+
+    if (source) {
+      queryBuilder.andWhere("business.source = :source", { source });
+    }
+
+    // Add rating filters
+    if (minRating !== undefined) {
+      const minRatingNum = parseFloat(minRating as string);
+      if (!isNaN(minRatingNum)) {
+        queryBuilder.andWhere("business.averageRating >= :minRating", {
+          minRating: minRatingNum,
+        });
+      }
+    }
+
+    if (maxRating !== undefined) {
+      const maxRatingNum = parseFloat(maxRating as string);
+      if (!isNaN(maxRatingNum)) {
+        queryBuilder.andWhere("business.averageRating <= :maxRating", {
+          maxRating: maxRatingNum,
+        });
+      }
+    }
+
+    // Add both rating filters together for range
+    if (minRating !== undefined && maxRating !== undefined) {
+      const minRatingNum = parseFloat(minRating as string);
+      const maxRatingNum = parseFloat(maxRating as string);
+      if (!isNaN(minRatingNum) && !isNaN(maxRatingNum)) {
+        queryBuilder.andWhere(
+          "business.averageRating BETWEEN :minRating AND :maxRating",
+          {
+            minRating: minRatingNum,
+            maxRating: maxRatingNum,
+          }
+        );
+      }
+    }
+
+    // Add verified filter (based on lastVerifiedAt)
+    if (verified !== undefined) {
+      const isVerified = verified === "true";
+      if (isVerified) {
+        queryBuilder.andWhere("business.lastVerifiedAt IS NOT NULL");
+        // Optional: Only consider verified if verified within last 30 days
+        // const thirtyDaysAgo = new Date();
+        // thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        // queryBuilder.andWhere("business.lastVerifiedAt >= :thirtyDaysAgo", { thirtyDaysAgo });
+      } else {
+        queryBuilder.andWhere("business.lastVerifiedAt IS NULL");
+      }
     }
 
     // Get total count
@@ -509,6 +534,7 @@ export const getAllBusinesses = async (
       },
     });
   } catch (error) {
+    console.error("Error fetching businesses:", error);
     return next(new ErrorHandler("Failed to fetch businesses", 500));
   }
 };
@@ -749,6 +775,14 @@ export const getBusinessStatistics = async (
       .limit(10)
       .getRawMany();
 
+    // Count by source
+    const sourceCounts = await businessRepository
+      .createQueryBuilder("business")
+      .select("business.source, COUNT(*) as count")
+      .groupBy("business.source")
+      .orderBy("count", "DESC")
+      .getRawMany();
+
     return res.status(200).json({
       success: true,
       data: {
@@ -757,6 +791,7 @@ export const getBusinessStatistics = async (
         withoutWebsite: businessesWithoutWebsite,
         byStatus: statusCounts,
         topCountries: countryCounts,
+        bySource: sourceCounts,
       },
     });
   } catch (error) {
@@ -796,3 +831,59 @@ export const bulkUpdateStatus = async (
     return next(new ErrorHandler("Failed to update business status", 500));
   }
 };
+
+// Helper functions (keep these the same)
+function sanitizeNumber(value: any): any {
+  if (value === null || value === undefined) return null;
+  const num = parseFloat(value);
+  return isNaN(num) ? null : num;
+}
+
+function sanitizeInteger(value: any): any {
+  if (value === null || value === undefined) return null;
+  const num = parseInt(value);
+  return isNaN(num) ? null : num;
+}
+
+function sanitizeRating(value: any): any {
+  const num = sanitizeNumber(value);
+  return num !== null && num >= 0 && num <= 5 ? Number(num.toFixed(2)) : null;
+}
+
+function sanitizeSocialMedia(socialMedia: any): any {
+  if (!socialMedia || typeof socialMedia !== "object") return null;
+
+  const sanitized: any = {};
+  const platforms = ["facebook", "instagram", "linkedin", "twitter"];
+
+  platforms.forEach((platform) => {
+    if (socialMedia[platform] && typeof socialMedia[platform] === "string") {
+      sanitized[platform] = socialMedia[platform].trim();
+    }
+  });
+
+  return Object.keys(sanitized).length > 0 ? sanitized : null;
+}
+
+function sanitizeBusinessHours(hours: any): any {
+  if (!hours || typeof hours !== "object") return null;
+
+  const sanitized: any = {};
+  const days = [
+    "monday",
+    "tuesday",
+    "wednesday",
+    "thursday",
+    "friday",
+    "saturday",
+    "sunday",
+  ];
+
+  days.forEach((day) => {
+    if (hours[day] && typeof hours[day] === "string") {
+      sanitized[day] = hours[day].trim();
+    }
+  });
+
+  return Object.keys(sanitized).length > 0 ? sanitized : null;
+}

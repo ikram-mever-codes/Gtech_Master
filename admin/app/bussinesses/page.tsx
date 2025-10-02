@@ -16,6 +16,8 @@ import {
   XMarkIcon,
   ArrowDownTrayIcon,
   ChartBarIcon,
+  CalendarIcon,
+  TagIcon,
 } from "@heroicons/react/24/outline";
 import {
   CheckIcon,
@@ -30,6 +32,7 @@ import {
 } from "@/api/bussiness";
 import { useRouter } from "next/navigation";
 import CustomButton from "@/components/UI/CustomButton";
+import { Plus } from "lucide-react";
 
 interface FilterState {
   search: string;
@@ -42,6 +45,7 @@ interface FilterState {
   minRating: string;
   maxRating: string;
   verified: string;
+  source: string;
 }
 
 const BusinessSearchPage: React.FC = () => {
@@ -67,12 +71,44 @@ const BusinessSearchPage: React.FC = () => {
     minRating: "",
     maxRating: "",
     verified: "",
+    source: "",
   });
 
   const [categories, setCategories] = useState<string[]>([]);
   const [cities, setCities] = useState<string[]>([]);
   const [countries, setCountries] = useState<string[]>([]);
+  const [sources, setSources] = useState<string[]>([]);
   const router = useRouter();
+
+  // Format date function
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  };
+
+  // Get source badge color
+  const getSourceBadgeColor = (source: string) => {
+    switch (source) {
+      case "Shop":
+        return "bg-blue-100 text-blue-700";
+      case "Anfrage":
+        return "bg-green-100 text-green-700";
+      case "Empfehlung":
+        return "bg-purple-100 text-purple-700";
+      case "Suche":
+        return "bg-amber-100 text-amber-700";
+      case "Manual":
+        return "bg-gray-100 text-gray-700";
+      case "Google Maps":
+        return "bg-red-100 text-red-700";
+      default:
+        return "bg-gray-100 text-gray-700";
+    }
+  };
 
   // Debounced search function
   const debouncedSearch = useCallback((searchFilters: SearchFilters) => {
@@ -86,6 +122,7 @@ const BusinessSearchPage: React.FC = () => {
         page: currentPage,
         limit: itemsPerPage,
         search: filters.search,
+        postalCode: filters.postalCode,
         city: filters.city,
         country: filters.country,
         category: filters.category,
@@ -96,6 +133,13 @@ const BusinessSearchPage: React.FC = () => {
             ? false
             : undefined,
         status: filters.status,
+        source: filters.source || undefined,
+        minRating: filters.minRating
+          ? parseFloat(filters.minRating)
+          : undefined,
+        maxRating: filters.maxRating
+          ? parseFloat(filters.maxRating)
+          : undefined,
       };
 
       const response = await getAllBusinesses(searchFilters);
@@ -128,10 +172,18 @@ const BusinessSearchPage: React.FC = () => {
                 .filter(Boolean)
             ),
           ];
+          const uniqueSources: any = [
+            ...new Set(
+              response.data.businesses
+                .map((b: Business) => b.source)
+                .filter(Boolean)
+            ),
+          ];
 
           setCategories(uniqueCategories);
           setCities(uniqueCities);
           setCountries(uniqueCountries);
+          setSources(uniqueSources);
         }
       }
     } catch (error) {
@@ -151,6 +203,7 @@ const BusinessSearchPage: React.FC = () => {
       page: 1,
       limit: itemsPerPage,
       search: filters.search,
+      postalCode: filters.postalCode,
       city: filters.city,
       country: filters.country,
       category: filters.category,
@@ -161,11 +214,14 @@ const BusinessSearchPage: React.FC = () => {
           ? false
           : undefined,
       status: filters.status,
+      source: filters.source || undefined,
+      minRating: filters.minRating ? parseFloat(filters.minRating) : undefined,
+      maxRating: filters.maxRating ? parseFloat(filters.maxRating) : undefined,
     };
 
     setCurrentPage(1);
     debouncedSearch(searchFilters);
-  }, [filters]);
+  }, [filters, itemsPerPage, debouncedSearch]);
 
   const handleSelectAll = () => {
     if (selectedBusinesses.size === businesses.length) {
@@ -201,6 +257,7 @@ const BusinessSearchPage: React.FC = () => {
       minRating: "",
       maxRating: "",
       verified: "",
+      source: "",
     });
   };
 
@@ -261,8 +318,21 @@ const BusinessSearchPage: React.FC = () => {
               <FunnelIcon className="w-5 h-5" />
               Filters
             </button>
-            <CustomButton gradient={true} onClick={handleExport}>
-              <ArrowDownTrayIcon className="w-5 h-5" />
+            <CustomButton
+              startIcon={<Plus className="w-5 h-5" />}
+              gradient={true}
+              onClick={() => {
+                router.push("/bussinesses/new");
+              }}
+            >
+              Add New
+            </CustomButton>
+
+            <CustomButton
+              startIcon={<ArrowDownTrayIcon className="w-5 h-5" />}
+              gradient={true}
+              onClick={handleExport}
+            >
               Import CSV
             </CustomButton>
             <button
@@ -325,10 +395,12 @@ const BusinessSearchPage: React.FC = () => {
                   type="text"
                   placeholder="Enter postal code"
                   value={filters.postalCode}
-                  onChange={(e) =>
-                    setFilters({ ...filters, postalCode: e.target.value })
-                  }
+                  onChange={(e) => {
+                    const value = e.target.value.toUpperCase();
+                    setFilters({ ...filters, postalCode: value });
+                  }}
                   className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                  pattern="[A-Z0-9\s-]*"
                 />
               </div>
 
@@ -425,6 +497,26 @@ const BusinessSearchPage: React.FC = () => {
                   <option value="active">Active</option>
                   <option value="inactive">Inactive</option>
                   <option value="no_website">No Website</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  Source
+                </label>
+                <select
+                  value={filters.source}
+                  onChange={(e) =>
+                    setFilters({ ...filters, source: e.target.value })
+                  }
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                >
+                  <option value="">All Sources</option>
+                  {sources.map((source) => (
+                    <option key={source} value={source}>
+                      {source}
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -583,11 +675,17 @@ const BusinessSearchPage: React.FC = () => {
                         Status
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                        Source
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                        Added On
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                         Actions
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y w-max   divide-gray-100">
+                  <tbody className="divide-y w-max divide-gray-100">
                     {businesses.map((business) => (
                       <tr
                         key={business.id}
@@ -638,9 +736,9 @@ const BusinessSearchPage: React.FC = () => {
                             )}
                           </div>
                         </td>
-                        <td className="px-4 py-3 w-[250px] ">
+                        <td className="px-4 py-3 w-[250px]">
                           {business.category && (
-                            <span className="px-3 py-2 text-xs    bg-blue-50 text-blue-700 rounded-md font-medium">
+                            <span className="px-3 py-2 text-xs bg-blue-50 text-blue-700 rounded-md font-medium">
                               {business.category}
                             </span>
                           )}
@@ -648,9 +746,8 @@ const BusinessSearchPage: React.FC = () => {
                         <td className="px-4 py-3">
                           {business.website ? (
                             <a
-                              href={business.website}
+                              href={`https://${business.website}`}
                               target="_blank"
-                              rel="noopener noreferrer"
                               className="text-primary hover:underline flex items-center gap-1"
                             >
                               <GlobeAltIcon className="w-4 h-4" />
@@ -683,31 +780,30 @@ const BusinessSearchPage: React.FC = () => {
                           {getStatusBadge(business)}
                         </td>
                         <td className="px-4 py-3">
+                          {business.source ? (
+                            <span
+                              className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-full ${getSourceBadgeColor(
+                                business.source
+                              )}`}
+                            >
+                              <TagIcon className="w-3 h-3" />
+                              {business.source}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400">-</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2 text-sm text-gray-600">
+                            <CalendarIcon className="w-4 h-4" />
+                            {business.createdAt
+                              ? formatDate(business.createdAt)
+                              : "-"}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
                           <div className="flex items-center gap-2">
-                            {/* <button
-                              onClick={() =>
-                                window.open(
-                                  `/businesses/${business.id}`,
-                                  "_blank"
-                                )
-                              }
-                              className="text-primary hover:text-primary-600"
-                              title="View Details"
-                            >
-                              View
-                            </button>
-                            <button
-                              onClick={() =>
-                                window.open(
-                                  `/businesses/${business.id}/edit`,
-                                  "_blank"
-                                )
-                              }
-                              className="text-gray-600 hover:text-gray-800"
-                              title="Edit"
-                            >
-                              Edit
-                            </button> */}
+                            {/* Action buttons can be added here */}
                           </div>
                         </td>
                       </tr>

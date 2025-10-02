@@ -281,14 +281,7 @@ const Sidebar = () => {
                     transition: "color 0.2s ease",
                   }}
                 >
-                  <item.icon
-                    color={
-                      activePath === item.path || activePath.includes(item.path)
-                        ? "white"
-                        : "#777777"
-                    }
-                    size={20}
-                  />
+                  <item.icon size={20} />
                 </ListItemIcon>
 
                 <Typography

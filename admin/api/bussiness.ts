@@ -11,6 +11,7 @@ export interface Business {
   description?: string;
   address: string;
   city?: string;
+  source: any;
   state?: string;
   country?: string;
   postalCode?: string;
@@ -103,11 +104,16 @@ export interface SearchFilters {
   page?: number;
   limit?: number;
   search?: string;
-  category?: string;
+  postalCode?: string;
   city?: string;
   country?: string;
+  category?: string;
+  source?: any;
   hasWebsite?: boolean;
   status?: string;
+  minRating?: number;
+  maxRating?: number;
+  verified?: boolean;
 }
 
 export interface LocationSearchPayload {

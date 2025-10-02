@@ -13,6 +13,15 @@ export enum BUSINESS_STATUS {
   NO_WEBSITE = "no_website",
 }
 
+export enum BUSINESS_SOURCE {
+  SHOP = "Shop",
+  INQUIRY = "Anfrage",
+  RECOMMENDATION = "Empfehlung",
+  SEARCH = "Suche",
+  MANUAL = "Manual",
+  GOOGLE_MAPS = "Google Maps",
+}
+
 @Entity()
 export class Business {
   @PrimaryGeneratedColumn("uuid")
@@ -92,6 +101,14 @@ export class Business {
     saturday?: string;
     sunday?: string;
   };
+
+  // Source of the business entry
+  @Column({
+    type: "enum",
+    enum: BUSINESS_SOURCE,
+    default: BUSINESS_SOURCE.SHOP,
+  })
+  source!: BUSINESS_SOURCE;
 
   // Status and Import Management
   @Column({
