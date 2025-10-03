@@ -248,11 +248,12 @@ export class List {
     oldValue: any,
     newValue: any,
     userRole: USER_ROLE,
+    name: string,
     userId: string,
     itemId?: string,
     itemName?: string
   ): void {
-    const message = `${userRole} changed ${field} value from "${oldValue}" to "${newValue}" at ${new Date().toLocaleString()}`;
+    const message = `${name} changed ${field} value from "${oldValue}" to "${newValue}" at ${new Date().toLocaleString()}`;
 
     this.addActivityLog(
       message,
@@ -639,13 +640,13 @@ export class ListItem {
 
 // Enhanced Utility functions
 export function formatActivityMessage(
-  userRole: USER_ROLE,
+  username: USER_ROLE,
   field: string,
   oldValue: any,
   newValue: any,
   itemName?: string
 ): string {
-  return `${userRole} changed ${field} value from "${oldValue}" to "${newValue}" at ${new Date().toLocaleString()}`;
+  return `${username} changed ${field} value from "${oldValue}" to "${newValue}" at ${new Date().toLocaleString()}`;
 }
 
 export function getUnacknowledgedChangesCount(list: List): number {

@@ -613,6 +613,10 @@ export const updateListItem = async (
       }
     }
 
+    const namee =
+      userRole === USER_ROLE.CUSTOMER
+        ? (req as any).customer?.companyName
+        : (req as any).name;
     if (marked !== undefined && marked !== item.marked) {
       const oldValue = item.marked;
       item.marked = marked;
@@ -621,6 +625,7 @@ export const updateListItem = async (
         oldValue,
         marked,
         userRole,
+        namee,
         performerId,
         item.id,
         item.articleName
@@ -684,7 +689,6 @@ export const updateListItemComment = async (
     const { comment } = req.body;
     const userId = (req as any).user?.id;
     const customerId = (req as any).customer?.id;
-
     if (!itemId) {
       return next(new ErrorHandler("Item ID is required", 400));
     }
@@ -732,6 +736,10 @@ export const updateListItemComment = async (
     // Update the comment directly
     item.comment = comment;
 
+    const namee =
+      userRole === USER_ROLE.CUSTOMER
+        ? (req as any).customer?.companyName
+        : (req as any).user.name;
     // Log the change to the list activity logs
     if (list) {
       list.logFieldChange(
@@ -739,6 +747,7 @@ export const updateListItemComment = async (
         oldComment,
         comment,
         userRole,
+        namee,
         performerId,
         item.id,
         item.articleName
@@ -1567,10 +1576,21 @@ export const updateList = async (
 
     const performerId = userId || customerId || "system";
     const userRole = getUserRole(userId, customerId);
+    const namee =
+      userRole === USER_ROLE.CUSTOMER
+        ? (req as any).customer?.companyName
+        : (req as any).user.name;
     const changes: string[] = [];
 
     if (name !== undefined && name !== list.name) {
-      list.logFieldChange("name", list.name, name, userRole, performerId);
+      list.logFieldChange(
+        "name",
+        list.name,
+        namee,
+        userRole,
+        namee,
+        performerId
+      );
       list.name = name;
       changes.push("name");
     }
@@ -1580,7 +1600,10 @@ export const updateList = async (
         "description",
         list.description,
         description,
+
         userRole,
+
+        namee,
         performerId
       );
       list.description = description;
@@ -1588,7 +1611,14 @@ export const updateList = async (
     }
 
     if (status !== undefined && status !== list.status) {
-      list.logFieldChange("status", list.status, status, userRole, performerId);
+      list.logFieldChange(
+        "status",
+        list.status,
+        status,
+        userRole,
+        namee,
+        performerId
+      );
       list.status = status;
       changes.push("status");
     }
