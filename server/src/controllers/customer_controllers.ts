@@ -3,12 +3,14 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import { Customer } from "../models/customers";
+import { StarCustomerDetails } from "../models/star_customer_details";
 import ErrorHandler from "../utils/errorHandler";
 import sendEmail from "../services/emailService";
 import { AppDataSource } from "../config/database";
 import cloudinary from "../config/cloudinary";
 import fs from "fs";
 import { AuthorizedCustomerRequest } from "../middlewares/authenticateCustomer";
+import { List } from "../models/list";
 
 // 1. Request Customer Account
 export const requestCustomerAccount = async (
@@ -24,11 +26,6 @@ export const requestCustomerAccount = async (
       contactEmail,
       contactPhoneNumber,
       taxNumber,
-      addressLine1,
-      addressLine2,
-      postalCode,
-      city,
-      country,
       deliveryAddressLine1,
       deliveryAddressLine2,
       deliveryPostalCode,
@@ -43,10 +40,6 @@ export const requestCustomerAccount = async (
       !email ||
       !contactEmail ||
       !contactPhoneNumber ||
-      !addressLine1 ||
-      !postalCode ||
-      !city ||
-      !country ||
       !password
     ) {
       return next(
@@ -55,6 +48,9 @@ export const requestCustomerAccount = async (
     }
 
     const customerRepository = AppDataSource.getRepository(Customer);
+    const starCustomerDetailsRepository =
+      AppDataSource.getRepository(StarCustomerDetails);
+
     // Check for existing customer with same company name, email, contact email, or phone
     const existingCustomer = await customerRepository.findOne({
       where: [
@@ -85,31 +81,54 @@ export const requestCustomerAccount = async (
     const emailVerificationCode = crypto.randomBytes(20).toString("hex");
     const emailVerificationExp = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
 
-    // Create customer
-    const customer = customerRepository.create({
-      companyName,
-      legalName,
-      email,
-      contactEmail,
-      contactPhoneNumber,
-      taxNumber,
-      addressLine1,
-      addressLine2,
-      postalCode,
-      city,
-      country,
-      deliveryAddressLine1,
-      deliveryAddressLine2,
-      deliveryPostalCode,
-      deliveryCity,
-      deliveryCountry,
-      password: hashedPassword,
-      emailVerificationCode,
-      emailVerificationExp,
-      accountVerificationStatus: "pending",
-    });
+    // Use transaction to ensure both customer and star customer details are created together
+    const result = await AppDataSource.transaction(
+      async (transactionalEntityManager) => {
+        // Create customer
+        const customer = customerRepository.create({
+          companyName,
+          legalName,
+          email,
+          contactEmail,
+          contactPhoneNumber,
+          stage: "star_customer",
+        });
 
-    await customerRepository.save(customer);
+        // Save customer first
+        const savedCustomer = await transactionalEntityManager.save(customer);
+
+        // Create star customer details
+        const starCustomerDetails = starCustomerDetailsRepository.create({
+          customer: savedCustomer,
+          taxNumber,
+          password: hashedPassword,
+          emailVerificationCode,
+          emailVerificationExp,
+          accountVerificationStatus: "pending",
+          deliveryAddressLine1,
+          deliveryAddressLine2,
+          deliveryPostalCode,
+          deliveryCity,
+          deliveryCountry,
+        });
+
+        // Save star customer details
+        const savedStarCustomerDetails = await transactionalEntityManager.save(
+          starCustomerDetails
+        );
+
+        // Update customer with star customer details relationship
+        savedCustomer.starCustomerDetails = savedStarCustomerDetails;
+        await transactionalEntityManager.save(savedCustomer);
+
+        return {
+          customer: savedCustomer,
+          starCustomerDetails: savedStarCustomerDetails,
+        };
+      }
+    );
+
+    const { customer } = result;
 
     // Send verification email
     const verificationUrl = `${process.env.STAR_URL}/verify-email?code=${emailVerificationCode}`;
@@ -199,34 +218,33 @@ export const verifyEmail = async (
       return next(new ErrorHandler("Verification code is required", 400));
     }
 
-    const customerRepository = AppDataSource.getRepository(Customer);
-    const customer = await customerRepository.findOne({
+    const starCustomerDetailsRepository =
+      AppDataSource.getRepository(StarCustomerDetails);
+    const starCustomerDetails = await starCustomerDetailsRepository.findOne({
       where: { emailVerificationCode: code },
+      relations: ["customer"],
     });
 
-    if (!customer) {
+    if (!starCustomerDetails || !starCustomerDetails.customer) {
       return next(new ErrorHandler("Invalid verification code", 400));
     }
 
     if (
-      customer.emailVerificationExp &&
-      customer.emailVerificationExp < new Date()
+      starCustomerDetails.emailVerificationExp &&
+      starCustomerDetails.emailVerificationExp < new Date()
     ) {
       return next(new ErrorHandler("Verification code has expired", 400));
     }
 
-    if (customer.isEmailVerified) {
+    if (starCustomerDetails.isEmailVerified) {
       return next(new ErrorHandler("Email is already verified", 400));
     }
 
-    // Update customer
-    customer.isEmailVerified = true;
-    customer.emailVerificationCode = undefined;
-    customer.emailVerificationExp = undefined;
-    await customerRepository.save(customer);
-
-    // Notify admin about new customer request (implementation depends on your notification system)
-    // ...
+    // Update star customer details
+    starCustomerDetails.isEmailVerified = true;
+    starCustomerDetails.emailVerificationCode = undefined;
+    starCustomerDetails.emailVerificationExp = undefined;
+    await starCustomerDetailsRepository.save(starCustomerDetails);
 
     return res.status(200).json({
       success: true,
@@ -234,7 +252,8 @@ export const verifyEmail = async (
         "Email verified successfully. Your account is pending admin approval.",
     });
   } catch (error) {
-    return next(error);
+    console.error("Verify email error:", error);
+    return next(new ErrorHandler("Failed to verify email", 500));
   }
 };
 
@@ -252,21 +271,27 @@ export const login = async (
     }
 
     const customerRepository = AppDataSource.getRepository(Customer);
-    const customer = await customerRepository.findOne({ where: { email } });
+    const customer = await customerRepository.findOne({
+      where: { email },
+      relations: ["starCustomerDetails"],
+    });
 
-    if (!customer) {
+    if (!customer || !customer.starCustomerDetails) {
       return next(new ErrorHandler("Invalid credentials", 401));
     }
 
-    if (!customer.isEmailVerified) {
+    if (!customer.starCustomerDetails.isEmailVerified) {
       return next(new ErrorHandler("Please verify your email first", 401));
     }
 
-    if (customer.accountVerificationStatus !== "verified") {
+    if (customer.starCustomerDetails.accountVerificationStatus !== "verified") {
       return next(new ErrorHandler("Your account is pending approval", 401));
     }
 
-    const isMatch = await bcrypt.compare(password, customer.password);
+    const isMatch = await bcrypt.compare(
+      password,
+      customer.starCustomerDetails.password
+    );
     if (!isMatch) {
       return next(new ErrorHandler("Invalid credentials", 401));
     }
@@ -285,7 +310,9 @@ export const login = async (
       email: customer.email,
       contactEmail: customer.contactEmail,
       avatar: customer.avatar,
-      accountVerificationStatus: customer.accountVerificationStatus,
+      stage: customer.stage,
+      accountVerificationStatus:
+        customer.starCustomerDetails.accountVerificationStatus,
     };
 
     return res
@@ -303,7 +330,8 @@ export const login = async (
         data: customerData,
       });
   } catch (error) {
-    return next(error);
+    console.error("Login error:", error);
+    return next(new ErrorHandler("Failed to login", 500));
   }
 };
 
@@ -344,11 +372,6 @@ export const editCustomerProfile = async (
       contactEmail,
       contactPhoneNumber,
       taxNumber,
-      addressLine1,
-      addressLine2,
-      postalCode,
-      city,
-      country,
       deliveryAddressLine1,
       deliveryAddressLine2,
       deliveryPostalCode,
@@ -357,8 +380,12 @@ export const editCustomerProfile = async (
     } = req.body;
 
     const customerRepository = AppDataSource.getRepository(Customer);
+    const starCustomerDetailsRepository =
+      AppDataSource.getRepository(StarCustomerDetails);
+
     const customer = await customerRepository.findOne({
       where: { id: customerId },
+      relations: ["starCustomerDetails"],
     });
 
     if (!customer) {
@@ -391,39 +418,71 @@ export const editCustomerProfile = async (
         return next(new ErrorHandler("Error uploading avatar", 500));
       }
     }
-    console.log(legalName);
-    // Update fields
+
+    // Update customer fields
     if (companyName) customer.companyName = companyName;
     if (legalName) customer.legalName = legalName;
     if (contactEmail) customer.contactEmail = contactEmail;
     if (contactPhoneNumber) customer.contactPhoneNumber = contactPhoneNumber;
-    if (taxNumber) customer.taxNumber = taxNumber;
-    if (addressLine1) customer.addressLine1 = addressLine1;
-    if (addressLine2) customer.addressLine2 = addressLine2;
-    if (postalCode) customer.postalCode = postalCode;
-    if (city) customer.city = city;
-    if (country) customer.country = country;
-    if (deliveryAddressLine1)
-      customer.deliveryAddressLine1 = deliveryAddressLine1;
-    if (deliveryAddressLine2)
-      customer.deliveryAddressLine2 = deliveryAddressLine2;
-    if (deliveryPostalCode) customer.deliveryPostalCode = deliveryPostalCode;
-    if (deliveryCity) customer.deliveryCity = deliveryCity;
-    if (deliveryCountry) customer.deliveryCountry = deliveryCountry;
 
+    // Save customer updates
     await customerRepository.save(customer);
+
+    // Update star customer details if they exist
+    if (customer.starCustomerDetails) {
+      const starCustomerDetails = await starCustomerDetailsRepository.findOne({
+        where: { id: customer.starCustomerDetails.id },
+      });
+
+      if (starCustomerDetails) {
+        if (taxNumber) starCustomerDetails.taxNumber = taxNumber;
+        if (deliveryAddressLine1)
+          starCustomerDetails.deliveryAddressLine1 = deliveryAddressLine1;
+        if (deliveryAddressLine2)
+          starCustomerDetails.deliveryAddressLine2 = deliveryAddressLine2;
+        if (deliveryPostalCode)
+          starCustomerDetails.deliveryPostalCode = deliveryPostalCode;
+        if (deliveryCity) starCustomerDetails.deliveryCity = deliveryCity;
+        if (deliveryCountry)
+          starCustomerDetails.deliveryCountry = deliveryCountry;
+
+        await starCustomerDetailsRepository.save(starCustomerDetails);
+      }
+    }
+
+    // Get updated customer with relations for response
+    const updatedCustomer = await customerRepository.findOne({
+      where: { id: customerId },
+      relations: ["starCustomerDetails"],
+    });
+
+    if (!updatedCustomer || !updatedCustomer.starCustomerDetails) {
+      return next(new ErrorHandler("Customer not found after update", 404));
+    }
 
     // Filter sensitive data
     const customerData = {
-      id: customer.id,
-      companyName: customer.companyName,
-      legalName: customer.legalName,
-      email: customer.email,
-      contactEmail: customer.contactEmail,
-      contactPhoneNumber: customer.contactPhoneNumber,
-      taxNumber: customer.taxNumber,
-      avatar: customer.avatar,
-      accountVerificationStatus: customer.accountVerificationStatus,
+      id: updatedCustomer.id,
+      companyName: updatedCustomer.companyName,
+      legalName: updatedCustomer.legalName,
+      email: updatedCustomer.email,
+      contactEmail: updatedCustomer.contactEmail,
+      contactPhoneNumber: updatedCustomer.contactPhoneNumber,
+      avatar: updatedCustomer.avatar,
+      stage: updatedCustomer.stage,
+      starCustomerDetails: {
+        taxNumber: updatedCustomer.starCustomerDetails.taxNumber,
+        accountVerificationStatus:
+          updatedCustomer.starCustomerDetails.accountVerificationStatus,
+        deliveryAddressLine1:
+          updatedCustomer.starCustomerDetails.deliveryAddressLine1,
+        deliveryAddressLine2:
+          updatedCustomer.starCustomerDetails.deliveryAddressLine2,
+        deliveryPostalCode:
+          updatedCustomer.starCustomerDetails.deliveryPostalCode,
+        deliveryCity: updatedCustomer.starCustomerDetails.deliveryCity,
+        deliveryCountry: updatedCustomer.starCustomerDetails.deliveryCountry,
+      },
     };
 
     return res.status(200).json({
@@ -432,7 +491,8 @@ export const editCustomerProfile = async (
       data: customerData,
     });
   } catch (error) {
-    return next(error);
+    console.error("Edit customer profile error:", error);
+    return next(new ErrorHandler("Failed to update customer profile", 500));
   }
 };
 
@@ -455,8 +515,10 @@ export const refresh = async (
     const customerRepository = AppDataSource.getRepository(Customer);
     const customer = await customerRepository.findOne({
       where: { id: decoded.id },
+      relations: ["starCustomerDetails"],
     });
-    if (!customer) {
+
+    if (!customer || !customer.starCustomerDetails) {
       return next(new ErrorHandler("Customer not found", 404));
     }
 
@@ -474,7 +536,9 @@ export const refresh = async (
       email: customer.email,
       contactEmail: customer.contactEmail,
       avatar: customer.avatar,
-      accountVerificationStatus: customer.accountVerificationStatus,
+      stage: customer.stage,
+      accountVerificationStatus:
+        customer.starCustomerDetails.accountVerificationStatus,
     };
 
     return res
@@ -496,35 +560,42 @@ export const refresh = async (
 
 // 6. Change Password
 export const changePassword = async (
-  req: Request,
+  req: AuthorizedCustomerRequest,
   res: Response,
   next: NextFunction
 ) => {
   try {
     const { currentPassword, newPassword } = req.body;
-    const customerId = (req as any).user.id;
+    const customerId = (req as any).customer.id;
 
     if (!currentPassword || !newPassword) {
       return next(new ErrorHandler("Both passwords are required", 400));
     }
 
     const customerRepository = AppDataSource.getRepository(Customer);
+    const starCustomerDetailsRepository =
+      AppDataSource.getRepository(StarCustomerDetails);
+
     const customer = await customerRepository.findOne({
       where: { id: customerId },
+      relations: ["starCustomerDetails"],
     });
 
-    if (!customer) {
+    if (!customer || !customer.starCustomerDetails) {
       return next(new ErrorHandler("Customer not found", 404));
     }
 
-    const isMatch = await bcrypt.compare(currentPassword, customer.password);
+    const isMatch = await bcrypt.compare(
+      currentPassword,
+      customer.starCustomerDetails.password
+    );
     if (!isMatch) {
       return next(new ErrorHandler("Current password is incorrect", 401));
     }
 
     const hashedPassword = await bcrypt.hash(newPassword, 10);
-    customer.password = hashedPassword;
-    await customerRepository.save(customer);
+    customer.starCustomerDetails.password = hashedPassword;
+    await starCustomerDetailsRepository.save(customer.starCustomerDetails);
 
     // Send email notification
     const message = `
@@ -544,11 +615,11 @@ export const changePassword = async (
       message: "Password changed successfully",
     });
   } catch (error) {
-    return next(error);
+    console.error("Change password error:", error);
+    return next(new ErrorHandler("Failed to change password", 500));
   }
 };
 
-// 7. Forgot Password
 // 7. Forgot Password
 export const forgotPassword = async (
   req: Request,
@@ -563,9 +634,15 @@ export const forgotPassword = async (
     }
 
     const customerRepository = AppDataSource.getRepository(Customer);
-    const customer = await customerRepository.findOne({ where: { email } });
+    const starCustomerDetailsRepository =
+      AppDataSource.getRepository(StarCustomerDetails);
 
-    if (!customer) {
+    const customer = await customerRepository.findOne({
+      where: { email },
+      relations: ["starCustomerDetails"],
+    });
+
+    if (!customer || !customer.starCustomerDetails) {
       // Don't reveal that email doesn't exist for security
       return res.status(200).json({
         success: true,
@@ -577,9 +654,9 @@ export const forgotPassword = async (
     const resetToken = crypto.randomBytes(20).toString("hex");
     const resetPasswordExp = new Date(Date.now() + 30 * 60 * 1000);
 
-    customer.resetPasswordToken = resetToken;
-    customer.resetPasswordExp = resetPasswordExp;
-    await customerRepository.save(customer);
+    customer.starCustomerDetails.resetPasswordToken = resetToken;
+    customer.starCustomerDetails.resetPasswordExp = resetPasswordExp;
+    await starCustomerDetailsRepository.save(customer.starCustomerDetails);
 
     // Send reset email with improved content
     const resetUrl = `${process.env.STAR_URL}/reset-password?token=${resetToken}`;
@@ -642,9 +719,9 @@ This is an automated message. Please do not reply to this email.
 
     await sendEmail({
       to: email,
-      subject: "Reset Your Password - Action Required", // More professional subject
+      subject: "Reset Your Password - Action Required",
       html: message,
-      text: textVersion, // Add text version for better deliverability
+      text: textVersion,
       headers: {
         "X-Priority": "3",
         "X-Mailer": "Gtech Industries Gmbh",
@@ -680,25 +757,30 @@ export const resetPassword = async (
       return next(new ErrorHandler("Token and new password are required", 400));
     }
 
-    const customerRepository = AppDataSource.getRepository(Customer);
-    const customer = await customerRepository.findOne({
+    const starCustomerDetailsRepository =
+      AppDataSource.getRepository(StarCustomerDetails);
+    const starCustomerDetails = await starCustomerDetailsRepository.findOne({
       where: { resetPasswordToken: token },
+      relations: ["customer"],
     });
 
-    if (!customer) {
+    if (!starCustomerDetails || !starCustomerDetails.customer) {
       return next(new ErrorHandler("Invalid or expired token", 400));
     }
 
-    if (!customer.resetPasswordExp || customer.resetPasswordExp < new Date()) {
+    if (
+      !starCustomerDetails.resetPasswordExp ||
+      starCustomerDetails.resetPasswordExp < new Date()
+    ) {
       return next(new ErrorHandler("Token has expired", 400));
     }
 
     // Update password
     const hashedPassword = await bcrypt.hash(password, 10);
-    customer.password = hashedPassword;
-    customer.resetPasswordToken = undefined;
-    customer.resetPasswordExp = undefined;
-    await customerRepository.save(customer);
+    starCustomerDetails.password = hashedPassword;
+    starCustomerDetails.resetPasswordToken = undefined;
+    starCustomerDetails.resetPasswordExp = undefined;
+    await starCustomerDetailsRepository.save(starCustomerDetails);
 
     const message = `
       <h2>Password Reset Successful</h2>
@@ -707,7 +789,7 @@ export const resetPassword = async (
     `;
 
     await sendEmail({
-      to: customer.email,
+      to: starCustomerDetails.customer.email,
       subject: "Password Reset Confirmation",
       html: message,
     });
@@ -717,7 +799,8 @@ export const resetPassword = async (
       message: "Password reset successfully",
     });
   } catch (error) {
-    return next(error);
+    console.error("Reset password error:", error);
+    return next(new ErrorHandler("Failed to reset password", 500));
   }
 };
 
@@ -737,17 +820,21 @@ export const updateCustomerStatus = async (
     }
 
     const customerRepository = AppDataSource.getRepository(Customer);
+    const starCustomerDetailsRepository =
+      AppDataSource.getRepository(StarCustomerDetails);
+
     const customer = await customerRepository.findOne({
       where: { id: customerId },
+      relations: ["starCustomerDetails"],
     });
 
-    if (!customer) {
+    if (!customer || !customer.starCustomerDetails) {
       return next(new ErrorHandler("Customer not found", 404));
     }
 
-    // Update status
-    customer.accountVerificationStatus = status;
-    await customerRepository.save(customer);
+    // Update status in star customer details
+    customer.starCustomerDetails.accountVerificationStatus = status;
+    await starCustomerDetailsRepository.save(customer.starCustomerDetails);
 
     // Send status update notification
     const htmlMessage = `
@@ -894,7 +981,7 @@ Contact Support: support@accez.cloud
       message: "Customer status updated successfully",
       data: {
         id: customer.id,
-        status: customer.accountVerificationStatus,
+        status: customer.starCustomerDetails.accountVerificationStatus,
       },
     });
   } catch (error) {
@@ -921,10 +1008,8 @@ export const getAllCustomers = async (
       "email",
       "contactEmail",
       "contactPhoneNumber",
-      "taxNumber",
       "city",
       "country",
-      "accountVerificationStatus",
     ];
 
     const validatedSortBy = allowedSortColumns.includes(sortBy)
@@ -933,12 +1018,17 @@ export const getAllCustomers = async (
 
     const validatedOrder = order === "ASC" ? "ASC" : "DESC";
 
-    const queryBuilder = customerRepository.createQueryBuilder("customer");
+    const queryBuilder = customerRepository
+      .createQueryBuilder("customer")
+      .leftJoinAndSelect("customer.starCustomerDetails", "starCustomerDetails");
 
     if (status) {
-      queryBuilder.andWhere("customer.accountVerificationStatus = :status", {
-        status: status.toString(),
-      });
+      queryBuilder.andWhere(
+        "starCustomerDetails.accountVerificationStatus = :status",
+        {
+          status: status.toString(),
+        }
+      );
     }
 
     queryBuilder.orderBy(`customer.${validatedSortBy}`, validatedOrder);
@@ -952,13 +1042,15 @@ export const getAllCustomers = async (
       email: customer.email,
       contactEmail: customer.contactEmail,
       contactPhoneNumber: customer.contactPhoneNumber,
-      taxNumber: customer.taxNumber,
-      addressLine1: customer.addressLine1,
-      city: customer.city,
-      country: customer.country,
+      taxNumber: customer.starCustomerDetails?.taxNumber,
+      deliveryAddressLine1: customer.starCustomerDetails?.deliveryAddressLine1,
+      deliveryCity: customer.starCustomerDetails?.deliveryCity,
+      deliveryCountry: customer.starCustomerDetails?.deliveryCountry,
       createdAt: customer.createdAt,
-      accountVerificationStatus: customer.accountVerificationStatus,
+      accountVerificationStatus:
+        customer.starCustomerDetails?.accountVerificationStatus,
       avatar: customer.avatar,
+      stage: customer.stage,
     }));
 
     return res.status(200).json({
@@ -967,7 +1059,8 @@ export const getAllCustomers = async (
       data: customersData,
     });
   } catch (error) {
-    return next(error);
+    console.error("Get all customers error:", error);
+    return next(new ErrorHandler("Failed to fetch customers", 500));
   }
 };
 
@@ -979,7 +1072,10 @@ export const getSingleUser = async (
   try {
     const { customerId } = req.params;
     const customerRepo = AppDataSource.getRepository(Customer);
-    const customer = await customerRepo.findOne({ where: { id: customerId } });
+    const customer = await customerRepo.findOne({
+      where: { id: customerId },
+      relations: ["starCustomerDetails"],
+    });
 
     if (!customer) {
       return next(new ErrorHandler("Customer Not Found!", 404));
@@ -993,21 +1089,18 @@ export const getSingleUser = async (
       email: customer.email,
       contactEmail: customer.contactEmail,
       contactPhoneNumber: customer.contactPhoneNumber,
-      taxNumber: customer.taxNumber,
-      addressLine1: customer.addressLine1,
-      addressLine2: customer.addressLine2,
-      postalCode: customer.postalCode,
-      city: customer.city,
-      country: customer.country,
-      deliveryAddressLine1: customer.deliveryAddressLine1,
-      deliveryAddressLine2: customer.deliveryAddressLine2,
-      deliveryPostalCode: customer.deliveryPostalCode,
-      deliveryCity: customer.deliveryCity,
-      deliveryCountry: customer.deliveryCountry,
+      taxNumber: customer.starCustomerDetails?.taxNumber,
+      deliveryAddressLine1: customer.starCustomerDetails?.deliveryAddressLine1,
+      deliveryAddressLine2: customer.starCustomerDetails?.deliveryAddressLine2,
+      deliveryPostalCode: customer.starCustomerDetails?.deliveryPostalCode,
+      deliveryCity: customer.starCustomerDetails?.deliveryCity,
+      deliveryCountry: customer.starCustomerDetails?.deliveryCountry,
       createdAt: customer.createdAt,
       updatedAt: customer.updatedAt,
-      accountVerificationStatus: customer.accountVerificationStatus,
+      accountVerificationStatus:
+        customer.starCustomerDetails?.accountVerificationStatus,
       avatar: customer.avatar,
+      stage: customer.stage,
     };
 
     return res.status(200).json({
@@ -1015,6 +1108,7 @@ export const getSingleUser = async (
       success: true,
     });
   } catch (error) {
-    return next(error);
+    console.error("Get single user error:", error);
+    return next(new ErrorHandler("Failed to fetch customer", 500));
   }
 };

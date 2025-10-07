@@ -392,7 +392,6 @@ export const createBusiness = async (
   }
 };
 
-// 3. Get All Businesses with Pagination and Filtering
 export const getAllBusinesses = async (
   req: Request,
   res: Response,

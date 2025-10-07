@@ -5,13 +5,25 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   OneToMany,
+  OneToOne,
+  JoinColumn,
 } from "typeorm";
 import { Invoice } from "./invoice";
+import { BusinessDetails } from "./business_details";
+import { StarBusinessDetails } from "./star_business_details";
+import { StarCustomerDetails } from "./star_customer_details";
 
 @Entity()
 export class Customer {
   @PrimaryGeneratedColumn("uuid")
   id!: string;
+
+  @Column({
+    type: "enum",
+    enum: ["business", "star_business", "star_customer"],
+    default: "business",
+  })
+  stage!: "business" | "star_business" | "star_customer";
 
   @Column({ unique: true })
   companyName!: string;
@@ -31,81 +43,17 @@ export class Customer {
   @Column()
   contactPhoneNumber!: string;
 
-  @Column()
-  taxNumber!: string;
+  @OneToOne(() => BusinessDetails, { nullable: true, cascade: true })
+  @JoinColumn()
+  businessDetails?: BusinessDetails;
 
-  @OneToMany(() => Invoice, (invoice) => invoice.customer)
-  invoices!: Invoice[];
+  @OneToOne(() => StarBusinessDetails, { nullable: true, cascade: true })
+  @JoinColumn()
+  starBusinessDetails?: StarBusinessDetails;
 
-  @Column({ nullable: true })
-  addressLine1?: string;
-
-  @Column({ nullable: true })
-  addressLine2?: string;
-
-  @Column({ nullable: true })
-  postalCode?: string;
-
-  @Column({ nullable: true })
-  city?: string;
-
-  @Column({ nullable: true })
-  country?: string;
-
-  @Column({ nullable: true })
-  deliveryAddressLine1?: string;
-
-  @Column({ nullable: true })
-  deliveryAddressLine2?: string;
-
-  @Column({ nullable: true })
-  deliveryPostalCode?: string;
-
-  @Column({ nullable: true })
-  deliveryCity?: string;
-
-  @Column({ nullable: true })
-  deliveryCountry?: string;
-
-  @Column({ type: "boolean", default: false })
-  isEmailVerified!: boolean;
-
-  @Column({ type: "varchar", nullable: true })
-  emailVerificationCode?: string;
-
-  @Column({ type: "timestamp", nullable: true })
-  emailVerificationExp?: Date;
-
-  @Column({ type: "boolean", default: false })
-  isPhoneVerified!: boolean;
-
-  @Column({ type: "varchar", nullable: true })
-  phoneVerificationCode?: string;
-
-  @Column({ type: "timestamp", nullable: true })
-  phoneVerificationExp?: Date;
-
-  @Column({
-    type: "enum",
-    enum: ["pending", "verified", "rejected"],
-    default: "pending",
-  })
-  accountVerificationStatus!: "pending" | "verified" | "rejected";
-
-  @Column({ type: "varchar", nullable: true })
-  verificationRemark?: string;
-
-  @Column()
-  password!: string;
-
-  @Column({ type: "varchar", nullable: true })
-  resetPasswordToken?: string;
-
-  @Column({ type: "timestamp", nullable: true })
-  resetPasswordExp?: Date;
-
-  @Column({ nullable: true })
-  deletedAt!: Date;
+  @OneToOne(() => StarCustomerDetails, { nullable: true, cascade: true })
+  @JoinColumn()
+  starCustomerDetails?: StarCustomerDetails;
 
   @CreateDateColumn()
   createdAt!: Date;

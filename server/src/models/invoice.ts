@@ -57,7 +57,10 @@ export class Invoice {
   @Column({ nullable: true })
   notes?: string;
 
-  @ManyToOne(() => Customer, (customer) => customer.invoices)
+  @ManyToOne(
+    () => Customer,
+    (customer) => customer.starCustomerDetails?.invoices
+  )
   @JoinColumn()
   customer!: Customer;
 
