@@ -34,7 +34,7 @@ export class BusinessDetails {
   @Column({ nullable: true })
   contactPhone?: string;
 
-  @Column({ nullable: true })
+  @Column({ nullable: true, unique: true })
   email?: string;
 
   @Column({ type: "json", nullable: true })

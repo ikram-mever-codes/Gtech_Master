@@ -18,6 +18,9 @@ import {
   SparklesIcon,
   ChartBarIcon,
   DocumentDuplicateIcon,
+  PencilSquareIcon,
+  TrashIcon,
+  ExclamationCircleIcon,
 } from "@heroicons/react/24/outline";
 import {
   CheckIcon,
@@ -27,12 +30,34 @@ import { toast } from "react-hot-toast";
 import { bulkImportBusinesses, BusinessCreatePayload } from "@/api/bussiness";
 import CustomButton from "@/components/UI/CustomButton";
 import theme from "@/styles/theme";
+import { errorStyles, successStyles } from "@/utils/constants";
 
 interface ParsedBusiness extends BusinessCreatePayload {
   rowIndex: number;
   validationErrors?: string[];
   isValid?: boolean;
   hasWebsite?: boolean;
+  isDuplicate?: boolean;
+  duplicateReason?: string;
+  existingRecord?: any;
+}
+
+interface BulkImportResult {
+  success: boolean;
+  message: string;
+  data: {
+    total: number;
+    imported: number;
+    skippedInvalidData: number;
+    duplicates: number;
+    errors: number;
+    errorsList: Array<{ business: string; error: string }>;
+    duplicateEntries: Array<{
+      business: any;
+      reason: string;
+      existingRecord?: any;
+    }>;
+  };
 }
 
 const BusinessBulkUpload: React.FC = () => {
@@ -45,10 +70,13 @@ const BusinessBulkUpload: React.FC = () => {
   const [currentStep, setCurrentStep] = useState(1);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState<
-    "all" | "valid" | "invalid" | "no_website"
+    "all" | "valid" | "invalid" | "no_website" | "duplicate"
   >("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
+  const [editingRow, setEditingRow] = useState<number | null>(null);
+  const [editedData, setEditedData] = useState<Partial<ParsedBusiness>>({});
+  const [showDuplicatesModal, setShowDuplicatesModal] = useState(false);
   const itemsPerPage = 15;
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
@@ -68,6 +96,24 @@ const BusinessBulkUpload: React.FC = () => {
     },
     maxFiles: 1,
   });
+
+  // Helper function to normalize website URLs
+  const normalizeWebsite = (website: string): string => {
+    if (!website) return website;
+
+    let normalized = website.trim().toLowerCase();
+
+    // Remove protocol
+    normalized = normalized.replace(/^https?:\/\//, "");
+
+    // Remove www.
+    normalized = normalized.replace(/^www\./, "");
+
+    // Remove trailing slash
+    normalized = normalized.replace(/\/$/, "");
+
+    return normalized;
+  };
 
   const parseAndProcessCSV = (file: File) => {
     setIsProcessing(true);
@@ -94,7 +140,7 @@ const BusinessBulkUpload: React.FC = () => {
         setCurrentStep(2);
 
         const validCount = processedBusinesses.filter(
-          (b) => b.isValid && b.website
+          (b) => b.isValid && b.website && !b.isDuplicate
         ).length;
         const invalidCount = processedBusinesses.filter(
           (b) => !b.isValid
@@ -104,7 +150,8 @@ const BusinessBulkUpload: React.FC = () => {
         ).length;
 
         toast.success(
-          `Processed ${processedBusinesses.length} records: ${validCount} valid, ${noWebsiteCount} without website, ${invalidCount} invalid`
+          `Processed ${processedBusinesses.length} records: ${validCount} valid, ${noWebsiteCount} without website, ${invalidCount} invalid`,
+          successStyles
         );
       },
       error: (error) => {
@@ -188,10 +235,19 @@ const BusinessBulkUpload: React.FC = () => {
           business.googlePlaceId = value;
         } else if (normalizedHeader.includes("mapsurl")) {
           business.googleMapsUrl = value;
+        } else if (normalizedHeader === "state") {
+          business.state = value;
+        } else if (normalizedHeader === "country") {
+          business.country = value;
+        } else if (
+          normalizedHeader === "postalcode" ||
+          normalizedHeader === "zip"
+        ) {
+          business.postalCode = value;
         }
       });
 
-      // Extract postal code from municipality
+      // Extract postal code from municipality if needed
       if (business.city && !business.postalCode) {
         const cityMatch = business.city.match(/^(\d{5})\s+(.+)$/);
         if (cityMatch) {
@@ -200,7 +256,7 @@ const BusinessBulkUpload: React.FC = () => {
         }
       }
 
-      // Set default country
+      // Set default country if needed
       if (
         !business.country &&
         business.address &&
@@ -209,7 +265,7 @@ const BusinessBulkUpload: React.FC = () => {
         business.country = "Germany";
       }
 
-      // Basic validation for display purposes only
+      // Basic validation
       if (!business.name || business.name.trim() === "") {
         errors.push("Business name is required");
       }
@@ -220,6 +276,7 @@ const BusinessBulkUpload: React.FC = () => {
       business.isValid = errors.length === 0;
       business.hasWebsite = !!business.website;
       business.validationErrors = errors;
+      business.isDuplicate = false;
 
       processedBusinesses.push(business);
     });
@@ -227,17 +284,69 @@ const BusinessBulkUpload: React.FC = () => {
     return processedBusinesses;
   };
 
+  const handleEdit = (rowIndex: number) => {
+    const business = parsedBusinesses.find((b) => b.rowIndex === rowIndex);
+    if (business) {
+      setEditingRow(rowIndex);
+      setEditedData({ ...business });
+    }
+  };
+
+  const handleSaveEdit = () => {
+    if (editingRow !== null) {
+      setParsedBusinesses((prev) =>
+        prev.map((business) => {
+          if (business.rowIndex === editingRow) {
+            const updated = { ...business, ...editedData };
+            // Revalidate
+            const errors: string[] = [];
+            if (!updated.name || updated.name.trim() === "") {
+              errors.push("Business name is required");
+            }
+            if (!updated.address || updated.address.trim() === "") {
+              errors.push("Address is required");
+            }
+            updated.isValid = errors.length === 0;
+            updated.hasWebsite = !!updated.website;
+            updated.validationErrors = errors;
+            updated.isDuplicate = false; // Clear duplicate status after edit
+            updated.duplicateReason = undefined;
+            return updated;
+          }
+          return business;
+        })
+      );
+      setEditingRow(null);
+      setEditedData({});
+      toast.success("Business updated successfully", successStyles);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingRow(null);
+    setEditedData({});
+  };
+
+  const handleDelete = (rowIndex: number) => {
+    setParsedBusinesses((prev) => prev.filter((b) => b.rowIndex !== rowIndex));
+    toast.success("Business removed", successStyles);
+  };
+
   const handleBulkUpload = async () => {
-    // Filter to only include valid businesses with websites
+    // Filter to only include non-duplicate, valid businesses with websites
     const businessesToUpload = parsedBusinesses.filter(
-      (b) => b.isValid && b.website
+      (b) => b.isValid && b.website && !b.isDuplicate
     );
 
-    // If using row selection, only include selected valid businesses with websites
+    // If using row selection, only include selected valid businesses
     const selectedBusinessesToUpload =
       selectedRows.size > 0
         ? parsedBusinesses.filter(
-            (b) => selectedRows.has(b.rowIndex) && b.isValid && b.website
+            (b) =>
+              selectedRows.has(b.rowIndex) &&
+              b.isValid &&
+              b.website &&
+              !b.isDuplicate
           )
         : businessesToUpload;
 
@@ -253,36 +362,130 @@ const BusinessBulkUpload: React.FC = () => {
     try {
       const payload = {
         businesses: finalBusinessesToUpload.map(
-          ({ rowIndex, isValid, validationErrors, hasWebsite, ...business }) =>
-            business
+          ({
+            rowIndex,
+            isValid,
+            validationErrors,
+            hasWebsite,
+            isDuplicate,
+            duplicateReason,
+            existingRecord,
+            ...business
+          }) => business
         ),
       };
 
-      const result = await bulkImportBusinesses(payload);
+      const result: any = await bulkImportBusinesses(payload);
 
-      // Show success message with counts
-      const invalidCount = parsedBusinesses.filter((b) => !b.isValid).length;
-      const noWebsiteCount = parsedBusinesses.filter(
-        (b) => b.isValid && !b.website
-      ).length;
+      // Handle duplicates from the response
+      if (
+        result &&
+        result?.duplicateEntries &&
+        result?.duplicateEntries.length > 0
+      ) {
+        // Mark duplicates in the parsed businesses
+        setParsedBusinesses((prev) => {
+          const updated = [...prev];
+          result.duplicateEntries.forEach((duplicate: any) => {
+            const businessIndex = updated.findIndex(
+              (b) =>
+                (b.email &&
+                  duplicate.business.email &&
+                  b.email.toLowerCase() ===
+                    duplicate.business.email.toLowerCase()) ||
+                (b.website &&
+                  duplicate.business.website &&
+                  normalizeWebsite(b.website) ===
+                    normalizeWebsite(duplicate.business.website)) ||
+                (b.name &&
+                  duplicate.business.name &&
+                  b.name.trim() === duplicate.business.name.trim())
+            );
 
-      toast.success(
-        `Successfully uploaded ${finalBusinessesToUpload.length} valid businesses with websites` +
-          (invalidCount > 0
-            ? ` (${invalidCount} invalid records ignored)`
-            : "") +
-          (noWebsiteCount > 0
-            ? ` (${noWebsiteCount} businesses without websites ignored)`
-            : "")
-      );
+            if (businessIndex !== -1) {
+              updated[businessIndex] = {
+                ...updated[businessIndex],
+                isDuplicate: true,
+                duplicateReason: duplicate.reason,
+                existingRecord: duplicate.existingRecord,
+              };
+            }
+          });
+          return updated;
+        });
 
-      setFile(null);
-      setParsedBusinesses([]);
-      setCurrentStep(1);
-      setSelectedRows(new Set());
-    } catch (error) {
+        // Show duplicates modal or message
+        if (result.data.duplicateEntries.length > 0) {
+          toast.error(
+            `Found ${result.data.duplicateEntries.length} duplicate(s). Please review and edit them.`,
+            errorStyles
+          );
+
+          setFilterStatus("duplicate");
+        }
+
+        // Show success for imported records
+        if (result.data.imported > 0) {
+          toast.success(
+            `Successfully imported ${result.data.imported} business(es)`,
+            successStyles
+          );
+        }
+      } else {
+        // No duplicates, all imported successfully
+        toast.success(
+          `Successfully uploaded ${
+            result.data?.imported || finalBusinessesToUpload.length
+          } businesses`
+        );
+
+        // Reset form after successful upload
+        setFile(null);
+        setParsedBusinesses([]);
+        setCurrentStep(1);
+        setSelectedRows(new Set());
+      }
+    } catch (error: any) {
       console.error("Upload error:", error);
-      toast.error("Failed to upload businesses");
+
+      // Check if error response contains duplicate information
+      if (error.response?.data?.data?.duplicateEntries) {
+        const duplicates = error.response.data.data.duplicateEntries;
+        setParsedBusinesses((prev) => {
+          const updated = [...prev];
+          duplicates.forEach((duplicate: any) => {
+            const businessIndex = updated.findIndex(
+              (b) =>
+                (b.email &&
+                  duplicate.business.email &&
+                  b.email.toLowerCase() ===
+                    duplicate.business.email.toLowerCase()) ||
+                (b.website &&
+                  duplicate.business.website &&
+                  normalizeWebsite(b.website) ===
+                    normalizeWebsite(duplicate.business.website))
+            );
+
+            if (businessIndex !== -1) {
+              updated[businessIndex] = {
+                ...updated[businessIndex],
+                isDuplicate: true,
+                duplicateReason: duplicate.reason,
+                existingRecord: duplicate.existingRecord,
+              };
+            }
+          });
+          return updated;
+        });
+
+        toast.error(
+          `Found ${duplicates.length} duplicate(s). Please review and edit them.`,
+          { duration: 5000 }
+        );
+
+        setFilterStatus("duplicate");
+      } else {
+      }
     } finally {
       setIsUploading(false);
     }
@@ -300,11 +503,15 @@ const BusinessBulkUpload: React.FC = () => {
     }
 
     if (filterStatus === "valid") {
-      filtered = filtered.filter((b) => b.isValid && b.website);
+      filtered = filtered.filter(
+        (b) => b.isValid && b.website && !b.isDuplicate
+      );
     } else if (filterStatus === "invalid") {
       filtered = filtered.filter((b) => !b.isValid);
     } else if (filterStatus === "no_website") {
       filtered = filtered.filter((b) => b.isValid && !b.website);
+    } else if (filterStatus === "duplicate") {
+      filtered = filtered.filter((b) => b.isDuplicate);
     }
 
     return filtered;
@@ -319,12 +526,15 @@ const BusinessBulkUpload: React.FC = () => {
 
   const statistics = useMemo(() => {
     const total = parsedBusinesses.length;
-    const valid = parsedBusinesses.filter((b) => b.isValid && b.website).length;
+    const valid = parsedBusinesses.filter(
+      (b) => b.isValid && b.website && !b.isDuplicate
+    ).length;
     const invalid = parsedBusinesses.filter((b) => !b.isValid).length;
     const noWebsite = parsedBusinesses.filter(
       (b) => b.isValid && !b.website
     ).length;
-    return { total, valid, invalid, noWebsite };
+    const duplicates = parsedBusinesses.filter((b) => b.isDuplicate).length;
+    return { total, valid, invalid, noWebsite, duplicates };
   }, [parsedBusinesses]);
 
   const handleSelectAll = () => {
@@ -350,6 +560,9 @@ const BusinessBulkUpload: React.FC = () => {
       "Name",
       "Full Address",
       "Municipality",
+      "State",
+      "Country",
+      "Postal Code",
       "Categories",
       "Phone",
       "Website",
@@ -358,6 +571,8 @@ const BusinessBulkUpload: React.FC = () => {
       "Latitude",
       "Longitude",
       "Google Maps Url",
+      "Average Rating",
+      "Review Count",
     ];
     const template = headers.join(",");
     const blob = new Blob([template + "\n"], { type: "text/csv" });
@@ -377,10 +592,12 @@ const BusinessBulkUpload: React.FC = () => {
     setSearchTerm("");
     setFilterStatus("all");
     setCurrentPage(1);
+    setEditingRow(null);
+    setEditedData({});
   };
 
   return (
-    <div className="w-full  mx-auto">
+    <div className="w-full mx-auto">
       <div
         className="bg-white rounded-lg mx-[2rem] shadow-sm pb-8 p-8 px-9"
         style={{
@@ -399,6 +616,15 @@ const BusinessBulkUpload: React.FC = () => {
               Bulk import business data from CSV files
             </p>
           </div>
+          <div className="flex gap-3">
+            <CustomButton
+              variant="outlined"
+              startIcon={<DocumentArrowDownIcon className="w-5 h-5" />}
+              onClick={downloadTemplate}
+            >
+              Download Template
+            </CustomButton>
+          </div>
         </div>
 
         {/* Progress Indicator */}
@@ -409,7 +635,7 @@ const BusinessBulkUpload: React.FC = () => {
               style={{ zIndex: 0 }}
             />
             <div
-              className="absolute top-5 left-0 h-0.5 bg-primary transition-all duration-500"
+              className={`absolute top-5 left-0 h-0.5 bg-[${theme.palette.primary.main}] transition-all duration-500`}
               style={{
                 width: currentStep === 2 ? "100%" : "0%",
                 zIndex: 0,
@@ -426,8 +652,8 @@ const BusinessBulkUpload: React.FC = () => {
                         w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300
                         ${
                           currentStep >= item.step
-                            ? "bg-gradient-to-r from-primary to-primary-600  shadow-lg scale-110"
-                            : `bg-[${theme.palette.primary.main}] text-black`
+                            ? "bg-gradient-to-r from-primary to-primary-600 text-black shadow-lg scale-110"
+                            : "bg-gray-200 text-gray-500"
                         }
                         `}
                   >
@@ -457,7 +683,7 @@ const BusinessBulkUpload: React.FC = () => {
                     relative border-2 border-dashed rounded-xl p-16 text-center cursor-pointer transition-all duration-300
                     ${
                       isDragActive
-                        ? "border-primary bg-primary-50 scale-[1.02]"
+                        ? `border-primary bg-[${theme.palette.primary.main}]-50 scale-[1.02]`
                         : "border-gray-300 hover:border-primary hover:bg-gray-50"
                     }
                 `}
@@ -491,13 +717,15 @@ const BusinessBulkUpload: React.FC = () => {
                     </p>
                   </div>
                 </div>
-                <CustomButton
-                  startIcon={<XMarkIcon className="w-5 h-5 text-gray-500" />}
+                <button
                   onClick={(e) => {
                     e.stopPropagation();
                     resetUpload();
                   }}
-                ></CustomButton>
+                  className="p-2 hover:bg-white/50 rounded-lg transition-colors"
+                >
+                  <XMarkIcon className="w-5 h-5 text-gray-500" />
+                </button>
               </div>
             )}
 
@@ -519,85 +747,103 @@ const BusinessBulkUpload: React.FC = () => {
         {currentStep === 2 && (
           <>
             {/* Statistics Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-5 mb-8">
-              <div className="bg-gradient-to-br from-blue-50 to-white rounded-xl p-6 border border-blue-100">
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
+              <div className="bg-gradient-to-br from-blue-50 to-white rounded-xl p-5 border border-blue-100">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-blue-600 text-sm font-medium">
+                    <p className="text-blue-600 text-xs font-medium">
                       Total Records
                     </p>
-                    <p className="text-3xl font-bold text-gray-800 mt-1">
+                    <p className="text-2xl font-bold text-gray-800 mt-1">
                       {statistics.total}
                     </p>
                   </div>
-                  <div className="w-14 h-14 bg-blue-100 rounded-xl flex items-center justify-center">
-                    <ChartBarIcon className="w-7 h-7 text-blue-600" />
+                  <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+                    <ChartBarIcon className="w-6 h-6 text-blue-600" />
                   </div>
                 </div>
               </div>
 
-              <div className="bg-gradient-to-br from-green-50 to-white rounded-xl p-6 border border-green-100">
+              <div className="bg-gradient-to-br from-green-50 to-white rounded-xl p-5 border border-green-100">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-green-600 text-sm font-medium">
-                      Valid with Website
+                    <p className="text-green-600 text-xs font-medium">
+                      Valid & Ready
                     </p>
-                    <p className="text-3xl font-bold text-gray-800 mt-1">
+                    <p className="text-2xl font-bold text-gray-800 mt-1">
                       {statistics.valid}
                     </p>
                   </div>
-                  <div className="w-14 h-14 bg-green-100 rounded-xl flex items-center justify-center">
-                    <CheckCircleIcon className="w-7 h-7 text-green-600" />
+                  <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
+                    <CheckCircleIcon className="w-6 h-6 text-green-600" />
                   </div>
                 </div>
               </div>
 
-              <div className="bg-gradient-to-br from-amber-50 to-white rounded-xl p-6 border border-amber-100">
+              <div className="bg-gradient-to-br from-amber-50 to-white rounded-xl p-5 border border-amber-100">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-amber-600 text-sm font-medium">
+                    <p className="text-amber-600 text-xs font-medium">
                       No Website
                     </p>
-                    <p className="text-3xl font-bold text-gray-800 mt-1">
+                    <p className="text-2xl font-bold text-gray-800 mt-1">
                       {statistics.noWebsite}
                     </p>
                   </div>
-                  <div className="w-14 h-14 bg-amber-100 rounded-xl flex items-center justify-center">
-                    <ExclamationTriangleIcon className="w-7 h-7 text-amber-600" />
+                  <div className="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center">
+                    <ExclamationTriangleIcon className="w-6 h-6 text-amber-600" />
                   </div>
                 </div>
               </div>
 
-              <div className="bg-gradient-to-br from-red-50 to-white rounded-xl p-6 border border-red-100">
+              <div className="bg-gradient-to-br from-purple-50 to-white rounded-xl p-5 border border-purple-100">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-red-600 text-sm font-medium">Invalid</p>
-                    <p className="text-3xl font-bold text-gray-800 mt-1">
+                    <p className="text-purple-600 text-xs font-medium">
+                      Duplicates
+                    </p>
+                    <p className="text-2xl font-bold text-gray-800 mt-1">
+                      {statistics.duplicates}
+                    </p>
+                  </div>
+                  <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center">
+                    <DocumentDuplicateIcon className="w-6 h-6 text-purple-600" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-gradient-to-br from-red-50 to-white rounded-xl p-5 border border-red-100">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-red-600 text-xs font-medium">Invalid</p>
+                    <p className="text-2xl font-bold text-gray-800 mt-1">
                       {statistics.invalid}
                     </p>
                   </div>
-                  <div className="w-14 h-14 bg-red-100 rounded-xl flex items-center justify-center">
-                    <XMarkIcon className="w-7 h-7 text-red-600" />
+                  <div className="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center">
+                    <XMarkIcon className="w-6 h-6 text-red-600" />
                   </div>
                 </div>
               </div>
             </div>
 
             {/* Info Message */}
-            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-5 mb-6 border border-blue-100">
-              <div className="flex items-start gap-3">
-                <InformationCircleIcon className="w-6 h-6 text-blue-600 mt-0.5" />
-                <div className="text-sm text-gray-700">
-                  <p className="font-medium mb-1">
-                    All records will be uploaded to the backend
-                  </p>
-                  <p>
-                    Invalid entries will be marked but still imported for data
-                    completeness. You can review and fix them later.
-                  </p>
+            {statistics.duplicates > 0 && (
+              <div className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg p-5 mb-6 border border-purple-100">
+                <div className="flex items-start gap-3">
+                  <ExclamationCircleIcon className="w-6 h-6 text-purple-600 mt-0.5" />
+                  <div className="text-sm text-gray-700">
+                    <p className="font-medium mb-1">
+                      {statistics.duplicates} duplicate(s) found
+                    </p>
+                    <p>
+                      Duplicates are highlighted in purple. You can edit them to
+                      make them unique or remove them before uploading.
+                    </p>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
 
             {/* Data Table */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
@@ -614,7 +860,7 @@ const BusinessBulkUpload: React.FC = () => {
                       className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all"
                     />
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 flex-wrap">
                     {[
                       {
                         value: "all",
@@ -627,6 +873,12 @@ const BusinessBulkUpload: React.FC = () => {
                         label: "Valid",
                         count: statistics.valid,
                         color: "green",
+                      },
+                      {
+                        value: "duplicate",
+                        label: "Duplicates",
+                        count: statistics.duplicates,
+                        color: "purple",
                       },
                       {
                         value: "no_website",
@@ -644,10 +896,18 @@ const BusinessBulkUpload: React.FC = () => {
                       <button
                         key={filter.value}
                         onClick={() => setFilterStatus(filter.value as any)}
-                        className={`px-4 py-2.5 rounded-lg transition-all font-medium ${
+                        className={`px-3 py-2 rounded-lg transition-all font-medium text-sm ${
                           filterStatus === filter.value
-                            ? `bg-${filter.color}-500 text-white shadow-md`
-                            : `bg-white text-gray-600 border border-gray-200 hover:bg-gray-50`
+                            ? filter.color === "gray"
+                              ? "bg-gray-500 text-white shadow-md"
+                              : filter.color === "green"
+                              ? "bg-green-500 text-white shadow-md"
+                              : filter.color === "purple"
+                              ? "bg-purple-500 text-white shadow-md"
+                              : filter.color === "amber"
+                              ? "bg-amber-500 text-white shadow-md"
+                              : "bg-red-500 text-white shadow-md"
+                            : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50"
                         }`}
                       >
                         {filter.label} ({filter.count})
@@ -683,19 +943,19 @@ const BusinessBulkUpload: React.FC = () => {
                         Business Name
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                        Category
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                        Location
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                        Contact
+                        Email
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                         Website
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                        Location
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                         Issues
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                        Actions
                       </th>
                     </tr>
                   </thead>
@@ -703,7 +963,9 @@ const BusinessBulkUpload: React.FC = () => {
                     {paginatedBusinesses.map((business) => (
                       <tr
                         key={business.rowIndex}
-                        className="hover:bg-gray-50 transition-colors"
+                        className={`hover:bg-gray-50 transition-colors ${
+                          business.isDuplicate ? "bg-purple-50" : ""
+                        }`}
                       >
                         <td className="p-4">
                           <input
@@ -717,7 +979,12 @@ const BusinessBulkUpload: React.FC = () => {
                           {business.rowIndex}
                         </td>
                         <td className="px-4 py-3">
-                          {business.isValid && business.website ? (
+                          {business.isDuplicate ? (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium bg-purple-100 text-purple-700 rounded-full">
+                              <DocumentDuplicateIcon className="w-3.5 h-3.5" />
+                              Duplicate
+                            </span>
+                          ) : business.isValid && business.website ? (
                             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium bg-green-100 text-green-700 rounded-full">
                               <CheckIcon className="w-3.5 h-3.5" />
                               Valid
@@ -735,34 +1002,57 @@ const BusinessBulkUpload: React.FC = () => {
                           )}
                         </td>
                         <td className="px-4 py-3">
-                          <p className="text-sm font-medium text-gray-900">
-                            {business.name || "-"}
-                          </p>
-                        </td>
-                        <td className="px-4 py-3">
-                          {business.category ? (
-                            <span className="px-2.5 py-1 text-xs bg-blue-50 text-blue-700 rounded-md font-medium">
-                              {business.category}
-                            </span>
+                          {editingRow === business.rowIndex ? (
+                            <input
+                              type="text"
+                              value={editedData.name || ""}
+                              onChange={(e) =>
+                                setEditedData({
+                                  ...editedData,
+                                  name: e.target.value,
+                                })
+                              }
+                              className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                            />
                           ) : (
-                            "-"
+                            <p className="text-sm font-medium text-gray-900">
+                              {business.name || "-"}
+                            </p>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-600">
-                          <div className="flex flex-col">
-                            <span>{business.city || "-"}</span>
-                            {business.postalCode && (
-                              <span className="text-xs text-gray-400">
-                                {business.postalCode}
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-600">
-                          {business.phoneNumber || business.email || "-"}
+                        <td className="px-4 py-3">
+                          {editingRow === business.rowIndex ? (
+                            <input
+                              type="email"
+                              value={editedData.email || ""}
+                              onChange={(e) =>
+                                setEditedData({
+                                  ...editedData,
+                                  email: e.target.value,
+                                })
+                              }
+                              className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                            />
+                          ) : (
+                            <p className="text-sm text-gray-600">
+                              {business.email || "-"}
+                            </p>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-sm">
-                          {business.website ? (
+                          {editingRow === business.rowIndex ? (
+                            <input
+                              type="url"
+                              value={editedData.website || ""}
+                              onChange={(e) =>
+                                setEditedData({
+                                  ...editedData,
+                                  website: e.target.value,
+                                })
+                              }
+                              className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                            />
+                          ) : business.website ? (
                             <a
                               href={business.website}
                               target="_blank"
@@ -777,9 +1067,60 @@ const BusinessBulkUpload: React.FC = () => {
                             <span className="text-gray-400">-</span>
                           )}
                         </td>
+                        <td className="px-4 py-3 text-sm text-gray-600">
+                          {editingRow === business.rowIndex ? (
+                            <div className="space-y-1">
+                              <input
+                                type="text"
+                                value={editedData.city || ""}
+                                onChange={(e) =>
+                                  setEditedData({
+                                    ...editedData,
+                                    city: e.target.value,
+                                  })
+                                }
+                                className="w-full px-2 py-1 border border-gray-300 rounded text-xs"
+                                placeholder="City"
+                              />
+                              <input
+                                type="text"
+                                value={editedData.country || ""}
+                                onChange={(e) =>
+                                  setEditedData({
+                                    ...editedData,
+                                    country: e.target.value,
+                                  })
+                                }
+                                className="w-full px-2 py-1 border border-gray-300 rounded text-xs"
+                                placeholder="Country"
+                              />
+                            </div>
+                          ) : (
+                            <div className="flex flex-col">
+                              <span>{business.city || "-"}</span>
+                              {business.country && (
+                                <span className="text-xs text-gray-400">
+                                  {business.country}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </td>
                         <td className="px-4 py-3 text-sm">
-                          {business.validationErrors &&
-                          business.validationErrors.length > 0 ? (
+                          {business.isDuplicate ? (
+                            <div className="space-y-1">
+                              <p className="text-xs text-purple-600 font-medium">
+                                {business.duplicateReason}
+                              </p>
+                              {business.existingRecord && (
+                                <p className="text-xs text-gray-500">
+                                  Existing:{" "}
+                                  {business.existingRecord.companyName}
+                                </p>
+                              )}
+                            </div>
+                          ) : business.validationErrors &&
+                            business.validationErrors.length > 0 ? (
                             <div className="space-y-1">
                               {business.validationErrors.map((error, idx) => (
                                 <p key={idx} className="text-xs text-red-600">
@@ -788,10 +1129,51 @@ const BusinessBulkUpload: React.FC = () => {
                               ))}
                             </div>
                           ) : (
-                            <span className="text-green-600 font-medium">
+                            <span className="text-green-600 font-medium text-xs">
                               ✓ None
                             </span>
                           )}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-1">
+                            {editingRow === business.rowIndex ? (
+                              <>
+                                <button
+                                  onClick={handleSaveEdit}
+                                  className="p-1.5 text-green-600 hover:bg-green-50 rounded transition-colors"
+                                  title="Save"
+                                >
+                                  <CheckIcon className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={handleCancelEdit}
+                                  className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
+                                  title="Cancel"
+                                >
+                                  <XMarkIcon className="w-4 h-4" />
+                                </button>
+                              </>
+                            ) : (
+                              <>
+                                <button
+                                  onClick={() => handleEdit(business.rowIndex)}
+                                  className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                                  title="Edit"
+                                >
+                                  <PencilSquareIcon className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={() =>
+                                    handleDelete(business.rowIndex)
+                                  }
+                                  className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
+                                  title="Delete"
+                                >
+                                  <TrashIcon className="w-4 h-4" />
+                                </button>
+                              </>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -837,7 +1219,7 @@ const BusinessBulkUpload: React.FC = () => {
                           onClick={() => setCurrentPage(page)}
                           className={`px-3 py-1.5 rounded-lg transition-all ${
                             currentPage === page
-                              ? "bg-primary text-white shadow-md"
+                              ? `bg-[${theme.palette.primary.main}] text-white shadow-md`
                               : "border border-gray-200 hover:bg-white"
                           }`}
                         >
@@ -880,24 +1262,32 @@ const BusinessBulkUpload: React.FC = () => {
                   gradient={true}
                   onClick={handleBulkUpload}
                   type="button"
-                  disabled={isUploading || parsedBusinesses.length === 0}
+                  disabled={isUploading || statistics.valid === 0}
                 >
                   {isUploading ? (
                     <>
                       <ArrowPathIcon className="w-5 h-5 animate-spin" />
-                      Uploading{" "}
-                      {selectedRows.size > 0
-                        ? selectedRows.size
-                        : parsedBusinesses.length}{" "}
-                      Records...
+                      Uploading...
                     </>
                   ) : (
                     <>
                       <ArrowUpTrayIcon className="w-5 h-5" />
                       Upload{" "}
                       {selectedRows.size > 0
-                        ? `${selectedRows.size} Selected`
-                        : `All ${parsedBusinesses.length}`}{" "}
+                        ? `${
+                            Array.from(selectedRows).filter((rowIndex) => {
+                              const business = parsedBusinesses.find(
+                                (b) => b.rowIndex === rowIndex
+                              );
+                              return (
+                                business &&
+                                business.isValid &&
+                                business.website &&
+                                !business.isDuplicate
+                              );
+                            }).length
+                          } Selected`
+                        : `${statistics.valid} Valid`}{" "}
                       Records
                     </>
                   )}

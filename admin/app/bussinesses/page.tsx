@@ -32,7 +32,7 @@ import {
 } from "@/api/bussiness";
 import { useRouter } from "next/navigation";
 import CustomButton from "@/components/UI/CustomButton";
-import { Plus } from "lucide-react";
+import { EditIcon, EyeIcon, Plus } from "lucide-react";
 
 interface FilterState {
   search: string;
@@ -686,7 +686,7 @@ const BusinessSearchPage: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y w-max divide-gray-100">
-                    {businesses.map((business) => (
+                    {businesses.map((business: any) => (
                       <tr
                         key={business.id}
                         className="hover:bg-gray-50 w-max transition-colors"
@@ -803,7 +803,20 @@ const BusinessSearchPage: React.FC = () => {
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2">
-                            {/* Action buttons can be added here */}
+                            <CustomButton
+                              onClick={() => {
+                                router.push(`/bussinesses/${business?.id}`);
+                              }}
+                              startIcon={<EyeIcon />}
+                            ></CustomButton>{" "}
+                            <CustomButton
+                              onClick={() => {
+                                router.push(
+                                  `/bussinesses/new?businessId=${business?.id}`
+                                );
+                              }}
+                              startIcon={<EditIcon />}
+                            ></CustomButton>{" "}
                           </div>
                         </td>
                       </tr>
