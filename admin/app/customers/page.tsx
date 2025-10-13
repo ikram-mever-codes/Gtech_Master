@@ -593,24 +593,6 @@ const CustomersPage = () => {
                 Manage customer accounts and registration requests
               </Typography>
             </Box>
-            <CustomButton
-              variant="contained"
-              startIcon={<PlusIcon size={18} />}
-              onClick={() => router.push("/customers/create")}
-              sx={{
-                borderRadius: 1,
-                px: 3,
-                py: 1.5,
-                fontWeight: 600,
-                textTransform: "none",
-                boxShadow: "0 4px 12px rgba(25, 118, 210, 0.4)",
-                "&:hover": {
-                  boxShadow: "0 6px 16px rgba(25, 118, 210, 0.5)",
-                },
-              }}
-            >
-              Create Company
-            </CustomButton>
           </Stack>
 
           {/* Stats Cards */}

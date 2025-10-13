@@ -5,6 +5,7 @@ import { Customer } from "../models/customers";
 import { BusinessDetails } from "../models/business_details";
 import ErrorHandler from "../utils/errorHandler";
 import { In, Like } from "typeorm";
+import { StarBusinessDetails } from "../models/star_business_details";
 
 // Constants for business sources and status (maintaining compatibility)
 export const BUSINESS_SOURCE = {
@@ -19,7 +20,6 @@ export const BUSINESS_STATUS = {
   NO_WEBSITE: "no_website",
   VERIFIED: "verified",
 };
-
 export const bulkImportBusinesses = async (
   req: Request,
   res: Response,
@@ -67,7 +67,6 @@ export const bulkImportBusinesses = async (
     const businessesToCheck: Array<{
       index: number;
       data: any;
-      normalizedEmail: string;
       normalizedWebsite: string | null;
       normalizedCompanyName: string;
     }> = [];
@@ -86,13 +85,7 @@ export const bulkImportBusinesses = async (
         continue;
       }
 
-      // Normalize data for duplicate checking
-      const normalizedEmail = businessData.email
-        ? businessData.email.trim().toLowerCase()
-        : `${businessData.name
-            .toLowerCase()
-            .replace(/\s+/g, ".")}@imported.business`;
-
+      // Normalize data for duplicate checking (only company name and website)
       const normalizedWebsite = businessData.website
         ? normalizeWebsite(businessData.website)
         : null;
@@ -102,45 +95,20 @@ export const bulkImportBusinesses = async (
       businessesToCheck.push({
         index: i,
         data: businessData,
-        normalizedEmail,
         normalizedWebsite,
         normalizedCompanyName,
       });
     }
 
     // Batch query for existing businesses to check duplicates efficiently
-    const existingBusinessesByEmail = new Map<string, any>();
     const existingBusinessesByWebsite = new Map<string, any>();
     const existingBusinessesByName = new Map<string, any>();
 
-    // Get all unique emails, websites, and names to check
-    const emailsToCheck = businessesToCheck.map((b) => b.normalizedEmail);
+    // Get all unique websites and names to check
     const websitesToCheck = businessesToCheck
       .filter((b) => b.normalizedWebsite)
       .map((b) => b.normalizedWebsite!);
     const namesToCheck = businessesToCheck.map((b) => b.normalizedCompanyName);
-
-    // Query existing customers by email
-    if (emailsToCheck.length > 0) {
-      const existingByEmail = await customerRepository
-        .createQueryBuilder("customer")
-        .leftJoinAndSelect("customer.businessDetails", "businessDetails")
-        .where("LOWER(customer.email) IN (:...emails)", {
-          emails: emailsToCheck,
-        })
-        .andWhere("customer.stage = :stage", { stage: "business" })
-        .getMany();
-
-      existingByEmail.forEach((customer) => {
-        existingBusinessesByEmail.set(customer.email.toLowerCase(), {
-          id: customer.id,
-          companyName: customer.companyName,
-          email: customer.email,
-          website: customer.businessDetails?.website,
-          stage: customer.stage,
-        });
-      });
-    }
 
     // Query existing businesses by website
     if (websitesToCheck.length > 0) {
@@ -191,7 +159,6 @@ export const bulkImportBusinesses = async (
     // Process each business and separate duplicates from new entries
     const customersToSave: Customer[] = [];
     const seenInBatch = {
-      emails: new Set<string>(),
       websites: new Set<string>(),
       names: new Set<string>(),
     };
@@ -200,7 +167,6 @@ export const bulkImportBusinesses = async (
       const {
         index,
         data: businessData,
-        normalizedEmail,
         normalizedWebsite,
         normalizedCompanyName,
       } = businessToCheck;
@@ -209,12 +175,7 @@ export const bulkImportBusinesses = async (
       let existingRecord = null;
 
       // Check for duplicates in current batch
-      if (seenInBatch.emails.has(normalizedEmail)) {
-        duplicateReason = "Duplicate email in current batch";
-      } else if (
-        normalizedWebsite &&
-        seenInBatch.websites.has(normalizedWebsite)
-      ) {
+      if (normalizedWebsite && seenInBatch.websites.has(normalizedWebsite)) {
         duplicateReason = "Duplicate website in current batch";
       } else if (seenInBatch.names.has(normalizedCompanyName)) {
         duplicateReason = "Duplicate company name in current batch";
@@ -222,13 +183,8 @@ export const bulkImportBusinesses = async (
 
       // Check against existing database records
       if (!duplicateReason) {
-        // Check by email
-        if (existingBusinessesByEmail.has(normalizedEmail)) {
-          duplicateReason = "Email already exists in database";
-          existingRecord = existingBusinessesByEmail.get(normalizedEmail);
-        }
         // Check by website
-        else if (
+        if (
           normalizedWebsite &&
           existingBusinessesByWebsite.has(normalizedWebsite)
         ) {
@@ -249,7 +205,7 @@ export const bulkImportBusinesses = async (
           business: {
             index: index,
             name: businessData.name,
-            email: normalizedEmail,
+            email: businessData.email,
             website: businessData.website,
             address: businessData.address,
             city: businessData.city,
@@ -268,11 +224,15 @@ export const bulkImportBusinesses = async (
 
         // Required fields for Customer
         customer.companyName = businessData.name.trim();
-        customer.email = normalizedEmail;
+        customer.email = businessData.email
+          ? businessData.email.trim().toLowerCase()
+          : `${businessData.name
+              .toLowerCase()
+              .replace(/\s+/g, ".")}@imported.business`;
         customer.stage = "business";
         customer.contactEmail = businessData.contactEmail
           ? businessData.contactEmail.trim().toLowerCase()
-          : normalizedEmail;
+          : customer.email;
         customer.contactPhoneNumber = businessData.contactPhoneNumber
           ? businessData.contactPhoneNumber.trim()
           : businessData.phoneNumber
@@ -350,8 +310,7 @@ export const bulkImportBusinesses = async (
 
         customer.businessDetails = businessDetails;
 
-        // Add to batch tracking
-        seenInBatch.emails.add(normalizedEmail);
+        // Add to batch tracking (only website and company name)
         if (normalizedWebsite) {
           seenInBatch.websites.add(normalizedWebsite);
         }
@@ -481,7 +440,6 @@ export const bulkImportBusinesses = async (
     );
   }
 };
-
 export const createBusiness = async (
   req: Request,
   res: Response,
@@ -495,7 +453,7 @@ export const createBusiness = async (
       description,
       city,
       state,
-      country,
+      country = "Germany",
       postalCode,
       latitude,
       longitude,
@@ -510,7 +468,8 @@ export const createBusiness = async (
       socialMedia,
       businessHours,
       source = BUSINESS_SOURCE.MANUAL,
-      isDeviceMaker, // New field
+      isDeviceMaker,
+      starBusinessDetails, // New field for star business details
       // Customer specific fields
       companyName,
       legalName,
@@ -555,6 +514,8 @@ export const createBusiness = async (
     const customerRepository = AppDataSource.getRepository(Customer);
     const businessDetailsRepository =
       AppDataSource.getRepository(BusinessDetails);
+    const starBusinessDetailsRepository =
+      AppDataSource.getRepository(StarBusinessDetails);
 
     // Normalize website for comparison (remove trailing slashes, www, etc.)
     const normalizedWebsite = website ? normalizeWebsite(website) : null;
@@ -594,7 +555,7 @@ export const createBusiness = async (
       );
     }
 
-    // Optional: Check for duplicate email if provided
+    // Optional: Check for duplicate email only if provided
     if (finalEmail) {
       const existingCustomerWithEmail = await customerRepository.findOne({
         where: { email: finalEmail.trim().toLowerCase() },
@@ -611,23 +572,26 @@ export const createBusiness = async (
     const customer = new Customer();
     customer.companyName = trimmedCompanyName;
     customer.email = finalEmail ? finalEmail.trim().toLowerCase() : undefined;
-    customer.stage = "business";
+    customer.stage = "business"; // Default stage
     customer.legalName = legalName ? legalName.trim() : undefined;
+
+    // Set contact email - prioritize contactEmail, then fall back to email if provided
     customer.contactEmail = contactEmail
       ? contactEmail.trim().toLowerCase()
       : finalEmail
       ? finalEmail.trim().toLowerCase()
       : undefined;
+
     customer.contactPhoneNumber = contactPhoneNumber
       ? contactPhoneNumber.trim()
       : phoneNumber
       ? phoneNumber.trim()
       : undefined;
+
     // Create BusinessDetails entity
     const businessDetails = new BusinessDetails();
     businessDetails.businessSource = source as any;
     businessDetails.isDeviceMaker = isDeviceMaker as "Yes" | "No" | "Unsure";
-    businessDetails.businessSource = source;
     businessDetails.address = address ? address.trim() : undefined;
     businessDetails.website = normalizedWebsite || undefined;
     businessDetails.description = description ? description.trim() : undefined;
@@ -638,7 +602,7 @@ export const createBusiness = async (
     businessDetails.latitude = sanitizeNumber(latitude);
     businessDetails.longitude = sanitizeNumber(longitude);
     businessDetails.contactPhone = phoneNumber ? phoneNumber.trim() : undefined;
-    businessDetails.email = email ? email.trim().toLowerCase() : undefined;
+    businessDetails.email = email ? email.trim().toLowerCase() : undefined; // Now optional
     businessDetails.googleMapsUrl = googleMapsUrl
       ? googleMapsUrl.trim()
       : undefined;
@@ -654,6 +618,48 @@ export const createBusiness = async (
     // Associate BusinessDetails with Customer
     customer.businessDetails = businessDetails;
 
+    // Create StarBusinessDetails if isDeviceMaker is "Yes"
+    if (isDeviceMaker === "Yes" && starBusinessDetails) {
+      const starBusiness = new StarBusinessDetails();
+
+      // Map star business fields
+      if (starBusinessDetails.inSeries) {
+        starBusiness.inSeries = starBusinessDetails.inSeries as "Yes" | "No";
+      }
+
+      if (starBusinessDetails.madeIn) {
+        starBusiness.madeIn = starBusinessDetails.madeIn as
+          | "Germany"
+          | "Switzerland"
+          | "Austria";
+      }
+
+      if (starBusinessDetails.lastChecked) {
+        starBusiness.lastChecked = new Date(starBusinessDetails.lastChecked);
+      }
+
+      if (starBusinessDetails.checkedBy) {
+        starBusiness.checkedBy = starBusinessDetails.checkedBy as
+          | "manual"
+          | "AI";
+      }
+
+      if (starBusinessDetails.device) {
+        starBusiness.device = starBusinessDetails.device.trim();
+      }
+
+      if (starBusinessDetails.industry) {
+        starBusiness.industry = starBusinessDetails.industry.trim();
+      }
+
+      // Associate StarBusinessDetails with Customer
+      customer.starBusinessDetails = starBusiness;
+
+      // Update customer stage to star_business
+      customer.stage = "star_business";
+      businessDetails.isStarBusiness = true;
+    }
+
     // Save to database
     await customerRepository.save(customer);
 
@@ -668,6 +674,17 @@ export const createBusiness = async (
       source: customer.businessDetails.businessSource,
       isDeviceMaker: customer.businessDetails.isDeviceMaker,
       ...businessDetails,
+      // Include star business details if present
+      starBusinessDetails: customer.starBusinessDetails
+        ? {
+            inSeries: customer.starBusinessDetails.inSeries,
+            madeIn: customer.starBusinessDetails.madeIn,
+            lastChecked: customer.starBusinessDetails.lastChecked,
+            checkedBy: customer.starBusinessDetails.checkedBy,
+            device: customer.starBusinessDetails.device,
+            industry: customer.starBusinessDetails.industry,
+          }
+        : undefined,
       // Include backward compatibility fields
       website: businessDetails.website,
       hasWebsite: !!businessDetails.website,
@@ -710,6 +727,347 @@ export const createBusiness = async (
       }
     }
 
+    return next(error);
+  }
+};
+
+// 5. Update Business
+export const updateBusiness = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { id } = req.params;
+    const updateData = req.body;
+
+    const customerRepository = AppDataSource.getRepository(Customer);
+    const starBusinessDetailsRepository =
+      AppDataSource.getRepository(StarBusinessDetails);
+
+    const customer = await customerRepository.findOne({
+      where: { id },
+      relations: ["businessDetails", "starBusinessDetails"],
+    });
+
+    if (!customer) {
+      return next(new ErrorHandler("Business not found", 404));
+    }
+
+    // Check for duplicate email if email is being updated
+    if (updateData.email && updateData.email !== customer.email) {
+      const existingCustomer = await customerRepository.findOne({
+        where: { email: updateData.email.trim().toLowerCase() },
+      });
+      if (existingCustomer && existingCustomer.id !== id) {
+        return next(
+          new ErrorHandler("Business with this email already exists", 400)
+        );
+      }
+    }
+
+    // Check for duplicate company name if being updated
+    if (updateData.name && updateData.name !== customer.companyName) {
+      const existingCustomer = await customerRepository.findOne({
+        where: { companyName: updateData.name.trim() },
+      });
+      if (existingCustomer && existingCustomer.id !== id) {
+        return next(
+          new ErrorHandler(
+            "Business with this company name already exists",
+            400
+          )
+        );
+      }
+    }
+
+    // Update main customer fields (with backward compatibility)
+    if (updateData.name) customer.companyName = updateData.name.trim();
+    if (updateData.companyName)
+      customer.companyName = updateData.companyName.trim();
+    if (updateData.legalName !== undefined)
+      customer.legalName = updateData.legalName
+        ? updateData.legalName.trim()
+        : undefined;
+    if (updateData.email)
+      customer.email = updateData.email.trim().toLowerCase();
+    if (updateData.contactEmail)
+      customer.contactEmail = updateData.contactEmail.trim().toLowerCase();
+    if (updateData.contactPhoneNumber)
+      customer.contactPhoneNumber = updateData.contactPhoneNumber.trim();
+
+    // Update BusinessDetails
+    if (!customer.businessDetails) {
+      customer.businessDetails = new BusinessDetails();
+    }
+
+    const businessDetails = customer.businessDetails;
+
+    // Map update data to BusinessDetails (with backward compatibility)
+    if (updateData.address !== undefined)
+      businessDetails.address = updateData.address
+        ? updateData.address.trim()
+        : undefined;
+    if (updateData.isDeviceMaker !== undefined)
+      businessDetails.isDeviceMaker = updateData.isDeviceMaker;
+    if (updateData.website !== undefined)
+      businessDetails.website = updateData.website
+        ? updateData.website.trim()
+        : undefined;
+    if (updateData.description !== undefined)
+      businessDetails.description = updateData.description
+        ? updateData.description.trim()
+        : undefined;
+    if (updateData.city !== undefined)
+      businessDetails.city = updateData.city
+        ? updateData.city.trim()
+        : undefined;
+    if (updateData.state !== undefined)
+      businessDetails.state = updateData.state
+        ? updateData.state.trim()
+        : undefined;
+    if (updateData.country !== undefined)
+      businessDetails.country = updateData.country
+        ? updateData.country.trim()
+        : undefined;
+    if (updateData.postalCode !== undefined)
+      businessDetails.postalCode = updateData.postalCode
+        ? updateData.postalCode.trim()
+        : undefined;
+    if (updateData.latitude !== undefined)
+      businessDetails.latitude = sanitizeNumber(updateData.latitude);
+    if (updateData.longitude !== undefined)
+      businessDetails.longitude = sanitizeNumber(updateData.longitude);
+    if (updateData.phoneNumber !== undefined)
+      businessDetails.contactPhone = updateData.phoneNumber
+        ? updateData.phoneNumber.trim()
+        : undefined;
+    if (updateData.businessEmail !== undefined)
+      businessDetails.email = updateData.businessEmail
+        ? updateData.businessEmail.trim().toLowerCase()
+        : undefined;
+    if (updateData.googleMapsUrl !== undefined)
+      businessDetails.googleMapsUrl = updateData.googleMapsUrl
+        ? updateData.googleMapsUrl.trim()
+        : undefined;
+    if (updateData.reviewCount !== undefined)
+      businessDetails.reviewCount = sanitizeInteger(updateData.reviewCount);
+    if (updateData.category !== undefined)
+      businessDetails.category = updateData.category
+        ? updateData.category.trim()
+        : undefined;
+    if (updateData.additionalCategories !== undefined)
+      businessDetails.additionalCategories = Array.isArray(
+        updateData.additionalCategories
+      )
+        ? updateData.additionalCategories
+            .map((cat: string) => cat.trim())
+            .filter(Boolean)
+        : undefined;
+    if (updateData.socialMedia !== undefined)
+      businessDetails.socialLinks = sanitizeSocialLinks(updateData.socialMedia);
+    if (updateData.source !== undefined)
+      businessDetails.businessSource = updateData.source;
+
+    // Handle StarBusinessDetails
+    if (updateData.isDeviceMaker === "Yes" && updateData.starBusinessDetails) {
+      // Create or update StarBusinessDetails
+      if (!customer.starBusinessDetails) {
+        customer.starBusinessDetails = new StarBusinessDetails();
+      }
+
+      const starBusiness = customer.starBusinessDetails;
+      if (!starBusiness) {
+        return next(new ErrorHandler("Star Business Details not found", 404));
+      }
+      // Update star business fields
+      if (updateData.starBusinessDetails.inSeries !== undefined) {
+        starBusiness.inSeries = updateData.starBusinessDetails.inSeries as
+          | "Yes"
+          | "No"
+          | undefined;
+      }
+
+      if (updateData.starBusinessDetails.madeIn !== undefined) {
+        starBusiness.madeIn = updateData.starBusinessDetails.madeIn as
+          | "Germany"
+          | "Switzerland"
+          | "Austria"
+          | undefined;
+      }
+
+      if (updateData.starBusinessDetails.lastChecked !== undefined) {
+        starBusiness.lastChecked = updateData.starBusinessDetails.lastChecked
+          ? new Date(updateData.starBusinessDetails.lastChecked)
+          : undefined;
+      }
+
+      if (updateData.starBusinessDetails.checkedBy !== undefined) {
+        starBusiness.checkedBy = updateData.starBusinessDetails.checkedBy as
+          | "manual"
+          | "AI"
+          | undefined;
+      }
+
+      if (updateData.starBusinessDetails.device !== undefined) {
+        starBusiness.device = updateData.starBusinessDetails.device
+          ? updateData.starBusinessDetails.device.trim()
+          : undefined;
+      }
+
+      if (updateData.starBusinessDetails.industry !== undefined) {
+        starBusiness.industry = updateData.starBusinessDetails.industry
+          ? updateData.starBusinessDetails.industry.trim()
+          : undefined;
+      }
+
+      // Update customer stage to star_business
+      customer.stage = "star_business";
+      businessDetails.isStarBusiness = true;
+    } else if (
+      updateData.isDeviceMaker === "No" ||
+      updateData.isDeviceMaker === "Unsure"
+    ) {
+      // If changing from Yes to No/Unsure, remove StarBusinessDetails
+      if (customer.starBusinessDetails) {
+        // Delete the star business details
+        await starBusinessDetailsRepository.remove(
+          customer.starBusinessDetails
+        );
+        customer.starBusinessDetails = undefined;
+
+        // Update stage back to business if not a star customer
+        if (!customer.starCustomerDetails) {
+          customer.stage = "business";
+        }
+        businessDetails.isStarBusiness = false;
+      }
+    }
+
+    await customerRepository.save(customer);
+
+    // Fetch updated customer with all relations
+    const updatedCustomer = await customerRepository.findOne({
+      where: { id },
+      relations: ["businessDetails", "starBusinessDetails"],
+    });
+
+    // Transform response
+    const businessResponse = {
+      id: updatedCustomer!.id,
+      name: updatedCustomer!.companyName,
+      legalName: updatedCustomer!.legalName,
+      email: updatedCustomer!.email,
+      contactEmail: updatedCustomer!.contactEmail,
+      contactPhoneNumber: updatedCustomer!.contactPhoneNumber,
+      stage: updatedCustomer!.stage,
+      ...updatedCustomer!.businessDetails,
+      // Include star business details if present
+      starBusinessDetails: updatedCustomer!.starBusinessDetails
+        ? {
+            inSeries: updatedCustomer!.starBusinessDetails.inSeries,
+            madeIn: updatedCustomer!.starBusinessDetails.madeIn,
+            lastChecked: updatedCustomer!.starBusinessDetails.lastChecked,
+            checkedBy: updatedCustomer!.starBusinessDetails.checkedBy,
+            device: updatedCustomer!.starBusinessDetails.device,
+            industry: updatedCustomer!.starBusinessDetails.industry,
+          }
+        : undefined,
+      // Backward compatibility fields
+      website: updatedCustomer!.businessDetails?.website,
+      hasWebsite: !!updatedCustomer!.businessDetails?.website,
+      phoneNumber: updatedCustomer!.businessDetails?.contactPhone,
+      businessEmail: updatedCustomer!.businessDetails?.email,
+      status: BUSINESS_STATUS.ACTIVE,
+      source: updatedCustomer!.businessDetails?.businessSource,
+      isDeviceMaker: updatedCustomer!.businessDetails?.isDeviceMaker,
+      createdAt: updatedCustomer!.createdAt,
+      updatedAt: updatedCustomer!.updatedAt,
+    };
+
+    return res.status(200).json({
+      success: true,
+      message: "Business updated successfully",
+      data: businessResponse,
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+// Get Business By ID (also updated to include starBusinessDetails)
+export const getBusinessById = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { id } = req.params;
+
+    const customerRepository = AppDataSource.getRepository(Customer);
+    const customer = await customerRepository.findOne({
+      where: { id },
+      relations: [
+        "businessDetails",
+        "starBusinessDetails",
+        "starCustomerDetails",
+      ],
+    });
+
+    if (!customer) {
+      return next(new ErrorHandler("Business not found", 404));
+    }
+
+    // Transform response
+    const businessResponse = {
+      id: customer.id,
+      name: customer.companyName,
+      companyName: customer.companyName,
+      legalName: customer.legalName,
+      email: customer.email,
+      contactEmail: customer.contactEmail,
+      contactPhoneNumber: customer.contactPhoneNumber,
+      stage: customer.stage,
+      businessDetails: customer.businessDetails,
+      starBusinessDetails: customer.starBusinessDetails
+        ? {
+            inSeries: customer.starBusinessDetails.inSeries,
+            madeIn: customer.starBusinessDetails.madeIn,
+            lastChecked: customer.starBusinessDetails.lastChecked,
+            checkedBy: customer.starBusinessDetails.checkedBy,
+            device: customer.starBusinessDetails.device,
+            industry: customer.starBusinessDetails.industry,
+          }
+        : undefined,
+      // Backward compatibility fields
+      website: customer.businessDetails?.website,
+      hasWebsite: !!customer.businessDetails?.website,
+      phoneNumber: customer.businessDetails?.contactPhone,
+      businessEmail: customer.businessDetails?.email,
+      address: customer.businessDetails?.address,
+      city: customer.businessDetails?.city,
+      state: customer.businessDetails?.state,
+      country: customer.businessDetails?.country,
+      postalCode: customer.businessDetails?.postalCode,
+      latitude: customer.businessDetails?.latitude,
+      longitude: customer.businessDetails?.longitude,
+      googleMapsUrl: customer.businessDetails?.googleMapsUrl,
+      reviewCount: customer.businessDetails?.reviewCount,
+      category: customer.businessDetails?.category,
+      additionalCategories: customer.businessDetails?.additionalCategories,
+      socialMedia: customer.businessDetails?.socialLinks,
+      source: customer.businessDetails?.businessSource,
+      isDeviceMaker: customer.businessDetails?.isDeviceMaker,
+      status: BUSINESS_STATUS.ACTIVE,
+      createdAt: customer.createdAt,
+      updatedAt: customer.updatedAt,
+    };
+
+    return res.status(200).json({
+      success: true,
+      data: businessResponse,
+    });
+  } catch (error) {
     return next(error);
   }
 };
@@ -787,6 +1145,8 @@ export const getAllBusinesses = async (
       minRating,
       maxRating,
       verified,
+      sortBy = "createdAt", // Add sortBy parameter
+      sortOrder = "DESC", // Add sortOrder parameter with DESC as default
     } = req.query;
 
     const pageNum = parseInt(page as string);
@@ -796,8 +1156,7 @@ export const getAllBusinesses = async (
     const customerRepository = AppDataSource.getRepository(Customer);
     const queryBuilder = customerRepository
       .createQueryBuilder("customer")
-      .leftJoinAndSelect("customer.businessDetails", "businessDetails")
-      .where("customer.stage = :stage", { stage: "business" });
+      .leftJoinAndSelect("customer.businessDetails", "businessDetails");
 
     // Apply filters
     if (search) {
@@ -843,15 +1202,37 @@ export const getAllBusinesses = async (
       });
     }
 
+    if (minRating) {
+      queryBuilder.andWhere("businessDetails.averageRating >= :minRating", {
+        minRating: parseFloat(minRating as string),
+      });
+    }
+
+    if (maxRating) {
+      queryBuilder.andWhere("businessDetails.averageRating <= :maxRating", {
+        maxRating: parseFloat(maxRating as string),
+      });
+    }
+
+    if (verified !== undefined) {
+      const verifiedBool = verified === "true";
+      queryBuilder.andWhere("customer.isVerified = :verified", {
+        verified: verifiedBool,
+      });
+    }
+
     // Get total count
     const total = await queryBuilder.getCount();
 
+    // Apply sorting - default is by createdAt DESC (newest first)
+    const orderByField =
+      sortBy === "name" ? "customer.companyName" : "customer.createdAt";
+    const orderDirection = sortOrder === "ASC" ? "ASC" : "DESC";
+
+    queryBuilder.orderBy(orderByField, orderDirection);
+
     // Get paginated results
-    const customers = await queryBuilder
-      .orderBy("customer.createdAt", "DESC")
-      .skip(skip)
-      .take(limitNum)
-      .getMany();
+    const customers = await queryBuilder.skip(skip).take(limitNum).getMany();
 
     const businesses = customers.map((customer) => {
       const { id: businessId, ...businessDetailsWithoutId } =
@@ -893,177 +1274,6 @@ export const getAllBusinesses = async (
   } catch (error) {
     console.error("Error fetching businesses:", error);
     return next(new ErrorHandler("Failed to fetch businesses", 500));
-  }
-};
-
-// 5. Update Business
-export const updateBusiness = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
-  try {
-    const { id } = req.params;
-    const updateData = req.body;
-
-    const customerRepository = AppDataSource.getRepository(Customer);
-    const customer = await customerRepository.findOne({
-      where: { id },
-      relations: ["businessDetails"],
-    });
-
-    if (!customer) {
-      return next(new ErrorHandler("Business not found", 404));
-    }
-
-    // Check for duplicate email if email is being updated
-    if (updateData.email && updateData.email !== customer.email) {
-      const existingCustomer = await customerRepository.findOne({
-        where: { email: updateData.email.trim().toLowerCase() },
-      });
-      if (existingCustomer && existingCustomer.id !== id) {
-        return next(
-          new ErrorHandler("Business with this email already exists", 400)
-        );
-      }
-    }
-
-    // Check for duplicate company name if being updated
-    if (updateData.name && updateData.name !== customer.companyName) {
-      const existingCustomer = await customerRepository.findOne({
-        where: { companyName: updateData.name.trim() },
-      });
-      if (existingCustomer && existingCustomer.id !== id) {
-        return next(
-          new ErrorHandler(
-            "Business with this company name already exists",
-            400
-          )
-        );
-      }
-    }
-
-    // Update main customer fields (with backward compatibility)
-    if (updateData.name) customer.companyName = updateData.name.trim();
-    if (updateData.companyName)
-      customer.companyName = updateData.companyName.trim();
-    if (updateData.legalName !== undefined)
-      customer.legalName = updateData.legalName
-        ? updateData.legalName.trim()
-        : undefined;
-    if (updateData.email)
-      customer.email = updateData.email.trim().toLowerCase();
-    if (updateData.contactEmail)
-      customer.contactEmail = updateData.contactEmail.trim().toLowerCase();
-    if (updateData.contactPhoneNumber)
-      customer.contactPhoneNumber = updateData.contactPhoneNumber.trim();
-
-    // Update BusinessDetails
-    if (!customer.businessDetails) {
-      customer.businessDetails = new BusinessDetails();
-    }
-
-    const businessDetails = customer.businessDetails;
-
-    // Map update data to BusinessDetails (with backward compatibility)
-    if (updateData.address) businessDetails.address = updateData.address.trim();
-    if (updateData.isDeviceMaker)
-      businessDetails.isDeviceMaker = updateData.isDeviceMaker;
-    if (updateData.website !== undefined)
-      businessDetails.website = updateData.website
-        ? updateData.website.trim()
-        : undefined;
-    if (updateData.description !== undefined)
-      businessDetails.description = updateData.description
-        ? updateData.description.trim()
-        : undefined;
-    if (updateData.city !== undefined)
-      businessDetails.city = updateData.city
-        ? updateData.city.trim()
-        : undefined;
-    if (updateData.state !== undefined)
-      businessDetails.state = updateData.state
-        ? updateData.state.trim()
-        : undefined;
-    if (updateData.country !== undefined)
-      businessDetails.country = updateData.country
-        ? updateData.country.trim()
-        : undefined;
-    if (updateData.postalCode !== undefined)
-      businessDetails.postalCode = updateData.postalCode
-        ? updateData.postalCode.trim()
-        : undefined;
-    if (updateData.latitude !== undefined)
-      businessDetails.latitude = sanitizeNumber(updateData.latitude);
-    if (updateData.longitude !== undefined)
-      businessDetails.longitude = sanitizeNumber(updateData.longitude);
-    if (updateData.phoneNumber !== undefined)
-      businessDetails.contactPhone = updateData.phoneNumber
-        ? updateData.phoneNumber.trim()
-        : undefined;
-    if (updateData.businessEmail !== undefined)
-      businessDetails.email = updateData.businessEmail
-        ? updateData.businessEmail.trim().toLowerCase()
-        : undefined;
-    if (updateData.googleMapsUrl !== undefined)
-      businessDetails.googleMapsUrl = updateData.googleMapsUrl
-        ? updateData.googleMapsUrl.trim()
-        : undefined;
-    if (updateData.reviewCount !== undefined)
-      businessDetails.reviewCount = sanitizeInteger(updateData.reviewCount);
-    if (updateData.category !== undefined)
-      businessDetails.category = updateData.category
-        ? updateData.category.trim()
-        : undefined;
-    if (updateData.additionalCategories !== undefined)
-      businessDetails.additionalCategories = Array.isArray(
-        updateData.additionalCategories
-      )
-        ? updateData.additionalCategories
-            .map((cat: string) => cat.trim())
-            .filter(Boolean)
-        : undefined;
-    if (updateData.socialMedia !== undefined)
-      businessDetails.socialLinks = sanitizeSocialLinks(updateData.socialMedia);
-    if (updateData.source !== undefined)
-      businessDetails.businessSource = updateData.source;
-
-    await customerRepository.save(customer);
-
-    // Fetch updated customer
-    const updatedCustomer = await customerRepository.findOne({
-      where: { id },
-      relations: ["businessDetails"],
-    });
-
-    // Transform response
-    const businessResponse = {
-      id: updatedCustomer!.id,
-      name: updatedCustomer!.companyName,
-      legalName: updatedCustomer!.legalName,
-      email: updatedCustomer!.email,
-      contactEmail: updatedCustomer!.contactEmail,
-      contactPhoneNumber: updatedCustomer!.contactPhoneNumber,
-      stage: updatedCustomer!.stage,
-      ...updatedCustomer!.businessDetails,
-      // Backward compatibility fields
-      website: updatedCustomer!.businessDetails?.website,
-      hasWebsite: !!updatedCustomer!.businessDetails?.website,
-      phoneNumber: updatedCustomer!.businessDetails?.contactPhone,
-      businessEmail: updatedCustomer!.businessDetails?.email,
-      status: BUSINESS_STATUS.ACTIVE,
-      source: updatedCustomer!.businessDetails?.businessSource,
-      createdAt: updatedCustomer!.createdAt,
-      updatedAt: updatedCustomer!.updatedAt,
-    };
-
-    return res.status(200).json({
-      success: true,
-      message: "Business updated successfully",
-      data: businessResponse,
-    });
-  } catch (error) {
-    return next(error);
   }
 };
 
@@ -1300,50 +1510,3 @@ function sanitizeIsDeviceMaker(
   }
   return undefined;
 }
-
-// 4. Get Business by ID
-export const getBusinessById = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
-  try {
-    const { id } = req.params;
-
-    const customerRepository = AppDataSource.getRepository(Customer);
-    const customer = await customerRepository.findOne({
-      where: { id },
-      relations: ["businessDetails"],
-    });
-
-    if (!customer) {
-      return next(new ErrorHandler("Business not found", 404));
-    }
-
-    const businessResponse = {
-      id: customer.id,
-      name: customer.companyName,
-      legalName: customer.legalName,
-      email: customer.email,
-      contactEmail: customer.contactEmail,
-      contactPhoneNumber: customer.contactPhoneNumber,
-      stage: customer.stage,
-      ...customer.businessDetails,
-      website: customer.businessDetails?.website,
-      hasWebsite: !!customer.businessDetails?.website,
-      phoneNumber: customer.businessDetails?.contactPhone,
-      businessEmail: customer.businessDetails?.email,
-      status: BUSINESS_STATUS.ACTIVE,
-      source: customer.businessDetails?.businessSource,
-      createdAt: customer.createdAt,
-      updatedAt: customer.updatedAt,
-    };
-
-    return res.status(200).json({
-      success: true,
-      data: businessResponse,
-    });
-  } catch (error) {
-    return next(error);
-  }
-};

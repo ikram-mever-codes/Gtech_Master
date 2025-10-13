@@ -616,15 +616,6 @@ const BusinessBulkUpload: React.FC = () => {
               Bulk import business data from CSV files
             </p>
           </div>
-          <div className="flex gap-3">
-            <CustomButton
-              variant="outlined"
-              startIcon={<DocumentArrowDownIcon className="w-5 h-5" />}
-              onClick={downloadTemplate}
-            >
-              Download Template
-            </CustomButton>
-          </div>
         </div>
 
         {/* Progress Indicator */}

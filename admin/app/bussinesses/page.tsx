@@ -46,6 +46,7 @@ interface FilterState {
   maxRating: string;
   verified: string;
   source: string;
+  stage: string; // Add stage filter
 }
 
 const BusinessSearchPage: React.FC = () => {
@@ -72,12 +73,14 @@ const BusinessSearchPage: React.FC = () => {
     maxRating: "",
     verified: "",
     source: "",
+    stage: "", // Add stage filter
   });
 
   const [categories, setCategories] = useState<string[]>([]);
   const [cities, setCities] = useState<string[]>([]);
   const [countries, setCountries] = useState<string[]>([]);
   const [sources, setSources] = useState<string[]>([]);
+  const [stages, setStages] = useState<string[]>([]); // Add stages state
   const router = useRouter();
 
   // Format date function
@@ -110,11 +113,50 @@ const BusinessSearchPage: React.FC = () => {
     }
   };
 
+  // Get stage badge color
+  const getStageBadgeColor = (stage: string) => {
+    switch (stage) {
+      case "star_business":
+        return "bg-yellow-100 text-yellow-700 border border-yellow-200";
+      case "star_customer":
+        return "bg-purple-100 text-purple-700 border border-purple-200";
+      case "business":
+      default:
+        return "bg-blue-100 text-blue-700 border border-blue-200";
+    }
+  };
+
+  // Get stage display name
+  const getStageDisplayName = (stage: string) => {
+    switch (stage) {
+      case "star_business":
+        return "Star Business";
+      case "star_customer":
+        return "Star Customer";
+      case "business":
+      default:
+        return "Business";
+    }
+  };
+
   // Debounced search function
   const debouncedSearch = useCallback((searchFilters: SearchFilters) => {
     fetchBusinesses(searchFilters);
   }, []);
 
+  useEffect(() => {
+    fetchBusinesses();
+  }, [currentPage]);
+
+  const sortedBusinesses = useMemo(() => {
+    return [...businesses].sort((a, b) => {
+      const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return dateB - dateA; // Descending order (newest first)
+    });
+  }, [businesses]);
+
+  // Also update the API call to ensure createdAt is included in the response
   const fetchBusinesses = async (customFilters?: SearchFilters) => {
     setLoading(true);
     try {
@@ -140,43 +182,55 @@ const BusinessSearchPage: React.FC = () => {
         maxRating: filters.maxRating
           ? parseFloat(filters.maxRating)
           : undefined,
+        stage: filters.stage || undefined, // Add stage filter
+        sortBy: "createdAt",
+        sortOrder: "desc",
       };
 
       const response = await getAllBusinesses(searchFilters);
 
       if (response && response.data) {
-        setBusinesses(response.data.businesses || []);
+        // The API might already sort it, but we'll sort client-side as well for consistency
+        const businessesData = response.data.businesses || [];
+
+        // Sort by createdAt descending (newest first)
+        const sortedBusinesses = businessesData.sort(
+          (a: Business, b: Business) => {
+            const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+            const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+            return dateB - dateA;
+          }
+        );
+
+        setBusinesses(sortedBusinesses);
         setTotalPages(response.data.totalPages || 1);
         setTotalRecords(response.data.total || 0);
 
-        // Extract unique values for filters
-        if (response.data.businesses) {
+        // ... rest of the existing code for extracting unique values
+        if (sortedBusinesses) {
           const uniqueCategories: any = [
             ...new Set(
-              response.data.businesses
-                .map((b: Business) => b.category)
-                .filter(Boolean)
+              sortedBusinesses.map((b: Business) => b.category).filter(Boolean)
             ),
           ];
           const uniqueCities: any = [
             ...new Set(
-              response.data.businesses
-                .map((b: Business) => b.city)
-                .filter(Boolean)
+              sortedBusinesses.map((b: Business) => b.city).filter(Boolean)
             ),
           ];
           const uniqueCountries: any = [
             ...new Set(
-              response.data.businesses
-                .map((b: Business) => b.country)
-                .filter(Boolean)
+              sortedBusinesses.map((b: Business) => b.country).filter(Boolean)
             ),
           ];
           const uniqueSources: any = [
             ...new Set(
-              response.data.businesses
-                .map((b: Business) => b.source)
-                .filter(Boolean)
+              sortedBusinesses.map((b: Business) => b.source).filter(Boolean)
+            ),
+          ];
+          const uniqueStages: any = [
+            ...new Set(
+              sortedBusinesses.map((b: Business) => b.stage).filter(Boolean)
             ),
           ];
 
@@ -184,6 +238,7 @@ const BusinessSearchPage: React.FC = () => {
           setCities(uniqueCities);
           setCountries(uniqueCountries);
           setSources(uniqueSources);
+          setStages(uniqueStages);
         }
       }
     } catch (error) {
@@ -193,10 +248,6 @@ const BusinessSearchPage: React.FC = () => {
       setLoading(false);
     }
   };
-
-  useEffect(() => {
-    fetchBusinesses();
-  }, [currentPage]);
 
   useEffect(() => {
     const searchFilters: SearchFilters = {
@@ -217,6 +268,7 @@ const BusinessSearchPage: React.FC = () => {
       source: filters.source || undefined,
       minRating: filters.minRating ? parseFloat(filters.minRating) : undefined,
       maxRating: filters.maxRating ? parseFloat(filters.maxRating) : undefined,
+      stage: filters.stage || undefined, // Add stage filter
     };
 
     setCurrentPage(1);
@@ -258,6 +310,7 @@ const BusinessSearchPage: React.FC = () => {
       maxRating: "",
       verified: "",
       source: "",
+      stage: "", // Reset stage filter
     });
   };
 
@@ -500,6 +553,30 @@ const BusinessSearchPage: React.FC = () => {
                 </select>
               </div>
 
+              {/* Add Stage Filter */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  Stage
+                </label>
+                <select
+                  value={filters.stage}
+                  onChange={(e) =>
+                    setFilters({ ...filters, stage: e.target.value })
+                  }
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                >
+                  <option value="">All Stages</option>
+                  <option value="business">Business</option>
+                  <option value="star_business">Star Business</option>
+                  <option value="star_customer">Star Customer</option>
+                  {stages.map((stage) => (
+                    <option key={stage} value={stage}>
+                      {getStageDisplayName(stage)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">
                   Source
@@ -520,7 +597,7 @@ const BusinessSearchPage: React.FC = () => {
                 </select>
               </div>
 
-              <div>
+              {/* <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">
                   Min Rating
                 </label>
@@ -554,7 +631,7 @@ const BusinessSearchPage: React.FC = () => {
                   }
                   className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                 />
-              </div>
+              </div> */}
             </div>
 
             {/* Active Filters Display */}
@@ -582,7 +659,7 @@ const BusinessSearchPage: React.FC = () => {
           </div>
         )}
 
-        {/* Statistics Cards */}
+        {/* Statistics Cards - Add Stage Statistics */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
           <div className="bg-gradient-to-br from-blue-50 to-white rounded-xl p-5 border border-blue-100">
             <div className="flex items-center justify-between">
@@ -625,6 +702,21 @@ const BusinessSearchPage: React.FC = () => {
               <ChartBarIcon className="w-10 h-10 text-purple-500 opacity-50" />
             </div>
           </div>
+
+          {/* Add Stage Statistics Card */}
+          <div className="bg-gradient-to-br from-amber-50 to-white rounded-xl p-5 border border-amber-100">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-amber-600 text-sm font-medium">
+                  Star Businesses
+                </p>
+                <p className="text-2xl font-bold text-gray-800 mt-1">
+                  {businesses.filter((b) => b.stage === "star_business").length}
+                </p>
+              </div>
+              <StarIcon className="w-10 h-10 text-amber-500 opacity-50" />
+            </div>
+          </div>
         </div>
 
         {/* Data Table */}
@@ -663,6 +755,9 @@ const BusinessSearchPage: React.FC = () => {
                         Contact
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                        Stage
+                      </th>{" "}
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                         Category
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
@@ -674,6 +769,7 @@ const BusinessSearchPage: React.FC = () => {
                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                         Status
                       </th>
+                      {/* Add Stage Column */}
                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                         Source
                       </th>
@@ -736,6 +832,20 @@ const BusinessSearchPage: React.FC = () => {
                             )}
                           </div>
                         </td>
+                        <td className="px-4 py-3">
+                          {business.stage ? (
+                            <span
+                              className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-full ${getStageBadgeColor(
+                                business.stage
+                              )}`}
+                            >
+                              {getStageDisplayName(business.stage)}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400">-</span>
+                          )}
+                        </td>
+
                         <td className="px-4 py-3 w-[250px]">
                           {business.category && (
                             <span className="px-3 py-2 text-xs bg-blue-50 text-blue-700 rounded-md font-medium">

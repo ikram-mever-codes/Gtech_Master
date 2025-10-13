@@ -34,13 +34,13 @@ export class Customer {
   @Column({ nullable: true })
   avatar?: string;
 
-  @Column({ unique: true })
+  @Column({ unique: true, nullable: true })
   email!: string;
 
-  @Column()
+  @Column({ nullable: true })
   contactEmail!: string;
 
-  @Column()
+  @Column({ nullable: true })
   contactPhoneNumber!: string;
 
   @OneToOne(() => BusinessDetails, { nullable: true, cascade: true })

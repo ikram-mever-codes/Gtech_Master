@@ -18,6 +18,7 @@ export interface Business {
   latitude?: number;
   longitude?: number;
   website?: string;
+  stage: string;
   phoneNumber?: string;
   email?: string;
   socialMedia?: {
@@ -66,6 +67,7 @@ export interface BusinessCreatePayload {
   reviewCount?: number;
   averageRating?: number;
   category?: string;
+  starBusinessDetails: any;
   additionalCategories?: string[];
   socialMedia?: {
     facebook?: string;
@@ -102,6 +104,9 @@ export interface BulkStatusUpdatePayload extends BulkOperationPayload {
 
 export interface SearchFilters {
   page?: number;
+  sortBy?: string;
+  stage?: any;
+  sortOrder?: string;
   limit?: number;
   search?: string;
   postalCode?: string;

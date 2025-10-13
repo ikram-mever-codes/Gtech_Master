@@ -275,7 +275,7 @@ export const login = async (
       where: { email },
       relations: ["starCustomerDetails"],
     });
-
+    console.log(customer);
     if (!customer || !customer.starCustomerDetails) {
       return next(new ErrorHandler("Invalid credentials", 401));
     }
@@ -1008,8 +1008,8 @@ export const getAllCustomers = async (
       "email",
       "contactEmail",
       "contactPhoneNumber",
-      "city",
-      "country",
+      "city", // For deliveryCity in starCustomerDetails
+      "country", // For deliveryCountry in starCustomerDetails
     ];
 
     const validatedSortBy = allowedSortColumns.includes(sortBy)
@@ -1020,7 +1020,8 @@ export const getAllCustomers = async (
 
     const queryBuilder = customerRepository
       .createQueryBuilder("customer")
-      .leftJoinAndSelect("customer.starCustomerDetails", "starCustomerDetails");
+      .leftJoinAndSelect("customer.starCustomerDetails", "starCustomerDetails")
+      .where("customer.stage = :stage", { stage: "star_customer" });
 
     if (status) {
       queryBuilder.andWhere(
@@ -1031,7 +1032,18 @@ export const getAllCustomers = async (
       );
     }
 
-    queryBuilder.orderBy(`customer.${validatedSortBy}`, validatedOrder);
+    // Handle sorting for fields that are in starCustomerDetails
+    if (sortBy === "city") {
+      queryBuilder.orderBy(`starCustomerDetails.deliveryCity`, validatedOrder);
+    } else if (sortBy === "country") {
+      queryBuilder.orderBy(
+        `starCustomerDetails.deliveryCountry`,
+        validatedOrder
+      );
+    } else {
+      // Sort by customer fields
+      queryBuilder.orderBy(`customer.${validatedSortBy}`, validatedOrder);
+    }
 
     const customers = await queryBuilder.getMany();
 
@@ -1046,6 +1058,9 @@ export const getAllCustomers = async (
       deliveryAddressLine1: customer.starCustomerDetails?.deliveryAddressLine1,
       deliveryCity: customer.starCustomerDetails?.deliveryCity,
       deliveryCountry: customer.starCustomerDetails?.deliveryCountry,
+      // Map delivery fields to city/country for consistent response
+      city: customer.starCustomerDetails?.deliveryCity,
+      country: customer.starCustomerDetails?.deliveryCountry,
       createdAt: customer.createdAt,
       accountVerificationStatus:
         customer.starCustomerDetails?.accountVerificationStatus,

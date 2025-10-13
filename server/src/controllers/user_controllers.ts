@@ -722,7 +722,6 @@ export const createCompany = async (
         // Save customer first
         const savedCustomer = await transactionalEntityManager.save(customer);
 
-        // Create star customer details
         const starCustomerDetails = starCustomerDetailsRepository.create({
           customer: savedCustomer,
           taxNumber,

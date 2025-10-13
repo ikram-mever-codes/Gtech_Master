@@ -802,3 +802,11 @@ const FormSelect: React.FC<FormSelectProps> = ({
 );
 
 export default CustomerCreatePage;
+
+// import React from "react";
+
+// const page = () => {
+//   return <div>page</div>;
+// };
+
+// export default page;
