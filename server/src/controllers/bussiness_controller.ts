@@ -709,10 +709,7 @@ export const createBusiness = async (
           }
 
           if (starBusinessDetails.madeIn) {
-            starBusiness.madeIn = starBusinessDetails.madeIn as
-              | "Germany"
-              | "Switzerland"
-              | "Austria";
+            starBusiness.madeIn = starBusinessDetails.madeIn as "Yes" | "No";
           }
 
           if (starBusinessDetails.lastChecked) {
@@ -1151,10 +1148,8 @@ export const updateBusiness = async (
 
           if (updateData.starBusinessDetails.madeIn !== undefined) {
             starBusiness.madeIn = updateData.starBusinessDetails.madeIn as
-              | "Germany"
-              | "Switzerland"
-              | "Austria"
-              | undefined;
+              | "Yes"
+              | "No";
           }
 
           if (updateData.starBusinessDetails.lastChecked !== undefined) {

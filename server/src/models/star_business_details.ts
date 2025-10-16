@@ -25,10 +25,10 @@ export class StarBusinessDetails {
 
   @Column({
     type: "enum",
-    enum: ["Germany", "Switzerland", "Austria"],
+    enum: ["Yes", "No"],
     nullable: true,
   })
-  madeIn?: "Germany" | "Switzerland" | "Austria";
+  madeIn?: "Yes" | "No";
 
   @Column({ type: "timestamp", nullable: true })
   lastChecked?: Date;

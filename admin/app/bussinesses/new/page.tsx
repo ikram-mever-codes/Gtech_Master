@@ -46,7 +46,7 @@ interface FormErrors {
 
 interface StarBusinessDetails {
   inSeries?: "Yes" | "No";
-  madeIn?: "Germany" | "Switzerland" | "Austria";
+  madeIn?: "Yes" | "No";
   lastChecked?: string;
   checkedBy?: "manual" | "AI";
   device?: string;
@@ -1082,7 +1082,7 @@ const AddEditBusinessManual: React.FC = () => {
                       undefined,
                       undefined,
                       undefined,
-                      ["Germany", "Switzerland", "Austria"]
+                      ["Yes", "No"]
                     )}
                     {renderField(
                       "Last Checked",
