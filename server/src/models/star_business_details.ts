@@ -5,8 +5,11 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   OneToOne,
+  ManyToOne,
+  JoinColumn,
 } from "typeorm";
 import { Customer } from "./customers";
+import { User } from "./users";
 
 @Entity()
 export class StarBusinessDetails {
@@ -39,6 +42,13 @@ export class StarBusinessDetails {
 
   @Column({ nullable: true })
   device?: string;
+
+  @Column({ type: "timestamp", nullable: true })
+  converted_timestamp?: Date;
+
+  @ManyToOne(() => User, { nullable: true })
+  @JoinColumn({ name: "check_by" })
+  convertedBy?: User;
 
   @Column({ nullable: true })
   industry?: string;

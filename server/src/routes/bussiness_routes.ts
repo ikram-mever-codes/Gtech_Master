@@ -11,9 +11,10 @@ import {
   getBusinessStatistics,
   bulkUpdateStatus,
 } from "../controllers/bussiness_controller";
+import { authenticateUser } from "../middlewares/authorized";
 
 const router: any = Router();
-
+router.use(authenticateUser);
 // Bulk operations
 router.post("/bulk-import", bulkImportBusinesses);
 router.post("/bulk-delete", bulkDeleteBusinesses);

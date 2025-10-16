@@ -483,6 +483,8 @@ export const createBusiness = async (
       contactPhoneNumber,
     } = req.body;
 
+    // Get current user from request
+    const user = (req as any).user;
     // Use companyName if provided, otherwise fall back to name for backward compatibility
     const finalCompanyName = companyName || name;
     const finalEmail = email;
@@ -682,6 +684,12 @@ export const createBusiness = async (
         businessDetails.isStarCustomer = isStarCustomer || false;
         businessDetails.customer = savedCustomer;
 
+        // Set check_by and check_timestamp for device maker status
+        businessDetails.check_timestamp = new Date();
+        if (user) {
+          businessDetails.check_by = user as User;
+        }
+
         // Save BusinessDetails
         const savedBusinessDetails = await transactionalEntityManager.save(
           BusinessDetails,
@@ -725,6 +733,14 @@ export const createBusiness = async (
 
           if (starBusinessDetails.industry) {
             starBusiness.industry = starBusinessDetails.industry.trim();
+          }
+
+          // Set converted_by and converted_timestamp for star customer conversion
+          if (isStarCustomer) {
+            starBusiness.converted_timestamp = new Date();
+            if (user) {
+              starBusiness.convertedBy = user as User;
+            }
           }
 
           starBusiness.customer = savedCustomer;
@@ -788,11 +804,25 @@ export const createBusiness = async (
           businessDetails: {
             id: savedBusinessDetails.id,
             website: savedBusinessDetails.website,
+            check_timestamp: savedBusinessDetails.check_timestamp,
+            check_by: savedBusinessDetails.check_by
+              ? {
+                  id: savedBusinessDetails.check_by.id,
+                  name: savedBusinessDetails.check_by.name,
+                }
+              : null,
           },
           starBusinessDetails: savedStarBusiness
             ? {
                 id: savedStarBusiness.id,
                 device: savedStarBusiness.device,
+                converted_timestamp: savedStarBusiness.converted_timestamp,
+                convertedBy: savedStarBusiness.convertedBy
+                  ? {
+                      id: savedStarBusiness.convertedBy.id,
+                      name: savedStarBusiness.convertedBy.name,
+                    }
+                  : null,
               }
             : null,
           starCustomerDetails: savedStarCustomerDetails
@@ -886,6 +916,7 @@ export const updateBusiness = async (
     const { id } = req.params;
     const updateData = req.body;
     const user = (req as any).user;
+    console.log(user);
     const customerRepository = AppDataSource.getRepository(Customer);
     const businessDetailsRepository =
       AppDataSource.getRepository(BusinessDetails);
@@ -908,11 +939,18 @@ export const updateBusiness = async (
       return next(new ErrorHandler("Business not found", 404));
     }
 
-    // Store original isDeviceMaker value to detect changes
+    // Store original values to detect changes
     const originalIsDeviceMaker = customer.businessDetails?.isDeviceMaker;
+    const originalIsStarCustomer = customer.businessDetails?.isStarCustomer;
+
     const isDeviceMakerChanged =
       updateData.isDeviceMaker !== undefined &&
       updateData.isDeviceMaker !== originalIsDeviceMaker;
+
+    const isStarCustomerChanged =
+      updateData.isStarCustomer !== undefined &&
+      updateData.isStarCustomer !== originalIsStarCustomer &&
+      updateData.isStarCustomer === true; // Only when upgrading to star customer
 
     // Check for duplicate email if email is being updated
     const emailToCheck = updateData.isStarCustomer
@@ -1143,24 +1181,19 @@ export const updateBusiness = async (
               : undefined;
           }
 
+          // Set converted_by and converted_timestamp when upgrading to star customer
+          if (isStarCustomerChanged) {
+            starBusiness.converted_timestamp = new Date();
+            if (user) {
+              starBusiness.convertedBy = user as User;
+            }
+          }
+
           await transactionalEntityManager.save(
             StarBusinessDetails,
             starBusiness
           );
           businessDetails.isStarBusiness = true;
-        } else if (
-          updateData.isDeviceMaker === "No" ||
-          updateData.isDeviceMaker === "Unsure"
-        ) {
-          // If changing from Yes to No/Unsure, remove StarBusinessDetails
-          if (customer.starBusinessDetails) {
-            await transactionalEntityManager.remove(
-              StarBusinessDetails,
-              customer.starBusinessDetails
-            );
-            customer.starBusinessDetails = undefined;
-            businessDetails.isStarBusiness = false;
-          }
         }
 
         // Handle StarCustomerDetails
@@ -1210,18 +1243,7 @@ export const updateBusiness = async (
           customer.stage = "star_customer";
         } else if (!updateData.isStarCustomer && customer.starCustomerDetails) {
           // Remove star customer details if downgrading
-          await transactionalEntityManager.remove(
-            StarCustomerDetails,
-            customer.starCustomerDetails
-          );
-          customer.starCustomerDetails = undefined;
-
           // Update stage
-          if (updateData.isDeviceMaker === "Yes") {
-            customer.stage = "star_business";
-          } else {
-            customer.stage = "business";
-          }
         } else if (updateData.isStarCustomer && customer.starCustomerDetails) {
           // Star customer already exists, just update stage if needed
           customer.stage = "star_customer";
@@ -1259,6 +1281,19 @@ export const updateBusiness = async (
                 }
               : null,
           },
+          starBusinessDetails: customer.starBusinessDetails
+            ? {
+                id: customer.starBusinessDetails.id,
+                converted_timestamp:
+                  customer.starBusinessDetails.converted_timestamp,
+                convertedBy: customer.starBusinessDetails.convertedBy
+                  ? {
+                      id: customer.starBusinessDetails.convertedBy.id,
+                      name: customer.starBusinessDetails.convertedBy.name,
+                    }
+                  : null,
+              }
+            : null,
           tempPassword,
           defaultList: defaultList
             ? {
@@ -1267,6 +1302,7 @@ export const updateBusiness = async (
               }
             : null,
           isDeviceMakerChanged,
+          isStarCustomerChanged,
         };
       }
     );
@@ -1305,6 +1341,7 @@ export const updateBusiness = async (
         "businessDetails",
         "businessDetails.check_by",
         "starBusinessDetails",
+        "starBusinessDetails.convertedBy",
         "starCustomerDetails",
       ],
     });
@@ -1340,6 +1377,15 @@ export const updateBusiness = async (
             checkedBy: finalCustomer.starBusinessDetails.checkedBy,
             device: finalCustomer.starBusinessDetails.device,
             industry: finalCustomer.starBusinessDetails.industry,
+            converted_timestamp:
+              finalCustomer.starBusinessDetails.converted_timestamp,
+            convertedBy: finalCustomer.starBusinessDetails.convertedBy
+              ? {
+                  id: finalCustomer.starBusinessDetails.convertedBy.id,
+                  name: finalCustomer.starBusinessDetails.convertedBy.name,
+                  email: finalCustomer.starBusinessDetails.convertedBy.email,
+                }
+              : undefined,
           }
         : undefined,
       // Include default list if just created
@@ -1370,6 +1416,9 @@ export const updateBusiness = async (
     } else if (isDeviceMakerChanged) {
       successMessage =
         "Business updated successfully. Device maker status change recorded.";
+    } else if (isStarCustomerChanged) {
+      successMessage =
+        "Business updated successfully. Star customer conversion recorded.";
     }
 
     return res.status(200).json({
@@ -1401,7 +1450,9 @@ export const getBusinessById = async (
       where: { id },
       relations: [
         "businessDetails",
+        "businessDetails.check_by",
         "starBusinessDetails",
+        "starBusinessDetails.convertedBy",
         "starCustomerDetails",
       ],
     });
@@ -1420,15 +1471,56 @@ export const getBusinessById = async (
       contactEmail: customer.contactEmail,
       contactPhoneNumber: customer.contactPhoneNumber,
       stage: customer.stage,
-      businessDetails: customer.businessDetails,
+      businessDetails: customer.businessDetails
+        ? {
+            ...customer.businessDetails,
+            // Include check_by user details if present
+            check_by: customer.businessDetails.check_by
+              ? {
+                  id: customer.businessDetails.check_by.id,
+                  name: customer.businessDetails.check_by.name,
+                  email: customer.businessDetails.check_by.email,
+                }
+              : undefined,
+          }
+        : undefined,
       starBusinessDetails: customer.starBusinessDetails
         ? {
+            id: customer.starBusinessDetails.id,
             inSeries: customer.starBusinessDetails.inSeries,
             madeIn: customer.starBusinessDetails.madeIn,
             lastChecked: customer.starBusinessDetails.lastChecked,
             checkedBy: customer.starBusinessDetails.checkedBy,
             device: customer.starBusinessDetails.device,
             industry: customer.starBusinessDetails.industry,
+            converted_timestamp:
+              customer.starBusinessDetails.converted_timestamp,
+            convertedBy: customer.starBusinessDetails.convertedBy
+              ? {
+                  id: customer.starBusinessDetails.convertedBy.id,
+                  name: customer.starBusinessDetails.convertedBy.name,
+                  email: customer.starBusinessDetails.convertedBy.email,
+                }
+              : undefined,
+            comment: customer.starBusinessDetails.comment,
+            createdAt: customer.starBusinessDetails.createdAt,
+            updatedAt: customer.starBusinessDetails.updatedAt,
+          }
+        : undefined,
+      starCustomerDetails: customer.starCustomerDetails
+        ? {
+            id: customer.starCustomerDetails.id,
+            taxNumber: customer.starCustomerDetails.taxNumber,
+            accountVerificationStatus:
+              customer.starCustomerDetails.accountVerificationStatus,
+            isEmailVerified: customer.starCustomerDetails.isEmailVerified,
+            deliveryAddressLine1:
+              customer.starCustomerDetails.deliveryAddressLine1,
+            deliveryPostalCode: customer.starCustomerDetails.deliveryPostalCode,
+            deliveryCity: customer.starCustomerDetails.deliveryCity,
+            deliveryCountry: customer.starCustomerDetails.deliveryCountry,
+            createdAt: customer.starCustomerDetails.createdAt,
+            updatedAt: customer.starCustomerDetails.updatedAt,
           }
         : undefined,
       // Backward compatibility fields
@@ -1450,6 +1542,8 @@ export const getBusinessById = async (
       socialMedia: customer.businessDetails?.socialLinks,
       source: customer.businessDetails?.businessSource,
       isDeviceMaker: customer.businessDetails?.isDeviceMaker,
+      isStarCustomer: customer.businessDetails?.isStarCustomer,
+      check_timestamp: customer.businessDetails?.check_timestamp,
       status: BUSINESS_STATUS.ACTIVE,
       createdAt: customer.createdAt,
       updatedAt: customer.updatedAt,

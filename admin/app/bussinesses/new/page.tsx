@@ -28,6 +28,7 @@ import {
   CogIcon,
   UserGroupIcon,
   EyeIcon,
+  ChatBubbleLeftIcon,
 } from "@heroicons/react/24/outline";
 import { toast } from "react-hot-toast";
 import {
@@ -50,11 +51,16 @@ interface StarBusinessDetails {
   checkedBy?: "manual" | "AI";
   device?: string;
   industry?: string;
+  comment?: string;
+  convertedBy?: { id: string; name: string };
+  converted_timestamp?: string;
 }
 
 interface ExtendedBusinessCreatePayload extends BusinessCreatePayload {
   source?: string;
   isDeviceMaker?: "Yes" | "No" | "Unsure";
+  check_by?: { id: string; name: string };
+  check_timestamp?: string;
 }
 
 const AddEditBusinessManual: React.FC = () => {
@@ -92,6 +98,8 @@ const AddEditBusinessManual: React.FC = () => {
     additionalCategories: [],
     source: "",
     isDeviceMaker: "Unsure",
+    check_by: undefined,
+    check_timestamp: undefined,
     isStarCustomer: false,
     starCustomerEmail: "",
     starBusinessDetails: {
@@ -101,6 +109,9 @@ const AddEditBusinessManual: React.FC = () => {
       checkedBy: undefined,
       device: "",
       industry: "",
+      comment: "",
+      convertedBy: undefined,
+      converted_timestamp: undefined,
     },
     socialMedia: {
       facebook: "",
@@ -217,6 +228,8 @@ const AddEditBusinessManual: React.FC = () => {
           businessData.source ||
           "",
         isDeviceMaker: businessData.isDeviceMaker,
+        check_by: businessData.businessDetails?.check_by,
+        check_timestamp: businessData.businessDetails?.check_timestamp,
         isStarCustomer: isStarCustomerBusiness,
         starCustomerEmail: isStarCustomerBusiness
           ? businessData.email || ""
@@ -228,6 +241,9 @@ const AddEditBusinessManual: React.FC = () => {
           checkedBy: undefined,
           device: "",
           industry: "",
+          comment: "",
+          convertedBy: undefined,
+          converted_timestamp: undefined,
         },
         socialMedia: businessData.businessDetails?.socialLinks ||
           businessData.socialMedia || {
@@ -568,6 +584,8 @@ const AddEditBusinessManual: React.FC = () => {
         additionalCategories: [],
         source: "",
         isDeviceMaker: undefined,
+        check_by: undefined,
+        check_timestamp: undefined,
         isStarCustomer: false,
         starCustomerEmail: "",
         starBusinessDetails: {
@@ -577,6 +595,9 @@ const AddEditBusinessManual: React.FC = () => {
           checkedBy: undefined,
           device: "",
           industry: "",
+          comment: "",
+          convertedBy: undefined,
+          converted_timestamp: undefined,
         },
         socialMedia: {
           facebook: "",
@@ -606,6 +627,19 @@ const AddEditBusinessManual: React.FC = () => {
     router.push(`/bussinesses/new?businessId=${businessId}`);
   };
 
+  // Helper function to format date and time
+  const formatDateTime = (dateString: string | undefined) => {
+    if (!dateString) return "-";
+    const date = new Date(dateString);
+    return date.toLocaleString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
   // Helper function to render form fields based on view/edit mode
   const renderField = (
     label: string,
@@ -615,9 +649,10 @@ const AddEditBusinessManual: React.FC = () => {
     type?: string,
     placeholder?: string,
     icon?: React.ReactNode,
-    selectOptions?: { value: string; label: string }[] | string[]
+    selectOptions?: { value: string; label: string }[] | string[],
+    readOnly?: boolean
   ) => {
-    if (isViewMode) {
+    if (isViewMode || readOnly) {
       // Determine display value for view mode
       let displayValue = "-";
       if (selectOptions) {
@@ -632,6 +667,13 @@ const AddEditBusinessManual: React.FC = () => {
             displayValue = found ? found.label : value || "-";
           }
         }
+      } else if (type === "datetime") {
+        displayValue = formatDateTime(value);
+      } else if (
+        fieldName === "check_by" ||
+        fieldName === "starBusinessDetails.convertedBy"
+      ) {
+        displayValue = value?.name || "-";
       } else {
         displayValue = value || "-";
       }
@@ -904,6 +946,39 @@ const AddEditBusinessManual: React.FC = () => {
                 undefined,
                 ["Yes", "No", "Unsure"]
               )}
+
+              {/* New View-Only Fields under Is Device Maker */}
+              {(isEditMode || isViewMode) && formData.check_by && (
+                <>
+                  {renderField(
+                    "Checked By",
+                    formData.check_by,
+                    "check_by",
+                    false,
+                    "text",
+                    "",
+                    <UserIcon className="w-5 h-5" />,
+                    undefined,
+                    true // Read-only
+                  )}
+                </>
+              )}
+
+              {(isEditMode || isViewMode) && formData.check_timestamp && (
+                <>
+                  {renderField(
+                    "Check Timestamp",
+                    formData.check_timestamp,
+                    "check_timestamp",
+                    false,
+                    "datetime",
+                    "",
+                    <CalendarIcon className="w-5 h-5" />,
+                    undefined,
+                    true // Read-only
+                  )}
+                </>
+              )}
             </div>
 
             {/* Star Customer Info Box */}
@@ -979,7 +1054,7 @@ const AddEditBusinessManual: React.FC = () => {
               <div
                 className={`overflow-hidden transition-all duration-300 ${
                   isStarBusinessOpen || isViewMode
-                    ? "max-h-[1000px]"
+                    ? "max-h-[1500px]"
                     : "max-h-0"
                 }`}
               >
@@ -1117,6 +1192,69 @@ const AddEditBusinessManual: React.FC = () => {
                         "customer@example.com",
                         <EnvelopeIcon className="w-5 h-5" />
                       )}
+
+                    {/* New View-Only Fields in Star Business Details */}
+                    {(isEditMode || isViewMode) &&
+                      formData.starBusinessDetails?.convertedBy && (
+                        <>
+                          {renderField(
+                            "Converted By",
+                            formData.starBusinessDetails.convertedBy,
+                            "starBusinessDetails.convertedBy",
+                            false,
+                            "text",
+                            "",
+                            <UserIcon className="w-5 h-5" />,
+                            undefined,
+                            true // Read-only
+                          )}
+                        </>
+                      )}
+
+                    {(isEditMode || isViewMode) &&
+                      formData.starBusinessDetails?.converted_timestamp && (
+                        <>
+                          {renderField(
+                            "Converted Timestamp",
+                            formData.starBusinessDetails.converted_timestamp,
+                            "starBusinessDetails.converted_timestamp",
+                            false,
+                            "datetime",
+                            "",
+                            <CalendarIcon className="w-5 h-5" />,
+                            undefined,
+                            true // Read-only
+                          )}
+                        </>
+                      )}
+                  </div>
+
+                  {/* New Editable Comment Field */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <div className="flex items-center gap-2">
+                        <ChatBubbleLeftIcon className="w-5 h-5" />
+                        Comment
+                      </div>
+                    </label>
+                    {isViewMode ? (
+                      <div className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg">
+                        <p className="text-gray-700 whitespace-pre-wrap">
+                          {formData.starBusinessDetails?.comment || "-"}
+                        </p>
+                      </div>
+                    ) : (
+                      <textarea
+                        name="starBusinessDetails.comment"
+                        value={formData.starBusinessDetails?.comment || ""}
+                        onChange={(e) =>
+                          handleStarBusinessChange("comment", e.target.value)
+                        }
+                        rows={3}
+                        className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 transition-all resize-none"
+                        placeholder="Enter any additional comments or notes..."
+                      />
+                    )}
                   </div>
 
                   {!isViewMode && formData.isDeviceMaker === "Yes" && (
