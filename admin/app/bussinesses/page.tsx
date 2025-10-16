@@ -746,38 +746,29 @@ const BusinessSearchPage: React.FC = () => {
                         />
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                        Business Info
+                        Business Name
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                        Location
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                        Contact
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                        Stage
-                      </th>{" "}
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                        Category
+                        Address
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                         Website
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                        Rating
+                        Device Maker
+                      </th>{" "}
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                        Check Date+ Time
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                        Status
+                        Stage
                       </th>
                       {/* Add Stage Column */}
                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                        Source
+                        Tags{" "}
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                         Added On
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                        Actions
                       </th>
                     </tr>
                   </thead>
@@ -786,6 +777,11 @@ const BusinessSearchPage: React.FC = () => {
                       <tr
                         key={business.id}
                         className="hover:bg-gray-50 w-max transition-colors"
+                        onClick={() => {
+                          router.push(
+                            `/bussinesses/new?businessId=${business.id}&view=true`
+                          );
+                        }}
                       >
                         <td className="p-4">
                           <input
@@ -800,58 +796,16 @@ const BusinessSearchPage: React.FC = () => {
                             <p className="font-medium w-[200px] text-gray-900">
                               {business.name}
                             </p>
-                            {business.description && (
-                              <p className="text-sm text-gray-500 mt-1 truncate max-w-xs">
-                                {business.description}
-                              </p>
-                            )}
                           </div>
                         </td>
                         <td className="px-4 py-3">
                           <div className="text-sm">
                             <p className="text-gray-900 w-[200px]">
-                              {business.address}
+                              {business.postalCode} {business.city},{" "}
+                              {business.country !== "Germany" &&
+                                business.country}
                             </p>
                           </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="text-sm space-y-1">
-                            {business.phoneNumber && (
-                              <div className="flex items-center gap-2 text-gray-600">
-                                <PhoneIcon className="w-4 h-4" />
-                                <span>{business.phoneNumber}</span>
-                              </div>
-                            )}
-                            {business.email && (
-                              <div className="flex items-center gap-2 text-gray-600">
-                                <EnvelopeIcon className="w-4 h-4" />
-                                <span className="truncate max-w-[150px]">
-                                  {business.email}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          {business.stage ? (
-                            <span
-                              className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-full ${getStageBadgeColor(
-                                business.stage
-                              )}`}
-                            >
-                              {getStageDisplayName(business.stage)}
-                            </span>
-                          ) : (
-                            <span className="text-gray-400">-</span>
-                          )}
-                        </td>
-
-                        <td className="px-4 py-3 w-[250px]">
-                          {business.category && (
-                            <span className="px-3 py-2 text-xs bg-blue-50 text-blue-700 rounded-md font-medium">
-                              {business.category}
-                            </span>
-                          )}
                         </td>
                         <td className="px-4 py-3">
                           {business.website ? (
@@ -869,64 +823,32 @@ const BusinessSearchPage: React.FC = () => {
                             <span className="text-gray-400">-</span>
                           )}
                         </td>
-                        <td className="px-4 py-3">
-                          {business.averageRating ? (
-                            <div className="flex items-center gap-1">
-                              <StarIcon className="w-4 h-4 text-amber-500 fill-current" />
-                              <span className="font-medium">
-                                {Number(business?.averageRating)?.toFixed(1)}
-                              </span>
-                              {business.reviewCount && (
-                                <span className="text-xs text-gray-500">
-                                  ({business.reviewCount})
-                                </span>
-                              )}
-                            </div>
-                          ) : (
-                            <span className="text-gray-400">-</span>
-                          )}
+                        <td className="px-4 py-3 text-center">
+                          {business.isDeviceMaker}{" "}
                         </td>
+
+                        <td className="px-4 py-3"></td>
                         <td className="px-4 py-3">
-                          {getStatusBadge(business)}
-                        </td>
-                        <td className="px-4 py-3">
-                          {business.source ? (
+                          {business.stage ? (
                             <span
-                              className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-full ${getSourceBadgeColor(
-                                business.source
+                              className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-full ${getStageBadgeColor(
+                                business.stage
                               )}`}
                             >
-                              <TagIcon className="w-3 h-3" />
-                              {business.source}
+                              {getStageDisplayName(business.stage)}
                             </span>
                           ) : (
                             <span className="text-gray-400">-</span>
                           )}
                         </td>
+                        <td className="px-4 py-3"></td>
+
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2 text-sm text-gray-600">
                             <CalendarIcon className="w-4 h-4" />
                             {business.createdAt
                               ? formatDate(business.createdAt)
                               : "-"}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
-                            <CustomButton
-                              onClick={() => {
-                                router.push(`/bussinesses/${business?.id}`);
-                              }}
-                              startIcon={<EyeIcon />}
-                            ></CustomButton>{" "}
-                            <CustomButton
-                              onClick={() => {
-                                router.push(
-                                  `/bussinesses/new?businessId=${business?.id}`
-                                );
-                              }}
-                              startIcon={<EditIcon />}
-                            ></CustomButton>{" "}
                           </div>
                         </td>
                       </tr>

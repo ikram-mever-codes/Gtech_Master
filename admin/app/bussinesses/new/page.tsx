@@ -26,6 +26,8 @@ import {
   CalendarIcon,
   UserIcon,
   CogIcon,
+  UserGroupIcon,
+  EyeIcon,
 } from "@heroicons/react/24/outline";
 import { toast } from "react-hot-toast";
 import {
@@ -59,13 +61,15 @@ const AddEditBusinessManual: React.FC = () => {
   const params = useSearchParams();
   const router = useRouter();
   const businessId = params?.get("businessId") as string;
-  const isEditMode = !!businessId;
+  const isViewMode = params?.get("view") === "true";
+  const isEditMode = !!businessId && !isViewMode;
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [formErrors, setFormErrors] = useState<FormErrors>({});
   const [isExtraInfoOpen, setIsExtraInfoOpen] = useState(false);
   const [isStarBusinessOpen, setIsStarBusinessOpen] = useState(false);
+  const [isStarCustomer, setIsStarCustomer] = useState(false);
 
   const [formData, setFormData] = useState<ExtendedBusinessCreatePayload>({
     name: "",
@@ -88,6 +92,8 @@ const AddEditBusinessManual: React.FC = () => {
     additionalCategories: [],
     source: "",
     isDeviceMaker: "Unsure",
+    isStarCustomer: false,
+    starCustomerEmail: "",
     starBusinessDetails: {
       inSeries: undefined,
       madeIn: undefined,
@@ -113,24 +119,51 @@ const AddEditBusinessManual: React.FC = () => {
     },
   });
 
-  // Auto-open Star Business Details when device maker is Yes
+  // Auto-open sections in view mode
   useEffect(() => {
-    if (formData.isDeviceMaker === "Yes") {
-      setIsStarBusinessOpen(true);
+    if (isViewMode) {
+      setIsExtraInfoOpen(true);
+      if (formData.isDeviceMaker === "Yes" && formData.starBusinessDetails) {
+        setIsStarBusinessOpen(true);
+      }
     }
-  }, [formData.isDeviceMaker]);
+  }, [isViewMode, formData.isDeviceMaker, formData.starBusinessDetails]);
 
-  // Fetch business data if in edit mode
+  // Auto-open Star Business Details when device maker is Yes (edit mode)
   useEffect(() => {
-    if (isEditMode && businessId) {
+    if (!isViewMode && formData.isDeviceMaker === "Yes") {
+      setIsStarBusinessOpen(true);
+    } else if (!isViewMode) {
+      // Reset star customer when device maker is not Yes
+      setIsStarCustomer(false);
+      setFormData((prev) => ({
+        ...prev,
+        isStarCustomer: false,
+        starCustomerEmail: "",
+      }));
+    }
+  }, [formData.isDeviceMaker, isViewMode]);
+
+  // Update formData when star customer toggle changes
+  useEffect(() => {
+    setFormData((prev) => ({ ...prev, isStarCustomer: isStarCustomer }));
+  }, [isStarCustomer]);
+
+  // Fetch business data if in edit or view mode
+  useEffect(() => {
+    if ((isEditMode || isViewMode) && businessId) {
       fetchBusinessData();
     }
-  }, [businessId, isEditMode]);
+  }, [businessId, isEditMode, isViewMode]);
 
   const fetchBusinessData = async () => {
     try {
       setIsLoading(true);
       const businessData = await getBusinessById(businessId);
+
+      // Check if this is a star customer
+      const isStarCustomerBusiness = businessData.stage === "star_customer";
+      setIsStarCustomer(isStarCustomerBusiness);
 
       // Map the business data to form structure
       setFormData({
@@ -184,6 +217,10 @@ const AddEditBusinessManual: React.FC = () => {
           businessData.source ||
           "",
         isDeviceMaker: businessData.isDeviceMaker,
+        isStarCustomer: isStarCustomerBusiness,
+        starCustomerEmail: isStarCustomerBusiness
+          ? businessData.email || ""
+          : "",
         starBusinessDetails: businessData.starBusinessDetails || {
           inSeries: undefined,
           madeIn: undefined,
@@ -211,21 +248,23 @@ const AddEditBusinessManual: React.FC = () => {
           },
       });
 
-      // Auto-open sections if there's data
-      if (
-        businessData.businessDetails?.description ||
-        businessData.businessDetails?.socialLinks ||
-        businessData.businessDetails?.businessHours
-      ) {
-        setIsExtraInfoOpen(true);
-      }
+      // Auto-open sections if there's data (for edit mode)
+      if (!isViewMode) {
+        if (
+          businessData.businessDetails?.description ||
+          businessData.businessDetails?.socialLinks ||
+          businessData.businessDetails?.businessHours
+        ) {
+          setIsExtraInfoOpen(true);
+        }
 
-      // Auto-open Star Business Details if it's a device maker with star details
-      if (
-        businessData.isDeviceMaker === "Yes" &&
-        businessData.starBusinessDetails
-      ) {
-        setIsStarBusinessOpen(true);
+        // Auto-open Star Business Details if it's a device maker with star details
+        if (
+          businessData.isDeviceMaker === "Yes" &&
+          businessData.starBusinessDetails
+        ) {
+          setIsStarBusinessOpen(true);
+        }
       }
     } catch (error) {
       console.error("Error fetching business:", error);
@@ -262,16 +301,25 @@ const AddEditBusinessManual: React.FC = () => {
   const sources = ["Shop", "Anfrage", "Empfehlung", "GoogleMaps"];
 
   const industries = [
-    "Medical Devices",
-    "Dental Equipment",
-    "Laboratory Equipment",
-    "Diagnostic Equipment",
-    "Surgical Instruments",
-    "Healthcare IT",
-    "Pharmaceutical Equipment",
-    "Rehabilitation Equipment",
-    "Veterinary Equipment",
-    "Other Healthcare",
+    "Gastro",
+    "Verpackung",
+    "Lebensmittel",
+    "Automatisierung",
+    "Mess",
+    "Bau",
+    "Medizin",
+    "Automatisierung",
+    "Reinigung",
+    "Veredelung",
+    "Holz",
+    "Elektronik",
+    "Fahrzeug",
+    "Infrastruktur",
+    "Beförderung",
+    "Bahn",
+    "Textil",
+    "Kosmetik",
+    "Fitness",
   ];
 
   const validateForm = (): boolean => {
@@ -305,6 +353,15 @@ const AddEditBusinessManual: React.FC = () => {
         formData.isDeviceMaker !== "Unsure")
     ) {
       errors.isDeviceMaker = "Please select if this is a device maker";
+    }
+
+    // Star Customer email validation
+    if (isStarCustomer) {
+      if (!formData.starCustomerEmail || !formData.starCustomerEmail.trim()) {
+        errors.starCustomerEmail = "Email is required for Star Customer";
+      } else if (!isValidEmail(formData.starCustomerEmail)) {
+        errors.starCustomerEmail = "Invalid email format";
+      }
     }
 
     // Optional fields validation
@@ -458,6 +515,11 @@ const AddEditBusinessManual: React.FC = () => {
           formData.isDeviceMaker === "Yes"
             ? formData.starBusinessDetails
             : undefined,
+        // Include star customer info
+        isStarCustomer: isStarCustomer,
+        starCustomerEmail: isStarCustomer
+          ? formData.starCustomerEmail
+          : undefined,
       };
 
       if (isEditMode) {
@@ -506,6 +568,8 @@ const AddEditBusinessManual: React.FC = () => {
         additionalCategories: [],
         source: "",
         isDeviceMaker: undefined,
+        isStarCustomer: false,
+        starCustomerEmail: "",
         starBusinessDetails: {
           inSeries: undefined,
           madeIn: undefined,
@@ -530,8 +594,140 @@ const AddEditBusinessManual: React.FC = () => {
           sunday: "",
         },
       });
+      setIsStarCustomer(false);
     }
     setFormErrors({});
+  };
+
+  const handleEditClick = () => {
+    // Remove view parameter and redirect to edit mode
+    const newParams = new URLSearchParams(params.toString());
+    newParams.delete("view");
+    router.push(`/bussinesses/new?businessId=${businessId}`);
+  };
+
+  // Helper function to render form fields based on view/edit mode
+  const renderField = (
+    label: string,
+    value: any,
+    fieldName: string,
+    required?: boolean,
+    type?: string,
+    placeholder?: string,
+    icon?: React.ReactNode,
+    selectOptions?: { value: string; label: string }[] | string[]
+  ) => {
+    if (isViewMode) {
+      // Determine display value for view mode
+      let displayValue = "-";
+      if (selectOptions) {
+        if (Array.isArray(selectOptions) && selectOptions.length > 0) {
+          if (typeof selectOptions[0] === "string") {
+            displayValue = value || "-";
+          } else {
+            // It's an array of objects
+            const found: any = selectOptions.find(
+              (opt: any) => opt.value === value
+            );
+            displayValue = found ? found.label : value || "-";
+          }
+        }
+      } else {
+        displayValue = value || "-";
+      }
+
+      return (
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            {label}
+          </label>
+          <div
+            className={`w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg ${
+              icon ? "flex items-center gap-3" : ""
+            }`}
+          >
+            {icon && <span className="text-gray-400">{icon}</span>}
+            <span className="text-gray-700">{displayValue}</span>
+          </div>
+        </div>
+      );
+    }
+
+    // Edit/Create mode rendering
+    if (selectOptions) {
+      const isStringArray =
+        Array.isArray(selectOptions) &&
+        selectOptions.length > 0 &&
+        typeof selectOptions[0] === "string";
+
+      return (
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            {label} {required && <span className="text-red-500">*</span>}
+          </label>
+          <select
+            name={fieldName}
+            value={value || ""}
+            onChange={(e) => handleInputChange(fieldName, e.target.value)}
+            className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all ${
+              formErrors[fieldName] ? "border-red-500" : "border-gray-200"
+            }`}
+            disabled={isViewMode}
+          >
+            <option value="">
+              {placeholder || `Select ${label.toLowerCase()}`}
+            </option>
+            {isStringArray
+              ? (selectOptions as string[]).map((opt) => (
+                  <option key={opt} value={opt}>
+                    {opt}
+                  </option>
+                ))
+              : (selectOptions as { value: string; label: string }[]).map(
+                  (opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  )
+                )}
+          </select>
+          {formErrors[fieldName] && (
+            <p className="mt-1 text-sm text-red-500">{formErrors[fieldName]}</p>
+          )}
+        </div>
+      );
+    }
+
+    return (
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          {label} {required && <span className="text-red-500">*</span>}
+        </label>
+        <div className="relative">
+          {icon && (
+            <span className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
+              {icon}
+            </span>
+          )}
+          <input
+            type={type || "text"}
+            name={fieldName}
+            value={value || ""}
+            onChange={(e) => handleInputChange(fieldName, e.target.value)}
+            className={`w-full ${
+              icon ? "pl-10" : "px-4"
+            } pr-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all ${
+              formErrors[fieldName] ? "border-red-500" : "border-gray-200"
+            } ${isViewMode ? "bg-gray-50 cursor-not-allowed" : ""}`}
+            placeholder={placeholder || ""}
+            disabled={isViewMode}
+          />
+        </div>
+        {formErrors[fieldName] && (
+          <p className="mt-1 text-sm text-red-500">{formErrors[fieldName]}</p>
+        )}
+      </div>
+    );
   };
 
   if (isLoading) {
@@ -558,7 +754,7 @@ const AddEditBusinessManual: React.FC = () => {
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <div>
             <div className="flex items-center gap-3 mb-2">
-              {isEditMode && (
+              {(isEditMode || isViewMode) && (
                 <button
                   onClick={() => router.back()}
                   className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
@@ -567,7 +763,12 @@ const AddEditBusinessManual: React.FC = () => {
                 </button>
               )}
               <h1 className="text-3xl font-semibold text-secondary flex items-center gap-3">
-                {isEditMode ? (
+                {isViewMode ? (
+                  <>
+                    <EyeIcon className="w-8 h-8 text-primary" />
+                    Business Details
+                  </>
+                ) : isEditMode ? (
                   <>
                     <PencilIcon className="w-8 h-8 text-primary" />
                     Edit Business
@@ -581,13 +782,36 @@ const AddEditBusinessManual: React.FC = () => {
               </h1>
             </div>
             <p className="mt-2 text-text-secondary">
-              {isEditMode
+              {isViewMode
+                ? `Viewing details for ${formData.name || "this business"}`
+                : isEditMode
                 ? `Update information for ${formData.name || "this business"}`
                 : "Enter business information with all details"}
             </p>
           </div>
-          {!isEditMode && (
-            <div className="flex gap-3">
+          <div className="flex items-center gap-4">
+            {/* Edit Button in View Mode */}
+            {isViewMode && (
+              <CustomButton
+                variant="contained"
+                startIcon={<PencilIcon className="w-5 h-5" />}
+                onClick={handleEditClick}
+              >
+                Edit Business
+              </CustomButton>
+            )}
+            {/* Star Customer Toggle - Only show when device maker is Yes and not in view mode */}
+
+            {/* Show Star Customer Badge in View Mode */}
+            {isViewMode && isStarCustomer && (
+              <div className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-yellow-50 to-orange-50 rounded-lg border border-yellow-200">
+                <StarIcon className="w-5 h-5 text-yellow-600" />
+                <span className="text-sm font-medium text-gray-700">
+                  Star Customer
+                </span>
+              </div>
+            )}
+            {!isEditMode && !isViewMode && (
               <CustomButton
                 variant="outlined"
                 startIcon={<DocumentPlusIcon className="w-5 h-5" />}
@@ -597,319 +821,253 @@ const AddEditBusinessManual: React.FC = () => {
               >
                 Bulk Import
               </CustomButton>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
         {/* Form Content */}
         <form onSubmit={handleSubmit} className="space-y-8">
           {/* Required Fields Section */}
-          <div className=" rounded-xl p-8 ">
+          <div className={`rounded-xl ${isViewMode ? "" : "p-8"}`}>
             <div className="flex items-center gap-3 mb-6">
               <ExclamationTriangleIcon className="w-6 h-6" />
               <h2 className="text-xl font-semibold text-gray-800">
-                Required Information
+                {isViewMode ? "Basic Information" : "Required Information"}
               </h2>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Business Name <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  name="name"
-                  value={formData.name}
-                  onChange={(e) => handleInputChange("name", e.target.value)}
-                  className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all ${
-                    formErrors.name ? "border-red-500" : "border-gray-200"
-                  }`}
-                  placeholder="Enter customer/business name"
-                />
-                {formErrors.name && (
-                  <p className="mt-1 text-sm text-red-500">{formErrors.name}</p>
+              {renderField(
+                "Business Name",
+                formData.name,
+                "name",
+                true,
+                "text",
+                "Enter customer/business name"
+              )}
+
+              <div className={isStarCustomer && !isViewMode ? "" : ""}>
+                {renderField(
+                  "Website",
+                  formData.website,
+                  "website",
+                  true,
+                  "text",
+                  "https://www.example.com",
+                  <GlobeAltIcon className="w-5 h-5" />
                 )}
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Postal Code <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  name="postalCode"
-                  value={formData.postalCode}
-                  onChange={(e) =>
-                    handleInputChange("postalCode", e.target.value)
-                  }
-                  className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all ${
-                    formErrors.postalCode ? "border-red-500" : "border-gray-200"
-                  }`}
-                  placeholder="10001"
-                />
-                {formErrors.postalCode && (
-                  <p className="mt-1 text-sm text-red-500">
-                    {formErrors.postalCode}
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  City <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  name="city"
-                  value={formData.city}
-                  onChange={(e) => handleInputChange("city", e.target.value)}
-                  className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all ${
-                    formErrors.city ? "border-red-500" : "border-gray-200"
-                  }`}
-                  placeholder="Stuttgart"
-                />
-                {formErrors.city && (
-                  <p className="mt-1 text-sm text-red-500">{formErrors.city}</p>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Website <span className="text-red-500">*</span>
-                </label>
-                <div className="relative">
-                  <GlobeAltIcon className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                  <input
-                    name="website"
-                    value={formData.website}
-                    onChange={(e) =>
-                      handleInputChange("website", e.target.value)
-                    }
-                    className={`w-full pl-10 pr-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all ${
-                      formErrors.website ? "border-red-500" : "border-gray-200"
-                    }`}
-                    placeholder="https://www.example.com"
-                  />
-                </div>
-                {formErrors.website && (
-                  <p className="mt-1 text-sm text-red-500">
-                    {formErrors.website}
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Source <span className="text-red-500">*</span>
-                </label>
-                <select
-                  name="source"
-                  value={formData.source}
-                  onChange={(e) => handleInputChange("source", e.target.value)}
-                  className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all ${
-                    formErrors.source ? "border-red-500" : "border-gray-200"
-                  }`}
-                >
-                  <option value="">Select a source</option>
-                  {sources.map((src) => (
-                    <option key={src} value={src}>
-                      {src}
-                    </option>
-                  ))}
-                </select>
-                {formErrors.source && (
-                  <p className="mt-1 text-sm text-red-500">
-                    {formErrors.source}
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Is Device Maker <span className="text-red-500">*</span>
-                </label>
-                <select
-                  name="isDeviceMaker"
-                  value={formData.isDeviceMaker || ""}
-                  onChange={(e) =>
-                    handleInputChange(
-                      "isDeviceMaker",
-                      e.target.value || undefined
-                    )
-                  }
-                  className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all ${
-                    formErrors.isDeviceMaker
-                      ? "border-red-500"
-                      : "border-gray-200"
-                  }`}
-                >
-                  <option value="">Select an option</option>
-                  <option value="Yes">Yes</option>
-                  <option value="No">No</option>
-                  <option value="Unsure">Unsure</option>
-                </select>
-                {formErrors.isDeviceMaker && (
-                  <p className="mt-1 text-sm text-red-500">
-                    {formErrors.isDeviceMaker}
-                  </p>
-                )}
-              </div>
+              {renderField(
+                "City",
+                formData.city,
+                "city",
+                true,
+                "text",
+                "Stuttgart"
+              )}
+              {renderField(
+                "Postal Code",
+                formData.postalCode,
+                "postalCode",
+                true,
+                "text",
+                "10001"
+              )}
+              {renderField(
+                "Source",
+                formData.source,
+                "source",
+                true,
+                undefined,
+                undefined,
+                undefined,
+                sources
+              )}
+              {renderField(
+                "Country",
+                formData.country,
+                "country",
+                false,
+                undefined,
+                undefined,
+                undefined,
+                ["Germany", "Austria", "Switzerland"]
+              )}
+              {renderField(
+                "Is Device Maker",
+                formData.isDeviceMaker,
+                "isDeviceMaker",
+                true,
+                undefined,
+                undefined,
+                undefined,
+                ["Yes", "No", "Unsure"]
+              )}
             </div>
+
+            {/* Star Customer Info Box */}
+            {isStarCustomer && !isViewMode && (
+              <div className="mt-6 p-4 bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-200 rounded-lg">
+                <div className="flex items-start gap-3">
+                  <StarIcon className="w-5 h-5 text-yellow-600 mt-0.5" />
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-800 mb-1">
+                      Star Customer Account
+                    </h3>
+                    <p className="text-sm text-gray-600">
+                      This business will be created as a Star Customer with full
+                      account access. They will receive login credentials via
+                      email and can manage their own orders.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
+          {/* Star Business Details Section */}
           {(isEditMode && formData.starBusinessDetails) ||
-          (!isEditMode && formData.isDeviceMaker === "Yes") ? (
+          (!isEditMode && !isViewMode && formData.isDeviceMaker === "Yes") ||
+          (isViewMode &&
+            formData.starBusinessDetails &&
+            Object.values(formData.starBusinessDetails).some((v) => v)) ? (
             <div className="bg-gradient-to-br from-gray-50 to-white rounded-xl border border-gray-200">
-              <button
-                type="button"
-                onClick={() => setIsStarBusinessOpen(!isStarBusinessOpen)}
-                className="w-full p-6 flex items-center justify-between transition-colors rounded-t-xl"
-              >
-                <div className="flex items-center gap-3">
-                  <StarIcon className="w-6 h-6 text-yellow-600" />
-                  <h2 className="text-xl font-semibold text-gray-800">
-                    Star Business Details
-                  </h2>
-                  <span className="text-sm text-yellow-600 font-medium">
-                    {formData.isDeviceMaker === "Yes"
-                      ? "(Device Maker)"
-                      : formData.isDeviceMaker === "No"
-                      ? "(Not Device Maker)"
-                      : "(Unsure)"}
-                  </span>
+              {!isViewMode ? (
+                <button
+                  type="button"
+                  onClick={() => setIsStarBusinessOpen(!isStarBusinessOpen)}
+                  className="w-full p-6 flex items-center justify-between transition-colors rounded-t-xl"
+                >
+                  <div className="flex items-center gap-3">
+                    <StarIcon className="w-6 h-6 text-yellow-600" />
+                    <h2 className="text-xl font-semibold text-gray-800">
+                      Star Business Details
+                    </h2>
+                    <span className="text-sm text-yellow-600 font-medium">
+                      {formData.isDeviceMaker === "Yes"
+                        ? "(Device Maker)"
+                        : formData.isDeviceMaker === "No"
+                        ? "(Not Device Maker)"
+                        : "(Unsure)"}
+                    </span>
+                  </div>
+                  {isStarBusinessOpen ? (
+                    <ChevronUpIcon className="w-5 h-5 text-gray-600" />
+                  ) : (
+                    <ChevronDownIcon className="w-5 h-5 text-gray-600" />
+                  )}
+                </button>
+              ) : (
+                <div className="p-6">
+                  <div className="flex items-center gap-3 mb-6">
+                    <StarIcon className="w-6 h-6 text-yellow-600" />
+                    <h2 className="text-xl font-semibold text-gray-800">
+                      Star Business Details
+                    </h2>
+                    <span className="text-sm text-yellow-600 font-medium">
+                      {formData.isDeviceMaker === "Yes"
+                        ? "(Device Maker)"
+                        : formData.isDeviceMaker === "No"
+                        ? "(Not Device Maker)"
+                        : "(Unsure)"}
+                    </span>
+                  </div>
                 </div>
-                {isStarBusinessOpen ? (
-                  <ChevronUpIcon className="w-5 h-5 text-gray-600" />
-                ) : (
-                  <ChevronDownIcon className="w-5 h-5 text-gray-600" />
-                )}
-              </button>
+              )}
 
               <div
                 className={`overflow-hidden transition-all duration-300 ${
-                  isStarBusinessOpen ? "max-h-[1000px]" : "max-h-0"
+                  isStarBusinessOpen || isViewMode
+                    ? "max-h-[1000px]"
+                    : "max-h-0"
                 }`}
               >
-                <div className="p-8 pt-0 space-y-6">
+                <div
+                  className={`${
+                    isViewMode ? "px-6 pb-6" : "p-8 pt-0"
+                  } space-y-6`}
+                >
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {renderField(
+                      "In Series",
+                      formData.starBusinessDetails?.inSeries,
+                      "starBusinessDetails.inSeries",
+                      true,
+                      undefined,
+                      undefined,
+                      undefined,
+                      ["Yes", "No"]
+                    )}
+                    {renderField(
+                      "Made In",
+                      formData.starBusinessDetails?.madeIn,
+                      "starBusinessDetails.madeIn",
+                      true,
+                      undefined,
+                      undefined,
+                      undefined,
+                      ["Germany", "Switzerland", "Austria"]
+                    )}
+                    {renderField(
+                      "Last Checked",
+                      formData.starBusinessDetails?.lastChecked,
+                      "starBusinessDetails.lastChecked",
+                      false,
+                      "date",
+                      undefined,
+                      <CalendarIcon className="w-5 h-5" />
+                    )}
+                    {/* Special handling for Checked By field */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        In Series <span className="text-red-500">*</span>
+                        Checked By{" "}
+                        {!isViewMode && <span className="text-red-500">*</span>}
                       </label>
-                      <select
-                        name="starBusinessDetails.inSeries"
-                        value={formData.starBusinessDetails?.inSeries || ""}
-                        onChange={(e) =>
-                          handleStarBusinessChange(
-                            "inSeries",
-                            e.target.value || undefined
-                          )
-                        }
-                        className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 transition-all ${
-                          formErrors["starBusinessDetails.inSeries"]
-                            ? "border-red-500"
-                            : "border-gray-200"
-                        }`}
-                      >
-                        <option value="">Select an option</option>
-                        <option value="Yes">Yes</option>
-                        <option value="No">No</option>
-                      </select>
-                      {formErrors["starBusinessDetails.inSeries"] && (
-                        <p className="mt-1 text-sm text-red-500">
-                          {formErrors["starBusinessDetails.inSeries"]}
-                        </p>
+                      {isViewMode ? (
+                        <div className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg flex items-center gap-3">
+                          <UserIcon className="w-5 h-5 text-gray-400" />
+                          <span className="text-gray-700">
+                            {formData.starBusinessDetails?.checkedBy ===
+                            "manual"
+                              ? "Manual"
+                              : formData.starBusinessDetails?.checkedBy === "AI"
+                              ? "AI"
+                              : "-"}
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="relative">
+                          <UserIcon className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                          <select
+                            name="starBusinessDetails.checkedBy"
+                            value={
+                              formData.starBusinessDetails?.checkedBy || ""
+                            }
+                            onChange={(e) =>
+                              handleStarBusinessChange(
+                                "checkedBy",
+                                e.target.value || undefined
+                              )
+                            }
+                            className={`w-full pl-10 pr-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 transition-all ${
+                              formErrors["starBusinessDetails.checkedBy"]
+                                ? "border-red-500"
+                                : "border-gray-200"
+                            }`}
+                          >
+                            <option value="">Select who checked</option>
+                            <option value="manual">Manual</option>
+                            <option value="AI">AI</option>
+                          </select>
+                          {formErrors["starBusinessDetails.checkedBy"] && (
+                            <p className="mt-1 text-sm text-red-500">
+                              {formErrors["starBusinessDetails.checkedBy"]}
+                            </p>
+                          )}
+                        </div>
                       )}
                     </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Made In <span className="text-red-500">*</span>
-                      </label>
-                      <select
-                        name="starBusinessDetails.madeIn"
-                        value={formData.starBusinessDetails?.madeIn || ""}
-                        onChange={(e) =>
-                          handleStarBusinessChange(
-                            "madeIn",
-                            e.target.value || undefined
-                          )
-                        }
-                        className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 transition-all ${
-                          formErrors["starBusinessDetails.madeIn"]
-                            ? "border-red-500"
-                            : "border-gray-200"
-                        }`}
-                      >
-                        <option value="">Select a country</option>
-                        <option value="Germany">Germany</option>
-                        <option value="Switzerland">Switzerland</option>
-                        <option value="Austria">Austria</option>
-                      </select>
-                      {formErrors["starBusinessDetails.madeIn"] && (
-                        <p className="mt-1 text-sm text-red-500">
-                          {formErrors["starBusinessDetails.madeIn"]}
-                        </p>
-                      )}
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Last Checked
-                      </label>
-                      <div className="relative">
-                        <CalendarIcon className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                        <input
-                          type="date"
-                          name="starBusinessDetails.lastChecked"
-                          value={
-                            formData.starBusinessDetails?.lastChecked || ""
-                          }
-                          onChange={(e) =>
-                            handleStarBusinessChange(
-                              "lastChecked",
-                              e.target.value || undefined
-                            )
-                          }
-                          className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 transition-all"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Checked By <span className="text-red-500">*</span>
-                      </label>
-                      <div className="relative">
-                        <UserIcon className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                        <select
-                          name="starBusinessDetails.checkedBy"
-                          value={formData.starBusinessDetails?.checkedBy || ""}
-                          onChange={(e) =>
-                            handleStarBusinessChange(
-                              "checkedBy",
-                              e.target.value || undefined
-                            )
-                          }
-                          className={`w-full pl-10 pr-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 transition-all ${
-                            formErrors["starBusinessDetails.checkedBy"]
-                              ? "border-red-500"
-                              : "border-gray-200"
-                          }`}
-                        >
-                          <option value="">Select who checked</option>
-                          <option value="manual">Manual</option>
-                          <option value="AI">AI</option>
-                        </select>
-                      </div>
-                      {formErrors["starBusinessDetails.checkedBy"] && (
-                        <p className="mt-1 text-sm text-red-500">
-                          {formErrors["starBusinessDetails.checkedBy"]}
-                        </p>
-                      )}
-                    </div>
-
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Device <span className="text-red-500">*</span>
@@ -918,17 +1076,18 @@ const AddEditBusinessManual: React.FC = () => {
                         <CpuChipIcon className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
                         <input
                           type="text"
-                          name="starBusinessDetails.device"
+                          name="device"
                           value={formData.starBusinessDetails?.device || ""}
                           onChange={(e) =>
                             handleStarBusinessChange("device", e.target.value)
                           }
-                          className={`w-full pl-10 pr-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 transition-all ${
+                          className={`w-full pl-10 pr-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all ${
                             formErrors["starBusinessDetails.device"]
                               ? "border-red-500"
                               : "border-gray-200"
                           }`}
                           placeholder="Enter device information"
+                          disabled={isViewMode}
                         />
                       </div>
                       {formErrors["starBusinessDetails.device"] && (
@@ -937,40 +1096,50 @@ const AddEditBusinessManual: React.FC = () => {
                         </p>
                       )}
                     </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Industry <span className="text-red-500">*</span>
-                      </label>
-                      <div className="relative">
-                        <CogIcon className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                        <select
-                          name="starBusinessDetails.industry"
-                          value={formData.starBusinessDetails?.industry || ""}
-                          onChange={(e) =>
-                            handleStarBusinessChange("industry", e.target.value)
-                          }
-                          className={`w-full pl-10 pr-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 transition-all ${
-                            formErrors["starBusinessDetails.industry"]
-                              ? "border-red-500"
-                              : "border-gray-200"
-                          }`}
-                        >
-                          <option value="">Select an industry</option>
-                          {industries.map((ind) => (
-                            <option key={ind} value={ind}>
-                              {ind}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      {formErrors["starBusinessDetails.industry"] && (
-                        <p className="mt-1 text-sm text-red-500">
-                          {formErrors["starBusinessDetails.industry"]}
-                        </p>
+                    {renderField(
+                      "Industry",
+                      formData.starBusinessDetails?.industry,
+                      "starBusinessDetails.industry",
+                      true,
+                      undefined,
+                      undefined,
+                      <CogIcon className="w-5 h-5" />,
+                      industries
+                    )}
+                    {(isStarCustomer ||
+                      (isViewMode && formData.starCustomerEmail)) &&
+                      renderField(
+                        "Customer Email",
+                        formData.starCustomerEmail,
+                        "starCustomerEmail",
+                        true,
+                        "email",
+                        "customer@example.com",
+                        <EnvelopeIcon className="w-5 h-5" />
                       )}
-                    </div>
                   </div>
+
+                  {!isViewMode && formData.isDeviceMaker === "Yes" && (
+                    <div className="flex items-center gap-3 px-4 py-2 bg-gradient-to-r from-yellow-50 to-orange-50 rounded-lg border border-yellow-200">
+                      <UserGroupIcon className="w-5 h-5 text-yellow-600" />
+                      <span className="text-sm font-medium text-gray-700">
+                        Star Customer
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setIsStarCustomer(!isStarCustomer)}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                          isStarCustomer ? "bg-yellow-600" : "bg-gray-300"
+                        }`}
+                      >
+                        <span
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                            isStarCustomer ? "translate-x-6" : "translate-x-1"
+                          }`}
+                        />
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -978,291 +1147,350 @@ const AddEditBusinessManual: React.FC = () => {
 
           {/* Optional Fields Section - Collapsible */}
           <div className="bg-gradient-to-br from-gray-50 to-white rounded-xl border border-gray-200">
-            <button
-              type="button"
-              onClick={() => setIsExtraInfoOpen(!isExtraInfoOpen)}
-              className="w-full p-6 flex items-center justify-between hover:bg-gray-50 transition-colors rounded-t-xl"
-            >
-              <div className="flex items-center gap-3">
-                <InformationCircleIcon className="w-6 h-6 text-gray-600" />
-                <h2 className="text-xl font-semibold text-gray-800">
-                  Extra Information
-                </h2>
-                <span className="text-sm text-gray-500">(Optional)</span>
+            {!isViewMode ? (
+              <button
+                type="button"
+                onClick={() => setIsExtraInfoOpen(!isExtraInfoOpen)}
+                className="w-full p-6 flex items-center justify-between hover:bg-gray-50 transition-colors rounded-t-xl"
+              >
+                <div className="flex items-center gap-3">
+                  <InformationCircleIcon className="w-6 h-6 text-gray-600" />
+                  <h2 className="text-xl font-semibold text-gray-800">
+                    Extra Information
+                  </h2>
+                  <span className="text-sm text-gray-500">(Optional)</span>
+                </div>
+                {isExtraInfoOpen ? (
+                  <ChevronUpIcon className="w-5 h-5 text-gray-600" />
+                ) : (
+                  <ChevronDownIcon className="w-5 h-5 text-gray-600" />
+                )}
+              </button>
+            ) : (
+              <div className="p-6">
+                <div className="flex items-center gap-3 mb-6">
+                  <InformationCircleIcon className="w-6 h-6 text-gray-600" />
+                  <h2 className="text-xl font-semibold text-gray-800">
+                    Extra Information
+                  </h2>
+                </div>
               </div>
-              {isExtraInfoOpen ? (
-                <ChevronUpIcon className="w-5 h-5 text-gray-600" />
-              ) : (
-                <ChevronDownIcon className="w-5 h-5 text-gray-600" />
-              )}
-            </button>
+            )}
 
-            {/* Collapsible Content */}
             <div
               className={`overflow-hidden transition-all duration-300 ${
-                isExtraInfoOpen ? "max-h-[3000px]" : "max-h-0"
+                isExtraInfoOpen || isViewMode ? "max-h-[3000px]" : "max-h-0"
               }`}
             >
-              <div className="p-8 pt-0 space-y-8">
-                {/* Contact Information */}
+              <div
+                className={`${isViewMode ? "px-6 pb-6" : "p-8 pt-0"} space-y-6`}
+              >
+                {/* Contact & Location */}
                 <div>
-                  <h3 className="text-lg font-medium text-gray-800 mb-4">
-                    Contact Information
+                  <h3 className="text-lg font-medium text-gray-700 mb-4 flex items-center gap-2">
+                    <MapPinIcon className="w-5 h-5" />
+                    Contact & Location
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Phone Number
-                      </label>
-                      <div className="relative">
-                        <PhoneIcon className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                        <input
-                          type="tel"
-                          name="phoneNumber"
-                          value={formData.phoneNumber}
-                          onChange={(e) =>
-                            handleInputChange("phoneNumber", e.target.value)
-                          }
-                          className={`w-full pl-10 pr-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all ${
-                            formErrors.phoneNumber
-                              ? "border-red-500"
-                              : "border-gray-200"
-                          }`}
-                          placeholder="+1 (555) 123-4567"
-                        />
+                    {renderField(
+                      "Address",
+                      formData.address,
+                      "address",
+                      false,
+                      "text",
+                      "123 Main Street"
+                    )}
+                    {renderField(
+                      "State",
+                      formData.state,
+                      "state",
+                      false,
+                      "text",
+                      "Baden-Württemberg"
+                    )}
+                    {renderField(
+                      "Phone Number",
+                      formData.phoneNumber,
+                      "phoneNumber",
+                      false,
+                      "tel",
+                      "+1 234 567 8900",
+                      <PhoneIcon className="w-5 h-5" />
+                    )}
+                    {renderField(
+                      "Email",
+                      formData.email,
+                      "email",
+                      false,
+                      "email",
+                      "contact@example.com",
+                      <EnvelopeIcon className="w-5 h-5" />
+                    )}
+                    {renderField(
+                      "Latitude",
+                      formData.latitude,
+                      "latitude",
+                      false,
+                      "number",
+                      "40.7128"
+                    )}
+                    {renderField(
+                      "Longitude",
+                      formData.longitude,
+                      "longitude",
+                      false,
+                      "number",
+                      "-74.0060"
+                    )}
+                  </div>
+                </div>
+
+                {/* Categories */}
+                <div>
+                  <h3 className="text-lg font-medium text-gray-700 mb-4 flex items-center gap-2">
+                    <TagIcon className="w-5 h-5" />
+                    Categories
+                  </h3>
+                  <div className="space-y-4">
+                    {renderField(
+                      "Primary Category",
+                      formData.category,
+                      "category",
+                      false,
+                      undefined,
+                      undefined,
+                      undefined,
+                      categories
+                    )}
+
+                    {!isViewMode && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Additional Categories
+                        </label>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                          {categories.map((cat) => (
+                            <label
+                              key={cat}
+                              className="flex items-center gap-2 cursor-pointer"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={formData.additionalCategories?.includes(
+                                  cat
+                                )}
+                                onChange={() =>
+                                  handleAdditionalCategoryToggle(cat)
+                                }
+                                className="w-4 h-4 text-primary rounded border-gray-300 focus:ring-primary"
+                              />
+                              <span className="text-sm text-gray-700">
+                                {cat}
+                              </span>
+                            </label>
+                          ))}
+                        </div>
                       </div>
-                      {formErrors.phoneNumber && (
-                        <p className="mt-1 text-sm text-red-500">
-                          {formErrors.phoneNumber}
-                        </p>
-                      )}
-                    </div>
+                    )}
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Email Address
-                      </label>
-                      <div className="relative">
-                        <EnvelopeIcon className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                        <input
-                          type="email"
-                          name="email"
-                          value={formData.email}
-                          onChange={(e) =>
-                            handleInputChange("email", e.target.value)
-                          }
-                          className={`w-full pl-10 pr-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all ${
-                            formErrors.email
-                              ? "border-red-500"
-                              : "border-gray-200"
-                          }`}
-                          placeholder="contact@business.com"
-                        />
-                      </div>
-                      {formErrors.email && (
-                        <p className="mt-1 text-sm text-red-500">
-                          {formErrors.email}
-                        </p>
+                    {isViewMode &&
+                      formData.additionalCategories &&
+                      formData.additionalCategories.length > 0 && (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Additional Categories
+                          </label>
+                          <div className="flex flex-wrap gap-2">
+                            {formData.additionalCategories.map((cat) => (
+                              <span
+                                key={cat}
+                                className="px-3 py-1 bg-gray-100 text-gray-700 rounded-lg text-sm"
+                              >
+                                {cat}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
                       )}
-                    </div>
                   </div>
                 </div>
 
-                {/* Coordinates */}
+                {/* Google Integration */}
                 <div>
-                  <h3 className="text-lg font-medium text-gray-800 mb-4">
-                    Coordinates
+                  <h3 className="text-lg font-medium text-gray-700 mb-4 flex items-center gap-2">
+                    <MapIcon className="w-5 h-5" />
+                    Google Integration
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Latitude
-                      </label>
-                      <input
-                        type="number"
-                        step="any"
-                        name="latitude"
-                        value={formData.latitude || ""}
-                        onChange={(e) =>
-                          handleInputChange(
-                            "latitude",
-                            e.target.value
-                              ? parseFloat(e.target.value)
-                              : undefined
-                          )
-                        }
-                        className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all ${
-                          formErrors.latitude
-                            ? "border-red-500"
-                            : "border-gray-200"
-                        }`}
-                        placeholder="40.7128"
-                      />
-                      {formErrors.latitude && (
-                        <p className="mt-1 text-sm text-red-500">
-                          {formErrors.latitude}
-                        </p>
-                      )}
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Longitude
-                      </label>
-                      <input
-                        type="number"
-                        step="any"
-                        name="longitude"
-                        value={formData.longitude || ""}
-                        onChange={(e) =>
-                          handleInputChange(
-                            "longitude",
-                            e.target.value
-                              ? parseFloat(e.target.value)
-                              : undefined
-                          )
-                        }
-                        className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all ${
-                          formErrors.longitude
-                            ? "border-red-500"
-                            : "border-gray-200"
-                        }`}
-                        placeholder="-74.0060"
-                      />
-                      {formErrors.longitude && (
-                        <p className="mt-1 text-sm text-red-500">
-                          {formErrors.longitude}
-                        </p>
-                      )}
-                    </div>
+                    {renderField(
+                      "Google Place ID",
+                      formData.googlePlaceId,
+                      "googlePlaceId",
+                      false,
+                      "text",
+                      "ChIJN1t_..."
+                    )}
+                    {renderField(
+                      "Google Maps URL",
+                      formData.googleMapsUrl,
+                      "googleMapsUrl",
+                      false,
+                      "url",
+                      "https://maps.google.com/..."
+                    )}
+                    {renderField(
+                      "Review Count",
+                      formData.reviewCount,
+                      "reviewCount",
+                      false,
+                      "number",
+                      "150"
+                    )}
+                    {renderField(
+                      "Average Rating",
+                      formData.averageRating,
+                      "averageRating",
+                      false,
+                      "number",
+                      "4.5"
+                    )}
                   </div>
                 </div>
 
-                {/* Additional Details */}
+                {/* Description */}
                 <div>
-                  <h3 className="text-lg font-medium text-gray-800 mb-4">
-                    Additional Details
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Description
+                  </label>
+                  {isViewMode ? (
+                    <div className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg">
+                      <p className="text-gray-700 whitespace-pre-wrap">
+                        {formData.description || "-"}
+                      </p>
+                    </div>
+                  ) : (
+                    <textarea
+                      name="description"
+                      value={formData.description}
+                      onChange={(e) =>
+                        handleInputChange("description", e.target.value)
+                      }
+                      rows={4}
+                      className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all resize-none"
+                      placeholder="Enter business description..."
+                    />
+                  )}
+                </div>
+
+                {/* Social Media */}
+                <div>
+                  <h3 className="text-lg font-medium text-gray-700 mb-4">
+                    Social Media Links
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="md:col-span-2">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Street Address
-                      </label>
-                      <input
-                        type="text"
-                        name="address"
-                        value={formData.address}
-                        onChange={(e) =>
-                          handleInputChange("address", e.target.value)
-                        }
-                        className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all"
-                        placeholder="123 Main Street"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        State/Province
-                      </label>
-                      <input
-                        type="text"
-                        name="state"
-                        value={formData.state}
-                        onChange={(e) =>
-                          handleInputChange("state", e.target.value)
-                        }
-                        className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all"
-                        placeholder="NY"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Country
-                      </label>
-                      <select
-                        name="country"
-                        value={formData.country}
-                        onChange={(e) =>
-                          handleInputChange("country", e.target.value)
-                        }
-                        className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all"
-                      >
-                        <option value="Germany">Germany</option>
-                        <option value="Austria">Austria</option>
-                        <option value="Switzerland">Switzerland</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Primary Category
-                      </label>
-                      <select
-                        name="category"
-                        value={formData.category}
-                        onChange={(e) =>
-                          handleInputChange("category", e.target.value)
-                        }
-                        className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all"
-                      >
-                        <option value="">Select a category</option>
-                        {categories.map((cat) => (
-                          <option key={cat} value={cat}>
-                            {cat}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="md:col-span-2">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Description
-                      </label>
-                      <textarea
-                        name="description"
-                        value={formData.description}
-                        onChange={(e) =>
-                          handleInputChange("description", e.target.value)
-                        }
-                        rows={4}
-                        className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all"
-                        placeholder="Enter business description"
-                      />
-                    </div>
+                    {Object.entries(formData.socialMedia || {}).map(
+                      ([platform, url]) => (
+                        <div key={platform}>
+                          <label className="block text-sm font-medium text-gray-700 mb-2 capitalize">
+                            {platform}
+                          </label>
+                          {isViewMode ? (
+                            <div className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg">
+                              <span className="text-gray-700">
+                                {url || "-"}
+                              </span>
+                            </div>
+                          ) : (
+                            <input
+                              type="url"
+                              value={url}
+                              onChange={(e) =>
+                                handleSocialMediaChange(
+                                  platform,
+                                  e.target.value
+                                )
+                              }
+                              className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all"
+                              placeholder={`https://${platform}.com/...`}
+                            />
+                          )}
+                        </div>
+                      )
+                    )}
                   </div>
                 </div>
 
-                {/* Rest of the optional fields remain the same... */}
-                {/* Google Information, Social Media, Business Hours, Additional Categories sections */}
-                {/* (keeping the rest of the code as is for brevity) */}
+                {/* Business Hours */}
+                <div>
+                  <h3 className="text-lg font-medium text-gray-700 mb-4 flex items-center gap-2">
+                    <ClockIcon className="w-5 h-5" />
+                    Business Hours
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {Object.entries(formData.businessHours || {}).map(
+                      ([day, hours]) => (
+                        <div key={day}>
+                          <label className="block text-sm font-medium text-gray-700 mb-2 capitalize">
+                            {day}
+                          </label>
+                          {isViewMode ? (
+                            <div className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg">
+                              <span className="text-gray-700">
+                                {hours || "Closed"}
+                              </span>
+                            </div>
+                          ) : (
+                            <input
+                              type="text"
+                              value={hours}
+                              onChange={(e) =>
+                                handleBusinessHoursChange(day, e.target.value)
+                              }
+                              className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all"
+                              placeholder="9:00 AM - 5:00 PM"
+                            />
+                          )}
+                        </div>
+                      )
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Form Actions */}
-          <div className="flex justify-between items-center pt-6 border-t border-gray-200">
-            <button
-              type="button"
-              onClick={handleReset}
-              className="px-6 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-all font-medium"
-            >
-              {isEditMode ? "Reset Changes" : "Reset Form"}
-            </button>
+          {/* Form Actions - Only show in edit/create mode */}
+          {!isViewMode && (
+            <div className="flex justify-between items-center pt-6 border-t border-gray-200">
+              <button
+                type="button"
+                onClick={handleReset}
+                className="px-6 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-all font-medium"
+              >
+                {isEditMode ? "Reset Changes" : "Reset Form"}
+              </button>
 
-            <CustomButton gradient={true} type="submit" disabled={isSubmitting}>
-              {isSubmitting ? (
-                <>
-                  <ArrowPathIcon className="w-5 h-5 animate-spin" />
-                  {isEditMode ? "Updating Business..." : "Creating Business..."}
-                </>
-              ) : (
-                <>
-                  <CheckCircleIcon className="w-5 h-5" />
-                  {isEditMode ? "Update Business" : "Create Business"}
-                </>
-              )}
-            </CustomButton>
-          </div>
+              <CustomButton
+                gradient={true}
+                type="submit"
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? (
+                  <>
+                    <ArrowPathIcon className="w-5 h-5 animate-spin" />
+                    {isEditMode
+                      ? "Updating Business..."
+                      : "Creating Business..."}
+                  </>
+                ) : (
+                  <>
+                    <CheckCircleIcon className="w-5 h-5" />
+                    {isEditMode ? "Update Business" : "Create Business"}
+                  </>
+                )}
+              </CustomButton>
+            </div>
+          )}
         </form>
       </div>
     </div>

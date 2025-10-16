@@ -127,7 +127,7 @@ export class List {
   @ManyToOne(() => ListCreator, {
     eager: true,
     cascade: ["insert", "update"],
-    nullable: false,
+    nullable: true,
   })
   @JoinColumn()
   createdBy!: ListCreator;

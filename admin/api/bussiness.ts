@@ -45,6 +45,7 @@ export interface Business {
   status: "active" | "inactive" | "no_website";
   hasWebsite: boolean;
   lastVerifiedAt?: string;
+  isStarCustomer: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -58,11 +59,13 @@ export interface BusinessCreatePayload {
   state?: string;
   country?: string;
   postalCode?: string;
+  isStarCustomer: boolean;
   latitude?: number;
   longitude?: number;
   phoneNumber?: string;
   email?: string;
   googlePlaceId?: string;
+  starCustomerEmail: any;
   googleMapsUrl?: string;
   reviewCount?: number;
   averageRating?: number;

@@ -6,8 +6,13 @@ import { BusinessDetails } from "../models/business_details";
 import ErrorHandler from "../utils/errorHandler";
 import { In, Like } from "typeorm";
 import { StarBusinessDetails } from "../models/star_business_details";
+import { StarCustomerDetails } from "../models/star_customer_details";
+import crypto from "crypto";
+import { CustomerCreator, List, LIST_STATUS } from "../models/list";
+import sendEmail from "../services/emailService";
+import bcrypt from "bcryptjs";
+import { User } from "../models/users";
 
-// Constants for business sources and status (maintaining compatibility)
 export const BUSINESS_SOURCE = {
   GOOGLE_MAPS: "Google Maps",
   MANUAL: "Manual",
@@ -440,6 +445,7 @@ export const bulkImportBusinesses = async (
     );
   }
 };
+
 export const createBusiness = async (
   req: Request,
   res: Response,
@@ -459,17 +465,17 @@ export const createBusiness = async (
       longitude,
       phoneNumber,
       email,
-      googlePlaceId,
       googleMapsUrl,
       reviewCount,
-      averageRating,
       category,
       additionalCategories,
       socialMedia,
-      businessHours,
       source = BUSINESS_SOURCE.MANUAL,
       isDeviceMaker,
-      starBusinessDetails, // New field for star business details
+      starBusinessDetails,
+      // Star Customer specific fields
+      isStarCustomer,
+      starCustomerEmail,
       // Customer specific fields
       companyName,
       legalName,
@@ -511,11 +517,30 @@ export const createBusiness = async (
       );
     }
 
+    // Star Customer validation
+    if (isStarCustomer && isDeviceMaker !== "Yes") {
+      return next(
+        new ErrorHandler(
+          "Star Customer can only be created when device maker is Yes",
+          400
+        )
+      );
+    }
+
+    if (isStarCustomer && !starCustomerEmail) {
+      return next(
+        new ErrorHandler("Email is required for Star Customer account", 400)
+      );
+    }
+
     const customerRepository = AppDataSource.getRepository(Customer);
     const businessDetailsRepository =
       AppDataSource.getRepository(BusinessDetails);
     const starBusinessDetailsRepository =
       AppDataSource.getRepository(StarBusinessDetails);
+    const starCustomerDetailsRepository =
+      AppDataSource.getRepository(StarCustomerDetails);
+    const listRepository = AppDataSource.getRepository(List);
 
     // Normalize website for comparison (remove trailing slashes, www, etc.)
     const normalizedWebsite = website ? normalizeWebsite(website) : null;
@@ -524,7 +549,7 @@ export const createBusiness = async (
     if (normalizedWebsite) {
       const existingBusinessWithWebsite = await businessDetailsRepository
         .createQueryBuilder("businessDetails")
-        .innerJoin("businessDetails.customer", "customer")
+        .leftJoinAndSelect("businessDetails.customer", "customer")
         .where("businessDetails.website = :website", {
           website: normalizedWebsite,
         })
@@ -555,10 +580,11 @@ export const createBusiness = async (
       );
     }
 
-    // Optional: Check for duplicate email only if provided
-    if (finalEmail) {
+    // Check for duplicate email - for star customers or regular businesses
+    const emailToCheck = isStarCustomer ? starCustomerEmail : finalEmail;
+    if (emailToCheck) {
       const existingCustomerWithEmail = await customerRepository.findOne({
-        where: { email: finalEmail.trim().toLowerCase() },
+        where: { email: emailToCheck.trim().toLowerCase() },
       });
 
       if (existingCustomerWithEmail) {
@@ -568,145 +594,263 @@ export const createBusiness = async (
       }
     }
 
-    // Create Customer entity
-    const customer = new Customer();
-    customer.companyName = trimmedCompanyName;
-    customer.email = finalEmail ? finalEmail.trim().toLowerCase() : undefined;
-    customer.stage = "business"; // Default stage
-    customer.legalName = legalName ? legalName.trim() : undefined;
+    // Use transaction to ensure all entities are created together
+    const result = await AppDataSource.transaction(
+      async (transactionalEntityManager) => {
+        // Create Customer entity first with minimal data
+        const customer = new Customer();
+        customer.companyName = trimmedCompanyName;
+        customer.legalName = legalName ? legalName.trim() : undefined;
 
-    // Set contact email - prioritize contactEmail, then fall back to email if provided
-    customer.contactEmail = contactEmail
-      ? contactEmail.trim().toLowerCase()
-      : finalEmail
-      ? finalEmail.trim().toLowerCase()
-      : undefined;
+        // Determine customer stage based on star customer and device maker
+        if (isStarCustomer) {
+          customer.stage = "star_customer";
+          customer.email = starCustomerEmail.trim().toLowerCase();
+          customer.contactEmail = starCustomerEmail.trim().toLowerCase();
+        } else if (isDeviceMaker === "Yes") {
+          customer.stage = "star_business";
+          customer.email = finalEmail
+            ? finalEmail.trim().toLowerCase()
+            : undefined;
+          customer.contactEmail = contactEmail
+            ? contactEmail.trim().toLowerCase()
+            : finalEmail
+            ? finalEmail.trim().toLowerCase()
+            : undefined;
+        } else {
+          customer.stage = "business";
+          customer.email = finalEmail
+            ? finalEmail.trim().toLowerCase()
+            : undefined;
+          customer.contactEmail = contactEmail
+            ? contactEmail.trim().toLowerCase()
+            : finalEmail
+            ? finalEmail.trim().toLowerCase()
+            : undefined;
+        }
 
-    customer.contactPhoneNumber = contactPhoneNumber
-      ? contactPhoneNumber.trim()
-      : phoneNumber
-      ? phoneNumber.trim()
-      : undefined;
+        customer.contactPhoneNumber = contactPhoneNumber
+          ? contactPhoneNumber.trim()
+          : phoneNumber
+          ? phoneNumber.trim()
+          : undefined;
 
-    // Create BusinessDetails entity
-    const businessDetails = new BusinessDetails();
-    businessDetails.businessSource = source as any;
-    businessDetails.isDeviceMaker = isDeviceMaker as "Yes" | "No" | "Unsure";
-    businessDetails.address = address ? address.trim() : undefined;
-    businessDetails.website = normalizedWebsite || undefined;
-    businessDetails.description = description ? description.trim() : undefined;
-    businessDetails.city = city.trim(); // Required field
-    businessDetails.state = state ? state.trim() : undefined;
-    businessDetails.country = country ? country.trim() : undefined;
-    businessDetails.postalCode = postalCode.trim(); // Required field
-    businessDetails.latitude = sanitizeNumber(latitude);
-    businessDetails.longitude = sanitizeNumber(longitude);
-    businessDetails.contactPhone = phoneNumber ? phoneNumber.trim() : undefined;
-    businessDetails.email = email ? email.trim().toLowerCase() : undefined; // Now optional
-    businessDetails.googleMapsUrl = googleMapsUrl
-      ? googleMapsUrl.trim()
-      : undefined;
-    businessDetails.reviewCount = sanitizeInteger(reviewCount);
-    businessDetails.category = category ? category.trim() : undefined;
-    businessDetails.additionalCategories = Array.isArray(additionalCategories)
-      ? additionalCategories.map((cat: string) => cat.trim()).filter(Boolean)
-      : undefined;
-    businessDetails.socialLinks = sanitizeSocialLinks(socialMedia);
-    businessDetails.isStarBusiness = false;
-    businessDetails.isStarCustomer = false;
+        // Save customer first without any relationships
+        const savedCustomer = await transactionalEntityManager.save(
+          Customer,
+          customer
+        );
 
-    // Associate BusinessDetails with Customer
-    customer.businessDetails = businessDetails;
+        // Create BusinessDetails entity
+        const businessDetails = new BusinessDetails();
+        businessDetails.businessSource = source as any;
+        businessDetails.isDeviceMaker = isDeviceMaker as
+          | "Yes"
+          | "No"
+          | "Unsure";
+        businessDetails.address = address ? address.trim() : undefined;
+        businessDetails.website = normalizedWebsite || undefined;
+        businessDetails.description = description
+          ? description.trim()
+          : undefined;
+        businessDetails.city = city.trim();
+        businessDetails.state = state ? state.trim() : undefined;
+        businessDetails.country = country ? country.trim() : undefined;
+        businessDetails.postalCode = postalCode.trim();
+        businessDetails.latitude = sanitizeNumber(latitude);
+        businessDetails.longitude = sanitizeNumber(longitude);
+        businessDetails.contactPhone = phoneNumber
+          ? phoneNumber.trim()
+          : undefined;
+        businessDetails.email = finalEmail
+          ? finalEmail.trim().toLowerCase()
+          : undefined;
+        businessDetails.googleMapsUrl = googleMapsUrl
+          ? googleMapsUrl.trim()
+          : undefined;
+        businessDetails.reviewCount = sanitizeInteger(reviewCount);
+        businessDetails.category = category ? category.trim() : undefined;
+        businessDetails.additionalCategories = Array.isArray(
+          additionalCategories
+        )
+          ? additionalCategories
+              .map((cat: string) => cat.trim())
+              .filter(Boolean)
+          : undefined;
+        businessDetails.socialLinks = sanitizeSocialLinks(socialMedia);
+        businessDetails.isStarBusiness = isDeviceMaker === "Yes";
+        businessDetails.isStarCustomer = isStarCustomer || false;
+        businessDetails.customer = savedCustomer;
 
-    // Create StarBusinessDetails if isDeviceMaker is "Yes"
-    if (isDeviceMaker === "Yes" && starBusinessDetails) {
-      const starBusiness = new StarBusinessDetails();
+        // Save BusinessDetails
+        const savedBusinessDetails = await transactionalEntityManager.save(
+          BusinessDetails,
+          businessDetails
+        );
 
-      // Map star business fields
-      if (starBusinessDetails.inSeries) {
-        starBusiness.inSeries = starBusinessDetails.inSeries as "Yes" | "No";
+        // Create StarBusinessDetails if isDeviceMaker is "Yes"
+        let savedStarBusiness = null;
+        if (isDeviceMaker === "Yes" && starBusinessDetails) {
+          const starBusiness = new StarBusinessDetails();
+
+          // Map star business fields
+          if (starBusinessDetails.inSeries) {
+            starBusiness.inSeries = starBusinessDetails.inSeries as
+              | "Yes"
+              | "No";
+          }
+
+          if (starBusinessDetails.madeIn) {
+            starBusiness.madeIn = starBusinessDetails.madeIn as
+              | "Germany"
+              | "Switzerland"
+              | "Austria";
+          }
+
+          if (starBusinessDetails.lastChecked) {
+            starBusiness.lastChecked = new Date(
+              starBusinessDetails.lastChecked
+            );
+          }
+
+          if (starBusinessDetails.checkedBy) {
+            starBusiness.checkedBy = starBusinessDetails.checkedBy as
+              | "manual"
+              | "AI";
+          }
+
+          if (starBusinessDetails.device) {
+            starBusiness.device = starBusinessDetails.device.trim();
+          }
+
+          if (starBusinessDetails.industry) {
+            starBusiness.industry = starBusinessDetails.industry.trim();
+          }
+
+          starBusiness.customer = savedCustomer;
+
+          // Save StarBusinessDetails
+          savedStarBusiness = await transactionalEntityManager.save(
+            StarBusinessDetails,
+            starBusiness
+          );
+        }
+
+        // Create StarCustomerDetails if isStarCustomer is true
+        let tempPassword = null;
+        let defaultList = null;
+        let savedStarCustomerDetails = null;
+
+        if (isStarCustomer) {
+          // Generate temporary password
+          tempPassword = crypto.randomBytes(8).toString("hex");
+          const hashedPassword = await bcrypt.hash(tempPassword, 10);
+
+          // Create star customer details
+          const starCustomerDetails = new StarCustomerDetails();
+          starCustomerDetails.customer = savedCustomer;
+          starCustomerDetails.taxNumber = "PENDING";
+          starCustomerDetails.password = hashedPassword;
+          starCustomerDetails.accountVerificationStatus = "verified";
+          starCustomerDetails.isEmailVerified = true;
+          starCustomerDetails.deliveryAddressLine1 = address || "";
+          starCustomerDetails.deliveryPostalCode = postalCode;
+          starCustomerDetails.deliveryCity = city;
+          starCustomerDetails.deliveryCountry = country;
+
+          savedStarCustomerDetails = await transactionalEntityManager.save(
+            StarCustomerDetails,
+            starCustomerDetails
+          );
+
+          // Create default list for the star customer
+          defaultList = new List();
+          defaultList.name = `${trimmedCompanyName} - Default List`;
+          defaultList.description = `Default list for ${trimmedCompanyName}`;
+          defaultList.customer = savedCustomer;
+          defaultList.status = LIST_STATUS.ACTIVE;
+
+          // Save the default list
+          defaultList = await transactionalEntityManager.save(
+            List,
+            defaultList
+          );
+        }
+
+        // Return a clean response object without circular references
+        return {
+          customer: {
+            id: savedCustomer.id,
+            companyName: savedCustomer.companyName,
+            email: savedCustomer.email,
+            stage: savedCustomer.stage,
+          },
+          businessDetails: {
+            id: savedBusinessDetails.id,
+            website: savedBusinessDetails.website,
+          },
+          starBusinessDetails: savedStarBusiness
+            ? {
+                id: savedStarBusiness.id,
+                device: savedStarBusiness.device,
+              }
+            : null,
+          starCustomerDetails: savedStarCustomerDetails
+            ? {
+                id: savedStarCustomerDetails.id,
+              }
+            : null,
+          tempPassword,
+          defaultList: defaultList
+            ? {
+                id: defaultList.id,
+                name: defaultList.name,
+              }
+            : null,
+        };
       }
+    );
 
-      if (starBusinessDetails.madeIn) {
-        starBusiness.madeIn = starBusinessDetails.madeIn as
-          | "Germany"
-          | "Switzerland"
-          | "Austria";
-      }
+    const { customer, tempPassword, defaultList } = result;
 
-      if (starBusinessDetails.lastChecked) {
-        starBusiness.lastChecked = new Date(starBusinessDetails.lastChecked);
-      }
+    // Send email if it's a star customer
+    if (isStarCustomer && tempPassword) {
+      const loginLink = `${process.env.STAR_URL}/login`;
+      const message = `
+        <h2>Welcome to Our Gtech Customers Portal</h2>
+        <p>Your Star Customer account has been created with the following credentials:</p>
+        <p><strong>Company Name:</strong> ${customer.companyName}</p>
+        <p><strong>Email:</strong> ${customer.email}</p>
+        <p><strong>Temporary Password:</strong> ${tempPassword}</p>
+        <p>Please login <a href="${loginLink}">here</a> and change your password.</p>
+        <p>You can now start using our platform to manage your orders and access exclusive features.</p>
+        ${
+          defaultList
+            ? `<p>A default list "${defaultList.name}" has been created for your company.</p>`
+            : ""
+        }
+      `;
 
-      if (starBusinessDetails.checkedBy) {
-        starBusiness.checkedBy = starBusinessDetails.checkedBy as
-          | "manual"
-          | "AI";
-      }
-
-      if (starBusinessDetails.device) {
-        starBusiness.device = starBusinessDetails.device.trim();
-      }
-
-      if (starBusinessDetails.industry) {
-        starBusiness.industry = starBusinessDetails.industry.trim();
-      }
-
-      // Associate StarBusinessDetails with Customer
-      customer.starBusinessDetails = starBusiness;
-
-      // Update customer stage to star_business
-      customer.stage = "star_business";
-      businessDetails.isStarBusiness = true;
+      await sendEmail({
+        to: customer.email,
+        subject: "Your Star Customer Account Credentials",
+        html: message,
+      });
     }
 
-    // Save to database
-    await customerRepository.save(customer);
-
-    // Return response in the expected format
-    const responseBusiness = {
-      name: customer.companyName,
-      legalName: customer.legalName,
-      email: customer.email,
-      contactEmail: customer.contactEmail,
-      contactPhoneNumber: customer.contactPhoneNumber,
-      stage: customer.stage,
-      source: customer.businessDetails.businessSource,
-      isDeviceMaker: customer.businessDetails.isDeviceMaker,
-      ...businessDetails,
-      // Include star business details if present
-      starBusinessDetails: customer.starBusinessDetails
-        ? {
-            inSeries: customer.starBusinessDetails.inSeries,
-            madeIn: customer.starBusinessDetails.madeIn,
-            lastChecked: customer.starBusinessDetails.lastChecked,
-            checkedBy: customer.starBusinessDetails.checkedBy,
-            device: customer.starBusinessDetails.device,
-            industry: customer.starBusinessDetails.industry,
-          }
-        : undefined,
-      // Include backward compatibility fields
-      website: businessDetails.website,
-      hasWebsite: !!businessDetails.website,
-      phoneNumber: businessDetails.contactPhone,
-      businessEmail: businessDetails.email,
-      status: BUSINESS_STATUS.ACTIVE, // Default status for new businesses
-      createdAt: customer.createdAt,
-      updatedAt: customer.updatedAt,
-    };
+    const successMessage = isStarCustomer
+      ? "Star Customer created successfully with account credentials. Email sent."
+      : "Business created successfully";
 
     return res.status(201).json({
       success: true,
-      message: "Business created successfully",
-      data: responseBusiness,
+      message: successMessage,
     });
   } catch (error: any) {
-    // Log error for debugging
     console.error("Error creating business:", error);
 
     // Handle database constraint errors
     if (error.code === "ER_DUP_ENTRY" || error.code === "23505") {
-      // PostgreSQL or MySQL duplicate key error
       if (error.message.includes("companyName")) {
         return next(
           new ErrorHandler(
@@ -727,11 +871,12 @@ export const createBusiness = async (
       }
     }
 
-    return next(error);
+    return next(
+      new ErrorHandler("Error creating business: " + error.message, 500)
+    );
   }
 };
 
-// 5. Update Business
 export const updateBusiness = async (
   req: Request,
   res: Response,
@@ -740,24 +885,43 @@ export const updateBusiness = async (
   try {
     const { id } = req.params;
     const updateData = req.body;
-
+    const user = (req as any).user;
     const customerRepository = AppDataSource.getRepository(Customer);
+    const businessDetailsRepository =
+      AppDataSource.getRepository(BusinessDetails);
     const starBusinessDetailsRepository =
       AppDataSource.getRepository(StarBusinessDetails);
+    const starCustomerDetailsRepository =
+      AppDataSource.getRepository(StarCustomerDetails);
+    const listRepository = AppDataSource.getRepository(List);
 
     const customer = await customerRepository.findOne({
       where: { id },
-      relations: ["businessDetails", "starBusinessDetails"],
+      relations: [
+        "businessDetails",
+        "starBusinessDetails",
+        "starCustomerDetails",
+      ],
     });
 
     if (!customer) {
       return next(new ErrorHandler("Business not found", 404));
     }
 
+    // Store original isDeviceMaker value to detect changes
+    const originalIsDeviceMaker = customer.businessDetails?.isDeviceMaker;
+    const isDeviceMakerChanged =
+      updateData.isDeviceMaker !== undefined &&
+      updateData.isDeviceMaker !== originalIsDeviceMaker;
+
     // Check for duplicate email if email is being updated
-    if (updateData.email && updateData.email !== customer.email) {
+    const emailToCheck = updateData.isStarCustomer
+      ? updateData.starCustomerEmail
+      : updateData.email;
+
+    if (emailToCheck && emailToCheck !== customer.email) {
       const existingCustomer = await customerRepository.findOne({
-        where: { email: updateData.email.trim().toLowerCase() },
+        where: { email: emailToCheck.trim().toLowerCase() },
       });
       if (existingCustomer && existingCustomer.id !== id) {
         return next(
@@ -781,220 +945,448 @@ export const updateBusiness = async (
       }
     }
 
-    // Update main customer fields (with backward compatibility)
-    if (updateData.name) customer.companyName = updateData.name.trim();
-    if (updateData.companyName)
-      customer.companyName = updateData.companyName.trim();
-    if (updateData.legalName !== undefined)
-      customer.legalName = updateData.legalName
-        ? updateData.legalName.trim()
-        : undefined;
-    if (updateData.email)
-      customer.email = updateData.email.trim().toLowerCase();
-    if (updateData.contactEmail)
-      customer.contactEmail = updateData.contactEmail.trim().toLowerCase();
-    if (updateData.contactPhoneNumber)
-      customer.contactPhoneNumber = updateData.contactPhoneNumber.trim();
-
-    // Update BusinessDetails
-    if (!customer.businessDetails) {
-      customer.businessDetails = new BusinessDetails();
+    // Validate star customer conditions
+    if (updateData.isStarCustomer && updateData.isDeviceMaker !== "Yes") {
+      return next(
+        new ErrorHandler(
+          "Star Customer can only be created when device maker is Yes",
+          400
+        )
+      );
     }
 
-    const businessDetails = customer.businessDetails;
+    if (updateData.isStarCustomer && !updateData.starCustomerEmail) {
+      return next(
+        new ErrorHandler("Email is required for Star Customer account", 400)
+      );
+    }
 
-    // Map update data to BusinessDetails (with backward compatibility)
-    if (updateData.address !== undefined)
-      businessDetails.address = updateData.address
-        ? updateData.address.trim()
-        : undefined;
-    if (updateData.isDeviceMaker !== undefined)
-      businessDetails.isDeviceMaker = updateData.isDeviceMaker;
-    if (updateData.website !== undefined)
-      businessDetails.website = updateData.website
-        ? updateData.website.trim()
-        : undefined;
-    if (updateData.description !== undefined)
-      businessDetails.description = updateData.description
-        ? updateData.description.trim()
-        : undefined;
-    if (updateData.city !== undefined)
-      businessDetails.city = updateData.city
-        ? updateData.city.trim()
-        : undefined;
-    if (updateData.state !== undefined)
-      businessDetails.state = updateData.state
-        ? updateData.state.trim()
-        : undefined;
-    if (updateData.country !== undefined)
-      businessDetails.country = updateData.country
-        ? updateData.country.trim()
-        : undefined;
-    if (updateData.postalCode !== undefined)
-      businessDetails.postalCode = updateData.postalCode
-        ? updateData.postalCode.trim()
-        : undefined;
-    if (updateData.latitude !== undefined)
-      businessDetails.latitude = sanitizeNumber(updateData.latitude);
-    if (updateData.longitude !== undefined)
-      businessDetails.longitude = sanitizeNumber(updateData.longitude);
-    if (updateData.phoneNumber !== undefined)
-      businessDetails.contactPhone = updateData.phoneNumber
-        ? updateData.phoneNumber.trim()
-        : undefined;
-    if (updateData.businessEmail !== undefined)
-      businessDetails.email = updateData.businessEmail
-        ? updateData.businessEmail.trim().toLowerCase()
-        : undefined;
-    if (updateData.googleMapsUrl !== undefined)
-      businessDetails.googleMapsUrl = updateData.googleMapsUrl
-        ? updateData.googleMapsUrl.trim()
-        : undefined;
-    if (updateData.reviewCount !== undefined)
-      businessDetails.reviewCount = sanitizeInteger(updateData.reviewCount);
-    if (updateData.category !== undefined)
-      businessDetails.category = updateData.category
-        ? updateData.category.trim()
-        : undefined;
-    if (updateData.additionalCategories !== undefined)
-      businessDetails.additionalCategories = Array.isArray(
-        updateData.additionalCategories
-      )
-        ? updateData.additionalCategories
-            .map((cat: string) => cat.trim())
-            .filter(Boolean)
-        : undefined;
-    if (updateData.socialMedia !== undefined)
-      businessDetails.socialLinks = sanitizeSocialLinks(updateData.socialMedia);
-    if (updateData.source !== undefined)
-      businessDetails.businessSource = updateData.source;
+    // Use transaction for updates
+    const result = await AppDataSource.transaction(
+      async (transactionalEntityManager) => {
+        // Update main customer fields (with backward compatibility)
+        if (updateData.name) customer.companyName = updateData.name.trim();
+        if (updateData.companyName)
+          customer.companyName = updateData.companyName.trim();
+        if (updateData.legalName !== undefined)
+          customer.legalName = updateData.legalName
+            ? updateData.legalName.trim()
+            : undefined;
 
-    // Handle StarBusinessDetails
-    if (updateData.isDeviceMaker === "Yes" && updateData.starBusinessDetails) {
-      // Create or update StarBusinessDetails
-      if (!customer.starBusinessDetails) {
-        customer.starBusinessDetails = new StarBusinessDetails();
-      }
-
-      const starBusiness = customer.starBusinessDetails;
-      if (!starBusiness) {
-        return next(new ErrorHandler("Star Business Details not found", 404));
-      }
-      // Update star business fields
-      if (updateData.starBusinessDetails.inSeries !== undefined) {
-        starBusiness.inSeries = updateData.starBusinessDetails.inSeries as
-          | "Yes"
-          | "No"
-          | undefined;
-      }
-
-      if (updateData.starBusinessDetails.madeIn !== undefined) {
-        starBusiness.madeIn = updateData.starBusinessDetails.madeIn as
-          | "Germany"
-          | "Switzerland"
-          | "Austria"
-          | undefined;
-      }
-
-      if (updateData.starBusinessDetails.lastChecked !== undefined) {
-        starBusiness.lastChecked = updateData.starBusinessDetails.lastChecked
-          ? new Date(updateData.starBusinessDetails.lastChecked)
-          : undefined;
-      }
-
-      if (updateData.starBusinessDetails.checkedBy !== undefined) {
-        starBusiness.checkedBy = updateData.starBusinessDetails.checkedBy as
-          | "manual"
-          | "AI"
-          | undefined;
-      }
-
-      if (updateData.starBusinessDetails.device !== undefined) {
-        starBusiness.device = updateData.starBusinessDetails.device
-          ? updateData.starBusinessDetails.device.trim()
-          : undefined;
-      }
-
-      if (updateData.starBusinessDetails.industry !== undefined) {
-        starBusiness.industry = updateData.starBusinessDetails.industry
-          ? updateData.starBusinessDetails.industry.trim()
-          : undefined;
-      }
-
-      // Update customer stage to star_business
-      customer.stage = "star_business";
-      businessDetails.isStarBusiness = true;
-    } else if (
-      updateData.isDeviceMaker === "No" ||
-      updateData.isDeviceMaker === "Unsure"
-    ) {
-      // If changing from Yes to No/Unsure, remove StarBusinessDetails
-      if (customer.starBusinessDetails) {
-        // Delete the star business details
-        await starBusinessDetailsRepository.remove(
-          customer.starBusinessDetails
-        );
-        customer.starBusinessDetails = undefined;
-
-        // Update stage back to business if not a star customer
-        if (!customer.starCustomerDetails) {
-          customer.stage = "business";
+        // Handle email updates based on star customer status
+        if (updateData.isStarCustomer) {
+          customer.email = updateData.starCustomerEmail.trim().toLowerCase();
+          customer.contactEmail = updateData.starCustomerEmail
+            .trim()
+            .toLowerCase();
+        } else {
+          if (updateData.email)
+            customer.email = updateData.email.trim().toLowerCase();
+          if (updateData.contactEmail)
+            customer.contactEmail = updateData.contactEmail
+              .trim()
+              .toLowerCase();
         }
-        businessDetails.isStarBusiness = false;
-      }
-    }
 
-    await customerRepository.save(customer);
+        if (updateData.contactPhoneNumber)
+          customer.contactPhoneNumber = updateData.contactPhoneNumber.trim();
+
+        // Update BusinessDetails
+        if (!customer.businessDetails) {
+          customer.businessDetails = new BusinessDetails();
+        }
+
+        const businessDetails = customer.businessDetails;
+
+        // Handle isDeviceMaker change - update check_timestamp and check_by
+        if (isDeviceMakerChanged) {
+          businessDetails.isDeviceMaker = updateData.isDeviceMaker;
+          businessDetails.check_timestamp = new Date(); // Current timestamp
+
+          // Set check_by to the current user making the change
+          if (user) {
+            businessDetails.check_by = user as User;
+          }
+        } else if (updateData.isDeviceMaker !== undefined) {
+          // If not changed but provided, still update the value
+          businessDetails.isDeviceMaker = updateData.isDeviceMaker;
+        }
+
+        // Map update data to BusinessDetails (with backward compatibility)
+        if (updateData.address !== undefined)
+          businessDetails.address = updateData.address
+            ? updateData.address.trim()
+            : undefined;
+        if (updateData.website !== undefined)
+          businessDetails.website = updateData.website
+            ? updateData.website.trim()
+            : undefined;
+        if (updateData.description !== undefined)
+          businessDetails.description = updateData.description
+            ? updateData.description.trim()
+            : undefined;
+        if (updateData.city !== undefined)
+          businessDetails.city = updateData.city
+            ? updateData.city.trim()
+            : undefined;
+        if (updateData.state !== undefined)
+          businessDetails.state = updateData.state
+            ? updateData.state.trim()
+            : undefined;
+        if (updateData.country !== undefined)
+          businessDetails.country = updateData.country
+            ? updateData.country.trim()
+            : undefined;
+        if (updateData.postalCode !== undefined)
+          businessDetails.postalCode = updateData.postalCode
+            ? updateData.postalCode.trim()
+            : undefined;
+        if (updateData.latitude !== undefined)
+          businessDetails.latitude = sanitizeNumber(updateData.latitude);
+        if (updateData.longitude !== undefined)
+          businessDetails.longitude = sanitizeNumber(updateData.longitude);
+        if (updateData.phoneNumber !== undefined)
+          businessDetails.contactPhone = updateData.phoneNumber
+            ? updateData.phoneNumber.trim()
+            : undefined;
+        if (updateData.businessEmail !== undefined)
+          businessDetails.email = updateData.businessEmail
+            ? updateData.businessEmail.trim().toLowerCase()
+            : undefined;
+        if (updateData.googleMapsUrl !== undefined)
+          businessDetails.googleMapsUrl = updateData.googleMapsUrl
+            ? updateData.googleMapsUrl.trim()
+            : undefined;
+        if (updateData.reviewCount !== undefined)
+          businessDetails.reviewCount = sanitizeInteger(updateData.reviewCount);
+        if (updateData.category !== undefined)
+          businessDetails.category = updateData.category
+            ? updateData.category.trim()
+            : undefined;
+        if (updateData.additionalCategories !== undefined)
+          businessDetails.additionalCategories = Array.isArray(
+            updateData.additionalCategories
+          )
+            ? updateData.additionalCategories
+                .map((cat: string) => cat.trim())
+                .filter(Boolean)
+            : undefined;
+        if (updateData.socialMedia !== undefined)
+          businessDetails.socialLinks = sanitizeSocialLinks(
+            updateData.socialMedia
+          );
+        if (updateData.source !== undefined)
+          businessDetails.businessSource = updateData.source;
+
+        // Update star customer flag
+        if (updateData.isStarCustomer !== undefined) {
+          businessDetails.isStarCustomer = updateData.isStarCustomer;
+        }
+
+        // Save business details first to get ID if new
+        const savedBusinessDetails = await transactionalEntityManager.save(
+          BusinessDetails,
+          businessDetails
+        );
+        customer.businessDetails = savedBusinessDetails;
+
+        // Handle StarBusinessDetails
+        if (
+          updateData.isDeviceMaker === "Yes" &&
+          updateData.starBusinessDetails
+        ) {
+          // Create or update StarBusinessDetails
+          if (!customer.starBusinessDetails) {
+            customer.starBusinessDetails = new StarBusinessDetails();
+            customer.starBusinessDetails.customer = customer;
+          }
+
+          const starBusiness = customer.starBusinessDetails;
+
+          // Update star business fields
+          if (updateData.starBusinessDetails.inSeries !== undefined) {
+            starBusiness.inSeries = updateData.starBusinessDetails.inSeries as
+              | "Yes"
+              | "No"
+              | undefined;
+          }
+
+          if (updateData.starBusinessDetails.madeIn !== undefined) {
+            starBusiness.madeIn = updateData.starBusinessDetails.madeIn as
+              | "Germany"
+              | "Switzerland"
+              | "Austria"
+              | undefined;
+          }
+
+          if (updateData.starBusinessDetails.lastChecked !== undefined) {
+            starBusiness.lastChecked = updateData.starBusinessDetails
+              .lastChecked
+              ? new Date(updateData.starBusinessDetails.lastChecked)
+              : undefined;
+          }
+
+          if (updateData.starBusinessDetails.checkedBy !== undefined) {
+            starBusiness.checkedBy = updateData.starBusinessDetails
+              .checkedBy as "manual" | "AI" | undefined;
+          }
+
+          if (updateData.starBusinessDetails.device !== undefined) {
+            starBusiness.device = updateData.starBusinessDetails.device
+              ? updateData.starBusinessDetails.device.trim()
+              : undefined;
+          }
+
+          if (updateData.starBusinessDetails.industry !== undefined) {
+            starBusiness.industry = updateData.starBusinessDetails.industry
+              ? updateData.starBusinessDetails.industry.trim()
+              : undefined;
+          }
+
+          await transactionalEntityManager.save(
+            StarBusinessDetails,
+            starBusiness
+          );
+          businessDetails.isStarBusiness = true;
+        } else if (
+          updateData.isDeviceMaker === "No" ||
+          updateData.isDeviceMaker === "Unsure"
+        ) {
+          // If changing from Yes to No/Unsure, remove StarBusinessDetails
+          if (customer.starBusinessDetails) {
+            await transactionalEntityManager.remove(
+              StarBusinessDetails,
+              customer.starBusinessDetails
+            );
+            customer.starBusinessDetails = undefined;
+            businessDetails.isStarBusiness = false;
+          }
+        }
+
+        // Handle StarCustomerDetails
+        let tempPassword = null;
+        let defaultList = null;
+
+        if (updateData.isStarCustomer && !customer.starCustomerDetails) {
+          // Create new star customer details if upgrading to star customer
+          tempPassword = crypto.randomBytes(8).toString("hex");
+          const hashedPassword = await bcrypt.hash(tempPassword, 10);
+
+          const starCustomerDetails = new StarCustomerDetails();
+          starCustomerDetails.customer = customer;
+          starCustomerDetails.taxNumber = "PENDING";
+          starCustomerDetails.password = hashedPassword;
+          starCustomerDetails.accountVerificationStatus = "verified";
+          starCustomerDetails.isEmailVerified = true;
+          starCustomerDetails.deliveryAddressLine1 =
+            businessDetails.address || "";
+          starCustomerDetails.deliveryPostalCode =
+            businessDetails.postalCode || "";
+          starCustomerDetails.deliveryCity = businessDetails.city || "";
+          starCustomerDetails.deliveryCountry =
+            businessDetails.country || "Germany";
+
+          const savedStarCustomerDetails =
+            await transactionalEntityManager.save(
+              StarCustomerDetails,
+              starCustomerDetails
+            );
+
+          customer.starCustomerDetails = savedStarCustomerDetails;
+
+          // Create default list for the new star customer
+          defaultList = new List();
+          defaultList.name = `${customer.companyName} - Default List`;
+          defaultList.description = `Default list for ${customer.companyName}`;
+          defaultList.customer = customer;
+          defaultList.status = LIST_STATUS.ACTIVE;
+
+          defaultList = await transactionalEntityManager.save(
+            List,
+            defaultList
+          );
+
+          // Update customer stage
+          customer.stage = "star_customer";
+        } else if (!updateData.isStarCustomer && customer.starCustomerDetails) {
+          // Remove star customer details if downgrading
+          await transactionalEntityManager.remove(
+            StarCustomerDetails,
+            customer.starCustomerDetails
+          );
+          customer.starCustomerDetails = undefined;
+
+          // Update stage
+          if (updateData.isDeviceMaker === "Yes") {
+            customer.stage = "star_business";
+          } else {
+            customer.stage = "business";
+          }
+        } else if (updateData.isStarCustomer && customer.starCustomerDetails) {
+          // Star customer already exists, just update stage if needed
+          customer.stage = "star_customer";
+        } else {
+          // Update stage based on device maker status
+          if (updateData.isDeviceMaker === "Yes") {
+            customer.stage = customer.starCustomerDetails
+              ? "star_customer"
+              : "star_business";
+          } else {
+            customer.stage = "business";
+          }
+        }
+
+        // Save customer
+        await transactionalEntityManager.save(Customer, customer);
+
+        // Return a clean response object without circular references
+        return {
+          customer: {
+            id: customer.id,
+            companyName: customer.companyName,
+            email: customer.email,
+            stage: customer.stage,
+          },
+          businessDetails: {
+            id: businessDetails.id,
+            website: businessDetails.website,
+            isDeviceMaker: businessDetails.isDeviceMaker,
+            check_timestamp: businessDetails.check_timestamp,
+            check_by: businessDetails.check_by
+              ? {
+                  id: businessDetails.check_by.id,
+                  name: businessDetails.check_by.name,
+                }
+              : null,
+          },
+          tempPassword,
+          defaultList: defaultList
+            ? {
+                id: defaultList.id,
+                name: defaultList.name,
+              }
+            : null,
+          isDeviceMakerChanged,
+        };
+      }
+    );
+
+    const { customer: updatedCustomer, tempPassword, defaultList } = result;
+
+    // Send email if upgrading to star customer
+    if (updateData.isStarCustomer && tempPassword) {
+      const loginLink = `${process.env.STAR_URL}/login`;
+      const message = `
+        <h2>Your Account Has Been Upgraded to Star Customer</h2>
+        <p>Congratulations! Your business account has been upgraded to a Star Customer account.</p>
+        <p><strong>Company Name:</strong> ${updatedCustomer.companyName}</p>
+        <p><strong>Email:</strong> ${updatedCustomer.email}</p>
+        <p><strong>Temporary Password:</strong> ${tempPassword}</p>
+        <p>Please login <a href="${loginLink}">here</a> and change your password.</p>
+        <p>You can now access exclusive features and manage your orders directly.</p>
+        ${
+          defaultList
+            ? `<p>A default list "${defaultList.name}" has been created for your company.</p>`
+            : ""
+        }
+      `;
+
+      await sendEmail({
+        to: updatedCustomer.email,
+        subject: "Your Account Has Been Upgraded to Star Customer",
+        html: message,
+      });
+    }
 
     // Fetch updated customer with all relations
-    const updatedCustomer = await customerRepository.findOne({
+    const finalCustomer = await customerRepository.findOne({
       where: { id },
-      relations: ["businessDetails", "starBusinessDetails"],
+      relations: [
+        "businessDetails",
+        "businessDetails.check_by",
+        "starBusinessDetails",
+        "starCustomerDetails",
+      ],
     });
+
+    if (!finalCustomer) {
+      return next(new ErrorHandler("Business not found after update", 404));
+    }
 
     // Transform response
     const businessResponse = {
-      id: updatedCustomer!.id,
-      name: updatedCustomer!.companyName,
-      legalName: updatedCustomer!.legalName,
-      email: updatedCustomer!.email,
-      contactEmail: updatedCustomer!.contactEmail,
-      contactPhoneNumber: updatedCustomer!.contactPhoneNumber,
-      stage: updatedCustomer!.stage,
-      ...updatedCustomer!.businessDetails,
-      // Include star business details if present
-      starBusinessDetails: updatedCustomer!.starBusinessDetails
+      id: finalCustomer.id,
+      name: finalCustomer.companyName,
+      legalName: finalCustomer.legalName,
+      email: finalCustomer.email,
+      contactEmail: finalCustomer.contactEmail,
+      contactPhoneNumber: finalCustomer.contactPhoneNumber,
+      stage: finalCustomer.stage,
+      ...finalCustomer.businessDetails,
+      // Include check_by user details if present
+      check_by: finalCustomer.businessDetails?.check_by
         ? {
-            inSeries: updatedCustomer!.starBusinessDetails.inSeries,
-            madeIn: updatedCustomer!.starBusinessDetails.madeIn,
-            lastChecked: updatedCustomer!.starBusinessDetails.lastChecked,
-            checkedBy: updatedCustomer!.starBusinessDetails.checkedBy,
-            device: updatedCustomer!.starBusinessDetails.device,
-            industry: updatedCustomer!.starBusinessDetails.industry,
+            id: finalCustomer.businessDetails.check_by.id,
+            name: finalCustomer.businessDetails.check_by.name,
+            email: finalCustomer.businessDetails.check_by.email,
+          }
+        : undefined,
+      // Include star business details if present
+      starBusinessDetails: finalCustomer.starBusinessDetails
+        ? {
+            inSeries: finalCustomer.starBusinessDetails.inSeries,
+            madeIn: finalCustomer.starBusinessDetails.madeIn,
+            lastChecked: finalCustomer.starBusinessDetails.lastChecked,
+            checkedBy: finalCustomer.starBusinessDetails.checkedBy,
+            device: finalCustomer.starBusinessDetails.device,
+            industry: finalCustomer.starBusinessDetails.industry,
+          }
+        : undefined,
+      // Include default list if just created
+      defaultList: defaultList
+        ? {
+            id: defaultList.id,
+            name: defaultList.name,
           }
         : undefined,
       // Backward compatibility fields
-      website: updatedCustomer!.businessDetails?.website,
-      hasWebsite: !!updatedCustomer!.businessDetails?.website,
-      phoneNumber: updatedCustomer!.businessDetails?.contactPhone,
-      businessEmail: updatedCustomer!.businessDetails?.email,
+      website: finalCustomer.businessDetails?.website,
+      hasWebsite: !!finalCustomer.businessDetails?.website,
+      phoneNumber: finalCustomer.businessDetails?.contactPhone,
+      businessEmail: finalCustomer.businessDetails?.email,
       status: BUSINESS_STATUS.ACTIVE,
-      source: updatedCustomer!.businessDetails?.businessSource,
-      isDeviceMaker: updatedCustomer!.businessDetails?.isDeviceMaker,
-      createdAt: updatedCustomer!.createdAt,
-      updatedAt: updatedCustomer!.updatedAt,
+      source: finalCustomer.businessDetails?.businessSource,
+      isDeviceMaker: finalCustomer.businessDetails?.isDeviceMaker,
+      isStarCustomer: finalCustomer.businessDetails?.isStarCustomer,
+      createdAt: finalCustomer.createdAt,
+      updatedAt: finalCustomer.updatedAt,
     };
+
+    let successMessage = "Business updated successfully";
+
+    if (updateData.isStarCustomer && tempPassword) {
+      successMessage =
+        "Business upgraded to Star Customer successfully. Credentials sent to email.";
+    } else if (isDeviceMakerChanged) {
+      successMessage =
+        "Business updated successfully. Device maker status change recorded.";
+    }
 
     return res.status(200).json({
       success: true,
-      message: "Business updated successfully",
+      message: successMessage,
       data: businessResponse,
     });
   } catch (error) {
-    return next(error);
+    console.error("Error updating business:", error);
+    return next(
+      new ErrorHandler(
+        "Error updating business: " + (error as Error).message,
+        500
+      )
+    );
   }
 };
-
 // Get Business By ID (also updated to include starBusinessDetails)
 export const getBusinessById = async (
   req: Request,

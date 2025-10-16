@@ -43,6 +43,9 @@ export class StarBusinessDetails {
   @Column({ nullable: true })
   industry?: string;
 
+  @Column({ type: "text", nullable: true })
+  comment?: string;
+
   @OneToOne(() => Customer, (customer) => customer.starBusinessDetails)
   customer!: Customer;
 

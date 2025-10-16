@@ -5,8 +5,11 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   OneToOne,
+  ManyToOne,
+  JoinColumn,
 } from "typeorm";
 import { Customer } from "./customers";
+import { User } from "./users";
 
 @Entity()
 export class BusinessDetails {
@@ -89,6 +92,13 @@ export class BusinessDetails {
 
   @Column({ type: "boolean", default: false })
   isStarCustomer!: boolean;
+
+  @Column({ type: "timestamp", nullable: true })
+  check_timestamp?: Date;
+
+  @ManyToOne(() => User, { nullable: true })
+  @JoinColumn({ name: "check_by" })
+  check_by?: User;
 
   @OneToOne(() => Customer, (customer) => customer.businessDetails)
   customer!: Customer;
