@@ -48,7 +48,17 @@ interface FilterState {
   source: string;
   stage: string; // Add stage filter
 }
-
+const formatDateTime = (dateString: string | undefined) => {
+  if (!dateString) return "-";
+  const date = new Date(dateString);
+  return date.toLocaleString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
 const BusinessSearchPage: React.FC = () => {
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [loading, setLoading] = useState(true);
@@ -203,8 +213,8 @@ const BusinessSearchPage: React.FC = () => {
         );
 
         setBusinesses(sortedBusinesses);
-        setTotalPages(response.data.totalPages || 1);
-        setTotalRecords(response.data.total || 0);
+        setTotalPages(response.data.pagination.pages || 1);
+        setTotalRecords(response.data.pagination.total || 0);
 
         // ... rest of the existing code for extracting unique values
         if (sortedBusinesses) {
@@ -801,17 +811,48 @@ const BusinessSearchPage: React.FC = () => {
                         <td className="px-4 py-3">
                           <div className="text-sm">
                             <p className="text-gray-900 w-[200px]">
-                              {business.postalCode} {business.city},{" "}
-                              {business.country !== "Germany" &&
-                                business.country}
+                              {(() => {
+                                const hasPostalCode =
+                                  business.postalCode &&
+                                  business.postalCode.trim() !== "";
+                                const hasCity =
+                                  business.city && business.city.trim() !== "";
+                                const hasNonGermanCountry =
+                                  business.country &&
+                                  business.country.trim() !== "" &&
+                                  business.country !== "Germany";
+
+                                if (
+                                  !hasPostalCode &&
+                                  !hasCity &&
+                                  !hasNonGermanCountry
+                                ) {
+                                  return (
+                                    <span className="text-gray-400">
+                                      No address data
+                                    </span>
+                                  );
+                                }
+
+                                const addressParts = [];
+                                if (hasPostalCode)
+                                  addressParts.push(business.postalCode);
+                                if (hasCity) addressParts.push(business.city);
+                                if (hasNonGermanCountry)
+                                  addressParts.push(business.country);
+
+                                return addressParts.join(", ");
+                              })()}
                             </p>
                           </div>
-                        </td>
+                        </td>{" "}
                         <td className="px-4 py-3">
                           {business.website ? (
                             <a
                               href={`https://${business.website}`}
                               target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()} // This prevents the row click
                               className="text-primary hover:underline flex items-center gap-1"
                             >
                               <GlobeAltIcon className="w-4 h-4" />
@@ -826,8 +867,9 @@ const BusinessSearchPage: React.FC = () => {
                         <td className="px-4 py-3 text-center">
                           {business.isDeviceMaker}{" "}
                         </td>
-
-                        <td className="px-4 py-3"></td>
+                        <td className="px-4 py-3">
+                          {formatDateTime(business.check_timestamp)}
+                        </td>
                         <td className="px-4 py-3">
                           {business.stage ? (
                             <span
@@ -842,7 +884,6 @@ const BusinessSearchPage: React.FC = () => {
                           )}
                         </td>
                         <td className="px-4 py-3"></td>
-
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2 text-sm text-gray-600">
                             <CalendarIcon className="w-4 h-4" />

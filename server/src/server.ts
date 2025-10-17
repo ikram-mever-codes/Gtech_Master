@@ -64,8 +64,6 @@ async function fetchItemData(itemId: number) {
 }
 
 app.listen(PORT, async () => {
-  const itemData = await fetchItemData(1);
-  console.log(itemData);
   console.log(`Server is running on port ${PORT}`);
   console.log(`WebSocket server is running`);
 });

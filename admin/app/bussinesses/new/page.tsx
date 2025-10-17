@@ -1559,7 +1559,7 @@ const AddEditBusinessManual: React.FC = () => {
                 </div>
 
                 {/* Business Hours */}
-                <div>
+                {/* <div>
                   <h3 className="text-lg font-medium text-gray-700 mb-4 flex items-center gap-2">
                     <ClockIcon className="w-5 h-5" />
                     Business Hours
@@ -1592,7 +1592,7 @@ const AddEditBusinessManual: React.FC = () => {
                       )
                     )}
                   </div>
-                </div>
+                </div> */}
               </div>
             </div>
           </div>
