@@ -41,7 +41,7 @@ import {
   type StarBusinessWithoutContactData,
 } from "@/api/contacts";
 import CustomButton from "@/components/UI/CustomButton";
-import { Google } from "@mui/icons-material";
+import { Google, LinkedIn } from "@mui/icons-material";
 
 // Tab type
 type TabType = "all" | "no-contacts";
@@ -686,19 +686,19 @@ const ContactPersonsPage: React.FC = () => {
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Business
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Position
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Contact
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                           LinkedIn
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Type
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Actions
                         </th>
                       </tr>
@@ -761,7 +761,7 @@ const ContactPersonsPage: React.FC = () => {
                               )}
                             </div>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
+                          <td className="px-6 py-4 w-[100px] whitespace-nowrap">
                             <select
                               value={contact.stateLinkedIn}
                               onChange={(e) =>
@@ -770,7 +770,7 @@ const ContactPersonsPage: React.FC = () => {
                                   e.target.value
                                 )
                               }
-                              className={`text-xs px-2 py-1 rounded-full font-medium border-0 cursor-pointer ${getLinkedInStateColor(
+                              className={`text-xs px-2 w-max max-w-[150px] truncate mr-4 py-1 rounded-full font-medium border-0 cursor-pointer ${getLinkedInStateColor(
                                 contact.stateLinkedIn
                               )}`}
                             >
@@ -802,6 +802,37 @@ const ContactPersonsPage: React.FC = () => {
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="flex items-center gap-2">
                               <button
+                                onClick={() => {
+                                  const searchQuery = encodeURIComponent(
+                                    `${contact.businessName}`.trim()
+                                  );
+                                  window.open(
+                                    `https://www.google.com/search?q=${searchQuery}`,
+                                    "_blank"
+                                  );
+                                }}
+                                className="text-green-600 hover:text-green-800 transition-colors"
+                                title="Google Search"
+                              >
+                                <Google sx={{ fontSize: 18 }} />
+                              </button>
+                              {/* LinkedIn Button */}
+                              <button
+                                onClick={() => {
+                                  const searchQuery = encodeURIComponent(
+                                    `${contact.businessName} linkedin`.trim()
+                                  );
+                                  window.open(
+                                    `https://www.google.com/search?q=${searchQuery}`,
+                                    "_blank"
+                                  );
+                                }}
+                                className="text-blue-700 hover:text-blue-900 transition-colors"
+                                title="LinkedIn Search"
+                              >
+                                <LinkedIn sx={{ fontSize: 18 }} />
+                              </button>
+                              <button
                                 onClick={() => handleEditContact(contact)}
                                 className="text-blue-600 hover:text-blue-800 transition-colors"
                                 title="Edit contact"
@@ -823,6 +854,7 @@ const ContactPersonsPage: React.FC = () => {
                               >
                                 <XMarkIcon className="h-4 w-4" />
                               </button>
+                              {/* Google Search Button */}
                             </div>
                           </td>
                         </tr>
