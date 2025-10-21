@@ -82,6 +82,7 @@ const AddEditBusinessManual: React.FC = () => {
     address: "",
     description: "",
     city: "",
+    displayName: "",
     state: "",
     country: "",
     postalCode: "",
@@ -185,6 +186,7 @@ const AddEditBusinessManual: React.FC = () => {
           businessData.businessDetails?.description ||
           businessData.description ||
           "",
+        displayName: businessData.displayName,
         city: businessData.businessDetails?.city || businessData.city || "",
         state: businessData.businessDetails?.state || businessData.state || "",
         country:
@@ -640,7 +642,7 @@ const AddEditBusinessManual: React.FC = () => {
     });
   };
 
-  // Helper function to render form fields based on view/edit mode
+  // Updated Helper function to render form fields based on view/edit mode
   const renderField = (
     label: string,
     value: any,
@@ -650,7 +652,8 @@ const AddEditBusinessManual: React.FC = () => {
     placeholder?: string,
     icon?: React.ReactNode,
     selectOptions?: { value: string; label: string }[] | string[],
-    readOnly?: boolean
+    readOnly?: boolean,
+    customOnChange?: (field: string, value: any) => void
   ) => {
     if (isViewMode || readOnly) {
       // Determine display value for view mode
@@ -702,6 +705,9 @@ const AddEditBusinessManual: React.FC = () => {
         selectOptions.length > 0 &&
         typeof selectOptions[0] === "string";
 
+      // Use custom onChange if provided, otherwise use handleInputChange
+      const onChangeHandler = customOnChange || handleInputChange;
+
       return (
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -710,7 +716,7 @@ const AddEditBusinessManual: React.FC = () => {
           <select
             name={fieldName}
             value={value || ""}
-            onChange={(e) => handleInputChange(fieldName, e.target.value)}
+            onChange={(e) => onChangeHandler(fieldName, e.target.value)}
             className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all ${
               formErrors[fieldName] ? "border-red-500" : "border-gray-200"
             }`}
@@ -755,7 +761,10 @@ const AddEditBusinessManual: React.FC = () => {
             type={type || "text"}
             name={fieldName}
             value={value || ""}
-            onChange={(e) => handleInputChange(fieldName, e.target.value)}
+            onChange={(e) => {
+              const handler = customOnChange || handleInputChange;
+              handler(fieldName, e.target.value);
+            }}
             className={`w-full ${
               icon ? "pl-10" : "px-4"
             } pr-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all ${
@@ -1067,22 +1076,38 @@ const AddEditBusinessManual: React.FC = () => {
                     {renderField(
                       "In Series",
                       formData.starBusinessDetails?.inSeries,
-                      "starBusinessDetails.inSeries",
+                      "inSeries",
                       true,
                       undefined,
                       undefined,
                       undefined,
-                      ["Yes", "No"]
+                      ["Yes", "No"],
+                      undefined,
+                      handleStarBusinessChange // Use the correct handler
                     )}
                     {renderField(
                       "Made In",
                       formData.starBusinessDetails?.madeIn,
-                      "starBusinessDetails.madeIn",
+                      "madeIn",
                       true,
                       undefined,
                       undefined,
                       undefined,
-                      ["Yes", "No"]
+                      ["Yes", "No"],
+                      undefined,
+                      handleStarBusinessChange // Use the correct handler
+                    )}
+                    {renderField(
+                      "Industry",
+                      formData.starBusinessDetails?.industry,
+                      "industry",
+                      true,
+                      undefined,
+                      undefined,
+                      <CogIcon className="w-5 h-5" />,
+                      industries,
+                      undefined,
+                      handleStarBusinessChange // Use the correct handler
                     )}
                     {renderField(
                       "Last Checked",
@@ -1171,27 +1196,6 @@ const AddEditBusinessManual: React.FC = () => {
                         </p>
                       )}
                     </div>
-                    {renderField(
-                      "Industry",
-                      formData.starBusinessDetails?.industry,
-                      "starBusinessDetails.industry",
-                      true,
-                      undefined,
-                      undefined,
-                      <CogIcon className="w-5 h-5" />,
-                      industries
-                    )}
-                    {(isStarCustomer ||
-                      (isViewMode && formData.starCustomerEmail)) &&
-                      renderField(
-                        "Customer Email",
-                        formData.starCustomerEmail,
-                        "starCustomerEmail",
-                        true,
-                        "email",
-                        "customer@example.com",
-                        <EnvelopeIcon className="w-5 h-5" />
-                      )}
 
                     {/* New View-Only Fields in Star Business Details */}
                     {(isEditMode || isViewMode) &&
@@ -1210,7 +1214,6 @@ const AddEditBusinessManual: React.FC = () => {
                           )}
                         </>
                       )}
-
                     {(isEditMode || isViewMode) &&
                       formData.starBusinessDetails?.converted_timestamp && (
                         <>
@@ -1277,6 +1280,25 @@ const AddEditBusinessManual: React.FC = () => {
                         />
                       </button>
                     </div>
+                  )}
+                  {(isStarCustomer ||
+                    (isViewMode && formData.starCustomerEmail)) &&
+                    renderField(
+                      "Customer Email",
+                      formData.starCustomerEmail,
+                      "starCustomerEmail",
+                      true,
+                      "email",
+                      "customer@example.com",
+                      <EnvelopeIcon className="w-5 h-5" />
+                    )}
+                  {renderField(
+                    "Display Name",
+                    formData.displayName,
+                    "displayName",
+                    false,
+                    "text",
+                    "Display name (what customers see)"
                   )}
                 </div>
               </div>

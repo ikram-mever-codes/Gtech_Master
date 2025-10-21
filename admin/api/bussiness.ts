@@ -55,6 +55,7 @@ export interface BusinessCreatePayload {
   address: string;
   website?: string;
   description?: string;
+  displayName?: string;
   city?: string;
   state?: string;
   country?: string;
