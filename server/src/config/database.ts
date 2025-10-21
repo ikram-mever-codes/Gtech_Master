@@ -17,6 +17,7 @@ import { Business } from "../models/bussiness";
 import { StarBusinessDetails } from "../models/star_business_details";
 import { StarCustomerDetails } from "../models/star_customer_details";
 import { BusinessDetails } from "../models/business_details";
+import { ContactPerson } from "../models/contact_person";
 
 dotenv.config();
 
@@ -34,6 +35,7 @@ export const AppDataSource = new DataSource({
     User,
     Customer,
     List,
+    ContactPerson,
     StarBusinessDetails,
     StarCustomerDetails,
     BusinessDetails,

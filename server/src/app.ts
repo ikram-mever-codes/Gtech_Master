@@ -6,6 +6,7 @@ import cookieParser from "cookie-parser";
 import userRoutes from "./routes/userRoutes";
 import customerRoutes from "./routes/customer_routes";
 import listRoutes from "./routes/list_routes";
+import contactRoutes from "./routes/contact_routes";
 import invoiceRoutes from "./routes/invoice_routes";
 import cronRoutes from "./routes/cronRoutes";
 import { AppDataSource } from "./config/database";
@@ -13,7 +14,6 @@ import { CronJobs } from "./services/cronJob";
 import bussinessRoutes from "./routes/bussiness_routes";
 const app: any = express();
 
-// Cors Setup
 const corsOptions = {
   origin: [
     "http://localhost:3000",
@@ -36,6 +36,7 @@ app.use(cors(corsOptions));
 // Coniguring Api Routes
 
 app.use("/api/v1/auth", userRoutes);
+app.use("/api/v1/contacts", contactRoutes);
 app.use("/api/v1/customers", customerRoutes);
 app.use("/api/v1/lists", listRoutes);
 app.use("/api/v1/invoices", invoiceRoutes);

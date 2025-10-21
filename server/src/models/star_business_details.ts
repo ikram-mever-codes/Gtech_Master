@@ -5,11 +5,13 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   OneToOne,
+  OneToMany,
   ManyToOne,
   JoinColumn,
 } from "typeorm";
 import { Customer } from "./customers";
 import { User } from "./users";
+import { ContactPerson } from "./contact_person";
 
 @Entity()
 export class StarBusinessDetails {
@@ -57,11 +59,27 @@ export class StarBusinessDetails {
   comment?: string;
 
   @OneToOne(() => Customer, (customer) => customer.starBusinessDetails)
+  @JoinColumn()
   customer!: Customer;
+
+  @OneToMany(
+    () => ContactPerson,
+    (contactPerson) => contactPerson.starBusinessDetails,
+    {
+      cascade: true,
+    }
+  )
+  contactPersons!: ContactPerson[];
 
   @CreateDateColumn()
   createdAt!: Date;
 
   @UpdateDateColumn()
   updatedAt!: Date;
+
+  constructor(partial?: Partial<StarBusinessDetails>) {
+    if (partial) {
+      Object.assign(this, partial);
+    }
+  }
 }

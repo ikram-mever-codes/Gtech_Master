@@ -20,10 +20,10 @@ export class Customer {
 
   @Column({
     type: "enum",
-    enum: ["business", "star_business", "star_customer"],
+    enum: ["business", "star_business", "star_customer", "device_maker"],
     default: "business",
   })
-  stage!: "business" | "star_business" | "star_customer";
+  stage!: "business" | "star_business" | "star_customer" | "device_maker";
 
   @Column({ unique: true })
   companyName!: string;
