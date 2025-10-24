@@ -638,6 +638,13 @@ export const createBusiness = async (
       }
     }
 
+    // AUTOMATIC STAGE DETERMINATION LOGIC
+    // Check if conditions are met for automatic star_business stage
+    const shouldBeStarBusiness =
+      isDeviceMaker === "Yes" &&
+      starBusinessDetails?.inSeries === true &&
+      starBusinessDetails?.madeIn;
+
     // Use transaction to ensure all entities are created together
     const result = await AppDataSource.transaction(
       async (transactionalEntityManager) => {
@@ -648,11 +655,22 @@ export const createBusiness = async (
         // IMPORTANT: companyName from frontend goes to legalName in DB
         customer.legalName = dbLegalName ? dbLegalName.trim() : undefined;
 
-        // Set customer stage and email
+        // Set customer stage and email - UPDATED LOGIC
         if (isStarCustomer) {
           customer.stage = "star_customer";
           customer.email = starCustomerEmail.trim().toLowerCase();
           customer.contactEmail = starCustomerEmail.trim().toLowerCase();
+        } else if (shouldBeStarBusiness) {
+          // AUTOMATIC PROMOTION TO STAR BUSINESS
+          customer.stage = "star_business";
+          customer.email = finalEmail
+            ? finalEmail.trim().toLowerCase()
+            : undefined;
+          customer.contactEmail = contactEmail
+            ? contactEmail.trim().toLowerCase()
+            : finalEmail
+            ? finalEmail.trim().toLowerCase()
+            : undefined;
         } else if (isDeviceMaker === "Yes") {
           customer.stage = "star_business";
           customer.email = finalEmail
@@ -724,8 +742,8 @@ export const createBusiness = async (
           businessDetails
         );
 
-        // Create StarBusinessDetails if device maker is "Yes"
-        if (isDeviceMaker === "Yes") {
+        // Create StarBusinessDetails if device maker is "Yes" OR if conditions are met for automatic promotion
+        if (isDeviceMaker === "Yes" || shouldBeStarBusiness) {
           const starBusiness = new StarBusinessDetails();
 
           if (starBusinessDetails) {
@@ -794,6 +812,7 @@ export const createBusiness = async (
           businessDetails: savedBusinessDetails,
           tempPassword,
           defaultList,
+          shouldBeStarBusiness, // Return this flag for response message
         };
       }
     );
@@ -904,6 +923,9 @@ export const createBusiness = async (
     if (isStarCustomer) {
       successMessage =
         "Star Customer created successfully. Credentials sent to email.";
+    } else if (shouldBeStarBusiness) {
+      successMessage =
+        "Star Business created automatically (Device Maker: Yes, In Series: Yes, Made In provided).";
     } else if (isDeviceMaker === "Yes") {
       successMessage = "Star Business (Device Maker) created successfully.";
     }
@@ -982,6 +1004,13 @@ export const updateBusiness = async (
     const currentIsStarCustomer = !!customer.starCustomerDetails;
     const isStarCustomerChanged =
       isStarCustomer !== undefined && isStarCustomer !== currentIsStarCustomer;
+
+    // AUTOMATIC STAGE DETERMINATION LOGIC FOR UPDATE
+    // Check if conditions are met for automatic star_business stage
+    const shouldBeStarBusiness =
+      (isDeviceMaker === "Yes" || currentIsDeviceMaker === "Yes") &&
+      starBusinessDetails?.inSeries === true &&
+      starBusinessDetails?.madeIn;
 
     // Validate star customer requirements
     if (
@@ -1114,7 +1143,10 @@ export const updateBusiness = async (
         }
 
         // Handle StarBusinessDetails updates
-        if (isDeviceMaker === "Yes" && !customer.starBusinessDetails) {
+        if (
+          (isDeviceMaker === "Yes" || shouldBeStarBusiness) &&
+          !customer.starBusinessDetails
+        ) {
           // Create new star business details
           const starBusiness = new StarBusinessDetails();
           if (starBusinessDetails) {
@@ -1189,9 +1221,14 @@ export const updateBusiness = async (
           customer.contactEmail = starCustomerEmail.trim().toLowerCase();
         }
 
-        // Update customer stage based on current state
+        // Update customer stage based on current state - UPDATED LOGIC
         if (isStarCustomer) {
           customer.stage = "star_customer";
+        } else if (shouldBeStarBusiness) {
+          // AUTOMATIC PROMOTION TO STAR BUSINESS
+          customer.stage = customer.starCustomerDetails
+            ? "star_customer"
+            : "star_business";
         } else if (
           isDeviceMaker === "Yes" ||
           customer.businessDetails?.isDeviceMaker === "Yes"
@@ -1212,6 +1249,7 @@ export const updateBusiness = async (
           defaultList,
           isDeviceMakerChanged,
           isStarCustomerChanged,
+          shouldBeStarBusiness, // Return this flag for response message
         };
       }
     );
@@ -1333,6 +1371,9 @@ export const updateBusiness = async (
     if (isStarCustomer && tempPassword) {
       successMessage =
         "Business upgraded to Star Customer successfully. Credentials sent to email.";
+    } else if (shouldBeStarBusiness) {
+      successMessage =
+        "Business automatically promoted to Star Business (Device Maker: Yes, In Series: Yes, Made In provided).";
     } else if (deviceMakerChanged) {
       successMessage =
         "Business updated successfully. Device maker status changed.";
@@ -1356,6 +1397,7 @@ export const updateBusiness = async (
     );
   }
 };
+
 // Get Business By ID (also updated to include starBusinessDetails)
 export const getBusinessById = async (
   req: Request,

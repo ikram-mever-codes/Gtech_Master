@@ -46,6 +46,7 @@ export type ContactPersonData = {
   familyName: string;
   fullName: string;
   position: Position;
+  isDecisionMaker: boolean;
   positionOthers?: string;
   displayPosition?: string;
   email?: string;
@@ -98,6 +99,7 @@ export type ContactPersonFilters = {
   starBusinessDetailsId?: string;
   position?: Position;
   sex?: Sex;
+  isDecisionMaker: boolean;
   stateLinkedIn?: LinkedInState;
   contact?: ContactType;
   hasEmail?: string;
@@ -493,17 +495,17 @@ export const CONTACT_TYPES = [
 
 export const POSITIONS = [
   { value: "", label: "Not Specified" },
-  { value: "Einkauf", label: "Purchasing" },
-  { value: "Entwickler", label: "Developer" },
-  { value: "Produktionsleiter", label: "Production Manager" },
-  { value: "Betriebsleiter", label: "Operations Manager" },
-  { value: "Geschäftsführer", label: "Managing Director" },
+  { value: "Einkauf", label: "Einkauf" },
+  { value: "Entwickler", label: "Entwickler" },
+  { value: "Produktionsleiter", label: "Produktionsleiter" },
+  { value: "Betriebsleiter", label: "Betriebsleiter" },
+  { value: "Geschäftsführer", label: "Geschäftsführer" },
   { value: "Owner", label: "Owner" },
   { value: "Others", label: "Others" },
 ] as const;
 
 export const SEX_OPTIONS = [
-  { value: "", label: "Not Specified" },
+  { value: "Not Specified", label: "Not Specified" },
   { value: "male", label: "Male" },
   { value: "female", label: "Female" },
 ] as const;

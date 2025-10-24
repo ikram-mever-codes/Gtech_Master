@@ -46,6 +46,26 @@ export const POSITIONS = {
 };
 
 // 1. Create Contact Person
+function isDecisionMakerContactType(contactType: ContactType): boolean {
+  return [
+    CONTACT_TYPES.DECISION_MAKER_TECH,
+    CONTACT_TYPES.DECISION_MAKER_FIN,
+    CONTACT_TYPES.REAL_DECISION_MAKER,
+  ].includes(contactType as any);
+}
+
+// Helper function to set isDecisionMaker based on contact type
+function setDecisionMakerFromContactType(contactPerson: ContactPerson): void {
+  if (contactPerson.contact) {
+    contactPerson.isDecisionMaker = isDecisionMakerContactType(
+      contactPerson.contact
+    );
+  } else {
+    contactPerson.isDecisionMaker = false;
+  }
+}
+
+// 1. Create Contact Person
 export const createContactPerson = async (
   req: Request,
   res: Response,
@@ -66,6 +86,7 @@ export const createContactPerson = async (
       stateLinkedIn = LINKEDIN_STATES.OPEN,
       contact,
       note,
+      isDecisionMaker, // Allow explicit setting, but will be overridden by contact type logic
     } = req.body;
 
     // Validate required fields
@@ -147,7 +168,7 @@ export const createContactPerson = async (
     contactPerson.starBusinessDetails = starBusinessDetails;
     contactPerson.name = name.trim();
     contactPerson.familyName = familyName.trim();
-    contactPerson.position = sanitizePosition(position);
+    contactPerson.position = position;
 
     if (position === POSITIONS.OTHERS) {
       contactPerson.positionOthers = positionOthers.trim();
@@ -175,6 +196,9 @@ export const createContactPerson = async (
     if (note) {
       contactPerson.note = note.trim();
     }
+
+    // Set isDecisionMaker based on contact type (overrides explicit setting)
+    setDecisionMakerFromContactType(contactPerson);
 
     // Save to database
     const savedContactPerson = await contactPersonRepository.save(
@@ -219,6 +243,7 @@ export const updateContactPerson = async (
       stateLinkedIn,
       contact,
       note,
+      isDecisionMaker, // Allow explicit setting, but will be overridden by contact type logic if contact changes
     } = req.body;
 
     const contactPersonRepository = AppDataSource.getRepository(ContactPerson);
@@ -309,8 +334,20 @@ export const updateContactPerson = async (
       contactPerson.stateLinkedIn = sanitizeLinkedInState(stateLinkedIn);
     }
 
+    // Handle contact type and decision maker logic
+    let contactTypeChanged = false;
     if (contact !== undefined) {
-      contactPerson.contact = sanitizeContactType(contact);
+      const newContactType = sanitizeContactType(contact);
+      contactTypeChanged = contactPerson.contact !== newContactType;
+      contactPerson.contact = newContactType;
+    }
+
+    // Update isDecisionMaker based on contact type if contact type changed
+    // Otherwise respect the explicit isDecisionMaker value if provided
+    if (contactTypeChanged) {
+      setDecisionMakerFromContactType(contactPerson);
+    } else if (isDecisionMaker !== undefined) {
+      contactPerson.isDecisionMaker = Boolean(isDecisionMaker);
     }
 
     if (note !== undefined) {
@@ -330,6 +367,395 @@ export const updateContactPerson = async (
   } catch (error) {
     console.error("Error updating contact person:", error);
     return next(new ErrorHandler("Failed to update contact person", 500));
+  }
+};
+
+// 8. Bulk Import Contact Persons
+export const bulkImportContactPersons = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { contactPersons, starBusinessDetailsId } = req.body;
+
+    // Validate input
+    if (!contactPersons || !Array.isArray(contactPersons)) {
+      return next(new ErrorHandler("Contact persons array is required", 400));
+    }
+
+    if (contactPersons.length === 0) {
+      return next(
+        new ErrorHandler("Contact persons array cannot be empty", 400)
+      );
+    }
+
+    if (!starBusinessDetailsId) {
+      return next(
+        new ErrorHandler("Star business details ID is required", 400)
+      );
+    }
+
+    console.log(
+      `Starting bulk import of ${contactPersons.length} contact persons for star business: ${starBusinessDetailsId}...`
+    );
+
+    const contactPersonRepository = AppDataSource.getRepository(ContactPerson);
+    const starBusinessDetailsRepository =
+      AppDataSource.getRepository(StarBusinessDetails);
+
+    // Verify star business exists
+    const starBusinessDetails = await starBusinessDetailsRepository.findOne({
+      where: { id: starBusinessDetailsId },
+      relations: ["customer"],
+    });
+
+    if (!starBusinessDetails) {
+      return next(new ErrorHandler("Star business not found", 404));
+    }
+
+    // Initialize results tracking
+    const results = {
+      total: contactPersons.length,
+      imported: 0,
+      skippedInvalidData: 0,
+      duplicates: 0,
+      errors: 0,
+      errorsList: [] as Array<{ contact: string; error: string }>,
+      duplicateEntries: [] as Array<{
+        contact: any;
+        reason: string;
+        existingRecord?: any;
+      }>,
+      importedContactPersons: [] as Array<any>,
+      startTime: new Date(),
+      endTime: null as Date | null,
+    };
+
+    // Get existing contact persons for duplicate checking
+    const existingContactPersons = await contactPersonRepository.find({
+      where: { starBusinessDetailsId },
+      select: ["id", "name", "familyName", "email"],
+    });
+
+    // Create maps for duplicate checking
+    const existingByEmail = new Map<string, any>();
+    const existingByName = new Map<string, any>();
+
+    existingContactPersons.forEach((contact) => {
+      if (contact.email) {
+        existingByEmail.set(contact.email.toLowerCase(), contact);
+      }
+      const nameKey = `${contact.name.toLowerCase()}_${contact.familyName.toLowerCase()}`;
+      existingByName.set(nameKey, contact);
+    });
+
+    // Process each contact person
+    const contactPersonsToSave: ContactPerson[] = [];
+    const seenInBatch = {
+      emails: new Set<string>(),
+      names: new Set<string>(),
+    };
+
+    for (let i = 0; i < contactPersons.length; i++) {
+      const contactData = contactPersons[i];
+
+      // Validate required fields
+      if (!contactData.name || !contactData.familyName) {
+        results.skippedInvalidData++;
+        results.errorsList.push({
+          contact: `Contact at index ${i}`,
+          error: "Missing required fields: name and familyName are required",
+        });
+        continue;
+      }
+
+      // Validate position and positionOthers
+      if (
+        contactData.position === POSITIONS.OTHERS &&
+        !contactData.positionOthers
+      ) {
+        results.skippedInvalidData++;
+        results.errorsList.push({
+          contact: `${contactData.name} ${contactData.familyName}`,
+          error: "Position description is required when position is 'Others'",
+        });
+        continue;
+      }
+
+      // Normalize data for duplicate checking
+      const normalizedEmail = contactData.email
+        ? contactData.email.trim().toLowerCase()
+        : null;
+      const nameKey = `${contactData.name
+        .trim()
+        .toLowerCase()}_${contactData.familyName.trim().toLowerCase()}`;
+
+      // Check for duplicates in current batch
+      let duplicateReason = "";
+      let existingRecord = null;
+
+      if (normalizedEmail && seenInBatch.emails.has(normalizedEmail)) {
+        duplicateReason = "Duplicate email in current batch";
+      } else if (seenInBatch.names.has(nameKey)) {
+        duplicateReason = "Duplicate name in current batch";
+      }
+
+      // Check against existing database records
+      if (!duplicateReason) {
+        if (normalizedEmail && existingByEmail.has(normalizedEmail)) {
+          duplicateReason = "Email already exists for this star business";
+          existingRecord = existingByEmail.get(normalizedEmail);
+        } else if (existingByName.has(nameKey)) {
+          duplicateReason = "Name already exists for this star business";
+          existingRecord = existingByName.get(nameKey);
+        }
+      }
+
+      // If duplicate found, add to results and skip
+      if (duplicateReason) {
+        results.duplicates++;
+        results.duplicateEntries.push({
+          contact: {
+            index: i,
+            name: contactData.name,
+            familyName: contactData.familyName,
+            email: contactData.email,
+            position: contactData.position,
+          },
+          reason: duplicateReason,
+          existingRecord: existingRecord,
+        });
+        continue;
+      }
+
+      // Add to seen sets
+      if (normalizedEmail) {
+        seenInBatch.emails.add(normalizedEmail);
+      }
+      seenInBatch.names.add(nameKey);
+
+      try {
+        // Create new contact person entity
+        const contactPerson = new ContactPerson();
+        contactPerson.sex = sanitizeSex(contactData.sex);
+        contactPerson.starBusinessDetailsId = starBusinessDetailsId;
+        contactPerson.starBusinessDetails = starBusinessDetails;
+        contactPerson.name = contactData.name.trim();
+        contactPerson.familyName = contactData.familyName.trim();
+        contactPerson.position = sanitizePosition(contactData.position);
+
+        if (
+          contactData.position === POSITIONS.OTHERS &&
+          contactData.positionOthers
+        ) {
+          contactPerson.positionOthers = contactData.positionOthers.trim();
+        }
+
+        if (contactData.email) {
+          contactPerson.email = normalizedEmail;
+        }
+
+        if (contactData.phone) {
+          contactPerson.phone = contactData.phone.trim();
+        }
+
+        if (contactData.linkedInLink) {
+          contactPerson.linkedInLink = normalizeLinkedInUrl(
+            contactData.linkedInLink
+          );
+        }
+
+        if (contactData.noteContactPreference) {
+          contactPerson.noteContactPreference =
+            contactData.noteContactPreference.trim();
+        }
+
+        contactPerson.stateLinkedIn = sanitizeLinkedInState(
+          contactData.stateLinkedIn || LINKEDIN_STATES.OPEN
+        );
+        contactPerson.contact = sanitizeContactType(contactData.contact);
+
+        if (contactData.note) {
+          contactPerson.note = contactData.note.trim();
+        }
+
+        // Set isDecisionMaker based on contact type for imported contacts
+        setDecisionMakerFromContactType(contactPerson);
+
+        contactPersonsToSave.push(contactPerson);
+      } catch (error) {
+        results.errors++;
+        results.errorsList.push({
+          contact: `${contactData.name} ${contactData.familyName}`,
+          error: error instanceof Error ? error.message : "Unknown error",
+        });
+      }
+    }
+
+    // Bulk save all valid contact persons
+    if (contactPersonsToSave.length > 0) {
+      try {
+        const savedContactPersons = await contactPersonRepository.save(
+          contactPersonsToSave,
+          { chunk: 100 } // Save in chunks of 100
+        );
+        results.imported = savedContactPersons.length;
+        results.importedContactPersons = savedContactPersons.map(
+          formatContactPersonResponse
+        );
+      } catch (error) {
+        console.error("Error during bulk save:", error);
+        results.errors += contactPersonsToSave.length;
+        results.errorsList.push({
+          contact: "Bulk save operation",
+          error:
+            error instanceof Error ? error.message : "Database save failed",
+        });
+      }
+    }
+
+    results.endTime = new Date();
+
+    const executionTime =
+      results.endTime.getTime() - results.startTime.getTime();
+    console.log(
+      `Bulk import completed in ${executionTime}ms. Imported: ${results.imported}/${results.total}`
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: `Bulk import completed. ${results.imported} contact persons imported successfully.`,
+      data: {
+        ...results,
+        executionTimeMs: executionTime,
+      },
+    });
+  } catch (error) {
+    console.error("Error bulk importing contact persons:", error);
+    return next(new ErrorHandler("Failed to bulk import contact persons", 500));
+  }
+};
+
+// 15. Quick Add Contact Person to Star Business
+export const quickAddContactPerson = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { starBusinessDetailsId } = req.params;
+    const { name, familyName, email, phone, position, contact } = req.body;
+
+    // Validate minimum required fields
+    if (!name || !familyName) {
+      return next(new ErrorHandler("Name and family name are required", 400));
+    }
+
+    const contactPersonRepository = AppDataSource.getRepository(ContactPerson);
+    const starBusinessDetailsRepository =
+      AppDataSource.getRepository(StarBusinessDetails);
+
+    // Verify star business exists
+    const starBusinessDetails = await starBusinessDetailsRepository.findOne({
+      where: { id: starBusinessDetailsId },
+      relations: ["customer"],
+    });
+
+    if (!starBusinessDetails) {
+      return next(new ErrorHandler("Star business not found", 404));
+    }
+
+    // Quick duplicate check by name and email
+    const existingQuery = contactPersonRepository
+      .createQueryBuilder("contactPerson")
+      .where("contactPerson.starBusinessDetailsId = :starBusinessDetailsId", {
+        starBusinessDetailsId,
+      })
+      .andWhere(
+        new Brackets((qb) => {
+          qb.where(
+            "LOWER(contactPerson.name) = :name AND LOWER(contactPerson.familyName) = :familyName",
+            {
+              name: name.toLowerCase(),
+              familyName: familyName.toLowerCase(),
+            }
+          );
+          if (email) {
+            qb.orWhere("LOWER(contactPerson.email) = :email", {
+              email: email.toLowerCase(),
+            });
+          }
+        })
+      );
+
+    const existingContact = await existingQuery.getOne();
+
+    if (existingContact) {
+      return next(
+        new ErrorHandler(
+          "A similar contact person already exists for this business",
+          400
+        )
+      );
+    }
+
+    // Create contact person with minimal fields
+    const contactPerson = new ContactPerson();
+    contactPerson.name = name.trim();
+    contactPerson.familyName = familyName.trim();
+    contactPerson.starBusinessDetailsId = starBusinessDetailsId;
+    contactPerson.starBusinessDetails = starBusinessDetails;
+
+    // Optional fields
+    if (email) {
+      contactPerson.email = email.trim().toLowerCase();
+    }
+    if (phone) {
+      contactPerson.phone = phone.trim();
+    }
+    if (position) {
+      contactPerson.position = sanitizePosition(position);
+    }
+    if (contact) {
+      contactPerson.contact = sanitizeContactType(contact);
+    }
+
+    // Set defaults
+    contactPerson.sex = "Not Specified";
+    contactPerson.stateLinkedIn = "open";
+    if (!contact) {
+      contactPerson.contact = "";
+    }
+
+    // Set isDecisionMaker based on contact type for quick add
+    setDecisionMakerFromContactType(contactPerson);
+
+    // Save to database
+    const savedContactPerson = await contactPersonRepository.save(
+      contactPerson
+    );
+
+    return res.status(201).json({
+      success: true,
+      message: "Contact person added successfully",
+      data: {
+        id: savedContactPerson.id,
+        name: savedContactPerson.name,
+        familyName: savedContactPerson.familyName,
+        fullName: `${savedContactPerson.name} ${savedContactPerson.familyName}`,
+        email: savedContactPerson.email,
+        phone: savedContactPerson.phone,
+        position: savedContactPerson.position,
+        contact: savedContactPerson.contact,
+        isDecisionMaker: savedContactPerson.isDecisionMaker,
+        businessName: starBusinessDetails.customer.companyName,
+        starBusinessDetailsId: savedContactPerson.starBusinessDetailsId,
+      },
+    });
+  } catch (error) {
+    console.error("Error quick adding contact person:", error);
+    return next(new ErrorHandler("Failed to add contact person", 500));
   }
 };
 
@@ -574,7 +1000,7 @@ export const getAllContactPersons = async (
           createdAt: contactPerson.createdAt,
           updatedAt: contactPerson.updatedAt,
           starBusinessDetailsId: contactPerson.starBusinessDetailsId,
-
+          isDecisionMaker: true,
           // Business info
           businessId: customer?.id || null,
           businessName: customer?.companyName || null,
@@ -778,270 +1204,6 @@ export const bulkDeleteContactPersons = async (
   }
 };
 
-// 8. Bulk Import Contact Persons
-export const bulkImportContactPersons = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
-  try {
-    const { contactPersons, starBusinessDetailsId } = req.body;
-
-    // Validate input
-    if (!contactPersons || !Array.isArray(contactPersons)) {
-      return next(new ErrorHandler("Contact persons array is required", 400));
-    }
-
-    if (contactPersons.length === 0) {
-      return next(
-        new ErrorHandler("Contact persons array cannot be empty", 400)
-      );
-    }
-
-    if (!starBusinessDetailsId) {
-      return next(
-        new ErrorHandler("Star business details ID is required", 400)
-      );
-    }
-
-    console.log(
-      `Starting bulk import of ${contactPersons.length} contact persons for star business: ${starBusinessDetailsId}...`
-    );
-
-    const contactPersonRepository = AppDataSource.getRepository(ContactPerson);
-    const starBusinessDetailsRepository =
-      AppDataSource.getRepository(StarBusinessDetails);
-
-    // Verify star business exists
-    const starBusinessDetails = await starBusinessDetailsRepository.findOne({
-      where: { id: starBusinessDetailsId },
-      relations: ["customer"],
-    });
-
-    if (!starBusinessDetails) {
-      return next(new ErrorHandler("Star business not found", 404));
-    }
-
-    // Initialize results tracking
-    const results = {
-      total: contactPersons.length,
-      imported: 0,
-      skippedInvalidData: 0,
-      duplicates: 0,
-      errors: 0,
-      errorsList: [] as Array<{ contact: string; error: string }>,
-      duplicateEntries: [] as Array<{
-        contact: any;
-        reason: string;
-        existingRecord?: any;
-      }>,
-      importedContactPersons: [] as Array<any>,
-      startTime: new Date(),
-      endTime: null as Date | null,
-    };
-
-    // Get existing contact persons for duplicate checking
-    const existingContactPersons = await contactPersonRepository.find({
-      where: { starBusinessDetailsId },
-      select: ["id", "name", "familyName", "email"],
-    });
-
-    // Create maps for duplicate checking
-    const existingByEmail = new Map<string, any>();
-    const existingByName = new Map<string, any>();
-
-    existingContactPersons.forEach((contact) => {
-      if (contact.email) {
-        existingByEmail.set(contact.email.toLowerCase(), contact);
-      }
-      const nameKey = `${contact.name.toLowerCase()}_${contact.familyName.toLowerCase()}`;
-      existingByName.set(nameKey, contact);
-    });
-
-    // Process each contact person
-    const contactPersonsToSave: ContactPerson[] = [];
-    const seenInBatch = {
-      emails: new Set<string>(),
-      names: new Set<string>(),
-    };
-
-    for (let i = 0; i < contactPersons.length; i++) {
-      const contactData = contactPersons[i];
-
-      // Validate required fields
-      if (!contactData.name || !contactData.familyName) {
-        results.skippedInvalidData++;
-        results.errorsList.push({
-          contact: `Contact at index ${i}`,
-          error: "Missing required fields: name and familyName are required",
-        });
-        continue;
-      }
-
-      // Validate position and positionOthers
-      if (
-        contactData.position === POSITIONS.OTHERS &&
-        !contactData.positionOthers
-      ) {
-        results.skippedInvalidData++;
-        results.errorsList.push({
-          contact: `${contactData.name} ${contactData.familyName}`,
-          error: "Position description is required when position is 'Others'",
-        });
-        continue;
-      }
-
-      // Normalize data for duplicate checking
-      const normalizedEmail = contactData.email
-        ? contactData.email.trim().toLowerCase()
-        : null;
-      const nameKey = `${contactData.name
-        .trim()
-        .toLowerCase()}_${contactData.familyName.trim().toLowerCase()}`;
-
-      // Check for duplicates in current batch
-      let duplicateReason = "";
-      let existingRecord = null;
-
-      if (normalizedEmail && seenInBatch.emails.has(normalizedEmail)) {
-        duplicateReason = "Duplicate email in current batch";
-      } else if (seenInBatch.names.has(nameKey)) {
-        duplicateReason = "Duplicate name in current batch";
-      }
-
-      // Check against existing database records
-      if (!duplicateReason) {
-        if (normalizedEmail && existingByEmail.has(normalizedEmail)) {
-          duplicateReason = "Email already exists for this star business";
-          existingRecord = existingByEmail.get(normalizedEmail);
-        } else if (existingByName.has(nameKey)) {
-          duplicateReason = "Name already exists for this star business";
-          existingRecord = existingByName.get(nameKey);
-        }
-      }
-
-      // If duplicate found, add to results and skip
-      if (duplicateReason) {
-        results.duplicates++;
-        results.duplicateEntries.push({
-          contact: {
-            index: i,
-            name: contactData.name,
-            familyName: contactData.familyName,
-            email: contactData.email,
-            position: contactData.position,
-          },
-          reason: duplicateReason,
-          existingRecord: existingRecord,
-        });
-        continue;
-      }
-
-      // Add to seen sets
-      if (normalizedEmail) {
-        seenInBatch.emails.add(normalizedEmail);
-      }
-      seenInBatch.names.add(nameKey);
-
-      try {
-        // Create new contact person entity
-        const contactPerson = new ContactPerson();
-        contactPerson.sex = sanitizeSex(contactData.sex);
-        contactPerson.starBusinessDetailsId = starBusinessDetailsId;
-        contactPerson.starBusinessDetails = starBusinessDetails;
-        contactPerson.name = contactData.name.trim();
-        contactPerson.familyName = contactData.familyName.trim();
-        contactPerson.position = sanitizePosition(contactData.position);
-
-        if (
-          contactData.position === POSITIONS.OTHERS &&
-          contactData.positionOthers
-        ) {
-          contactPerson.positionOthers = contactData.positionOthers.trim();
-        }
-
-        if (contactData.email) {
-          contactPerson.email = normalizedEmail;
-        }
-
-        if (contactData.phone) {
-          contactPerson.phone = contactData.phone.trim();
-        }
-
-        if (contactData.linkedInLink) {
-          contactPerson.linkedInLink = normalizeLinkedInUrl(
-            contactData.linkedInLink
-          );
-        }
-
-        if (contactData.noteContactPreference) {
-          contactPerson.noteContactPreference =
-            contactData.noteContactPreference.trim();
-        }
-
-        contactPerson.stateLinkedIn = sanitizeLinkedInState(
-          contactData.stateLinkedIn || LINKEDIN_STATES.OPEN
-        );
-        contactPerson.contact = sanitizeContactType(contactData.contact);
-
-        if (contactData.note) {
-          contactPerson.note = contactData.note.trim();
-        }
-
-        contactPersonsToSave.push(contactPerson);
-      } catch (error) {
-        results.errors++;
-        results.errorsList.push({
-          contact: `${contactData.name} ${contactData.familyName}`,
-          error: error instanceof Error ? error.message : "Unknown error",
-        });
-      }
-    }
-
-    // Bulk save all valid contact persons
-    if (contactPersonsToSave.length > 0) {
-      try {
-        const savedContactPersons = await contactPersonRepository.save(
-          contactPersonsToSave,
-          { chunk: 100 } // Save in chunks of 100
-        );
-        results.imported = savedContactPersons.length;
-        results.importedContactPersons = savedContactPersons.map(
-          formatContactPersonResponse
-        );
-      } catch (error) {
-        console.error("Error during bulk save:", error);
-        results.errors += contactPersonsToSave.length;
-        results.errorsList.push({
-          contact: "Bulk save operation",
-          error:
-            error instanceof Error ? error.message : "Database save failed",
-        });
-      }
-    }
-
-    results.endTime = new Date();
-
-    const executionTime =
-      results.endTime.getTime() - results.startTime.getTime();
-    console.log(
-      `Bulk import completed in ${executionTime}ms. Imported: ${results.imported}/${results.total}`
-    );
-
-    return res.status(200).json({
-      success: true,
-      message: `Bulk import completed. ${results.imported} contact persons imported successfully.`,
-      data: {
-        ...results,
-        executionTimeMs: executionTime,
-      },
-    });
-  } catch (error) {
-    console.error("Error bulk importing contact persons:", error);
-    return next(new ErrorHandler("Failed to bulk import contact persons", 500));
-  }
-};
-
 // 9. Update LinkedIn State in Bulk
 export const bulkUpdateLinkedInState = async (
   req: Request,
@@ -1135,13 +1297,6 @@ export const getContactPersonStatistics = async (
       .getRawMany();
 
     // Count by sex
-    const sexCounts = await baseQuery
-      .select("contactPerson.sex, COUNT(*) as count")
-      .where("contactPerson.sex IS NOT NULL")
-      .andWhere("contactPerson.sex != :empty", { empty: "" })
-      .groupBy("contactPerson.sex")
-      .orderBy("count", "DESC")
-      .getRawMany();
 
     // Contact information availability
     const withEmail = await baseQuery
@@ -1166,7 +1321,6 @@ export const getContactPersonStatistics = async (
         byPosition: positionCounts,
         byLinkedInState: linkedInStateCounts,
         byContactType: contactTypeCounts,
-        bySex: sexCounts,
         contactInfo: {
           withEmail,
           withPhone,
@@ -1294,11 +1448,12 @@ export const exportContactPersonsToCSV = async (
 // Helper Functions
 
 function sanitizeSex(value: any): Sex {
-  if (!value) return "";
+  if (!value) return "Not Specified";
   const stringValue = String(value).trim().toLowerCase();
   if (stringValue === "male") return "male";
   if (stringValue === "female") return "female";
-  return "";
+  if (stringValue === "Not Specified") return "Not Specified";
+  return "Not Specified";
 }
 
 function sanitizePosition(value: any): Position {
@@ -1401,6 +1556,7 @@ function formatContactPersonResponse(contactPerson: any) {
     noteContactPreference: contactPerson.noteContactPreference,
     stateLinkedIn: contactPerson.stateLinkedIn,
     contact: contactPerson.contact,
+    isDecisionMaker: contactPerson.isDecisionMaker,
     note: contactPerson.note,
     createdAt: contactPerson.createdAt,
     updatedAt: contactPerson.updatedAt,
@@ -1410,11 +1566,6 @@ function formatContactPersonResponse(contactPerson: any) {
 // Add missing import
 import { Not } from "typeorm";
 import { link } from "pdfkit";
-
-// Additional controller functions for contactPersonController.ts
-// Add these to your existing contactPersonController.ts file
-
-// 12. Get All Star Businesses (for dropdown selection)
 export const getAllStarBusinesses = async (
   req: Request,
   res: Response,
@@ -1437,12 +1588,14 @@ export const getAllStarBusinesses = async (
     const skip = (pageNum - 1) * limitNum;
     const includeContactsCount = withContactsCount === "true";
 
-    // Build query for star businesses
+    // Modified query to include both star_business and star_customer stages
     let query = customerRepository
       .createQueryBuilder("customer")
       .leftJoinAndSelect("customer.starBusinessDetails", "starBusinessDetails")
       .leftJoinAndSelect("customer.businessDetails", "businessDetails")
-      .where("customer.stage = :stage", { stage: "star_business" });
+      .where("customer.stage IN (:...stages)", {
+        stages: ["star_business", "star_customer"],
+      });
 
     // Add search filter
     if (search) {
@@ -1462,52 +1615,57 @@ export const getAllStarBusinesses = async (
       );
     }
 
-    // Add ordering
     query.orderBy("customer.companyName", "ASC");
 
-    // Execute query with pagination
-    const [starBusinesses, total] = await query
+    const [starRecords, total] = await query
       .skip(skip)
       .take(limitNum)
       .getManyAndCount();
 
-    // Format response with contact counts if requested
-    const formattedBusinesses = await Promise.all(
-      starBusinesses.map(async (business) => {
+    const formattedRecords = await Promise.all(
+      starRecords.map(async (record) => {
         const baseData = {
-          id: business.starBusinessDetails?.id,
-          customerId: business.id,
-          companyName: business.companyName,
-          legalName: business.legalName,
-          email: business.email,
-          contactEmail: business.contactEmail,
-          contactPhoneNumber: business.contactPhoneNumber,
-          website: business.businessDetails?.website,
-          city: business.businessDetails?.city,
-          country: business.businessDetails?.country,
-          address: business.businessDetails?.address,
-          postalCode: business.businessDetails?.postalCode,
+          id: record.starBusinessDetails?.id,
+          customerId: record.id,
+          companyName: record.companyName,
+          legalName: record.legalName,
+          email: record.email,
+          contactEmail: record.contactEmail,
+          contactPhoneNumber: record.contactPhoneNumber,
+          website: record.businessDetails?.website,
+          city: record.businessDetails?.city,
+          country: record.businessDetails?.country,
+          address: record.businessDetails?.address,
+          postalCode: record.businessDetails?.postalCode,
           industry:
-            business.starBusinessDetails?.industry ||
-            business.businessDetails?.industry,
-          inSeries: business.starBusinessDetails?.inSeries,
-          madeIn: business.starBusinessDetails?.madeIn,
-          device: business.starBusinessDetails?.device,
-          lastChecked: business.starBusinessDetails?.lastChecked,
-          checkedBy: business.starBusinessDetails?.checkedBy,
-          comment: business.starBusinessDetails?.comment,
-          createdAt: business.createdAt,
-          updatedAt: business.updatedAt,
+            record.starBusinessDetails?.industry ||
+            record.businessDetails?.industry,
+          inSeries: record.starBusinessDetails?.inSeries,
+          madeIn: record.starBusinessDetails?.madeIn,
+          device: record.starBusinessDetails?.device,
+          lastChecked: record.starBusinessDetails?.lastChecked,
+          checkedBy: record.starBusinessDetails?.checkedBy,
+          comment: record.starBusinessDetails?.comment,
+          stage: record.stage,
+          createdAt: record.createdAt,
+          updatedAt: record.updatedAt,
         };
 
-        // Add contact count if requested
-        if (includeContactsCount && business.starBusinessDetails?.id) {
+        if (
+          includeContactsCount &&
+          record.starBusinessDetails?.id &&
+          record.stage === "star_business"
+        ) {
           const contactPersonRepository =
             AppDataSource.getRepository(ContactPerson);
           const contactCount = await contactPersonRepository.count({
-            where: { starBusinessDetailsId: business.starBusinessDetails.id },
+            where: { starBusinessDetailsId: record.starBusinessDetails.id },
           });
           return { ...baseData, contactPersonsCount: contactCount };
+        }
+
+        if (includeContactsCount && record.stage === "star_customer") {
+          return { ...baseData, contactPersonsCount: 0 };
         }
 
         return baseData;
@@ -1517,7 +1675,7 @@ export const getAllStarBusinesses = async (
     return res.status(200).json({
       success: true,
       data: {
-        starBusinesses: formattedBusinesses,
+        starBusinesses: formattedRecords,
         pagination: {
           total,
           page: pageNum,
@@ -1527,10 +1685,13 @@ export const getAllStarBusinesses = async (
       },
     });
   } catch (error) {
-    console.error("Error fetching star businesses:", error);
-    return next(new ErrorHandler("Failed to fetch star businesses", 500));
+    console.error("Error fetching star businesses and customers:", error);
+    return next(
+      new ErrorHandler("Failed to fetch star businesses and customers", 500)
+    );
   }
 };
+
 export const getStarBusinessesWithoutContacts = async (
   req: Request,
   res: Response,
@@ -1541,10 +1702,10 @@ export const getStarBusinessesWithoutContacts = async (
 
     const customerRepository = AppDataSource.getRepository(Customer);
 
-    // Get all star business customers with their relations
-    const starBusinessCustomers = await customerRepository.find({
+    // Get all star business AND star customer customers with their relations
+    const starCustomers = await customerRepository.find({
       where: {
-        stage: "star_business",
+        stage: In(["star_business", "star_customer"]),
       },
       relations: [
         "starBusinessDetails",
@@ -1557,25 +1718,36 @@ export const getStarBusinessesWithoutContacts = async (
     });
 
     console.log(
-      `Total star business customers found: ${starBusinessCustomers.length}`
+      `Total star businesses and customers found: ${starCustomers.length}`
     );
 
-    // Filter customers that have starBusinessDetails and no contact persons
-    let filteredCustomers = starBusinessCustomers.filter(
-      (customer) =>
-        customer.starBusinessDetails &&
-        (!customer.starBusinessDetails.contactPersons ||
-          customer.starBusinessDetails.contactPersons.length === 0)
-    );
+    // Filter records based on their stage and contact persons
+    let filteredRecords = starCustomers.filter((customer) => {
+      // For star_business: must have starBusinessDetails and no contact persons
+      if (customer.stage === "star_business") {
+        return (
+          customer.starBusinessDetails &&
+          (!customer.starBusinessDetails.contactPersons ||
+            customer.starBusinessDetails.contactPersons.length === 0)
+        );
+      }
+
+      // For star_customer: they don't have contact persons by definition
+      if (customer.stage === "star_customer") {
+        return true;
+      }
+
+      return false;
+    });
 
     console.log(
-      `Star businesses without contacts: ${filteredCustomers.length}`
+      `Star businesses and customers without contacts: ${filteredRecords.length}`
     );
 
     // Apply search filter if provided
     if (search) {
       const searchTerm = search.toString().toLowerCase();
-      filteredCustomers = filteredCustomers.filter(
+      filteredRecords = filteredRecords.filter(
         (customer) =>
           customer.companyName?.toLowerCase().includes(searchTerm) ||
           customer.legalName?.toLowerCase().includes(searchTerm) ||
@@ -1587,7 +1759,7 @@ export const getStarBusinessesWithoutContacts = async (
     // Apply city filter if provided
     if (city) {
       const cityTerm = city.toString().toLowerCase();
-      filteredCustomers = filteredCustomers.filter((customer) =>
+      filteredRecords = filteredRecords.filter((customer) =>
         customer.businessDetails?.city?.toLowerCase().includes(cityTerm)
       );
     }
@@ -1595,7 +1767,7 @@ export const getStarBusinessesWithoutContacts = async (
     // Apply country filter if provided
     if (country) {
       const countryTerm = country.toString().toLowerCase();
-      filteredCustomers = filteredCustomers.filter((customer) =>
+      filteredRecords = filteredRecords.filter((customer) =>
         customer.businessDetails?.country?.toLowerCase().includes(countryTerm)
       );
     }
@@ -1603,7 +1775,7 @@ export const getStarBusinessesWithoutContacts = async (
     // Apply industry filter if provided
     if (industry) {
       const industryTerm = industry.toString().toLowerCase();
-      filteredCustomers = filteredCustomers.filter(
+      filteredRecords = filteredRecords.filter(
         (customer) =>
           customer.starBusinessDetails?.industry
             ?.toLowerCase()
@@ -1615,18 +1787,11 @@ export const getStarBusinessesWithoutContacts = async (
     }
 
     // Format the response
-    const formattedBusinesses = filteredCustomers.map((customer) => {
+    const formattedRecords = filteredRecords.map((customer) => {
       const starBusiness = customer.starBusinessDetails;
       const businessDetails = customer.businessDetails;
 
-      console.log("Formatting customer:", {
-        id: customer.id,
-        companyName: customer.companyName,
-        hasStarBusiness: !!starBusiness,
-        hasBusinessDetails: !!businessDetails,
-      });
-
-      return {
+      const baseData = {
         id: starBusiness?.id || customer.id,
         customerId: customer.id,
         companyName: customer.companyName || "N/A",
@@ -1642,55 +1807,84 @@ export const getStarBusinessesWithoutContacts = async (
         postalCode: businessDetails?.postalCode || "N/A",
         category: businessDetails?.category || "N/A",
         industry: starBusiness?.industry || businessDetails?.industry || "N/A",
-        inSeries: starBusiness?.inSeries,
-        madeIn: starBusiness?.madeIn,
-        device: starBusiness?.device,
-        lastChecked: starBusiness?.lastChecked,
-        checkedBy: starBusiness?.checkedBy,
-        convertedTimestamp: starBusiness?.converted_timestamp,
-        comment: starBusiness?.comment,
+        stage: customer.stage,
         createdAt: starBusiness?.createdAt || customer.createdAt,
         updatedAt: starBusiness?.updatedAt || customer.updatedAt,
         contactPersonsCount: 0,
-        needsContactPerson: true,
-        daysSinceConverted: starBusiness?.converted_timestamp
-          ? Math.floor(
-              (Date.now() -
-                new Date(starBusiness.converted_timestamp).getTime()) /
-                (1000 * 60 * 60 * 24)
-            )
-          : null,
+        needsContactPerson: customer.stage === "star_business",
       };
+
+      if (customer.stage === "star_business") {
+        return {
+          ...baseData,
+          inSeries: starBusiness?.inSeries,
+          madeIn: starBusiness?.madeIn,
+          device: starBusiness?.device,
+          lastChecked: starBusiness?.lastChecked,
+          checkedBy: starBusiness?.checkedBy,
+          convertedTimestamp: starBusiness?.converted_timestamp,
+          comment: starBusiness?.comment,
+          daysSinceConverted: starBusiness?.converted_timestamp
+            ? Math.floor(
+                (Date.now() -
+                  new Date(starBusiness.converted_timestamp).getTime()) /
+                  (1000 * 60 * 60 * 24)
+              )
+            : null,
+        };
+      }
+
+      return baseData;
     });
+
+    const starBusinesses = formattedRecords.filter(
+      (record) => record.stage === "star_business"
+    );
+    const starCustomersOnly = formattedRecords.filter(
+      (record) => record.stage === "star_customer"
+    );
+
+    const starBusinessesWithDays = starBusinesses.filter(
+      (b: any) => b.daysSinceConverted !== null
+    );
+    const averageDaysSinceConverted =
+      starBusinessesWithDays.length > 0
+        ? Math.round(
+            starBusinessesWithDays.reduce(
+              (acc, b: any) => acc + (b.daysSinceConverted || 0),
+              0
+            ) / starBusinessesWithDays.length
+          )
+        : 0;
 
     return res.status(200).json({
       success: true,
-      message: "Star businesses without contact persons fetched successfully",
+      message:
+        "Star businesses and customers without contact persons fetched successfully",
       data: {
-        starBusinesses: formattedBusinesses,
-        total: filteredCustomers.length,
+        starBusinesses: formattedRecords, // Keeping same response structure for compatibility
+        total: filteredRecords.length,
         summary: {
-          totalWithoutContacts: filteredCustomers.length,
-          averageDaysSinceConverted:
-            formattedBusinesses.length > 0
-              ? Math.round(
-                  formattedBusinesses.reduce(
-                    (acc, b) => acc + (b.daysSinceConverted || 0),
-                    0
-                  ) / formattedBusinesses.length
-                )
-              : 0,
+          totalStarBusinesses: starBusinesses.length,
+          totalStarCustomers: starCustomersOnly.length,
+          totalWithoutContacts: filteredRecords.length,
+          averageDaysSinceConverted,
         },
       },
     });
   } catch (error) {
-    console.error("Error fetching star businesses without contacts:", error);
+    console.error(
+      "Error fetching star businesses and customers without contacts:",
+      error
+    );
     return next(
-      new ErrorHandler("Failed to fetch star businesses without contacts", 500)
+      new ErrorHandler(
+        "Failed to fetch star businesses and customers without contacts",
+        500
+      )
     );
   }
 };
-
 export const getStarBusinessesWithContactSummary = async (
   req: Request,
   res: Response,
@@ -1801,117 +1995,5 @@ export const getStarBusinessesWithContactSummary = async (
     return next(
       new ErrorHandler("Failed to fetch star businesses contact summary", 500)
     );
-  }
-};
-
-// 15. Quick Add Contact Person to Star Business
-export const quickAddContactPerson = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
-  try {
-    const { starBusinessDetailsId } = req.params;
-    const { name, familyName, email, phone, position } = req.body;
-
-    // Validate minimum required fields
-    if (!name || !familyName) {
-      return next(new ErrorHandler("Name and family name are required", 400));
-    }
-
-    const contactPersonRepository = AppDataSource.getRepository(ContactPerson);
-    const starBusinessDetailsRepository =
-      AppDataSource.getRepository(StarBusinessDetails);
-
-    // Verify star business exists
-    const starBusinessDetails = await starBusinessDetailsRepository.findOne({
-      where: { id: starBusinessDetailsId },
-      relations: ["customer"],
-    });
-
-    if (!starBusinessDetails) {
-      return next(new ErrorHandler("Star business not found", 404));
-    }
-
-    // Quick duplicate check by name and email
-    const existingQuery = contactPersonRepository
-      .createQueryBuilder("contactPerson")
-      .where("contactPerson.starBusinessDetailsId = :starBusinessDetailsId", {
-        starBusinessDetailsId,
-      })
-      .andWhere(
-        new Brackets((qb) => {
-          qb.where(
-            "LOWER(contactPerson.name) = :name AND LOWER(contactPerson.familyName) = :familyName",
-            {
-              name: name.toLowerCase(),
-              familyName: familyName.toLowerCase(),
-            }
-          );
-          if (email) {
-            qb.orWhere("LOWER(contactPerson.email) = :email", {
-              email: email.toLowerCase(),
-            });
-          }
-        })
-      );
-
-    const existingContact = await existingQuery.getOne();
-
-    if (existingContact) {
-      return next(
-        new ErrorHandler(
-          "A similar contact person already exists for this business",
-          400
-        )
-      );
-    }
-
-    // Create contact person with minimal fields
-    const contactPerson = new ContactPerson();
-    contactPerson.name = name.trim();
-    contactPerson.familyName = familyName.trim();
-    contactPerson.starBusinessDetailsId = starBusinessDetailsId;
-    contactPerson.starBusinessDetails = starBusinessDetails;
-
-    // Optional fields
-    if (email) {
-      contactPerson.email = email.trim().toLowerCase();
-    }
-    if (phone) {
-      contactPerson.phone = phone.trim();
-    }
-    if (position) {
-      contactPerson.position = sanitizePosition(position);
-    }
-
-    // Set defaults
-    contactPerson.sex = "";
-    contactPerson.stateLinkedIn = "open";
-    contactPerson.contact = "";
-
-    // Save to database
-    const savedContactPerson = await contactPersonRepository.save(
-      contactPerson
-    );
-
-    return res.status(201).json({
-      success: true,
-      message: "Contact person added successfully",
-      data: {
-        id: savedContactPerson.id,
-        name: savedContactPerson.name,
-        familyName: savedContactPerson.familyName,
-        fullName: `${savedContactPerson.name} ${savedContactPerson.familyName}`,
-        email: savedContactPerson.email,
-        phone: savedContactPerson.phone,
-        position: savedContactPerson.position,
-        businessName: starBusinessDetails.customer.companyName,
-        starBusinessDetailsId: savedContactPerson.starBusinessDetailsId,
-      },
-    });
-  } catch (error) {
-    console.error("Error quick adding contact person:", error);
-    return next(new ErrorHandler("Failed to add contact person", 500));
   }
 };

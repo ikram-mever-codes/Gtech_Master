@@ -44,7 +44,7 @@ import CustomButton from "@/components/UI/CustomButton";
 import { Google, LinkedIn } from "@mui/icons-material";
 
 // Tab type
-type TabType = "all" | "no-contacts";
+type TabType = "all" | "no-contacts" | "sales";
 
 // Modal mode type
 type ModalMode = "create" | "edit";
@@ -55,14 +55,20 @@ const ContactPersonsPage: React.FC = () => {
   // State management
   const [activeTab, setActiveTab] = useState<TabType>("all");
   const [contactPersons, setContactPersons] = useState<ContactPersonData[]>([]);
+  const [decisionMakers, setDecisionMakers] = useState<ContactPersonData[]>([]);
   const [starBusinessesWithoutContacts, setStarBusinessesWithoutContacts] =
     useState<StarBusinessWithoutContactData[]>([]);
   const [allStarBusinesses, setAllStarBusinesses] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingDecisionMakers, setLoadingDecisionMakers] = useState(false);
   const [loadingBusinesses, setLoadingBusinesses] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [decisionMakersPage, setDecisionMakersPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [decisionMakersTotalPages, setDecisionMakersTotalPages] = useState(1);
   const [totalRecords, setTotalRecords] = useState(0);
+  const [decisionMakersTotalRecords, setDecisionMakersTotalRecords] =
+    useState(0);
   const [selectedContacts, setSelectedContacts] = useState<Set<string>>(
     new Set()
   );
@@ -75,11 +81,22 @@ const ContactPersonsPage: React.FC = () => {
   const [businessSearchTerm, setBusinessSearchTerm] = useState("");
   const [businessesWithoutContactsCount, setBusinessesWithoutContactsCount] =
     useState(0);
+  const [editModeEnabled, setEditModeEnabled] = useState(false);
 
   const itemsPerPage = 20;
 
   // Filter state - simplified
-  const [filters, setFilters] = useState<ContactPersonFilters>({
+  const [filters, setFilters] = useState<any>({
+    search: "",
+    position: "" as any,
+    stateLinkedIn: "" as any,
+    contact: "" as any,
+    page: 1,
+    limit: itemsPerPage,
+  });
+
+  // Decision Makers filter state
+  const [decisionMakersFilters, setDecisionMakersFilters] = useState<any>({
     search: "",
     position: "" as any,
     stateLinkedIn: "" as any,
@@ -127,6 +144,34 @@ const ContactPersonsPage: React.FC = () => {
     }
   }, [filters, currentPage]);
 
+  // Fetch decision makers
+  const fetchDecisionMakers = useCallback(async () => {
+    setLoadingDecisionMakers(true);
+    try {
+      const response = await getAllContactPersons({
+        ...decisionMakersFilters,
+        page: decisionMakersPage,
+        limit: itemsPerPage,
+        isDecisionMaker: true,
+      });
+
+      if (response?.data) {
+        const decisionMakers = (response.data.contactPersons || []).filter(
+          (contact: any) => contact.isDecisionMaker === true
+        );
+        setDecisionMakers(decisionMakers);
+        setDecisionMakersTotalRecords(
+          response.data.pagination?.total || decisionMakers.length
+        );
+        setDecisionMakersTotalPages(response.data.pagination?.totalPages || 1);
+      }
+    } catch (error) {
+      console.error("Error fetching decision makers:", error);
+    } finally {
+      setLoadingDecisionMakers(false);
+    }
+  }, [decisionMakersFilters, decisionMakersPage]);
+
   // Fetch star businesses without contacts
   const fetchStarBusinessesWithoutContacts = async () => {
     setLoadingBusinesses(true);
@@ -170,10 +215,43 @@ const ContactPersonsPage: React.FC = () => {
     }
   };
 
-  // Handle edit contact - populate form with existing data
+  // Handle contact person click - open modal in view mode
+  const handleContactPersonClick = (contact: ContactPersonData) => {
+    setModalMode("edit");
+    setEditingContactId(contact.id);
+    setEditModeEnabled(false); // Start in view mode
+
+    // Populate form with contact data
+    setCreateForm({
+      starBusinessDetailsId: contact.starBusinessDetailsId || "",
+      name: contact.name || "",
+      familyName: contact.familyName || "",
+      sex: contact.sex || "",
+      position: contact.position || "",
+      positionOthers: contact.positionOthers || "",
+      email: contact.email || "",
+      phone: contact.phone || "",
+      linkedInLink: contact.linkedInLink || "",
+      stateLinkedIn: contact.stateLinkedIn || "open",
+      contact: contact.contact || "",
+      note: contact.note || "",
+      noteContactPreference: contact.noteContactPreference || "",
+    });
+
+    // Set the selected business if it exists
+    if (contact.starBusinessDetailsId) {
+      setSelectedBusiness(contact.starBusinessDetailsId);
+    }
+
+    // Open the modal
+    setShowCreateModal(true);
+  };
+
+  // Handle edit contact - open modal in edit mode
   const handleEditContact = (contact: ContactPersonData) => {
     setModalMode("edit");
     setEditingContactId(contact.id);
+    setEditModeEnabled(true); // Start in edit mode
 
     // Populate form with contact data
     setCreateForm({
@@ -206,6 +284,9 @@ const ContactPersonsPage: React.FC = () => {
     try {
       await deleteContactPerson(contactId);
       fetchContactPersons(); // Refresh the list
+      if (activeTab === "sales") {
+        fetchDecisionMakers(); // Refresh decision makers list
+      }
     } catch (error) {
       console.error("Error deleting contact:", error);
       toast.error("Failed to delete contact");
@@ -216,10 +297,12 @@ const ContactPersonsPage: React.FC = () => {
     if (activeTab === "all") {
       fetchContactPersons();
       fetchStatistics();
-    } else {
+    } else if (activeTab === "no-contacts") {
       fetchStarBusinessesWithoutContacts();
+    } else if (activeTab === "sales") {
+      fetchDecisionMakers();
     }
-  }, [activeTab, fetchContactPersons]);
+  }, [activeTab, fetchContactPersons, fetchDecisionMakers]);
 
   // Fetch star businesses when modal opens
   useEffect(() => {
@@ -236,6 +319,9 @@ const ContactPersonsPage: React.FC = () => {
     try {
       await updateContactLinkedInState(contactId, newState);
       fetchContactPersons(); // Refresh the list
+      if (activeTab === "sales") {
+        fetchDecisionMakers(); // Refresh decision makers list
+      }
     } catch (error) {
       console.error("Error updating LinkedIn state:", error);
       toast.error("Failed to update LinkedIn state");
@@ -306,6 +392,7 @@ const ContactPersonsPage: React.FC = () => {
       setShowCreateModal(false);
       setModalMode("create");
       setEditingContactId(null);
+      setEditModeEnabled(false);
 
       // Refresh the list
       fetchContactPersons();
@@ -313,6 +400,11 @@ const ContactPersonsPage: React.FC = () => {
       // Refresh businesses without contacts if we were adding from that tab
       if (activeTab === "no-contacts") {
         fetchStarBusinessesWithoutContacts();
+      }
+
+      // Refresh decision makers if we're on sales tab
+      if (activeTab === "sales") {
+        fetchDecisionMakers();
       }
     } catch (error) {
       console.error(
@@ -324,8 +416,6 @@ const ContactPersonsPage: React.FC = () => {
       );
     }
   };
-
-  // Quick add contact
 
   // Reset form
   const resetCreateForm = () => {
@@ -345,6 +435,7 @@ const ContactPersonsPage: React.FC = () => {
       noteContactPreference: "",
     });
     setSelectedBusiness(null);
+    setEditModeEnabled(false);
   };
 
   // Format date
@@ -376,6 +467,25 @@ const ContactPersonsPage: React.FC = () => {
     return position;
   };
 
+  // Render note icons
+  const renderNoteIcons = (note: any) => {
+    if (!note) return null;
+
+    return (
+      <div className="flex gap-1">
+        <span className="text-blue-500" title="Contact Note">
+          📞
+        </span>
+        <span className="text-green-500" title="Preference Note">
+          ⭐
+        </span>
+        <span className="text-purple-500" title="Sales Note">
+          💰
+        </span>
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 p-8">
       <div className="max-w-7xl mx-auto">
@@ -388,69 +498,6 @@ const ContactPersonsPage: React.FC = () => {
             Manage and track all contact persons across star businesses
           </p>
         </div>
-
-        {/* Statistics */}
-        {activeTab === "all" && statistics && (
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-            <div className="bg-white/80 backdrop-blur-sm rounded-xl p-6 shadow-lg border border-gray-100/50">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Total Contacts</p>
-                  <p className="text-3xl font-bold text-gray-900 mt-1">
-                    {statistics.totalContacts || 0}
-                  </p>
-                </div>
-                <div className="bg-blue-100 p-3 rounded-lg">
-                  <Users className="h-6 w-6 text-blue-600" />
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white/80 backdrop-blur-sm rounded-xl p-6 shadow-lg border border-gray-100/50">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">LinkedIn Connected</p>
-                  <p className="text-3xl font-bold text-gray-900 mt-1">
-                    {statistics.linkedInConnected || 0}
-                  </p>
-                </div>
-                <div className="bg-green-100 p-3 rounded-lg">
-                  <Linkedin className="h-6 w-6 text-green-600" />
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white/80 backdrop-blur-sm rounded-xl p-6 shadow-lg border border-gray-100/50">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">
-                    Businesses with Contacts
-                  </p>
-                  <p className="text-3xl font-bold text-gray-900 mt-1">
-                    {statistics.businessesWithContacts || 0}
-                  </p>
-                </div>
-                <div className="bg-purple-100 p-3 rounded-lg">
-                  <Building2 className="h-6 w-6 text-purple-600" />
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white/80 backdrop-blur-sm rounded-xl p-6 shadow-lg border border-gray-100/50">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Pending Connections</p>
-                  <p className="text-3xl font-bold text-gray-900 mt-1">
-                    {statistics.pendingConnections || 0}
-                  </p>
-                </div>
-                <div className="bg-yellow-100 p-3 rounded-lg">
-                  <UserCheck className="h-6 w-6 text-yellow-600" />
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Tabs */}
         <div className="border-b border-gray-200 mb-6">
@@ -471,6 +518,21 @@ const ContactPersonsPage: React.FC = () => {
               )}
             </button>
             <button
+              onClick={() => setActiveTab("sales")}
+              className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
+                activeTab === "sales"
+                  ? "border-gray-500 text-gray-600"
+                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+              }`}
+            >
+              Sales View
+              {decisionMakersTotalRecords > 0 && (
+                <span className="ml-2 bg-blue-100 text-blue-600 px-2 py-1 rounded-full text-xs">
+                  {decisionMakersTotalRecords}
+                </span>
+              )}
+            </button>
+            <button
               onClick={() => setActiveTab("no-contacts")}
               className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
                 activeTab === "no-contacts"
@@ -478,7 +540,7 @@ const ContactPersonsPage: React.FC = () => {
                   : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
               }`}
             >
-              Businesses Without Contacts
+              STARS Without Contacts
               {businessesWithoutContactsCount > 0 && (
                 <span className="ml-2 bg-orange-100 text-orange-600 px-2 py-1 rounded-full text-xs">
                   {businessesWithoutContactsCount}
@@ -681,10 +743,10 @@ const ContactPersonsPage: React.FC = () => {
                     <thead className="bg-gray-50/50 border-b border-gray-200/50">
                       <tr>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Name
+                          Business
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Business
+                          Name
                         </th>
                         <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Position
@@ -707,8 +769,18 @@ const ContactPersonsPage: React.FC = () => {
                       {contactPersons.map((contact) => (
                         <tr
                           key={contact.id}
-                          className="hover:bg-gray-50/50 transition-colors"
+                          className="hover:bg-gray-50/50 transition-colors cursor-pointer"
+                          onClick={() => handleContactPersonClick(contact)}
                         >
+                          <td className="px-6 py-4">
+                            <a
+                              href={`/bussinesses/new?businessId=${contact.businessId}`}
+                              className="text-sm text-blue-600 hover:text-blue-800 text-left"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {contact.businessName || "-"}
+                            </a>
+                          </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div>
                               <div className="text-sm font-medium text-gray-900">
@@ -720,16 +792,6 @@ const ContactPersonsPage: React.FC = () => {
                                 </div>
                               )}
                             </div>
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="text-sm text-gray-900">
-                              {contact.businessName || "-"}
-                            </div>
-                            {/* {contact.city && (
-                              <div className="text-xs text-gray-500">
-                                {contact.city}
-                              </div>
-                            )} */}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm text-gray-900">
@@ -745,6 +807,7 @@ const ContactPersonsPage: React.FC = () => {
                                 <a
                                   href={`mailto:${contact.email}`}
                                   className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800"
+                                  onClick={(e) => e.stopPropagation()}
                                 >
                                   <EnvelopeIcon className="h-3 w-3" />
                                   {contact.email}
@@ -754,6 +817,7 @@ const ContactPersonsPage: React.FC = () => {
                                 <a
                                   href={`tel:${contact.phone}`}
                                   className="flex items-center gap-1 text-xs text-gray-600"
+                                  onClick={(e) => e.stopPropagation()}
                                 >
                                   <PhoneIcon className="h-3 w-3" />
                                   {contact.phone}
@@ -764,15 +828,17 @@ const ContactPersonsPage: React.FC = () => {
                           <td className="px-6 py-4 w-[100px] whitespace-nowrap">
                             <select
                               value={contact.stateLinkedIn}
-                              onChange={(e) =>
+                              onChange={(e) => {
+                                e.stopPropagation();
                                 handleUpdateLinkedInState(
                                   contact.id,
                                   e.target.value
-                                )
-                              }
+                                );
+                              }}
                               className={`text-xs px-2 w-max max-w-[150px] truncate mr-4 py-1 rounded-full font-medium border-0 cursor-pointer ${getLinkedInStateColor(
                                 contact.stateLinkedIn
                               )}`}
+                              onClick={(e) => e.stopPropagation()}
                             >
                               {LINKEDIN_STATES.map((state: any) => (
                                 <option key={state.value} value={state.value}>
@@ -786,6 +852,7 @@ const ContactPersonsPage: React.FC = () => {
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="mt-1 inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800"
+                                onClick={(e) => e.stopPropagation()}
                               >
                                 <Linkedin className="h-3 w-3" />
                                 Profile
@@ -802,7 +869,8 @@ const ContactPersonsPage: React.FC = () => {
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="flex items-center gap-2">
                               <button
-                                onClick={() => {
+                                onClick={(e) => {
+                                  e.stopPropagation();
                                   const searchQuery = encodeURIComponent(
                                     `${contact.businessName}`.trim()
                                   );
@@ -816,9 +884,9 @@ const ContactPersonsPage: React.FC = () => {
                               >
                                 <Google sx={{ fontSize: 18 }} />
                               </button>
-                              {/* LinkedIn Button */}
                               <button
-                                onClick={() => {
+                                onClick={(e) => {
+                                  e.stopPropagation();
                                   const searchQuery = encodeURIComponent(
                                     `${contact.businessName} linkedin`.trim()
                                   );
@@ -832,15 +900,19 @@ const ContactPersonsPage: React.FC = () => {
                               >
                                 <LinkedIn sx={{ fontSize: 18 }} />
                               </button>
-                              <button
-                                onClick={() => handleEditContact(contact)}
+                              {/* <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleEditContact(contact);
+                                }}
                                 className="text-blue-600 hover:text-blue-800 transition-colors"
                                 title="Edit contact"
                               >
                                 <PencilIcon className="h-4 w-4" />
                               </button>
                               <button
-                                onClick={() => {
+                                onClick={(e) => {
+                                  e.stopPropagation();
                                   if (
                                     confirm(
                                       "Are you sure you want to delete this contact?"
@@ -853,8 +925,7 @@ const ContactPersonsPage: React.FC = () => {
                                 title="Delete contact"
                               >
                                 <XMarkIcon className="h-4 w-4" />
-                              </button>
-                              {/* Google Search Button */}
+                              </button> */}
                             </div>
                           </td>
                         </tr>
@@ -936,6 +1007,330 @@ const ContactPersonsPage: React.FC = () => {
           </>
         )}
 
+        {/* Sales View Tab */}
+        {activeTab === "sales" && (
+          <>
+            {/* Filters & Actions */}
+            <div className="bg-white/80 backdrop-blur-sm rounded-xl shadow-lg border border-gray-100/50 mb-6">
+              <div className="p-6">
+                <div className="flex flex-col lg:flex-row gap-4 items-center justify-between">
+                  {/* Search */}
+                  <div className="w-full lg:w-96 relative">
+                    <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                    <input
+                      type="text"
+                      placeholder="Search decision makers by name, email, or company..."
+                      value={decisionMakersFilters.search}
+                      onChange={(e) =>
+                        setDecisionMakersFilters({
+                          ...decisionMakersFilters,
+                          search: e.target.value,
+                        })
+                      }
+                      className="w-full pl-10 pr-4 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all"
+                    />
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex gap-3">
+                    <button
+                      onClick={fetchDecisionMakers}
+                      disabled={loadingDecisionMakers}
+                      className="px-4 py-2 text-gray-700 bg-white/80 backdrop-blur-sm border border-gray-300/80 rounded-lg hover:bg-white/60 transition-all flex items-center gap-2 disabled:opacity-50"
+                    >
+                      <ArrowPathIcon
+                        className={`h-5 w-5 ${
+                          loadingDecisionMakers ? "animate-spin" : ""
+                        }`}
+                      />
+                      Refresh
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Decision Makers Table */}
+            <div className="bg-white/80 backdrop-blur-sm rounded-xl shadow-lg border border-gray-100/50 overflow-hidden">
+              {loadingDecisionMakers ? (
+                <div className="p-12 text-center">
+                  <div className="inline-flex items-center gap-3">
+                    <ArrowPathIcon className="h-6 w-6 animate-spin text-gray-500" />
+                    <span className="text-gray-600">
+                      Loading decision makers...
+                    </span>
+                  </div>
+                </div>
+              ) : decisionMakers.length === 0 ? (
+                <div className="p-12 text-center">
+                  <UserCheck className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <p className="text-gray-600 text-lg">
+                    No decision makers found
+                  </p>
+                  <p className="text-gray-500 text-sm mt-2">
+                    Decision makers are contacts with isDecisionMaker set to
+                    true
+                  </p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-gray-50/50 border-b border-gray-200/50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Business
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Name
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Position
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Contact
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Type
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Decision Maker State
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Note
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Actions
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200/50">
+                      {decisionMakers.map((contact) => (
+                        <tr
+                          key={contact.id}
+                          className="hover:bg-gray-50/50 transition-colors cursor-pointer"
+                          onClick={() => handleContactPersonClick(contact)}
+                        >
+                          <td className="px-6 py-4">
+                            <a
+                              href={`/bussinesses/new?businessId=${contact.businessId}`}
+                              className="text-sm text-blue-600 hover:text-blue-800 text-left"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {contact.businessName || "-"}
+                            </a>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleContactPersonClick(contact);
+                              }}
+                              className="text-sm font-medium text-gray-900 text-left"
+                            >
+                              {contact.name} {contact.familyName}
+                            </button>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleContactPersonClick(contact);
+                              }}
+                              className="text-sm text-gray-900 hover:text-blue-600 text-left"
+                            >
+                              {getPositionLabel(
+                                contact.position,
+                                contact.positionOthers
+                              )}
+                            </button>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="space-y-1">
+                              {contact.email && (
+                                <a
+                                  href={`mailto:${contact.email}`}
+                                  className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <EnvelopeIcon className="h-3 w-3" />
+                                  {contact.email}
+                                </a>
+                              )}
+                              {contact.phone && (
+                                <a
+                                  href={`tel:${contact.phone}`}
+                                  className="flex items-center gap-1 text-xs text-gray-600"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <PhoneIcon className="h-3 w-3" />
+                                  {contact.phone}
+                                </a>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleContactPersonClick(contact);
+                              }}
+                              className="text-sm text-gray-900 hover:text-blue-600 text-left"
+                            >
+                              {contact.contact && (
+                                <span className="inline-flex text-xs px-2 py-1 rounded-full bg-indigo-100 text-indigo-800">
+                                  {contact.contact}
+                                </span>
+                              )}
+                            </button>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <select
+                              value={contact.stateLinkedIn}
+                              onChange={(e) => {
+                                e.stopPropagation();
+                                handleUpdateLinkedInState(
+                                  contact.id,
+                                  e.target.value
+                                );
+                              }}
+                              className={`text-xs px-2 w-max max-w-[150px] truncate py-1 rounded-full font-medium border-0 cursor-pointer ${getLinkedInStateColor(
+                                contact.stateLinkedIn
+                              )}`}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {LINKEDIN_STATES.map((state: any) => (
+                                <option key={state.value} value={state.value}>
+                                  {state.label}
+                                </option>
+                              ))}
+                            </select>
+                          </td>
+                          <td className="px-6 py-4">
+                            {renderNoteIcons(contact.note)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const searchQuery = encodeURIComponent(
+                                    `${contact.businessName}`.trim()
+                                  );
+                                  window.open(
+                                    `https://www.google.com/search?q=${searchQuery}`,
+                                    "_blank"
+                                  );
+                                }}
+                                className="text-green-600 hover:text-green-800 transition-colors"
+                                title="Google Search"
+                              >
+                                <Google sx={{ fontSize: 18 }} />
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleEditContact(contact);
+                                }}
+                                className="text-blue-600 hover:text-blue-800 transition-colors"
+                                title="Edit contact"
+                              >
+                                <PencilIcon className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* Pagination */}
+              {decisionMakersTotalPages > 1 && (
+                <div className="px-6 py-4 bg-gray-50/50 border-t border-gray-200/50 flex items-center justify-between">
+                  <div className="text-sm text-gray-700">
+                    Showing {(decisionMakersPage - 1) * itemsPerPage + 1} to{" "}
+                    {Math.min(
+                      decisionMakersPage * itemsPerPage,
+                      decisionMakersTotalRecords
+                    )}{" "}
+                    of {decisionMakersTotalRecords} results
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() =>
+                        setDecisionMakersPage(
+                          Math.max(1, decisionMakersPage - 1)
+                        )
+                      }
+                      disabled={decisionMakersPage === 1}
+                      className="px-3 py-1 text-sm bg-white/80 backdrop-blur-sm border border-gray-300/80 rounded-lg hover:bg-white/60 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-1"
+                    >
+                      <ChevronLeftIcon className="h-4 w-4" />
+                      Previous
+                    </button>
+                    <div className="flex items-center gap-1">
+                      {[...Array(Math.min(5, decisionMakersTotalPages))].map(
+                        (_, i) => {
+                          const pageNum = i + 1;
+                          if (decisionMakersTotalPages <= 5) {
+                            return (
+                              <button
+                                key={pageNum}
+                                onClick={() => setDecisionMakersPage(pageNum)}
+                                className={`px-3 py-1 text-sm rounded-lg transition-all ${
+                                  decisionMakersPage === pageNum
+                                    ? "bg-gray-600 text-white"
+                                    : "bg-white/80 backdrop-blur-sm border border-gray-300/80 hover:bg-white/60"
+                                }`}
+                              >
+                                {pageNum}
+                              </button>
+                            );
+                          }
+                          return null;
+                        }
+                      )}
+                      {decisionMakersTotalPages > 5 && (
+                        <span className="px-2 text-gray-500">...</span>
+                      )}
+                      {decisionMakersTotalPages > 5 && (
+                        <button
+                          onClick={() =>
+                            setDecisionMakersPage(decisionMakersTotalPages)
+                          }
+                          className={`px-3 py-1 text-sm rounded-lg transition-all ${
+                            decisionMakersPage === decisionMakersTotalPages
+                              ? "bg-gray-600 text-white"
+                              : "bg-white/80 backdrop-blur-sm border border-gray-300/80 hover:bg-white/60"
+                          }`}
+                        >
+                          {decisionMakersTotalPages}
+                        </button>
+                      )}
+                    </div>
+                    <button
+                      onClick={() =>
+                        setDecisionMakersPage(
+                          Math.min(
+                            decisionMakersTotalPages,
+                            decisionMakersPage + 1
+                          )
+                        )
+                      }
+                      disabled={decisionMakersPage === decisionMakersTotalPages}
+                      className="px-3 py-1 text-sm bg-white/80 backdrop-blur-sm border border-gray-300/80 rounded-lg hover:bg-white/60 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-1"
+                    >
+                      Next
+                      <ChevronRightIcon className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
         {/* Businesses Without Contacts Tab */}
         {activeTab === "no-contacts" && (
           <div className="bg-white/80 backdrop-blur-sm rounded-xl shadow-lg border border-gray-100/50">
@@ -988,9 +1383,12 @@ const ContactPersonsPage: React.FC = () => {
                         className="hover:bg-gray-50/50 transition-colors"
                       >
                         <td className="px-6 py-4">
-                          <div className="text-sm font-medium text-gray-900">
+                          <a
+                            href={`/bussinesses/new?businessId=${business.id}`}
+                            className="text-sm text-blue-600 hover:text-blue-800 text-left"
+                          >
                             {business.companyName}
-                          </div>
+                          </a>
                         </td>
                         <td className="px-6 py-4">
                           <div className="text-sm text-gray-900">
@@ -1071,6 +1469,36 @@ const ContactPersonsPage: React.FC = () => {
                   </button>
                 </div>
 
+                {/* Edit Mode Switch - Only show in edit mode */}
+                {modalMode === "edit" && (
+                  <div className="mb-6 flex items-center justify-between bg-gray-50 rounded-lg p-4">
+                    <span className="text-sm font-medium text-gray-700">
+                      Edit Mode
+                    </span>
+                    <div className="flex items-center">
+                      <span className="text-sm text-gray-500 mr-3">
+                        {editModeEnabled ? "Enabled" : "Disabled"}
+                      </span>
+                      <button
+                        type="button"
+                        className={`${
+                          editModeEnabled ? "bg-gray-600" : "bg-gray-200"
+                        } relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2`}
+                        role="switch"
+                        aria-checked={editModeEnabled}
+                        onClick={() => setEditModeEnabled(!editModeEnabled)}
+                      >
+                        <span
+                          aria-hidden="true"
+                          className={`${
+                            editModeEnabled ? "translate-x-5" : "translate-x-0"
+                          } pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out`}
+                        />
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 <div className="space-y-6">
                   {/* Business Selection */}
                   {!selectedBusiness && (
@@ -1087,7 +1515,8 @@ const ContactPersonsPage: React.FC = () => {
                             setBusinessSearchTerm(e.target.value);
                             fetchAllStarBusinesses(e.target.value);
                           }}
-                          className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all"
+                          disabled={modalMode === "edit" && !editModeEnabled}
+                          className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
                         />
                         {allStarBusinesses.length > 0 && (
                           <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto z-10">
@@ -1170,8 +1599,9 @@ const ContactPersonsPage: React.FC = () => {
                         onChange={(e) =>
                           setCreateForm({ ...createForm, name: e.target.value })
                         }
-                        className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all"
-                        placeholder="John"
+                        disabled={modalMode === "edit" && !editModeEnabled}
+                        className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                        placeholder="Peter"
                       />
                     </div>
                     <div>
@@ -1187,8 +1617,9 @@ const ContactPersonsPage: React.FC = () => {
                             familyName: e.target.value,
                           })
                         }
-                        className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all"
-                        placeholder="Doe"
+                        disabled={modalMode === "edit" && !editModeEnabled}
+                        className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                        placeholder="Müller"
                       />
                     </div>
 
@@ -1201,10 +1632,11 @@ const ContactPersonsPage: React.FC = () => {
                         onChange={(e: any) =>
                           setCreateForm({
                             ...createForm,
-                            sex: e.target.value || "male",
+                            sex: e.target.value,
                           })
                         }
-                        className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all"
+                        disabled={modalMode === "edit" && !editModeEnabled}
+                        className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
                       >
                         <option value="">Select Gender</option>
                         {SEX_OPTIONS.map((option) => (
@@ -1227,7 +1659,8 @@ const ContactPersonsPage: React.FC = () => {
                             position: e.target.value as any,
                           })
                         }
-                        className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all"
+                        disabled={modalMode === "edit" && !editModeEnabled}
+                        className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
                       >
                         <option value="">Select Position</option>
                         {POSITIONS.map((pos) => (
@@ -1253,7 +1686,8 @@ const ContactPersonsPage: React.FC = () => {
                               positionOthers: e.target.value,
                             })
                           }
-                          className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all"
+                          disabled={modalMode === "edit" && !editModeEnabled}
+                          className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
                           placeholder="Specify position"
                         />
                       </div>
@@ -1273,7 +1707,8 @@ const ContactPersonsPage: React.FC = () => {
                             email: e.target.value,
                           })
                         }
-                        className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all"
+                        disabled={modalMode === "edit" && !editModeEnabled}
+                        className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
                         placeholder="john.doe@example.com"
                       />
                     </div>
@@ -1290,7 +1725,8 @@ const ContactPersonsPage: React.FC = () => {
                             phone: e.target.value,
                           })
                         }
-                        className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all"
+                        disabled={modalMode === "edit" && !editModeEnabled}
+                        className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
                         placeholder="+49 171 1234567"
                       />
                     </div>
@@ -1309,7 +1745,8 @@ const ContactPersonsPage: React.FC = () => {
                             linkedInLink: e.target.value,
                           })
                         }
-                        className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all"
+                        disabled={modalMode === "edit" && !editModeEnabled}
+                        className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
                         placeholder="https://linkedin.com/in/johndoe"
                       />
                     </div>
@@ -1325,7 +1762,8 @@ const ContactPersonsPage: React.FC = () => {
                             stateLinkedIn: e.target.value as any,
                           })
                         }
-                        className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all"
+                        disabled={modalMode === "edit" && !editModeEnabled}
+                        className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
                       >
                         {LINKEDIN_STATES.map((state: any) => (
                           <option key={state.value} value={state.value}>
@@ -1348,8 +1786,10 @@ const ContactPersonsPage: React.FC = () => {
                             contact: e.target.value as any,
                           })
                         }
-                        className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all"
+                        disabled={modalMode === "edit" && !editModeEnabled}
+                        className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
                       >
+                        <option value="">Select contact type</option>
                         {CONTACT_TYPES.map((type) => (
                           <option key={type.value} value={type.value}>
                             {type.label}
@@ -1372,7 +1812,8 @@ const ContactPersonsPage: React.FC = () => {
                             noteContactPreference: e.target.value,
                           })
                         }
-                        className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all"
+                        disabled={modalMode === "edit" && !editModeEnabled}
+                        className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
                         placeholder="Best time to contact, preferred method, etc."
                       />
                     </div>
@@ -1386,7 +1827,8 @@ const ContactPersonsPage: React.FC = () => {
                           setCreateForm({ ...createForm, note: e.target.value })
                         }
                         rows={3}
-                        className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all"
+                        disabled={modalMode === "edit" && !editModeEnabled}
+                        className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
                         placeholder="Additional notes about this contact..."
                       />
                     </div>
@@ -1402,17 +1844,26 @@ const ContactPersonsPage: React.FC = () => {
                       }}
                       className="px-4 py-2 text-gray-700 bg-white/80 backdrop-blur-sm border border-gray-300/80 rounded-lg hover:bg-white/60 transition-all"
                     >
-                      Cancel
+                      {modalMode === "edit" ? "Close" : "Cancel"}
                     </button>
-                    <CustomButton
-                      gradient={true}
-                      onClick={handleCreateContact}
-                      className="px-4 py-2 bg-gray-600/90 backdrop-blur-sm text-white rounded-lg hover:bg-gray-700/90 transition-all"
-                    >
-                      {modalMode === "edit"
-                        ? "Update Contact Person"
-                        : "Add Contact Person"}
-                    </CustomButton>
+                    {modalMode === "edit" && editModeEnabled && (
+                      <CustomButton
+                        gradient={true}
+                        onClick={handleCreateContact}
+                        className="px-4 py-2 bg-gray-600/90 backdrop-blur-sm text-white rounded-lg hover:bg-gray-700/90 transition-all"
+                      >
+                        Update Contact Person
+                      </CustomButton>
+                    )}
+                    {modalMode === "create" && (
+                      <CustomButton
+                        gradient={true}
+                        onClick={handleCreateContact}
+                        className="px-4 py-2 bg-gray-600/90 backdrop-blur-sm text-white rounded-lg hover:bg-gray-700/90 transition-all"
+                      >
+                        Add Contact Person
+                      </CustomButton>
+                    )}
                   </div>
                 </div>
               </div>

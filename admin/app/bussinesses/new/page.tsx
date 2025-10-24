@@ -1109,65 +1109,6 @@ const AddEditBusinessManual: React.FC = () => {
                       undefined,
                       handleStarBusinessChange // Use the correct handler
                     )}
-                    {renderField(
-                      "Last Checked",
-                      formData.starBusinessDetails?.lastChecked,
-                      "starBusinessDetails.lastChecked",
-                      false,
-                      "date",
-                      undefined,
-                      <CalendarIcon className="w-5 h-5" />
-                    )}
-                    {/* Special handling for Checked By field */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Checked By{" "}
-                        {!isViewMode && <span className="text-red-500">*</span>}
-                      </label>
-                      {isViewMode ? (
-                        <div className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg flex items-center gap-3">
-                          <UserIcon className="w-5 h-5 text-gray-400" />
-                          <span className="text-gray-700">
-                            {formData.starBusinessDetails?.checkedBy ===
-                            "manual"
-                              ? "Manual"
-                              : formData.starBusinessDetails?.checkedBy === "AI"
-                              ? "AI"
-                              : "-"}
-                          </span>
-                        </div>
-                      ) : (
-                        <div className="relative">
-                          <UserIcon className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                          <select
-                            name="starBusinessDetails.checkedBy"
-                            value={
-                              formData.starBusinessDetails?.checkedBy || ""
-                            }
-                            onChange={(e) =>
-                              handleStarBusinessChange(
-                                "checkedBy",
-                                e.target.value || undefined
-                              )
-                            }
-                            className={`w-full pl-10 pr-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 transition-all ${
-                              formErrors["starBusinessDetails.checkedBy"]
-                                ? "border-red-500"
-                                : "border-gray-200"
-                            }`}
-                          >
-                            <option value="">Select who checked</option>
-                            <option value="manual">Manual</option>
-                            <option value="AI">AI</option>
-                          </select>
-                          {formErrors["starBusinessDetails.checkedBy"] && (
-                            <p className="mt-1 text-sm text-red-500">
-                              {formErrors["starBusinessDetails.checkedBy"]}
-                            </p>
-                          )}
-                        </div>
-                      )}
-                    </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Device <span className="text-red-500">*</span>
@@ -1196,6 +1137,67 @@ const AddEditBusinessManual: React.FC = () => {
                         </p>
                       )}
                     </div>
+
+                    {/* Special handling for Checked By field */}
+                    {/* <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Checked By{" "}
+                          {!isViewMode && <span className="text-red-500">*</span>}
+                        </label>
+                        {isViewMode ? (
+                          <div className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg flex items-center gap-3">
+                            <UserIcon className="w-5 h-5 text-gray-400" />
+                            <span className="text-gray-700">
+                              {formData.starBusinessDetails?.checkedBy ===
+                              "manual"
+                                ? "Manual"
+                                : formData.starBusinessDetails?.checkedBy === "AI"
+                                ? "AI"
+                                : "-"}
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="relative">
+                            <UserIcon className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                            <select
+                              name="starBusinessDetails.checkedBy"
+                              value={
+                                formData.starBusinessDetails?.checkedBy || ""
+                              }
+                              onChange={(e) =>
+                                handleStarBusinessChange(
+                                  "checkedBy",
+                                  e.target.value || undefined
+                                )
+                              }
+                              className={`w-full pl-10 pr-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 transition-all ${
+                                formErrors["starBusinessDetails.checkedBy"]
+                                  ? "border-red-500"
+                                  : "border-gray-200"
+                              }`}
+                            >
+                              <option value="">Select who checked</option>
+                              <option value="manual">Manual</option>
+                              <option value="AI">AI</option>
+                            </select>
+                            {formErrors["starBusinessDetails.checkedBy"] && (
+                              <p className="mt-1 text-sm text-red-500">
+                                {formErrors["starBusinessDetails.checkedBy"]}
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {renderField(
+                        "Last Checked",
+                        formData.starBusinessDetails?.lastChecked,
+                        "starBusinessDetails.lastChecked",
+                        false,
+                        "date",
+                        undefined,
+                        <CalendarIcon className="w-5 h-5" />
+                      )} */}
 
                     {/* New View-Only Fields in Star Business Details */}
                     {(isEditMode || isViewMode) &&
@@ -1282,23 +1284,26 @@ const AddEditBusinessManual: React.FC = () => {
                     </div>
                   )}
                   {(isStarCustomer ||
-                    (isViewMode && formData.starCustomerEmail)) &&
-                    renderField(
-                      "Customer Email",
-                      formData.starCustomerEmail,
-                      "starCustomerEmail",
-                      true,
-                      "email",
-                      "customer@example.com",
-                      <EnvelopeIcon className="w-5 h-5" />
-                    )}
-                  {renderField(
-                    "Display Name",
-                    formData.displayName,
-                    "displayName",
-                    false,
-                    "text",
-                    "Display name (what customers see)"
+                    (isViewMode && formData.starCustomerEmail)) && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {renderField(
+                        "Customer Email",
+                        formData.starCustomerEmail,
+                        "starCustomerEmail",
+                        true,
+                        "email",
+                        "customer@example.com",
+                        <EnvelopeIcon className="w-5 h-5" />
+                      )}
+                      {renderField(
+                        "Display Name",
+                        formData.displayName,
+                        "displayName",
+                        false,
+                        "text",
+                        "Display name (what customers see)"
+                      )}
+                    </div>
                   )}
                 </div>
               </div>

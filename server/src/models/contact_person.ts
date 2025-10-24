@@ -9,7 +9,7 @@ import {
 } from "typeorm";
 import { StarBusinessDetails } from "./star_business_details";
 
-export type Sex = "male" | "female" | "";
+export type Sex = "male" | "female" | "Not Specified";
 export type Position =
   | "Einkauf"
   | "Entwickler"
@@ -44,8 +44,8 @@ export class ContactPerson {
 
   @Column({
     type: "enum",
-    enum: ["male", "female", ""],
-    default: "",
+    enum: ["male", "female", "Not Specified"],
+    default: "Not Specified",
   })
   sex!: Sex;
 
@@ -130,6 +130,9 @@ export class ContactPerson {
     default: "",
   })
   contact!: ContactType;
+
+  @Column({ type: "boolean", default: false })
+  isDecisionMaker!: boolean;
 
   @Column({ type: "text", nullable: true })
   note!: string;
