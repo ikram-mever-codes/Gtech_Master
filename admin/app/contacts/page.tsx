@@ -53,7 +53,7 @@ const ContactPersonsPage: React.FC = () => {
   const router = useRouter();
 
   // State management
-  const [activeTab, setActiveTab] = useState<TabType>("all");
+  const [activeTab, setActiveTab] = useState<TabType>("no-contacts");
   const [contactPersons, setContactPersons] = useState<ContactPersonData[]>([]);
   const [decisionMakers, setDecisionMakers] = useState<ContactPersonData[]>([]);
   const [starBusinessesWithoutContacts, setStarBusinessesWithoutContacts] =
@@ -503,6 +503,21 @@ const ContactPersonsPage: React.FC = () => {
         <div className="border-b border-gray-200 mb-6">
           <nav className="-mb-px flex space-x-8">
             <button
+              onClick={() => setActiveTab("no-contacts")}
+              className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
+                activeTab === "no-contacts"
+                  ? "border-gray-500 text-gray-600"
+                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+              }`}
+            >
+              STARS Without Contacts
+              {businessesWithoutContactsCount > 0 && (
+                <span className="ml-2 bg-orange-100 text-orange-600 px-2 py-1 rounded-full text-xs">
+                  {businessesWithoutContactsCount}
+                </span>
+              )}
+            </button>
+            <button
               onClick={() => setActiveTab("all")}
               className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
                 activeTab === "all"
@@ -529,21 +544,6 @@ const ContactPersonsPage: React.FC = () => {
               {decisionMakersTotalRecords > 0 && (
                 <span className="ml-2 bg-blue-100 text-blue-600 px-2 py-1 rounded-full text-xs">
                   {decisionMakersTotalRecords}
-                </span>
-              )}
-            </button>
-            <button
-              onClick={() => setActiveTab("no-contacts")}
-              className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
-                activeTab === "no-contacts"
-                  ? "border-gray-500 text-gray-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-              }`}
-            >
-              STARS Without Contacts
-              {businessesWithoutContactsCount > 0 && (
-                <span className="ml-2 bg-orange-100 text-orange-600 px-2 py-1 rounded-full text-xs">
-                  {businessesWithoutContactsCount}
                 </span>
               )}
             </button>
@@ -1509,7 +1509,7 @@ const ContactPersonsPage: React.FC = () => {
                       <div className="relative">
                         <input
                           type="text"
-                          placeholder="Search for a business..."
+                          placeholder="Geschäft suchen..."
                           value={businessSearchTerm}
                           onChange={(e) => {
                             setBusinessSearchTerm(e.target.value);
@@ -1638,7 +1638,7 @@ const ContactPersonsPage: React.FC = () => {
                         disabled={modalMode === "edit" && !editModeEnabled}
                         className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
                       >
-                        <option value="">Select Gender</option>
+                        <option value="">Geschlecht auswählen</option>
                         {SEX_OPTIONS.map((option) => (
                           <option key={option.value} value={option.value}>
                             {option.label}
@@ -1662,7 +1662,7 @@ const ContactPersonsPage: React.FC = () => {
                         disabled={modalMode === "edit" && !editModeEnabled}
                         className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
                       >
-                        <option value="">Select Position</option>
+                        <option value="">Position auswählen</option>
                         {POSITIONS.map((pos) => (
                           <option key={pos.value} value={pos.value}>
                             {pos.label}
@@ -1688,7 +1688,7 @@ const ContactPersonsPage: React.FC = () => {
                           }
                           disabled={modalMode === "edit" && !editModeEnabled}
                           className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                          placeholder="Specify position"
+                          placeholder="Position beschreiben"
                         />
                       </div>
                     )}
@@ -1709,7 +1709,7 @@ const ContactPersonsPage: React.FC = () => {
                         }
                         disabled={modalMode === "edit" && !editModeEnabled}
                         className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                        placeholder="john.doe@example.com"
+                        placeholder="max.mustermann@beispiel.de"
                       />
                     </div>
                     <div>
@@ -1747,7 +1747,7 @@ const ContactPersonsPage: React.FC = () => {
                         }
                         disabled={modalMode === "edit" && !editModeEnabled}
                         className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                        placeholder="https://linkedin.com/in/johndoe"
+                        placeholder="https://linkedin.com/in/maxmustermann"
                       />
                     </div>
                     <div>
@@ -1789,7 +1789,7 @@ const ContactPersonsPage: React.FC = () => {
                         disabled={modalMode === "edit" && !editModeEnabled}
                         className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
                       >
-                        <option value="">Select contact type</option>
+                        <option value="">Kontaktart auswählen</option>
                         {CONTACT_TYPES.map((type) => (
                           <option key={type.value} value={type.value}>
                             {type.label}
@@ -1814,7 +1814,7 @@ const ContactPersonsPage: React.FC = () => {
                         }
                         disabled={modalMode === "edit" && !editModeEnabled}
                         className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                        placeholder="Best time to contact, preferred method, etc."
+                        placeholder="Beste Erreichbarkeit, bevorzugte Kontaktmethode, etc."
                       />
                     </div>
                     <div className="col-span-2">
@@ -1829,7 +1829,7 @@ const ContactPersonsPage: React.FC = () => {
                         rows={3}
                         disabled={modalMode === "edit" && !editModeEnabled}
                         className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                        placeholder="Additional notes about this contact..."
+                        placeholder="Zusätzliche Notizen zu diesem Kontakt..."
                       />
                     </div>
                   </div>
