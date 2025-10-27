@@ -18,7 +18,7 @@ export class StarCustomerDetails {
   @OneToOne(() => Customer, (customer) => customer.starCustomerDetails)
   customer!: Customer;
 
-  @Column()
+  @Column({ nullable: true })
   taxNumber!: string;
 
   @Column({ type: "boolean", default: false })

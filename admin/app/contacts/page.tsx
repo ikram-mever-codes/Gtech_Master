@@ -157,7 +157,13 @@ const ContactPersonsPage: React.FC = () => {
 
       if (response?.data) {
         const decisionMakers = (response.data.contactPersons || []).filter(
-          (contact: any) => contact.isDecisionMaker === true
+          (contact: any) =>
+            contact.isDecisionMaker === true ||
+            [
+              "DecisionMaker technical",
+              "DecisionMaker financial",
+              "real DecisionMaker",
+            ].includes(contact.contact)
         );
         setDecisionMakers(decisionMakers);
         setDecisionMakersTotalRecords(
@@ -541,9 +547,9 @@ const ContactPersonsPage: React.FC = () => {
               }`}
             >
               Sales View
-              {decisionMakersTotalRecords > 0 && (
+              {decisionMakers.length > 0 && (
                 <span className="ml-2 bg-blue-100 text-blue-600 px-2 py-1 rounded-full text-xs">
-                  {decisionMakersTotalRecords}
+                  {decisionMakers.length}f
                 </span>
               )}
             </button>
