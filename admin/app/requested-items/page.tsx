@@ -34,6 +34,21 @@ import {
   type RequestedItemsStatistics,
 } from "@/api/requested_items";
 import CustomButton from "@/components/UI/CustomButton";
+import { getAllContactPersons } from "@/api/contacts";
+
+// Add interface for ContactPerson
+interface ContactPerson {
+  id: string;
+  name: string;
+  familyName: string;
+  position: string;
+  email?: string;
+  starBusinessDetailsId: string;
+  starBusinessDetails?: {
+    id: string;
+    companyName: string;
+  };
+}
 
 const RequestedItemsPage: React.FC = () => {
   // State management
@@ -51,6 +66,9 @@ const RequestedItemsPage: React.FC = () => {
   );
   const [showFilters, setShowFilters] = useState(false);
   const [editModeEnabled, setEditModeEnabled] = useState(false);
+  // Add state for contact persons
+  const [contactPersons, setContactPersons] = useState<ContactPerson[]>([]);
+  const [loadingContactPersons, setLoadingContactPersons] = useState(false);
 
   const itemsPerPage = 20;
 
@@ -85,6 +103,52 @@ const RequestedItemsPage: React.FC = () => {
     comment: "",
   });
 
+  // Fetch contact persons on component mount
+  useEffect(() => {
+    const fetchContactPersons = async () => {
+      setLoadingContactPersons(true);
+      try {
+        const response: any = await getAllContactPersons();
+        console.log("Contact persons response:", response);
+        if (response?.data?.contactPersons) {
+          setContactPersons(response.data.contactPersons);
+        } else {
+          console.error("Unexpected response structure:", response);
+          setContactPersons([]);
+        }
+      } catch (error) {
+        console.error("Error fetching contact persons:", error);
+        toast.error("Failed to fetch contact persons");
+        setContactPersons([]);
+      } finally {
+        setLoadingContactPersons(false);
+      }
+    };
+
+    fetchContactPersons();
+  }, []);
+
+  // Handle contact person selection
+  const handleContactPersonChange = (contactPersonId: string) => {
+    const selectedContactPerson = contactPersons.find(
+      (person) => person.id === contactPersonId
+    );
+
+    if (selectedContactPerson) {
+      setFormData({
+        ...formData,
+        contactPersonId: selectedContactPerson.id,
+        businessId: selectedContactPerson.starBusinessDetailsId,
+      });
+    } else {
+      setFormData({
+        ...formData,
+        contactPersonId: "",
+        businessId: "",
+      });
+    }
+  };
+
   // Fetch requested items
   const fetchRequestedItems = useCallback(async () => {
     setLoading(true);
@@ -95,11 +159,7 @@ const RequestedItemsPage: React.FC = () => {
         limit: itemsPerPage,
       });
 
-      if (response?.data) {
-        setRequestedItems(response.data.items || []);
-        setTotalRecords(response.data.pagination?.total || 0);
-        setTotalPages(response.data.pagination?.totalPages || 1);
-      }
+      setRequestedItems(response || []);
     } catch (error) {
       console.error("Error fetching requested items:", error);
       toast.error("Failed to fetch requested items");
@@ -533,6 +593,10 @@ const RequestedItemsPage: React.FC = () => {
                       Item Name
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Contact Per
+                    </th>
+
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Business
                     </th>
                     <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -572,6 +636,11 @@ const RequestedItemsPage: React.FC = () => {
                               Material: {item.material}
                             </div>
                           )}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="text-sm text-gray-900">
+                          {item.contactPerson?.email || "-"}
                         </div>
                       </td>
                       <td className="px-6 py-4">
@@ -766,6 +835,61 @@ const RequestedItemsPage: React.FC = () => {
 
                 <div className="space-y-6">
                   <div className="grid grid-cols-2 gap-4">
+                    {/* Contact Person Dropdown - Now comes first */}
+                    <div className="col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Contact Person *
+                      </label>
+                      <select
+                        value={formData.contactPersonId}
+                        onChange={(e) =>
+                          handleContactPersonChange(e.target.value)
+                        }
+                        disabled={modalMode === "edit" && !editModeEnabled}
+                        className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                      >
+                        <option value="">Select Contact Person</option>
+                        {loadingContactPersons ? (
+                          <option value="" disabled>
+                            Loading contact persons...
+                          </option>
+                        ) : contactPersons.length > 0 ? (
+                          contactPersons.map((person) => (
+                            <option key={person.id} value={person.id}>
+                              {person.name} {person.familyName}
+                              {person.position ? ` - ${person.position}` : ""}
+                              {person.email ? ` (${person.email})` : ""}
+                              {person.starBusinessDetails?.companyName
+                                ? ` - ${person.starBusinessDetails.companyName}`
+                                : ""}
+                            </option>
+                          ))
+                        ) : (
+                          <option value="" disabled>
+                            No contact persons found
+                          </option>
+                        )}
+                      </select>
+                    </div>
+
+                    {/* Business ID - Now auto-populated and read-only */}
+                    <div className="col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Business ID *
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.businessId}
+                        readOnly
+                        className="w-full px-3 py-2 border border-gray-300/80 bg-gray-100 rounded-lg cursor-not-allowed"
+                        placeholder="Will be auto-filled when you select a contact person"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Business ID is automatically set from the selected
+                        contact person
+                      </p>
+                    </div>
+
                     {/* Item Name */}
                     <div className="col-span-2">
                       <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -783,6 +907,7 @@ const RequestedItemsPage: React.FC = () => {
                       />
                     </div>
 
+                    {/* Rest of the form remains the same */}
                     {/* Material & Specification */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">

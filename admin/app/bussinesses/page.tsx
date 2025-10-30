@@ -35,6 +35,9 @@ import { useRouter } from "next/navigation";
 import CustomButton from "@/components/UI/CustomButton";
 import { EditIcon, EyeIcon, Plus } from "lucide-react";
 import { Delete } from "@mui/icons-material";
+import { RootState } from "../Redux/store";
+import { useSelector } from "react-redux";
+import { UserRole } from "@/utils/interfaces";
 
 interface FilterState {
   search: string;
@@ -67,6 +70,8 @@ const BusinessSearchPage: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalRecords, setTotalRecords] = useState(0);
+  const { user } = useSelector((state: RootState) => state.user);
+
   const [showFilters, setShowFilters] = useState(true);
   const [selectedBusinesses, setSelectedBusinesses] = useState<Set<string>>(
     new Set()
@@ -922,15 +927,17 @@ const BusinessSearchPage: React.FC = () => {
                           </div>
                         </td>
                         <td className="px-4 py-3">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteBusiness(business.id);
-                            }}
-                            className="p-1 hover:bg-gray-100 rounded transition-colors"
-                          >
-                            <Delete sx={{ fontSize: 16, color: "red" }} />
-                          </button>
+                          {user?.role === UserRole.ADMIN && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteBusiness(business.id);
+                              }}
+                              className="p-1 hover:bg-gray-100 rounded transition-colors"
+                            >
+                              <Delete sx={{ fontSize: 16, color: "red" }} />
+                            </button>
+                          )}
                         </td>
                       </tr>
                     ))}

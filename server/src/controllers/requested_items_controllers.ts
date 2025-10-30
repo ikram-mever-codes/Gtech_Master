@@ -23,6 +23,7 @@ export class RequestedItemController {
       const queryBuilder = this.requestedItemRepository
         .createQueryBuilder("requestedItem")
         .leftJoinAndSelect("requestedItem.business", "business")
+        .leftJoinAndSelect("business.customer", "customer") // Join business -> customer
         .leftJoinAndSelect("requestedItem.contactPerson", "contactPerson")
         .orderBy("requestedItem.createdAt", "DESC");
 
@@ -111,7 +112,7 @@ export class RequestedItemController {
     try {
       const {
         businessId,
-        contactPersonId,
+        contactPersonId, // Make sure this is being received
         itemName,
         material,
         specification,
@@ -125,6 +126,8 @@ export class RequestedItemController {
         requestStatus,
         comment,
       } = request.body;
+
+      console.log("Received contactPersonId:", contactPersonId); // Debug log
 
       // Basic validation
       if (!businessId || !itemName || !qty) {
@@ -146,7 +149,7 @@ export class RequestedItemController {
         });
       }
 
-      let contactPerson: ContactPerson | null = null;
+      let contactPerson: any = null;
       if (contactPersonId) {
         contactPerson = await this.contactPersonRepository.findOne({
           where: { id: contactPersonId },
@@ -162,6 +165,8 @@ export class RequestedItemController {
 
       const requestedItem = this.requestedItemRepository.create({
         business: business,
+        contactPerson: contactPerson,
+        contactPersonId: contactPersonId || null,
         itemName,
         material,
         specification,
