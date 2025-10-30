@@ -6,8 +6,10 @@ import {
   UpdateDateColumn,
   ManyToOne,
   JoinColumn,
+  OneToMany,
 } from "typeorm";
 import { StarBusinessDetails } from "./star_business_details";
+import { RequestedItem } from "./requested_items";
 
 export type Sex = "male" | "female" | "Not Specified";
 export type Position =
@@ -36,6 +38,15 @@ export type ContactType =
   | "DecisionMaker financial"
   | "real DecisionMaker"
   | "";
+export type DecisionMakerState =
+  | ""
+  | "open"
+  | "ErstEmail"
+  | "Folgetelefonat"
+  | "2.Email"
+  | "Anfragtelefonat"
+  | "weiteres Serienteil"
+  | "kein Interesse";
 
 @Entity()
 export class ContactPerson {
@@ -59,6 +70,12 @@ export class ContactPerson {
   )
   @JoinColumn({ name: "star_business_details_id" })
   starBusinessDetails!: StarBusinessDetails;
+
+  @OneToMany(
+    () => RequestedItem,
+    (requestedItem) => requestedItem.contactPerson
+  )
+  requestedItems!: RequestedItem[];
 
   @Column({ name: "star_business_details_id" })
   starBusinessDetailsId!: string;
@@ -134,8 +151,27 @@ export class ContactPerson {
   @Column({ type: "boolean", default: false })
   isDecisionMaker!: boolean;
 
+  @Column({
+    type: "enum",
+    enum: [
+      "",
+      "open",
+      "ErstEmail",
+      "Folgetelefonat",
+      "2.Email",
+      "Anfragtelefonat",
+      "weiteres Serienteil",
+      "kein Interesse",
+    ],
+    default: "",
+  })
+  decisionMakerState!: DecisionMakerState;
+
   @Column({ type: "text", nullable: true })
   note!: string;
+
+  @Column({ type: "text", nullable: true })
+  decisionMakerNote!: string;
 
   @CreateDateColumn()
   createdAt!: Date;

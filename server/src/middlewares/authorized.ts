@@ -1,9 +1,10 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { getRepository } from "typeorm";
-import { User } from "../models/users";
+import { User, UserRole } from "../models/users";
 import ErrorHandler from "../utils/errorHandler";
 import { AppDataSource } from "../config/database";
+import { USER_ROLE } from "../models/list";
 
 export interface AuthorizedRequest extends Request {
   user?: User;
@@ -44,5 +45,25 @@ export const authenticateUser = async (
   } catch (error) {
     console.log(error);
     return next(new ErrorHandler("Session expired! Please login again", 401));
+  }
+};
+
+export const isAdmin = async (
+  req: AuthorizedRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    if (!req.user) {
+      return next(new ErrorHandler("Authentication required", 401));
+    }
+    if (req.user.role !== UserRole.ADMIN) {
+      return next(new ErrorHandler("Admin access required", 403));
+    }
+
+    next();
+  } catch (error) {
+    console.error("Admin check error:", error);
+    return next(new ErrorHandler("Authorization failed", 500));
   }
 };

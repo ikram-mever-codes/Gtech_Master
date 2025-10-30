@@ -8,8 +8,10 @@ import customerRoutes from "./routes/customer_routes";
 import listRoutes from "./routes/list_routes";
 import contactRoutes from "./routes/contact_routes";
 import invoiceRoutes from "./routes/invoice_routes";
+import requestedItemsRoutes from "./routes/requested_item_routes";
 import cronRoutes from "./routes/cronRoutes";
 import { AppDataSource } from "./config/database";
+
 import { CronJobs } from "./services/cronJob";
 import bussinessRoutes from "./routes/bussiness_routes";
 const app: any = express();
@@ -42,6 +44,7 @@ app.use("/api/v1/lists", listRoutes);
 app.use("/api/v1/invoices", invoiceRoutes);
 app.use("/api/cron", cronRoutes);
 app.use("/api/v1/businesses", bussinessRoutes);
+app.use("/api/v1/requested-items", requestedItemsRoutes);
 
 // Configuring the Uploads Dir
 

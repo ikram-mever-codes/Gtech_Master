@@ -1699,36 +1699,6 @@ export const getAllBusinesses = async (
   }
 };
 
-// 6. Delete Business
-export const deleteBusiness = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
-  try {
-    const { id } = req.params;
-
-    const customerRepository = AppDataSource.getRepository(Customer);
-    const customer = await customerRepository.findOne({
-      where: { id },
-      relations: ["businessDetails"],
-    });
-
-    if (!customer) {
-      return next(new ErrorHandler("Business not found", 404));
-    }
-
-    await customerRepository.remove(customer);
-
-    return res.status(200).json({
-      success: true,
-      message: "Business deleted successfully",
-    });
-  } catch (error) {
-    return next(error);
-  }
-};
-
 // 7. Bulk Delete Businesses
 export const bulkDeleteBusinesses = async (
   req: Request,
@@ -1932,3 +1902,32 @@ function sanitizeIsDeviceMaker(
   }
   return undefined;
 }
+
+export const deleteBusiness = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { id } = req.params;
+
+    const customerRepository = AppDataSource.getRepository(Customer);
+    const customer = await customerRepository.findOne({
+      where: { id },
+      relations: ["businessDetails"],
+    });
+
+    if (!customer) {
+      return next(new ErrorHandler("Business not found", 404));
+    }
+
+    await customerRepository.remove(customer);
+
+    return res.status(200).json({
+      success: true,
+      message: "Business deleted successfully",
+    });
+  } catch (error) {
+    return next(error);
+  }
+};

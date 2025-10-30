@@ -2,13 +2,8 @@
 import React, { useState, useEffect } from "react";
 import {
   Box,
-  IconButton,
   InputBase,
   Paper,
-  Menu,
-  MenuItem,
-  Chip,
-  Avatar,
   Button,
   FormControl,
   InputLabel,
@@ -16,38 +11,30 @@ import {
   Checkbox,
   ListItemText,
   Typography,
-  Divider,
   useTheme,
   CircularProgress,
   Alert,
   alpha,
+  Avatar,
+  MenuItem,
 } from "@mui/material";
 import {
-  LucideMoreVertical,
   LucideUserPlus,
   LucideSearch,
-  LucideTrash2,
-  LucidePencil,
-  LucideEye,
-  LucideShield,
-  LucideMail,
-  LucideBan,
   PlusIcon,
   RefreshCw,
 } from "lucide-react";
-import { User, UserRole, UserStatus } from "@/utils/interfaces";
+import { UserRole, UserStatus } from "@/utils/interfaces";
 import theme from "@/styles/theme";
 import CustomButton from "@/components/UI/CustomButton";
 import CustomTable from "@/components/UI/CustomTable";
 import { useRouter } from "next/navigation";
-import { deleteUser, getAllUsers } from "@/api/user";
+import { deleteUser, getAllUsers, resendVerificationEmail } from "@/api/user";
 import { toast } from "react-hot-toast";
 
 const UsersPage = () => {
   const muiTheme = useTheme();
   const [searchText, setSearchText] = useState("");
-  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const router = useRouter();
   const [filters, setFilters] = useState({
     status: [] as UserStatus[],
@@ -58,7 +45,7 @@ const UsersPage = () => {
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [refreshKey, setRefreshKey] = useState<number>(0); // For triggering refresh
+  const [refreshKey, setRefreshKey] = useState<number>(0);
 
   // Function to fetch users from backend
   const fetchUsers = async () => {
@@ -85,20 +72,7 @@ const UsersPage = () => {
   }, [refreshKey]);
 
   const handleRefresh = () => {
-    setRefreshKey((prev) => prev + 1); // Increment refreshKey to trigger a new fetch
-  };
-
-  const handleActionClick = (
-    event: React.MouseEvent<HTMLElement>,
-    userId: string
-  ) => {
-    setAnchorEl(event.currentTarget);
-    setSelectedUserId(userId);
-  };
-
-  const handleActionClose = () => {
-    setAnchorEl(null);
-    setSelectedUserId(null);
+    setRefreshKey((prev) => prev + 1);
   };
 
   const calculateAge = (dateOfBirth: string): number => {
@@ -203,39 +177,19 @@ const UsersPage = () => {
     return matchesSearch && matchesStatus && matchesRole;
   });
 
-  // Handle user actions
-  const handleViewUser = (userId: string) => {
-    router.push(`/users/${userId}`);
-    handleActionClose();
-  };
-
-  const handleEditUser = (userId: string) => {
-    router.push(`/users/${userId}/edit`);
-    handleActionClose();
-  };
-
-  const handleChangeRole = (userId: string) => {
-    toast.success("Role change functionality will be implemented soon");
-    handleActionClose();
-  };
-
-  const handleResendVerification = (userId: string) => {
-    toast.success("Verification email has been sent");
-    handleActionClose();
-  };
-
-  const handleBlockUser = (userId: string) => {
-    toast.success("User has been blocked");
-    handleActionClose();
-  };
-
-  const handleDeleteUser = (userId: string) => {
-    toast.success("User has been deleted");
-    handleActionClose();
+  const handleResendVerification = async (
+    userId: string,
+    userEmail: string
+  ) => {
+    try {
+      await resendVerificationEmail(userEmail);
+    } catch (error) {
+      // Error is already handled by the API function
+    }
   };
 
   return (
-    <div className="w-full max-w-[80vw]  mx-auto px-0">
+    <div className="w-full max-w-[80vw] mx-auto px-0">
       <div
         className="bg-white rounded-lg shadow-sm pb-[7rem] p-8 px-9"
         style={{
@@ -426,78 +380,19 @@ const UsersPage = () => {
             onRowClick={(row) => router.push(`/users/${row.id}`)}
             onEdit={(row) => router.push(`/users/${row.id}/edit`)}
             onDelete={async (row) => {
-              const cfs = window.confirm("Do you want to delete this User?");
-              if (!cfs) {
-                return;
-              }
+              const confirmDelete = window.confirm(
+                "Do you want to delete this User?"
+              );
+              if (!confirmDelete) return;
               const data = await deleteUser(row.id);
-              if (data?.success) {
-                await fetchUsers();
-              }
+              if (data?.success) await fetchUsers();
             }}
             onView={(row) => router.push(`/users/${row.id}`)}
+            onResendVerification={(row) => {
+              handleResendVerification(row.id, row.email);
+            }}
           />
         )}
-
-        {/* Action Menu */}
-        <Menu
-          anchorEl={anchorEl}
-          open={Boolean(anchorEl)}
-          onClose={handleActionClose}
-          PaperProps={{
-            elevation: 4,
-            sx: {
-              borderRadius: "8px",
-              minWidth: 200,
-              boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-              "& .MuiMenuItem-root": {
-                fontSize: "0.875rem",
-                padding: "8px 16px",
-              },
-            },
-          }}
-        >
-          <MenuItem
-            onClick={() => selectedUserId && handleViewUser(selectedUserId)}
-          >
-            <LucideEye className="mr-2" size={18} color="#666" />
-            <Typography variant="body2">View Profile</Typography>
-          </MenuItem>
-          <MenuItem
-            onClick={() => selectedUserId && handleEditUser(selectedUserId)}
-          >
-            <LucidePencil className="mr-2" size={18} color="#666" />
-            <Typography variant="body2">Edit User</Typography>
-          </MenuItem>
-          <MenuItem
-            onClick={() => selectedUserId && handleChangeRole(selectedUserId)}
-          >
-            <LucideShield className="mr-2" size={18} color="#666" />
-            <Typography variant="body2">Change Role</Typography>
-          </MenuItem>
-          <MenuItem
-            onClick={() =>
-              selectedUserId && handleResendVerification(selectedUserId)
-            }
-          >
-            <LucideMail className="mr-2" size={18} color="#666" />
-            <Typography variant="body2">Resend Verification</Typography>
-          </MenuItem>
-          <MenuItem
-            onClick={() => selectedUserId && handleBlockUser(selectedUserId)}
-          >
-            <LucideBan className="mr-2" size={18} color="#666" />
-            <Typography variant="body2">Block User</Typography>
-          </MenuItem>
-          <Divider sx={{ my: 0.5 }} />
-          <MenuItem
-            onClick={() => selectedUserId && handleDeleteUser(selectedUserId)}
-            sx={{ color: "#F44336", "&:hover": { backgroundColor: "#ffeeee" } }}
-          >
-            <LucideTrash2 className="mr-2" size={18} />
-            <Typography variant="body2">Delete User</Typography>
-          </MenuItem>
-        </Menu>
       </div>
     </div>
   );

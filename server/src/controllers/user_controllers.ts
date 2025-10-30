@@ -1252,3 +1252,87 @@ export const deleteUser = async (
     );
   }
 };
+
+export const resendVerificationEmail = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return next(new ErrorHandler("Email is required", 400));
+    }
+
+    const userRepository = AppDataSource.getRepository(User);
+    const user = await userRepository.findOne({ where: { email } });
+
+    if (!user) {
+      // For security reasons, don't reveal if email exists or not
+      return res.status(200).json({
+        success: true,
+        message: "If the email exists, a verification email has been sent",
+      });
+    }
+
+    if (user.isEmailVerified) {
+      return next(new ErrorHandler("Email is already verified", 400));
+    }
+
+    // Check if there's a recent verification attempt (prevent spam)
+    const now = new Date();
+    if (user.emailVerificationExp && user.emailVerificationExp > now) {
+      const timeLeft = Math.ceil(
+        (user.emailVerificationExp.getTime() - now.getTime()) / 60000
+      ); // in minutes
+      return next(
+        new ErrorHandler(
+          `Please wait ${timeLeft} minute(s) before requesting another verification email`,
+          429
+        )
+      );
+    }
+
+    // Generate new verification code
+    const emailVerificationCode = Math.floor(
+      100000 + Math.random() * 900000
+    ).toString();
+    const emailVerificationExp = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+    // Update user with new verification code
+    user.emailVerificationCode = emailVerificationCode;
+    user.emailVerificationExp = emailVerificationExp;
+    await userRepository.save(user);
+
+    // Send verification email
+    const verificationLink = `https://master.gtech.de/verify?email=${encodeURIComponent(
+      email
+    )}&verificationCode=${emailVerificationCode}`;
+
+    const message = `
+      <h2>Email Verification</h2>
+      <p>You requested a new verification email for your account.</p>
+      <p>Please verify your email by clicking the link below:</p>
+      <p><a href="${verificationLink}" style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">Verify Email</a></p>
+      <p>Or copy and paste this link in your browser:</p>
+      <p>${verificationLink}</p>
+      <p>Alternatively, you can use this verification code: <strong>${emailVerificationCode}</strong></p>
+      <p><strong>Note:</strong> This verification code will expire in 24 hours.</p>
+      <p>If you didn't request this verification, please ignore this email.</p>
+    `;
+
+    await sendEmail({
+      to: email,
+      subject: "Verify Your Email Address",
+      html: message,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Verification email sent successfully",
+    });
+  } catch (error) {
+    return next(error);
+  }
+};

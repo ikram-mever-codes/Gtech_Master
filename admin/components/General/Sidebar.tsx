@@ -18,6 +18,7 @@ import {
   Drawer,
   Button,
   Tooltip,
+  listItemSecondaryActionClasses,
 } from "@mui/material";
 import {
   LucideHome,
@@ -37,6 +38,8 @@ import {
   Timer,
   BookUser,
   DollarSign,
+  IceCream2,
+  PackageSearchIcon,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -58,12 +61,12 @@ const allMenuItems = [
     path: "/users",
     resource: "Users",
   },
-  {
-    icon: BookUser,
-    text: "Customers",
-    path: "/customers",
-    resource: "Users",
-  },
+  // {
+  //   icon: BookUser,
+  //   text: "Customers",
+  //   path: "/customers",
+  //   resource: "Users",
+  // },
   {
     icon: Timer,
     text: "Scheduled Items",
@@ -77,10 +80,16 @@ const allMenuItems = [
     resource: "Bussinesses",
   },
   {
-    icon: Person,
+    icon: BookUser,
     text: "Contacts",
     path: "/contacts",
     resource: "Contacts",
+  },
+  {
+    icon: PackageSearchIcon,
+    text: "Requested Items",
+    path: "/requested-items",
+    resource: "RequestedItems",
   },
   {
     icon: DollarSign,
@@ -89,19 +98,19 @@ const allMenuItems = [
     resource: "Invoices",
   },
 
-  {
-    icon: LucideMail,
-    text: "Messages",
-    path: "/messages",
-    resource: "Messages",
-  },
+  // {
+  //   icon: LucideMail,
+  //   text: "Messages",
+  //   path: "/messages",
+  //   resource: "Messages",
+  // },
 
-  {
-    icon: LucideSettings,
-    text: "Settings",
-    path: "/settings",
-    resource: "Settings",
-  },
+  // {
+  //   icon: LucideSettings,
+  //   text: "Settings",
+  //   path: "/settings",
+  //   resource: "Settings",
+  // },
 ];
 
 const Sidebar = () => {

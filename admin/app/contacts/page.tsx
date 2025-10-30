@@ -34,6 +34,7 @@ import {
   LINKEDIN_STATES,
   CONTACT_TYPES,
   SEX_OPTIONS,
+  DECISION_MAKER_STATES,
   type ContactPersonData,
   type ContactPersonFilters,
   type CreateContactPersonPayload,
@@ -91,6 +92,7 @@ const ContactPersonsPage: React.FC = () => {
     position: "" as any,
     stateLinkedIn: "" as any,
     contact: "" as any,
+    decisionMakerState: "" as any,
     page: 1,
     limit: itemsPerPage,
   });
@@ -101,6 +103,7 @@ const ContactPersonsPage: React.FC = () => {
     position: "" as any,
     stateLinkedIn: "" as any,
     contact: "" as any,
+    decisionMakerState: "" as any,
     page: 1,
     limit: itemsPerPage,
   });
@@ -118,6 +121,7 @@ const ContactPersonsPage: React.FC = () => {
     linkedInLink: "",
     stateLinkedIn: "open",
     contact: "",
+    decisionMakerState: "",
     note: "",
     noteContactPreference: "",
   });
@@ -158,7 +162,6 @@ const ContactPersonsPage: React.FC = () => {
       if (response?.data) {
         const decisionMakers = (response.data.contactPersons || []).filter(
           (contact: any) =>
-            contact.isDecisionMaker === true ||
             [
               "DecisionMaker technical",
               "DecisionMaker financial",
@@ -240,6 +243,7 @@ const ContactPersonsPage: React.FC = () => {
       linkedInLink: contact.linkedInLink || "",
       stateLinkedIn: contact.stateLinkedIn || "open",
       contact: contact.contact || "",
+      decisionMakerState: contact.decisionMakerState || "",
       note: contact.note || "",
       noteContactPreference: contact.noteContactPreference || "",
     });
@@ -272,6 +276,7 @@ const ContactPersonsPage: React.FC = () => {
       linkedInLink: contact.linkedInLink || "",
       stateLinkedIn: contact.stateLinkedIn || "open",
       contact: contact.contact || "",
+      decisionMakerState: contact.decisionMakerState || "",
       note: contact.note || "",
       noteContactPreference: contact.noteContactPreference || "",
     });
@@ -330,7 +335,23 @@ const ContactPersonsPage: React.FC = () => {
       }
     } catch (error) {
       console.error("Error updating LinkedIn state:", error);
-      toast.error("Failed to update LinkedIn state");
+    }
+  };
+
+  // Update Decision Maker State
+  const handleUpdateDecisionMakerState = async (
+    contactId: string,
+    newState: any
+  ) => {
+    try {
+      await updateContactPerson(contactId, { decisionMakerState: newState });
+      fetchContactPersons();
+      if (activeTab === "sales") {
+        fetchDecisionMakers();
+      }
+    } catch (error) {
+      console.error("Error updating decision maker state:", error);
+      toast.error("Failed to update decision maker state");
     }
   };
 
@@ -437,6 +458,7 @@ const ContactPersonsPage: React.FC = () => {
       linkedInLink: "",
       stateLinkedIn: "open",
       contact: "",
+      decisionMakerState: "",
       note: "",
       noteContactPreference: "",
     });
@@ -461,6 +483,20 @@ const ContactPersonsPage: React.FC = () => {
       pending: "bg-yellow-100 text-yellow-800",
       connected: "bg-blue-100 text-blue-800",
       rejected: "bg-red-100 text-red-800",
+    };
+    return colors[state] || "bg-gray-100 text-gray-800";
+  };
+
+  // Decision Maker state colors
+  const getDecisionMakerStateColor = (state: string) => {
+    const colors: Record<string, string> = {
+      open: "bg-blue-100 text-blue-800",
+      ErstEmail: "bg-purple-100 text-purple-800",
+      Folgetelefonat: "bg-orange-100 text-orange-800",
+      "2.Email": "bg-indigo-100 text-indigo-800",
+      Anfragtelefonat: "bg-pink-100 text-pink-800",
+      "weiteres Serienteil": "bg-teal-100 text-teal-800",
+      "kein Interesse": "bg-red-100 text-red-800",
     };
     return colors[state] || "bg-gray-100 text-gray-800";
   };
@@ -549,7 +585,7 @@ const ContactPersonsPage: React.FC = () => {
               Sales View
               {decisionMakers.length > 0 && (
                 <span className="ml-2 bg-blue-100 text-blue-600 px-2 py-1 rounded-full text-xs">
-                  {decisionMakers.length}f
+                  {decisionMakers.length}
                 </span>
               )}
             </button>
@@ -587,7 +623,8 @@ const ContactPersonsPage: React.FC = () => {
                       Filters
                       {(filters.position ||
                         filters.stateLinkedIn ||
-                        filters.contact) && (
+                        filters.contact ||
+                        filters.decisionMakerState) && (
                         <span className="bg-gray-500 text-white px-2 py-0.5 rounded-full text-xs">
                           Active
                         </span>
@@ -632,7 +669,7 @@ const ContactPersonsPage: React.FC = () => {
                 {/* Filter Panel */}
                 {showFilters && (
                   <div className="mt-6 pt-6 border-t border-gray-200/50">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                           Position
@@ -701,6 +738,29 @@ const ContactPersonsPage: React.FC = () => {
                           ))}
                         </select>
                       </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Decision Maker State
+                        </label>
+                        <select
+                          value={filters.decisionMakerState || ""}
+                          onChange={(e) =>
+                            setFilters({
+                              ...filters,
+                              decisionMakerState: e.target.value as any,
+                            })
+                          }
+                          className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all"
+                        >
+                          <option value="">All States</option>
+                          {DECISION_MAKER_STATES.map((state: any) => (
+                            <option key={state.value} value={state.value}>
+                              {state.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
                     </div>
 
                     <div className="mt-4 flex justify-end">
@@ -711,6 +771,7 @@ const ContactPersonsPage: React.FC = () => {
                             position: "" as any,
                             stateLinkedIn: "" as any,
                             contact: "" as any,
+                            decisionMakerState: "" as any,
                             page: 1,
                             limit: itemsPerPage,
                           });
@@ -765,6 +826,9 @@ const ContactPersonsPage: React.FC = () => {
                         </th>
                         <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Type
+                        </th>
+                        <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Decision Maker State
                         </th>
                         <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Actions
@@ -873,6 +937,28 @@ const ContactPersonsPage: React.FC = () => {
                             )}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
+                            <select
+                              value={contact.decisionMakerState || ""}
+                              onChange={(e) => {
+                                e.stopPropagation();
+                                handleUpdateDecisionMakerState(
+                                  contact.id,
+                                  e.target.value
+                                );
+                              }}
+                              className={`text-xs px-2 w-max max-w-[180px] truncate py-1 rounded-full font-medium border-0 cursor-pointer ${getDecisionMakerStateColor(
+                                contact.decisionMakerState || ""
+                              )}`}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {DECISION_MAKER_STATES.map((state: any) => (
+                                <option key={state.value} value={state.value}>
+                                  {state.label}
+                                </option>
+                              ))}
+                            </select>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
                             <div className="flex items-center gap-2">
                               <button
                                 onClick={(e) => {
@@ -906,32 +992,6 @@ const ContactPersonsPage: React.FC = () => {
                               >
                                 <LinkedIn sx={{ fontSize: 18 }} />
                               </button>
-                              {/* <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleEditContact(contact);
-                                }}
-                                className="text-blue-600 hover:text-blue-800 transition-colors"
-                                title="Edit contact"
-                              >
-                                <PencilIcon className="h-4 w-4" />
-                              </button>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (
-                                    confirm(
-                                      "Are you sure you want to delete this contact?"
-                                    )
-                                  ) {
-                                    handleDeleteContact(contact.id);
-                                  }
-                                }}
-                                className="text-red-600 hover:text-red-800 transition-colors"
-                                title="Delete contact"
-                              >
-                                <XMarkIcon className="h-4 w-4" />
-                              </button> */}
                             </div>
                           </td>
                         </tr>
@@ -1099,6 +1159,9 @@ const ContactPersonsPage: React.FC = () => {
                           Type
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          LinkedIn State
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Decision Maker State
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -1205,6 +1268,28 @@ const ContactPersonsPage: React.FC = () => {
                               onClick={(e) => e.stopPropagation()}
                             >
                               {LINKEDIN_STATES.map((state: any) => (
+                                <option key={state.value} value={state.value}>
+                                  {state.label}
+                                </option>
+                              ))}
+                            </select>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <select
+                              value={contact.decisionMakerState || ""}
+                              onChange={(e) => {
+                                e.stopPropagation();
+                                handleUpdateDecisionMakerState(
+                                  contact.id,
+                                  e.target.value
+                                );
+                              }}
+                              className={`text-xs px-2 w-max max-w-[180px] truncate py-1 rounded-full font-medium border-0 cursor-pointer ${getDecisionMakerStateColor(
+                                contact.decisionMakerState || ""
+                              )}`}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {DECISION_MAKER_STATES.map((state: any) => (
                                 <option key={state.value} value={state.value}>
                                   {state.label}
                                 </option>
@@ -1780,7 +1865,7 @@ const ContactPersonsPage: React.FC = () => {
                     </div>
 
                     {/* Contact Type */}
-                    <div className="col-span-2">
+                    <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Contact Type
                       </label>
@@ -1799,6 +1884,31 @@ const ContactPersonsPage: React.FC = () => {
                         {CONTACT_TYPES.map((type) => (
                           <option key={type.value} value={type.value}>
                             {type.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Decision Maker State */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Decision Maker State
+                      </label>
+                      <select
+                        value={createForm.decisionMakerState}
+                        onChange={(e) =>
+                          setCreateForm({
+                            ...createForm,
+                            decisionMakerState: e.target.value as any,
+                          })
+                        }
+                        disabled={modalMode === "edit" && !editModeEnabled}
+                        className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                      >
+                        <option value="">State auswählen</option>
+                        {DECISION_MAKER_STATES.map((state: any) => (
+                          <option key={state.value} value={state.value}>
+                            {state.label}
                           </option>
                         ))}
                       </select>

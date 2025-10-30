@@ -7,6 +7,7 @@ import {
   Position,
   LinkedInState,
   ContactType,
+  DecisionMakerState,
 } from "../models/contact_person";
 import { StarBusinessDetails } from "../models/star_business_details";
 import { Customer } from "../models/customers";
@@ -65,6 +66,21 @@ function setDecisionMakerFromContactType(contactPerson: ContactPerson): void {
   }
 }
 
+export const sanitizeDecisionMakerState = (state: any): DecisionMakerState => {
+  const validStates: DecisionMakerState[] = [
+    "",
+    "open",
+    "ErstEmail",
+    "Folgetelefonat",
+    "2.Email",
+    "Anfragtelefonat",
+    "weiteres Serienteil",
+    "kein Interesse",
+  ];
+
+  return validStates.includes(state) ? state : "";
+};
+
 // 1. Create Contact Person
 export const createContactPerson = async (
   req: Request,
@@ -85,7 +101,9 @@ export const createContactPerson = async (
       noteContactPreference,
       stateLinkedIn = LINKEDIN_STATES.OPEN,
       contact,
+      decisionMakerState,
       note,
+      decisionMakerNote,
       isDecisionMaker, // Allow explicit setting, but will be overridden by contact type logic
     } = req.body;
 
@@ -193,8 +211,18 @@ export const createContactPerson = async (
     contactPerson.stateLinkedIn = sanitizeLinkedInState(stateLinkedIn);
     contactPerson.contact = sanitizeContactType(contact);
 
+    // Add decisionMakerState handling
+    if (decisionMakerState !== undefined) {
+      contactPerson.decisionMakerState =
+        sanitizeDecisionMakerState(decisionMakerState);
+    }
+
     if (note) {
       contactPerson.note = note.trim();
+    }
+
+    if (decisionMakerNote) {
+      contactPerson.decisionMakerNote = decisionMakerNote.trim();
     }
 
     // Set isDecisionMaker based on contact type (overrides explicit setting)
@@ -222,7 +250,7 @@ export const createContactPerson = async (
   }
 };
 
-// 2. Update Contact Person
+// Updated updateContactPerson function with decisionMakerState
 export const updateContactPerson = async (
   req: Request,
   res: Response,
@@ -242,6 +270,7 @@ export const updateContactPerson = async (
       noteContactPreference,
       stateLinkedIn,
       contact,
+      decisionMakerState,
       note,
       isDecisionMaker, // Allow explicit setting, but will be overridden by contact type logic if contact changes
     } = req.body;
@@ -340,6 +369,12 @@ export const updateContactPerson = async (
       const newContactType = sanitizeContactType(contact);
       contactTypeChanged = contactPerson.contact !== newContactType;
       contactPerson.contact = newContactType;
+    }
+
+    // Update decisionMakerState if provided
+    if (decisionMakerState !== undefined) {
+      contactPerson.decisionMakerState =
+        sanitizeDecisionMakerState(decisionMakerState);
     }
 
     // Update isDecisionMaker based on contact type if contact type changed
@@ -1001,6 +1036,7 @@ export const getAllContactPersons = async (
           updatedAt: contactPerson.updatedAt,
           starBusinessDetailsId: contactPerson.starBusinessDetailsId,
           isDecisionMaker: true,
+          decisionMakerState: contactPerson.decisionMakerState,
           // Business info
           businessId: customer?.id || null,
           businessName: customer?.companyName || null,

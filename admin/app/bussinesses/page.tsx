@@ -29,10 +29,12 @@ import {
   exportBusinessesToCSV,
   Business,
   SearchFilters,
+  deleteBusiness,
 } from "@/api/bussiness";
 import { useRouter } from "next/navigation";
 import CustomButton from "@/components/UI/CustomButton";
 import { EditIcon, EyeIcon, Plus } from "lucide-react";
+import { Delete } from "@mui/icons-material";
 
 interface FilterState {
   search: string;
@@ -293,6 +295,27 @@ const BusinessSearchPage: React.FC = () => {
     }
   };
 
+  const handleDeleteBusiness = async (id: string) => {
+    const cfs = window.confirm(
+      "Are you sure you want to delete this business?"
+    );
+    if (!cfs) {
+      return;
+    }
+
+    const data = await deleteBusiness(id);
+
+    if (data.success) {
+      setBusinesses((prevBusinesses) =>
+        prevBusinesses.filter((business) => business.id !== id)
+      );
+      setSelectedBusinesses((prevSelected) => {
+        const newSelected = new Set(prevSelected);
+        newSelected.delete(id);
+        return newSelected;
+      });
+    }
+  };
   const handleSelectBusiness = (id: string) => {
     const newSelection = new Set(selectedBusinesses);
     if (newSelection.has(id)) {
@@ -779,6 +802,9 @@ const BusinessSearchPage: React.FC = () => {
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                         Added On
+                      </th>{" "}
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                        Actions
                       </th>
                     </tr>
                   </thead>
@@ -797,7 +823,10 @@ const BusinessSearchPage: React.FC = () => {
                           <input
                             type="checkbox"
                             checked={selectedBusinesses.has(business.id)}
-                            onChange={() => handleSelectBusiness(business.id)}
+                            onChange={(e) => {
+                              e.stopPropagation(); // Also good to add here to prevent row navigation when checking
+                              handleSelectBusiness(business.id);
+                            }}
                             className="w-4 h-4 text-primary focus:ring-primary border-gray-300 rounded"
                           />
                         </td>
@@ -845,7 +874,7 @@ const BusinessSearchPage: React.FC = () => {
                               })()}
                             </p>
                           </div>
-                        </td>{" "}
+                        </td>
                         <td className="px-4 py-3">
                           {business.website ? (
                             <a
@@ -891,6 +920,17 @@ const BusinessSearchPage: React.FC = () => {
                               ? formatDate(business.createdAt)
                               : "-"}
                           </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteBusiness(business.id);
+                            }}
+                            className="p-1 hover:bg-gray-100 rounded transition-colors"
+                          >
+                            <Delete sx={{ fontSize: 16, color: "red" }} />
+                          </button>
                         </td>
                       </tr>
                     ))}

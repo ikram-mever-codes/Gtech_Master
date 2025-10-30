@@ -12,6 +12,7 @@ import {
 import { Customer } from "./customers";
 import { User } from "./users";
 import { ContactPerson } from "./contact_person";
+import { RequestedItem } from "./requested_items";
 
 @Entity()
 export class StarBusinessDetails {
@@ -70,6 +71,10 @@ export class StarBusinessDetails {
     }
   )
   contactPersons!: ContactPerson[];
+  @OneToMany(() => RequestedItem, (requestedItem) => requestedItem.business, {
+    cascade: true,
+  })
+  requestedItems!: RequestedItem[];
 
   @CreateDateColumn()
   createdAt!: Date;

@@ -35,6 +35,16 @@ export type ContactType =
   | "real DecisionMaker"
   | "";
 
+export type DecisionMakerState =
+  | ""
+  | "open"
+  | "ErstEmail"
+  | "Folgetelefonat"
+  | "2.Email"
+  | "Anfragtelefonat"
+  | "weiteres Serienteil"
+  | "kein Interesse";
+
 // Data Types
 export type ContactPersonData = {
   id: string;
@@ -47,6 +57,7 @@ export type ContactPersonData = {
   fullName: string;
   position: Position;
   isDecisionMaker: boolean;
+  decisionMakerState?: DecisionMakerState;
   positionOthers?: string;
   displayPosition?: string;
   email?: string;
@@ -73,6 +84,7 @@ export type CreateContactPersonPayload = {
   noteContactPreference?: string;
   stateLinkedIn?: LinkedInState;
   contact?: ContactType;
+  decisionMakerState?: DecisionMakerState;
   note?: string;
 };
 
@@ -88,6 +100,7 @@ export type UpdateContactPersonPayload = {
   noteContactPreference?: string;
   stateLinkedIn?: LinkedInState;
   contact?: ContactType;
+  decisionMakerState?: DecisionMakerState;
   note?: string;
 };
 
@@ -510,6 +523,16 @@ export const SEX_OPTIONS = [
   { value: "female", label: "Female" },
 ] as const;
 
+export const DECISION_MAKER_STATES = [
+  { value: "", label: "No State" },
+  { value: "open", label: "Open" },
+  { value: "ErstEmail", label: "Erst Email" },
+  { value: "Folgetelefonat", label: "Folgetelefonat" },
+  { value: "2.Email", label: "2. Email" },
+  { value: "Anfragtelefonat", label: "Anfragtelefonat" },
+  { value: "weiteres Serienteil", label: "Weiteres Serienteil" },
+  { value: "kein Interesse", label: "Kein Interesse" },
+] as const;
 // Helper function to get display labels
 export const getLinkedInStateLabel = (state: LinkedInState): string => {
   const found = LINKEDIN_STATES.find((s) => s.value === state);

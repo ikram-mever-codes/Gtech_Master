@@ -40,6 +40,19 @@ export const loginUser = async (
   }
 };
 
+export const resendVerificationEmail = async (email: string) => {
+  try {
+    toast.loading("Sending verification email...", loadingStyles);
+    const response = await api.post("/auth/resend-verification", { email });
+    toast.dismiss();
+    toast.success("Verification email sent successfully", successStyles);
+    return response.data;
+  } catch (error) {
+    handleApiError(error, "Failed to send verification email");
+    throw error;
+  }
+};
+
 export const verifyEmail = async (email: string, verificationCode: string) => {
   try {
     toast.loading("Authenticating...", loadingStyles);

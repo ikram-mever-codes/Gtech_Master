@@ -18,6 +18,7 @@ import { StarBusinessDetails } from "../models/star_business_details";
 import { StarCustomerDetails } from "../models/star_customer_details";
 import { BusinessDetails } from "../models/business_details";
 import { ContactPerson } from "../models/contact_person";
+import { RequestedItem } from "../models/requested_items";
 
 dotenv.config();
 
@@ -43,6 +44,7 @@ export const AppDataSource = new DataSource({
     ListCreator,
     UserCreator,
     Business,
+    RequestedItem,
     CustomerCreator,
     Permission,
     Invoice,
@@ -59,31 +61,6 @@ export const AppDataSource = new DataSource({
   poolSize: 10,
 });
 
-const createAdminUser = async () => {
-  const adminConfig: any = {
-    name: "Mr IKRAM",
-    email: "admin@gmail.com",
-    password: hashSync("admin123", 10),
-    role: "ADMIN" as const,
-    country: "Pakistan",
-    isEmailVerified: true,
-  };
-
-  const userRepository = AppDataSource.getRepository(User);
-
-  const existingAdmin = await userRepository.findOne({
-    where: { email: adminConfig.email },
-  });
-
-  if (!existingAdmin) {
-    const adminUser = userRepository.create(adminConfig);
-    await userRepository.save(adminUser);
-    console.log("Admin user created successfully!");
-  } else {
-    console.log("Admin user already exists");
-  }
-};
-
 export const initializeDatabase = async (): Promise<DataSource> => {
   try {
     await AppDataSource.initialize();
@@ -94,7 +71,6 @@ export const initializeDatabase = async (): Promise<DataSource> => {
       console.log("Migrations executed successfully");
     }
 
-    await createAdminUser();
     return AppDataSource;
   } catch (error) {
     console.error("Database connection error:", error);
