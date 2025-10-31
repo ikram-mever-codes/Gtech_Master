@@ -29,6 +29,8 @@ import {
   UserGroupIcon,
   EyeIcon,
   ChatBubbleLeftIcon,
+  TrashIcon,
+  ListBulletIcon,
 } from "@heroicons/react/24/outline";
 import { toast } from "react-hot-toast";
 import {
@@ -37,6 +39,7 @@ import {
   getBusinessById,
   BusinessCreatePayload,
 } from "@/api/bussiness";
+import { getCustomerLists, deleteList } from "@/api/list";
 import CustomButton from "@/components/UI/CustomButton";
 import theme from "@/styles/theme";
 
@@ -63,6 +66,18 @@ interface ExtendedBusinessCreatePayload extends BusinessCreatePayload {
   check_timestamp?: string;
 }
 
+// Interface for list data
+interface CustomerList {
+  id: string;
+  name: string;
+  items: any;
+  description?: string;
+  itemCount: number;
+  createdAt: string;
+  updatedAt: string;
+  status: string;
+}
+
 const AddEditBusinessManual: React.FC = () => {
   const params = useSearchParams();
   const router = useRouter();
@@ -76,6 +91,12 @@ const AddEditBusinessManual: React.FC = () => {
   const [isExtraInfoOpen, setIsExtraInfoOpen] = useState(false);
   const [isStarBusinessOpen, setIsStarBusinessOpen] = useState(false);
   const [isStarCustomer, setIsStarCustomer] = useState(false);
+
+  // New state for lists management
+  const [customerLists, setCustomerLists] = useState<CustomerList[]>([]);
+  const [loadingLists, setLoadingLists] = useState(false);
+  const [expandedLists, setExpandedLists] = useState<Set<string>>(new Set());
+  const [isListsSectionOpen, setIsListsSectionOpen] = useState(false);
 
   const [formData, setFormData] = useState<ExtendedBusinessCreatePayload>({
     name: "",
@@ -167,6 +188,13 @@ const AddEditBusinessManual: React.FC = () => {
       fetchBusinessData();
     }
   }, [businessId, isEditMode, isViewMode]);
+
+  // Fetch customer lists when business is a star customer
+  useEffect(() => {
+    if ((isEditMode || isViewMode) && businessId && isStarCustomer) {
+      fetchCustomerLists();
+    }
+  }, [businessId, isEditMode, isViewMode, isStarCustomer]);
 
   const fetchBusinessData = async () => {
     try {
@@ -291,6 +319,59 @@ const AddEditBusinessManual: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const fetchCustomerLists = async () => {
+    try {
+      setLoadingLists(true);
+      const lists = await getCustomerLists(businessId);
+      setCustomerLists(lists);
+
+      // Auto-open lists section if there are lists
+      if (lists.length > 0) {
+        setIsListsSectionOpen(true);
+      }
+    } catch (err) {
+      console.error("Failed to fetch customer lists:", err);
+      toast.error("Failed to load customer lists");
+    } finally {
+      setLoadingLists(false);
+    }
+  };
+
+  const handleDeleteList = async (listId: string, listName: string) => {
+    if (
+      !confirm(
+        `Are you sure you want to delete the list "${listName}"? This action cannot be undone.`
+      )
+    ) {
+      return;
+    }
+
+    try {
+      await deleteList(listId);
+      toast.success(`List "${listName}" deleted successfully`);
+
+      // Remove the list from local state
+      setCustomerLists((prev) => prev.filter((list) => list.id !== listId));
+
+      // Remove from expanded lists if it was expanded
+      const newExpanded = new Set(expandedLists);
+      newExpanded.delete(listId);
+      setExpandedLists(newExpanded);
+    } catch (err) {
+      console.error("Delete list error:", err);
+    }
+  };
+
+  const toggleListExpansion = (listId: string) => {
+    const newExpanded = new Set(expandedLists);
+    if (newExpanded.has(listId)) {
+      newExpanded.delete(listId);
+    } else {
+      newExpanded.add(listId);
+    }
+    setExpandedLists(newExpanded);
   };
 
   const categories = [
@@ -1309,6 +1390,220 @@ const AddEditBusinessManual: React.FC = () => {
               </div>
             </div>
           ) : null}
+
+          {/* Customer Lists Section - Only for Star Customers */}
+          {isStarCustomer && (isEditMode || isViewMode) && (
+            <div className="bg-gradient-to-br from-gray-50 to-white rounded-xl border border-gray-200">
+              {!isViewMode ? (
+                <button
+                  type="button"
+                  onClick={() => setIsListsSectionOpen(!isListsSectionOpen)}
+                  className="w-full p-6 flex items-center justify-between transition-colors rounded-t-xl"
+                >
+                  <div className="flex items-center gap-3">
+                    <ListBulletIcon className="w-6 h-6 text-blue-600" />
+                    <h2 className="text-xl font-semibold text-gray-800">
+                      Customer Lists
+                    </h2>
+                    <span className="text-sm text-gray-500">
+                      ({customerLists.length} list
+                      {customerLists.length !== 1 ? "s" : ""})
+                    </span>
+                  </div>
+                  {isListsSectionOpen ? (
+                    <ChevronUpIcon className="w-5 h-5 text-gray-600" />
+                  ) : (
+                    <ChevronDownIcon className="w-5 h-5 text-gray-600" />
+                  )}
+                </button>
+              ) : (
+                <div className="p-6">
+                  <div className="flex items-center gap-3 mb-6">
+                    <ListBulletIcon className="w-6 h-6 text-blue-600" />
+                    <h2 className="text-xl font-semibold text-gray-800">
+                      Customer Lists
+                    </h2>
+                    <span className="text-sm text-gray-500">
+                      ({customerLists.length} list
+                      {customerLists.length !== 1 ? "s" : ""})
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              <div
+                className={`overflow-hidden transition-all duration-300 ${
+                  isListsSectionOpen || isViewMode
+                    ? "max-h-[2000px]"
+                    : "max-h-0"
+                }`}
+              >
+                <div
+                  className={`${
+                    isViewMode ? "px-6 pb-6" : "p-8 pt-0"
+                  } space-y-4`}
+                >
+                  {loadingLists ? (
+                    <div className="flex items-center justify-center py-8">
+                      <ArrowPathIcon className="w-6 h-6 animate-spin text-gray-400 mr-3" />
+                      <span className="text-gray-600">Loading lists...</span>
+                    </div>
+                  ) : customerLists.length === 0 ? (
+                    <div className="text-center py-8 bg-gray-50 rounded-lg">
+                      <ListBulletIcon className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                      <p className="text-gray-500">
+                        No lists found for this customer.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {customerLists.map((list) => (
+                        <div
+                          key={list.id}
+                          className="border border-gray-200 rounded-lg overflow-hidden bg-white"
+                        >
+                          {/* List Header */}
+                          <div
+                            className="flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 cursor-pointer transition-colors"
+                            onClick={() => toggleListExpansion(list.id)}
+                          >
+                            <div className="flex items-center space-x-4 flex-1">
+                              <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-blue-500 text-white">
+                                <ListBulletIcon className="h-5 w-5" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <h4 className="font-medium text-gray-900 truncate">
+                                  {list.name}
+                                </h4>
+                                {list.description && (
+                                  <p className="text-sm text-gray-500 truncate mt-1">
+                                    {list.description}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="flex items-center space-x-6">
+                              {/* Item Count */}
+                              <div className="text-right">
+                                <p className="text-sm font-medium text-gray-900">
+                                  {list?.items?.length}
+                                </p>
+                                <p className="text-xs text-gray-500">Items</p>
+                              </div>
+
+                              {/* Added Date */}
+                              <div className="text-right">
+                                <p className="text-sm font-medium text-gray-900">
+                                  {new Date(
+                                    list.createdAt
+                                  ).toLocaleDateString()}
+                                </p>
+                                <p className="text-xs text-gray-500">Created</p>
+                              </div>
+
+                              {/* Expand/Collapse Icon */}
+                              <div className="flex items-center">
+                                {expandedLists.has(list.id) ? (
+                                  <ChevronUpIcon className="h-5 w-5 text-gray-400" />
+                                ) : (
+                                  <ChevronDownIcon className="h-5 w-5 text-gray-400" />
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Expanded Content */}
+                          {expandedLists.has(list.id) && (
+                            <div className="p-4 bg-white border-t border-gray-200">
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
+                                <div>
+                                  <p className="text-xs text-gray-500 mb-1">
+                                    List Name
+                                  </p>
+                                  <p className="text-sm font-medium text-gray-900">
+                                    {list.name}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-xs text-gray-500 mb-1">
+                                    Status
+                                  </p>
+                                  <span
+                                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                      list.status === "active"
+                                        ? "bg-green-100 text-green-800"
+                                        : list.status === "disabled"
+                                        ? "bg-red-100 text-red-800"
+                                        : "bg-gray-100 text-gray-800"
+                                    }`}
+                                  >
+                                    {list.status}
+                                  </span>
+                                </div>
+                                {list.description && (
+                                  <div className="md:col-span-2">
+                                    <p className="text-xs text-gray-500 mb-1">
+                                      Description
+                                    </p>
+                                    <p className="text-sm text-gray-900">
+                                      {list.description}
+                                    </p>
+                                  </div>
+                                )}
+                                <div>
+                                  <p className="text-xs text-gray-500 mb-1">
+                                    Created
+                                  </p>
+                                  <p className="text-sm text-gray-900">
+                                    {new Date(
+                                      list.createdAt
+                                    ).toLocaleDateString()}{" "}
+                                    at{" "}
+                                    {new Date(
+                                      list.createdAt
+                                    ).toLocaleTimeString()}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-xs text-gray-500 mb-1">
+                                    Last Updated
+                                  </p>
+                                  <p className="text-sm text-gray-900">
+                                    {new Date(
+                                      list.updatedAt
+                                    ).toLocaleDateString()}{" "}
+                                    at{" "}
+                                    {new Date(
+                                      list.updatedAt
+                                    ).toLocaleTimeString()}
+                                  </p>
+                                </div>
+                              </div>
+
+                              {/* Action Buttons */}
+                              <div className="flex items-center justify-end space-x-3 pt-4 border-t border-gray-200">
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleDeleteList(list.id, list.name)
+                                  }
+                                  className="px-4 py-2 text-sm font-medium text-red-600 border border-red-600 rounded-lg hover:bg-red-600 hover:text-white transition-colors flex items-center space-x-2"
+                                >
+                                  <TrashIcon className="h-4 w-4" />
+                                  <span>Delete List</span>
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Optional Fields Section - Collapsible */}
           <div className="bg-gradient-to-br from-gray-50 to-white rounded-xl border border-gray-200">

@@ -12,6 +12,9 @@ import { CustomerCreator, List, LIST_STATUS } from "../models/list";
 import sendEmail from "../services/emailService";
 import bcrypt from "bcryptjs";
 import { User } from "../models/users";
+import { Invoice } from "../models/invoice";
+import { RequestedItem } from "../models/requested_items";
+import { ContactPerson } from "../models/contact_person";
 
 export const BUSINESS_SOURCE = {
   GOOGLE_MAPS: "Google Maps",
@@ -1912,15 +1915,83 @@ export const deleteBusiness = async (
     const { id } = req.params;
 
     const customerRepository = AppDataSource.getRepository(Customer);
+    const starBusinessDetailsRepository =
+      AppDataSource.getRepository(StarBusinessDetails);
+    const starCustomerDetailsRepository =
+      AppDataSource.getRepository(StarCustomerDetails);
+
+    // Find the customer with all related entities
     const customer = await customerRepository.findOne({
       where: { id },
-      relations: ["businessDetails"],
+      relations: [
+        "businessDetails",
+        "starBusinessDetails",
+        "starCustomerDetails",
+      ],
     });
 
     if (!customer) {
       return next(new ErrorHandler("Business not found", 404));
     }
 
+    // Check for contact persons and requested items in star business details
+    if (customer.starBusinessDetails) {
+      const starBusinessDetails = await starBusinessDetailsRepository.findOne({
+        where: { id: customer.starBusinessDetails.id },
+        relations: ["contactPersons", "requestedItems"],
+      });
+
+      if (starBusinessDetails) {
+        // Check if there are any contact persons
+        if (
+          starBusinessDetails.contactPersons &&
+          starBusinessDetails.contactPersons.length > 0
+        ) {
+          return next(
+            new ErrorHandler(
+              "Cannot delete business because it has associated contact persons. Please delete the contact persons first.",
+              400
+            )
+          );
+        }
+
+        // Check if there are any requested items (lists)
+        if (
+          starBusinessDetails.requestedItems &&
+          starBusinessDetails.requestedItems.length > 0
+        ) {
+          return next(
+            new ErrorHandler(
+              "Cannot delete business because it has associated item requests. Please delete the item requests first.",
+              400
+            )
+          );
+        }
+      }
+    }
+
+    // Check for invoices in star customer details
+    if (customer.starCustomerDetails) {
+      const starCustomerDetails = await starCustomerDetailsRepository.findOne({
+        where: { id: customer.starCustomerDetails.id },
+        relations: ["invoices"],
+      });
+
+      if (
+        starCustomerDetails &&
+        starCustomerDetails.invoices &&
+        starCustomerDetails.invoices.length > 0
+      ) {
+        return next(
+          new ErrorHandler(
+            "Cannot delete business because it has associated invoices. Please delete the invoices first.",
+            400
+          )
+        );
+      }
+    }
+
+    // If all checks pass, delete the customer
     await customerRepository.remove(customer);
 
     return res.status(200).json({
@@ -1928,6 +1999,7 @@ export const deleteBusiness = async (
       message: "Business deleted successfully",
     });
   } catch (error) {
-    return next(error);
+    console.error("Error deleting business:", error);
+    return next(new ErrorHandler("Failed to delete business", 500));
   }
 };

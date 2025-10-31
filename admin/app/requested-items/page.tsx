@@ -644,9 +644,15 @@ const RequestedItemsPage: React.FC = () => {
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <div className="text-sm text-gray-900">
-                          {item.business?.companyName || "-"}
-                        </div>
+                        <a
+                          href={`/bussinesses/new?businessId=${item.business.customer.id}`}
+                          className="text-sm text-blue-600 hover:text-blue-800
+                          text-left"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {" "}
+                          {item.business?.customer.companyName || "-"}
+                        </a>
                       </td>
                       <td className="px-6 py-4 text-center">
                         <div className="text-sm font-medium text-gray-900">

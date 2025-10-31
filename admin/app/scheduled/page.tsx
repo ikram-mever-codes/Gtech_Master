@@ -150,9 +150,15 @@ import {
   acknowledgeListItemChanges,
   acknowledgeItemFieldChanges,
 } from "@/api/list";
-import { DELIVERY_STATUS, INTERVAL_OPTIONS } from "@/utils/interfaces";
+import {
+  DELIVERY_STATUS,
+  INTERVAL_OPTIONS,
+  UserRole,
+} from "@/utils/interfaces";
 import { successStyles } from "@/utils/constants";
 import { DataGrid } from "react-data-grid";
+import { useSelector } from "react-redux";
+import { RootState } from "../Redux/store";
 
 function AddItemDialog({
   open,
@@ -2073,6 +2079,7 @@ const AdminAllItemsPage = () => {
   const [showOnlyChanges, setShowOnlyChanges] = useState(false);
   const [bulkAcknowledging, setBulkAcknowledging] = useState(false);
   const [currentTab, setCurrentTab] = useState(0);
+  const { user } = useSelector((state: RootState) => state.user);
 
   // Activity logs dialog state
   const [activityLogsDialog, setActivityLogsDialog] = useState(false);
@@ -3463,7 +3470,7 @@ const AdminAllItemsPage = () => {
                     }}
                   />
 
-                  {selectedRows.size > 0 && (
+                  {user?.role === UserRole.ADMIN && selectedRows.size > 0 && (
                     <CustomButton
                       variant="outlined"
                       color="error"

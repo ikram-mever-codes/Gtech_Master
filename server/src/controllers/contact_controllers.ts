@@ -1178,6 +1178,7 @@ export const getContactPersonsByStarBusiness = async (
 };
 
 // 6. Delete Contact Person
+// 6. Delete Contact Person
 export const deleteContactPerson = async (
   req: Request,
   res: Response,
@@ -1187,13 +1188,28 @@ export const deleteContactPerson = async (
     const { id } = req.params;
 
     const contactPersonRepository = AppDataSource.getRepository(ContactPerson);
+    const requestedItemRepository = AppDataSource.getRepository(RequestedItem);
 
     const contactPerson = await contactPersonRepository.findOne({
       where: { id },
+      relations: ["requestedItems"],
     });
 
     if (!contactPerson) {
       return next(new ErrorHandler("Contact person not found", 404));
+    }
+
+    const hasRequestedItems = await requestedItemRepository.exists({
+      where: { contactPersonId: id },
+    });
+
+    if (hasRequestedItems) {
+      return next(
+        new ErrorHandler(
+          "Cannot delete contact person because they have associated item requests. Please remove the item requests first.",
+          400
+        )
+      );
     }
 
     await contactPersonRepository.remove(contactPerson);
@@ -1602,6 +1618,7 @@ function formatContactPersonResponse(contactPerson: any) {
 // Add missing import
 import { Not } from "typeorm";
 import { link } from "pdfkit";
+import { RequestedItem } from "../models/requested_items";
 export const getAllStarBusinesses = async (
   req: Request,
   res: Response,

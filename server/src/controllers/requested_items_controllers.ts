@@ -3,6 +3,7 @@ import { RequestedItem } from "../models/requested_items";
 import { StarBusinessDetails } from "../models/star_business_details";
 import { ContactPerson } from "../models/contact_person";
 import { AppDataSource } from "../config/database";
+import { Customer } from "../models/customers";
 
 export class RequestedItemController {
   private requestedItemRepository = AppDataSource.getRepository(RequestedItem);
@@ -22,8 +23,7 @@ export class RequestedItemController {
 
       const queryBuilder = this.requestedItemRepository
         .createQueryBuilder("requestedItem")
-        .leftJoinAndSelect("requestedItem.business", "business")
-        .leftJoinAndSelect("business.customer", "customer") // Join business -> customer
+        .leftJoinAndSelect("requestedItem.business", "starBusiness")
         .leftJoinAndSelect("requestedItem.contactPerson", "contactPerson")
         .orderBy("requestedItem.createdAt", "DESC");
 
@@ -60,9 +60,41 @@ export class RequestedItemController {
         .take(Number(limit))
         .getManyAndCount();
 
+      const customerRepository = AppDataSource.getRepository(Customer);
+
+      const enrichedItems = await Promise.all(
+        items.map(async (item) => {
+          const customer = await customerRepository.findOne({
+            where: { starBusinessDetails: { id: item.businessId } },
+            relations: ["starBusinessDetails"],
+          });
+
+          return {
+            ...item,
+            business: {
+              ...item.business,
+              customer: customer
+                ? {
+                    id: customer.id,
+                    companyName: customer.companyName,
+                    legalName: customer.legalName,
+                    email: customer.email,
+                    contactEmail: customer.contactEmail,
+                    contactPhoneNumber: customer.contactPhoneNumber,
+                    stage: customer.stage,
+                    avatar: customer.avatar,
+                    createdAt: customer.createdAt,
+                    updatedAt: customer.updatedAt,
+                  }
+                : null,
+            },
+          };
+        })
+      );
+
       return response.status(200).json({
         success: true,
-        data: items,
+        data: enrichedItems,
         pagination: {
           page: Number(page),
           limit: Number(limit),
@@ -78,7 +110,6 @@ export class RequestedItemController {
       });
     }
   }
-
   async getRequestedItemById(request: Request, response: Response) {
     try {
       const { id } = request.params;
