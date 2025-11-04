@@ -856,7 +856,7 @@ export const getAllContactPersons = async (
 
     // Get all star business customers with their contact persons
     const allCustomers = await customerRepository.find({
-      where: { stage: "star_business" },
+      where: {},
       relations: [
         "starBusinessDetails",
         "starBusinessDetails.contactPersons",
@@ -1755,7 +1755,6 @@ export const getStarBusinessesWithoutContacts = async (
 
     const customerRepository = AppDataSource.getRepository(Customer);
 
-    // Get all star business AND star customer customers with their relations
     const starCustomers = await customerRepository.find({
       where: {
         stage: In(["star_business", "star_customer"]),
@@ -1787,7 +1786,11 @@ export const getStarBusinessesWithoutContacts = async (
 
       // For star_customer: they don't have contact persons by definition
       if (customer.stage === "star_customer") {
-        return true;
+        return (
+          customer.starBusinessDetails &&
+          (!customer.starBusinessDetails.contactPersons ||
+            customer.starBusinessDetails.contactPersons.length === 0)
+        );
       }
 
       return false;

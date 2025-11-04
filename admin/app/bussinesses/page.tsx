@@ -818,31 +818,39 @@ const BusinessSearchPage: React.FC = () => {
                       <tr
                         key={business.id}
                         className="hover:bg-gray-50 w-max transition-colors"
-                        onClick={() => {
-                          router.push(
-                            `/bussinesses/new?businessId=${business.id}&view=true`
-                          );
-                        }}
                       >
                         <td className="p-4">
                           <input
                             type="checkbox"
                             checked={selectedBusinesses.has(business.id)}
                             onChange={(e) => {
-                              e.stopPropagation(); // Also good to add here to prevent row navigation when checking
                               handleSelectBusiness(business.id);
                             }}
                             className="w-4 h-4 text-primary focus:ring-primary border-gray-300 rounded"
                           />
                         </td>
-                        <td className="px-4 py-3">
+                        <td
+                          className="px-4 py-3 cursor-pointer"
+                          onClick={() => {
+                            router.push(
+                              `/bussinesses/new?businessId=${business.id}&view=true`
+                            );
+                          }}
+                        >
                           <div>
                             <p className="font-medium w-[200px] text-gray-900">
                               {business.name}
                             </p>
                           </div>
                         </td>
-                        <td className="px-4 py-3">
+                        <td
+                          className="px-4 py-3 cursor-pointer"
+                          onClick={() => {
+                            router.push(
+                              `/bussinesses/new?businessId=${business.id}&view=true`
+                            );
+                          }}
+                        >
                           <div className="text-sm">
                             <p className="text-gray-900 w-[200px]">
                               {(() => {
@@ -886,7 +894,6 @@ const BusinessSearchPage: React.FC = () => {
                               href={`https://${business.website}`}
                               target="_blank"
                               rel="noopener noreferrer"
-                              onClick={(e) => e.stopPropagation()} // This prevents the row click
                               className="text-primary hover:underline flex items-center gap-1"
                             >
                               <GlobeAltIcon className="w-4 h-4" />
@@ -898,13 +905,34 @@ const BusinessSearchPage: React.FC = () => {
                             <span className="text-gray-400">-</span>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-center">
+                        <td
+                          className="px-4 py-3 text-center cursor-pointer"
+                          onClick={() => {
+                            router.push(
+                              `/bussinesses/new?businessId=${business.id}&view=true`
+                            );
+                          }}
+                        >
                           {business.isDeviceMaker}{" "}
                         </td>
-                        <td className="px-4 py-3">
+                        <td
+                          className="px-4 py-3 cursor-pointer"
+                          onClick={() => {
+                            router.push(
+                              `/bussinesses/new?businessId=${business.id}&view=true`
+                            );
+                          }}
+                        >
                           {formatDateTime(business.check_timestamp)}
                         </td>
-                        <td className="px-4 py-3">
+                        <td
+                          className="px-4 py-3 cursor-pointer"
+                          onClick={() => {
+                            router.push(
+                              `/bussinesses/new?businessId=${business.id}&view=true`
+                            );
+                          }}
+                        >
                           {business.stage ? (
                             <span
                               className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-full ${getStageBadgeColor(
@@ -918,7 +946,14 @@ const BusinessSearchPage: React.FC = () => {
                           )}
                         </td>
                         <td className="px-4 py-3"></td>
-                        <td className="px-4 py-3">
+                        <td
+                          className="px-4 py-3 cursor-pointer"
+                          onClick={() => {
+                            router.push(
+                              `/bussinesses/new?businessId=${business.id}&view=true`
+                            );
+                          }}
+                        >
                           <div className="flex items-center gap-2 text-sm text-gray-600">
                             <CalendarIcon className="w-4 h-4" />
                             {business.createdAt
@@ -930,7 +965,6 @@ const BusinessSearchPage: React.FC = () => {
                           {user?.role === UserRole.ADMIN && (
                             <button
                               onClick={(e) => {
-                                e.stopPropagation();
                                 handleDeleteBusiness(business.id);
                               }}
                               className="p-1 hover:bg-gray-100 rounded transition-colors"
