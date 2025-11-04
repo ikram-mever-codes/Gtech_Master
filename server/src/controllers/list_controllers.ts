@@ -1348,8 +1348,8 @@ export const getAllLists = async (
   next: NextFunction
 ) => {
   try {
-    const { refresh = "true" } = req.query; // Add optional refresh parameter
-    const shouldRefresh = refresh === "true";
+    const { refresh = "false" } = req.query; // Add optional refresh parameter
+    const shouldRefresh = false;
 
     const listRepository = AppDataSource.getRepository(List);
     const listItemRepository = AppDataSource.getRepository(ListItem);

@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, use } from "react";
 import {
   MagnifyingGlassIcon,
   FunnelIcon,
@@ -42,7 +42,11 @@ import {
   type StarBusinessWithoutContactData,
 } from "@/api/contacts";
 import CustomButton from "@/components/UI/CustomButton";
-import { Google, LinkedIn } from "@mui/icons-material";
+import { Add, Delete, Google, LinkedIn } from "@mui/icons-material";
+import { RootState } from "../Redux/store";
+import { useSelector } from "react-redux";
+import { UserRole } from "@/utils/interfaces";
+import Link from "next/link";
 
 // Tab type
 type TabType = "all" | "no-contacts" | "sales";
@@ -68,6 +72,7 @@ const ContactPersonsPage: React.FC = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [decisionMakersTotalPages, setDecisionMakersTotalPages] = useState(1);
   const [totalRecords, setTotalRecords] = useState(0);
+  const { user } = useSelector((state: RootState) => state.user);
   const [decisionMakersTotalRecords, setDecisionMakersTotalRecords] =
     useState(0);
   const [selectedContacts, setSelectedContacts] = useState<Set<string>>(
@@ -293,8 +298,10 @@ const ContactPersonsPage: React.FC = () => {
   // Handle delete contact
   const handleDeleteContact = async (contactId: string) => {
     try {
+      const cfs = window.confirm("Do you want to delete this contact?");
+      if (!cfs) return;
       await deleteContactPerson(contactId);
-      fetchContactPersons(); // Refresh the list
+      fetchContactPersons();
       if (activeTab === "sales") {
         fetchDecisionMakers(); // Refresh decision makers list
       }
@@ -532,15 +539,25 @@ const ContactPersonsPage: React.FC = () => {
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 p-8">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Contact Persons Management
-          </h1>
-          <p className="text-gray-600">
-            Manage and track all contact persons across star businesses
-          </p>
-        </div>
 
+        <div className="w-full items-center  flex justify-between">
+          <div className="mb-3">
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">
+              Contact Persons Management
+            </h1>
+          </div>
+          {activeTab === "sales" && (
+            <CustomButton
+              startIcon={<Add />}
+              href={"/requested-items"}
+              LinkComponent={"a"}
+              gradient={true}
+              className="h-[3rem]"
+            >
+              Add Requested Items
+            </CustomButton>
+          )}
+        </div>
         {/* Tabs */}
         <div className="border-b border-gray-200 mb-6">
           <nav className="-mb-px flex space-x-8">
@@ -960,6 +977,15 @@ const ContactPersonsPage: React.FC = () => {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="flex items-center gap-2">
+                              {user?.role === UserRole.ADMIN && (
+                                <button
+                                  onClick={async () => {
+                                    await handleDeleteContact(contact.id);
+                                  }}
+                                >
+                                  <Delete sx={{ fontSize: 16, color: "red" }} />
+                                </button>
+                              )}
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();

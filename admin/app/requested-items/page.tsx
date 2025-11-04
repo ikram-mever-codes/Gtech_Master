@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, use } from "react";
 import {
   MagnifyingGlassIcon,
   FunnelIcon,
@@ -35,6 +35,10 @@ import {
 } from "@/api/requested_items";
 import CustomButton from "@/components/UI/CustomButton";
 import { getAllContactPersons } from "@/api/contacts";
+import { Delete } from "@mui/icons-material";
+import { RootState } from "../Redux/store";
+import { useSelector } from "react-redux";
+import { UserRole } from "@/utils/interfaces";
 
 // Add interface for ContactPerson
 interface ContactPerson {
@@ -64,6 +68,8 @@ const RequestedItemsPage: React.FC = () => {
   const [statistics, setStatistics] = useState<RequestedItemsStatistics | null>(
     null
   );
+  const { user } = useSelector((state: RootState) => state.user);
+
   const [showFilters, setShowFilters] = useState(false);
   const [editModeEnabled, setEditModeEnabled] = useState(false);
   // Add state for contact persons
@@ -448,7 +454,7 @@ const RequestedItemsPage: React.FC = () => {
                   className="px-4 py-2 bg-gray-600/90 backdrop-blur-sm text-white rounded-lg hover:bg-gray-700/90 transition-all flex items-center gap-2"
                 >
                   <PlusIcon className="h-5 w-5" />
-                  Add Item
+                  Add Request
                 </CustomButton>
               </div>
             </div>
@@ -593,7 +599,7 @@ const RequestedItemsPage: React.FC = () => {
                       Item Name
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Contact Per
+                      Contact Person
                     </th>
 
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -616,6 +622,9 @@ const RequestedItemsPage: React.FC = () => {
                     </th>
                     <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Created
+                    </th>
+                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Actions{" "}
                     </th>
                   </tr>
                 </thead>
@@ -640,7 +649,9 @@ const RequestedItemsPage: React.FC = () => {
                       </td>
                       <td className="px-6 py-4">
                         <div className="text-sm text-gray-900">
-                          {item.contactPerson?.email || "-"}
+                          {item.contactPerson?.name +
+                            " " +
+                            item.contactPerson?.familyName || "-"}
                         </div>
                       </td>
                       <td className="px-6 py-4">
@@ -717,6 +728,17 @@ const RequestedItemsPage: React.FC = () => {
                         <div className="text-sm text-gray-900">
                           {formatDate(item.createdAt)}
                         </div>
+                      </td>
+                      <td className="px-6 py-4 text-center whitespace-nowrap">
+                        {user?.role === UserRole.ADMIN && (
+                          <button
+                            onClick={async () => {
+                              await deleteRequestedItem(item.id);
+                            }}
+                          >
+                            <Delete sx={{ fontSize: 16, color: "red" }} />
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -1152,7 +1174,9 @@ const RequestedItemsPage: React.FC = () => {
                         onClick={handleSubmit}
                         className="px-4 py-2 bg-gray-600/90 backdrop-blur-sm text-white rounded-lg hover:bg-gray-700/90 transition-all"
                       >
-                        {modalMode === "edit" ? "Update Item" : "Add Item"}
+                        {modalMode === "edit"
+                          ? "Update Request"
+                          : "Add Request"}
                       </CustomButton>
                     )}
                   </div>

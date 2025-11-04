@@ -8,7 +8,12 @@ import { In, Like } from "typeorm";
 import { StarBusinessDetails } from "../models/star_business_details";
 import { StarCustomerDetails } from "../models/star_customer_details";
 import crypto from "crypto";
-import { CustomerCreator, List, LIST_STATUS } from "../models/list";
+import {
+  CustomerCreator,
+  List,
+  LIST_STATUS,
+  ListCreator,
+} from "../models/list";
 import sendEmail from "../services/emailService";
 import bcrypt from "bcryptjs";
 import { User } from "../models/users";
@@ -1915,10 +1920,6 @@ export const deleteBusiness = async (
     const { id } = req.params;
 
     const customerRepository = AppDataSource.getRepository(Customer);
-    const starBusinessDetailsRepository =
-      AppDataSource.getRepository(StarBusinessDetails);
-    const starCustomerDetailsRepository =
-      AppDataSource.getRepository(StarCustomerDetails);
 
     // Find the customer with all related entities
     const customer = await customerRepository.findOne({
@@ -1936,7 +1937,9 @@ export const deleteBusiness = async (
 
     // Check for contact persons and requested items in star business details
     if (customer.starBusinessDetails) {
-      const starBusinessDetails = await starBusinessDetailsRepository.findOne({
+      const starBusinessDetails = await AppDataSource.getRepository(
+        StarBusinessDetails
+      ).findOne({
         where: { id: customer.starBusinessDetails.id },
         relations: ["contactPersons", "requestedItems"],
       });
@@ -1970,29 +1973,116 @@ export const deleteBusiness = async (
       }
     }
 
-    // Check for invoices in star customer details
-    if (customer.starCustomerDetails) {
-      const starCustomerDetails = await starCustomerDetailsRepository.findOne({
-        where: { id: customer.starCustomerDetails.id },
-        relations: ["invoices"],
-      });
-
-      if (
-        starCustomerDetails &&
-        starCustomerDetails.invoices &&
-        starCustomerDetails.invoices.length > 0
-      ) {
-        return next(
-          new ErrorHandler(
-            "Cannot delete business because it has associated invoices. Please delete the invoices first.",
-            400
+    // Use a transaction to ensure all operations succeed or fail together
+    await AppDataSource.transaction(async (transactionalEntityManager) => {
+      // 1. Delete all list_activity_log records
+      await transactionalEntityManager.query(
+        `DELETE FROM list_activity_log WHERE "listId" IN (
+          SELECT id FROM list WHERE "customerId" = $1
+          UNION
+          SELECT id FROM list WHERE "createdById" IN (
+            SELECT id FROM list_creator WHERE "customerId" = $1
           )
+        )`,
+        [id]
+      );
+
+      // 2. Delete all list_item records
+      await transactionalEntityManager.query(
+        `DELETE FROM list_item WHERE "listId" IN (
+          SELECT id FROM list WHERE "customerId" = $1
+          UNION
+          SELECT id FROM list WHERE "createdById" IN (
+            SELECT id FROM list_creator WHERE "customerId" = $1
+          )
+        )`,
+        [id]
+      );
+
+      // 3. Delete all lists that reference this customer directly or via list_creator
+      await transactionalEntityManager.query(
+        `DELETE FROM list WHERE "customerId" = $1 OR "createdById" IN (
+          SELECT id FROM list_creator WHERE "customerId" = $1
+        )`,
+        [id]
+      );
+
+      // 4. Delete list_creator records
+      await transactionalEntityManager.query(
+        `DELETE FROM list_creator WHERE "customerId" = $1`,
+        [id]
+      );
+
+      // 5. Delete any other direct list references to customer
+      await transactionalEntityManager.query(
+        `DELETE FROM list WHERE "customerId" = $1`,
+        [id]
+      );
+
+      // 6. Delete invoice items first (if they exist)
+      await transactionalEntityManager.query(
+        `DELETE FROM invoice_item WHERE "invoiceId" IN (
+          SELECT id FROM invoice WHERE "customerId" = $1
+        )`,
+        [id]
+      );
+
+      // 7. Delete invoices
+      await transactionalEntityManager.query(
+        `DELETE FROM invoice WHERE "customerId" = $1`,
+        [id]
+      );
+
+      // 8. Delete star customer details invoices if they exist
+      if (customer.starCustomerDetails) {
+        await transactionalEntityManager.query(
+          `DELETE FROM invoice WHERE "starCustomerDetailsId" = $1`,
+          [customer.starCustomerDetails.id]
         );
       }
-    }
 
-    // If all checks pass, delete the customer
-    await customerRepository.remove(customer);
+      // 9. Delete any user_customer relationships
+      await transactionalEntityManager.query(
+        `DELETE FROM user_customers_customer WHERE "customerId" = $1`,
+        [id]
+      );
+
+      // 10. Delete any other junction table relationships
+      await transactionalEntityManager.query(
+        `DELETE FROM customer_users_user WHERE "customerId" = $1`,
+        [id]
+      );
+
+      // 11. Delete business details if exists
+      if (customer.businessDetails) {
+        await transactionalEntityManager.query(
+          `DELETE FROM business_details WHERE id = $1`,
+          [customer.businessDetails.id]
+        );
+      }
+
+      // 12. Delete star customer details if exists
+      if (customer.starCustomerDetails) {
+        await transactionalEntityManager.query(
+          `DELETE FROM star_customer_details WHERE id = $1`,
+          [customer.starCustomerDetails.id]
+        );
+      }
+
+      // 13. Delete star business details if exists (after checking contact persons and requested items)
+      if (customer.starBusinessDetails) {
+        await transactionalEntityManager.query(
+          `DELETE FROM star_business_details WHERE id = $1`,
+          [customer.starBusinessDetails.id]
+        );
+      }
+
+      // 14. Finally delete the customer
+      await transactionalEntityManager.query(
+        `DELETE FROM customer WHERE id = $1`,
+        [id]
+      );
+    });
 
     return res.status(200).json({
       success: true,

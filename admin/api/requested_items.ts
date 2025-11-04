@@ -166,6 +166,10 @@ export const updateRequestedItem = async (
 // Delete requested item
 export const deleteRequestedItem = async (id: string) => {
   try {
+    const cfs = window.confirm(
+      "Are you sure you want to delete this requested item?"
+    );
+    if (!cfs) return;
     toast.loading("Deleting requested item...", loadingStyles);
     const response = await api.delete(`/requested-items/${id}`);
     toast.dismiss();
