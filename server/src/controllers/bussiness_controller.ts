@@ -1916,8 +1916,6 @@ export const deleteBusiness = async (
   res: Response,
   next: NextFunction
 ) => {
-  const queryRunner = AppDataSource.createQueryRunner();
-
   try {
     const { id } = req.params;
 
@@ -1960,131 +1958,41 @@ export const deleteBusiness = async (
       }
     }
 
-    // Connect query runner and start transaction
+    // SIMPLE FOCUSED APPROACH - Just handle list_creator and delete customer
+    const queryRunner = AppDataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
 
-    console.log(`Starting nuclear deletion for customer: ${id}`);
-
     try {
-      // 1. DISABLE FOREIGN KEY CONSTRAINTS
+      // DISABLE CONSTRAINTS
       await queryRunner.query("SET session_replication_role = replica;");
 
-      // 2. DELETE EVERYTHING IN CORRECT ORDER
-
-      // Delete list_activity_log records
-      await queryRunner.query(
-        `
-        DELETE FROM list_activity_log 
-        WHERE "listId" IN (
-          SELECT id FROM list 
-          WHERE "customerId" = $1 
-          OR "createdById" IN (SELECT id FROM list_creator WHERE "customerId" = $1)
-        )
-      `,
-        [id]
-      );
-
-      // Delete list_item records
-      await queryRunner.query(
-        `
-        DELETE FROM list_item 
-        WHERE "listId" IN (
-          SELECT id FROM list 
-          WHERE "customerId" = $1 
-          OR "createdById" IN (SELECT id FROM list_creator WHERE "customerId" = $1)
-        )
-      `,
-        [id]
-      );
-
-      // Delete list_item that reference list_creator directly
-      await queryRunner.query(
-        `
-        DELETE FROM list_item 
-        WHERE "createdById" IN (SELECT id FROM list_creator WHERE "customerId" = $1)
-      `,
-        [id]
-      );
-
-      // Delete lists that reference customer directly
-      await queryRunner.query(`DELETE FROM list WHERE "customerId" = $1`, [id]);
-
-      // Delete lists that reference list_creator
-      await queryRunner.query(
-        `
-        DELETE FROM list 
-        WHERE "createdById" IN (SELECT id FROM list_creator WHERE "customerId" = $1)
-      `,
-        [id]
-      );
-
-      // DELETE LIST_CREATOR RECORDS - This is the key!
+      // 1. Delete list_creator records FIRST (this is the main blocker)
       await queryRunner.query(
         `DELETE FROM list_creator WHERE "customerId" = $1`,
         [id]
       );
 
-      // Delete invoice items
-      await queryRunner.query(
-        `
-        DELETE FROM invoice_item 
-        WHERE "invoiceId" IN (SELECT id FROM invoice WHERE "customerId" = $1)
-      `,
-        [id]
-      );
-
-      // Delete invoices
-      await queryRunner.query(`DELETE FROM invoice WHERE "customerId" = $1`, [
-        id,
-      ]);
-
-      // Delete related entities
-      if (customer.starBusinessDetails) {
-        await queryRunner.query(
-          `DELETE FROM star_business_details WHERE id = $1`,
-          [customer.starBusinessDetails.id]
-        );
-      }
-
-      if (customer.starCustomerDetails) {
-        await queryRunner.query(
-          `DELETE FROM star_customer_details WHERE id = $1`,
-          [customer.starCustomerDetails.id]
-        );
-      }
-
-      if (customer.businessDetails) {
-        await queryRunner.query(`DELETE FROM business_details WHERE id = $1`, [
-          customer.businessDetails.id,
-        ]);
-      }
-
-      // FINALLY DELETE THE CUSTOMER
+      // 2. Delete customer
       await queryRunner.query(`DELETE FROM customer WHERE id = $1`, [id]);
 
-      // 3. RE-ENABLE FOREIGN KEY CONSTRAINTS
+      // RE-ENABLE CONSTRAINTS
       await queryRunner.query("SET session_replication_role = DEFAULT;");
 
-      // Commit transaction
       await queryRunner.commitTransaction();
-
-      console.log("Business deleted successfully");
 
       return res.status(200).json({
         success: true,
         message: "Business deleted successfully",
       });
     } catch (error) {
-      // Rollback transaction if anything fails
       await queryRunner.rollbackTransaction();
       throw error;
+    } finally {
+      await queryRunner.release();
     }
   } catch (error: any) {
     console.error("Error deleting business:", error);
     return next(new ErrorHandler("Failed to delete business", 500));
-  } finally {
-    // Always release query runner
-    await queryRunner.release();
   }
 };
