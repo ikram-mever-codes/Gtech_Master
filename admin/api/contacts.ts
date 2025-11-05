@@ -67,6 +67,7 @@ export type ContactPersonData = {
   stateLinkedIn: LinkedInState;
   contact: ContactType;
   note?: string;
+  decisionMakerNote?: string;
   createdAt: string;
   updatedAt: string;
 };

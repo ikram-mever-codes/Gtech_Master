@@ -54,6 +54,24 @@ type TabType = "all" | "no-contacts" | "sales";
 // Modal mode type
 type ModalMode = "create" | "edit";
 
+interface ContactFormData {
+  starBusinessDetailsId: string;
+  name: string;
+  familyName: string;
+  sex: string;
+  position: string;
+  positionOthers: string;
+  email: string;
+  phone: string;
+  linkedInLink: string;
+  stateLinkedIn: string;
+  contact: string;
+  decisionMakerState: string;
+  note: string;
+  noteContactPreference: string;
+  decisionMakerNote: string; // NEW FIELD
+}
+
 const ContactPersonsPage: React.FC = () => {
   const router = useRouter();
 
@@ -88,6 +106,8 @@ const ContactPersonsPage: React.FC = () => {
   const [businessesWithoutContactsCount, setBusinessesWithoutContactsCount] =
     useState(0);
   const [editModeEnabled, setEditModeEnabled] = useState(false);
+  const [showNotesModal, setShowNotesModal] = useState(false);
+  const [notesModalData, setNotesModalData] = useState<any>(null);
 
   const itemsPerPage = 20;
 
@@ -113,8 +133,8 @@ const ContactPersonsPage: React.FC = () => {
     limit: itemsPerPage,
   });
 
-  // Create/Edit contact form state
-  const [createForm, setCreateForm] = useState<CreateContactPersonPayload>({
+  // Form state with decisionMakerNote field
+  const [createForm, setCreateForm] = useState<any>({
     starBusinessDetailsId: "",
     name: "",
     familyName: "",
@@ -129,6 +149,7 @@ const ContactPersonsPage: React.FC = () => {
     decisionMakerState: "",
     note: "",
     noteContactPreference: "",
+    decisionMakerNote: "", // Initialize the new field
   });
 
   // Fetch contact persons
@@ -153,6 +174,13 @@ const ContactPersonsPage: React.FC = () => {
     }
   }, [filters, currentPage]);
 
+  const isDecisionMakerContact = (contactType: string) => {
+    return [
+      "DecisionMaker technical",
+      "DecisionMaker financial",
+      "real DecisionMaker",
+    ].includes(contactType);
+  };
   // Fetch decision makers
   const fetchDecisionMakers = useCallback(async () => {
     setLoadingDecisionMakers(true);
@@ -251,6 +279,7 @@ const ContactPersonsPage: React.FC = () => {
       decisionMakerState: contact.decisionMakerState || "",
       note: contact.note || "",
       noteContactPreference: contact.noteContactPreference || "",
+      decisionMakerNote: contact.decisionMakerNote || "", // Include decisionMakerNote
     });
 
     // Set the selected business if it exists
@@ -390,7 +419,6 @@ const ContactPersonsPage: React.FC = () => {
 
   // Handle create/edit contact submission
   const handleCreateContact = async () => {
-    // Validation
     if (!createForm.name || !createForm.familyName || !createForm.position) {
       toast.error("Please fill in all required fields");
       return;
@@ -407,7 +435,7 @@ const ContactPersonsPage: React.FC = () => {
     }
 
     try {
-      const payload = {
+      const payload: any = {
         ...createForm,
         starBusinessDetailsId:
           selectedBusiness?.id || createForm.starBusinessDetailsId,
@@ -516,22 +544,44 @@ const ContactPersonsPage: React.FC = () => {
     return position;
   };
 
-  // Render note icons
-  const renderNoteIcons = (note: any) => {
-    if (!note) return null;
-
+  const handleOpenNotesModal = (contact: any) => {
+    setNotesModalData(contact);
+    setShowNotesModal(true);
+  };
+  const renderNoteIcons = (contact: any) => {
+    if (
+      !contact.note &&
+      !contact.noteContactPreference &&
+      !contact.decisionMakerNote
+    ) {
+      return null;
+    }
+    console.log(contact);
     return (
-      <div className="flex gap-1">
-        <span className="text-blue-500" title="Contact Note">
-          📞
-        </span>
-        <span className="text-green-500" title="Preference Note">
-          ⭐
-        </span>
-        <span className="text-purple-500" title="Sales Note">
-          💰
-        </span>
-      </div>
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          handleOpenNotesModal(contact);
+        }}
+        className="flex gap-1 hover:bg-gray-100 p-1 rounded cursor-pointer"
+        title="Click to view all notes"
+      >
+        {contact.note && (
+          <span className="text-blue-500" title="General Note">
+            📝
+          </span>
+        )}
+        {contact.noteContactPreference && (
+          <span className="text-green-500" title="Contact Preference">
+            ⭐
+          </span>
+        )}
+        {contact.decisionMakerNote && (
+          <span className="text-purple-500" title="Decision Maker Note">
+            💼
+          </span>
+        )}
+      </button>
     );
   };
 
@@ -856,10 +906,12 @@ const ContactPersonsPage: React.FC = () => {
                       {contactPersons.map((contact) => (
                         <tr
                           key={contact.id}
-                          className="hover:bg-gray-50/50 transition-colors cursor-pointer"
-                          onClick={() => handleContactPersonClick(contact)}
+                          className="hover:bg-gray-50/50 transition-colors"
                         >
-                          <td className="px-6 py-4">
+                          <td
+                            className="px-6 py-4 cursor-pointer"
+                            onClick={() => handleContactPersonClick(contact)}
+                          >
                             <a
                               href={`/bussinesses/new?businessId=${contact.businessId}`}
                               className="text-sm text-blue-600 hover:text-blue-800 text-left"
@@ -868,7 +920,10 @@ const ContactPersonsPage: React.FC = () => {
                               {contact.businessName || "-"}
                             </a>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
+                          <td
+                            className="px-6 py-4 whitespace-nowrap cursor-pointer"
+                            onClick={() => handleContactPersonClick(contact)}
+                          >
                             <div>
                               <div className="text-sm font-medium text-gray-900">
                                 {contact.name} {contact.familyName}
@@ -880,7 +935,10 @@ const ContactPersonsPage: React.FC = () => {
                               )}
                             </div>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
+                          <td
+                            className="px-6 py-4 whitespace-nowrap cursor-pointer"
+                            onClick={() => handleContactPersonClick(contact)}
+                          >
                             <div className="text-sm text-gray-900">
                               {getPositionLabel(
                                 contact.position,
@@ -888,7 +946,10 @@ const ContactPersonsPage: React.FC = () => {
                               )}
                             </div>
                           </td>
-                          <td className="px-6 py-4">
+                          <td
+                            className="px-6 py-4 cursor-pointer"
+                            onClick={() => handleContactPersonClick(contact)}
+                          >
                             <div className="space-y-1">
                               {contact.email && (
                                 <a
@@ -916,7 +977,6 @@ const ContactPersonsPage: React.FC = () => {
                             <select
                               value={contact.stateLinkedIn}
                               onChange={(e) => {
-                                e.stopPropagation();
                                 handleUpdateLinkedInState(
                                   contact.id,
                                   e.target.value
@@ -925,7 +985,6 @@ const ContactPersonsPage: React.FC = () => {
                               className={`text-xs px-2 w-max max-w-[150px] truncate mr-4 py-1 rounded-full font-medium border-0 cursor-pointer ${getLinkedInStateColor(
                                 contact.stateLinkedIn
                               )}`}
-                              onClick={(e) => e.stopPropagation()}
                             >
                               {LINKEDIN_STATES.map((state: any) => (
                                 <option key={state.value} value={state.value}>
@@ -939,7 +998,6 @@ const ContactPersonsPage: React.FC = () => {
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="mt-1 inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800"
-                                onClick={(e) => e.stopPropagation()}
                               >
                                 <Linkedin className="h-3 w-3" />
                                 Profile
@@ -957,7 +1015,6 @@ const ContactPersonsPage: React.FC = () => {
                             <select
                               value={contact.decisionMakerState || ""}
                               onChange={(e) => {
-                                e.stopPropagation();
                                 handleUpdateDecisionMakerState(
                                   contact.id,
                                   e.target.value
@@ -966,7 +1023,6 @@ const ContactPersonsPage: React.FC = () => {
                               className={`text-xs px-2 w-max max-w-[180px] truncate py-1 rounded-full font-medium border-0 cursor-pointer ${getDecisionMakerStateColor(
                                 contact.decisionMakerState || ""
                               )}`}
-                              onClick={(e) => e.stopPropagation()}
                             >
                               {DECISION_MAKER_STATES.map((state: any) => (
                                 <option key={state.value} value={state.value}>
@@ -988,7 +1044,6 @@ const ContactPersonsPage: React.FC = () => {
                               )}
                               <button
                                 onClick={(e) => {
-                                  e.stopPropagation();
                                   const searchQuery = encodeURIComponent(
                                     `${contact.businessName}`.trim()
                                   );
@@ -1004,7 +1059,6 @@ const ContactPersonsPage: React.FC = () => {
                               </button>
                               <button
                                 onClick={(e) => {
-                                  e.stopPropagation();
                                   const searchQuery = encodeURIComponent(
                                     `${contact.businessName} linkedin`.trim()
                                   );
@@ -1323,7 +1377,7 @@ const ContactPersonsPage: React.FC = () => {
                             </select>
                           </td>
                           <td className="px-6 py-4">
-                            {renderNoteIcons(contact.note)}
+                            {renderNoteIcons(contact)}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="flex items-center gap-2">
@@ -1562,7 +1616,6 @@ const ContactPersonsPage: React.FC = () => {
           </div>
         )}
 
-        {/* Create/Edit Contact Modal */}
         {showCreateModal && (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
             <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
@@ -1632,7 +1685,11 @@ const ContactPersonsPage: React.FC = () => {
                             setBusinessSearchTerm(e.target.value);
                             fetchAllStarBusinesses(e.target.value);
                           }}
-                          disabled={modalMode === "edit" && !editModeEnabled}
+                          disabled={
+                            (modalMode === "edit" && !editModeEnabled) ||
+                            (activeTab === "sales" &&
+                              !isDecisionMakerContact(createForm.contact))
+                          }
                           className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
                         />
                         {allStarBusinesses.length > 0 && (
@@ -1716,7 +1773,11 @@ const ContactPersonsPage: React.FC = () => {
                         onChange={(e) =>
                           setCreateForm({ ...createForm, name: e.target.value })
                         }
-                        disabled={modalMode === "edit" && !editModeEnabled}
+                        disabled={
+                          (modalMode === "edit" && !editModeEnabled) ||
+                          (activeTab === "sales" &&
+                            !isDecisionMakerContact(createForm.contact))
+                        }
                         className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
                         placeholder="Peter"
                       />
@@ -1734,7 +1795,11 @@ const ContactPersonsPage: React.FC = () => {
                             familyName: e.target.value,
                           })
                         }
-                        disabled={modalMode === "edit" && !editModeEnabled}
+                        disabled={
+                          (modalMode === "edit" && !editModeEnabled) ||
+                          (activeTab === "sales" &&
+                            !isDecisionMakerContact(createForm.contact))
+                        }
                         className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
                         placeholder="Müller"
                       />
@@ -1746,13 +1811,17 @@ const ContactPersonsPage: React.FC = () => {
                       </label>
                       <select
                         value={createForm.sex}
-                        onChange={(e: any) =>
+                        onChange={(e) =>
                           setCreateForm({
                             ...createForm,
                             sex: e.target.value,
                           })
                         }
-                        disabled={modalMode === "edit" && !editModeEnabled}
+                        disabled={
+                          (modalMode === "edit" && !editModeEnabled) ||
+                          (activeTab === "sales" &&
+                            !isDecisionMakerContact(createForm.contact))
+                        }
                         className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
                       >
                         <option value="">Geschlecht auswählen</option>
@@ -1773,10 +1842,14 @@ const ContactPersonsPage: React.FC = () => {
                         onChange={(e) =>
                           setCreateForm({
                             ...createForm,
-                            position: e.target.value as any,
+                            position: e.target.value,
                           })
                         }
-                        disabled={modalMode === "edit" && !editModeEnabled}
+                        disabled={
+                          (modalMode === "edit" && !editModeEnabled) ||
+                          (activeTab === "sales" &&
+                            !isDecisionMakerContact(createForm.contact))
+                        }
                         className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
                       >
                         <option value="">Position auswählen</option>
@@ -1803,7 +1876,11 @@ const ContactPersonsPage: React.FC = () => {
                               positionOthers: e.target.value,
                             })
                           }
-                          disabled={modalMode === "edit" && !editModeEnabled}
+                          disabled={
+                            (modalMode === "edit" && !editModeEnabled) ||
+                            (activeTab === "sales" &&
+                              !isDecisionMakerContact(createForm.contact))
+                          }
                           className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
                           placeholder="Position beschreiben"
                         />
@@ -1824,7 +1901,11 @@ const ContactPersonsPage: React.FC = () => {
                             email: e.target.value,
                           })
                         }
-                        disabled={modalMode === "edit" && !editModeEnabled}
+                        disabled={
+                          (modalMode === "edit" && !editModeEnabled) ||
+                          (activeTab === "sales" &&
+                            !isDecisionMakerContact(createForm.contact))
+                        }
                         className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
                         placeholder="max.mustermann@beispiel.de"
                       />
@@ -1842,7 +1923,11 @@ const ContactPersonsPage: React.FC = () => {
                             phone: e.target.value,
                           })
                         }
-                        disabled={modalMode === "edit" && !editModeEnabled}
+                        disabled={
+                          (modalMode === "edit" && !editModeEnabled) ||
+                          (activeTab === "sales" &&
+                            !isDecisionMakerContact(createForm.contact))
+                        }
                         className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
                         placeholder="+49 171 1234567"
                       />
@@ -1862,7 +1947,11 @@ const ContactPersonsPage: React.FC = () => {
                             linkedInLink: e.target.value,
                           })
                         }
-                        disabled={modalMode === "edit" && !editModeEnabled}
+                        disabled={
+                          (modalMode === "edit" && !editModeEnabled) ||
+                          (activeTab === "sales" &&
+                            !isDecisionMakerContact(createForm.contact))
+                        }
                         className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
                         placeholder="https://linkedin.com/in/maxmustermann"
                       />
@@ -1876,13 +1965,17 @@ const ContactPersonsPage: React.FC = () => {
                         onChange={(e) =>
                           setCreateForm({
                             ...createForm,
-                            stateLinkedIn: e.target.value as any,
+                            stateLinkedIn: e.target.value,
                           })
                         }
-                        disabled={modalMode === "edit" && !editModeEnabled}
+                        disabled={
+                          (modalMode === "edit" && !editModeEnabled) ||
+                          (activeTab === "sales" &&
+                            !isDecisionMakerContact(createForm.contact))
+                        }
                         className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
                       >
-                        {LINKEDIN_STATES.map((state: any) => (
+                        {LINKEDIN_STATES.map((state) => (
                           <option key={state.value} value={state.value}>
                             {state.label}
                           </option>
@@ -1891,7 +1984,7 @@ const ContactPersonsPage: React.FC = () => {
                     </div>
 
                     {/* Contact Type */}
-                    <div>
+                    <div className="col-span-2">
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Contact Type
                       </label>
@@ -1900,10 +1993,14 @@ const ContactPersonsPage: React.FC = () => {
                         onChange={(e) =>
                           setCreateForm({
                             ...createForm,
-                            contact: e.target.value as any,
+                            contact: e.target.value,
                           })
                         }
-                        disabled={modalMode === "edit" && !editModeEnabled}
+                        disabled={
+                          (modalMode === "edit" && !editModeEnabled) ||
+                          (activeTab === "sales" &&
+                            !isDecisionMakerContact(createForm.contact))
+                        }
                         className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
                       >
                         <option value="">Kontaktart auswählen</option>
@@ -1916,7 +2013,7 @@ const ContactPersonsPage: React.FC = () => {
                     </div>
 
                     {/* Decision Maker State */}
-                    <div>
+                    <div className="col-span-2">
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Decision Maker State
                       </label>
@@ -1925,14 +2022,18 @@ const ContactPersonsPage: React.FC = () => {
                         onChange={(e) =>
                           setCreateForm({
                             ...createForm,
-                            decisionMakerState: e.target.value as any,
+                            decisionMakerState: e.target.value,
                           })
                         }
-                        disabled={modalMode === "edit" && !editModeEnabled}
+                        disabled={
+                          (modalMode === "edit" && !editModeEnabled) ||
+                          (activeTab === "sales" &&
+                            !isDecisionMakerContact(createForm.contact))
+                        }
                         className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
                       >
                         <option value="">State auswählen</option>
-                        {DECISION_MAKER_STATES.map((state: any) => (
+                        {DECISION_MAKER_STATES.map((state) => (
                           <option key={state.value} value={state.value}>
                             {state.label}
                           </option>
@@ -1940,7 +2041,7 @@ const ContactPersonsPage: React.FC = () => {
                       </select>
                     </div>
 
-                    {/* Notes */}
+                    {/* Contact Preference Note */}
                     <div className="col-span-2">
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Contact Preference
@@ -1954,11 +2055,43 @@ const ContactPersonsPage: React.FC = () => {
                             noteContactPreference: e.target.value,
                           })
                         }
-                        disabled={modalMode === "edit" && !editModeEnabled}
+                        disabled={
+                          (modalMode === "edit" && !editModeEnabled) ||
+                          (activeTab === "sales" &&
+                            !isDecisionMakerContact(createForm.contact))
+                        }
                         className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
                         placeholder="Beste Erreichbarkeit, bevorzugte Kontaktmethode, etc."
                       />
                     </div>
+
+                    {/* Decision Maker Note - ONLY visible in sales view */}
+                    {activeTab === "sales" && (
+                      <div className="col-span-2 border-l-4 border-purple-500 pl-4 bg-purple-50 rounded-r-lg p-3">
+                        <label className="block text-sm font-medium text-purple-800 mb-1">
+                          Decision Maker Note
+                        </label>
+                        <textarea
+                          value={createForm.decisionMakerNote || ""}
+                          onChange={(e) =>
+                            setCreateForm({
+                              ...createForm,
+                              decisionMakerNote: e.target.value,
+                            })
+                          }
+                          rows={3}
+                          disabled={
+                            (modalMode === "edit" && !editModeEnabled) ||
+                            (activeTab === "sales" &&
+                              !isDecisionMakerContact(createForm.contact))
+                          }
+                          className="w-full px-3 py-2 border border-purple-300 rounded-lg focus:ring-2 focus:ring-purple-500 disabled:bg-gray-100"
+                          placeholder="Key decision-making information, approval authority, budget control, etc."
+                        />
+                      </div>
+                    )}
+
+                    {/* General Notes */}
                     <div className="col-span-2">
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Notes
@@ -1969,7 +2102,11 @@ const ContactPersonsPage: React.FC = () => {
                           setCreateForm({ ...createForm, note: e.target.value })
                         }
                         rows={3}
-                        disabled={modalMode === "edit" && !editModeEnabled}
+                        disabled={
+                          (modalMode === "edit" && !editModeEnabled) ||
+                          (activeTab === "sales" &&
+                            !isDecisionMakerContact(createForm.contact))
+                        }
                         className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
                         placeholder="Zusätzliche Notizen zu diesem Kontakt..."
                       />
@@ -2007,6 +2144,96 @@ const ContactPersonsPage: React.FC = () => {
                       </CustomButton>
                     )}
                   </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {showNotesModal && notesModalData && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+            <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-xl font-bold text-gray-900">
+                    All Notes for {notesModalData.name}{" "}
+                    {notesModalData.familyName}
+                  </h2>
+                  <button
+                    onClick={() => {
+                      setShowNotesModal(false);
+                      setNotesModalData(null);
+                    }}
+                    className="text-gray-400 hover:text-gray-600"
+                  >
+                    <XMarkIcon className="h-6 w-6" />
+                  </button>
+                </div>
+
+                <div className="space-y-6">
+                  {/* General Note */}
+                  <div className="bg-blue-50 rounded-lg p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-blue-500 text-xl">📝</span>
+                      <h3 className="font-semibold text-gray-900">
+                        General Note
+                      </h3>
+                    </div>
+                    <p className="text-gray-700 whitespace-pre-wrap">
+                      {notesModalData.note || "No general notes available"}
+                    </p>
+                  </div>
+
+                  {/* Contact Preference */}
+                  <div className="bg-green-50 rounded-lg p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-green-500 text-xl">⭐</span>
+                      <h3 className="font-semibold text-gray-900">
+                        Contact Preference
+                      </h3>
+                    </div>
+                    <p className="text-gray-700 whitespace-pre-wrap">
+                      {notesModalData.noteContactPreference ||
+                        "No contact preference notes available"}
+                    </p>
+                  </div>
+
+                  {/* Decision Maker Note */}
+                  <div className="bg-purple-50 rounded-lg p-4 border-l-4 border-purple-500">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-purple-500 text-xl">💼</span>
+                      <h3 className="font-semibold text-purple-900">
+                        Decision Maker Note
+                      </h3>
+                    </div>
+                    <p className="text-gray-700 whitespace-pre-wrap font-medium">
+                      {notesModalData.decisionMakerNote ||
+                        "No decision maker notes available"}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-6 flex justify-end gap-3">
+                  <button
+                    onClick={() => {
+                      setShowNotesModal(false);
+                      setNotesModalData(null);
+                      handleEditContact(notesModalData);
+                    }}
+                    className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2"
+                  >
+                    <PencilIcon className="h-4 w-4" />
+                    Edit Contact
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowNotesModal(false);
+                      setNotesModalData(null);
+                    }}
+                    className="px-4 py-2 text-white bg-gray-600 rounded-lg hover:bg-gray-700"
+                  >
+                    Close
+                  </button>
                 </div>
               </div>
             </div>

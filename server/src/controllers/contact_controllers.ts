@@ -81,7 +81,6 @@ export const sanitizeDecisionMakerState = (state: any): DecisionMakerState => {
   return validStates.includes(state) ? state : "";
 };
 
-// 1. Create Contact Person
 export const createContactPerson = async (
   req: Request,
   res: Response,
@@ -104,7 +103,7 @@ export const createContactPerson = async (
       decisionMakerState,
       note,
       decisionMakerNote,
-      isDecisionMaker, // Allow explicit setting, but will be overridden by contact type logic
+      isDecisionMaker,
     } = req.body;
 
     // Validate required fields
@@ -221,11 +220,26 @@ export const createContactPerson = async (
       contactPerson.note = note.trim();
     }
 
+    // Allow decisionMakerNote only if the contact person is a decision maker
     if (decisionMakerNote) {
-      contactPerson.decisionMakerNote = decisionMakerNote.trim();
+      // Set isDecisionMaker based on contact type first
+      setDecisionMakerFromContactType(contactPerson);
+
+      // Only allow decisionMakerNote if the person is a decision maker
+      if (contactPerson.isDecisionMaker) {
+        contactPerson.decisionMakerNote = decisionMakerNote.trim();
+      } else {
+        return next(
+          new ErrorHandler(
+            "Decision maker note can only be set for decision makers",
+            400
+          )
+        );
+      }
     }
 
     // Set isDecisionMaker based on contact type (overrides explicit setting)
+    // This is called again to ensure consistency after potential changes above
     setDecisionMakerFromContactType(contactPerson);
 
     // Save to database
@@ -272,6 +286,7 @@ export const updateContactPerson = async (
       contact,
       decisionMakerState,
       note,
+      decisionMakerNote,
       isDecisionMaker, // Allow explicit setting, but will be overridden by contact type logic if contact changes
     } = req.body;
 
@@ -317,7 +332,53 @@ export const updateContactPerson = async (
       }
     }
 
-    // Update fields
+    // Handle contact type and decision maker logic first to determine if they're a decision maker
+    let contactTypeChanged = false;
+    if (contact !== undefined) {
+      const newContactType = sanitizeContactType(contact);
+      contactTypeChanged = contactPerson.contact !== newContactType;
+      contactPerson.contact = newContactType;
+    }
+
+    // Update decisionMakerState if provided
+    if (decisionMakerState !== undefined) {
+      contactPerson.decisionMakerState =
+        sanitizeDecisionMakerState(decisionMakerState);
+    }
+
+    // Update isDecisionMaker based on contact type if contact type changed
+    // Otherwise respect the explicit isDecisionMaker value if provided
+    if (contactTypeChanged) {
+      setDecisionMakerFromContactType(contactPerson);
+    } else if (isDecisionMaker !== undefined) {
+      contactPerson.isDecisionMaker = Boolean(isDecisionMaker);
+    }
+
+    // Validate decisionMakerNote - only allow if the person is a decision maker
+    if (decisionMakerNote !== undefined) {
+      // Check if the person is currently a decision maker or will become one
+      const willBeDecisionMaker = contactTypeChanged
+        ? isDecisionMakerFromContactType(contactPerson.contact)
+        : isDecisionMaker !== undefined
+        ? Boolean(isDecisionMaker)
+        : contactPerson.isDecisionMaker;
+
+      if (decisionMakerNote && !willBeDecisionMaker) {
+        return next(
+          new ErrorHandler(
+            "Decision maker note can only be set for decision makers",
+            400
+          )
+        );
+      }
+
+      // If validation passes, update the decisionMakerNote
+      contactPerson.decisionMakerNote = decisionMakerNote
+        ? decisionMakerNote.trim()
+        : null;
+    }
+
+    // Update other fields
     if (sex !== undefined) {
       contactPerson.sex = sanitizeSex(sex);
     }
@@ -363,28 +424,6 @@ export const updateContactPerson = async (
       contactPerson.stateLinkedIn = sanitizeLinkedInState(stateLinkedIn);
     }
 
-    // Handle contact type and decision maker logic
-    let contactTypeChanged = false;
-    if (contact !== undefined) {
-      const newContactType = sanitizeContactType(contact);
-      contactTypeChanged = contactPerson.contact !== newContactType;
-      contactPerson.contact = newContactType;
-    }
-
-    // Update decisionMakerState if provided
-    if (decisionMakerState !== undefined) {
-      contactPerson.decisionMakerState =
-        sanitizeDecisionMakerState(decisionMakerState);
-    }
-
-    // Update isDecisionMaker based on contact type if contact type changed
-    // Otherwise respect the explicit isDecisionMaker value if provided
-    if (contactTypeChanged) {
-      setDecisionMakerFromContactType(contactPerson);
-    } else if (isDecisionMaker !== undefined) {
-      contactPerson.isDecisionMaker = Boolean(isDecisionMaker);
-    }
-
     if (note !== undefined) {
       contactPerson.note = note ? note.trim() : null;
     }
@@ -404,7 +443,6 @@ export const updateContactPerson = async (
     return next(new ErrorHandler("Failed to update contact person", 500));
   }
 };
-
 // 8. Bulk Import Contact Persons
 export const bulkImportContactPersons = async (
   req: Request,
@@ -1062,7 +1100,7 @@ export const getAllContactPersons = async (
           }`.trim(),
           displayPosition: contactPerson.position || "",
           note: contactPerson.note || null,
-          noteContactPreference: contactPerson.contact || null,
+          noteContactPreference: contactPerson.noteContactPreference || null,
           positionOthers: null,
         };
       }
@@ -1160,7 +1198,7 @@ export const getContactPersonsByStarBusiness = async (
         }`.trim(),
         displayPosition: contactPerson.position || "",
         note: contactPerson.note || null,
-        noteContactPreference: contactPerson.contact || null,
+        noteContactPreference: contactPerson.noteContactPreference || null,
         positionOthers: null,
       };
     });
@@ -2053,3 +2091,12 @@ export const getStarBusinessesWithContactSummary = async (
     );
   }
 };
+
+function isDecisionMakerFromContactType(contactType: ContactType): boolean {
+  const decisionMakerTypes = [
+    "DecisionMaker technical",
+    "DecisionMaker financial",
+    "real DecisionMaker",
+  ];
+  return decisionMakerTypes.includes(contactType);
+}

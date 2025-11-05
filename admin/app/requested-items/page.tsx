@@ -632,10 +632,12 @@ const RequestedItemsPage: React.FC = () => {
                   {requestedItems.map((item) => (
                     <tr
                       key={item.id}
-                      className="hover:bg-gray-50/50 transition-colors cursor-pointer"
-                      onClick={() => handleItemClick(item)}
+                      className="hover:bg-gray-50/50 transition-colors"
                     >
-                      <td className="px-6 py-4">
+                      <td
+                        className="px-6 py-4 cursor-pointer"
+                        onClick={() => handleItemClick(item)}
+                      >
                         <div>
                           <div className="text-sm font-medium text-gray-900">
                             {item.itemName}
@@ -647,7 +649,10 @@ const RequestedItemsPage: React.FC = () => {
                           )}
                         </div>
                       </td>
-                      <td className="px-6 py-4">
+                      <td
+                        className="px-6 py-4 cursor-pointer"
+                        onClick={() => handleItemClick(item)}
+                      >
                         <div className="text-sm text-gray-900">
                           {item.contactPerson?.name +
                             " " +
@@ -657,9 +662,7 @@ const RequestedItemsPage: React.FC = () => {
                       <td className="px-6 py-4">
                         <a
                           href={`/bussinesses/new?businessId=${item.business.customer.id}`}
-                          className="text-sm text-blue-600 hover:text-blue-800
-                          text-left"
-                          onClick={(e) => e.stopPropagation()}
+                          className="text-sm text-blue-600 hover:text-blue-800 text-left"
                         >
                           {" "}
                           {item.business?.customer.companyName || "-"}
@@ -679,13 +682,11 @@ const RequestedItemsPage: React.FC = () => {
                         <select
                           value={item.priority}
                           onChange={(e) => {
-                            e.stopPropagation();
                             handlePriorityUpdate(item.id, e.target.value);
                           }}
                           className={`text-xs px-2 py-1 rounded-full font-medium border-0 cursor-pointer ${getPriorityColor(
                             item.priority
                           )}`}
-                          onClick={(e) => e.stopPropagation()}
                         >
                           {getAvailablePriorities().map((priority) => (
                             <option key={priority.value} value={priority.value}>
@@ -698,13 +699,11 @@ const RequestedItemsPage: React.FC = () => {
                         <select
                           value={item.requestStatus}
                           onChange={(e) => {
-                            e.stopPropagation();
                             handleStatusUpdate(item.id, e.target.value);
                           }}
                           className={`text-xs px-2 py-1 rounded-full font-medium border-0 cursor-pointer ${getStatusColor(
                             item.requestStatus
                           )}`}
-                          onClick={(e) => e.stopPropagation()}
                         >
                           {getAvailableStatuses().map((status) => (
                             <option key={status.value} value={status.value}>
