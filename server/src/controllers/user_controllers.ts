@@ -36,7 +36,7 @@ export const createUser = async (
       country,
     } = req.body;
 
-    // Validation
+    // Validation - Only name, email and role are required
     if (!name || !email || !role) {
       return next(new ErrorHandler("Name, email and role are required", 400));
     }
@@ -62,18 +62,18 @@ export const createUser = async (
     ).toString();
     const emailVerificationExp = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
-    // Create user
+    // Create user with optional fields
     const user = userRepository.create({
       name,
       email,
       password: hashedPassword,
       role,
       assignedResources: assignedResources || [],
-      phoneNumber,
-      country,
-      gender,
-      dateOfBirth,
-      address,
+      phoneNumber: phoneNumber || null,
+      country: country || null,
+      gender: gender || null,
+      dateOfBirth: dateOfBirth || null,
+      address: address || null,
       emailVerificationCode,
       emailVerificationExp,
       isEmailVerified: false,
@@ -81,6 +81,7 @@ export const createUser = async (
 
     await userRepository.save(user);
 
+    // Handle optional permissions
     if (permissions && permissions.length > 0) {
       const permissionRepository = AppDataSource.getRepository(Permission);
       const permissionEntities = permissions.map((perm: any) =>

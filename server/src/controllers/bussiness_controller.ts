@@ -800,7 +800,7 @@ export const createBusiness = async (
 
           // Create default list for star customer
           defaultList = new List();
-          defaultList.name = `${savedCustomer.companyName} - Default List`;
+          defaultList.name = `Default`;
           defaultList.description = `Default list for ${savedCustomer.companyName}`;
           defaultList.customer = savedCustomer;
           defaultList.status = LIST_STATUS.ACTIVE;
@@ -827,22 +827,24 @@ export const createBusiness = async (
 
     const { customer, businessDetails, tempPassword, defaultList } = result;
 
-    // Send email if this is a star customer
+    // Send email if this is a star customer - USING ALISHA'S PROPOSED TEXT
     if (isStarCustomer && tempPassword) {
       const loginLink = `${process.env.STAR_URL}/login`;
+      const portalLink = "https://stars.gtech.de/potis";
+
       const message = `
-        <h2>Welcome to Star Customer Portal</h2>
-        <p>Your Star Customer account has been created successfully.</p>
-        <p><strong>Business Name:</strong> ${customer.companyName}</p>
-        ${
-          customer.legalName
-            ? `<p><strong>Legal Name:</strong> ${customer.legalName}</p>`
-            : ""
-        }
+        <h2>Welcome to the GTech Star customer portal!</h2>
+        <p>From now on, you have direct access to all your products as well as upcoming and completed deliveries.</p>
+        <p>In read-only mode, you can see the complete overview and track the current status of your orders at any time – without any login required.</p>
+        <p>Try it directly here: <a href="${portalLink}">${portalLink}</a></p>
+        <p>This way you'll always stay informed – fast, clear, and reliable.</p>
+        <p>Enjoy your access!</p>
+        <p>Your GTech Team</p>
+        <br>
+        <p><strong>Your Login Credentials:</strong></p>
         <p><strong>Email:</strong> ${customer.email}</p>
         <p><strong>Temporary Password:</strong> ${tempPassword}</p>
-        <p>Please login <a href="${loginLink}">here</a> and change your password.</p>
-        <p>You can now access exclusive features and manage your orders directly.</p>
+        <p>Please login <a href="${loginLink}">here</a> to access your full account features.</p>
         ${
           defaultList
             ? `<p>A default list "${defaultList.name}" has been created for your company.</p>`
@@ -852,7 +854,7 @@ export const createBusiness = async (
 
       await sendEmail({
         to: customer.email,
-        subject: "Your Star Customer Account Has Been Created",
+        subject: "Welcome to the GTech Star Customer Portal!",
         html: message,
       });
     }
@@ -930,7 +932,7 @@ export const createBusiness = async (
 
     if (isStarCustomer) {
       successMessage =
-        "Star Customer created successfully. Credentials sent to email.";
+        "Star Customer created successfully. Welcome email sent with credentials.";
     } else if (shouldBeStarBusiness) {
       successMessage =
         "Star Business created automatically (Device Maker: Yes, In Series: Yes, Made In provided).";
@@ -963,11 +965,9 @@ export const updateBusiness = async (
     const { id } = req.params;
     const updateData = req.body;
 
-    // Extract fields with PROPER MAPPING
     const {
-      displayName, // Frontend display name -> maps to DB companyName
-      companyName, // Frontend legal name -> maps to DB legalName
-      name, // Legacy support
+      displayName,
+      name,
       contactEmail,
       contactPhoneNumber,
       isDeviceMaker,
@@ -1040,29 +1040,6 @@ export const updateBusiness = async (
       );
     }
 
-    // Check for duplicate display name if updating
-    if (displayName || name) {
-      const newDisplayName = (displayName || name).trim();
-      if (newDisplayName !== customer.companyName) {
-        const existingCustomer = await customerRepository
-          .createQueryBuilder("customer")
-          .where("LOWER(customer.companyName) = LOWER(:companyName)", {
-            companyName: newDisplayName,
-          })
-          .andWhere("customer.id != :id", { id })
-          .getOne();
-
-        if (existingCustomer) {
-          return next(
-            new ErrorHandler(
-              "A business with this display name already exists",
-              400
-            )
-          );
-        }
-      }
-    }
-
     // Check for duplicate email if updating
     const emailToCheck = isStarCustomer ? starCustomerEmail : updateData.email;
     if (emailToCheck && emailToCheck !== customer.email) {
@@ -1081,13 +1058,13 @@ export const updateBusiness = async (
     const result = await AppDataSource.transaction(
       async (transactionalEntityManager) => {
         // Update Customer entity with PROPER FIELD MAPPING
-        if (displayName !== undefined || name !== undefined) {
+        if (displayName !== undefined) {
           // IMPORTANT: displayName from frontend goes to companyName in DB
-          customer.companyName = (displayName || name).trim();
+          customer.companyName = displayName.trim();
         }
-        if (companyName !== undefined) {
+        if (name !== undefined) {
           // IMPORTANT: companyName from frontend goes to legalName in DB
-          customer.legalName = companyName.trim();
+          customer.legalName = name.trim();
         }
         if (contactEmail !== undefined) {
           customer.contactEmail = contactEmail.trim().toLowerCase();
@@ -1214,7 +1191,7 @@ export const updateBusiness = async (
 
           // Create default list for the new star customer
           defaultList = new List();
-          defaultList.name = `${customer.companyName} - Default List`;
+          defaultList.name = `Default`;
           defaultList.description = `Default list for ${customer.companyName}`;
           defaultList.customer = customer;
           defaultList.status = LIST_STATUS.ACTIVE;
@@ -1269,17 +1246,25 @@ export const updateBusiness = async (
       isStarCustomerChanged: starCustomerChanged,
     } = result;
 
-    // Send email if upgrading to star customer
+    // Send email if upgrading to star customer - USING ALISHA'S PROPOSED TEXT
     if (isStarCustomer && tempPassword) {
       const loginLink = `${process.env.STAR_URL}/login`;
+      const portalLink = "https://stars.gtech.de/potis";
+
       const message = `
-        <h2>Your Account Has Been Upgraded to Star Customer</h2>
-        <p>Congratulations! Your business account has been upgraded to a Star Customer account.</p>
+        <h2>Welcome to the GTech Star customer portal!</h2>
+        <p>From now on, you have direct access to all your products as well as upcoming and completed deliveries.</p>
+        <p>In read-only mode, you can see the complete overview and track the current status of your orders at any time – without any login required.</p>
+        <p>Try it directly here: <a href="${portalLink}">${portalLink}</a></p>
+        <p>This way you'll always stay informed – fast, clear, and reliable.</p>
+        <p>Enjoy your access!</p>
+        <p>Your GTech Team</p>
+        <br>
+        <p><strong>Your Account Has Been Upgraded to Star Customer</strong></p>
         <p><strong>Company Name:</strong> ${customer.companyName}</p>
         <p><strong>Email:</strong> ${customer.email}</p>
         <p><strong>Temporary Password:</strong> ${tempPassword}</p>
-        <p>Please login <a href="${loginLink}">here</a> and change your password.</p>
-        <p>You can now access exclusive features and manage your orders directly.</p>
+        <p>Please login <a href="${loginLink}">here</a> to access your full account features and change your password.</p>
         ${
           defaultList
             ? `<p>A default list "${defaultList.name}" has been created for your company.</p>`
@@ -1289,7 +1274,7 @@ export const updateBusiness = async (
 
       await sendEmail({
         to: customer.email,
-        subject: "Your Account Has Been Upgraded to Star Customer",
+        subject: "Welcome to the GTech Star Customer Portal!",
         html: message,
       });
     }
@@ -1313,20 +1298,15 @@ export const updateBusiness = async (
     // RETURN RESPONSE WITH PROPER FIELD MAPPING
     const businessResponse = {
       id: finalCustomer.id,
-      // IMPORTANT: Map DB fields back to frontend expected fields
       displayName: finalCustomer.companyName, // DB companyName -> Frontend displayName
-      companyName: finalCustomer.legalName, // DB legalName -> Frontend companyName
-      // Legacy field support
-      name: finalCustomer.companyName,
+      companyName: finalCustomer.legalName,
+      name: finalCustomer.legalName,
       legalName: finalCustomer.legalName,
-      // Contact information
       email: finalCustomer.email,
       contactEmail: finalCustomer.contactEmail,
       contactPhoneNumber: finalCustomer.contactPhoneNumber,
       stage: finalCustomer.stage,
-      // Business details
       ...finalCustomer.businessDetails,
-      // Include check_by user details if present
       check_by: finalCustomer.businessDetails?.check_by
         ? {
             id: finalCustomer.businessDetails.check_by.id,
@@ -1334,7 +1314,6 @@ export const updateBusiness = async (
             email: finalCustomer.businessDetails.check_by.email,
           }
         : undefined,
-      // Include star business details if present
       starBusinessDetails: finalCustomer.starBusinessDetails
         ? {
             inSeries: finalCustomer.starBusinessDetails.inSeries,
@@ -1378,7 +1357,7 @@ export const updateBusiness = async (
 
     if (isStarCustomer && tempPassword) {
       successMessage =
-        "Business upgraded to Star Customer successfully. Credentials sent to email.";
+        "Business upgraded to Star Customer successfully. Welcome email sent with credentials.";
     } else if (shouldBeStarBusiness) {
       successMessage =
         "Business automatically promoted to Star Business (Device Maker: Yes, In Series: Yes, Made In provided).";
@@ -1434,10 +1413,9 @@ export const getBusinessById = async (
     // Transform response
     const businessResponse = {
       id: customer.id,
-      name: customer.companyName,
-      companyName: customer.companyName,
       displayName: customer.companyName,
       legalName: customer.legalName,
+      name: customer.legalName,
       email: customer.email,
       contactEmail: customer.contactEmail,
       contactPhoneNumber: customer.contactPhoneNumber,
@@ -1670,9 +1648,9 @@ export const getAllBusinesses = async (
 
       return {
         id: customer.id, // This will now be customer.id
-        name: customer.companyName,
         displayName: customer.companyName,
         legalName: customer.legalName,
+        name: customer.legalName,
         email: customer.email,
         contactEmail: customer.contactEmail,
         contactPhoneNumber: customer.contactPhoneNumber,

@@ -19,6 +19,8 @@ import {
   LucideMapPin,
   PenTool,
   Globe,
+  LucideChevronDown,
+  LucideChevronUp,
 } from "lucide-react";
 import {
   Dialog,
@@ -36,6 +38,7 @@ import {
   alpha,
   useTheme,
   Snackbar,
+  Collapse,
 } from "@mui/material";
 import theme from "@/styles/theme";
 import Link from "next/link";
@@ -69,23 +72,21 @@ interface FormValues {
   assignedResources: string[];
 }
 
+// Updated validation schema - only name, email, and role are required
 const validationSchema = Yup.object({
   name: Yup.string().required("Full name is required"),
   email: Yup.string().email("Invalid email").required("Email is required"),
-  phoneNumber: Yup.string()
-    .matches(
-      /^[+]?[(]?[0-9]{3}[)]?[-\s.]?[0-9]{3}[-\s.]?[0-9]{4,6}$/,
-      "Invalid phone number"
-    )
-    .required("Phone number is required"),
-  dateOfBirth: Yup.date().required("Date of birth is required"),
-  address: Yup.string().required("Address is required"),
-  gender: Yup.string().required("Gender is required"),
   role: Yup.string().required("Role is required"),
-  password: Yup.string()
-    .min(8, "Password must be at least 8 characters")
-    .required("Password is required"),
-  country: Yup.string().required("Country is required"),
+  // Optional fields - no validation required
+  phoneNumber: Yup.string().matches(
+    /^[+]?[(]?[0-9]{3}[)]?[-\s.]?[0-9]{3}[-\s.]?[0-9]{4,6}$/,
+    "Invalid phone number"
+  ),
+  dateOfBirth: Yup.date(),
+  address: Yup.string(),
+  gender: Yup.string(),
+  password: Yup.string().min(8, "Password must be at least 8 characters"),
+  country: Yup.string(),
 });
 
 // Expanded resource configuration with descriptions
@@ -161,6 +162,7 @@ const UserCreatePage: React.FC = () => {
   const [permissions, setPermissions] = useState<Permission[]>([]);
   const [showResourceDialog, setShowResourceDialog] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [showOptionalFields, setShowOptionalFields] = useState<boolean>(false);
   const [alertInfo, setAlertInfo] = useState<{
     show: boolean;
     message: string;
@@ -189,9 +191,16 @@ const UserCreatePage: React.FC = () => {
       try {
         setIsSubmitting(true);
 
-        // Prepare the payload for API
-        const userData = {
-          ...values,
+        const userData: any = {
+          name: values.name,
+          email: values.email,
+          role: values.role,
+          ...(values.phoneNumber && { phoneNumber: values.phoneNumber }),
+          ...(values.dateOfBirth && { dateOfBirth: values.dateOfBirth }),
+          ...(values.address && { address: values.address }),
+          ...(values.gender && { gender: values.gender }),
+          ...(values.password && { password: values.password }),
+          ...(values.country && { country: values.country }),
           assignedResources: permissions.map((p) => p.resource),
           permissions: permissions.map((p) => ({
             resource: p.resource,
@@ -199,10 +208,8 @@ const UserCreatePage: React.FC = () => {
           })),
         };
 
-        // Call the API
         await createNewUser(userData);
 
-        // Redirect to users list after short delay
         setTimeout(() => {
           router.push("/users");
         }, 1500);
@@ -320,124 +327,183 @@ const UserCreatePage: React.FC = () => {
         </Box>
 
         <Box component="form" onSubmit={formik.handleSubmit} sx={{ p: 3 }}>
-          {/* User Information Form Fields */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 mb-8">
-            <div>
-              <FormInput
-                name="name"
-                label="Full Name"
-                icon={<LucideUser size={20} />}
-                formik={formik}
-                placeholder="John Doe"
-              />
+          {/* Required Fields Section */}
+          <div className="mb-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="text-primary-main bg-primary-50 p-2 rounded-lg">
+                <LucideUser size={20} />
+              </div>
+              <Typography
+                variant="h6"
+                fontWeight={600}
+                fontSize="18px"
+                sx={{ color: "secondary.main" }}
+              >
+                Required Information
+              </Typography>
+              <div className="ml-2 px-2 py-1 bg-red-50 text-red-600 text-xs font-medium rounded">
+                Required
+              </div>
             </div>
 
-            <div>
-              <FormInput
-                name="email"
-                label="Email Address"
-                icon={<LucideMail size={20} />}
-                formik={formik}
-                placeholder="john.doe@example.com"
-              />
-            </div>
-
-            <div>
-              <FormInput
-                name="phoneNumber"
-                label="Phone Number"
-                icon={<LucidePhone size={20} />}
-                formik={formik}
-                placeholder="+1 (555) 123-4567"
-              />
-            </div>
-
-            <div>
-              <FormInput
-                name="dateOfBirth"
-                label="Date of Birth"
-                type="date"
-                icon={<LucideCalendar size={20} />}
-                formik={formik}
-              />
-            </div>
-
-            <div>
-              <FormSelect
-                name="gender"
-                label="Gender"
-                options={[
-                  { value: "MALE", label: "Male" },
-                  { value: "FEMALE", label: "Female" },
-                ]}
-                formik={formik}
-                icon={<LucideUser size={20} />}
-              />
-            </div>
-
-            <div>
-              <FormSelect
-                name="country"
-                label="Country"
-                options={countries.map((country) => ({
-                  value: country,
-                  label: country,
-                }))}
-                formik={formik}
-                icon={<Globe size={20} />}
-              />
-            </div>
-
-            <div>
-              <FormSelect
-                name="role"
-                label="User Role"
-                options={Object.values(UserRole).map((role) => ({
-                  value: role,
-                  label: role.charAt(0) + role.slice(1).toLowerCase(),
-                }))}
-                formik={formik}
-                icon={<PenTool size={20} />}
-                helperText="Role determines base access level"
-              />
-            </div>
-
-            <div>
-              <Box position="relative">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+              <div>
                 <FormInput
-                  name="password"
-                  label="Temporary Password"
-                  type="text"
-                  icon={<LucideLock size={20} />}
+                  name="name"
+                  label="Full Name"
+                  icon={<LucideUser size={20} />}
                   formik={formik}
-                  helperText="This password will be emailed to the user"
-                  InputProps={{
-                    endAdornment: (
-                      <Button
-                        size="small"
-                        onClick={generateRandomPassword}
-                        variant="outlined"
-                        sx={{ position: "absolute", right: 8, top: 8 }}
-                      >
-                        Generate
-                      </Button>
-                    ),
-                  }}
+                  placeholder="John Doe"
+                  required
                 />
-              </Box>
-            </div>
+              </div>
 
-            <div className="md:col-span-2">
-              <FormInput
-                name="address"
-                label="Address"
-                icon={<LucideMapPin size={20} />}
-                formik={formik}
-                placeholder="123 Main St, City, State, Zip"
-                multiline
-                rows={2}
-              />
+              <div>
+                <FormInput
+                  name="email"
+                  label="Email Address"
+                  icon={<LucideMail size={20} />}
+                  formik={formik}
+                  placeholder="john.doe@example.com"
+                  required
+                />
+              </div>
+
+              <div>
+                <FormSelect
+                  name="role"
+                  label="User Role"
+                  options={Object.values(UserRole).map((role) => ({
+                    value: role,
+                    label: role.charAt(0) + role.slice(1).toLowerCase(),
+                  }))}
+                  formik={formik}
+                  icon={<PenTool size={20} />}
+                  helperText="Role determines base access level"
+                  required
+                />
+              </div>
             </div>
+          </div>
+
+          {/* Optional Fields Collapsible Section */}
+          <div className="mb-6">
+            <button
+              type="button"
+              onClick={() => setShowOptionalFields(!showOptionalFields)}
+              className="w-full flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:border-primary-main transition-colors mb-2"
+            >
+              <div className="flex items-center gap-3">
+                <div className="text-gray-600 bg-gray-50 p-2 rounded-lg">
+                  <LucideUser size={20} />
+                </div>
+                <Typography
+                  variant="h6"
+                  fontWeight={600}
+                  fontSize="18px"
+                  sx={{ color: "secondary.main" }}
+                >
+                  Additional Information
+                </Typography>
+                <div className="ml-2 px-2 py-1 bg-gray-100 text-gray-600 text-xs font-medium rounded">
+                  Optional
+                </div>
+              </div>
+              <div className="text-gray-500">
+                {showOptionalFields ? (
+                  <LucideChevronUp size={20} />
+                ) : (
+                  <LucideChevronDown size={20} />
+                )}
+              </div>
+            </button>
+
+            <Collapse in={showOptionalFields}>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 mt-4 p-4 bg-gray-50 rounded-lg">
+                <div>
+                  <FormInput
+                    name="phoneNumber"
+                    label="Phone Number"
+                    icon={<LucidePhone size={20} />}
+                    formik={formik}
+                    placeholder="+1 (555) 123-4567"
+                  />
+                </div>
+
+                <div>
+                  <FormInput
+                    name="dateOfBirth"
+                    label="Date of Birth"
+                    type="date"
+                    icon={<LucideCalendar size={20} />}
+                    formik={formik}
+                  />
+                </div>
+
+                <div>
+                  <FormSelect
+                    name="gender"
+                    label="Gender"
+                    options={[
+                      { value: "MALE", label: "Male" },
+                      { value: "FEMALE", label: "Female" },
+                    ]}
+                    formik={formik}
+                    icon={<LucideUser size={20} />}
+                  />
+                </div>
+
+                <div>
+                  <FormSelect
+                    name="country"
+                    label="Country"
+                    options={countries.map((country) => ({
+                      value: country,
+                      label: country,
+                    }))}
+                    formik={formik}
+                    icon={<Globe size={20} />}
+                  />
+                </div>
+
+                <div>
+                  <Box position="relative">
+                    <FormInput
+                      name="password"
+                      label="Temporary Password"
+                      type="text"
+                      icon={<LucideLock size={20} />}
+                      formik={formik}
+                      helperText="This password will be emailed to the user"
+                      InputProps={{
+                        endAdornment: (
+                          <Button
+                            size="small"
+                            onClick={generateRandomPassword}
+                            variant="outlined"
+                            sx={{ position: "absolute", right: 8, top: 8 }}
+                          >
+                            Generate
+                          </Button>
+                        ),
+                      }}
+                    />
+                  </Box>
+                </div>
+
+                <div className="md:col-span-2">
+                  <FormInput
+                    name="address"
+                    label="Address"
+                    icon={<LucideMapPin size={20} />}
+                    formik={formik}
+                    placeholder="123 Main St, City, State, Zip"
+                    multiline
+                    rows={2}
+                  />
+                </div>
+              </div>
+            </Collapse>
           </div>
 
           {/* Beautiful Divider */}
@@ -466,6 +532,9 @@ const UserCreatePage: React.FC = () => {
               >
                 Access Permissions
               </Typography>
+              <div className="ml-2 px-2 py-1 bg-gray-100 text-gray-600 text-xs font-medium rounded">
+                Optional
+              </div>
             </div>
 
             <button
@@ -699,6 +768,7 @@ interface FormInputProps {
   multiline?: boolean;
   rows?: number;
   InputProps?: any;
+  required?: boolean;
   [x: string]: any;
 }
 
@@ -713,11 +783,13 @@ const FormInput: React.FC<FormInputProps> = ({
   multiline = false,
   rows = 1,
   InputProps,
+  required = false,
   ...props
 }) => (
   <div className="space-y-1.5">
     <label className="text-sm font-medium font-roboto text-gray-700 block">
       {label}
+      {required && <span className="text-red-500 ml-1">*</span>}
     </label>
     <div className="relative">
       <div className="absolute left-3 top-3 text-gray-500">{icon}</div>
@@ -769,6 +841,7 @@ interface FormSelectProps {
   formik: any;
   icon: React.ReactNode;
   helperText?: string;
+  required?: boolean;
   [x: string]: any;
 }
 
@@ -779,10 +852,14 @@ const FormSelect: React.FC<FormSelectProps> = ({
   formik,
   icon,
   helperText,
+  required = false,
   ...props
 }) => (
   <div className="space-y-1.5">
-    <label className="text-sm font-medium text-gray-700 block">{label}</label>
+    <label className="text-sm font-medium text-gray-700 block">
+      {label}
+      {required && <span className="text-red-500 ml-1">*</span>}
+    </label>
     <div className="relative">
       <div className="absolute left-3 top-3 z-10 text-gray-500">{icon}</div>
       <FormControl

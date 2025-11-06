@@ -112,7 +112,7 @@ export class List {
   @PrimaryGeneratedColumn("uuid")
   id!: string;
 
-  @Column({ nullable: false })
+  @Column({ nullable: false, unique: false })
   name!: string;
 
   @Column({ nullable: true, unique: true })
