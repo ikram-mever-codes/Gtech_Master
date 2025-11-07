@@ -13,6 +13,8 @@ export interface RequestedItem {
   material?: string;
   specification?: string;
   extraItems: "YES" | "NO";
+  extraNote?: string;
+  asanaLink?: string;
   extraItemsDescriptions?: string;
   qty: string;
   interval:
@@ -36,7 +38,9 @@ export interface RequestedItemCreatePayload {
   businessId: string;
   contactPersonId?: string;
   itemName: string;
+  extraNote?: string;
   material?: string;
+  asanaLink?: string;
   specification?: string;
   extraItems?: "YES" | "NO";
   extraItemsDescriptions?: string;

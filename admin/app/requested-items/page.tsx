@@ -13,6 +13,9 @@ import {
   CheckCircleIcon,
   ClockIcon,
   PauseIcon,
+  ChatBubbleLeftIcon,
+  CubeIcon,
+  LinkIcon,
 } from "@heroicons/react/24/outline";
 import { toast } from "react-hot-toast";
 import {
@@ -96,6 +99,7 @@ const RequestedItemsPage: React.FC = () => {
     businessId: "",
     contactPersonId: "",
     itemName: "",
+    extraNote: "",
     material: "",
     specification: "",
     extraItems: "NO",
@@ -107,6 +111,7 @@ const RequestedItemsPage: React.FC = () => {
     priority: "Normal",
     requestStatus: "open",
     comment: "",
+    asanaLink: "",
   });
 
   // Fetch contact persons on component mount
@@ -212,6 +217,8 @@ const RequestedItemsPage: React.FC = () => {
       priority: item.priority,
       requestStatus: item.requestStatus,
       comment: item.comment || "",
+      extraNote: item.extraNote || "",
+      asanaLink: item.asanaLink || "",
     });
 
     setShowCreateModal(true);
@@ -269,6 +276,21 @@ const RequestedItemsPage: React.FC = () => {
     }
   };
 
+  // Handle delete item
+  const handleDeleteItem = async (itemId: string) => {
+    if (window.confirm("Are you sure you want to delete this item?")) {
+      try {
+        await deleteRequestedItem(itemId);
+        toast.success("Item deleted successfully");
+        fetchRequestedItems();
+        fetchStatistics();
+      } catch (error) {
+        console.error("Error deleting item:", error);
+        toast.error("Failed to delete item");
+      }
+    }
+  };
+
   // Export to CSV
   const handleExportToCSV = async () => {
     try {
@@ -292,9 +314,11 @@ const RequestedItemsPage: React.FC = () => {
       interval: "Monatlich",
       sampleQty: "",
       expectedDelivery: "",
+      extraNote: "",
       priority: "Normal",
       requestStatus: "open",
       comment: "",
+      asanaLink: "",
     });
     setEditModeEnabled(false);
     setEditingItemId(null);
@@ -344,16 +368,42 @@ const RequestedItemsPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 p-8">
+    <div className="min-h-screen bg-white shadow-xl rounded-lg p-8">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Requested Items Management
-          </h1>
-          <p className="text-gray-600">
-            Manage and track all requested items across businesses
-          </p>
+        <div className="mb-8 w-full flex justify-between items-center">
+          <div className="">
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">
+              Requested Items
+            </h1>
+          </div>
+          <div>
+            {" "}
+            <div className="flex gap-3">
+              <button
+                onClick={fetchRequestedItems}
+                disabled={loading}
+                className="px-4 py-2 text-gray-700 bg-white/80 backdrop-blur-sm border border-gray-300/80 rounded-lg hover:bg-white/60 transition-all flex items-center gap-2 disabled:opacity-50"
+              >
+                <ArrowPathIcon
+                  className={`h-5 w-5 ${loading ? "animate-spin" : ""}`}
+                />
+                Refresh
+              </button>
+
+              <CustomButton
+                gradient={true}
+                onClick={() => {
+                  resetForm();
+                  setShowCreateModal(true);
+                }}
+                className="px-4 py-2 bg-gray-600/90 backdrop-blur-sm text-white rounded-lg hover:bg-gray-700/90 transition-all flex items-center gap-2"
+              >
+                <PlusIcon className="h-5 w-5" />
+                Add Request
+              </CustomButton>
+            </div>
+          </div>
         </div>
 
         {/* Statistics Cards */}
@@ -399,182 +449,8 @@ const RequestedItemsPage: React.FC = () => {
           </div>
         )}
 
-        {/* Filters & Actions */}
-        <div className="bg-white/80 backdrop-blur-sm rounded-xl shadow-lg border border-gray-100/50 mb-6">
-          <div className="p-6">
-            <div className="flex flex-col lg:flex-row gap-4 items-center justify-between">
-              {/* Search */}
-              <div className="w-full lg:w-96 relative">
-                <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Search by item name, material, or specification..."
-                  value={filters.search}
-                  onChange={(e) =>
-                    setFilters({ ...filters, search: e.target.value })
-                  }
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all"
-                />
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setShowFilters(!showFilters)}
-                  className="px-4 py-2 text-gray-700 bg-white/80 backdrop-blur-sm border border-gray-300/80 rounded-lg hover:bg-white/60 transition-all flex items-center gap-2"
-                >
-                  <FunnelIcon className="h-5 w-5" />
-                  Filters
-                  {(filters.requestStatus ||
-                    filters.priority ||
-                    filters.interval) && (
-                    <span className="bg-gray-500 text-white px-2 py-0.5 rounded-full text-xs">
-                      Active
-                    </span>
-                  )}
-                </button>
-
-                <button
-                  onClick={fetchRequestedItems}
-                  disabled={loading}
-                  className="px-4 py-2 text-gray-700 bg-white/80 backdrop-blur-sm border border-gray-300/80 rounded-lg hover:bg-white/60 transition-all flex items-center gap-2 disabled:opacity-50"
-                >
-                  <ArrowPathIcon
-                    className={`h-5 w-5 ${loading ? "animate-spin" : ""}`}
-                  />
-                  Refresh
-                </button>
-
-                <CustomButton
-                  gradient={true}
-                  onClick={() => {
-                    resetForm();
-                    setShowCreateModal(true);
-                  }}
-                  className="px-4 py-2 bg-gray-600/90 backdrop-blur-sm text-white rounded-lg hover:bg-gray-700/90 transition-all flex items-center gap-2"
-                >
-                  <PlusIcon className="h-5 w-5" />
-                  Add Request
-                </CustomButton>
-              </div>
-            </div>
-
-            {/* Filter Panel */}
-            {showFilters && (
-              <div className="mt-6 pt-6 border-t border-gray-200/50">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Status
-                    </label>
-                    <select
-                      value={filters.requestStatus || ""}
-                      onChange={(e) =>
-                        setFilters({
-                          ...filters,
-                          requestStatus: e.target.value,
-                        })
-                      }
-                      className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all"
-                    >
-                      <option value="">All Statuses</option>
-                      {getAvailableStatuses().map((status: any) => (
-                        <option key={status.value} value={status.value}>
-                          {status.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Priority
-                    </label>
-                    <select
-                      value={filters.priority || ""}
-                      onChange={(e) =>
-                        setFilters({ ...filters, priority: e.target.value })
-                      }
-                      className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all"
-                    >
-                      <option value="">All Priorities</option>
-                      {getAvailablePriorities().map((priority: any) => (
-                        <option key={priority.value} value={priority.value}>
-                          {priority.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Interval
-                    </label>
-                    <select
-                      value={filters.interval || ""}
-                      onChange={(e) =>
-                        setFilters({ ...filters, interval: e.target.value })
-                      }
-                      className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all"
-                    >
-                      <option value="">All Intervals</option>
-                      {getAvailableIntervals().map((interval: any) => (
-                        <option key={interval.value} value={interval.value}>
-                          {interval.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Extra Items
-                    </label>
-                    <select
-                      value={filters.extraItems || ""}
-                      onChange={(e) =>
-                        setFilters({
-                          ...filters,
-                          extraItems: e.target.value as any,
-                        })
-                      }
-                      className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all"
-                    >
-                      <option value="">All</option>
-                      <option value="YES">Yes</option>
-                      <option value="NO">No</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="mt-4 flex justify-end">
-                  <button
-                    onClick={() => {
-                      setFilters({
-                        search: "",
-                        requestStatus: "",
-                        priority: "",
-                        interval: "",
-                        extraItems: "" as any,
-                        sortBy: "",
-                        sortOrder: "DESC",
-                        page: 1,
-                        limit: itemsPerPage,
-                      });
-                      setCurrentPage(1);
-                    }}
-                    className="px-4 py-2 text-gray-600 bg-white/80 backdrop-blur-sm border border-gray-300/80 rounded-lg hover:bg-white/60 transition-all"
-                  >
-                    Clear Filters
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
         {/* Items Table */}
-        <div className="bg-white/80 backdrop-blur-sm rounded-xl shadow-lg border border-gray-100/50 overflow-hidden">
+        <div className="bg-white/80 backdrop-blur-sm rounded-md shadow-lg border border-gray-100/50 overflow-hidden">
           {loading ? (
             <div className="p-12 text-center">
               <div className="inline-flex items-center gap-3">
@@ -593,7 +469,7 @@ const RequestedItemsPage: React.FC = () => {
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-gray-50/50 border-b border-gray-200/50">
+                <thead className="bg-gray-200/50 border-b border-gray-200/50">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Item Name
@@ -601,30 +477,17 @@ const RequestedItemsPage: React.FC = () => {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Contact Person
                     </th>
-
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Business
                     </th>
                     <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Quantity
+                      Quantity & Interval
                     </th>
                     <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Interval
-                    </th>
-                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Priority
+                      Extra Note
                     </th>
                     <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Status
-                    </th>
-                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Extra Items
-                    </th>
-                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Created
-                    </th>
-                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Actions{" "}
                     </th>
                   </tr>
                 </thead>
@@ -632,15 +495,38 @@ const RequestedItemsPage: React.FC = () => {
                   {requestedItems.map((item) => (
                     <tr
                       key={item.id}
-                      className="hover:bg-gray-50/50 transition-colors"
+                      className={`transition-colors ${
+                        item.priority === "High" ? "bg-red-300/40" : ""
+                      }`}
                     >
                       <td
                         className="px-6 py-4 cursor-pointer"
                         onClick={() => handleItemClick(item)}
                       >
                         <div>
-                          <div className="text-sm font-medium text-gray-900">
+                          <div className="text-sm font-medium text-gray-900 flex items-center gap-2">
                             {item.itemName}
+                            {/* Comment Icon */}
+                            {item.comment && (
+                              <ChatBubbleLeftIcon
+                                className="h-4 w-4 text-blue-500"
+                                title="Has comment"
+                              />
+                            )}
+                            {/* Extra Items Icon */}
+                            {item.extraItems === "YES" && (
+                              <CubeIcon
+                                className="h-4 w-4 text-green-500"
+                                title="Has extra items"
+                              />
+                            )}
+                            {/* Asana Link Icon */}
+                            {item.asanaLink && (
+                              <LinkIcon
+                                className="h-4 w-4 text-purple-500"
+                                title="Has Asana link"
+                              />
+                            )}
                           </div>
                           {item.material && (
                             <div className="text-xs text-gray-500">
@@ -669,31 +555,14 @@ const RequestedItemsPage: React.FC = () => {
                         </a>
                       </td>
                       <td className="px-6 py-4 text-center">
-                        <div className="text-sm font-medium text-gray-900">
-                          {item.qty}
+                        <div className="text-sm flex flex-col justify-center items-center font-medium text-gray-900">
+                          <div>{item.qty}</div>
+                          <div>{item.interval}</div>
                         </div>
                       </td>
+
                       <td className="px-6 py-4 text-center">
-                        <span className="inline-flex text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-800">
-                          {item.interval}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        <select
-                          value={item.priority}
-                          onChange={(e) => {
-                            handlePriorityUpdate(item.id, e.target.value);
-                          }}
-                          className={`text-xs px-2 py-1 rounded-full font-medium border-0 cursor-pointer ${getPriorityColor(
-                            item.priority
-                          )}`}
-                        >
-                          {getAvailablePriorities().map((priority) => (
-                            <option key={priority.value} value={priority.value}>
-                              {priority.label}
-                            </option>
-                          ))}
-                        </select>
+                        {item.extraNote}
                       </td>
                       <td className="px-6 py-4 text-center">
                         <select
@@ -711,33 +580,6 @@ const RequestedItemsPage: React.FC = () => {
                             </option>
                           ))}
                         </select>
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        {item.extraItems === "YES" ? (
-                          <span className="inline-flex text-xs px-2 py-1 rounded-full bg-green-100 text-green-800">
-                            Yes
-                          </span>
-                        ) : (
-                          <span className="inline-flex text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-800">
-                            No
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 text-center whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
-                          {formatDate(item.createdAt)}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-center whitespace-nowrap">
-                        {user?.role === UserRole.ADMIN && (
-                          <button
-                            onClick={async () => {
-                              await deleteRequestedItem(item.id);
-                            }}
-                          >
-                            <Delete sx={{ fontSize: 16, color: "red" }} />
-                          </button>
-                        )}
                       </td>
                     </tr>
                   ))}
@@ -814,12 +656,12 @@ const RequestedItemsPage: React.FC = () => {
         {/* Create/Edit Modal */}
         {showCreateModal && (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
               <div className="p-6">
                 <div className="flex items-center justify-between mb-6">
                   <h2 className="text-2xl font-bold text-gray-900">
                     {modalMode === "edit"
-                      ? "Edit Requested Item"
+                      ? "Request Details"
                       : "Add New Requested Item"}
                   </h2>
                   <button
@@ -899,24 +741,6 @@ const RequestedItemsPage: React.FC = () => {
                       </select>
                     </div>
 
-                    {/* Business ID - Now auto-populated and read-only */}
-                    <div className="col-span-2">
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Business ID *
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.businessId}
-                        readOnly
-                        className="w-full px-3 py-2 border border-gray-300/80 bg-gray-100 rounded-lg cursor-not-allowed"
-                        placeholder="Will be auto-filled when you select a contact person"
-                      />
-                      <p className="text-xs text-gray-500 mt-1">
-                        Business ID is automatically set from the selected
-                        contact person
-                      </p>
-                    </div>
-
                     {/* Item Name */}
                     <div className="col-span-2">
                       <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -934,7 +758,6 @@ const RequestedItemsPage: React.FC = () => {
                       />
                     </div>
 
-                    {/* Rest of the form remains the same */}
                     {/* Material & Specification */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -1116,6 +939,46 @@ const RequestedItemsPage: React.FC = () => {
                       </div>
                     )}
 
+                    {/* Extra Note Field */}
+                    <div className="col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Extra Note
+                      </label>
+                      <textarea
+                        value={formData.extraNote}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            extraNote: e.target.value,
+                          })
+                        }
+                        rows={2}
+                        disabled={modalMode === "edit" && !editModeEnabled}
+                        className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                        placeholder="Additional notes..."
+                      />
+                    </div>
+
+                    {/* Asana Link Field */}
+                    <div className="col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Asana Link
+                      </label>
+                      <input
+                        type="url"
+                        value={formData.asanaLink}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            asanaLink: e.target.value,
+                          })
+                        }
+                        disabled={modalMode === "edit" && !editModeEnabled}
+                        className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                        placeholder="https://app.asana.com/..."
+                      />
+                    </div>
+
                     {/* Expected Delivery */}
                     <div className="col-span-2">
                       <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -1155,6 +1018,20 @@ const RequestedItemsPage: React.FC = () => {
                   </div>
 
                   <div className="mt-6 flex justify-end gap-3">
+                    {/* Delete Button in Edit Mode */}
+                    {modalMode === "edit" && user?.role === UserRole.ADMIN && (
+                      <button
+                        onClick={() => {
+                          if (editingItemId) {
+                            handleDeleteItem(editingItemId);
+                            setShowCreateModal(false);
+                          }
+                        }}
+                        className="px-4 py-2 text-red-700 bg-white/80 backdrop-blur-sm border border-red-300/80 rounded-lg hover:bg-red-50/60 transition-all"
+                      >
+                        Delete
+                      </button>
+                    )}
                     <button
                       onClick={() => {
                         setShowCreateModal(false);

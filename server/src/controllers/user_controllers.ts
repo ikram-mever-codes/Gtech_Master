@@ -1283,17 +1283,6 @@ export const resendVerificationEmail = async (
 
     // Check if there's a recent verification attempt (prevent spam)
     const now = new Date();
-    if (user.emailVerificationExp && user.emailVerificationExp > now) {
-      const timeLeft = Math.ceil(
-        (user.emailVerificationExp.getTime() - now.getTime()) / 60000
-      ); // in minutes
-      return next(
-        new ErrorHandler(
-          `Please wait ${timeLeft} minute(s) before requesting another verification email`,
-          429
-        )
-      );
-    }
 
     // Generate new verification code
     const emailVerificationCode = Math.floor(

@@ -143,13 +143,15 @@ export class RequestedItemController {
     try {
       const {
         businessId,
-        contactPersonId, // Make sure this is being received
+        contactPersonId,
+        extraNote,
         itemName,
         material,
         specification,
         extraItems,
         extraItemsDescriptions,
         qty,
+        asanaLink,
         interval,
         sampleQty,
         expectedDelivery,
@@ -200,6 +202,8 @@ export class RequestedItemController {
         contactPersonId: contactPersonId || null,
         itemName,
         material,
+        asanaLink,
+        extraNote,
         specification,
         extraItems: extraItems || "NO",
         extraItemsDescriptions,
@@ -244,8 +248,10 @@ export class RequestedItemController {
         material,
         specification,
         extraItems,
+        extraNote,
         extraItemsDescriptions,
         qty,
+        asanaLink,
         interval,
         sampleQty,
         expectedDelivery,
@@ -282,6 +288,8 @@ export class RequestedItemController {
 
       const updateData: any = {
         ...(itemName && { itemName }),
+        ...(extraNote !== "" && { extraNote }),
+        ...(asanaLink !== "" && { asanaLink }),
         ...(material !== undefined && { material }),
         ...(specification !== undefined && { specification }),
         ...(extraItems && { extraItems }),

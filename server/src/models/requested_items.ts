@@ -104,6 +104,12 @@ export class RequestedItem {
   @Column({ type: "text", nullable: true })
   comment!: string;
 
+  @Column({ type: "text", nullable: true })
+  extraNote!: string;
+
+  @Column({ type: "text", nullable: true })
+  asanaLink!: string;
+
   @CreateDateColumn()
   createdAt!: Date;
 

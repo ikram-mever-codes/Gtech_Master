@@ -104,7 +104,6 @@ const AddEditBusinessManual: React.FC = () => {
     description: "",
     city: "",
     displayName: "",
-    state: "",
     country: "",
     postalCode: "",
     latitude: undefined,
@@ -112,7 +111,6 @@ const AddEditBusinessManual: React.FC = () => {
     website: "",
     phoneNumber: "",
     email: "",
-    googlePlaceId: "",
     googleMapsUrl: "",
     reviewCount: undefined,
     averageRating: undefined,
@@ -216,7 +214,6 @@ const AddEditBusinessManual: React.FC = () => {
           "",
         displayName: businessData.displayName,
         city: businessData.businessDetails?.city || businessData.city || "",
-        state: businessData.businessDetails?.state || businessData.state || "",
         country:
           businessData.businessDetails?.country || businessData.country || "",
         postalCode:
@@ -234,10 +231,6 @@ const AddEditBusinessManual: React.FC = () => {
           businessData.phoneNumber ||
           "",
         email: businessData.businessDetails?.email || businessData.email || "",
-        googlePlaceId:
-          businessData.businessDetails?.googlePlaceId ||
-          businessData.googlePlaceId ||
-          "",
         googleMapsUrl:
           businessData.businessDetails?.googleMapsUrl ||
           businessData.googleMapsUrl ||
@@ -651,7 +644,6 @@ const AddEditBusinessManual: React.FC = () => {
         address: "",
         description: "",
         city: "",
-        state: "",
         country: "",
         postalCode: "",
         latitude: undefined,
@@ -659,7 +651,6 @@ const AddEditBusinessManual: React.FC = () => {
         website: "",
         phoneNumber: "",
         email: "",
-        googlePlaceId: "",
         googleMapsUrl: "",
         reviewCount: undefined,
         averageRating: undefined,
@@ -1660,14 +1651,7 @@ const AddEditBusinessManual: React.FC = () => {
                       "text",
                       "123 Main Street"
                     )}
-                    {renderField(
-                      "State",
-                      formData.state,
-                      "state",
-                      false,
-                      "text",
-                      "Baden-Württemberg"
-                    )}
+
                     {renderField(
                       "Phone Number",
                       formData.phoneNumber,
@@ -1723,36 +1707,6 @@ const AddEditBusinessManual: React.FC = () => {
                       categories
                     )}
 
-                    {!isViewMode && (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Additional Categories
-                        </label>
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                          {categories.map((cat) => (
-                            <label
-                              key={cat}
-                              className="flex items-center gap-2 cursor-pointer"
-                            >
-                              <input
-                                type="checkbox"
-                                checked={formData.additionalCategories?.includes(
-                                  cat
-                                )}
-                                onChange={() =>
-                                  handleAdditionalCategoryToggle(cat)
-                                }
-                                className="w-4 h-4 text-primary rounded border-gray-300 focus:ring-primary"
-                              />
-                              <span className="text-sm text-gray-700">
-                                {cat}
-                              </span>
-                            </label>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
                     {isViewMode &&
                       formData.additionalCategories &&
                       formData.additionalCategories.length > 0 && (
@@ -1782,14 +1736,6 @@ const AddEditBusinessManual: React.FC = () => {
                     Google Integration
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {renderField(
-                      "Google Place ID",
-                      formData.googlePlaceId,
-                      "googlePlaceId",
-                      false,
-                      "text",
-                      "ChIJN1t_..."
-                    )}
                     {renderField(
                       "Google Maps URL",
                       formData.googleMapsUrl,
