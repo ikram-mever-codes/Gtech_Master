@@ -21,7 +21,53 @@ export type RequestStatus =
   | "open"
   | "supplier search"
   | "stopped"
-  | "successful";
+  | "successful"
+  | "Anfrage gestoppt"
+  | "Anfrage verschoben"
+  | "Anfrage Phase"
+  | "Musterplanung"
+  | "WAS besprechen"
+  | "Musterbeschaffung"
+  | "Muster Empfänger klären"
+  | "Muster vom Kunden in DE"
+  | "Muster unterwegs"
+  | "Lieferanten Findung"
+  | "Rückfragen an Kunden"
+  | "Angebot erstellen"
+  | "Angebot besprechen"
+  | "Artikel erstellen"
+  | "AB an Kunden Muster"
+  | "Muster bestellen"
+  | "Muster fertiggestellt"
+  | "Muster Versand vorbereiten"
+  | "Muster versendet"
+  | "Rückmeldung Liefertermin Muster"
+  | "Muster auf dem Weg"
+  | "Muster ist in DE"
+  | "Artikel in MIS korrigieren"
+  | "Muster Versand an Kunden"
+  | "Muster Eingang beim Kunden"
+  | "Kontakt mit Kunden Muster"
+  | "Trial order besprechen"
+  | "AB an Kunden gesendet"
+  | "Trial order bestellt"
+  | "Trial order fertiggestellt"
+  | "Trial order vorbereiten"
+  | "Rückmeldung Liefertermin Trial Order"
+  | "Trial order Verfolgung"
+  | "Trial order Wareneingang DE"
+  | "Trial order Eingang beim Kunde"
+  | "Trial order besprechen nach Erhalt"
+  | "Übergabe an COO"
+  | "Anruf Serienteil Planung"
+  | "Bestellung Serienteil erstellen"
+  | "Serienteil fertiggestellt"
+  | "Fracht vorbereiten MIS"
+  | "Versanddetails erhalten"
+  | "Rückmeldung Liefertermin Serienteil"
+  | "Serienteil Verfolgung"
+  | "Serienteil Wareneingang DE"
+  | "Serienteil Eingang beim Kunde";
 
 @Entity()
 export class RequestedItem {
@@ -85,7 +131,58 @@ export class RequestedItem {
 
   @Column({
     type: "enum",
-    enum: ["open", "supplier search", "stopped", "successful"],
+    enum: [
+      "open",
+      "supplier search",
+      "stopped",
+      "successful",
+      "Anfrage gestoppt",
+      "Anfrage verschoben",
+      "Anfrage Phase",
+      "Musterplanung",
+      "WAS besprechen",
+      "Musterbeschaffung",
+      "Muster Empfänger klären",
+      "Muster vom Kunden in DE",
+      "Muster unterwegs",
+      "Lieferanten Findung",
+      "Rückfragen an Kunden",
+      "Angebot erstellen",
+      "Angebot besprechen",
+      "Artikel erstellen",
+      "AB an Kunden Muster",
+      "Muster bestellen",
+      "Muster fertiggestellt",
+      "Muster Versand vorbereiten",
+      "Muster versendet",
+      "Rückmeldung Liefertermin Muster",
+      "Muster auf dem Weg",
+      "Muster ist in DE",
+      "Artikel in MIS korrigieren",
+      "Muster Versand an Kunden",
+      "Muster Eingang beim Kunden",
+      "Kontakt mit Kunden Muster",
+      "Trial order besprechen",
+      "AB an Kunden gesendet",
+      "Trial order bestellt",
+      "Trial order fertiggestellt",
+      "Trial order vorbereiten",
+      "Rückmeldung Liefertermin Trial Order",
+      "Trial order Verfolgung",
+      "Trial order Wareneingang DE",
+      "Trial order Eingang beim Kunde",
+      "Trial order besprechen nach Erhalt",
+      "Übergabe an COO",
+      "Anruf Serienteil Planung",
+      "Bestellung Serienteil erstellen",
+      "Serienteil fertiggestellt",
+      "Fracht vorbereiten MIS",
+      "Versanddetails erhalten",
+      "Rückmeldung Liefertermin Serienteil",
+      "Serienteil Verfolgung",
+      "Serienteil Wareneingang DE",
+      "Serienteil Eingang beim Kunde",
+    ],
     default: "open",
   })
   requestStatus!: RequestStatus;

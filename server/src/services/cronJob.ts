@@ -71,7 +71,7 @@ export class CronJobs {
               console.log(`✅ Refreshed item: ${item.articleName}`);
             } catch (error) {
               console.error(`❌ Failed to refresh item ${item.id}:`, error);
-              updatedItems.push(item); // Keep original item if refresh fails
+              updatedItems.push(item);
               failedRefreshes++;
             }
           }
@@ -81,18 +81,6 @@ export class CronJobs {
 
           // Save the updated list
           await listRepository.save(list);
-
-          // Log the refresh activity for the list
-          //   list.addActivityLog(
-          //     `System automatically refreshed ${updatedItems.length} items from MIS`,
-          //     "admin",
-          //     "system",
-          //     undefined,
-          //     "list_auto_refreshed"
-          //   );
-
-          //   await listRepository.save(list);
-          // }
         }
 
         const duration = Date.now() - startTime;
@@ -142,15 +130,6 @@ export class CronJobs {
 
         list.items = updatedItems;
         await listRepository.save(list);
-
-        // Log the manual refresh activity
-        // list.addActivityLog(
-        //   `System manually refreshed ${refreshedCount} items from MIS`,
-        //   "admin",
-        //   "system",
-        //   undefined,
-        //   "list_manual_refresh"
-        // );
 
         await listRepository.save(list);
 

@@ -127,27 +127,27 @@ const Sidebar = () => {
   // Filter menu items based on user role and assigned resources
   const menuItems = useMemo(() => {
     // If user is admin, show all menu items
-    if (user?.role === "ADMIN") {
-      return allMenuItems;
-    }
+    // if (user?.role === "ADMIN") {
+    return allMenuItems;
+    // }
 
-    // Otherwise, filter based on assigned resources
-    if (user?.assignedResources && user.assignedResources.length > 0) {
-      return allMenuItems.filter((item) =>
-        user.assignedResources.includes(item.resource)
-      );
-    }
+    // // Otherwise, filter based on assigned resources
+    // if (user?.assignedResources && user.assignedResources.length > 0) {
+    //   return allMenuItems.filter((item) =>
+    //     user.assignedResources.includes(item.resource)
+    //   );
+    // }
 
-    // If no assigned resources but has permissions with resources
-    if (user?.permissions && user.permissions.length > 0) {
-      const permissionResources = user.permissions.map((perm) => perm.resource);
-      return allMenuItems.filter((item) =>
-        permissionResources.includes(item.resource)
-      );
-    }
+    // // If no assigned resources but has permissions with resources
+    // if (user?.permissions && user.permissions.length > 0) {
+    //   const permissionResources = user.permissions.map((perm) => perm.resource);
+    //   return allMenuItems.filter((item) =>
+    //     permissionResources.includes(item.resource)
+    //   );
+    // }
 
     // Fallback to just Dashboard if no permissions
-    return allMenuItems.filter((item) => item.resource === "Dashboard");
+    // return   allMenuItems.filter((item) => item.resource === "Dashboard");
   }, [user]);
 
   const handleDrawerToggle = () => {

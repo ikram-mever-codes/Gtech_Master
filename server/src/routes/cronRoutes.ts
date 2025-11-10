@@ -5,7 +5,7 @@ import { CronJobs } from "../services/cronJob";
 const router = Router();
 const cronJobs = CronJobs.getInstance();
 
-router.post("/start", (req, res) => {
+router.get("/start", (req, res) => {
   cronJobs.start();
   res.json({
     success: true,

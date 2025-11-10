@@ -487,15 +487,239 @@ export const getAvailablePriorities = (): Array<{
   ];
 };
 
-// Get available statuses
+// Get available statuses grouped by phase
 export const getAvailableStatuses = (): Array<{
   value: string;
   label: string;
+  group?: string;
 }> => {
   return [
-    { value: "open", label: "Open" },
-    { value: "supplier search", label: "Supplier Search" },
-    { value: "stopped", label: "Stopped" },
-    { value: "successful", label: "Successful" },
+    { value: "open", label: "Open", group: "Initial" },
+    { value: "supplier search", label: "Supplier Search", group: "Initial" },
+    { value: "stopped", label: "Stopped", group: "Initial" },
+    { value: "successful", label: "Successful", group: "Final" },
+
+    {
+      value: "Anfrage gestoppt",
+      label: "Anfrage gestoppt",
+      group: "Request Phase",
+    },
+    {
+      value: "Anfrage verschoben",
+      label: "Anfrage verschoben",
+      group: "Request Phase",
+    },
+    { value: "Anfrage Phase", label: "Anfrage Phase", group: "Request Phase" },
+
+    { value: "Musterplanung", label: "Musterplanung", group: "Sample Phase" },
+    { value: "WAS besprechen", label: "WAS besprechen", group: "Sample Phase" },
+    {
+      value: "Musterbeschaffung",
+      label: "Musterbeschaffung",
+      group: "Sample Phase",
+    },
+    {
+      value: "Muster Empfänger klären",
+      label: "Muster Empfänger klären",
+      group: "Sample Phase",
+    },
+    {
+      value: "Muster vom Kunden in DE",
+      label: "Muster vom Kunden in DE",
+      group: "Sample Phase",
+    },
+    {
+      value: "Muster unterwegs",
+      label: "Muster unterwegs",
+      group: "Sample Phase",
+    },
+    {
+      value: "Muster bestellen",
+      label: "Muster bestellen",
+      group: "Sample Phase",
+    },
+    {
+      value: "Muster fertiggestellt",
+      label: "Muster fertiggestellt",
+      group: "Sample Phase",
+    },
+    {
+      value: "Muster Versand vorbereiten",
+      label: "Muster Versand vorbereiten",
+      group: "Sample Phase",
+    },
+    {
+      value: "Muster versendet",
+      label: "Muster versendet",
+      group: "Sample Phase",
+    },
+    {
+      value: "Rückmeldung Liefertermin Muster",
+      label: "Rückmeldung Liefertermin Muster",
+      group: "Sample Phase",
+    },
+    {
+      value: "Muster auf dem Weg",
+      label: "Muster auf dem Weg",
+      group: "Sample Phase",
+    },
+    {
+      value: "Muster ist in DE",
+      label: "Muster ist in DE",
+      group: "Sample Phase",
+    },
+    {
+      value: "Muster Versand an Kunden",
+      label: "Muster Versand an Kunden",
+      group: "Sample Phase",
+    },
+    {
+      value: "Muster Eingang beim Kunden",
+      label: "Muster Eingang beim Kunden",
+      group: "Sample Phase",
+    },
+    {
+      value: "Kontakt mit Kunden Muster",
+      label: "Kontakt mit Kunden Muster",
+      group: "Sample Phase",
+    },
+
+    {
+      value: "Lieferanten Findung",
+      label: "Lieferanten Findung",
+      group: "Quotation",
+    },
+    {
+      value: "Rückfragen an Kunden",
+      label: "Rückfragen an Kunden",
+      group: "Quotation",
+    },
+    {
+      value: "Angebot erstellen",
+      label: "Angebot erstellen",
+      group: "Quotation",
+    },
+    {
+      value: "Angebot besprechen",
+      label: "Angebot besprechen",
+      group: "Quotation",
+    },
+    {
+      value: "Artikel erstellen",
+      label: "Artikel erstellen",
+      group: "Quotation",
+    },
+    {
+      value: "AB an Kunden Muster",
+      label: "AB an Kunden Muster",
+      group: "Quotation",
+    },
+    {
+      value: "Artikel in MIS korrigieren",
+      label: "Artikel in MIS korrigieren",
+      group: "Quotation",
+    },
+
+    {
+      value: "Trial order besprechen",
+      label: "Trial order besprechen",
+      group: "Trial Order",
+    },
+    {
+      value: "AB an Kunden gesendet",
+      label: "AB an Kunden gesendet",
+      group: "Trial Order",
+    },
+    {
+      value: "Trial order bestellt",
+      label: "Trial order bestellt",
+      group: "Trial Order",
+    },
+    {
+      value: "Trial order fertiggestellt",
+      label: "Trial order fertiggestellt",
+      group: "Trial Order",
+    },
+    {
+      value: "Trial order vorbereiten",
+      label: "Trial order vorbereiten",
+      group: "Trial Order",
+    },
+    {
+      value: "Rückmeldung Liefertermin Trial Order",
+      label: "Rückmeldung Liefertermin Trial Order",
+      group: "Trial Order",
+    },
+    {
+      value: "Trial order Verfolgung",
+      label: "Trial order Verfolgung",
+      group: "Trial Order",
+    },
+    {
+      value: "Trial order Wareneingang DE",
+      label: "Trial order Wareneingang DE",
+      group: "Trial Order",
+    },
+    {
+      value: "Trial order Eingang beim Kunde",
+      label: "Trial order Eingang beim Kunde",
+      group: "Trial Order",
+    },
+    {
+      value: "Trial order besprechen nach Erhalt",
+      label: "Trial order besprechen nach Erhalt",
+      group: "Trial Order",
+    },
+
+    {
+      value: "Übergabe an COO",
+      label: "Übergabe an COO",
+      group: "Series Production",
+    },
+    {
+      value: "Anruf Serienteil Planung",
+      label: "Anruf Serienteil Planung",
+      group: "Series Production",
+    },
+    {
+      value: "Bestellung Serienteil erstellen",
+      label: "Bestellung Serienteil erstellen",
+      group: "Series Production",
+    },
+    {
+      value: "Serienteil fertiggestellt",
+      label: "Serienteil fertiggestellt",
+      group: "Series Production",
+    },
+    {
+      value: "Fracht vorbereiten MIS",
+      label: "Fracht vorbereiten MIS",
+      group: "Series Production",
+    },
+    {
+      value: "Versanddetails erhalten",
+      label: "Versanddetails erhalten",
+      group: "Series Production",
+    },
+    {
+      value: "Rückmeldung Liefertermin Serienteil",
+      label: "Rückmeldung Liefertermin Serienteil",
+      group: "Series Production",
+    },
+    {
+      value: "Serienteil Verfolgung",
+      label: "Serienteil Verfolgung",
+      group: "Series Production",
+    },
+    {
+      value: "Serienteil Wareneingang DE",
+      label: "Serienteil Wareneingang DE",
+      group: "Series Production",
+    },
+    {
+      value: "Serienteil Eingang beim Kunde",
+      label: "Serienteil Eingang beim Kunde",
+      group: "Series Production",
+    },
   ];
 };

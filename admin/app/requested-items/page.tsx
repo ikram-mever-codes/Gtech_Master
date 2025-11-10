@@ -16,6 +16,7 @@ import {
   ChatBubbleLeftIcon,
   CubeIcon,
   LinkIcon,
+  DocumentTextIcon,
 } from "@heroicons/react/24/outline";
 import { toast } from "react-hot-toast";
 import {
@@ -38,6 +39,7 @@ import {
 } from "@/api/requested_items";
 import CustomButton from "@/components/UI/CustomButton";
 import { getAllContactPersons } from "@/api/contacts";
+import { getAllBusinesses } from "@/api/bussiness";
 import { Delete } from "@mui/icons-material";
 import { RootState } from "../Redux/store";
 import { useSelector } from "react-redux";
@@ -57,9 +59,22 @@ interface ContactPerson {
   };
 }
 
+// Add interface for Business
+interface Business {
+  id: string;
+  customer: {
+    id: string;
+    companyName: string;
+    legalName: string;
+  };
+}
+
 const RequestedItemsPage: React.FC = () => {
   // State management
   const [requestedItems, setRequestedItems] = useState<RequestedItem[]>([]);
+  const [allRequestedItems, setAllRequestedItems] = useState<RequestedItem[]>(
+    []
+  ); // Store all items for frontend filtering
   const [loading, setLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -78,6 +93,19 @@ const RequestedItemsPage: React.FC = () => {
   // Add state for contact persons
   const [contactPersons, setContactPersons] = useState<ContactPerson[]>([]);
   const [loadingContactPersons, setLoadingContactPersons] = useState(false);
+  const [filteredContactPersons, setFilteredContactPersons] = useState<
+    ContactPerson[]
+  >([]);
+
+  // Add state for businesses
+  const [businesses, setBusinesses] = useState<any[]>([]);
+  const [loadingBusinesses, setLoadingBusinesses] = useState(false);
+  const [selectedBusinessId, setSelectedBusinessId] = useState<string>("");
+
+  // Add state for notes popup
+  const [showNotesPopup, setShowNotesPopup] = useState(false);
+  const [selectedItemNotes, setSelectedItemNotes] =
+    useState<RequestedItem | null>(null);
 
   const itemsPerPage = 20;
 
@@ -114,6 +142,33 @@ const RequestedItemsPage: React.FC = () => {
     asanaLink: "",
   });
 
+  // Fetch businesses on component mount
+  useEffect(() => {
+    const fetchBusinesses = async () => {
+      setLoadingBusinesses(true);
+      try {
+        const response: any = await getAllBusinesses();
+        console.log("Businesses response:", response);
+        if (response?.data?.businesses) {
+          setBusinesses(response.data.businesses);
+        } else if (Array.isArray(response?.data)) {
+          setBusinesses(response.data);
+        } else {
+          console.error("Unexpected response structure:", response);
+          setBusinesses([]);
+        }
+      } catch (error) {
+        console.error("Error fetching businesses:", error);
+        toast.error("Failed to fetch businesses");
+        setBusinesses([]);
+      } finally {
+        setLoadingBusinesses(false);
+      }
+    };
+
+    fetchBusinesses();
+  }, []);
+
   // Fetch contact persons on component mount
   useEffect(() => {
     const fetchContactPersons = async () => {
@@ -123,14 +178,17 @@ const RequestedItemsPage: React.FC = () => {
         console.log("Contact persons response:", response);
         if (response?.data?.contactPersons) {
           setContactPersons(response.data.contactPersons);
+          setFilteredContactPersons(response.data.contactPersons); // Initialize filtered list
         } else {
           console.error("Unexpected response structure:", response);
           setContactPersons([]);
+          setFilteredContactPersons([]);
         }
       } catch (error) {
         console.error("Error fetching contact persons:", error);
         toast.error("Failed to fetch contact persons");
         setContactPersons([]);
+        setFilteredContactPersons([]);
       } finally {
         setLoadingContactPersons(false);
       }
@@ -151,12 +209,27 @@ const RequestedItemsPage: React.FC = () => {
         contactPersonId: selectedContactPerson.id,
         businessId: selectedContactPerson.starBusinessDetailsId,
       });
+
+      // When creating new item, update filtered list based on selected business
+      if (modalMode === "create") {
+        const businessContactPersons = contactPersons.filter(
+          (person) =>
+            person.starBusinessDetailsId ===
+            selectedContactPerson.starBusinessDetailsId
+        );
+        setFilteredContactPersons(businessContactPersons);
+      }
     } else {
       setFormData({
         ...formData,
         contactPersonId: "",
         businessId: "",
       });
+
+      // Reset to all contact persons when nothing is selected
+      if (modalMode === "create") {
+        setFilteredContactPersons(contactPersons);
+      }
     }
   };
 
@@ -164,20 +237,22 @@ const RequestedItemsPage: React.FC = () => {
   const fetchRequestedItems = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await getAllRequestedItems({
+      const filterParams: any = {
         ...filters,
-        page: currentPage,
-        limit: itemsPerPage,
-      });
+        page: 1,
+        limit: 10000, // Fetch all items for frontend filtering
+      };
 
-      setRequestedItems(response || []);
+      const response = await getAllRequestedItems(filterParams);
+
+      setAllRequestedItems(response || []);
     } catch (error) {
       console.error("Error fetching requested items:", error);
       toast.error("Failed to fetch requested items");
     } finally {
       setLoading(false);
     }
-  }, [filters, currentPage]);
+  }, [filters]);
 
   // Fetch statistics
   const fetchStatistics = async () => {
@@ -196,11 +271,55 @@ const RequestedItemsPage: React.FC = () => {
     fetchStatistics();
   }, [fetchRequestedItems]);
 
+  // Apply frontend filtering when business filter or page changes
+  useEffect(() => {
+    let filtered = allRequestedItems;
+
+    // Filter by business if selected
+    if (selectedBusinessId) {
+      filtered = filtered.filter(
+        (item) => item.business?.customer?.id === selectedBusinessId
+      );
+    }
+
+    // Calculate pagination
+    const totalFiltered = filtered.length;
+    const totalPagesCalc = Math.ceil(totalFiltered / itemsPerPage);
+    setTotalPages(totalPagesCalc);
+    setTotalRecords(totalFiltered);
+
+    // Apply pagination
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const paginatedItems = filtered.slice(startIndex, endIndex);
+
+    setRequestedItems(paginatedItems);
+  }, [allRequestedItems, selectedBusinessId, currentPage, itemsPerPage]);
+
+  // Handle notes icon click
+  const handleNotesClick = (item: RequestedItem, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedItemNotes(item);
+    setShowNotesPopup(true);
+  };
+
+  // Handle Asana link click
+  const handleAsanaLinkClick = (asanaLink: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    window.open(asanaLink, "_blank");
+  };
+
   // Handle item click - open modal in view mode
   const handleItemClick = (item: RequestedItem) => {
     setModalMode("edit");
     setEditingItemId(item.id);
     setEditModeEnabled(false);
+
+    // Filter contact persons by the business of the current item
+    const businessContactPersons = contactPersons.filter(
+      (person) => person.starBusinessDetailsId === item.businessId
+    );
+    setFilteredContactPersons(businessContactPersons);
 
     setFormData({
       businessId: item.businessId,
@@ -323,6 +442,7 @@ const RequestedItemsPage: React.FC = () => {
     setEditModeEnabled(false);
     setEditingItemId(null);
     setModalMode("create");
+    setFilteredContactPersons(contactPersons); // Reset to show all contact persons for new item
   };
 
   // Get status color
@@ -380,6 +500,34 @@ const RequestedItemsPage: React.FC = () => {
           <div>
             {" "}
             <div className="flex gap-3">
+              {/* Business Filter Dropdown */}
+              <select
+                value={selectedBusinessId}
+                onChange={(e) => {
+                  setSelectedBusinessId(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="px-4 py-2 text-gray-700 bg-white/80 backdrop-blur-sm border border-gray-300/80 rounded-lg hover:bg-white/60 transition-all"
+                disabled={loadingBusinesses}
+              >
+                <option value="">All Businesses</option>
+                {loadingBusinesses ? (
+                  <option value="" disabled>
+                    Loading businesses...
+                  </option>
+                ) : businesses.length > 0 ? (
+                  businesses.map((business) => (
+                    <option key={business.id} value={business.id}>
+                      {business.displayName}
+                    </option>
+                  ))
+                ) : (
+                  <option value="" disabled>
+                    No businesses found
+                  </option>
+                )}
+              </select>
+
               <button
                 onClick={fetchRequestedItems}
                 disabled={loading}
@@ -475,19 +623,16 @@ const RequestedItemsPage: React.FC = () => {
                       Item Name
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Contact Person
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Business
+                      Business & Contact
                     </th>
                     <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Quantity & Interval
                     </th>
                     <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Extra Note
+                      Status
                     </th>
                     <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
+                      Actions
                     </th>
                   </tr>
                 </thead>
@@ -504,29 +649,8 @@ const RequestedItemsPage: React.FC = () => {
                         onClick={() => handleItemClick(item)}
                       >
                         <div>
-                          <div className="text-sm font-medium text-gray-900 flex items-center gap-2">
+                          <div className="text-sm font-medium text-gray-900">
                             {item.itemName}
-                            {/* Comment Icon */}
-                            {item.comment && (
-                              <ChatBubbleLeftIcon
-                                className="h-4 w-4 text-blue-500"
-                                title="Has comment"
-                              />
-                            )}
-                            {/* Extra Items Icon */}
-                            {item.extraItems === "YES" && (
-                              <CubeIcon
-                                className="h-4 w-4 text-green-500"
-                                title="Has extra items"
-                              />
-                            )}
-                            {/* Asana Link Icon */}
-                            {item.asanaLink && (
-                              <LinkIcon
-                                className="h-4 w-4 text-purple-500"
-                                title="Has Asana link"
-                              />
-                            )}
                           </div>
                           {item.material && (
                             <div className="text-xs text-gray-500">
@@ -539,30 +663,23 @@ const RequestedItemsPage: React.FC = () => {
                         className="px-6 py-4 cursor-pointer"
                         onClick={() => handleItemClick(item)}
                       >
-                        <div className="text-sm text-gray-900">
-                          {item.contactPerson?.name +
-                            " " +
-                            item.contactPerson?.familyName || "-"}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
                         <a
                           href={`/bussinesses/new?businessId=${item.business.customer.id}`}
-                          className="text-sm text-blue-600 hover:text-blue-800 text-left"
+                          className="text-sm text-blue-600 hover:text-blue-800 block"
+                          onClick={(e) => e.stopPropagation()}
                         >
-                          {" "}
                           {item.business?.customer.companyName || "-"}
                         </a>
+                        <div className="text-xs text-gray-500 mt-1">
+                          {item.contactPerson?.name}{" "}
+                          {item.contactPerson?.familyName || "-"}
+                        </div>
                       </td>
                       <td className="px-6 py-4 text-center">
                         <div className="text-sm flex flex-col justify-center items-center font-medium text-gray-900">
                           <div>{item.qty}</div>
                           <div>{item.interval}</div>
                         </div>
-                      </td>
-
-                      <td className="px-6 py-4 text-center">
-                        {item.extraNote}
                       </td>
                       <td className="px-6 py-4 text-center">
                         <select
@@ -580,6 +697,42 @@ const RequestedItemsPage: React.FC = () => {
                             </option>
                           ))}
                         </select>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center justify-center gap-3">
+                          {/* Notes/Comments Icon */}
+                          {(item.comment ||
+                            item.extraNote ||
+                            item.extraItemsDescriptions ||
+                            item.specification) && (
+                            <button
+                              onClick={(e) => handleNotesClick(item, e)}
+                              className="text-blue-500 hover:text-blue-700 transition-colors"
+                              title="View notes"
+                            >
+                              <DocumentTextIcon className="h-5 w-5" />
+                            </button>
+                          )}
+                          {/* Extra Items Icon */}
+                          {item.extraItems === "YES" && (
+                            <CubeIcon
+                              className="h-5 w-5 text-green-500"
+                              title="Has extra items"
+                            />
+                          )}
+                          {/* Asana Link Icon */}
+                          {item.asanaLink && (
+                            <button
+                              onClick={(e) =>
+                                handleAsanaLinkClick(item.asanaLink!, e)
+                              }
+                              className="text-purple-500 hover:text-purple-700 transition-colors"
+                              title="Open Asana link"
+                            >
+                              <LinkIcon className="h-5 w-5" />
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -653,6 +806,80 @@ const RequestedItemsPage: React.FC = () => {
           )}
         </div>
 
+        {/* Notes Popup Modal */}
+        {showNotesPopup && selectedItemNotes && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+            <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-2xl font-bold text-gray-900">
+                    Notes & Details
+                  </h2>
+                  <button
+                    onClick={() => {
+                      setShowNotesPopup(false);
+                      setSelectedItemNotes(null);
+                    }}
+                    className="text-gray-400 hover:text-gray-600 transition-colors"
+                  >
+                    <XMarkIcon className="h-6 w-6" />
+                  </button>
+                </div>
+
+                <div className="space-y-4">
+                  {/* Extra Note */}
+                  {selectedItemNotes.extraNote && (
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-700 mb-1">
+                        Extra Note
+                      </h3>
+                      <p className="text-gray-900 whitespace-pre-wrap">
+                        {selectedItemNotes.extraNote}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Extra Items Description */}
+                  {selectedItemNotes.extraItemsDescriptions && (
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-700 mb-1">
+                        Extra Items Description
+                      </h3>
+                      <p className="text-gray-900 whitespace-pre-wrap">
+                        {selectedItemNotes.extraItemsDescriptions}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Comments */}
+                  {selectedItemNotes.comment && (
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-700 mb-1">
+                        Comments
+                      </h3>
+                      <p className="text-gray-900 whitespace-pre-wrap">
+                        {selectedItemNotes.comment}
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="mt-6 flex justify-end">
+                  <button
+                    onClick={() => {
+                      setShowNotesPopup(false);
+                      setSelectedItemNotes(null);
+                    }}
+                    className="px-4 py-2 text-gray-700 bg-white/80 backdrop-blur-sm border border-gray-300/80 rounded-lg hover:bg-white/60 transition-all"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Create/Edit Modal */}
         {showCreateModal && (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
@@ -708,6 +935,11 @@ const RequestedItemsPage: React.FC = () => {
                     <div className="col-span-2">
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Contact Person *
+                        {modalMode === "edit" && (
+                          <span className="text-xs text-gray-500 ml-2">
+                            (Showing contacts from this business only)
+                          </span>
+                        )}
                       </label>
                       <select
                         value={formData.contactPersonId}
@@ -722,20 +954,23 @@ const RequestedItemsPage: React.FC = () => {
                           <option value="" disabled>
                             Loading contact persons...
                           </option>
-                        ) : contactPersons.length > 0 ? (
-                          contactPersons.map((person) => (
+                        ) : filteredContactPersons.length > 0 ? (
+                          filteredContactPersons.map((person) => (
                             <option key={person.id} value={person.id}>
                               {person.name} {person.familyName}
                               {person.position ? ` - ${person.position}` : ""}
                               {person.email ? ` (${person.email})` : ""}
-                              {person.starBusinessDetails?.companyName
+                              {modalMode === "create" &&
+                              person.starBusinessDetails?.companyName
                                 ? ` - ${person.starBusinessDetails.companyName}`
                                 : ""}
                             </option>
                           ))
                         ) : (
                           <option value="" disabled>
-                            No contact persons found
+                            {modalMode === "edit"
+                              ? "No contact persons found for this business"
+                              : "No contact persons found"}
                           </option>
                         )}
                       </select>
@@ -1017,44 +1252,50 @@ const RequestedItemsPage: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="mt-6 flex justify-end gap-3">
-                    {/* Delete Button in Edit Mode */}
-                    {modalMode === "edit" && user?.role === UserRole.ADMIN && (
+                  <div className="mt-6 flex justify-between gap-3">
+                    {/* Delete Button in Edit Mode - Only when edit is enabled */}
+                    <div>
+                      {modalMode === "edit" &&
+                        editModeEnabled &&
+                        user?.role === UserRole.ADMIN && (
+                          <button
+                            onClick={() => {
+                              if (editingItemId) {
+                                handleDeleteItem(editingItemId);
+                                setShowCreateModal(false);
+                              }
+                            }}
+                            className="px-4 py-2 text-red-700 bg-white/80 backdrop-blur-sm border border-red-300/80 rounded-lg hover:bg-red-50/60 transition-all"
+                          >
+                            Delete
+                          </button>
+                        )}
+                    </div>
+                    <div className="flex gap-3">
                       <button
                         onClick={() => {
-                          if (editingItemId) {
-                            handleDeleteItem(editingItemId);
-                            setShowCreateModal(false);
-                          }
+                          setShowCreateModal(false);
+                          resetForm();
                         }}
-                        className="px-4 py-2 text-red-700 bg-white/80 backdrop-blur-sm border border-red-300/80 rounded-lg hover:bg-red-50/60 transition-all"
+                        className="px-4 py-2 text-gray-700 bg-white/80 backdrop-blur-sm border border-gray-300/80 rounded-lg hover:bg-white/60 transition-all"
                       >
-                        Delete
+                        {modalMode === "edit" && !editModeEnabled
+                          ? "Close"
+                          : "Cancel"}
                       </button>
-                    )}
-                    <button
-                      onClick={() => {
-                        setShowCreateModal(false);
-                        resetForm();
-                      }}
-                      className="px-4 py-2 text-gray-700 bg-white/80 backdrop-blur-sm border border-gray-300/80 rounded-lg hover:bg-white/60 transition-all"
-                    >
-                      {modalMode === "edit" && !editModeEnabled
-                        ? "Close"
-                        : "Cancel"}
-                    </button>
-                    {(modalMode === "create" ||
-                      (modalMode === "edit" && editModeEnabled)) && (
-                      <CustomButton
-                        gradient={true}
-                        onClick={handleSubmit}
-                        className="px-4 py-2 bg-gray-600/90 backdrop-blur-sm text-white rounded-lg hover:bg-gray-700/90 transition-all"
-                      >
-                        {modalMode === "edit"
-                          ? "Update Request"
-                          : "Add Request"}
-                      </CustomButton>
-                    )}
+                      {(modalMode === "create" ||
+                        (modalMode === "edit" && editModeEnabled)) && (
+                        <CustomButton
+                          gradient={true}
+                          onClick={handleSubmit}
+                          className="px-4 py-2 bg-gray-600/90 backdrop-blur-sm text-white rounded-lg hover:bg-gray-700/90 transition-all"
+                        >
+                          {modalMode === "edit"
+                            ? "Update Request"
+                            : "Add Request"}
+                        </CustomButton>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
