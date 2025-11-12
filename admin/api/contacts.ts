@@ -56,6 +56,7 @@ export type ContactPersonData = {
   familyName: string;
   fullName: string;
   position: Position;
+  businessLegalName?: string;
   isDecisionMaker: boolean;
   decisionMakerState?: DecisionMakerState;
   positionOthers?: string;

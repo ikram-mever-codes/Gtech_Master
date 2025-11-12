@@ -15,6 +15,7 @@ import {
 import { Customer } from "./customers";
 import { User } from "./users";
 import { AppDataSource } from "../config/database";
+import { ContactPerson } from "./contact_person";
 
 // Enums
 export enum LIST_STATUS {
@@ -159,6 +160,13 @@ export class List {
 
   @UpdateDateColumn()
   updatedAt!: Date;
+
+  @ManyToOne(() => ContactPerson, {
+    nullable: true,
+    onDelete: "SET NULL",
+  })
+  @JoinColumn({ name: "contact_person_id" })
+  contactPerson!: ContactPerson;
 
   @BeforeInsert()
   async generateListNumber() {

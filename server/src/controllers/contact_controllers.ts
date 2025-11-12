@@ -1057,7 +1057,7 @@ export const getAllContactPersons = async (
         const customer = contactPerson.customer;
         const starBusinessDetails = contactPerson.starBusinessDetails;
         const businessDetails = customer?.businessDetails;
-
+        console.log("Formatting contact person:", contactPerson);
         return {
           id: contactPerson.id,
           name: contactPerson.name,
@@ -1078,7 +1078,7 @@ export const getAllContactPersons = async (
           // Business info
           businessId: customer?.id || null,
           businessName: customer?.companyName || null,
-          businessLegalName: customer?.legalName || null,
+          businessLegalName: customer?.legalName,
           businessEmail: customer?.email || null,
           businessContactEmail: customer?.contactEmail || null,
           businessContactPhone: customer?.contactPhoneNumber || null,

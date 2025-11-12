@@ -611,6 +611,7 @@ const FieldHighlight = ({
       sx={{
         position: "relative",
         borderRadius: 1,
+        width: "100%",
         backgroundColor: hasChanges
           ? alpha("#ff1744", 0.15) // Red background for unacknowledged changes
           : "transparent",
@@ -1140,19 +1141,20 @@ function DeliveryCell({
         title={
           <Box sx={{ color: "white" }}>
             <Typography color="white" variant="caption" display="block">
-              Period: {period}
+              Zeitraum: {period}
             </Typography>
             <Typography color="white" variant="caption" display="block">
-              Quantity: {delivery?.quantity || 0}
+              Menge: {delivery?.quantity || 0}
             </Typography>
             {delivery?.deliveredAt && (
               <Typography color="white" variant="caption" display="block">
-                Delivered: {new Date(delivery.deliveredAt).toLocaleDateString()}
+                Geliefert am:{" "}
+                {new Date(delivery.deliveredAt).toLocaleDateString()}
               </Typography>
             )}
             {delivery?.cargoNo && (
               <Typography color="white" variant="caption" display="block">
-                Cargo: {delivery.cargoNo}
+                Fracht: {delivery.cargoNo}
               </Typography>
             )}
             {hasUnacknowledgedChanges && (
@@ -1162,7 +1164,7 @@ function DeliveryCell({
                 display="block"
                 sx={{ mt: 1 }}
               >
-                ⚠️ Unacknowledged changes
+                ⚠️ Nicht bestätigte Änderungen
               </Typography>
             )}
           </Box>
@@ -1192,7 +1194,6 @@ function DeliveryCell({
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              width: "100%",
               gap: 0.5,
             }}
           >
@@ -1333,7 +1334,7 @@ function EditableQuantityCell({ row, onUpdateItem, onAcknowledgeField }: any) {
           alignItems: "center",
           justifyContent: "center",
           width: "100%",
-          height: "100%",
+          height: "0px",
           cursor: "pointer",
           borderRadius: 1,
           "&:hover": {
@@ -1349,7 +1350,10 @@ function EditableQuantityCell({ row, onUpdateItem, onAcknowledgeField }: any) {
           fontWeight={600}
           sx={{
             fontSize: "16px",
-            color: hasUnacknowledgedChanges ? "#d32f2f" : "inherit",
+            width: "100%",
+
+            textAlign: "center",
+            color: hasUnacknowledgedChanges ? "#d32f2f" : "#64748B",
           }}
         >
           {row.quantity || 0}
@@ -1531,79 +1535,6 @@ function EditableCommentCell({ row, onUpdateItem, onAcknowledgeField }: any) {
   );
 }
 
-// New function to extract unique cargo numbers with sorting
-function extractUniqueCargos(items: any[]): {
-  sortedCargos: string[];
-  cargoDataMap: Map<string, { period: string; eta?: number }>;
-} {
-  const cargoMap = new Map<string, { period: string; eta?: number }>();
-
-  items.forEach((item) => {
-    if (item.deliveries) {
-      Object.entries(item.deliveries).forEach(
-        ([period, deliveryDetails]: [string, any]) => {
-          if (deliveryDetails?.cargoNo) {
-            const cargoNo = String(deliveryDetails.cargoNo).trim();
-
-            // Skip invalid cargo numbers
-            if (
-              !cargoNo ||
-              cargoNo === "null" ||
-              cargoNo === "undefined" ||
-              cargoNo === ""
-            ) {
-              return;
-            }
-
-            // If cargo doesn't exist or current ETA is earlier, update it
-            if (!cargoMap.has(cargoNo)) {
-              cargoMap.set(cargoNo, {
-                period: period,
-                eta: deliveryDetails.eta,
-              });
-            } else {
-              // Update if this instance has an earlier ETA
-              const existing = cargoMap.get(cargoNo)!;
-              if (
-                deliveryDetails.eta &&
-                (!existing.eta || deliveryDetails.eta < existing.eta)
-              ) {
-                cargoMap.set(cargoNo, {
-                  period: period,
-                  eta: deliveryDetails.eta,
-                });
-              }
-            }
-          }
-        }
-      );
-    }
-  });
-
-  // Sort cargo numbers by ETA, then alphabetically
-  const sortedCargos = Array.from(cargoMap.keys()).sort((a, b) => {
-    const dataA = cargoMap.get(a)!;
-    const dataB = cargoMap.get(b)!;
-
-    // Sort by ETA first if both have it
-    if (dataA.eta && dataB.eta) {
-      return dataA.eta - dataB.eta;
-    }
-
-    // Cargos with ETA come before those without
-    if (dataA.eta && !dataB.eta) return -1;
-    if (!dataA.eta && dataB.eta) return 1;
-
-    // Finally sort alphabetically by cargo number
-    return a.localeCompare(b);
-  });
-
-  return {
-    sortedCargos,
-    cargoDataMap: cargoMap,
-  };
-}
-
 // Format period label for cargo columns
 function formatCargoColumnLabel(
   cargoNo: string,
@@ -1776,6 +1707,7 @@ function EditableIntervalCell({ row, onUpdateItem, onAcknowledgeField }: any) {
             fontSize: "14px",
             color: hasUnacknowledgedChanges ? "#d32f2f" : "inherit",
             flex: 1,
+            height: "15px",
           }}
         >
           {getCurrentLabel()}
@@ -1799,44 +1731,6 @@ function EditableIntervalCell({ row, onUpdateItem, onAcknowledgeField }: any) {
         )}
       </Box>
     </FieldHighlight>
-  );
-}
-
-// Enhanced Breadcrumbs
-function EnhancedBreadcrumbs() {
-  return (
-    <Box sx={{ borderRadius: 3, px: 2.5, py: 1, display: "inline-flex" }}>
-      <Breadcrumbs aria-label="breadcrumb">
-        <Link
-          underline="none"
-          color="inherit"
-          href="/admin"
-          sx={{
-            display: "flex",
-            alignItems: "center",
-            fontSize: "0.85rem",
-            px: 1,
-            py: 0.5,
-            borderRadius: 1,
-            "&:hover": {
-              bgcolor: "rgba(140, 194, 27, 0.08)",
-              color: "primary.main",
-            },
-            transition: "all 0.2s",
-          }}
-        >
-          <AdminPanelSettings fontSize="small" sx={{ mr: 0.5 }} />
-          Admin Dashboard
-        </Link>
-        <Typography
-          color="primary.main"
-          fontWeight={600}
-          sx={{ fontSize: "0.85rem", px: 1, py: 0.5 }}
-        >
-          All Items Management
-        </Typography>
-      </Breadcrumbs>
-    </Box>
   );
 }
 
@@ -2489,12 +2383,24 @@ const AdminAllItemsPage = () => {
     sortedCargos: string[];
     cargoDataMap: Map<
       string,
-      { period: string; eta?: number; cargoStatus?: string; parsedEta: number }
+      {
+        period: string;
+        eta?: number;
+        cargoStatus?: string;
+        cargoType?: string;
+        parsedEta: number;
+      }
     >;
   } {
     const cargoMap = new Map<
       string,
-      { period: string; eta?: number; cargoStatus?: string; parsedEta: number }
+      {
+        period: string;
+        eta?: number;
+        cargoStatus?: string;
+        cargoType?: string;
+        parsedEta: number;
+      }
     >();
 
     // Utility function to parse ETA dates for proper sorting
@@ -2567,6 +2473,7 @@ const AdminAllItemsPage = () => {
                   period: period,
                   eta: deliveryDetails.eta,
                   cargoStatus: deliveryDetails.cargoStatus,
+                  cargoType: deliveryDetails.cargoType,
                   parsedEta: parsedEta,
                 });
               } else {
@@ -2577,6 +2484,7 @@ const AdminAllItemsPage = () => {
                     period: period,
                     eta: deliveryDetails.eta,
                     cargoStatus: deliveryDetails.cargoStatus,
+                    cargoType: deliveryDetails.cargoType,
                     parsedEta: parsedEta,
                   });
                 }
@@ -2632,51 +2540,33 @@ const AdminAllItemsPage = () => {
     cargoNo: string,
     period: string,
     eta?: number,
-    cargoStatus?: string
+    cargoStatus?: string,
+    cargoType?: string
   ): string {
-    const monthMap: { [key: string]: string } = {
-      "01": "January",
-      "02": "February",
-      "03": "March",
-      "04": "April",
-      "05": "May",
-      "06": "June",
-      "07": "July",
-      "08": "August",
-      "09": "September",
-      "10": "October",
-      "11": "November",
-      "12": "December",
-    };
-
     let label = "";
 
-    // Format period first (like "September 2025")
-    const periodMatch = period.match(/(\d{4})-(\d{1,2})/);
-    if (periodMatch) {
-      const year = periodMatch[1];
-      const month = periodMatch[2].padStart(2, "0");
-      const monthName = monthMap[month] || `Month ${month}`;
-      label = `${monthName} ${year}`;
-    } else if (period && period.startsWith("no-date-")) {
-      // Handle no-date periods
-      const periodNum = period.replace("no-date-", "");
-      label = `Period ${periodNum}`;
-    } else if (period) {
-      label = period;
-    } else {
-      label = "No Date";
+    // Add cargo type if available
+    if (cargoType) {
+      label += cargoType;
     }
 
-    // Add cargo number in parentheses (like original format)
+    // Add cargo number in parentheses
     if (cargoNo) {
-      label += ` (${cargoNo})`;
+      // Add space if cargo type exists
+      if (cargoType) {
+        label += ` `;
+      }
+      label += `(${cargoNo})`;
+    }
+
+    // If neither cargo type nor number exists, return a fallback
+    if (!cargoType && !cargoNo) {
+      label = "No Cargo";
     }
 
     return label;
   }
 
-  // In your columns useMemo, update the deliveryColumns generation with enhanced tooltips:
   const columns = useMemo(() => {
     const baseColumns = [
       {
@@ -2700,50 +2590,84 @@ const AdminAllItemsPage = () => {
           />
         ),
       },
+      // MERGED COLUMN - Company + List Name
       {
-        key: "companyName",
-        name: "Company",
-        width: 150,
+        key: "company_list",
+        name: "Company / List",
+        width: 200,
         resizable: true,
         renderCell: (props: any) => (
-          <Typography
-            variant="body2"
-            sx={{ fontSize: "14px", p: 1, fontWeight: 500 }}
+          <Box
+            sx={{
+              display: "flex",
+              flexDirection: "column",
+              width: "100%",
+              height: "100%",
+              p: 1,
+            }}
           >
-            {props.row.companyName}
-          </Typography>
+            {/* Top level - Company Name (black) */}
+            <Typography
+              variant="body2"
+              sx={{
+                fontWeight: 500,
+                color: "black",
+                fontSize: "0.8rem",
+                lineHeight: 1.2,
+                mb: 1,
+              }}
+            >
+              {props.row.companyName}
+            </Typography>
+
+            {/* Bottom level - List Name (grey) */}
+            <Typography
+              variant="body2"
+              sx={{
+                color: "#64748B",
+                fontSize: "14px",
+                lineHeight: 1.2,
+              }}
+            >
+              {props.row.listName}
+            </Typography>
+          </Box>
         ),
-      },
-      {
-        key: "listName",
-        name: "List",
-        width: 120,
-        resizable: true,
-        renderCell: (props: any) => (
-          <Typography
-            variant="body2"
-            sx={{ fontSize: "14px", p: 1, fontWeight: 500 }}
+        renderHeaderCell: () => (
+          <Box
+            sx={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              height: "100%",
+              padding: "4px 8px",
+            }}
           >
-            {props.row.listName}
-          </Typography>
+            <Typography
+              variant="subtitle2"
+              sx={{
+                fontWeight: 500,
+                color: "black",
+                fontSize: "0.8rem",
+                lineHeight: 1.2,
+              }}
+            >
+              Company
+            </Typography>
+            <Typography
+              variant="caption"
+              sx={{
+                color: "text.secondary",
+                fontSize: "0.75rem",
+                lineHeight: 1.2,
+                mt: 0.5,
+              }}
+            >
+              List
+            </Typography>
+          </Box>
         ),
-      },
-      {
-        key: "item_no_de",
-        name: "Item No. DE",
-        width: 120,
-        resizable: true,
-        renderCell: (props: any) => {
-          const hasChanges =
-            props.row.unacknowledgedFields?.includes("item_no_de");
-          return (
-            <FieldHighlight hasChanges={hasChanges} fieldName="Item No.">
-              <Typography variant="body2" sx={{ fontSize: "14px", p: 1 }}>
-                {props.row.item_no_de || "-"}
-              </Typography>
-            </FieldHighlight>
-          );
-        },
       },
       {
         key: "imageUrl",
@@ -2863,47 +2787,167 @@ const AdminAllItemsPage = () => {
           );
         },
       },
+      // MERGED COLUMN - Item No. DE + Article Name
       {
-        key: "articleName",
-        name: "Article Name",
+        key: "item_info",
+        name: "Item",
         width: 300,
         resizable: true,
         renderCell: (props: any) => {
-          const hasChanges =
+          const hasItemNoChanges =
+            props.row.unacknowledgedFields?.includes("item_no_de");
+          const hasArticleNameChanges =
             props.row.unacknowledgedFields?.includes("articleName");
+
           return (
-            <FieldHighlight hasChanges={hasChanges} fieldName="Article Name">
-              <Typography variant="body2" sx={{ fontSize: "14px", p: 1 }}>
-                {props.row.articleName}
-              </Typography>
-            </FieldHighlight>
+            <Box
+              sx={{
+                display: "flex",
+                flexDirection: "column",
+                width: "100%",
+                height: "100%",
+                p: 1,
+              }}
+            >
+              {/* Top level - Item No. DE (black) */}
+              <FieldHighlight
+                hasChanges={hasItemNoChanges}
+                fieldName="Item No."
+              >
+                <Typography
+                  variant="body2"
+                  sx={{
+                    fontWeight: 600,
+                    color: "black",
+                    fontSize: "0.8rem",
+                    lineHeight: 1.2,
+                    mb: 0.5,
+                  }}
+                >
+                  {props.row.item_no_de || "-"}
+                </Typography>
+              </FieldHighlight>
+
+              {/* Bottom level - Article Name (grey) */}
+              <FieldHighlight
+                hasChanges={hasArticleNameChanges}
+                fieldName="Article Name"
+              >
+                <Typography
+                  variant="body2"
+                  sx={{
+                    color: "#64748B",
+                    fontSize: "14px",
+                    lineHeight: 1.2,
+                    fontStyle: props.row.articleName ? "normal" : "italic",
+                  }}
+                >
+                  {props.row.articleName || "No article name"}
+                </Typography>
+              </FieldHighlight>
+            </Box>
           );
         },
-      },
-      {
-        key: "quantity",
-        name: "Total Quantity",
-        width: 120,
-        resizable: true,
-        renderCell: (props: any) => (
-          <EditableQuantityCell
-            row={props.row}
-            onUpdateItem={handleUpdateItem}
-            onAcknowledgeField={handleAcknowledgeField}
-          />
+        renderHeaderCell: () => (
+          <Box
+            sx={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              height: "100%",
+              padding: "4px 8px",
+            }}
+          >
+            <Typography
+              variant="subtitle2"
+              sx={{
+                fontWeight: 600,
+                color: "black",
+                fontSize: "0.8rem",
+                lineHeight: 1.2,
+              }}
+            >
+              ItemNo
+            </Typography>
+            <Typography
+              variant="caption"
+              sx={{
+                color: "text.secondary",
+                fontSize: "0.75rem",
+                lineHeight: 1.2,
+                mt: 0.5,
+              }}
+            >
+              ItemName
+            </Typography>
+          </Box>
         ),
       },
       {
-        key: "interval",
-        name: "Interval",
+        key: "interval_quantity",
+        name: "Interval / Qty",
         width: 130,
         resizable: true,
         renderCell: (props: any) => (
-          <EditableIntervalCell
-            row={props.row}
-            onUpdateItem={handleUpdateItem}
-            onAcknowledgeField={handleAcknowledgeField}
-          />
+          <Box
+            sx={{
+              display: "flex",
+              flexDirection: "column",
+              width: "100%",
+              height: "100%",
+              cursor: "pointer",
+            }}
+          >
+            <EditableIntervalCell
+              row={props.row}
+              onUpdateItem={handleUpdateItem}
+              onAcknowledgeField={handleAcknowledgeField}
+              compact={true}
+            />
+
+            <EditableQuantityCell
+              row={props.row}
+              onUpdateItem={handleUpdateItem}
+              onAcknowledgeField={handleAcknowledgeField}
+              compact={true}
+            />
+          </Box>
+        ),
+        renderHeaderCell: () => (
+          <Box
+            sx={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              height: "100%",
+              padding: "4px 8px",
+            }}
+          >
+            <Typography
+              variant="subtitle2"
+              sx={{
+                fontWeight: 600,
+                color: "black",
+                fontSize: "0.8rem",
+                lineHeight: 1.2,
+              }}
+            >
+              Interval
+            </Typography>
+            <Typography
+              variant="caption"
+              sx={{
+                color: "text.secondary",
+                fontSize: "0.75rem",
+                lineHeight: 1.2,
+                mt: 0.5,
+              }}
+            >
+              Qty
+            </Typography>
+          </Box>
         ),
       },
     ];
@@ -2911,15 +2955,15 @@ const AdminAllItemsPage = () => {
     // Generate delivery columns based on unique cargo numbers - now properly sorted by ETA
     const deliveryColumns = deliveryColumnsData.sortedCargos.map((cargoNo) => {
       const cargoData = deliveryColumnsData.cargoDataMap.get(cargoNo);
-
+      console.log(cargoData);
       const statusDescriptions: Record<string, string> = {
-        open: "Cargo planned - The shipment is in the planning phase",
+        open: "Fracht geplant - Die Sendung befindet sich in der Planungsphase",
         packed:
-          "Goods are packed - Items have been prepared and packaged for shipment",
+          "Ware ist verpackt - Artikel wurden für den Versand vorbereitet und verpackt",
         shipped:
-          "Cargo is sent out - The shipment has left the origin facility",
+          "Fracht wurde versendet - Die Sendung hat das Ursprungszentrum verlassen",
         arrived:
-          "Arrived in Germany - The shipment has reached its destination in Germany",
+          "In Deutschland angekommen - Die Sendung hat ihr Ziel in Deutschland erreicht",
       };
 
       const renderTooltipContent = () => (
@@ -2981,7 +3025,7 @@ const AdminAllItemsPage = () => {
         resizable: false,
         renderCell: (props: any) => (
           <Tooltip {...tooltipProps}>
-            <span>
+            <span className=" w-full">
               <DeliveryCell
                 row={props.row}
                 cargoNo={cargoNo}
@@ -3011,7 +3055,8 @@ const AdminAllItemsPage = () => {
                     cargoNo,
                     cargoData?.period || "",
                     cargoData?.eta,
-                    cargoData?.cargoStatus
+                    cargoData?.cargoStatus,
+                    cargoData?.cargoType
                   )}
                 </span>
                 {cargoData?.cargoStatus && (
@@ -3242,35 +3287,14 @@ const AdminAllItemsPage = () => {
                     lineHeight: 1.2,
                   }}
                 >
-                  All Items Management
+                  Scheduled Items{" "}
                 </Typography>
               </Box>
             </Box>
 
             {saving && <CircularProgress size={20} sx={{ ml: 2 }} />}
           </Box>
-
-          <EnhancedBreadcrumbs />
-        </Box>
-
-        {/* Filter Section */}
-        <Card
-          sx={{
-            mb: 2,
-            borderRadius: 1,
-            boxShadow: "0 4px 20px rgba(0, 0, 0, 0.08)",
-            border: "1px solid",
-            borderColor: alpha("#E2E8F0", 0.8),
-          }}
-        >
-          <CardContent sx={{ p: 3 }}>
-            <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
-              <FilterList sx={{ color: "primary.main", mr: 1 }} />
-              <Typography variant="h6" fontWeight={600}>
-                Filters & Actions
-              </Typography>
-            </Box>
-
+          <CardContent sx={{ paddingLeft: 4, paddingRight: 4 }}>
             <div className="w-full flex justify-between items-center">
               <Grid container spacing={3} alignItems="center">
                 <Grid item xs={12} sm={2.5}>
@@ -3366,15 +3390,6 @@ const AdminAllItemsPage = () => {
                     >
                       Clear Filters
                     </Button>
-                    <Chip
-                      label={`${
-                        currentTab === 0
-                          ? filteredItems.length
-                          : filteredActivityLogs.length
-                      } ${currentTab === 0 ? "items" : "logs"}`}
-                      color="primary"
-                      variant="outlined"
-                    />
                   </Box>
                 </Grid>
               </Grid>
@@ -3393,7 +3408,7 @@ const AdminAllItemsPage = () => {
               </Grid>
             </div>
           </CardContent>
-        </Card>
+        </Box>
 
         {/* Tabs Section */}
         <Card

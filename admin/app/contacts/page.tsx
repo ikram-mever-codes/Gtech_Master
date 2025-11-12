@@ -587,7 +587,7 @@ const ContactPersonsPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 p-8">
-      <div className="max-w-7xl mx-auto">
+      <div className="max-w-[85vw] mx-auto">
         {/* Header */}
 
         <div className="w-full items-center  flex justify-between">
@@ -635,11 +635,6 @@ const ContactPersonsPage: React.FC = () => {
               }`}
             >
               All Contacts
-              {totalRecords > 0 && (
-                <span className="ml-2 bg-gray-100 text-gray-600 px-2 py-1 rounded-full text-xs">
-                  {totalRecords}
-                </span>
-              )}
             </button>
             <button
               onClick={() => setActiveTab("sales")}
@@ -650,11 +645,6 @@ const ContactPersonsPage: React.FC = () => {
               }`}
             >
               Sales View
-              {decisionMakers.length > 0 && (
-                <span className="ml-2 bg-blue-100 text-blue-600 px-2 py-1 rounded-full text-xs">
-                  {decisionMakers.length}
-                </span>
-              )}
             </button>
           </nav>
         </div>
@@ -883,9 +873,6 @@ const ContactPersonsPage: React.FC = () => {
                           Name
                         </th>
                         <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Position
-                        </th>
-                        <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Contact
                         </th>
                         <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -895,7 +882,7 @@ const ContactPersonsPage: React.FC = () => {
                           Type
                         </th>
                         <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Decision Maker State
+                          Note{" "}
                         </th>
                         <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Actions
@@ -928,24 +915,14 @@ const ContactPersonsPage: React.FC = () => {
                               <div className="text-sm font-medium text-gray-900">
                                 {contact.name} {contact.familyName}
                               </div>
-                              {contact.sex && (
+                              {contact.position && (
                                 <div className="text-xs text-gray-500">
-                                  {contact.sex}
+                                  {contact.position}
                                 </div>
                               )}
                             </div>
                           </td>
-                          <td
-                            className="px-6 py-4 whitespace-nowrap cursor-pointer"
-                            onClick={() => handleContactPersonClick(contact)}
-                          >
-                            <div className="text-sm text-gray-900">
-                              {getPositionLabel(
-                                contact.position,
-                                contact.positionOthers
-                              )}
-                            </div>
-                          </td>
+
                           <td
                             className="px-6 py-4 cursor-pointer"
                             onClick={() => handleContactPersonClick(contact)}
@@ -958,7 +935,9 @@ const ContactPersonsPage: React.FC = () => {
                                   onClick={(e) => e.stopPropagation()}
                                 >
                                   <EnvelopeIcon className="h-3 w-3" />
-                                  {contact.email}
+                                  {contact.email.length > 20
+                                    ? `${contact.email.substring(0, 15)}...`
+                                    : contact.email}
                                 </a>
                               )}
                               {contact.phone && (
@@ -1012,24 +991,7 @@ const ContactPersonsPage: React.FC = () => {
                             )}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <select
-                              value={contact.decisionMakerState || ""}
-                              onChange={(e) => {
-                                handleUpdateDecisionMakerState(
-                                  contact.id,
-                                  e.target.value
-                                );
-                              }}
-                              className={`text-xs px-2 w-max max-w-[180px] truncate py-1 rounded-full font-medium border-0 cursor-pointer ${getDecisionMakerStateColor(
-                                contact.decisionMakerState || ""
-                              )}`}
-                            >
-                              {DECISION_MAKER_STATES.map((state: any) => (
-                                <option key={state.value} value={state.value}>
-                                  {state.label}
-                                </option>
-                              ))}
-                            </select>
+                            {renderNoteIcons(contact)}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="flex items-center gap-2">
@@ -1045,7 +1007,7 @@ const ContactPersonsPage: React.FC = () => {
                               <button
                                 onClick={(e) => {
                                   const searchQuery = encodeURIComponent(
-                                    `${contact.businessName}`.trim()
+                                    `${contact.businessLegalName}`.trim()
                                   );
                                   window.open(
                                     `https://www.google.com/search?q=${searchQuery}`,
@@ -1060,7 +1022,7 @@ const ContactPersonsPage: React.FC = () => {
                               <button
                                 onClick={(e) => {
                                   const searchQuery = encodeURIComponent(
-                                    `${contact.businessName} linkedin`.trim()
+                                    `${contact.businessLegalName} linkedin`.trim()
                                   );
                                   window.open(
                                     `https://www.google.com/search?q=${searchQuery}`,
@@ -1229,9 +1191,7 @@ const ContactPersonsPage: React.FC = () => {
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Name
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Position
-                        </th>
+
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Contact
                         </th>
@@ -1278,21 +1238,14 @@ const ContactPersonsPage: React.FC = () => {
                             >
                               {contact.name} {contact.familyName}
                             </button>
+
+                            {contact.position && (
+                              <div className="text-xs text-gray-500">
+                                {contact.position}
+                              </div>
+                            )}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleContactPersonClick(contact);
-                              }}
-                              className="text-sm text-gray-900 hover:text-blue-600 text-left"
-                            >
-                              {getPositionLabel(
-                                contact.position,
-                                contact.positionOthers
-                              )}
-                            </button>
-                          </td>
+
                           <td className="px-6 py-4">
                             <div className="space-y-1">
                               {contact.email && (
@@ -1302,7 +1255,9 @@ const ContactPersonsPage: React.FC = () => {
                                   onClick={(e) => e.stopPropagation()}
                                 >
                                   <EnvelopeIcon className="h-3 w-3" />
-                                  {contact.email}
+                                  {contact.email.length > 20
+                                    ? `${contact.email.substring(0, 20)}...`
+                                    : contact.email}
                                 </a>
                               )}
                               {contact.phone && (
@@ -1385,7 +1340,7 @@ const ContactPersonsPage: React.FC = () => {
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   const searchQuery = encodeURIComponent(
-                                    `${contact.businessName}`.trim()
+                                    `${contact.businessLegalName}`.trim()
                                   );
                                   window.open(
                                     `https://www.google.com/search?q=${searchQuery}`,
@@ -1907,7 +1862,7 @@ const ContactPersonsPage: React.FC = () => {
                             !isDecisionMakerContact(createForm.contact))
                         }
                         className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                        placeholder="max.mustermann@beispiel.de"
+                        placeholder="max@beispiel.de"
                       />
                     </div>
                     <div>
@@ -1953,7 +1908,7 @@ const ContactPersonsPage: React.FC = () => {
                             !isDecisionMakerContact(createForm.contact))
                         }
                         className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                        placeholder="https://linkedin.com/in/maxmustermann"
+                        placeholder=""
                       />
                     </div>
                     <div>
@@ -2044,6 +1999,7 @@ const ContactPersonsPage: React.FC = () => {
                     {/* Contact Preference Note */}
                     <div className="col-span-2">
                       <label className="block text-sm font-medium text-gray-700 mb-1">
+                        <span className="text-green-500 text-xl">⭐</span>
                         Contact Preference
                       </label>
                       <input
@@ -2061,7 +2017,7 @@ const ContactPersonsPage: React.FC = () => {
                             !isDecisionMakerContact(createForm.contact))
                         }
                         className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                        placeholder="Beste Erreichbarkeit, bevorzugte Kontaktmethode, etc."
+                        placeholder=""
                       />
                     </div>
 
@@ -2069,6 +2025,12 @@ const ContactPersonsPage: React.FC = () => {
                     {activeTab === "sales" && (
                       <div className="col-span-2 border-l-4 border-purple-500 pl-4 bg-purple-50 rounded-r-lg p-3">
                         <label className="block text-sm font-medium text-purple-800 mb-1">
+                          <span
+                            className="text-purple-500"
+                            title="Decision Maker Note"
+                          >
+                            💼
+                          </span>{" "}
                           Decision Maker Note
                         </label>
                         <textarea
@@ -2086,7 +2048,7 @@ const ContactPersonsPage: React.FC = () => {
                               !isDecisionMakerContact(createForm.contact))
                           }
                           className="w-full px-3 py-2 border border-purple-300 rounded-lg focus:ring-2 focus:ring-purple-500 disabled:bg-gray-100"
-                          placeholder="Key decision-making information, approval authority, budget control, etc."
+                          placeholder=""
                         />
                       </div>
                     )}
@@ -2094,6 +2056,9 @@ const ContactPersonsPage: React.FC = () => {
                     {/* General Notes */}
                     <div className="col-span-2">
                       <label className="block text-sm font-medium text-gray-700 mb-1">
+                        <span className="text-blue-500" title="General Note">
+                          📝
+                        </span>{" "}
                         Notes
                       </label>
                       <textarea
@@ -2108,7 +2073,7 @@ const ContactPersonsPage: React.FC = () => {
                             !isDecisionMakerContact(createForm.contact))
                         }
                         className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                        placeholder="Zusätzliche Notizen zu diesem Kontakt..."
+                        placeholder=""
                       />
                     </div>
                   </div>
@@ -2180,7 +2145,7 @@ const ContactPersonsPage: React.FC = () => {
                       </h3>
                     </div>
                     <p className="text-gray-700 whitespace-pre-wrap">
-                      {notesModalData.note || "No general notes available"}
+                      {notesModalData.note || ""}
                     </p>
                   </div>
 
@@ -2193,8 +2158,7 @@ const ContactPersonsPage: React.FC = () => {
                       </h3>
                     </div>
                     <p className="text-gray-700 whitespace-pre-wrap">
-                      {notesModalData.noteContactPreference ||
-                        "No contact preference notes available"}
+                      {notesModalData.noteContactPreference || ""}
                     </p>
                   </div>
 
@@ -2207,8 +2171,7 @@ const ContactPersonsPage: React.FC = () => {
                       </h3>
                     </div>
                     <p className="text-gray-700 whitespace-pre-wrap font-medium">
-                      {notesModalData.decisionMakerNote ||
-                        "No decision maker notes available"}
+                      {notesModalData.decisionMakerNote || ""}
                     </p>
                   </div>
                 </div>

@@ -509,43 +509,89 @@ const DeliveryHistoryTab = ({ items, isMobile }: any) => {
                   >
                     Items in this delivery:
                   </Typography>
-                  {delivery.items.map((item: any, idx: number) => (
-                    <Card
-                      key={`${item.id}_${idx}`}
-                      sx={{
-                        p: 2,
-                        mb: 1,
-                        backgroundColor: alpha(
-                          theme.palette.background.paper,
-                          0.8
-                        ),
-                        border: `1px solid ${alpha("#E2E8F0", 0.8)}`,
-                      }}
-                    >
-                      <Typography variant="body2" fontWeight={500}>
-                        {item.articleName}
-                      </Typography>
-                      <Stack direction="row" spacing={1} sx={{ mt: 0.5 }}>
-                        <Chip
-                          label={`Art: ${item.articleNumber}`}
-                          size="small"
-                          variant="outlined"
-                        />
-                        {item.item_no_de && (
-                          <Chip
-                            label={`DE: ${item.item_no_de}`}
-                            size="small"
-                            variant="outlined"
-                          />
-                        )}
-                        <Chip
-                          label={`Qty: ${item.quantity}`}
-                          size="small"
-                          color="primary"
-                        />
-                      </Stack>
-                    </Card>
-                  ))}
+
+                  {/* ITEMS LIST TABLE - REDESIGNED */}
+                  <TableContainer
+                    component={Paper}
+                    sx={{
+                      borderRadius: 1,
+                      boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+                      mb: 2,
+                    }}
+                  >
+                    <Table size="small">
+                      <TableHead>
+                        <TableRow
+                          sx={{
+                            backgroundColor: alpha(
+                              theme.palette.primary.main,
+                              0.02
+                            ),
+                          }}
+                        >
+                          <TableCell sx={{ py: 1 }}>
+                            <Typography variant="subtitle2" fontWeight={600}>
+                              Article Name
+                            </Typography>
+                          </TableCell>
+                          <TableCell sx={{ py: 1 }}>
+                            <Typography variant="subtitle2" fontWeight={600}>
+                              Article No
+                            </Typography>
+                          </TableCell>
+                          <TableCell align="center" sx={{ py: 1 }}>
+                            <Typography variant="subtitle2" fontWeight={600}>
+                              Quantity
+                            </Typography>
+                          </TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {delivery.items.map((item: any, idx: number) => (
+                          <TableRow
+                            key={`${item.id}_${idx}`}
+                            sx={{
+                              "&:last-child td, &:last-child th": { border: 0 },
+                              "&:hover": {
+                                backgroundColor: alpha(
+                                  theme.palette.primary.main,
+                                  0.01
+                                ),
+                              },
+                            }}
+                          >
+                            <TableCell sx={{ py: 1.5 }}>
+                              <Typography variant="body2" fontSize="0.875rem">
+                                {item.articleName}
+                              </Typography>
+                            </TableCell>
+                            <TableCell sx={{ py: 1.5 }}>
+                              <Typography
+                                variant="body2"
+                                fontSize="0.875rem"
+                                color="text.secondary"
+                              >
+                                {item.articleNumber}
+                              </Typography>
+                            </TableCell>
+                            <TableCell align="center" sx={{ py: 1.5 }}>
+                              <Chip
+                                label={item.quantity}
+                                size="small"
+                                color="primary"
+                                variant="outlined"
+                                sx={{
+                                  minWidth: "40px",
+                                  fontSize: "0.75rem",
+                                  fontWeight: 600,
+                                }}
+                              />
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
                 </Box>
               </AccordionDetails>
             </Accordion>
@@ -791,63 +837,141 @@ const DeliveryHistoryTab = ({ items, isMobile }: any) => {
                           >
                             Items in this delivery:
                           </Typography>
-                          <Grid container spacing={2}>
-                            {delivery.items.map((item: any, idx: number) => (
-                              <Grid
-                                item
-                                xs={12}
-                                md={6}
-                                lg={4}
-                                key={`${item.id}_${idx}`}
-                              >
-                                <Card
+
+                          {/* ITEMS LIST TABLE - REDESIGNED */}
+                          <TableContainer
+                            component={Paper}
+                            sx={{
+                              borderRadius: 1,
+                              boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+                              mb: 2,
+                            }}
+                          >
+                            <Table>
+                              <TableHead>
+                                <TableRow
                                   sx={{
-                                    p: 2,
-                                    border: `1px solid ${alpha(
-                                      "#E2E8F0",
-                                      0.8
-                                    )}`,
-                                    backgroundColor: "background.paper",
+                                    backgroundColor: alpha(
+                                      theme.palette.primary.main,
+                                      0.02
+                                    ),
                                   }}
                                 >
-                                  <Typography
-                                    variant="body2"
-                                    fontWeight={500}
-                                    gutterBottom
-                                  >
-                                    {item.articleName}
-                                  </Typography>
-                                  <Stack
-                                    direction="row"
-                                    spacing={1}
-                                    flexWrap="wrap"
-                                    sx={{ gap: 0.5 }}
-                                  >
-                                    <Chip
-                                      label={`Art: ${item.articleNumber}`}
-                                      size="small"
-                                      variant="outlined"
-                                      sx={{ fontSize: "0.7rem" }}
-                                    />
-                                    {item.item_no_de && (
-                                      <Chip
-                                        label={`DE: ${item.item_no_de}`}
-                                        size="small"
-                                        variant="outlined"
-                                        sx={{ fontSize: "0.7rem" }}
-                                      />
-                                    )}
-                                    <Chip
-                                      label={`Quantity: ${item.quantity}`}
-                                      size="small"
-                                      color="primary"
-                                      sx={{ fontSize: "0.7rem" }}
-                                    />
-                                  </Stack>
-                                </Card>
-                              </Grid>
-                            ))}
-                          </Grid>
+                                  <TableCell sx={{ py: 1.5 }}>
+                                    <Typography
+                                      variant="subtitle2"
+                                      fontWeight={600}
+                                    >
+                                      Article Name
+                                    </Typography>
+                                  </TableCell>
+                                  <TableCell sx={{ py: 1.5 }}>
+                                    <Typography
+                                      variant="subtitle2"
+                                      fontWeight={600}
+                                    >
+                                      Article Number
+                                    </Typography>
+                                  </TableCell>
+                                  <TableCell sx={{ py: 1.5 }}>
+                                    <Typography
+                                      variant="subtitle2"
+                                      fontWeight={600}
+                                    >
+                                      DE Item No
+                                    </Typography>
+                                  </TableCell>
+                                  <TableCell align="center" sx={{ py: 1.5 }}>
+                                    <Typography
+                                      variant="subtitle2"
+                                      fontWeight={600}
+                                    >
+                                      Quantity
+                                    </Typography>
+                                  </TableCell>
+                                  <TableCell align="center" sx={{ py: 1.5 }}>
+                                    <Typography
+                                      variant="subtitle2"
+                                      fontWeight={600}
+                                    >
+                                      Status
+                                    </Typography>
+                                  </TableCell>
+                                </TableRow>
+                              </TableHead>
+                              <TableBody>
+                                {delivery.items.map(
+                                  (item: any, idx: number) => (
+                                    <TableRow
+                                      key={`${item.id}_${idx}`}
+                                      sx={{
+                                        "&:last-child td, &:last-child th": {
+                                          border: 0,
+                                        },
+                                        "&:hover": {
+                                          backgroundColor: alpha(
+                                            theme.palette.primary.main,
+                                            0.01
+                                          ),
+                                        },
+                                      }}
+                                    >
+                                      <TableCell sx={{ py: 2 }}>
+                                        <Typography
+                                          variant="body2"
+                                          fontWeight={500}
+                                        >
+                                          {item.articleName}
+                                        </Typography>
+                                      </TableCell>
+                                      <TableCell sx={{ py: 2 }}>
+                                        <Typography
+                                          variant="body2"
+                                          color="text.secondary"
+                                        >
+                                          {item.articleNumber}
+                                        </Typography>
+                                      </TableCell>
+                                      <TableCell sx={{ py: 2 }}>
+                                        <Typography
+                                          variant="body2"
+                                          color="text.secondary"
+                                        >
+                                          {item.item_no_de || "-"}
+                                        </Typography>
+                                      </TableCell>
+                                      <TableCell align="center" sx={{ py: 2 }}>
+                                        <Chip
+                                          label={item.quantity}
+                                          size="small"
+                                          color="primary"
+                                          variant="outlined"
+                                          sx={{
+                                            minWidth: "50px",
+                                            fontWeight: 600,
+                                          }}
+                                        />
+                                      </TableCell>
+                                      <TableCell align="center" sx={{ py: 2 }}>
+                                        <Chip
+                                          label={item.status}
+                                          size="small"
+                                          sx={{
+                                            backgroundColor: alpha(
+                                              getStatusColor(item.status),
+                                              0.1
+                                            ),
+                                            color: getStatusColor(item.status),
+                                            fontWeight: 500,
+                                          }}
+                                        />
+                                      </TableCell>
+                                    </TableRow>
+                                  )
+                                )}
+                              </TableBody>
+                            </Table>
+                          </TableContainer>
                         </Box>
                       </Collapse>
                     </TableCell>
@@ -3392,15 +3516,14 @@ const ListManagerPage: React.FC = () => {
       const cargoData = deliveryColumnsData.cargoDataMap.get(cargoNo);
 
       const statusDescriptions: Record<string, string> = {
-        open: "Cargo planned - The shipment is in the planning phase",
+        open: "Fracht geplant - Die Sendung befindet sich in der Planungsphase",
         packed:
-          "Goods are packed - Items have been prepared and packaged for shipment",
+          "Ware ist verpackt - Artikel wurden für den Versand vorbereitet und verpackt",
         shipped:
-          "Cargo is sent out - The shipment has left the origin facility",
+          "Fracht wurde versendet - Die Sendung hat das Ursprungszentrum verlassen",
         arrived:
-          "Arrived in Germany - The shipment has reached its destination in Germany",
+          "In Deutschland angekommen - Die Sendung hat ihr Ziel in Deutschland erreicht",
       };
-
       const renderTooltipContent = () => (
         <Box sx={{ p: 1 }}>
           <Typography variant="body2" sx={{ fontWeight: "bold", mb: 1 }}>
@@ -4241,11 +4364,8 @@ const ListManagerPage: React.FC = () => {
               </Box>
             )}
 
-            {/* Items Display */}
             {activeTab === "items" ? (
-              // Items tab content
               isMobile ? (
-                // Mobile Card View
                 <Box>
                   {filteredItems.length === 0 ? (
                     <Box
