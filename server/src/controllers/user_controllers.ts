@@ -553,30 +553,42 @@ export const forgetPassword = async (
       });
     }
 
-    // Generate reset token with expiration (1 hour)
+    // Generate reset token with expiration (30 minutes)
     const resetToken = jwt.sign({ id: user.id }, process.env.JWT_SECRET!, {
-      expiresIn: "1h",
+      expiresIn: "30m",
     });
 
     // Save reset token to user
     user.resetPasswordToken = resetToken;
-    user.resetPasswordExp = new Date(Date.now() + 3600000);
+    user.resetPasswordExp = new Date(Date.now() + 1800000); // 30 minutes
     await userRepository.save(user);
 
     // Create reset link
     const resetLink = `${process.env.MASTER}/reset-password?token=${resetToken}`;
 
     const message = `
-      <h2>Password Reset Request</h2>
-      <p>You requested a password reset for your account.</p>
-      <p>Click the link below to reset your password (expires in 1 hour):</p>
-      <a href="${resetLink}">Reset Password</a>
-      <p>If you didn't request this, please ignore this email.</p>
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2>Passwort zurücksetzen – GTech Star-Kundenportal</h2>
+        <p>Hallo ${user.name || "Nutzer"},</p>
+        <p>Du hast eine Anfrage gestellt, Dein Passwort für das GTech Star-Kundenportal zurückzusetzen.</p>
+        <p>Klicke einfach auf den Button, um Dein neues Passwort festzulegen:</p>
+        <p>
+          <a href="${resetLink}" style="background-color: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block; font-weight: bold;">
+            👉 Passwort jetzt zurücksetzen
+          </a>
+        </p>
+        <p>Falls Du den Link lieber kopieren möchtest, kannst Du ihn auch direkt in Deinen Browser einfügen:</p>
+        <p style="word-break: break-all; color: #007bff;">${resetLink}</p>
+        <p><strong>Aus Sicherheitsgründen ist dieser Link 30 Minuten gültig.</strong></p>
+        <p>Wenn Du kein neues Passwort angefordert hast, kannst Du diese E-Mail einfach ignorieren.</p>
+        <br>
+        <p>Viele Grüße<br>Dein GTech Team</p>
+      </div>
     `;
 
     await sendEmail({
       to: email,
-      subject: "Password Reset Request",
+      subject: "Passwort zurücksetzen – GTech Star-Kundenportal",
       html: message,
     });
 

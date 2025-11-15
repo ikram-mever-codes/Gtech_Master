@@ -1535,54 +1535,6 @@ function EditableCommentCell({ row, onUpdateItem, onAcknowledgeField }: any) {
   );
 }
 
-// Format period label for cargo columns
-function formatCargoColumnLabel(
-  cargoNo: string,
-  period: string,
-  eta?: number
-): string {
-  const monthMap: { [key: string]: string } = {
-    "01": "January",
-    "02": "February",
-    "03": "March",
-    "04": "April",
-    "05": "May",
-    "06": "June",
-    "07": "July",
-    "08": "August",
-    "09": "September",
-    "10": "October",
-    "11": "November",
-    "12": "December",
-  };
-
-  let label = "";
-
-  // Format period first (like "September 2025")
-  const periodMatch = period.match(/(\d{4})-(\d{1,2})/);
-  if (periodMatch) {
-    const year = periodMatch[1];
-    const month = periodMatch[2].padStart(2, "0");
-    const monthName = monthMap[month] || `Month ${month}`;
-    label = `${monthName} ${year}`;
-  } else if (period && period.startsWith("no-date-")) {
-    // Handle no-date periods
-    const periodNum = period.replace("no-date-", "");
-    label = `Period ${periodNum}`;
-  } else if (period) {
-    label = period;
-  } else {
-    label = "No Date";
-  }
-
-  // Add cargo number in parentheses (like original format)
-  if (cargoNo) {
-    label += ` (${cargoNo})`;
-  }
-
-  return label;
-}
-
 // Enhanced Editable Interval Cell with change highlighting
 function EditableIntervalCell({ row, onUpdateItem, onAcknowledgeField }: any) {
   const [isEditing, setIsEditing] = useState(false);

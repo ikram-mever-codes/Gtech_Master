@@ -87,6 +87,11 @@ const RequestedItemsPage: React.FC = () => {
     null
   );
   const { user } = useSelector((state: RootState) => state.user);
+  const [businessesWithRequests, setBusinessesWithRequests] = useState<any[]>(
+    []
+  );
+  const [loadingBusinessesWithRequests, setLoadingBusinessesWithRequests] =
+    useState(false);
 
   const [showFilters, setShowFilters] = useState(false);
   const [editModeEnabled, setEditModeEnabled] = useState(false);
@@ -109,6 +114,27 @@ const RequestedItemsPage: React.FC = () => {
 
   const itemsPerPage = 20;
 
+  const getBusinessesWithRequests = useCallback((items: RequestedItem[]) => {
+    const businessMap = new Map();
+
+    items.forEach((item) => {
+      if (item.business?.customer) {
+        const businessId = item.business.customer.id;
+        if (!businessMap.has(businessId)) {
+          businessMap.set(businessId, {
+            id: businessId,
+            displayName:
+              item.business.customer.companyName ||
+              item.business.customer.legalName,
+            companyName: item.business.customer.companyName,
+            legalName: item.business.customer.legalName,
+          });
+        }
+      }
+    });
+
+    return Array.from(businessMap.values());
+  }, []);
   // Filter state
   const [filters, setFilters] = useState<RequestedItemsSearchFilters>({
     search: "",
@@ -271,7 +297,6 @@ const RequestedItemsPage: React.FC = () => {
     fetchStatistics();
   }, [fetchRequestedItems]);
 
-  // Apply frontend filtering when business filter or page changes
   useEffect(() => {
     let filtered = allRequestedItems;
 
@@ -294,7 +319,18 @@ const RequestedItemsPage: React.FC = () => {
     const paginatedItems = filtered.slice(startIndex, endIndex);
 
     setRequestedItems(paginatedItems);
-  }, [allRequestedItems, selectedBusinessId, currentPage, itemsPerPage]);
+
+    // Update businesses with requests whenever allRequestedItems changes
+    const businessesWithRequestsData =
+      getBusinessesWithRequests(allRequestedItems);
+    setBusinessesWithRequests(businessesWithRequestsData);
+  }, [
+    allRequestedItems,
+    selectedBusinessId,
+    currentPage,
+    itemsPerPage,
+    getBusinessesWithRequests,
+  ]);
 
   // Handle notes icon click
   const handleNotesClick = (item: RequestedItem, e: React.MouseEvent) => {
@@ -491,6 +527,7 @@ const RequestedItemsPage: React.FC = () => {
     <div className="min-h-screen bg-white shadow-xl rounded-lg p-8">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
+        {/* Header */}
         <div className="mb-8 w-full flex justify-between items-center">
           <div className="">
             <h1 className="text-3xl font-bold text-gray-900 mb-2">
@@ -498,9 +535,8 @@ const RequestedItemsPage: React.FC = () => {
             </h1>
           </div>
           <div>
-            {" "}
             <div className="flex gap-3">
-              {/* Business Filter Dropdown */}
+              {/* Business Filter Dropdown - Updated to only show businesses with requests */}
               <select
                 value={selectedBusinessId}
                 onChange={(e) => {
@@ -508,22 +544,24 @@ const RequestedItemsPage: React.FC = () => {
                   setCurrentPage(1);
                 }}
                 className="px-4 py-2 text-gray-700 bg-white/80 backdrop-blur-sm border border-gray-300/80 rounded-lg hover:bg-white/60 transition-all"
-                disabled={loadingBusinesses}
+                disabled={loadingBusinessesWithRequests}
               >
-                <option value="">All Businesses</option>
-                {loadingBusinesses ? (
+                <option value="">All Businesses with Requests</option>
+                {loadingBusinessesWithRequests ? (
                   <option value="" disabled>
                     Loading businesses...
                   </option>
-                ) : businesses.length > 0 ? (
-                  businesses.map((business) => (
-                    <option key={business.id} value={business.id}>
-                      {business.displayName}
-                    </option>
-                  ))
+                ) : businessesWithRequests.length > 0 ? (
+                  businessesWithRequests
+                    .sort((a, b) => a.displayName.localeCompare(b.displayName))
+                    .map((business) => (
+                      <option key={business.id} value={business.id}>
+                        {business.displayName}
+                      </option>
+                    ))
                 ) : (
                   <option value="" disabled>
-                    No businesses found
+                    No businesses with requests found
                   </option>
                 )}
               </select>
@@ -625,11 +663,15 @@ const RequestedItemsPage: React.FC = () => {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Business & Contact
                     </th>
-                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6  w-[8rem] py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Quantity & Interval
                     </th>
-                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="w-[8rem] px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Status
+                    </th>
+
+                    <th className=" w-[14rem] px-0 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Extra Note{" "}
                     </th>
                     <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Actions
@@ -648,13 +690,13 @@ const RequestedItemsPage: React.FC = () => {
                         className="px-6 py-4 cursor-pointer"
                         onClick={() => handleItemClick(item)}
                       >
-                        <div>
+                        <div className="w-[10rem]">
                           <div className="text-sm font-medium text-gray-900">
                             {item.itemName}
                           </div>
                           {item.material && (
                             <div className="text-xs text-gray-500">
-                              Material: {item.material}
+                              {item.material}
                             </div>
                           )}
                         </div>
@@ -663,40 +705,54 @@ const RequestedItemsPage: React.FC = () => {
                         className="px-6 py-4 cursor-pointer"
                         onClick={() => handleItemClick(item)}
                       >
-                        <a
-                          href={`/bussinesses/new?businessId=${item.business.customer.id}`}
-                          className="text-sm text-blue-600 hover:text-blue-800 block"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          {item.business?.customer.companyName || "-"}
-                        </a>
-                        <div className="text-xs text-gray-500 mt-1">
-                          {item.contactPerson?.name}{" "}
-                          {item.contactPerson?.familyName || "-"}
+                        <div className="w-[10rem]">
+                          <a
+                            href={`/bussinesses/new?businessId=${item.business.customer.id}`}
+                            className="text-sm text-blue-600 hover:text-blue-800 block"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {item.business?.customer.companyName || "-"}
+                          </a>
+                          <a
+                            href={`/contacts?contactId=${item.contactPerson.id}`}
+                            className="text-sm text-gray-600 hover:text-gray-800 block"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {" "}
+                            {item.contactPerson?.name}{" "}
+                            {item.contactPerson?.familyName || "-"}
+                          </a>
                         </div>
                       </td>
                       <td className="px-6 py-4 text-center">
-                        <div className="text-sm flex flex-col justify-center items-center font-medium text-gray-900">
+                        <div className="text-sm w-[4rem] flex flex-col justify-center items-center font-medium text-gray-900">
                           <div>{item.qty}</div>
                           <div>{item.interval}</div>
                         </div>
                       </td>
                       <td className="px-6 py-4 text-center">
-                        <select
-                          value={item.requestStatus}
-                          onChange={(e) => {
-                            handleStatusUpdate(item.id, e.target.value);
-                          }}
-                          className={`text-xs px-2 py-1 rounded-full font-medium border-0 cursor-pointer ${getStatusColor(
-                            item.requestStatus
-                          )}`}
-                        >
-                          {getAvailableStatuses().map((status) => (
-                            <option key={status.value} value={status.value}>
-                              {status.label}
-                            </option>
-                          ))}
-                        </select>
+                        <div className="w-[8rem] overflow-hidden">
+                          <select
+                            value={item.requestStatus}
+                            onChange={(e) => {
+                              handleStatusUpdate(item.id, e.target.value);
+                            }}
+                            className={`text-xs w-[8rem] px-2 py-1 rounded-full font-medium  border-0 cursor-pointer ${getStatusColor(
+                              item.requestStatus
+                            )}`}
+                          >
+                            {getAvailableStatuses().map((status) => (
+                              <option key={status.value} value={status.value}>
+                                {status.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </td>
+                      <td className="py-4 text-center">
+                        <div className="w-[14rem] break-words overflow-hidden">
+                          {item.extraNote}
+                        </div>
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center justify-center gap-3">
@@ -1166,7 +1222,7 @@ const RequestedItemsPage: React.FC = () => {
                               extraItemsDescriptions: e.target.value,
                             })
                           }
-                          rows={2}
+                          rows={4}
                           disabled={modalMode === "edit" && !editModeEnabled}
                           className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
                           placeholder="Describe the extra items..."
@@ -1187,7 +1243,7 @@ const RequestedItemsPage: React.FC = () => {
                             extraNote: e.target.value,
                           })
                         }
-                        rows={2}
+                        rows={4}
                         disabled={modalMode === "edit" && !editModeEnabled}
                         className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
                         placeholder="Additional notes..."

@@ -17,7 +17,7 @@ import {
   PencilIcon,
 } from "@heroicons/react/24/outline";
 import { toast } from "react-hot-toast";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Linkedin, Users, Building2, UserCheck } from "lucide-react";
 import {
   getAllContactPersons,
@@ -74,6 +74,7 @@ interface ContactFormData {
 
 const ContactPersonsPage: React.FC = () => {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   // State management
   const [activeTab, setActiveTab] = useState<TabType>("no-contacts");
@@ -257,8 +258,8 @@ const ContactPersonsPage: React.FC = () => {
     }
   };
 
-  // Handle contact person click - open modal in view mode
-  const handleContactPersonClick = (contact: ContactPersonData) => {
+  // Function to open contact modal with specific contact data
+  const openContactModal = useCallback((contact: ContactPersonData) => {
     setModalMode("edit");
     setEditingContactId(contact.id);
     setEditModeEnabled(false); // Start in view mode
@@ -289,6 +290,11 @@ const ContactPersonsPage: React.FC = () => {
 
     // Open the modal
     setShowCreateModal(true);
+  }, []);
+
+  // Handle contact person click - open modal in view mode
+  const handleContactPersonClick = (contact: ContactPersonData) => {
+    openContactModal(contact);
   };
 
   // Handle edit contact - open modal in edit mode
@@ -339,6 +345,53 @@ const ContactPersonsPage: React.FC = () => {
       toast.error("Failed to delete contact");
     }
   };
+
+  // Function to find and open contact by ID
+  const findAndOpenContactById = useCallback(
+    async (contactId: string) => {
+      try {
+        // First try to find in existing contact persons
+        const allContacts = await getAllContactPersons();
+
+        if (allContacts?.data?.contactPersons) {
+          const foundContact = allContacts.data.contactPersons.find(
+            (contact: ContactPersonData) => contact.id === contactId
+          );
+
+          if (foundContact) {
+            // Switch to "all" tab and open the modal
+            setActiveTab("all");
+            setTimeout(() => {
+              openContactModal(foundContact);
+            }, 100);
+            return true;
+          }
+        }
+
+        return false;
+      } catch (error) {
+        console.error("Error finding contact by ID:", error);
+        return false;
+      }
+    },
+    [openContactModal]
+  );
+
+  // Effect to handle contactId from URL query parameters
+  useEffect(() => {
+    const contactId = searchParams?.get("contactId");
+    if (contactId) {
+      // Set active tab to "all" to ensure contact is visible
+      setActiveTab("all");
+
+      // Small delay to ensure data is loaded before trying to find the contact
+      const timer = setTimeout(() => {
+        findAndOpenContactById(contactId);
+      }, 500);
+
+      return () => clearTimeout(timer);
+    }
+  }, [searchParams, findAndOpenContactById]);
 
   useEffect(() => {
     if (activeTab === "all") {

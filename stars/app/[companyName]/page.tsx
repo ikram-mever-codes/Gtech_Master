@@ -163,7 +163,6 @@ const DELIVERY_STATUS = {
   CANCELLED: "cancelled",
 };
 
-// Complete DeliveryHistoryTab Component
 const DeliveryHistoryTab = ({ items, isMobile }: any) => {
   const theme = useTheme();
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
@@ -192,18 +191,15 @@ const DeliveryHistoryTab = ({ items, isMobile }: any) => {
 
   // Utility function to parse ETA dates for proper sorting
   function parseEtaForSorting(etaDate: any): number {
-    if (!etaDate) return Number.MAX_SAFE_INTEGER; // Put items without ETA at the end
+    if (!etaDate) return Number.MAX_SAFE_INTEGER;
 
     try {
-      // Handle different date formats
       if (typeof etaDate === "string") {
-        // Try parsing as ISO string first
         const isoDate = new Date(etaDate);
         if (!isNaN(isoDate.getTime())) {
           return isoDate.getTime();
         }
 
-        // Try parsing German date format (DD.MM.YYYY)
         const germanFormatMatch = etaDate.match(
           /(\d{1,2})\.(\d{1,2})\.(\d{4})/
         );
@@ -217,17 +213,14 @@ const DeliveryHistoryTab = ({ items, isMobile }: any) => {
           return date.getTime();
         }
 
-        // Try parsing other common formats
         const date = new Date(etaDate);
         if (!isNaN(date.getTime())) {
           return date.getTime();
         }
       } else if (typeof etaDate === "number") {
-        // Assume it's already a timestamp
         return etaDate;
       }
 
-      // If all parsing fails, put at the end
       return Number.MAX_SAFE_INTEGER;
     } catch (error) {
       console.warn("Failed to parse ETA date:", etaDate, error);
@@ -235,7 +228,7 @@ const DeliveryHistoryTab = ({ items, isMobile }: any) => {
     }
   }
 
-  // Process and combine deliveries from all items - UPDATED to handle unique cargos
+  // Process and combine deliveries from all items - FIXED to handle unique cargos and combine items
   const deliveryHistory = useMemo(() => {
     const deliveryMap = new Map();
 
@@ -259,22 +252,31 @@ const DeliveryHistoryTab = ({ items, isMobile }: any) => {
                 totalQuantity: 0,
                 itemCount: 0,
                 items: [],
-                // Add parsed ETA for sorting
                 parsedEta: parseEtaForSorting(delivery.eta),
+                // Track unique item IDs to avoid duplicates
+                uniqueItemIds: new Set(),
               });
             }
 
             const historyItem = deliveryMap.get(key)!;
-            historyItem.totalQuantity += delivery.quantity || 0;
-            historyItem.itemCount += 1;
-            historyItem.items.push({
-              id: item.id,
-              articleName: item.articleName || "",
-              articleNumber: item.articleNumber || "",
-              item_no_de: item.item_no_de,
-              quantity: delivery.quantity || 0,
-              status: delivery.status || "pending",
-            });
+
+            // Check if this item is already in this cargo delivery
+            const itemKey = `${item.id}_${period}`;
+            if (!historyItem.uniqueItemIds.has(itemKey)) {
+              historyItem.uniqueItemIds.add(itemKey);
+              historyItem.totalQuantity += delivery.quantity || 0;
+              historyItem.itemCount += 1;
+              historyItem.items.push({
+                id: item.id,
+                articleName: item.articleName || "",
+                articleNumber: item.articleNumber || "",
+                item_no_de: item.item_no_de,
+                quantity: delivery.quantity || 0,
+                status: delivery.status || "pending",
+                // Add period for reference
+                period: period,
+              });
+            }
           }
         );
       }
@@ -299,7 +301,8 @@ const DeliveryHistoryTab = ({ items, isMobile }: any) => {
                 .includes(searchTerm.toLowerCase()) ||
               item.articleNumber
                 .toLowerCase()
-                .includes(searchTerm.toLowerCase())
+                .includes(searchTerm.toLowerCase()) ||
+              item.item_no_de?.toLowerCase().includes(searchTerm.toLowerCase())
           )
       );
     }
@@ -310,7 +313,6 @@ const DeliveryHistoryTab = ({ items, isMobile }: any) => {
 
       switch (sortBy) {
         case "eta":
-          // Use the pre-parsed ETA values for consistent sorting
           comparison = a.parsedEta - b.parsedEta;
           break;
         case "period":
@@ -601,7 +603,7 @@ const DeliveryHistoryTab = ({ items, isMobile }: any) => {
     );
   }
 
-  // Desktop table view (also needs the same ETA sorting fix)
+  // Desktop table view
   return (
     <Box sx={{ p: 3 }}>
       {/* Search and Info Bar */}
@@ -985,7 +987,6 @@ const DeliveryHistoryTab = ({ items, isMobile }: any) => {
     </Box>
   );
 };
-
 const DELIVERY_STATUS_CONFIG: any = {
   [DELIVERY_STATUS.PENDING]: { color: "warning", label: "Pending" },
   [DELIVERY_STATUS.PARTIAL]: { color: "info", label: "Partial" },
@@ -1222,132 +1223,6 @@ const FieldHighlight = ({
   );
 };
 
-// Enhanced function to extract unique cargo numbers with sorting
-function extractUniqueCargos(items: any[]): {
-  sortedCargos: string[];
-  cargoDataMap: Map<
-    string,
-    { period: string; eta?: number; cargoStatus?: string }
-  >;
-} {
-  const cargoMap = new Map<
-    string,
-    { period: string; eta?: number; cargoStatus?: string }
-  >();
-
-  items.forEach((item) => {
-    if (item.deliveries) {
-      Object.entries(item.deliveries).forEach(
-        ([period, deliveryDetails]: [string, any]) => {
-          if (deliveryDetails?.cargoNo) {
-            const cargoNo = String(deliveryDetails.cargoNo).trim();
-
-            // Skip invalid cargo numbers
-            if (
-              !cargoNo ||
-              cargoNo === "null" ||
-              cargoNo === "undefined" ||
-              cargoNo === ""
-            ) {
-              return;
-            }
-
-            // If cargo doesn't exist or current ETA is earlier, update it
-            if (!cargoMap.has(cargoNo)) {
-              cargoMap.set(cargoNo, {
-                period: period,
-                eta: deliveryDetails.eta,
-                cargoStatus: deliveryDetails.cargoStatus,
-              });
-            } else {
-              // Update if this instance has an earlier ETA
-              const existing = cargoMap.get(cargoNo)!;
-              if (
-                deliveryDetails.eta &&
-                (!existing.eta || deliveryDetails.eta < existing.eta)
-              ) {
-                cargoMap.set(cargoNo, {
-                  period: period,
-                  eta: deliveryDetails.eta,
-                  cargoStatus: deliveryDetails.cargoStatus,
-                });
-              }
-            }
-          }
-        }
-      );
-    }
-  });
-
-  // Sort cargo numbers by ETA, then alphabetically
-  const sortedCargos = Array.from(cargoMap.keys()).sort((a, b) => {
-    const dataA = cargoMap.get(a)!;
-    const dataB = cargoMap.get(b)!;
-
-    // Sort by ETA first if both have it
-    if (dataA.eta && dataB.eta) {
-      return dataA.eta - dataB.eta;
-    }
-
-    // Cargos with ETA come before those without
-    if (dataA.eta && !dataB.eta) return -1;
-    if (!dataA.eta && dataB.eta) return 1;
-
-    // Finally sort alphabetically by cargo number
-    return a.localeCompare(b);
-  });
-
-  return {
-    sortedCargos,
-    cargoDataMap: cargoMap,
-  };
-}
-
-function formatCargoColumnLabel(
-  cargoNo: string,
-  period: string,
-  eta?: number
-): string {
-  const monthMap: { [key: string]: string } = {
-    "01": "January",
-    "02": "February",
-    "03": "March",
-    "04": "April",
-    "05": "May",
-    "06": "June",
-    "07": "July",
-    "08": "August",
-    "09": "September",
-    "10": "October",
-    "11": "November",
-    "12": "December",
-  };
-
-  let label = "";
-
-  // Format period first (like "September 2025")
-  const periodMatch = period.match(/(\d{4})-(\d{1,2})/);
-  if (periodMatch) {
-    const year = periodMatch[1];
-    const month = periodMatch[2].padStart(2, "0");
-    const monthName = monthMap[month] || `Month ${month}`;
-    label = `${monthName} ${year}`;
-  } else if (period && period.startsWith("no-date-")) {
-    const periodNum = period.replace("no-date-", "");
-    label = `Period ${periodNum}`;
-  } else if (period) {
-    label = period;
-  } else {
-    label = "No Date";
-  }
-
-  // Add cargo number in parentheses
-  if (cargoNo) {
-    label += ` (${cargoNo})`;
-  }
-
-  return label;
-}
 // Delivery Cell Component
 const DeliveryCell = ({ row, period }: any) => {
   const [deliveryModalOpen, setDeliveryModalOpen] = useState(false);
@@ -1908,17 +1783,11 @@ function ListTabs({
   if (loading || allLists.length <= 1) return null;
 
   return (
-    <Box
-      sx={{
-        borderTop: `1px solid ${alpha("#E2E8F0", 0.8)}`,
-        backgroundColor: alpha("#F8FAFC", 0.6),
-        backdropFilter: "blur(10px)",
-      }}
-    >
+    <Box sx={{}}>
       <Box
         sx={{
-          px: { xs: 1, sm: 2 },
-          py: 1,
+          px: 0,
+          py: 0,
           overflowX: "auto",
           "&::-webkit-scrollbar": {
             height: 6,
@@ -3110,17 +2979,28 @@ const ListManagerPage: React.FC = () => {
 
   const dispatch = useDispatch();
 
-  // Enhanced function to extract unique cargo numbers with proper ETA sorting
   function extractUniqueCargos(items: any[]): {
     sortedCargos: string[];
     cargoDataMap: Map<
       string,
-      { period: string; eta?: number; cargoStatus?: string; parsedEta: number }
+      {
+        period: string;
+        eta?: number;
+        cargoStatus?: string;
+        cargoType?: string;
+        parsedEta: number;
+      }
     >;
   } {
     const cargoMap = new Map<
       string,
-      { period: string; eta?: number; cargoStatus?: string; parsedEta: number }
+      {
+        period: string;
+        eta?: number;
+        cargoStatus?: string;
+        cargoType?: string;
+        parsedEta: number;
+      }
     >();
 
     // Utility function to parse ETA dates for proper sorting
@@ -3193,6 +3073,7 @@ const ListManagerPage: React.FC = () => {
                   period: period,
                   eta: deliveryDetails.eta,
                   cargoStatus: deliveryDetails.cargoStatus,
+                  cargoType: deliveryDetails.cargoType,
                   parsedEta: parsedEta,
                 });
               } else {
@@ -3203,6 +3084,7 @@ const ListManagerPage: React.FC = () => {
                     period: period,
                     eta: deliveryDetails.eta,
                     cargoStatus: deliveryDetails.cargoStatus,
+                    cargoType: deliveryDetails.cargoType,
                     parsedEta: parsedEta,
                   });
                 }
@@ -3254,47 +3136,26 @@ const ListManagerPage: React.FC = () => {
   }
 
   // Enhanced function to format cargo column labels with proper ETA display
-  function formatCargoColumnLabel(
-    cargoNo: string,
-    period: string,
-    eta?: number
-  ): string {
-    const monthMap: { [key: string]: string } = {
-      "01": "January",
-      "02": "February",
-      "03": "March",
-      "04": "April",
-      "05": "May",
-      "06": "June",
-      "07": "July",
-      "08": "August",
-      "09": "September",
-      "10": "October",
-      "11": "November",
-      "12": "December",
-    };
-
+  function formatCargoColumnLabel(cargoNo: string, cargoType?: string): string {
     let label = "";
 
-    // Format period first (like "September 2025")
-    const periodMatch = period.match(/(\d{4})-(\d{1,2})/);
-    if (periodMatch) {
-      const year = periodMatch[1];
-      const month = periodMatch[2].padStart(2, "0");
-      const monthName = monthMap[month] || `Month ${month}`;
-      label = `${monthName} ${year}`;
-    } else if (period && period.startsWith("no-date-")) {
-      const periodNum = period.replace("no-date-", "");
-      label = `Period ${periodNum}`;
-    } else if (period) {
-      label = period;
-    } else {
-      label = "No Date";
+    // Add cargo type if available
+    if (cargoType) {
+      label += cargoType;
     }
 
     // Add cargo number in parentheses
     if (cargoNo) {
-      label += ` (${cargoNo})`;
+      // Add space if cargo type exists
+      if (cargoType) {
+        label += ` `;
+      }
+      label += `(${cargoNo})`;
+    }
+
+    // If neither cargo type nor number exists, return a fallback
+    if (!cargoType && !cargoNo) {
+      label = "No Cargo";
     }
 
     return label;
@@ -3309,29 +3170,30 @@ const ListManagerPage: React.FC = () => {
 
     const baseColumns = [
       {
-        key: "item_no_de",
-        name: "Artikelnr",
-        width: 120,
-        resizable: true,
-        renderCell: (props: any) => {
-          const hasChanges =
-            (props.row.changesNeedAcknowledgment ||
-              props.row.hasChanges ||
-              props.row.shouldHighlight) &&
-            props.row.changedFields?.includes("item_no_de");
-          return (
-            <FieldHighlight hasChanges={hasChanges} fieldName="Artikelnr">
-              <Typography variant="body2" sx={{ fontSize: "14px", p: 1 }}>
-                {props.row.item_no_de || "-"}
-              </Typography>
-            </FieldHighlight>
-          );
-        },
+        key: "selection",
+        name: "",
+        width: 50,
+        frozen: true,
+        renderCell: (props: any) => (
+          <Checkbox
+            size="small"
+            checked={selectedRows.has(props.row.id)}
+            onChange={() => {
+              const newSelectedRows = new Set(selectedRows);
+              if (newSelectedRows.has(props.row.id)) {
+                newSelectedRows.delete(props.row.id);
+              } else {
+                newSelectedRows.add(props.row.id);
+              }
+              setSelectedRows(newSelectedRows);
+            }}
+          />
+        ),
       },
       {
         key: "imageUrl",
         name: "Bild",
-        width: 150,
+        width: 100,
         resizable: true,
         frozen: true,
         renderCell: (props: any) => {
@@ -3346,7 +3208,7 @@ const ListManagerPage: React.FC = () => {
                   justifyContent: "center",
                   color: "text.disabled",
                   width: "100%",
-                  height: 80,
+                  height: 60,
                 }}
               >
                 <Image fontSize="small" />
@@ -3368,8 +3230,8 @@ const ListManagerPage: React.FC = () => {
               >
                 <Box
                   sx={{
-                    width: 80,
-                    height: 80,
+                    width: 65,
+                    height: 65,
                     borderRadius: 1,
                     overflow: "hidden",
                     display: "flex",
@@ -3446,36 +3308,71 @@ const ListManagerPage: React.FC = () => {
           );
         },
       },
+      // MERGED COLUMN - Item No. DE + Article Name
       {
-        key: "articleName",
-        name: "Item Name DE",
-        width: 450,
+        key: "item_info",
+        name: "Artikel",
+        width: 300,
         resizable: true,
         renderCell: (props: any) => {
+          const hasItemNoChanges =
+            (props.row.changesNeedAcknowledgment ||
+              props.row.hasChanges ||
+              props.row.shouldHighlight) &&
+            props.row.changedFields?.includes("item_no_de");
+          const hasArticleNameChanges =
+            (props.row.changesNeedAcknowledgment ||
+              props.row.hasChanges ||
+              props.row.shouldHighlight) &&
+            props.row.changedFields?.includes("articleName");
+
           return (
-            <FieldHighlight hasChanges={false} fieldName="Artikelname">
-              <Tooltip
-                title={props.row.articleName || ""}
-                arrow
-                placement="top-start"
+            <Box
+              sx={{
+                display: "flex",
+                flexDirection: "column",
+                width: "100%",
+                height: "100%",
+                p: 1,
+              }}
+            >
+              {/* Top level - Item No. DE (black) */}
+              <FieldHighlight
+                hasChanges={hasItemNoChanges}
+                fieldName="Artikelnr"
               >
-                <Box
+                <Typography
+                  variant="body2"
                   sx={{
-                    width: "100%",
-                    height: "100%",
-                    display: "flex",
-                    alignItems: "center",
-                    cursor: "help",
-                    py: 1,
-                    px: 0.5,
-                    position: "relative",
+                    fontWeight: 600,
+                    color: "black",
+                    fontSize: "0.8rem",
+                    lineHeight: 1.2,
+                    mb: 0.5,
                   }}
+                >
+                  {props.row.item_no_de || "-"}
+                </Typography>
+              </FieldHighlight>
+
+              {/* Bottom level - Article Name (grey) */}
+              <FieldHighlight
+                hasChanges={hasArticleNameChanges}
+                fieldName="Artikelname"
+              >
+                <Tooltip
+                  title={props.row.articleName || ""}
+                  arrow
+                  placement="top-start"
                 >
                   <Typography
                     variant="body2"
                     sx={{
+                      color: "#64748B",
                       fontSize: "14px",
-                      lineHeight: 1.4,
+                      lineHeight: 1.2,
+                      fontStyle: props.row.articleName ? "normal" : "italic",
+                      cursor: "help",
                       width: "100%",
                       wordBreak: "break-word",
                       whiteSpace: "pre-wrap",
@@ -3484,30 +3381,112 @@ const ListManagerPage: React.FC = () => {
                       display: "block",
                       maxHeight: "none",
                       fontWeight: 500,
-                      color: "inherit",
                     }}
                   >
-                    {props.row.articleName || "-"}
+                    {props.row.articleName || "Kein Artikelname"}
                   </Typography>
-                </Box>
-              </Tooltip>
-            </FieldHighlight>
+                </Tooltip>
+              </FieldHighlight>
+            </Box>
           );
         },
+        renderHeaderCell: () => (
+          <Box
+            sx={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              height: "100%",
+              padding: "4px 8px",
+            }}
+          >
+            <Typography
+              variant="subtitle2"
+              sx={{
+                fontWeight: 600,
+                color: "black",
+                fontSize: "0.8rem",
+                lineHeight: 1.2,
+              }}
+            >
+              Artikelnr
+            </Typography>
+            <Typography
+              variant="caption"
+              sx={{
+                color: "text.secondary",
+                fontSize: "0.75rem",
+                lineHeight: 1.2,
+                mt: 0.5,
+              }}
+            >
+              Artikelname
+            </Typography>
+          </Box>
+        ),
       },
+      // MERGED COLUMN - Interval + Quantity
       {
-        key: "quantity",
-        name: "Gesamtmenge",
-        width: 120,
-        resizable: true,
-        renderCell: (props: any) => <StaticQuantityCell row={props.row} />,
-      },
-      {
-        key: "interval",
-        name: "Intervall",
+        key: "interval_quantity",
+        name: "Intervall / Menge",
         width: 130,
         resizable: true,
-        renderCell: (props: any) => <StaticIntervalCell row={props.row} />,
+        renderCell: (props: any) => (
+          <Box
+            sx={{
+              display: "flex",
+              flexDirection: "column",
+              width: "100%",
+              height: "100%",
+            }}
+          >
+            {/* Top level - Interval */}
+            <Box sx={{ flex: 1, borderBottom: "1px solid #f0f0f0" }}>
+              <StaticIntervalCell row={props.row} compact={true} />
+            </Box>
+
+            {/* Bottom level - Quantity */}
+            <Box sx={{ flex: 1 }}>
+              <StaticQuantityCell row={props.row} compact={true} />
+            </Box>
+          </Box>
+        ),
+        renderHeaderCell: () => (
+          <Box
+            sx={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              height: "100%",
+              padding: "4px 8px",
+            }}
+          >
+            <Typography
+              variant="subtitle2"
+              sx={{
+                fontWeight: 600,
+                color: "black",
+                fontSize: "0.8rem",
+                lineHeight: 1.2,
+              }}
+            >
+              Intervall
+            </Typography>
+            <Typography
+              variant="caption"
+              sx={{
+                color: "text.secondary",
+                fontSize: "0.75rem",
+                lineHeight: 1.2,
+                mt: 0.5,
+              }}
+            >
+              Menge
+            </Typography>
+          </Box>
+        ),
       },
     ];
 
@@ -3666,7 +3645,7 @@ const ListManagerPage: React.FC = () => {
                 >
                   <Typography variant="h6">
                     Delivery Details -{" "}
-                    {formatCargoColumnLabel(cargoNo, period, delivery.eta)}
+                    {formatCargoColumnLabel(cargoNo, cargoData.cargoType)}
                   </Typography>
                   <IconButton
                     onClick={() => setDeliveryModalOpen(false)}
@@ -3725,11 +3704,7 @@ const ListManagerPage: React.FC = () => {
 
       return {
         key: `cargo_${cargoNo}`,
-        name: formatCargoColumnLabel(
-          cargoNo,
-          cargoData?.period || "",
-          cargoData?.eta
-        ),
+        name: formatCargoColumnLabel(cargoNo, cargoData?.cargoType || ""),
         width: 250,
         resizable: false,
         renderCell: (props: any) => (
@@ -3754,11 +3729,7 @@ const ListManagerPage: React.FC = () => {
             >
               <div className="flex gap-0 text-sm flex-col">
                 <span>
-                  {formatCargoColumnLabel(
-                    cargoNo,
-                    cargoData?.period || "",
-                    cargoData?.eta
-                  )}
+                  {formatCargoColumnLabel(cargoNo, cargoData?.cargoType)}
                 </span>
                 {cargoData?.cargoStatus && (
                   <span className="w-max h-max p-1 px-3 text-xs bg-yellow-500 text-white rounded-full">
@@ -3879,7 +3850,7 @@ const ListManagerPage: React.FC = () => {
           sx={{
             display: "flex",
             alignItems: "center",
-            mb: { xs: 1, sm: 1.5 },
+            mb: 0,
             flexWrap: { xs: "wrap", sm: "nowrap" },
             gap: 1,
           }}
@@ -4133,17 +4104,86 @@ const ListManagerPage: React.FC = () => {
                 )}
               </div>
             </Box>
+            {currentList && (
+              <Box sx={{ mt: "10px" }}>
+                <Stack
+                  direction="row"
+                  spacing={0}
+                  sx={{
+                    px: { xs: 1, sm: 2 },
+                  }}
+                >
+                  <Button
+                    onClick={() => setActiveTab("items")}
+                    sx={{
+                      px: 3,
+                      py: 1.5,
+                      borderRadius: 0,
+                      borderBottom:
+                        activeTab === "items"
+                          ? `3px solid ${theme.palette.primary.main}`
+                          : "none",
+                      color:
+                        activeTab === "items"
+                          ? "primary.main"
+                          : "text.secondary",
+                      fontWeight: activeTab === "items" ? 600 : 400,
+                      backgroundColor:
+                        activeTab === "items"
+                          ? alpha(theme.palette.primary.main, 0.05)
+                          : "transparent",
+                      "&:hover": {
+                        backgroundColor: alpha(
+                          theme.palette.primary.main,
+                          0.08
+                        ),
+                      },
+                    }}
+                    startIcon={<Package size={18} />}
+                  >
+                    List Items
+                    {itemsWithChanges.length > 0 && (
+                      <Badge
+                        badgeContent={itemsWithChanges.length}
+                        color="error"
+                        sx={{ ml: 2 }}
+                      />
+                    )}
+                  </Button>
 
-            {/* List Tabs with Editable Names */}
-            <ListTabs
-              currentListId={currentListId}
-              allLists={allLists}
-              onListChange={handleListChange}
-              onListNameUpdate={handleListNameUpdate}
-              loading={isLoading}
-              router={router}
-              isEditable={isEditable}
-            />
+                  <Button
+                    onClick={() => setActiveTab("deliveries")}
+                    sx={{
+                      px: 3,
+                      py: 1.5,
+                      borderRadius: 0,
+                      borderBottom:
+                        activeTab === "deliveries"
+                          ? `3px solid ${theme.palette.primary.main}`
+                          : "none",
+                      color:
+                        activeTab === "deliveries"
+                          ? "primary.main"
+                          : "text.secondary",
+                      fontWeight: activeTab === "deliveries" ? 600 : 400,
+                      backgroundColor:
+                        activeTab === "deliveries"
+                          ? alpha(theme.palette.primary.main, 0.05)
+                          : "transparent",
+                      "&:hover": {
+                        backgroundColor: alpha(
+                          theme.palette.primary.main,
+                          0.08
+                        ),
+                      },
+                    }}
+                    startIcon={<LocalShippingOutlined />}
+                  >
+                    Delivery History
+                  </Button>
+                </Stack>
+              </Box>
+            )}
           </Box>
         </Box>
       </Box>
@@ -4186,6 +4226,15 @@ const ListManagerPage: React.FC = () => {
         >
           <Box sx={{ p: { xs: 2, sm: 3 } }}>
             {/* Action Bar */}
+            <ListTabs
+              currentListId={currentListId}
+              allLists={allLists}
+              onListChange={handleListChange}
+              onListNameUpdate={handleListNameUpdate}
+              loading={isLoading}
+              router={router}
+              isEditable={isEditable}
+            />
             <Stack
               direction={{ xs: "column", sm: "row" }}
               spacing={2}
@@ -4277,92 +4326,6 @@ const ListManagerPage: React.FC = () => {
             </Stack>
 
             {/* Items Display */}
-            {currentList && (
-              <Box
-                sx={{
-                  mb: 2,
-                  borderBottom: `2px solid ${alpha("#E2E8F0", 0.8)}`,
-                  backgroundColor: alpha("#F8FAFC", 0.6),
-                }}
-              >
-                <Stack
-                  direction="row"
-                  spacing={0}
-                  sx={{
-                    px: { xs: 1, sm: 2 },
-                  }}
-                >
-                  <Button
-                    onClick={() => setActiveTab("items")}
-                    sx={{
-                      px: 3,
-                      py: 1.5,
-                      borderRadius: 0,
-                      borderBottom:
-                        activeTab === "items"
-                          ? `3px solid ${theme.palette.primary.main}`
-                          : "none",
-                      color:
-                        activeTab === "items"
-                          ? "primary.main"
-                          : "text.secondary",
-                      fontWeight: activeTab === "items" ? 600 : 400,
-                      backgroundColor:
-                        activeTab === "items"
-                          ? alpha(theme.palette.primary.main, 0.05)
-                          : "transparent",
-                      "&:hover": {
-                        backgroundColor: alpha(
-                          theme.palette.primary.main,
-                          0.08
-                        ),
-                      },
-                    }}
-                    startIcon={<Package size={18} />}
-                  >
-                    List Items
-                    {itemsWithChanges.length > 0 && (
-                      <Badge
-                        badgeContent={itemsWithChanges.length}
-                        color="error"
-                        sx={{ ml: 2 }}
-                      />
-                    )}
-                  </Button>
-
-                  <Button
-                    onClick={() => setActiveTab("deliveries")}
-                    sx={{
-                      px: 3,
-                      py: 1.5,
-                      borderRadius: 0,
-                      borderBottom:
-                        activeTab === "deliveries"
-                          ? `3px solid ${theme.palette.primary.main}`
-                          : "none",
-                      color:
-                        activeTab === "deliveries"
-                          ? "primary.main"
-                          : "text.secondary",
-                      fontWeight: activeTab === "deliveries" ? 600 : 400,
-                      backgroundColor:
-                        activeTab === "deliveries"
-                          ? alpha(theme.palette.primary.main, 0.05)
-                          : "transparent",
-                      "&:hover": {
-                        backgroundColor: alpha(
-                          theme.palette.primary.main,
-                          0.08
-                        ),
-                      },
-                    }}
-                    startIcon={<LocalShippingOutlined />}
-                  >
-                    Delivery History
-                  </Button>
-                </Stack>
-              </Box>
-            )}
 
             {activeTab === "items" ? (
               isMobile ? (
