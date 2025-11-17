@@ -24,6 +24,7 @@ import {
   updateListItemComment,
   getPendingChangesForAdmin,
   acknowledgeItemFieldChanges,
+  updateListContactPerson,
 } from "../controllers/list_controllers";
 import { authenticateUser, AuthorizedRequest } from "../middlewares/authorized";
 import { authenticateCustomer } from "../middlewares/authenticateCustomer";
@@ -120,6 +121,8 @@ router.get(
   authenticateMixed,
   getListItemWithRefresh
 );
+
+router.patch("/:listId/contact-person", updateListContactPerson);
 
 // Admin-only list management
 router.get("/admin/all-lists", adminOnly, getAllLists);

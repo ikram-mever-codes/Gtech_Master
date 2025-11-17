@@ -5,6 +5,64 @@ import { loadingStyles, successStyles } from "@/utils/constants";
 import { ResponseInterface } from "@/utils/interfaces";
 
 // Types
+export type Interval =
+  | "Monatlich"
+  | "2 monatlich"
+  | "Quartal"
+  | "halbjährlich"
+  | "jährlich";
+
+export type Priority = "High" | "Normal";
+
+export type RequestStatus =
+  | "1_Anfrage gestoppt"
+  | "2_Anfrage verschoben"
+  | "3_Anfrage Phase"
+  | "4_Musterplanung"
+  | "5_WAS besprechen"
+  | "6_Musterbeschaffung"
+  | "7_Muster Empfänger klären"
+  | "8_Muster vom Kunden in DE"
+  | "9_Muster unterwegs"
+  | "10_Lieferanten Findung"
+  | "11_Rückfragen an Kunden"
+  | "11_Angebot erstellen"
+  | "12_Angebot besprechen"
+  | "13_Artikel erstellen"
+  | "14_AB an Kunden Muster"
+  | "15_Muster bestellen"
+  | "16_Muster fertiggestellt"
+  | "17_Muster Versand vorbereiten"
+  | "18_Muster versendet"
+  | "19_Rückmeldung Liefertermin Muster"
+  | "20_Muster auf dem Weg"
+  | "21_Muster ist in DE"
+  | "22_Artikel in MIS korrigieren"
+  | "23_Muster Versand an Kunden"
+  | "24_Muster Eingang beim Kunden"
+  | "25_Kontakt mit Kunden Muster"
+  | "26_Trial order besprechen"
+  | "27_AB an Kunden gesendet"
+  | "28_Trial order bestellt"
+  | "29_Trial order fertiggestellt"
+  | "30_Trial order vorbereiten"
+  | "31_Rückmeldung Liefertermin Trial Order"
+  | "32_Trial order Verfolgung"
+  | "33_Trial order Wareneingang DE"
+  | "34_Trial order Eingang beim Kunde"
+  | "35_Trial order besprechen nach Erhalt"
+  | "36_Übergabe an COO"
+  | "37_Anruf Serienteil Planung"
+  | "38_Bestellung Serienteil erstellen"
+  | "39_Serienteil fertiggestellt"
+  | "40_Fracht vorbereiten MIS"
+  | "41_Versanddetails erhalten"
+  | "42_Rückmeldung Liefertermin Serienteil"
+  | "43_Serienteil Verfolgung"
+  | "44_Serienteil Wareneingang DE"
+  | "45_Serienteil Eingang beim Kunde"
+  | "";
+
 export interface RequestedItem {
   id: string;
   businessId: string;
@@ -17,16 +75,11 @@ export interface RequestedItem {
   asanaLink?: string;
   extraItemsDescriptions?: string;
   qty: string;
-  interval:
-    | "Monatlich"
-    | "2 monatlich"
-    | "Quartal"
-    | "halbjährlich"
-    | "jährlich";
+  interval: Interval;
   sampleQty?: string;
   expectedDelivery?: string;
-  priority: "High" | "Normal";
-  requestStatus: "open" | "supplier search" | "stopped" | "successful";
+  priority: Priority;
+  requestStatus: RequestStatus;
   comment?: string;
   createdAt: string;
   updatedAt: string;
@@ -45,23 +98,18 @@ export interface RequestedItemCreatePayload {
   extraItems?: "YES" | "NO";
   extraItemsDescriptions?: string;
   qty: string;
-  interval?:
-    | "Monatlich"
-    | "2 monatlich"
-    | "Quartal"
-    | "halbjährlich"
-    | "jährlich";
+  interval?: Interval;
   sampleQty?: string;
   expectedDelivery?: string;
-  priority?: "High" | "Normal";
-  requestStatus?: "open" | "supplier search" | "stopped" | "successful";
+  priority?: Priority;
+  requestStatus?: RequestStatus;
   comment?: string;
 }
 
 export interface RequestedItemUpdatePayload
   extends Partial<RequestedItemCreatePayload> {
-  requestStatus?: "open" | "supplier search" | "stopped" | "successful";
-  priority?: "High" | "Normal";
+  requestStatus?: RequestStatus;
+  priority?: Priority;
 }
 
 export interface BulkRequestedItemsOperationPayload {
@@ -70,12 +118,12 @@ export interface BulkRequestedItemsOperationPayload {
 
 export interface BulkStatusUpdatePayload
   extends BulkRequestedItemsOperationPayload {
-  requestStatus: "open" | "supplier search" | "stopped" | "successful";
+  requestStatus: RequestStatus;
 }
 
 export interface BulkPriorityUpdatePayload
   extends BulkRequestedItemsOperationPayload {
-  priority: "High" | "Normal";
+  priority: Priority;
 }
 
 export interface RequestedItemsSearchFilters {
@@ -354,35 +402,45 @@ export const formatQuantityDisplay = (qty: string): string => {
 };
 
 // Format priority badge
-export const getPriorityBadgeVariant = (
-  priority: "High" | "Normal"
-): string => {
+export const getPriorityBadgeVariant = (priority: Priority): string => {
   return priority === "High" ? "danger" : "secondary";
 };
 
 // Format status badge
-export const getStatusBadgeVariant = (status: string): string => {
-  switch (status) {
-    case "successful":
-      return "success";
-    case "stopped":
-      return "danger";
-    case "supplier search":
-      return "warning";
-    case "open":
-    default:
-      return "primary";
+export const getStatusBadgeVariant = (status: RequestStatus): string => {
+  if (status.includes("gestoppt") || status.includes("stopped")) {
+    return "danger";
   }
+  if (status.includes("successful") || status.includes("Eingang")) {
+    return "success";
+  }
+  if (status.includes("besprechen") || status.includes("planung")) {
+    return "warning";
+  }
+  return "primary";
 };
 
-// Check if item needs attention (high priority and open status)
+// Check if item needs attention (high priority and early status)
 export const needsAttention = (item: RequestedItem): boolean => {
-  return item.priority === "High" && item.requestStatus === "open";
+  return (
+    item.priority === "High" &&
+    (item.requestStatus === "1_Anfrage gestoppt" ||
+      item.requestStatus === "2_Anfrage verschoben" ||
+      item.requestStatus === "3_Anfrage Phase")
+  );
 };
 
-// Check if item is overdue (created more than 30 days ago and still open)
+// Check if item is overdue (created more than 30 days ago and still in early phases)
 export const isOverdue = (item: RequestedItem): boolean => {
-  if (item.requestStatus !== "open") return false;
+  const earlyStatuses = [
+    "1_Anfrage gestoppt",
+    "2_Anfrage verschoben",
+    "3_Anfrage Phase",
+    "4_Musterplanung",
+    "5_WAS besprechen",
+  ];
+
+  if (!earlyStatuses.includes(item.requestStatus)) return false;
 
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
@@ -487,239 +545,268 @@ export const getAvailablePriorities = (): Array<{
   ];
 };
 
-// Get available statuses grouped by phase
+// Get available statuses with proper numbering
 export const getAvailableStatuses = (): Array<{
-  value: string;
+  value: RequestStatus;
   label: string;
   group?: string;
 }> => {
   return [
-    { value: "open", label: "Open", group: "Initial" },
-    { value: "supplier search", label: "Supplier Search", group: "Initial" },
-    { value: "stopped", label: "Stopped", group: "Initial" },
-    { value: "successful", label: "Successful", group: "Final" },
-
     {
-      value: "Anfrage gestoppt",
-      label: "Anfrage gestoppt",
+      value: "1_Anfrage gestoppt",
+      label: "1. Anfrage gestoppt",
       group: "Request Phase",
     },
     {
-      value: "Anfrage verschoben",
-      label: "Anfrage verschoben",
+      value: "2_Anfrage verschoben",
+      label: "2. Anfrage verschoben",
       group: "Request Phase",
     },
-    { value: "Anfrage Phase", label: "Anfrage Phase", group: "Request Phase" },
+    {
+      value: "3_Anfrage Phase",
+      label: "3. Anfrage Phase",
+      group: "Request Phase",
+    },
 
-    { value: "Musterplanung", label: "Musterplanung", group: "Sample Phase" },
-    { value: "WAS besprechen", label: "WAS besprechen", group: "Sample Phase" },
     {
-      value: "Musterbeschaffung",
-      label: "Musterbeschaffung",
+      value: "4_Musterplanung",
+      label: "4. Musterplanung",
       group: "Sample Phase",
     },
     {
-      value: "Muster Empfänger klären",
-      label: "Muster Empfänger klären",
+      value: "5_WAS besprechen",
+      label: "5. WAS besprechen",
       group: "Sample Phase",
     },
     {
-      value: "Muster vom Kunden in DE",
-      label: "Muster vom Kunden in DE",
+      value: "6_Musterbeschaffung",
+      label: "6. Musterbeschaffung",
       group: "Sample Phase",
     },
     {
-      value: "Muster unterwegs",
-      label: "Muster unterwegs",
+      value: "7_Muster Empfänger klären",
+      label: "7. Muster Empfänger klären",
       group: "Sample Phase",
     },
     {
-      value: "Muster bestellen",
-      label: "Muster bestellen",
+      value: "8_Muster vom Kunden in DE",
+      label: "8. Muster vom Kunden in DE",
       group: "Sample Phase",
     },
     {
-      value: "Muster fertiggestellt",
-      label: "Muster fertiggestellt",
-      group: "Sample Phase",
-    },
-    {
-      value: "Muster Versand vorbereiten",
-      label: "Muster Versand vorbereiten",
-      group: "Sample Phase",
-    },
-    {
-      value: "Muster versendet",
-      label: "Muster versendet",
-      group: "Sample Phase",
-    },
-    {
-      value: "Rückmeldung Liefertermin Muster",
-      label: "Rückmeldung Liefertermin Muster",
-      group: "Sample Phase",
-    },
-    {
-      value: "Muster auf dem Weg",
-      label: "Muster auf dem Weg",
-      group: "Sample Phase",
-    },
-    {
-      value: "Muster ist in DE",
-      label: "Muster ist in DE",
-      group: "Sample Phase",
-    },
-    {
-      value: "Muster Versand an Kunden",
-      label: "Muster Versand an Kunden",
-      group: "Sample Phase",
-    },
-    {
-      value: "Muster Eingang beim Kunden",
-      label: "Muster Eingang beim Kunden",
-      group: "Sample Phase",
-    },
-    {
-      value: "Kontakt mit Kunden Muster",
-      label: "Kontakt mit Kunden Muster",
+      value: "9_Muster unterwegs",
+      label: "9. Muster unterwegs",
       group: "Sample Phase",
     },
 
     {
-      value: "Lieferanten Findung",
-      label: "Lieferanten Findung",
-      group: "Quotation",
+      value: "10_Lieferanten Findung",
+      label: "10. Lieferanten Findung",
+      group: "Supplier Phase",
     },
     {
-      value: "Rückfragen an Kunden",
-      label: "Rückfragen an Kunden",
-      group: "Quotation",
+      value: "11_Rückfragen an Kunden",
+      label: "11. Rückfragen an Kunden",
+      group: "Supplier Phase",
     },
     {
-      value: "Angebot erstellen",
-      label: "Angebot erstellen",
-      group: "Quotation",
+      value: "11_Angebot erstellen",
+      label: "11. Angebot erstellen",
+      group: "Supplier Phase",
     },
     {
-      value: "Angebot besprechen",
-      label: "Angebot besprechen",
-      group: "Quotation",
+      value: "12_Angebot besprechen",
+      label: "12. Angebot besprechen",
+      group: "Supplier Phase",
     },
     {
-      value: "Artikel erstellen",
-      label: "Artikel erstellen",
-      group: "Quotation",
+      value: "13_Artikel erstellen",
+      label: "13. Artikel erstellen",
+      group: "Supplier Phase",
     },
     {
-      value: "AB an Kunden Muster",
-      label: "AB an Kunden Muster",
-      group: "Quotation",
-    },
-    {
-      value: "Artikel in MIS korrigieren",
-      label: "Artikel in MIS korrigieren",
-      group: "Quotation",
+      value: "14_AB an Kunden Muster",
+      label: "14. AB an Kunden Muster",
+      group: "Supplier Phase",
     },
 
     {
-      value: "Trial order besprechen",
-      label: "Trial order besprechen",
+      value: "15_Muster bestellen",
+      label: "15. Muster bestellen",
+      group: "Sample Order",
+    },
+    {
+      value: "16_Muster fertiggestellt",
+      label: "16. Muster fertiggestellt",
+      group: "Sample Order",
+    },
+    {
+      value: "17_Muster Versand vorbereiten",
+      label: "17. Muster Versand vorbereiten",
+      group: "Sample Order",
+    },
+    {
+      value: "18_Muster versendet",
+      label: "18. Muster versendet",
+      group: "Sample Order",
+    },
+    {
+      value: "19_Rückmeldung Liefertermin Muster",
+      label: "19. Rückmeldung Liefertermin Muster",
+      group: "Sample Order",
+    },
+    {
+      value: "20_Muster auf dem Weg",
+      label: "20. Muster auf dem Weg",
+      group: "Sample Order",
+    },
+    {
+      value: "21_Muster ist in DE",
+      label: "21. Muster ist in DE",
+      group: "Sample Order",
+    },
+    {
+      value: "22_Artikel in MIS korrigieren",
+      label: "22. Artikel in MIS korrigieren",
+      group: "Sample Order",
+    },
+    {
+      value: "23_Muster Versand an Kunden",
+      label: "23. Muster Versand an Kunden",
+      group: "Sample Order",
+    },
+    {
+      value: "24_Muster Eingang beim Kunden",
+      label: "24. Muster Eingang beim Kunden",
+      group: "Sample Order",
+    },
+    {
+      value: "25_Kontakt mit Kunden Muster",
+      label: "25. Kontakt mit Kunden Muster",
+      group: "Sample Order",
+    },
+
+    {
+      value: "26_Trial order besprechen",
+      label: "26. Trial order besprechen",
       group: "Trial Order",
     },
     {
-      value: "AB an Kunden gesendet",
-      label: "AB an Kunden gesendet",
+      value: "27_AB an Kunden gesendet",
+      label: "27. AB an Kunden gesendet",
       group: "Trial Order",
     },
     {
-      value: "Trial order bestellt",
-      label: "Trial order bestellt",
+      value: "28_Trial order bestellt",
+      label: "28. Trial order bestellt",
       group: "Trial Order",
     },
     {
-      value: "Trial order fertiggestellt",
-      label: "Trial order fertiggestellt",
+      value: "29_Trial order fertiggestellt",
+      label: "29. Trial order fertiggestellt",
       group: "Trial Order",
     },
     {
-      value: "Trial order vorbereiten",
-      label: "Trial order vorbereiten",
+      value: "30_Trial order vorbereiten",
+      label: "30. Trial order vorbereiten",
       group: "Trial Order",
     },
     {
-      value: "Rückmeldung Liefertermin Trial Order",
-      label: "Rückmeldung Liefertermin Trial Order",
+      value: "31_Rückmeldung Liefertermin Trial Order",
+      label: "31. Rückmeldung Liefertermin Trial Order",
       group: "Trial Order",
     },
     {
-      value: "Trial order Verfolgung",
-      label: "Trial order Verfolgung",
+      value: "32_Trial order Verfolgung",
+      label: "32. Trial order Verfolgung",
       group: "Trial Order",
     },
     {
-      value: "Trial order Wareneingang DE",
-      label: "Trial order Wareneingang DE",
+      value: "33_Trial order Wareneingang DE",
+      label: "33. Trial order Wareneingang DE",
       group: "Trial Order",
     },
     {
-      value: "Trial order Eingang beim Kunde",
-      label: "Trial order Eingang beim Kunde",
+      value: "34_Trial order Eingang beim Kunde",
+      label: "34. Trial order Eingang beim Kunde",
       group: "Trial Order",
     },
     {
-      value: "Trial order besprechen nach Erhalt",
-      label: "Trial order besprechen nach Erhalt",
+      value: "35_Trial order besprechen nach Erhalt",
+      label: "35. Trial order besprechen nach Erhalt",
       group: "Trial Order",
     },
 
     {
-      value: "Übergabe an COO",
-      label: "Übergabe an COO",
+      value: "36_Übergabe an COO",
+      label: "36. Übergabe an COO",
       group: "Series Production",
     },
     {
-      value: "Anruf Serienteil Planung",
-      label: "Anruf Serienteil Planung",
+      value: "37_Anruf Serienteil Planung",
+      label: "37. Anruf Serienteil Planung",
       group: "Series Production",
     },
     {
-      value: "Bestellung Serienteil erstellen",
-      label: "Bestellung Serienteil erstellen",
+      value: "38_Bestellung Serienteil erstellen",
+      label: "38. Bestellung Serienteil erstellen",
       group: "Series Production",
     },
     {
-      value: "Serienteil fertiggestellt",
-      label: "Serienteil fertiggestellt",
+      value: "39_Serienteil fertiggestellt",
+      label: "39. Serienteil fertiggestellt",
       group: "Series Production",
     },
     {
-      value: "Fracht vorbereiten MIS",
-      label: "Fracht vorbereiten MIS",
+      value: "40_Fracht vorbereiten MIS",
+      label: "40. Fracht vorbereiten MIS",
       group: "Series Production",
     },
     {
-      value: "Versanddetails erhalten",
-      label: "Versanddetails erhalten",
+      value: "41_Versanddetails erhalten",
+      label: "41. Versanddetails erhalten",
       group: "Series Production",
     },
     {
-      value: "Rückmeldung Liefertermin Serienteil",
-      label: "Rückmeldung Liefertermin Serienteil",
+      value: "42_Rückmeldung Liefertermin Serienteil",
+      label: "42. Rückmeldung Liefertermin Serienteil",
       group: "Series Production",
     },
     {
-      value: "Serienteil Verfolgung",
-      label: "Serienteil Verfolgung",
+      value: "43_Serienteil Verfolgung",
+      label: "43. Serienteil Verfolgung",
       group: "Series Production",
     },
     {
-      value: "Serienteil Wareneingang DE",
-      label: "Serienteil Wareneingang DE",
+      value: "44_Serienteil Wareneingang DE",
+      label: "44. Serienteil Wareneingang DE",
       group: "Series Production",
     },
     {
-      value: "Serienteil Eingang beim Kunde",
-      label: "Serienteil Eingang beim Kunde",
+      value: "45_Serienteil Eingang beim Kunde",
+      label: "45. Serienteil Eingang beim Kunde",
       group: "Series Production",
     },
   ];
+};
+
+// Get status groups for organized display
+export const getStatusGroups = (): Array<{
+  name: string;
+  statuses: Array<{ value: RequestStatus; label: string }>;
+}> => {
+  const allStatuses = getAvailableStatuses();
+  const groups = [
+    "Request Phase",
+    "Sample Phase",
+    "Supplier Phase",
+    "Sample Order",
+    "Trial Order",
+    "Series Production",
+  ];
+
+  return groups.map((groupName) => ({
+    name: groupName,
+    statuses: allStatuses.filter((status) => status.group === groupName),
+  }));
 };

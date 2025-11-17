@@ -149,6 +149,7 @@ import {
   updateListItemComment,
   acknowledgeListItemChanges,
   acknowledgeItemFieldChanges,
+  updateListContactPerson,
 } from "@/api/list";
 import {
   DELIVERY_STATUS,
@@ -159,6 +160,7 @@ import { successStyles } from "@/utils/constants";
 import { DataGrid } from "react-data-grid";
 import { useSelector } from "react-redux";
 import { RootState } from "../Redux/store";
+import { getAllContactPersons } from "@/api/contacts";
 
 function AddItemDialog({
   open,
@@ -1573,11 +1575,6 @@ function EditableIntervalCell({ row, onUpdateItem, onAcknowledgeField }: any) {
     }
   };
 
-  const handleCancel = () => {
-    setValue(row.interval);
-    setIsEditing(false);
-  };
-
   const handleAcknowledge = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (onAcknowledgeField) {
@@ -1918,6 +1915,8 @@ const AdminAllItemsPage = () => {
   const [allItems, setAllItems] = useState<any[]>([]);
   const [allActivityLogs, setAllActivityLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [contactPersons, setContactPersons] = useState<any[]>([]);
+
   const [saving, setSaving] = useState(false);
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   const [searchTerm, setSearchTerm] = useState("");
@@ -1926,7 +1925,6 @@ const AdminAllItemsPage = () => {
   const [bulkAcknowledging, setBulkAcknowledging] = useState(false);
   const [currentTab, setCurrentTab] = useState(0);
   const { user } = useSelector((state: RootState) => state.user);
-
   // Activity logs dialog state
   const [activityLogsDialog, setActivityLogsDialog] = useState(false);
   const [selectedItemForLogs, setSelectedItemForLogs] = useState<any>(null);
@@ -1945,13 +1943,12 @@ const AdminAllItemsPage = () => {
     );
   }, [allItems]);
 
-  // Extract unique cargo numbers for columns
   const deliveryColumnsData = useMemo(() => {
     if (!allItems.length) return { sortedCargos: [], cargoDataMap: new Map() };
     return extractUniqueCargos(allItems);
   }, [allItems]);
 
-  // Filter activity logs based on current filters
+  // Filter activity logs based o n current filters
   const filteredActivityLogs = useMemo(() => {
     let filtered = allActivityLogs;
     // Filter by customer
@@ -1987,6 +1984,13 @@ const AdminAllItemsPage = () => {
     );
   }, [allActivityLogs, selectedCustomer, selectedList, searchTerm]);
 
+  const updateListContact = async (listId: string, contactId: string) => {
+    const response = await updateListContactPerson(listId, contactId);
+    if (response && response.success) {
+      await loadAllItems();
+    }
+  };
+
   const loadAllItems = async () => {
     try {
       setLoading(true);
@@ -2007,6 +2011,7 @@ const AdminAllItemsPage = () => {
               list.customer?.companyName || list.customer?.legalName,
             unacknowledgedChangesCount: list.unacknowledgedChangesCount || 0,
             pendingChanges: list.pendingChanges || [],
+            contactPerson: list.contactPerson || null, // Add contact person data
           });
 
           if (
@@ -2036,10 +2041,8 @@ const AdminAllItemsPage = () => {
             });
           }
 
-          // Process each item in the list with enhanced acknowledgment tracking
           if (list.items && list.items.length > 0) {
             list.items.forEach((item: any) => {
-              // Get unacknowledged fields and pending changes for this item
               const itemUnacknowledgedFields = item.unacknowledgedFields || [];
               const hasUnacknowledgedChanges =
                 item.hasUnacknowledgedChanges || false;
@@ -2054,11 +2057,11 @@ const AdminAllItemsPage = () => {
                 listName: list.name || "Unknown List",
                 listId: list.id,
                 customerId: list.customer?.id,
-                // Enhanced change tracking
                 unacknowledgedFields: itemUnacknowledgedFields,
                 hasUnacknowledgedChanges: hasUnacknowledgedChanges,
                 pendingChanges: itemPendingChanges,
-                changedFields: itemUnacknowledgedFields, // Map unacknowledged fields to changed fields
+                changedFields: itemUnacknowledgedFields,
+                contactPerson: list.contactPerson || null,
               });
             });
           }
@@ -2076,7 +2079,6 @@ const AdminAllItemsPage = () => {
       setLoading(false);
     }
   };
-
   const handleRefetchItemData = async () => {
     const data = await fetchAllListsWithMISRefresh(true);
     if (data) {
@@ -2084,36 +2086,19 @@ const AdminAllItemsPage = () => {
     }
   };
 
+  const fetchContactPersons = async () => {
+    const data = await getAllContactPersons();
+    if (data?.success) {
+      setContactPersons(data.data.contactPersons);
+    }
+  };
   // Load all items from all lists
   useEffect(() => {
     loadAllItems();
+    fetchContactPersons();
   }, []);
 
-  // Handle bulk acknowledge all changes
-  const handleBulkAcknowledgeAllChanges = async () => {
-    if (itemsWithChanges.length === 0) {
-      toast.error("No changes to acknowledge");
-      return;
-    }
-
-    try {
-      setBulkAcknowledging(true);
-
-      // Get all item IDs that have changes
-      const itemIdsWithChanges: any = lists.map((list) => list.id);
-
-      // Call bulk acknowledge API
-      await bulkAcknowledgeChanges(itemIdsWithChanges);
-
-      await loadAllItems();
-    } catch (error) {
-      console.error("Failed to bulk acknowledge changes:", error);
-      toast.error("Failed to acknowledge changes. Please try again.");
-    } finally {
-      setBulkAcknowledging(false);
-    }
-  };
-
+  console.log(allItems);
   // Enhanced handleUpdateItem with optimistic state updates
   const handleUpdateItem = useCallback((itemId: string, updateData: any) => {
     // Optimistically update the state
@@ -2329,7 +2314,6 @@ const AdminAllItemsPage = () => {
     if (!selectedCustomer) return lists;
     return lists.filter((list) => list.customerId === selectedCustomer);
   }, [lists, selectedCustomer]);
-
   // Enhanced function to extract unique cargo numbers with proper ETA sorting
   function extractUniqueCargos(items: any[]): {
     sortedCargos: string[];
@@ -2542,49 +2526,90 @@ const AdminAllItemsPage = () => {
           />
         ),
       },
-      // MERGED COLUMN - Company + List Name
       {
         key: "company_list",
         name: "Company / List",
         width: 200,
         resizable: true,
-        renderCell: (props: any) => (
-          <Box
-            sx={{
-              display: "flex",
-              flexDirection: "column",
-              width: "100%",
-              height: "100%",
-              p: 1,
-            }}
-          >
-            {/* Top level - Company Name (black) */}
-            <Typography
-              variant="body2"
-              sx={{
-                fontWeight: 500,
-                color: "black",
-                fontSize: "0.8rem",
-                lineHeight: 1.2,
-                mb: 1,
-              }}
-            >
-              {props.row.companyName}
-            </Typography>
+        renderCell: (props: any) => {
+          // Safely access contact person data with fallbacks
+          const contactPersonName =
+            props.row.contactPerson?.name || "Select Contact";
+          const contactPersonId = props.row.contactPerson?.id || "";
+          const listId = props.row.listId;
 
-            {/* Bottom level - List Name (grey) */}
-            <Typography
-              variant="body2"
+          return (
+            <Box
               sx={{
-                color: "#64748B",
-                fontSize: "14px",
-                lineHeight: 1.2,
+                display: "flex",
+                flexDirection: "column",
+                width: "100%",
+                height: "100%",
+                p: 0,
               }}
             >
-              {props.row.listName}
-            </Typography>
-          </Box>
-        ),
+              {/* Top level - Company Name (black) */}
+              <Typography
+                variant="body2"
+                sx={{
+                  fontWeight: 500,
+                  color: "black",
+                  fontSize: "0.8rem",
+                  lineHeight: 1.2,
+                  mb: 0,
+                }}
+              >
+                {props.row.companyName}
+              </Typography>
+
+              {/* Bottom level - List Name (grey) */}
+              <Typography
+                variant="body2"
+                sx={{
+                  color: "#64748B",
+                  fontSize: "14px",
+                  lineHeight: 1.2,
+                  mb: 0,
+                }}
+              >
+                {props.row.listName}
+              </Typography>
+
+              {/* Contact Person Select */}
+              <Select
+                size="small"
+                value={contactPersonId}
+                onChange={async (e) => {
+                  if (listId && e.target.value) {
+                    await updateListContact(listId, e.target.value);
+                  }
+                }}
+                displayEmpty
+                sx={{
+                  height: 28,
+                  fontSize: "0.75rem",
+                  "& .MuiSelect-select": {
+                    padding: "4px 8px",
+                    fontSize: "0.75rem",
+                  },
+                }}
+              >
+                <MenuItem value="" sx={{ fontSize: "0.75rem" }}>
+                  <em>Select Contact</em>
+                </MenuItem>
+                {contactPersons.map((cp) => (
+                  <MenuItem
+                    key={cp.id}
+                    sx={{ fontSize: "0.75rem" }}
+                    value={cp.id}
+                  >
+                    {cp.name}
+                  </MenuItem>
+                ))}
+              </Select>
+            </Box>
+          );
+        },
         renderHeaderCell: () => (
           <Box
             sx={{

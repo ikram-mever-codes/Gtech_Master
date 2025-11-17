@@ -160,24 +160,6 @@ export const createContactPerson = async (
       }
     }
 
-    // Check for duplicate by name and family name
-    const existingContactByName = await contactPersonRepository.findOne({
-      where: {
-        name: name.trim(),
-        familyName: familyName.trim(),
-        starBusinessDetailsId,
-      },
-    });
-
-    if (existingContactByName) {
-      return next(
-        new ErrorHandler(
-          "A contact person with this name already exists for this business",
-          400
-        )
-      );
-    }
-
     // Create new contact person
     const contactPerson = new ContactPerson();
     contactPerson.sex = sanitizeSex(sex);
@@ -287,7 +269,7 @@ export const updateContactPerson = async (
       decisionMakerState,
       note,
       decisionMakerNote,
-      isDecisionMaker, // Allow explicit setting, but will be overridden by contact type logic if contact changes
+      isDecisionMaker,
     } = req.body;
 
     const contactPersonRepository = AppDataSource.getRepository(ContactPerson);

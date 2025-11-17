@@ -465,3 +465,27 @@ export const hasPendingChanges = (item: any): boolean => {
 export const getPendingChangesCount = (list: any): number => {
   return list.pendingChangesCount || list.unacknowledgedChangesCount || 0;
 };
+
+// Enhanced version with toast notifications
+export const updateListContactPerson = async (
+  listId: string,
+  contactPersonId: string | null
+) => {
+  try {
+    toast.loading("Updating contact person...", loadingStyles);
+
+    const res: ResponseInterface = await api.patch(
+      `/lists/${listId}/contact-person`,
+      { contactPersonId }
+    );
+
+    toast.dismiss();
+    toast.success("Contact person updated successfully", successStyles);
+
+    return res;
+  } catch (error) {
+    toast.dismiss();
+    handleApiError(error, "Failed to update contact person");
+    throw error;
+  }
+};

@@ -19,6 +19,7 @@ import { getConnection } from "../config/misDb";
 import { Customer } from "../models/customers";
 import { User } from "../models/users";
 import { In } from "typeorm";
+import { ContactPerson } from "../models/contact_person";
 
 async function fetchItemData(itemId: number) {
   const connection = await getConnection();
@@ -1348,7 +1349,7 @@ export const getAllLists = async (
   next: NextFunction
 ) => {
   try {
-    const { refresh = "false" } = req.query; // Add optional refresh parameter
+    const { refresh = "false" } = req.query;
     const shouldRefresh = false;
 
     const listRepository = AppDataSource.getRepository(List);
@@ -1358,7 +1359,13 @@ export const getAllLists = async (
 
     // Fetch all lists with their relationships
     const lists = await listRepository.find({
-      relations: ["customer", "items", "createdBy.user", "createdBy.customer"],
+      relations: [
+        "customer",
+        "items",
+        "createdBy.user",
+        "createdBy.customer",
+        "contactPerson",
+      ],
       order: { createdAt: "DESC" },
     });
 
@@ -2219,6 +2226,104 @@ export const acknowledgeItemFieldChanges = async (
       },
     });
   } catch (error) {
+    return next(error);
+  }
+};
+
+export const updateListContactPerson = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { listId } = req.params;
+    const { contactPersonId } = req.body;
+    const userId = (req as any).user?.id;
+
+    if (!listId) {
+      return next(new ErrorHandler("List ID is required", 400));
+    }
+
+    const listRepository = AppDataSource.getRepository(List);
+    const contactPersonRepository = AppDataSource.getRepository(ContactPerson);
+
+    const list = await listRepository.findOne({
+      where: { id: listId },
+      relations: ["customer.starBusinessDetails", "contactPerson"],
+    });
+
+    if (!list) {
+      return next(new ErrorHandler("List not found", 404));
+    }
+
+    let contactPerson: any = null;
+    if (contactPersonId) {
+      contactPerson = await contactPersonRepository.findOne({
+        where: { id: contactPersonId },
+        relations: ["starBusinessDetails"],
+      });
+
+      if (!contactPerson) {
+        return next(new ErrorHandler("Contact person not found", 404));
+      }
+      // console.log(contactPerson.starBusinessDetails.id, list.customer);
+      // Validate that contact person belongs to the same company
+      if (
+        contactPerson.starBusinessDetailsId !==
+        list?.customer?.starBusinessDetails?.id
+      ) {
+        return next(
+          new ErrorHandler(
+            "Contact person does not belong to this company",
+            400
+          )
+        );
+      }
+    }
+
+    // Store old contact person for logging
+    const oldContactPerson = list.contactPerson;
+
+    // Update the contact person
+    list.contactPerson = contactPerson;
+
+    // Add activity log
+    const action = contactPerson
+      ? `assigned contact person ${contactPerson.name} ${contactPerson.familyName} to the list`
+      : "removed contact person from the list";
+
+    list.addActivityLog(
+      `Admin ${action}`,
+      USER_ROLE.ADMIN,
+      userId || "system",
+      undefined,
+      "contact_person_updated"
+    );
+
+    await listRepository.save(list);
+
+    return res.status(200).json({
+      success: true,
+      message: "Contact person updated successfully",
+      data: {
+        list: {
+          id: list.id,
+          contactPerson: contactPerson
+            ? {
+                id: contactPerson.id,
+                name: contactPerson.name,
+                familyName: contactPerson.familyName,
+                position: contactPerson.position,
+                email: contactPerson.email,
+                phone: contactPerson.phone,
+                linkedInLink: contactPerson.linkedInLink,
+              }
+            : null,
+        },
+      },
+    });
+  } catch (error) {
+    console.error("Error in updateListContactPerson:", error);
     return next(error);
   }
 };

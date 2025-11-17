@@ -59,16 +59,6 @@ interface ContactPerson {
   };
 }
 
-// Add interface for Business
-interface Business {
-  id: string;
-  customer: {
-    id: string;
-    companyName: string;
-    legalName: string;
-  };
-}
-
 const RequestedItemsPage: React.FC = () => {
   // State management
   const [requestedItems, setRequestedItems] = useState<RequestedItem[]>([]);
@@ -163,7 +153,7 @@ const RequestedItemsPage: React.FC = () => {
     sampleQty: "",
     expectedDelivery: "",
     priority: "Normal",
-    requestStatus: "open",
+    requestStatus: "",
     comment: "",
     asanaLink: "",
   });
@@ -471,7 +461,7 @@ const RequestedItemsPage: React.FC = () => {
       expectedDelivery: "",
       extraNote: "",
       priority: "Normal",
-      requestStatus: "open",
+      requestStatus: "",
       comment: "",
       asanaLink: "",
     });

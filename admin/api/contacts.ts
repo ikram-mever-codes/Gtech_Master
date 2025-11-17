@@ -111,6 +111,7 @@ export type ContactPersonFilters = {
   limit?: number;
   search?: string;
   businessName?: string;
+  companyId?: string;
   starBusinessDetailsId?: string;
   position?: Position;
   sex?: Sex;
@@ -199,7 +200,7 @@ export const getSingleContactPerson = async (contactPersonId: string) => {
 };
 
 // Get all contact persons with filters
-export const getAllContactPersons = async (filters?: ContactPersonFilters) => {
+export const getAllContactPersons = async (filters?: any) => {
   try {
     const params = new URLSearchParams();
 
