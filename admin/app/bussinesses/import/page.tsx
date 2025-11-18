@@ -115,6 +115,23 @@ const BusinessBulkUpload: React.FC = () => {
     return normalized;
   };
 
+  // Helper function to extract display name (first word of business name)
+  const extractDisplayName = (businessName: string): string => {
+    if (!businessName) return "";
+    return businessName.split(" ")[0] || businessName;
+  };
+
+  // Helper function to process categories into tags
+  const processCategories = (categories: string): string[] => {
+    if (!categories) return [];
+
+    // Split by common separators and clean up
+    return categories
+      .split(/[,;|]/)
+      .map((cat) => cat.trim())
+      .filter((cat) => cat.length > 0);
+  };
+
   const parseAndProcessCSV = (file: File) => {
     setIsProcessing(true);
 
@@ -183,6 +200,8 @@ const BusinessBulkUpload: React.FC = () => {
           normalizedHeader.includes("businessname")
         ) {
           business.name = value;
+          // Extract display name from first word of business name
+          business.displayName = extractDisplayName(value);
         } else if (
           normalizedHeader === "fulladdress" ||
           normalizedHeader === "address"
@@ -200,13 +219,7 @@ const BusinessBulkUpload: React.FC = () => {
             ? value
             : `https://${value}`;
         } else if (
-          normalizedHeader === "emails" ||
-          normalizedHeader === "email"
-        ) {
-          business.email = value;
-        } else if (
-          normalizedHeader === "phone" ||
-          normalizedHeader.includes("phone")
+          normalizedHeader === "phone" // Use Phone instead of Phones
         ) {
           business.phoneNumber = value;
         } else if (
@@ -218,25 +231,30 @@ const BusinessBulkUpload: React.FC = () => {
           normalizedHeader === "categories" ||
           normalizedHeader === "category"
         ) {
-          business.category = value;
+          // Process categories into tags array
+          business.categoryTags = processCategories(value);
         } else if (normalizedHeader === "latitude") {
           const lat = parseFloat(value);
           if (!isNaN(lat)) business.latitude = lat;
         } else if (normalizedHeader === "longitude") {
           const lng = parseFloat(value);
           if (!isNaN(lng)) business.longitude = lng;
-        } else if (normalizedHeader.includes("rating")) {
+        } else if (normalizedHeader.includes("averagerating")) {
           const rating = parseFloat(value);
           if (!isNaN(rating)) business.averageRating = rating;
-        } else if (normalizedHeader.includes("review")) {
-          const count = parseFloat(value);
+        } else if (normalizedHeader.includes("reviewcount")) {
+          const count = parseInt(value);
           if (!isNaN(count)) business.reviewCount = count;
-        } else if (normalizedHeader.includes("placeid")) {
+        } else if (
+          normalizedHeader.includes("placeid") ||
+          normalizedHeader.includes("googleplaceid")
+        ) {
           business.googlePlaceId = value;
-        } else if (normalizedHeader.includes("mapsurl")) {
+        } else if (
+          normalizedHeader.includes("mapsurl") ||
+          normalizedHeader.includes("googlemapsurl")
+        ) {
           business.googleMapsUrl = value;
-        } else if (normalizedHeader === "state") {
-          business.state = value;
         } else if (normalizedHeader === "country") {
           business.country = value;
         } else if (
@@ -245,6 +263,7 @@ const BusinessBulkUpload: React.FC = () => {
         ) {
           business.postalCode = value;
         }
+        // Note: State field is intentionally skipped/removed
       });
 
       // Extract postal code from municipality if needed
@@ -311,6 +330,12 @@ const BusinessBulkUpload: React.FC = () => {
             updated.validationErrors = errors;
             updated.isDuplicate = false; // Clear duplicate status after edit
             updated.duplicateReason = undefined;
+
+            // Update display name if name changed
+            if (updated.name !== business.name) {
+              updated.displayName = extractDisplayName(updated.name);
+            }
+
             return updated;
           }
           return business;
@@ -425,20 +450,7 @@ const BusinessBulkUpload: React.FC = () => {
         }
 
         // Show success for imported records
-        if (result.data.imported > 0) {
-          toast.success(
-            `Successfully imported ${result.data.imported} business(es)`,
-            successStyles
-          );
-        }
       } else {
-        // No duplicates, all imported successfully
-        toast.success(
-          `Successfully uploaded ${
-            result.data?.imported || finalBusinessesToUpload.length
-          } businesses`
-        );
-
         // Reset form after successful upload
         setFile(null);
         setParsedBusinesses([]);
@@ -560,19 +572,18 @@ const BusinessBulkUpload: React.FC = () => {
       "Name",
       "Full Address",
       "Municipality",
-      "State",
       "Country",
       "Postal Code",
       "Categories",
       "Phone",
       "Website",
       "Domain",
-      "Email",
       "Latitude",
       "Longitude",
       "Google Maps Url",
       "Average Rating",
       "Review Count",
+      "Google Place ID",
     ];
     const template = headers.join(",");
     const blob = new Blob([template + "\n"], { type: "text/csv" });
@@ -640,13 +651,13 @@ const BusinessBulkUpload: React.FC = () => {
                 <div className="flex flex-col items-center">
                   <div
                     className={`
-                        w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300
-                        ${
-                          currentStep >= item.step
-                            ? "bg-gradient-to-r from-primary to-primary-600 text-black shadow-lg scale-110"
-                            : "bg-gray-200 text-gray-500"
-                        }
-                        `}
+                          w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300
+                          ${
+                            currentStep >= item.step
+                              ? "bg-gradient-to-r from-primary to-primary-600 text-black shadow-lg scale-110"
+                              : "bg-gray-200 text-gray-500"
+                          }
+                          `}
                   >
                     <item.icon className="w-5 h-5" />
                   </div>
@@ -671,13 +682,13 @@ const BusinessBulkUpload: React.FC = () => {
             <div
               {...getRootProps()}
               className={`
-                    relative border-2 border-dashed rounded-xl p-16 text-center cursor-pointer transition-all duration-300
-                    ${
-                      isDragActive
-                        ? `border-primary bg-[${theme.palette.primary.main}]-50 scale-[1.02]`
-                        : "border-gray-300 hover:border-primary hover:bg-gray-50"
-                    }
-                `}
+                      relative border-2 border-dashed rounded-xl p-16 text-center cursor-pointer transition-all duration-300
+                      ${
+                        isDragActive
+                          ? `border-primary bg-[${theme.palette.primary.main}]-50 scale-[1.02]`
+                          : "border-gray-300 hover:border-primary hover:bg-gray-50"
+                      }
+                  `}
             >
               <input {...getInputProps()} />
               <div className="absolute inset-0 bg-gradient-to-r from-primary/5 to-transparent rounded-xl pointer-events-none" />
@@ -934,13 +945,19 @@ const BusinessBulkUpload: React.FC = () => {
                         Business Name
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                        Email
+                        Display Name
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                         Website
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                        Location
+                        Phone
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                        Rating
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                        Categories
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                         Issues
@@ -1012,23 +1029,9 @@ const BusinessBulkUpload: React.FC = () => {
                           )}
                         </td>
                         <td className="px-4 py-3">
-                          {editingRow === business.rowIndex ? (
-                            <input
-                              type="email"
-                              value={editedData.email || ""}
-                              onChange={(e) =>
-                                setEditedData({
-                                  ...editedData,
-                                  email: e.target.value,
-                                })
-                              }
-                              className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-                            />
-                          ) : (
-                            <p className="text-sm text-gray-600">
-                              {business.email || "-"}
-                            </p>
-                          )}
+                          <p className="text-sm text-gray-600">
+                            {business.displayName || "-"}
+                          </p>
                         </td>
                         <td className="px-4 py-3 text-sm">
                           {editingRow === business.rowIndex ? (
@@ -1059,44 +1062,14 @@ const BusinessBulkUpload: React.FC = () => {
                           )}
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-600">
-                          {editingRow === business.rowIndex ? (
-                            <div className="space-y-1">
-                              <input
-                                type="text"
-                                value={editedData.city || ""}
-                                onChange={(e) =>
-                                  setEditedData({
-                                    ...editedData,
-                                    city: e.target.value,
-                                  })
-                                }
-                                className="w-full px-2 py-1 border border-gray-300 rounded text-xs"
-                                placeholder="City"
-                              />
-                              <input
-                                type="text"
-                                value={editedData.country || ""}
-                                onChange={(e) =>
-                                  setEditedData({
-                                    ...editedData,
-                                    country: e.target.value,
-                                  })
-                                }
-                                className="w-full px-2 py-1 border border-gray-300 rounded text-xs"
-                                placeholder="Country"
-                              />
-                            </div>
-                          ) : (
-                            <div className="flex flex-col">
-                              <span>{business.city || "-"}</span>
-                              {business.country && (
-                                <span className="text-xs text-gray-400">
-                                  {business.country}
-                                </span>
-                              )}
-                            </div>
-                          )}
+                          {business.phoneNumber || "-"}
                         </td>
+                        <td className="px-4 py-3 text-sm text-gray-600">
+                          {business.averageRating
+                            ? `${business.averageRating} ⭐`
+                            : "-"}
+                        </td>
+
                         <td className="px-4 py-3 text-sm">
                           {business.isDuplicate ? (
                             <div className="space-y-1">

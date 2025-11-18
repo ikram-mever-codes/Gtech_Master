@@ -33,6 +33,7 @@ export const BUSINESS_STATUS = {
   NO_WEBSITE: "no_website",
   VERIFIED: "verified",
 };
+
 export const bulkImportBusinesses = async (
   req: Request,
   res: Response,
@@ -76,6 +77,12 @@ export const bulkImportBusinesses = async (
       endTime: null as Date | null,
     };
 
+    // Helper function to extract first word for companyName
+    const extractFirstWord = (businessName: string): string => {
+      if (!businessName) return "";
+      return businessName.split(" ")[0] || businessName;
+    };
+
     // Batch check for existing businesses - more efficient
     const businessesToCheck: Array<{
       index: number;
@@ -103,7 +110,9 @@ export const bulkImportBusinesses = async (
         ? normalizeWebsite(businessData.website)
         : null;
 
-      const normalizedCompanyName = businessData.name.trim().toLowerCase();
+      // Use first word for duplicate checking of company names
+      const companyNameFirstWord = extractFirstWord(businessData.name);
+      const normalizedCompanyName = companyNameFirstWord.trim().toLowerCase();
 
       businessesToCheck.push({
         index: i,
@@ -121,6 +130,8 @@ export const bulkImportBusinesses = async (
     const websitesToCheck = businessesToCheck
       .filter((b) => b.normalizedWebsite)
       .map((b) => b.normalizedWebsite!);
+
+    // Use first words for name checking
     const namesToCheck = businessesToCheck.map((b) => b.normalizedCompanyName);
 
     // Query existing businesses by website
@@ -147,7 +158,7 @@ export const bulkImportBusinesses = async (
       });
     }
 
-    // Query existing customers by company name
+    // Query existing customers by company name (using first word matching)
     if (namesToCheck.length > 0) {
       const existingByName = await customerRepository
         .createQueryBuilder("customer")
@@ -204,7 +215,7 @@ export const bulkImportBusinesses = async (
           duplicateReason = "Website already exists in database";
           existingRecord = existingBusinessesByWebsite.get(normalizedWebsite);
         }
-        // Check by company name
+        // Check by company name (first word)
         else if (existingBusinessesByName.has(normalizedCompanyName)) {
           duplicateReason = "Company name already exists in database";
           existingRecord = existingBusinessesByName.get(normalizedCompanyName);
@@ -235,13 +246,18 @@ export const bulkImportBusinesses = async (
         // Create new customer entity
         const customer = new Customer();
 
+        // Assign complete business name to legalName and first word to companyName
+        const completeBusinessName = businessData.name.trim();
+        const companyNameFirstWord = extractFirstWord(completeBusinessName);
+
         // Required fields for Customer
-        customer.companyName = businessData.name.trim();
+        customer.legalName = completeBusinessName; // Complete business name
+        customer.companyName = companyNameFirstWord; // First word only
         customer.email = businessData.email
           ? businessData.email.trim().toLowerCase()
-          : `${businessData.name
+          : `${companyNameFirstWord
               .toLowerCase()
-              .replace(/\s+/g, ".")}@imported.business`;
+              .replace(/[^a-z0-9]/g, ".")}@imported.business`;
         customer.stage = "business";
         customer.contactEmail = businessData.contactEmail
           ? businessData.contactEmail.trim().toLowerCase()
@@ -253,9 +269,6 @@ export const bulkImportBusinesses = async (
           : "";
 
         // Optional fields for Customer
-        customer.legalName = businessData.legalName
-          ? businessData.legalName.trim()
-          : undefined;
         customer.avatar = businessData.avatar
           ? businessData.avatar.trim()
           : undefined;
@@ -305,13 +318,27 @@ export const bulkImportBusinesses = async (
         businessDetails.category = businessData.category
           ? businessData.category.trim()
           : undefined;
-        businessDetails.additionalCategories = Array.isArray(
-          businessData.additionalCategories
-        )
-          ? businessData.additionalCategories
+
+        // Handle category tags if provided
+        if (
+          businessData.categoryTags &&
+          Array.isArray(businessData.categoryTags)
+        ) {
+          businessDetails.additionalCategories = businessData.categoryTags
+            .map((cat: string) => cat.trim())
+            .filter(Boolean);
+        } else if (
+          businessData.additionalCategories &&
+          Array.isArray(businessData.additionalCategories)
+        ) {
+          businessDetails.additionalCategories =
+            businessData.additionalCategories
               .map((cat: string) => cat.trim())
-              .filter(Boolean)
-          : undefined;
+              .filter(Boolean);
+        } else {
+          businessDetails.additionalCategories = undefined;
+        }
+
         businessDetails.industry = businessData.industry
           ? businessData.industry.trim()
           : undefined;
@@ -332,6 +359,8 @@ export const bulkImportBusinesses = async (
         customersToSave.push(customer);
 
         console.log(`Prepared business for import: ${customer.companyName}`, {
+          legalName: customer.legalName,
+          companyName: customer.companyName,
           email: customer.email,
           website: normalizedWebsite,
           stage: customer.stage,
@@ -373,6 +402,7 @@ export const bulkImportBusinesses = async (
             savedChunk.forEach((customer) => {
               results.importedBusinesses.push({
                 id: customer.id,
+                legalName: customer.legalName,
                 companyName: customer.companyName,
                 email: customer.email,
                 website: customer.businessDetails?.website,
@@ -397,6 +427,7 @@ export const bulkImportBusinesses = async (
                 savedCustomers.push(saved);
                 results.importedBusinesses.push({
                   id: saved.id,
+                  legalName: saved.legalName,
                   companyName: saved.companyName,
                   email: saved.email,
                   website: saved.businessDetails?.website,
@@ -404,11 +435,11 @@ export const bulkImportBusinesses = async (
               } catch (individualError: any) {
                 results.errors++;
                 results.errorsList.push({
-                  business: customer.companyName,
+                  business: customer.legalName || "",
                   error: individualError.message || "Failed to save",
                 });
                 console.error(
-                  `Failed to save business: ${customer.companyName}`,
+                  `Failed to save business: ${customer.legalName}`,
                   individualError
                 );
               }

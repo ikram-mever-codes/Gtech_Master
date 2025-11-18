@@ -163,7 +163,7 @@ const DELIVERY_STATUS = {
   CANCELLED: "cancelled",
 };
 
-const DeliveryHistoryTab = ({ items, isMobile }: any) => {
+const DeliveryHistoryTab = ({ items, isMobile, allLists }: any) => {
   const theme = useTheme();
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
   const [sortBy, setSortBy] = useState<"eta" | "period" | "cargo">("eta");
@@ -228,58 +228,66 @@ const DeliveryHistoryTab = ({ items, isMobile }: any) => {
     }
   }
 
-  // Process and combine deliveries from all items - FIXED to handle unique cargos and combine items
+  // Process and combine deliveries from ALL LISTS
   const deliveryHistory = useMemo(() => {
     const deliveryMap = new Map();
 
-    items.forEach((item: any) => {
-      if (item.deliveries) {
-        Object.entries(item.deliveries).forEach(
-          ([period, delivery]: [string, any]) => {
-            // Use cargo number as the primary key for uniqueness
-            const cargoNo = delivery.cargoNo || "no-cargo";
-            const key =
-              cargoNo !== "no-cargo"
-                ? cargoNo
-                : `${period}_no-cargo_${item.id}`;
+    // Iterate through all lists and their items
+    allLists.forEach((list: any) => {
+      list.items.forEach((item: any) => {
+        if (item.deliveries) {
+          Object.entries(item.deliveries).forEach(
+            ([period, delivery]: [string, any]) => {
+              // Use cargo number as the primary key for uniqueness
+              const cargoNo = delivery.cargoNo || "no-cargo";
+              const key =
+                cargoNo !== "no-cargo"
+                  ? cargoNo
+                  : `${period}_no-cargo_${item.id}_${list.id}`;
 
-            if (!deliveryMap.has(key)) {
-              deliveryMap.set(key, {
-                period,
-                cargoNo: cargoNo !== "no-cargo" ? cargoNo : "",
-                cargoStatus: delivery.cargoStatus,
-                eta: delivery.eta,
-                totalQuantity: 0,
-                itemCount: 0,
-                items: [],
-                parsedEta: parseEtaForSorting(delivery.eta),
-                // Track unique item IDs to avoid duplicates
-                uniqueItemIds: new Set(),
-              });
+              if (!deliveryMap.has(key)) {
+                deliveryMap.set(key, {
+                  period,
+                  cargoNo: cargoNo !== "no-cargo" ? cargoNo : "",
+                  cargoStatus: delivery.cargoStatus,
+                  eta: delivery.eta,
+                  totalQuantity: 0,
+                  itemCount: 0,
+                  items: [],
+                  parsedEta: parseEtaForSorting(delivery.eta),
+                  // Track unique item IDs to avoid duplicates
+                  uniqueItemIds: new Set(),
+                  // Store list information for reference
+                  listNames: new Set(),
+                });
+              }
+
+              const historyItem = deliveryMap.get(key)!;
+
+              // Check if this item is already in this cargo delivery
+              const itemKey = `${item.id}_${period}_${list.id}`;
+              if (!historyItem.uniqueItemIds.has(itemKey)) {
+                historyItem.uniqueItemIds.add(itemKey);
+                historyItem.totalQuantity += delivery.quantity || 0;
+                historyItem.itemCount += 1;
+                historyItem.listNames.add(list.name);
+
+                historyItem.items.push({
+                  id: item.id,
+                  articleName: item.articleName || "",
+                  articleNumber: item.articleNumber || "",
+                  item_no_de: item.item_no_de,
+                  quantity: delivery.quantity || 0,
+                  status: delivery.status || "pending",
+                  period: period,
+                  listName: list.name,
+                  listId: list.id,
+                });
+              }
             }
-
-            const historyItem = deliveryMap.get(key)!;
-
-            // Check if this item is already in this cargo delivery
-            const itemKey = `${item.id}_${period}`;
-            if (!historyItem.uniqueItemIds.has(itemKey)) {
-              historyItem.uniqueItemIds.add(itemKey);
-              historyItem.totalQuantity += delivery.quantity || 0;
-              historyItem.itemCount += 1;
-              historyItem.items.push({
-                id: item.id,
-                articleName: item.articleName || "",
-                articleNumber: item.articleNumber || "",
-                item_no_de: item.item_no_de,
-                quantity: delivery.quantity || 0,
-                status: delivery.status || "pending",
-                // Add period for reference
-                period: period,
-              });
-            }
-          }
-        );
-      }
+          );
+        }
+      });
     });
 
     // Convert map to array and sort
@@ -294,6 +302,9 @@ const DeliveryHistoryTab = ({ items, isMobile }: any) => {
           delivery.cargoStatus
             ?.toLowerCase()
             .includes(searchTerm.toLowerCase()) ||
+          Array.from(delivery.listNames).some((listName: any) =>
+            listName.toLowerCase().includes(searchTerm.toLowerCase())
+          ) ||
           delivery.items.some(
             (item: any) =>
               item.articleName
@@ -302,7 +313,10 @@ const DeliveryHistoryTab = ({ items, isMobile }: any) => {
               item.articleNumber
                 .toLowerCase()
                 .includes(searchTerm.toLowerCase()) ||
-              item.item_no_de?.toLowerCase().includes(searchTerm.toLowerCase())
+              item.item_no_de
+                ?.toLowerCase()
+                .includes(searchTerm.toLowerCase()) ||
+              item.listName.toLowerCase().includes(searchTerm.toLowerCase())
           )
       );
     }
@@ -327,7 +341,7 @@ const DeliveryHistoryTab = ({ items, isMobile }: any) => {
     });
 
     return historyArray;
-  }, [items, sortBy, sortOrder, searchTerm]);
+  }, [allLists, sortBy, sortOrder, searchTerm]);
 
   const handleSort = (column: "eta" | "period" | "cargo") => {
     if (sortBy === column) {
@@ -368,7 +382,15 @@ const DeliveryHistoryTab = ({ items, isMobile }: any) => {
     }
   };
 
-  // Rest of the component remains the same...
+  // Helper function to format list names
+  const formatListNames = (listNamesSet: Set<any>) => {
+    const listNames = Array.from(listNamesSet);
+    if (listNames.length === 0) return "No List";
+    if (listNames.length === 1) return listNames[0];
+    return `${listNames[0]} +${listNames.length - 1} more`;
+  };
+
+  // Rest of the component remains similar but updated to show combined data...
   if (isMobile) {
     // Mobile view with accordions
     return (
@@ -499,6 +521,15 @@ const DeliveryHistoryTab = ({ items, isMobile }: any) => {
                       </Typography>
                     )}
                   </Stack>
+
+                  {/* Show list names */}
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{ mt: 0.5 }}
+                  >
+                    Lists: {formatListNames(delivery.listNames)}
+                  </Typography>
                 </Box>
               </AccordionSummary>
 
@@ -509,10 +540,11 @@ const DeliveryHistoryTab = ({ items, isMobile }: any) => {
                     gutterBottom
                     sx={{ mb: 2, fontWeight: 600 }}
                   >
-                    Items in this delivery:
+                    Items in this delivery ({delivery.items.length} items from{" "}
+                    {delivery.listNames.size} lists):
                   </Typography>
 
-                  {/* ITEMS LIST TABLE - REDESIGNED */}
+                  {/* ITEMS LIST TABLE - UPDATED TO SHOW LIST INFORMATION */}
                   <TableContainer
                     component={Paper}
                     sx={{
@@ -539,6 +571,11 @@ const DeliveryHistoryTab = ({ items, isMobile }: any) => {
                           <TableCell sx={{ py: 1 }}>
                             <Typography variant="subtitle2" fontWeight={600}>
                               Article No
+                            </Typography>
+                          </TableCell>
+                          <TableCell sx={{ py: 1 }}>
+                            <Typography variant="subtitle2" fontWeight={600}>
+                              List
                             </Typography>
                           </TableCell>
                           <TableCell align="center" sx={{ py: 1 }}>
@@ -576,6 +613,15 @@ const DeliveryHistoryTab = ({ items, isMobile }: any) => {
                                 {item.articleNumber}
                               </Typography>
                             </TableCell>
+                            <TableCell sx={{ py: 1.5 }}>
+                              <Chip
+                                label={item.listName}
+                                size="small"
+                                variant="outlined"
+                                color="secondary"
+                                sx={{ fontSize: "0.7rem" }}
+                              />
+                            </TableCell>
                             <TableCell align="center" sx={{ py: 1.5 }}>
                               <Chip
                                 label={item.quantity}
@@ -603,7 +649,7 @@ const DeliveryHistoryTab = ({ items, isMobile }: any) => {
     );
   }
 
-  // Desktop table view
+  // Desktop table view - UPDATED TO SHOW COMBINED DATA
   return (
     <Box sx={{ p: 3 }}>
       {/* Search and Info Bar */}
@@ -642,6 +688,12 @@ const DeliveryHistoryTab = ({ items, isMobile }: any) => {
               0
             )} Total Items`}
             color="secondary"
+            variant="outlined"
+          />
+          <Chip
+            icon={<Business fontSize="small" />}
+            label={`${allLists.length} Lists`}
+            color="info"
             variant="outlined"
           />
         </Stack>
@@ -709,6 +761,11 @@ const DeliveryHistoryTab = ({ items, isMobile }: any) => {
               </TableCell>
               <TableCell>
                 <Typography variant="subtitle2" fontWeight={600}>
+                  Lists
+                </Typography>
+              </TableCell>
+              <TableCell>
+                <Typography variant="subtitle2" fontWeight={600}>
                   Details
                 </Typography>
               </TableCell>
@@ -717,7 +774,7 @@ const DeliveryHistoryTab = ({ items, isMobile }: any) => {
           <TableBody>
             {deliveryHistory.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
+                <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
                   <LocalShipping
                     sx={{ fontSize: 48, color: "text.disabled", mb: 2 }}
                   />
@@ -805,6 +862,18 @@ const DeliveryHistoryTab = ({ items, isMobile }: any) => {
                       </Typography>
                     </TableCell>
                     <TableCell>
+                      <Tooltip
+                        title={Array.from(delivery.listNames).join(", ")}
+                      >
+                        <Chip
+                          label={formatListNames(delivery.listNames)}
+                          size="small"
+                          color="secondary"
+                          variant="outlined"
+                        />
+                      </Tooltip>
+                    </TableCell>
+                    <TableCell>
                       <IconButton size="small">
                         {expandedPeriod ===
                         `${delivery.period}_${delivery.cargoNo}` ? (
@@ -816,7 +885,7 @@ const DeliveryHistoryTab = ({ items, isMobile }: any) => {
                     </TableCell>
                   </TableRow>
                   <TableRow>
-                    <TableCell colSpan={7} sx={{ p: 0, border: 0 }}>
+                    <TableCell colSpan={8} sx={{ p: 0, border: 0 }}>
                       <Collapse
                         in={
                           expandedPeriod ===
@@ -837,10 +906,11 @@ const DeliveryHistoryTab = ({ items, isMobile }: any) => {
                             gutterBottom
                             sx={{ mb: 2, fontWeight: 600 }}
                           >
-                            Items in this delivery:
+                            Items in this delivery ({delivery.items.length}{" "}
+                            items from {delivery.listNames.size} lists):
                           </Typography>
 
-                          {/* ITEMS LIST TABLE - REDESIGNED */}
+                          {/* ITEMS LIST TABLE - UPDATED TO SHOW LIST INFORMATION */}
                           <TableContainer
                             component={Paper}
                             sx={{
@@ -881,6 +951,14 @@ const DeliveryHistoryTab = ({ items, isMobile }: any) => {
                                       fontWeight={600}
                                     >
                                       DE Item No
+                                    </Typography>
+                                  </TableCell>
+                                  <TableCell sx={{ py: 1.5 }}>
+                                    <Typography
+                                      variant="subtitle2"
+                                      fontWeight={600}
+                                    >
+                                      List
                                     </Typography>
                                   </TableCell>
                                   <TableCell align="center" sx={{ py: 1.5 }}>
@@ -942,6 +1020,15 @@ const DeliveryHistoryTab = ({ items, isMobile }: any) => {
                                           {item.item_no_de || "-"}
                                         </Typography>
                                       </TableCell>
+                                      <TableCell sx={{ py: 2 }}>
+                                        <Chip
+                                          label={item.listName}
+                                          size="small"
+                                          variant="outlined"
+                                          color="secondary"
+                                          sx={{ fontSize: "0.75rem" }}
+                                        />
+                                      </TableCell>
                                       <TableCell align="center" sx={{ py: 2 }}>
                                         <Chip
                                           label={item.quantity}
@@ -987,6 +1074,7 @@ const DeliveryHistoryTab = ({ items, isMobile }: any) => {
     </Box>
   );
 };
+
 const DELIVERY_STATUS_CONFIG: any = {
   [DELIVERY_STATUS.PENDING]: { color: "warning", label: "Pending" },
   [DELIVERY_STATUS.PARTIAL]: { color: "info", label: "Partial" },
@@ -1220,137 +1308,6 @@ const FieldHighlight = ({
     >
       {children}
     </Box>
-  );
-};
-
-// Delivery Cell Component
-const DeliveryCell = ({ row, period }: any) => {
-  const [deliveryModalOpen, setDeliveryModalOpen] = useState(false);
-  const delivery = row.deliveries?.[period];
-
-  if (!delivery) {
-    return (
-      <Box
-        sx={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          height: "100%",
-          color: "text.disabled",
-        }}
-      >
-        <Typography variant="caption">-</Typography>
-      </Box>
-    );
-  }
-
-  const status = delivery.status || "NSO";
-
-  return (
-    <>
-      <Box
-        sx={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: 0.5,
-          height: "100%",
-          cursor: "pointer",
-          p: 1,
-          borderRadius: 1,
-          "&:hover": {
-            backgroundColor: alpha("#8CC21B", 0.05),
-          },
-        }}
-        onClick={() => setDeliveryModalOpen(true)}
-      >
-        <Typography variant="body2" fontWeight={600} sx={{ fontSize: "14px" }}>
-          {delivery.quantity || 0}
-        </Typography>
-        <Chip
-          label={status}
-          size="small"
-          color={"primary"}
-          sx={{
-            fontSize: "0.65rem",
-            height: 18,
-            borderRadius: 1,
-          }}
-        />
-      </Box>
-
-      <Dialog
-        open={deliveryModalOpen}
-        onClose={() => setDeliveryModalOpen(false)}
-        maxWidth="md"
-        fullWidth
-      >
-        <DialogTitle>
-          <Box
-            sx={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-            }}
-          >
-            <Typography variant="h6">
-              Delivery Details -{" "}
-              {formatPeriodLabel(period, delivery.cargoNo || "")}
-            </Typography>
-            <IconButton
-              onClick={() => setDeliveryModalOpen(false)}
-              size="small"
-            >
-              <X />
-            </IconButton>
-          </Box>
-        </DialogTitle>
-        <DialogContent>
-          <Grid container spacing={3} sx={{ mt: 1 }}>
-            <Grid item xs={12} md={6}>
-              <Typography variant="subtitle2" gutterBottom>
-                Article Information
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                <strong>Name:</strong> {row.articleName}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                <strong>Article Number:</strong> {row.articleNumber}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                <strong>Artikelnr:</strong> {row.item_no_de}
-              </Typography>
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <Typography variant="subtitle2" gutterBottom>
-                Delivery Information
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                <strong>Quantity:</strong> {delivery.quantity || 0}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                <strong>Status:</strong>{" "}
-                <Chip label={status} size="small" color={"primary"} />
-              </Typography>
-              {delivery.eta && (
-                <Typography variant="body2" color="text.secondary">
-                  <strong>ETA:</strong>{" "}
-                  {new Date(delivery.eta).toLocaleDateString()}
-                </Typography>
-              )}
-              <Typography variant="body2" color="text.secondary">
-                <strong>Cargo Number:</strong>{" "}
-                {delivery.cargoNo || "Not assigned"}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                <strong>Period:</strong> {period}
-              </Typography>
-            </Grid>
-          </Grid>
-        </DialogContent>
-      </Dialog>
-    </>
   );
 };
 
@@ -4141,7 +4098,7 @@ const ListManagerPage: React.FC = () => {
                     }}
                     startIcon={<Package size={18} />}
                   >
-                    List Items
+                    Artikel{" "}
                     {itemsWithChanges.length > 0 && (
                       <Badge
                         badgeContent={itemsWithChanges.length}
@@ -4179,7 +4136,7 @@ const ListManagerPage: React.FC = () => {
                     }}
                     startIcon={<LocalShippingOutlined />}
                   >
-                    Delivery History
+                    Lieferungen{" "}
                   </Button>
                 </Stack>
               </Box>
@@ -4226,15 +4183,18 @@ const ListManagerPage: React.FC = () => {
         >
           <Box sx={{ p: { xs: 2, sm: 3 } }}>
             {/* Action Bar */}
-            <ListTabs
-              currentListId={currentListId}
-              allLists={allLists}
-              onListChange={handleListChange}
-              onListNameUpdate={handleListNameUpdate}
-              loading={isLoading}
-              router={router}
-              isEditable={isEditable}
-            />
+
+            {activeTab === "items" && (
+              <ListTabs
+                currentListId={currentListId}
+                allLists={allLists}
+                onListChange={handleListChange}
+                onListNameUpdate={handleListNameUpdate}
+                loading={isLoading}
+                router={router}
+                isEditable={isEditable}
+              />
+            )}
             <Stack
               direction={{ xs: "column", sm: "row" }}
               spacing={2}
@@ -4496,6 +4456,7 @@ const ListManagerPage: React.FC = () => {
               // Delivery History tab content
               <DeliveryHistoryTab
                 items={currentList.items}
+                allLists={allLists} // Pass allLists instead of just current list items
                 isMobile={isMobile}
               />
             )}

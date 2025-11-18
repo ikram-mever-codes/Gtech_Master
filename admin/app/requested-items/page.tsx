@@ -153,7 +153,7 @@ const RequestedItemsPage: React.FC = () => {
     sampleQty: "",
     expectedDelivery: "",
     priority: "Normal",
-    requestStatus: "",
+    requestStatus: "Open",
     comment: "",
     asanaLink: "",
   });
@@ -426,7 +426,6 @@ const RequestedItemsPage: React.FC = () => {
     if (window.confirm("Are you sure you want to delete this item?")) {
       try {
         await deleteRequestedItem(itemId);
-        toast.success("Item deleted successfully");
         fetchRequestedItems();
         fetchStatistics();
       } catch (error) {
@@ -461,7 +460,7 @@ const RequestedItemsPage: React.FC = () => {
       expectedDelivery: "",
       extraNote: "",
       priority: "Normal",
-      requestStatus: "",
+      requestStatus: "Open",
       comment: "",
       asanaLink: "",
     });
@@ -747,10 +746,7 @@ const RequestedItemsPage: React.FC = () => {
                       <td className="px-6 py-4">
                         <div className="flex items-center justify-center gap-3">
                           {/* Notes/Comments Icon */}
-                          {(item.comment ||
-                            item.extraNote ||
-                            item.extraItemsDescriptions ||
-                            item.specification) && (
+                          {(item.comment || item.extraItemsDescriptions) && (
                             <button
                               onClick={(e) => handleNotesClick(item, e)}
                               className="text-blue-500 hover:text-blue-700 transition-colors"

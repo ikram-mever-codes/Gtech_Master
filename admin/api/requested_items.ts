@@ -61,7 +61,7 @@ export type RequestStatus =
   | "43_Serienteil Verfolgung"
   | "44_Serienteil Wareneingang DE"
   | "45_Serienteil Eingang beim Kunde"
-  | "";
+  | "Open";
 
 export interface RequestedItem {
   id: string;

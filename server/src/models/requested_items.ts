@@ -17,54 +17,6 @@ export type Interval =
   | "halbjährlich"
   | "jährlich";
 export type Priority = "High" | "Normal";
-export type RequestStatus =
-  | "1_Anfrage gestoppt"
-  | "2_Anfrage verschoben"
-  | "3_Anfrage Phase"
-  | "4_Musterplanung"
-  | "5_WAS besprechen"
-  | "6_Musterbeschaffung"
-  | "7_Muster Empfänger klären"
-  | "8_Muster vom Kunden in DE"
-  | "9_Muster unterwegs"
-  | "10_Lieferanten Findung"
-  | "11_Rückfragen an Kunden"
-  | "11_Angebot erstellen"
-  | "12_Angebot besprechen"
-  | "13_Artikel erstellen"
-  | "14_AB an Kunden Muster"
-  | "15_Muster bestellen"
-  | "16_Muster fertiggestellt"
-  | "17_Muster Versand vorbereiten"
-  | "18_Muster versendet"
-  | "19_Rückmeldung Liefertermin Muster"
-  | "20_Muster auf dem Weg"
-  | "21_Muster ist in DE"
-  | "22_Artikel in MIS korrigieren"
-  | "23_Muster Versand an Kunden"
-  | "24_Muster Eingang beim Kunden"
-  | "25_Kontakt mit Kunden Muster"
-  | "26_Trial order besprechen"
-  | "27_AB an Kunden gesendet"
-  | "28_Trial order bestellt"
-  | "29_Trial order fertiggestellt"
-  | "30_Trial order vorbereiten"
-  | "31_Rückmeldung Liefertermin Trial Order"
-  | "32_Trial order Verfolgung"
-  | "33_Trial order Wareneingang DE"
-  | "34_Trial order Eingang beim Kunde"
-  | "35_Trial order besprechen nach Erhalt"
-  | "36_Übergabe an COO"
-  | "37_Anruf Serienteil Planung"
-  | "38_Bestellung Serienteil erstellen"
-  | "39_Serienteil fertiggestellt"
-  | "40_Fracht vorbereiten MIS"
-  | "41_Versanddetails erhalten"
-  | "42_Rückmeldung Liefertermin Serienteil"
-  | "43_Serienteil Verfolgung"
-  | "44_Serienteil Wareneingang DE"
-  | "45_Serienteil Eingang beim Kunde"
-  | "";
 
 @Entity()
 export class RequestedItem {
@@ -104,7 +56,7 @@ export class RequestedItem {
   extraItemsDescriptions!: string;
 
   @Column({ type: "varchar", length: 100 })
-  qty!: string; // e.g., "24000 Stk"
+  qty!: string;
 
   @Column({
     type: "enum",
@@ -114,7 +66,7 @@ export class RequestedItem {
   interval!: Interval;
 
   @Column({ type: "varchar", length: 100, nullable: true })
-  sampleQty!: string; // e.g., "30 Stk"
+  sampleQty!: string;
 
   @Column({ type: "text", nullable: true })
   expectedDelivery!: string;
@@ -126,61 +78,8 @@ export class RequestedItem {
   })
   priority!: Priority;
 
-  @Column({
-    type: "enum",
-    enum: [
-      "1_Anfrage gestoppt",
-      "2_Anfrage verschoben",
-      "3_Anfrage Phase",
-      "4_Musterplanung",
-      "5_WAS besprechen",
-      "6_Musterbeschaffung",
-      "7_Muster Empfänger klären",
-      "8_Muster vom Kunden in DE",
-      "9_Muster unterwegs",
-      "10_Lieferanten Findung",
-      "11_Rückfragen an Kunden",
-      "11_Angebot erstellen",
-      "12_Angebot besprechen",
-      "13_Artikel erstellen",
-      "14_AB an Kunden Muster",
-      "15_Muster bestellen",
-      "16_Muster fertiggestellt",
-      "17_Muster Versand vorbereiten",
-      "18_Muster versendet",
-      "19_Rückmeldung Liefertermin Muster",
-      "20_Muster auf dem Weg",
-      "21_Muster ist in DE",
-      "22_Artikel in MIS korrigieren",
-      "23_Muster Versand an Kunden",
-      "24_Muster Eingang beim Kunden",
-      "25_Kontakt mit Kunden Muster",
-      "26_Trial order besprechen",
-      "27_AB an Kunden gesendet",
-      "28_Trial order bestellt",
-      "29_Trial order fertiggestellt",
-      "30_Trial order vorbereiten",
-      "31_Rückmeldung Liefertermin Trial Order",
-      "32_Trial order Verfolgung",
-      "33_Trial order Wareneingang DE",
-      "34_Trial order Eingang beim Kunde",
-      "35_Trial order besprechen nach Erhalt",
-      "36_Übergabe an COO",
-      "37_Anruf Serienteil Planung",
-      "38_Bestellung Serienteil erstellen",
-      "39_Serienteil fertiggestellt",
-      "40_Fracht vorbereiten MIS",
-      "41_Versanddetails erhalten",
-      "42_Rückmeldung Liefertermin Serienteil",
-      "43_Serienteil Verfolgung",
-      "44_Serienteil Wareneingang DE",
-      "45_Serienteil Eingang beim Kunde",
-      "",
-    ],
-    nullable: true,
-    default: "",
-  })
-  requestStatus!: RequestStatus;
+  @Column({ type: "varchar", length: 255, nullable: true, default: "Open" })
+  requestStatus!: string;
 
   @ManyToOne(
     () => ContactPerson,
