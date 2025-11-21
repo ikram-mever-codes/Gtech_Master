@@ -19,6 +19,18 @@ import { StarCustomerDetails } from "../models/star_customer_details";
 import { BusinessDetails } from "../models/business_details";
 import { ContactPerson } from "../models/contact_person";
 import { RequestedItem } from "../models/requested_items";
+import { Parent } from "../models/parents";
+import { Item } from "../models/items";
+import { Order } from "../models/orders";
+import { OrderItem } from "../models/order_items";
+import { Supplier } from "../models/suppliers";
+import { SupplierItem } from "../models/supplier_items";
+import { WarehouseItem } from "../models/warehouse_items";
+import { VariationValue } from "../models/variation_values";
+import { Taric } from "../models/tarics";
+import { Ean } from "../models/eans";
+import { Category } from "../models/categories";
+import { ItemQuality } from "../models/item_qualities";
 
 dotenv.config();
 
@@ -33,6 +45,7 @@ export const AppDataSource = new DataSource({
   logging: false,
 
   entities: [
+    // EXISTING ENTITIES
     User,
     Customer,
     List,
@@ -49,6 +62,19 @@ export const AppDataSource = new DataSource({
     Permission,
     Invoice,
     InvoiceItem,
+
+    Parent,
+    Item,
+    Order,
+    OrderItem,
+    Supplier,
+    SupplierItem,
+    WarehouseItem,
+    VariationValue,
+    Taric,
+    ItemQuality,
+    Ean,
+    Category,
   ],
   extra: {
     ssl:
