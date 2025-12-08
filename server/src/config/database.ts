@@ -28,9 +28,9 @@ import { SupplierItem } from "../models/supplier_items";
 import { WarehouseItem } from "../models/warehouse_items";
 import { VariationValue } from "../models/variation_values";
 import { Taric } from "../models/tarics";
-import { Ean } from "../models/eans";
 import { Category } from "../models/categories";
 import { ItemQuality } from "../models/item_qualities";
+import { LibraryFile } from "../models/library";
 
 dotenv.config();
 
@@ -49,6 +49,7 @@ export const AppDataSource = new DataSource({
     User,
     Customer,
     List,
+    LibraryFile,
     ContactPerson,
     StarBusinessDetails,
     StarCustomerDetails,
@@ -73,7 +74,6 @@ export const AppDataSource = new DataSource({
     VariationValue,
     Taric,
     ItemQuality,
-    Ean,
     Category,
   ],
   extra: {

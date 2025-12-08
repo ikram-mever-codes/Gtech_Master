@@ -27,30 +27,34 @@ async function fetchItemData(itemId: number) {
   try {
     const [itemRows]: any = await connection.query(
       `
-          SELECT 
-            i.*,
-            os.cargo_id,
-            os.status as order_status,
-            oi.qty AS quantity,
-            c.cargo_no,
-            c.pickup_date,
-            c.dep_date,
-            c.cargo_status,
-            c.shipped_at,
-            c.eta,
-            c.remark,
-            c.cargo_type_id,
-            ct.cargo_type,
-            wi.item_name_de,
-            wi.item_no_de 
-                FROM items i
-          LEFT JOIN order_items oi ON i.ItemID_DE = oi.ItemID_DE
-          LEFT JOIN order_statuses os ON oi.master_id = os.master_id AND oi.ItemID_DE = os.ItemID_DE
-          LEFT JOIN cargos c ON os.cargo_id = c.id
-          LEFT JOIN cargo_types ct ON c.cargo_type_id = ct.id
-          LEFT JOIN warehouse_items wi ON i.ItemID_DE = wi.ItemID_DE
-          WHERE i.id = ?
-          `,
+            SELECT 
+              i.*,
+              os.cargo_id,
+              os.status as order_status,
+              oi.qty AS quantity,
+              c.cargo_no,
+              c.pickup_date,
+              c.dep_date,
+              c.cargo_status,
+              c.shipped_at,
+              c.eta,
+              c.remark,
+              c.cargo_type_id,
+              ct.cargo_type,
+              wi.item_name_de,
+              wi.item_no_de,
+              -- Additional field to identify unassigned items
+              CASE WHEN os.cargo_id IS NULL THEN 1 ELSE 0 END as has_no_cargo
+            FROM items i
+            LEFT JOIN order_items oi ON i.ItemID_DE = oi.ItemID_DE
+            LEFT JOIN order_statuses os ON oi.master_id = os.master_id AND oi.ItemID_DE = os.ItemID_DE
+            LEFT JOIN cargos c ON os.cargo_id = c.id
+            LEFT JOIN cargo_types ct ON c.cargo_type_id = ct.id
+            LEFT JOIN warehouse_items wi ON i.ItemID_DE = wi.ItemID_DE
+            WHERE i.id = ? 
+            -- Include items that either match the itemId OR have no cargo assigned
+            OR (os.cargo_id IS NULL AND oi.ItemID_DE IS NOT NULL)
+            `,
       [itemId]
     );
 
@@ -73,14 +77,54 @@ async function fetchItemData(itemId: number) {
         shippedAt: string;
         eta: string;
         cargoType: string;
+        isUnassigned: boolean; // New field to track unassigned cargos
       }
     >();
 
     // Counter for cargos without dates
     let noDateCounter = 0;
+    // Counter for unassigned cargos
+    let unassignedCounter = 0;
 
     itemRows.forEach((row: any) => {
-      if (row.cargo_id && row.cargo_no) {
+      // Handle unassigned cargos (cargo_id IS NULL but has order_status)
+      if (row.cargo_id === null && row.order_status) {
+        unassignedCounter++;
+        const unassignedKey = `unassigned-${unassignedCounter}`;
+
+        const quantity = Number(row.quantity) || 0;
+
+        if (!deliveryMap.has(unassignedKey)) {
+          deliveryMap.set(unassignedKey, {
+            quantity,
+            status: row.order_status || "Open",
+            deliveredAt: null,
+            cargoNo: [], // Empty array for cargo numbers
+            cargoStatus: "UNASSIGNED", // Special status for unassigned
+            remark: row.remark || "Not yet assigned to cargo",
+            shippedAt: "",
+            eta: "",
+            cargoType: "",
+            isUnassigned: true, // Mark as unassigned
+          });
+        } else {
+          const existing = deliveryMap.get(unassignedKey)!;
+          deliveryMap.set(unassignedKey, {
+            quantity: existing.quantity + quantity,
+            status: row.order_status || existing.status,
+            deliveredAt: existing.deliveredAt,
+            cargoNo: existing.cargoNo,
+            cargoStatus: existing.cargoStatus,
+            remark: existing.remark,
+            shippedAt: existing.shippedAt,
+            eta: existing.eta,
+            cargoType: existing.cargoType,
+            isUnassigned: true,
+          });
+        }
+      }
+      // Handle assigned cargos (existing logic)
+      else if (row.cargo_id && row.cargo_no) {
         // Get all possible dates, use fallbacks if primary dates are null
         const possibleDates = [
           row.pickup_date,
@@ -109,6 +153,7 @@ async function fetchItemData(itemId: number) {
                 : "",
               eta: row.eta ? new Date(row.eta).toISOString().split("T")[0] : "",
               cargoType: row.cargo_type || "",
+              isUnassigned: false,
             });
           } else {
             const existing = deliveryMap.get(uniqueKey)!;
@@ -130,6 +175,7 @@ async function fetchItemData(itemId: number) {
                 ? new Date(row.eta).toISOString().split("T")[0]
                 : existing.eta,
               cargoType: row.cargo_type || existing.cargoType,
+              isUnassigned: false,
             });
           }
         } else {
@@ -153,6 +199,7 @@ async function fetchItemData(itemId: number) {
                   ? new Date(row.eta).toISOString().split("T")[0]
                   : "",
                 cargoType: row.cargo_type || "",
+                isUnassigned: false,
               });
             } else {
               const existing = deliveryMap.get(dateKey)!;
@@ -174,6 +221,7 @@ async function fetchItemData(itemId: number) {
                   ? new Date(row.eta).toISOString().split("T")[0]
                   : existing.eta,
                 cargoType: row.cargo_type || existing.cargoType,
+                isUnassigned: false,
               });
             }
           });
@@ -192,6 +240,7 @@ async function fetchItemData(itemId: number) {
         shippedAt: string;
         eta: string;
         cargoType: string;
+        isUnassigned?: boolean; // Optional field in final output
       };
     } = {};
 
@@ -208,6 +257,7 @@ async function fetchItemData(itemId: number) {
         shippedAt: value.shippedAt,
         eta: value.eta,
         cargoType: value.cargoType,
+        ...(value.isUnassigned && { isUnassigned: true }),
       };
     });
 

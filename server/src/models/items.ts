@@ -1,114 +1,160 @@
-// src/entities/items.ts
+// src/entities/items.ts - COMPLETE VERSION
 import {
   Entity,
-  PrimaryGeneratedColumn,
   Column,
   CreateDateColumn,
   UpdateDateColumn,
   ManyToOne,
   OneToMany,
   JoinColumn,
+  PrimaryColumn,
 } from "typeorm";
 import { Parent } from "./parents";
-import { SupplierItem } from "./supplier_items";
-import { WarehouseItem } from "./warehouse_items";
-import { VariationValue } from "./variation_values";
-import { OrderItem } from "./order_items";
 import { Taric } from "./tarics";
-import { ItemQuality } from "./item_qualities";
 import { Category } from "./categories";
-import { Supplier } from "./suppliers";
 
 @Entity()
 export class Item {
-  @PrimaryGeneratedColumn()
+  @PrimaryColumn()
   id!: number;
+
+  @Column({ nullable: true })
+  parent_id?: number;
+
+  @Column({ nullable: true })
+  ItemID_DE?: number;
+
+  @Column({ type: "varchar", length: 50, nullable: true })
+  parent_no_de?: string;
+
+  @Column({ type: "char", length: 1, default: "N" })
+  is_dimension_special!: string;
+
+  @Column({ type: "varchar", length: 100, nullable: true })
+  model?: string;
+
+  @Column({ type: "varchar", length: 3, nullable: true })
+  supp_cat?: string;
+
+  @Column({ type: "bigint", nullable: true })
+  ean?: number;
 
   @Column({ nullable: true })
   taric_id?: number;
 
-  @Column({ nullable: true })
-  supplier_id?: number;
+  @Column({ type: "float", nullable: true })
+  weight?: number;
+
+  @Column({ type: "float", nullable: true })
+  width?: number;
+
+  @Column({ type: "float", nullable: true })
+  height?: number;
+
+  @Column({ type: "float", nullable: true })
+  length?: number;
+
+  @Column({ type: "text", nullable: true })
+  item_name?: string;
+
+  @Column({ type: "text", nullable: true })
+  item_name_cn?: string;
+
+  @Column({ type: "decimal", precision: 10, scale: 0, nullable: true })
+  FOQ?: number;
+
+  @Column({ type: "decimal", precision: 10, scale: 0, nullable: true })
+  FSQ?: number;
+
+  @Column({ type: "char", length: 1, default: "Y" })
+  is_qty_dividable!: string;
+
+  @Column({ default: 0 })
+  ISBN!: number;
 
   @Column({ nullable: true })
-  de_id?: number;
+  cat_id?: number;
 
-  @Column({ type: "varchar", length: 9, nullable: true })
-  de_no?: string;
+  @Column({ type: "text", nullable: true })
+  remark?: string;
 
-  @Column({ type: "varchar", length: 1, default: "Y" })
-  is_active!: string;
-
-  @Column({ type: "varchar", length: 111, nullable: true })
-  name_de?: string;
-
-  @Column({ type: "varchar", length: 80, nullable: true })
-  name_en?: string;
+  @Column({ type: "decimal", precision: 10, scale: 2, nullable: true })
+  RMB_Price?: number;
 
   @Column({ type: "varchar", length: 255, nullable: true })
-  name_cn?: string;
+  photo?: string;
 
-  @Column({ type: "varchar", length: 27, nullable: true })
-  var_de_1?: string;
+  @Column({ type: "text", nullable: true })
+  pix_path?: string;
 
-  @Column({ type: "varchar", length: 23, nullable: true })
-  var_de_2?: string;
+  @Column({ type: "text", nullable: true })
+  pix_path_eBay?: string;
 
-  @Column({ type: "varchar", length: 18, nullable: true })
-  var_de_3?: string;
+  @Column({ type: "char", length: 1, default: "N" })
+  is_npr!: string;
 
-  @Column({ type: "varchar", length: 25, nullable: true })
-  var_en_1?: string;
+  @Column({ type: "varchar", length: 255, nullable: true })
+  npr_remark?: string;
 
-  @Column({ type: "varchar", length: 17, nullable: true })
-  var_en_2?: string;
+  @Column({ nullable: true })
+  many_components?: number;
 
-  @Column({ type: "varchar", length: 18, nullable: true })
-  var_en_3?: string;
+  @Column({ nullable: true })
+  effort_rating?: number;
 
-  @Column({ type: "varchar", length: 1, default: "N" })
-  is_NwV!: string;
+  @Column({ type: "char", length: 1, default: "N" })
+  is_rmb_special!: string;
 
-  @Column({ type: "smallint", default: 3 }) // FIXED: tinyint → smallint
-  parent_rank!: number;
+  @Column({ type: "char", length: 1, default: "N" })
+  is_eur_special!: string;
 
-  @Column({ type: "varchar", length: 1, default: "N" })
-  is_var_unilingual!: string;
+  @Column({ default: 0 })
+  is_pu_item!: number;
 
-  @ManyToOne(() => Parent, (parent) => parent.items)
-  @JoinColumn({ name: "parent_id" })
-  parent!: Parent;
+  @Column({ default: 0 })
+  is_meter_item!: number;
 
-  @ManyToOne(() => Taric, (taric) => taric.items)
-  @JoinColumn({ name: "taric_id" })
-  taric!: Taric;
+  @Column({ type: "varchar", length: 1, default: "Y" })
+  is_new!: string;
 
-  @ManyToOne(() => Category, (category) => category.items)
-  @JoinColumn({ name: "category_id" })
-  category!: Category;
+  @Column({ type: "char", length: 1, default: "Y" })
+  isActive!: string;
 
-  @ManyToOne(() => Supplier, (supplier) => supplier.items)
-  @JoinColumn({ name: "supplier_id" })
-  supplier!: Supplier;
+  @Column({ type: "varchar", length: 200, nullable: true })
+  note?: string;
 
-  @OneToMany(() => SupplierItem, (supplierItem) => supplierItem.item)
-  supplierItems!: SupplierItem[];
-
-  @OneToMany(() => WarehouseItem, (warehouseItem) => warehouseItem.item)
-  warehouseItems!: WarehouseItem[];
-
-  @OneToMany(() => VariationValue, (variationValue) => variationValue.item)
-  variationValues!: VariationValue[];
-
-  @OneToMany(() => OrderItem, (orderItem) => orderItem.item)
-  orderItems!: OrderItem[];
-
-  @OneToMany(() => ItemQuality, (itemQuality) => itemQuality.item)
-  itemQualities!: ItemQuality[];
+  @CreateDateColumn()
+  synced_at!: Date;
 
   @CreateDateColumn()
   created_at!: Date;
 
   @UpdateDateColumn()
   updated_at!: Date;
+
+  // Relationships
+  @ManyToOne(() => Parent, (parent) => parent.items, { nullable: true })
+  @JoinColumn({ name: "parent_id" })
+  parent: Parent | null;
+
+  @ManyToOne(() => Taric, (taric) => taric.items, { nullable: true })
+  @JoinColumn({ name: "taric_id" })
+  taric: Taric | null;
+
+  @ManyToOne(() => Category, (category) => category.items, { nullable: true })
+  @JoinColumn({ name: "cat_id" })
+  category: Category | null;
+
+  // Remove these OneToMany relationships if you don't need them for migration
+  // @OneToMany(() => WarehouseItem, (warehouseItem) => warehouseItem.item)
+  // warehouseItems: WarehouseItem[];
+
+  // @OneToMany(() => VariationValue, (variationValue) => variationValue.item)
+  // variationValues: VariationValue[];
+
+  // @OneToMany(() => OrderItem, (orderItem) => orderItem.item)
+  // orderItems: OrderItem[];
+
+  // @OneToMany(() => ItemQuality, (itemQuality) => itemQuality.item)
+  // itemQualities: ItemQuality[];
 }

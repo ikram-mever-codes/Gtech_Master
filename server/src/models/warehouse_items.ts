@@ -7,14 +7,14 @@ import {
   ManyToOne,
   JoinColumn,
   OneToOne,
+  PrimaryColumn,
 } from "typeorm";
 import { Item } from "./items";
-import { Ean } from "./eans";
 import { Category } from "./categories";
 
 @Entity()
 export class WarehouseItem {
-  @PrimaryGeneratedColumn()
+  @PrimaryColumn()
   id!: number;
 
   @Column()
@@ -23,15 +23,11 @@ export class WarehouseItem {
   @Column({ nullable: true })
   ItemID_DE?: number;
 
-  @Column({ default: 1 })
+  @Column({ default: 1, nullable: true })
   category_id!: number;
 
-  @ManyToOne(() => Category, (category) => category.warehouseItems)
-  @JoinColumn({ name: "category_id" })
-  category!: Category;
-
-  @Column({ type: "bigint", nullable: true })
-  ean?: number;
+  @Column({ type: "varchar", length: 13, nullable: true })
+  ean?: string; // Changed from bigint to varchar, no foreign key
 
   @Column({ type: "varchar", length: 100, nullable: true })
   item_no_de?: string;
@@ -66,13 +62,9 @@ export class WarehouseItem {
   @Column({ type: "varchar", length: 50, nullable: true })
   ship_class?: string;
 
-  @ManyToOne(() => Item, (item) => item.warehouseItems)
-  @JoinColumn({ name: "item_id" })
-  item!: Item;
-
-  @OneToOne(() => Ean, (ean) => ean.warehouseItem)
-  @JoinColumn({ name: "ean", referencedColumnName: "ean" })
-  eanRecord!: Ean;
+  // @ManyToOne(() => Item, (item) => item.warehouseItems)
+  // @JoinColumn({ name: "item_id" })
+  // item!: Item;
 
   @CreateDateColumn()
   created_at!: Date;

@@ -8,13 +8,14 @@ import {
   OneToMany,
   ManyToOne,
   JoinColumn,
+  PrimaryColumn,
 } from "typeorm";
 import { OrderItem } from "./order_items";
 import { Category } from "./categories";
 
 @Entity()
 export class Order {
-  @PrimaryGeneratedColumn()
+  @PrimaryColumn()
   id!: number;
 
   @Column({ type: "varchar", length: 255, unique: true }) // ADDED: unique: true

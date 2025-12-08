@@ -6,6 +6,7 @@ import {
   UpdateDateColumn,
   ManyToOne,
   JoinColumn,
+  PrimaryColumn,
 } from "typeorm";
 import { Item } from "./items";
 import { Order } from "./orders";
@@ -13,7 +14,7 @@ import { Order } from "./orders";
 // Alternative OrderItem entity (use this if order_no shouldn't be unique)
 @Entity()
 export class OrderItem {
-  @PrimaryGeneratedColumn()
+  @PrimaryColumn()
   id!: number;
 
   @Column({ type: "varchar", length: 25 })
@@ -34,9 +35,9 @@ export class OrderItem {
   @Column({ type: "int", nullable: true })
   qty_delivered?: number;
 
-  @ManyToOne(() => Item, (item) => item.orderItems)
-  @JoinColumn({ name: "item_id" })
-  item!: Item;
+  // @ManyToOne(() => Item, (item) => item.orderItems)
+  // @JoinColumn({ name: "item_id" })
+  // item!: Item;
 
   @ManyToOne(() => Order, (order) => order.orderItems)
   @JoinColumn({ name: "order_id" }) // Changed to reference id instead of order_no

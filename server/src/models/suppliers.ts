@@ -7,6 +7,7 @@ import {
   OneToMany,
   ManyToOne,
   JoinColumn,
+  PrimaryColumn,
 } from "typeorm";
 import { SupplierItem } from "./supplier_items";
 import { Item } from "./items";
@@ -14,7 +15,7 @@ import { Parent } from "./parents";
 
 @Entity()
 export class Supplier {
-  @PrimaryGeneratedColumn()
+  @PrimaryColumn()
   id!: number;
 
   @Column({ type: "int", default: 1 })
@@ -100,9 +101,6 @@ export class Supplier {
 
   @OneToMany(() => SupplierItem, (supplierItem) => supplierItem.supplier)
   supplierItems!: SupplierItem[];
-
-  @OneToMany(() => Item, (item) => item.supplier)
-  items!: Item[];
 
   @OneToMany(() => Parent, (parent) => parent.supplier)
   parents!: Parent[];

@@ -11,9 +11,11 @@ import invoiceRoutes from "./routes/invoice_routes";
 import requestedItemsRoutes from "./routes/requested_item_routes";
 import cronRoutes from "./routes/cronRoutes";
 import { AppDataSource } from "./config/database";
-
+import itemRoutes from "./routes/item_routes";
 import { CronJobs } from "./services/cronJob";
 import bussinessRoutes from "./routes/bussiness_routes";
+import libraryRoutes from "./routes/library_routes";
+
 const app: any = express();
 
 const corsOptions = {
@@ -45,6 +47,8 @@ app.use("/api/v1/invoices", invoiceRoutes);
 app.use("/api/cron", cronRoutes);
 app.use("/api/v1/businesses", bussinessRoutes);
 app.use("/api/v1/requested-items", requestedItemsRoutes);
+app.use("/api/v1/items", itemRoutes);
+app.use("/api/v1/library", libraryRoutes);
 
 // Configuring the Uploads Dir
 

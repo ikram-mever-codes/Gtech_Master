@@ -100,17 +100,17 @@ export const createUser = async (
     const loginLink = `https://master.gtech.de/login`;
 
     const message = `
-      <h2>Welcome to Our Platform</h2>
-      <p>Your admin account has been created with the following credentials:</p>
-      <p><strong>Email:</strong> ${email}</p>
-      <p><strong>Temporary Password:</strong> ${tempPassword}</p>
-      <p>Please verify your email by clicking the link below:</p>
-      <p><a href="${verificationLink}" style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">Verify Email</a></p>
-      <p>Or copy and paste this link in your browser:</p>
-      <p>${verificationLink}</p>
-      <p>After verification, you can login <a href="${loginLink}">here</a> and change your password.</p>
-      <p><strong>Note:</strong> This verification code will expire in 24 hours.</p>
-    `;
+        <h2>Welcome to Our Platform</h2>
+        <p>Your admin account has been created with the following credentials:</p>
+        <p><strong>Email:</strong> ${email}</p>
+        <p><strong>Temporary Password:</strong> ${tempPassword}</p>
+        <p>Please verify your email by clicking the link below:</p>
+        <p><a href="${verificationLink}" style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">Verify Email</a></p>
+        <p>Or copy and paste this link in your browser:</p>
+        <p>${verificationLink}</p>
+        <p>After verification, you can login <a href="${loginLink}">here</a> and change your password.</p>
+        <p><strong>Note:</strong> This verification code will expire in 24 hours.</p>
+      `;
 
     await sendEmail({
       to: email,
@@ -365,10 +365,10 @@ export const changePassword = async (
 
     // Send email notification
     const message = `
-      <h2>Password Changed</h2>
-      <p>Your password was successfully changed.</p>
-      <p>If you didn't make this change, please contact support immediately.</p>
-    `;
+        <h2>Password Changed</h2>
+        <p>Your password was successfully changed.</p>
+        <p>If you didn't make this change, please contact support immediately.</p>
+      `;
 
     await sendEmail({
       to: user.email,
@@ -567,24 +567,24 @@ export const forgetPassword = async (
     const resetLink = `${process.env.MASTER}/reset-password?token=${resetToken}`;
 
     const message = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2>Passwort zurücksetzen – GTech Star-Kundenportal</h2>
-        <p>Hallo ${user.name || "Nutzer"},</p>
-        <p>Du hast eine Anfrage gestellt, Dein Passwort für das GTech Star-Kundenportal zurückzusetzen.</p>
-        <p>Klicke einfach auf den Button, um Dein neues Passwort festzulegen:</p>
-        <p>
-          <a href="${resetLink}" style="background-color: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block; font-weight: bold;">
-            👉 Passwort jetzt zurücksetzen
-          </a>
-        </p>
-        <p>Falls Du den Link lieber kopieren möchtest, kannst Du ihn auch direkt in Deinen Browser einfügen:</p>
-        <p style="word-break: break-all; color: #007bff;">${resetLink}</p>
-        <p><strong>Aus Sicherheitsgründen ist dieser Link 30 Minuten gültig.</strong></p>
-        <p>Wenn Du kein neues Passwort angefordert hast, kannst Du diese E-Mail einfach ignorieren.</p>
-        <br>
-        <p>Viele Grüße<br>Dein GTech Team</p>
-      </div>
-    `;
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2>Passwort zurücksetzen – GTech Star-Kundenportal</h2>
+          <p>Hallo ${user.name || "Nutzer"},</p>
+          <p>Du hast eine Anfrage gestellt, Dein Passwort für das GTech Star-Kundenportal zurückzusetzen.</p>
+          <p>Klicke einfach auf den Button, um Dein neues Passwort festzulegen:</p>
+          <p>
+            <a href="${resetLink}" style="background-color: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block; font-weight: bold;">
+              👉 Passwort jetzt zurücksetzen
+            </a>
+          </p>
+          <p>Falls Du den Link lieber kopieren möchtest, kannst Du ihn auch direkt in Deinen Browser einfügen:</p>
+          <p style="word-break: break-all; color: #007bff;">${resetLink}</p>
+          <p><strong>Aus Sicherheitsgründen ist dieser Link 30 Minuten gültig.</strong></p>
+          <p>Wenn Du kein neues Passwort angefordert hast, kannst Du diese E-Mail einfach ignorieren.</p>
+          <br>
+          <p>Viele Grüße<br>Dein GTech Team</p>
+        </div>
+      `;
 
     await sendEmail({
       to: email,
@@ -646,10 +646,10 @@ export const resetPassword = async (
 
     // Send confirmation email
     const message = `
-      <h2>Password Updated</h2>
-      <p>Your password has been successfully updated.</p>
-      <p>If you didn't make this change, please contact support immediately.</p>
-    `;
+        <h2>Password Updated</h2>
+        <p>Your password has been successfully updated.</p>
+        <p>If you didn't make this change, please contact support immediately.</p>
+      `;
 
     await sendEmail({
       to: user.email,
@@ -783,15 +783,15 @@ export const createCompany = async (
 
     const loginLink = `${process.env.STAR_URL}/login`;
     const message = `
-      <h2>Welcome to Our Gtech Customers Portal</h2>
-      <p>Your company account has been created by the admin with the following credentials:</p>
-      <p><strong>Company Name:</strong> ${companyName}</p>
-      <p><strong>Email:</strong> ${email}</p>
-      <p><strong>Temporary Password:</strong> ${tempPassword}</p>
-      <p>Please login <a href="${loginLink}">here</a> and change your password.</p>
-      <p>You can now start using our platform with your company account.</p>
-      <p>A default list "${list.name}" has been created for your company.</p>
-    `;
+        <h2>Welcome to Our Gtech Customers Portal</h2>
+        <p>Your company account has been created by the admin with the following credentials:</p>
+        <p><strong>Company Name:</strong> ${companyName}</p>
+        <p><strong>Email:</strong> ${email}</p>
+        <p><strong>Temporary Password:</strong> ${tempPassword}</p>
+        <p>Please login <a href="${loginLink}">here</a> and change your password.</p>
+        <p>You can now start using our platform with your company account.</p>
+        <p>A default list "${list.name}" has been created for your company.</p>
+      `;
 
     await sendEmail({
       to: email,
@@ -1239,10 +1239,10 @@ export const deleteUser = async (
     // Send notification email (optional)
     try {
       const message = `
-        <h2>Account Deletion Notification</h2>
-        <p>Your account (${user.email}) has been deleted by an administrator.</p>
-        <p>If you believe this was a mistake, please contact support immediately.</p>
-      `;
+          <h2>Account Deletion Notification</h2>
+          <p>Your account (${user.email}) has been deleted by an administrator.</p>
+          <p>If you believe this was a mistake, please contact support immediately.</p>
+        `;
 
       await sendEmail({
         to: user.email,
@@ -1313,16 +1313,16 @@ export const resendVerificationEmail = async (
     )}&verificationCode=${emailVerificationCode}`;
 
     const message = `
-      <h2>Email Verification</h2>
-      <p>You requested a new verification email for your account.</p>
-      <p>Please verify your email by clicking the link below:</p>
-      <p><a href="${verificationLink}" style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">Verify Email</a></p>
-      <p>Or copy and paste this link in your browser:</p>
-      <p>${verificationLink}</p>
-      <p>Alternatively, you can use this verification code: <strong>${emailVerificationCode}</strong></p>
-      <p><strong>Note:</strong> This verification code will expire in 24 hours.</p>
-      <p>If you didn't request this verification, please ignore this email.</p>
-    `;
+        <h2>Email Verification</h2>
+        <p>You requested a new verification email for your account.</p>
+        <p>Please verify your email by clicking the link below:</p>
+        <p><a href="${verificationLink}" style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">Verify Email</a></p>
+        <p>Or copy and paste this link in your browser:</p>
+        <p>${verificationLink}</p>
+        <p>Alternatively, you can use this verification code: <strong>${emailVerificationCode}</strong></p>
+        <p><strong>Note:</strong> This verification code will expire in 24 hours.</p>
+        <p>If you didn't request this verification, please ignore this email.</p>
+      `;
 
     await sendEmail({
       to: email,

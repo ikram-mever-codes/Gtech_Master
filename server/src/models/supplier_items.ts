@@ -7,13 +7,14 @@ import {
   UpdateDateColumn,
   ManyToOne,
   JoinColumn,
+  PrimaryColumn,
 } from "typeorm";
 import { Item } from "./items";
 import { Supplier } from "./suppliers";
 
 @Entity()
 export class SupplierItem {
-  @PrimaryGeneratedColumn()
+  @PrimaryColumn()
   id!: number;
 
   @Column()
@@ -48,10 +49,6 @@ export class SupplierItem {
 
   @Column({ type: "varchar", length: 25, nullable: true })
   updated_by?: string;
-
-  @ManyToOne(() => Item, (item) => item.supplierItems)
-  @JoinColumn({ name: "item_id" })
-  item!: Item;
 
   @ManyToOne(() => Supplier, (supplier) => supplier.supplierItems)
   @JoinColumn({ name: "supplier_id" })

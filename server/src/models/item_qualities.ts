@@ -6,12 +6,13 @@ import {
   UpdateDateColumn,
   ManyToOne,
   JoinColumn,
+  PrimaryColumn,
 } from "typeorm";
 import { Item } from "./items";
 
 @Entity()
 export class ItemQuality {
-  @PrimaryGeneratedColumn()
+  @PrimaryColumn()
   id!: number;
 
   @Column()
@@ -35,9 +36,9 @@ export class ItemQuality {
   @Column({ type: "int", nullable: true })
   confirmed?: number;
 
-  @ManyToOne(() => Item, (item) => item.itemQualities)
-  @JoinColumn({ name: "item_id" })
-  item!: Item;
+  // @ManyToOne(() => Item, (item) => item.itemQualities)
+  // @JoinColumn({ name: "item_id" })
+  // item!: Item;
 
   @CreateDateColumn()
   created_at!: Date;

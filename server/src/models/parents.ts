@@ -1,4 +1,4 @@
-// src/entities/parents.ts
+// Updated parents.ts with proper nullable handling
 import {
   Entity,
   PrimaryGeneratedColumn,
@@ -8,6 +8,7 @@ import {
   OneToMany,
   ManyToOne,
   JoinColumn,
+  PrimaryColumn,
 } from "typeorm";
 import { Item } from "./items";
 import { Taric } from "./tarics";
@@ -15,7 +16,7 @@ import { Supplier } from "./suppliers";
 
 @Entity()
 export class Parent {
-  @PrimaryGeneratedColumn()
+  @PrimaryColumn()
   id!: number;
 
   @Column({ nullable: true })
@@ -63,22 +64,22 @@ export class Parent {
   @Column({ type: "varchar", length: 1, default: "N" })
   is_NwV!: string;
 
-  @Column({ type: "smallint", default: 3 }) // FIXED: tinyint → smallint
+  @Column({ type: "smallint", default: 3 })
   parent_rank!: number;
 
   @Column({ type: "varchar", length: 1, default: "N" })
   is_var_unilingual!: string;
 
-  @ManyToOne(() => Taric, (taric) => taric.parents)
+  @ManyToOne(() => Taric, (taric) => taric.parents, { nullable: true })
   @JoinColumn({ name: "taric_id" })
-  taric!: Taric;
+  taric: Taric | null;
 
-  @ManyToOne(() => Supplier, (supplier) => supplier.parents)
+  @ManyToOne(() => Supplier, (supplier) => supplier.parents, { nullable: true })
   @JoinColumn({ name: "supplier_id" })
-  supplier!: Supplier;
+  supplier: Supplier | null;
 
   @OneToMany(() => Item, (item) => item.parent)
-  items!: Item[];
+  items: Item[];
 
   @CreateDateColumn()
   created_at!: Date;

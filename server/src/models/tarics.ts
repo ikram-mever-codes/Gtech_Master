@@ -5,13 +5,14 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   OneToMany,
+  PrimaryColumn,
 } from "typeorm";
 import { Item } from "./items";
 import { Parent } from "./parents";
 
 @Entity()
 export class Taric {
-  @PrimaryGeneratedColumn()
+  @PrimaryColumn()
   id!: number;
 
   @Column({ type: "varchar", length: 11, nullable: true })

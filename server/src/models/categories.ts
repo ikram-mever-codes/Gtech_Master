@@ -31,9 +31,6 @@ export class Category {
   @OneToMany(() => Item, (item) => item.category)
   items!: Item[];
 
-  @OneToMany(() => WarehouseItem, (warehouseItem) => warehouseItem.category)
-  warehouseItems!: WarehouseItem[];
-
   @CreateDateColumn()
   created_at!: Date;
 
