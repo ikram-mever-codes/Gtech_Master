@@ -3,7 +3,13 @@
 import { logoutUser } from "@/api/user";
 import { RootState } from "@/app/Redux/store";
 import theme from "@/styles/theme";
-import { BusinessCenterSharp, Logout, Person } from "@mui/icons-material";
+import {
+  BusinessCenterSharp,
+  LibraryAdd,
+  Logout,
+  Person,
+  ShopSharp,
+} from "@mui/icons-material";
 import {
   Box,
   List,
@@ -67,6 +73,13 @@ const allMenuItems = [
   //   path: "/customers",
   //   resource: "Users",
   // },
+
+  {
+    icon: ShopSharp,
+    text: "Items Management",
+    path: "/items",
+    resource: "Items",
+  },
   {
     icon: Timer,
     text: "Scheduled Items",
@@ -96,6 +109,13 @@ const allMenuItems = [
     text: "Invoices",
     path: "/invoices",
     resource: "Invoices",
+  },
+
+  {
+    icon: LibraryAdd,
+    text: "Library",
+    path: "/library",
+    resource: "Library",
   },
 
   // {

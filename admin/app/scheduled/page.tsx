@@ -2125,7 +2125,6 @@ const AdminAllItemsPage = () => {
       };
 
       setAllItems((prev) => [itemWithMetadata, ...prev]);
-      toast.success("Item added successfully", successStyles);
     },
     [customers, lists]
   );

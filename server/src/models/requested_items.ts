@@ -6,9 +6,11 @@ import {
   UpdateDateColumn,
   ManyToOne,
   JoinColumn,
+  OneToMany,
 } from "typeorm";
 import { StarBusinessDetails } from "./star_business_details";
 import { ContactPerson } from "./contact_person";
+import { Inquiry } from "./inquiry";
 
 export type Interval =
   | "Monatlich"
@@ -100,6 +102,13 @@ export class RequestedItem {
 
   @Column({ type: "text", nullable: true })
   asanaLink!: string;
+
+  @ManyToOne(() => Inquiry, (inquiry) => inquiry.requests, {
+    nullable: true,
+    onDelete: "CASCADE",
+  })
+  @JoinColumn({ name: "inquiry_id" })
+  inquiry!: Inquiry;
 
   @CreateDateColumn()
   createdAt!: Date;

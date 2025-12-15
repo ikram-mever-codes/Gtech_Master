@@ -15,6 +15,7 @@ import itemRoutes from "./routes/item_routes";
 import { CronJobs } from "./services/cronJob";
 import bussinessRoutes from "./routes/bussiness_routes";
 import libraryRoutes from "./routes/library_routes";
+import inquiryRoutes from "./routes/inquiry_routes";
 
 const app: any = express();
 
@@ -49,6 +50,7 @@ app.use("/api/v1/businesses", bussinessRoutes);
 app.use("/api/v1/requested-items", requestedItemsRoutes);
 app.use("/api/v1/items", itemRoutes);
 app.use("/api/v1/library", libraryRoutes);
+app.use("/api/v1/inquiries", inquiryRoutes);
 
 // Configuring the Uploads Dir
 

@@ -23,7 +23,7 @@ export class OrderItem {
   @Column()
   ItemID_DE!: number;
 
-  @Column({ type: "int", nullable: true }) // Changed to int to reference Order.id
+  @Column({ type: "int", nullable: true })
   order_id?: number;
 
   @Column({ type: "int", nullable: true })

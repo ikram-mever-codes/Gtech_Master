@@ -3125,6 +3125,29 @@ const ListManagerPage: React.FC = () => {
       ? extractUniqueCargos(currentList.items)
       : { sortedCargos: [], cargoDataMap: new Map() };
 
+    // Extract unique unassigned statuses
+    const unassignedStatuses = new Set<string>();
+
+    currentList?.items?.forEach((item: any) => {
+      if (item.deliveries) {
+        Object.entries(item.deliveries).forEach(
+          ([period, delivery]: [string, any]) => {
+            // Check if delivery is unassigned (no cargo but has status)
+            if (
+              (!delivery.cargoNo ||
+                delivery.cargoNo === "" ||
+                delivery.isUnassigned) &&
+              delivery.status
+            ) {
+              unassignedStatuses.add(delivery.status);
+            }
+          }
+        );
+      }
+    });
+
+    const sortedUnassignedStatuses = Array.from(unassignedStatuses).sort();
+
     const baseColumns = [
       {
         key: "selection",
@@ -3708,6 +3731,207 @@ const ListManagerPage: React.FC = () => {
       };
     });
 
+    // Generate unassigned status columns
+    const unassignedColumns = sortedUnassignedStatuses.map((status) => {
+      const UnassignedStatusCell = ({ row }: any) => {
+        const [deliveryModalOpen, setDeliveryModalOpen] = useState(false);
+
+        // Find unassigned deliveries with this specific status
+        const getUnassignedDeliveries = () => {
+          if (!row.deliveries) return [];
+
+          const unassignedDeliveries: Array<{ period: string; delivery: any }> =
+            [];
+
+          Object.entries(row.deliveries).forEach(
+            ([period, delivery]: [string, any]) => {
+              // Check if delivery is unassigned and matches the status
+              if (
+                (!delivery.cargoNo ||
+                  delivery.cargoNo === "" ||
+                  delivery.isUnassigned) &&
+                delivery.status === status
+              ) {
+                unassignedDeliveries.push({ period, delivery });
+              }
+            }
+          );
+
+          return unassignedDeliveries;
+        };
+
+        const unassignedDeliveries = getUnassignedDeliveries();
+
+        if (unassignedDeliveries.length === 0) {
+          return (
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                height: "100%",
+                color: "text.disabled",
+              }}
+            >
+              <Typography variant="caption">-</Typography>
+            </Box>
+          );
+        }
+
+        // Sum quantities for all unassigned deliveries with this status
+        const totalQuantity = unassignedDeliveries.reduce(
+          (sum, { delivery }) => sum + (delivery.quantity || 0),
+          0
+        );
+
+        return (
+          <>
+            <Box
+              sx={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 0.5,
+                height: "100%",
+                cursor: "pointer",
+                p: 1,
+                borderRadius: 1,
+                backgroundColor: alpha("#FFA726", 0.05),
+                "&:hover": {
+                  backgroundColor: alpha("#FFA726", 0.1),
+                },
+              }}
+              onClick={() => setDeliveryModalOpen(true)}
+            >
+              <Typography
+                variant="body2"
+                fontWeight={600}
+                sx={{ fontSize: "14px" }}
+              >
+                {totalQuantity}
+              </Typography>
+              <Chip
+                label={status}
+                size="small"
+                color="warning"
+                sx={{
+                  fontSize: "0.65rem",
+                  height: 18,
+                  borderRadius: 1,
+                }}
+              />
+            </Box>
+
+            <Dialog
+              open={deliveryModalOpen}
+              onClose={() => setDeliveryModalOpen(false)}
+              maxWidth="md"
+              fullWidth
+            >
+              <DialogTitle>
+                <Box
+                  sx={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                  }}
+                >
+                  <Typography variant="h6">
+                    Unassigned Deliveries - {status}
+                  </Typography>
+                  <IconButton
+                    onClick={() => setDeliveryModalOpen(false)}
+                    size="small"
+                  >
+                    <X />
+                  </IconButton>
+                </Box>
+              </DialogTitle>
+              <DialogContent>
+                <Grid container spacing={3} sx={{ mt: 1 }}>
+                  <Grid item xs={12} md={6}>
+                    <Typography variant="subtitle2" gutterBottom>
+                      Article Information
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      <strong>Name:</strong> {row.articleName}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      <strong>Article Number:</strong> {row.articleNumber}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      <strong>Artikelnr:</strong> {row.item_no_de}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <Typography variant="subtitle2" gutterBottom>
+                      Unassigned Deliveries
+                    </Typography>
+                    {unassignedDeliveries.map(({ period, delivery }, index) => (
+                      <Box
+                        key={index}
+                        sx={{
+                          mb: 2,
+                          p: 1,
+                          border: "1px solid #e0e0e0",
+                          borderRadius: 1,
+                        }}
+                      >
+                        <Typography variant="body2" color="text.secondary">
+                          <strong>Period:</strong> {period}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          <strong>Quantity:</strong> {delivery.quantity || 0}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          <strong>Status:</strong> {delivery.status}
+                        </Typography>
+                        {delivery.remark && (
+                          <Typography variant="body2" color="text.secondary">
+                            <strong>Remark:</strong> {delivery.remark}
+                          </Typography>
+                        )}
+                      </Box>
+                    ))}
+                  </Grid>
+                </Grid>
+              </DialogContent>
+            </Dialog>
+          </>
+        );
+      };
+
+      return {
+        key: `unassigned_${status}`,
+        name: `Unassigned - ${status}`,
+        width: 200,
+        resizable: false,
+        renderCell: (props: any) => <UnassignedStatusCell row={props.row} />,
+        renderHeaderCell: () => (
+          <Box
+            sx={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              height: "100%",
+              padding: "8px 4px",
+              textWrap: "wrap",
+              backgroundColor: alpha("#FFA726", 0.1),
+            }}
+          >
+            <div className="flex gap-0 text-sm flex-col items-center">
+              <span className="font-medium">Unassigned</span>
+              <span className="w-max h-max p-1 px-2 text-xs bg-orange-500 text-white rounded-full">
+                {status}
+              </span>
+            </div>
+          </Box>
+        ),
+      };
+    });
+
     const endColumns: any = [
       {
         key: "comment",
@@ -3752,7 +3976,12 @@ const ListManagerPage: React.FC = () => {
       },
     ];
 
-    return [...baseColumns, ...deliveryColumns, ...endColumns];
+    return [
+      ...baseColumns,
+      ...deliveryColumns,
+      ...unassignedColumns,
+      ...endColumns,
+    ];
   }, [
     currentList?.items,
     selectedRows,

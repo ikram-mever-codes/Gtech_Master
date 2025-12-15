@@ -12,6 +12,7 @@ import { Invoice } from "./invoice";
 import { BusinessDetails } from "./business_details";
 import { StarBusinessDetails } from "./star_business_details";
 import { StarCustomerDetails } from "./star_customer_details";
+import { Inquiry } from "./inquiry";
 
 @Entity()
 export class Customer {
@@ -54,6 +55,9 @@ export class Customer {
   @OneToOne(() => StarCustomerDetails, { nullable: true, cascade: true })
   @JoinColumn()
   starCustomerDetails?: StarCustomerDetails;
+
+  @OneToMany(() => Inquiry, (inquiry) => inquiry.customer)
+  inquiries!: Inquiry;
 
   @CreateDateColumn()
   createdAt!: Date;

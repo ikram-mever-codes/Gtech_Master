@@ -205,7 +205,7 @@ class MySQLToPostgresMigrator {
       await queryRunner.query("DELETE FROM taric");
       await queryRunner.query("DELETE FROM supplier");
       await queryRunner.query("DELETE FROM category");
-      await queryRunner.query('DELETE FROM "order"'); // Note: order is a reserved word
+      await queryRunner.query('DELETE FROM "order"');
 
       if (!keepForeignKeysDisabled) {
         await queryRunner.query('SET session_replication_role = "origin"');
