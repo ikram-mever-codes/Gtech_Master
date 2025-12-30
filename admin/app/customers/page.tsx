@@ -585,13 +585,6 @@ const CustomersPage = () => {
               >
                 Customer Management
               </Typography>
-              <Typography
-                variant="body1"
-                color="text.secondary"
-                sx={{ mt: 0.5 }}
-              >
-                Manage customer accounts and registration requests
-              </Typography>
             </Box>
           </Stack>
 

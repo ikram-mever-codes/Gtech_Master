@@ -27,8 +27,10 @@ export interface Request {
     unit?: string;
     [key: string]: any;
   };
+
+  isEstimated?: boolean;
   quantity: number;
-  purchasePrice: number;
+  purchasePrice: any;
   currency: "RMB" | "HKD" | "EUR" | "USD";
   notes?: string;
   specifications?: string;
@@ -45,7 +47,19 @@ export interface Inquiry {
   id: string;
   name: string;
   description?: string;
+  weight?: number;
+  width?: number;
+  height?: number;
+  length?: number;
   image?: string;
+  isFragile?: any;
+  purchasePrice?: any;
+  isEstimated?: boolean;
+  requiresSpecialHandling?: any;
+  handlingInstructions?: any;
+  numberOfPackages?: any;
+  packageType?: any;
+  purchasePriceCurrency?: any;
   isAssembly: boolean;
   assemblyInstructions?: string;
   customer: any;
@@ -76,8 +90,21 @@ export interface CreateInquiryPayload {
   name: string;
   description?: string;
   image?: string;
+  weight?: number;
+  width?: number;
+  height?: number;
+  length?: number;
   isAssembly?: boolean;
+  isEstimated?: boolean;
   customerId: string;
+  isFragile: any;
+  requiresSpecialHandling: any;
+  handlingInstructions: any;
+  numberOfPackages: any;
+  packageType: any;
+  // Purchase price fields
+  purchasePrice: any;
+  purchasePriceCurrency: any;
   contactPersonId?: string;
   status?: Inquiry["status"];
   priority?: Inquiry["priority"];
@@ -182,7 +209,7 @@ export const getPriorityOptions = () => [
 export const getAllInquiries = async (filters?: InquirySearchFilters) => {
   try {
     const response = await api.get("/inquiries", { params: filters });
-    return response.data;
+    return response;
   } catch (error) {
     handleApiError(error, "Failed to fetch inquiries");
     throw error;
@@ -192,7 +219,7 @@ export const getAllInquiries = async (filters?: InquirySearchFilters) => {
 export const getInquiryById = async (id: string) => {
   try {
     const response = await api.get(`/inquiries/${id}`);
-    return response.data;
+    return response;
   } catch (error) {
     handleApiError(error, "Failed to fetch inquiry");
     throw error;
@@ -303,7 +330,7 @@ export const removeRequestFromInquiry = async (
 
 export const getInquiryStatistics = async () => {
   try {
-    const response = await api.get("/inquiries/statistics");
+    const response = await api.get("/inquiries/s/statistics");
     return response.data;
   } catch (error) {
     handleApiError(error, "Failed to fetch statistics");
@@ -373,6 +400,45 @@ export const updateInquiryPriority = async (
     return response.data;
   } catch (error) {
     handleApiError(error, "Failed to update priority");
+    throw error;
+  }
+};
+
+export const convertInquiryToItem = async (
+  inquiryId: string,
+  conversionData: any
+) => {
+  try {
+    toast.loading("Converting inquiry to item...", loadingStyles);
+    const response = await api.post(
+      `/inquiries/${inquiryId}/convert-to-item`,
+      conversionData
+    );
+    toast.dismiss();
+    toast.success("Inquiry converted to item successfully", successStyles);
+    return response.data;
+  } catch (error) {
+    handleApiError(error, "Failed to convert inquiry to item");
+    throw error;
+  }
+};
+
+// Convert Requested Item to Item API
+export const convertRequestToItem = async (
+  requestId: string,
+  conversionData: any
+) => {
+  try {
+    toast.loading("Converting request to item...", loadingStyles);
+    const response = await api.post(
+      `/requested-items/${requestId}/convert-to-item`,
+      conversionData
+    );
+    toast.dismiss();
+    toast.success("Request converted to item successfully", successStyles);
+    return response.data;
+  } catch (error) {
+    handleApiError(error, "Failed to convert request to item");
     throw error;
   }
 };

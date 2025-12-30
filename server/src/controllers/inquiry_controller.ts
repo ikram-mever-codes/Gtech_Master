@@ -5,6 +5,177 @@ import { Customer } from "../models/customers";
 import { ContactPerson } from "../models/contact_person";
 import { AppDataSource } from "../config/database";
 import { RequestedItem } from "../models/requested_items";
+import { Taric } from "../models/tarics";
+import { Item } from "../models/items";
+import { validate } from "class-validator";
+import { plainToInstance } from "class-transformer";
+
+// Alternative: Simplified DTOs
+
+import { IsOptional, IsString, IsNumber, IsInt, Min } from "class-validator";
+import { Type } from "class-transformer";
+
+export class BaseItemConversionDto {
+  @IsOptional()
+  @Type(() => Number)
+  taricId?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  catId?: number;
+
+  @IsOptional()
+  @IsString()
+  model?: string;
+
+  @IsOptional()
+  @IsString()
+  suppCat?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Type(() => Number)
+  weight?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Type(() => Number)
+  width?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Type(() => Number)
+  height?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Type(() => Number)
+  length?: number;
+
+  @IsOptional()
+  @IsString()
+  itemNameCN?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Type(() => Number)
+  FOQ?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Type(() => Number)
+  FSQ?: number;
+
+  @IsOptional()
+  @IsString()
+  remark?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Type(() => Number)
+  RMBPrice?: number;
+
+  @IsOptional()
+  @IsString()
+  note?: string;
+}
+
+export class ConvertInquiryToItemDto extends BaseItemConversionDto {}
+
+export class ConvertRequestToItemDto extends BaseItemConversionDto {
+  @IsOptional()
+  @IsString()
+  extraItemsDescriptions?: string;
+}
+export class ItemGenerator {
+  static async generateTaricCode(): Promise<string> {
+    const taricRepository = AppDataSource.getRepository(Taric);
+
+    const highestTaric = await taricRepository
+      .createQueryBuilder("taric")
+      .select("MAX(CAST(taric.code AS UNSIGNED))", "maxCode")
+      .where("taric.code REGEXP :regex", { regex: "^[0-9]+$" })
+      .getRawOne();
+
+    let nextCode = 1;
+    if (highestTaric?.maxCode) {
+      nextCode = parseInt(highestTaric.maxCode) + 1;
+    }
+
+    return nextCode.toString().padStart(11, "0");
+  }
+  static async generateItemId(): Promise<number> {
+    const itemRepository = AppDataSource.getRepository(Item);
+
+    const highestItem = await itemRepository
+      .createQueryBuilder("item")
+      .select("MAX(item.id)", "maxId")
+      .getRawOne();
+
+    return (highestItem?.maxId || 0) + 1;
+  }
+  static generateEAN(itemId: number): number {
+    const prefix = 789;
+    const timestamp = Date.now() % 1000000;
+    const baseNumber = parseInt(
+      `${itemId.toString().padStart(6, "0")}${timestamp
+        .toString()
+        .padStart(6, "0")}`.slice(0, 9)
+    );
+
+    const eanWithoutCheck = `${prefix}${baseNumber
+      .toString()
+      .padStart(9, "0")}`;
+    const checkDigit = this.calculateEANCheckDigit(eanWithoutCheck);
+
+    return parseInt(`${eanWithoutCheck}${checkDigit}`);
+  }
+
+  private static calculateEANCheckDigit(code: string): number {
+    let sum = 0;
+
+    for (let i = 0; i < code.length; i++) {
+      const digit = parseInt(code[i]);
+      sum += i % 2 === 0 ? digit * 1 : digit * 3;
+    }
+
+    const remainder = sum % 10;
+    return remainder === 0 ? 0 : 10 - remainder;
+  }
+
+  static async createTaricForItem(itemName: string): Promise<Taric> {
+    const taricRepository = AppDataSource.getRepository(Taric);
+
+    const highestTaricId = await taricRepository
+      .createQueryBuilder("taric")
+      .select("MAX(taric.id)", "maxId")
+      .getRawOne();
+
+    const newTaricId = (highestTaricId?.maxId || 0) + 1;
+    const taricCode = await this.generateTaricCode();
+
+    const taric = taricRepository.create({
+      id: newTaricId,
+      code: taricCode,
+      reguler_artikel: "Y",
+      duty_rate: 0,
+      name_de: itemName,
+      description_de: itemName,
+      name_en: itemName,
+      description_en: itemName,
+      name_cn: itemName,
+    });
+
+    return await taricRepository.save(taric);
+  }
+}
 
 export class InquiryController {
   private inquiryRepository: any = AppDataSource.getRepository(Inquiry);
@@ -12,8 +183,6 @@ export class InquiryController {
   private customerRepository: any = AppDataSource.getRepository(Customer);
   private contactPersonRepository: any =
     AppDataSource.getRepository(ContactPerson);
-  private deliveryAddressRepository: any =
-    AppDataSource.getRepository(DeliveryAddress);
 
   async getAllInquiries(request: Request, response: Response) {
     try {
@@ -31,8 +200,26 @@ export class InquiryController {
         .createQueryBuilder("inquiry")
         .leftJoinAndSelect("inquiry.customer", "customer")
         .leftJoinAndSelect("inquiry.contactPerson", "contactPerson")
-        .leftJoinAndSelect("inquiry.deliveryAddress", "deliveryAddress")
         .leftJoinAndSelect("inquiry.requests", "requests")
+        .leftJoinAndSelect("requests.business", "business")
+        .leftJoinAndSelect(
+          "business.customer",
+          "businessCustomer",
+          "businessCustomer.id = business.customerId"
+        )
+        .leftJoinAndSelect("requests.contactPerson", "requestContactPerson")
+        .select([
+          "inquiry",
+          "customer",
+          "contactPerson",
+          "requests",
+          "business",
+          "businessCustomer.companyName",
+          "businessCustomer.id",
+          "requestContactPerson.name",
+          "requestContactPerson.familyName",
+          "requestContactPerson.id",
+        ])
         .orderBy("inquiry.createdAt", "DESC");
 
       if (customerId) {
@@ -96,7 +283,7 @@ export class InquiryController {
 
       const inquiry = await this.inquiryRepository.findOne({
         where: { id },
-        relations: ["customer", "contactPerson", "deliveryAddress", "requests"],
+        relations: ["customer", "contactPerson", "requests"],
       });
 
       if (!inquiry) {
@@ -127,6 +314,7 @@ export class InquiryController {
         image,
         isAssembly,
         customerId,
+        isEstimated,
         contactPersonId,
         status,
         priority,
@@ -136,7 +324,20 @@ export class InquiryController {
         termsConditions,
         projectLink,
         assemblyInstructions,
-        deliveryAddress,
+        // New dimension fields
+        weight,
+        width,
+        height,
+        length,
+        // New shipping fields
+        isFragile,
+        requiresSpecialHandling,
+        handlingInstructions,
+        numberOfPackages,
+        packageType,
+        // Purchase price fields
+        purchasePrice,
+        purchasePriceCurrency,
         requests,
       } = request.body;
 
@@ -150,6 +351,7 @@ export class InquiryController {
 
       const customer = await this.customerRepository.findOne({
         where: { id: customerId },
+        relations: ["starBusinessDetails"],
       });
 
       if (!customer) {
@@ -173,15 +375,7 @@ export class InquiryController {
         }
       }
 
-      // Create delivery address if provided
-      let deliveryAddressEntity = null;
-      if (deliveryAddress) {
-        deliveryAddressEntity =
-          this.deliveryAddressRepository.create(deliveryAddress);
-        await this.deliveryAddressRepository.save(deliveryAddressEntity);
-      }
-
-      // Create inquiry
+      // Create inquiry with all fields including dimensions
       const inquiry = this.inquiryRepository.create({
         name,
         description,
@@ -197,7 +391,21 @@ export class InquiryController {
         termsConditions,
         projectLink,
         assemblyInstructions,
-        deliveryAddress: deliveryAddressEntity,
+        // Dimension fields
+        weight,
+        width,
+        height,
+        length,
+        isEstimated,
+        // Shipping fields
+        isFragile: isFragile || false,
+        requiresSpecialHandling: requiresSpecialHandling || false,
+        handlingInstructions,
+        numberOfPackages,
+        packageType,
+        // Purchase price fields
+        purchasePrice,
+        purchasePriceCurrency,
       });
 
       // Save inquiry first to get ID
@@ -206,32 +414,33 @@ export class InquiryController {
       // Create and save requests if provided
       if (requests && Array.isArray(requests) && requests.length > 0) {
         const requestEntities = requests.map((reqData: any) => {
+          // Calculate total weight if unit weight and quantity are provided
+          let totalWeight = null;
+          if (reqData.unitWeight && reqData.quantity) {
+            totalWeight =
+              parseFloat(reqData.unitWeight) * parseFloat(reqData.quantity);
+          }
+
           const requestItem = this.requestRepository.create({
             ...reqData,
+            businessId: customer.starBusinessDetails.id,
+            businessDetails: customer.starBusinessDetails,
             inquiry: savedInquiry,
+            qty: reqData.quantity,
+            // Calculate total weight for requested item
+            totalWeight: totalWeight || reqData.totalWeight,
           });
-
-          // If this is the first request and no status set, use request status for inquiry
-          if (!savedInquiry.status || savedInquiry.status === "Draft") {
-            savedInquiry.status = reqData.status || "Draft";
-          }
 
           return requestItem;
         });
 
         await this.requestRepository.save(requestEntities);
-
-        // Update inquiry status based on first request if not already set
-        if (savedInquiry.status === "Draft" && requestEntities[0]) {
-          savedInquiry.status = requestEntities[0].status || "Draft";
-          await this.inquiryRepository.save(savedInquiry);
-        }
       }
 
       // Fetch complete inquiry with relations
       const completeInquiry = await this.inquiryRepository.findOne({
         where: { id: savedInquiry.id },
-        relations: ["customer", "contactPerson", "deliveryAddress", "requests"],
+        relations: ["customer", "contactPerson", "requests"],
       });
 
       return response.status(201).json({
@@ -260,17 +469,37 @@ export class InquiryController {
         status,
         priority,
         referenceNumber,
+        isEstimated,
         requiredByDate,
         internalNotes,
         termsConditions,
         projectLink,
         assemblyInstructions,
-        deliveryAddress,
+        // New dimension fields
+        weight,
+        width,
+        height,
+        length,
+        // New shipping fields
+        isFragile,
+        requiresSpecialHandling,
+        handlingInstructions,
+        numberOfPackages,
+        packageType,
+        // Purchase price fields
+        purchasePrice,
+        purchasePriceCurrency,
+        requests,
       } = request.body;
 
       const existingInquiry = await this.inquiryRepository.findOne({
         where: { id },
-        relations: ["customer", "contactPerson", "deliveryAddress", "requests"],
+        relations: [
+          "customer",
+          "contactPerson",
+          "requests",
+          "customer.starBusinessDetails",
+        ],
       });
 
       if (!existingInquiry) {
@@ -294,21 +523,7 @@ export class InquiryController {
         }
       }
 
-      // Handle delivery address update
-      let deliveryAddressEntity = existingInquiry.deliveryAddress;
-      if (deliveryAddress) {
-        if (deliveryAddressEntity) {
-          await this.deliveryAddressRepository.update(
-            deliveryAddressEntity.id,
-            deliveryAddress
-          );
-        } else {
-          deliveryAddressEntity =
-            this.deliveryAddressRepository.create(deliveryAddress);
-          await this.deliveryAddressRepository.save(deliveryAddressEntity);
-        }
-      }
-
+      // Update data including all new fields
       const updateData: any = {
         ...(name && { name }),
         ...(description !== undefined && { description }),
@@ -322,22 +537,89 @@ export class InquiryController {
         ...(termsConditions !== undefined && { termsConditions }),
         ...(projectLink !== undefined && { projectLink }),
         ...(assemblyInstructions !== undefined && { assemblyInstructions }),
-        ...(deliveryAddressEntity && {
-          deliveryAddress: deliveryAddressEntity,
+        ...(isEstimated !== undefined && { isEstimated }),
+        // Dimension fields
+        ...(weight !== undefined && { weight }),
+        ...(width !== undefined && { width }),
+        ...(height !== undefined && { height }),
+        ...(length !== undefined && { length }),
+        // Shipping fields
+        ...(isFragile !== undefined && { isFragile }),
+        ...(requiresSpecialHandling !== undefined && {
+          requiresSpecialHandling,
         }),
+        ...(handlingInstructions !== undefined && { handlingInstructions }),
+        ...(numberOfPackages !== undefined && { numberOfPackages }),
+        ...(packageType !== undefined && { packageType }),
+        // Purchase price fields
+        ...(purchasePrice !== undefined && { purchasePrice }),
+        ...(purchasePriceCurrency !== undefined && { purchasePriceCurrency }),
       };
 
       if (contactPerson !== undefined) {
         updateData.contactPerson = contactPerson;
       }
 
-      // Apply status change logic
+      // Apply the update
+      await this.inquiryRepository.update(id, updateData);
+
+      // Handle requests update if provided
+      if (requests && Array.isArray(requests)) {
+        // First, remove existing requests
+        if (existingInquiry.requests && existingInquiry.requests.length > 0) {
+          await this.requestRepository.remove(existingInquiry.requests);
+        }
+
+        // Then create new requests with proper business details
+        if (
+          requests.length > 0 &&
+          existingInquiry.customer?.starBusinessDetails
+        ) {
+          const requestEntities = requests.map((reqData: any) => {
+            // Calculate total weight if unit weight and quantity are provided
+            let totalWeight = null;
+            if (reqData.unitWeight && reqData.quantity) {
+              totalWeight =
+                parseFloat(reqData.unitWeight) * parseFloat(reqData.quantity);
+            }
+
+            const requestItem = this.requestRepository.create({
+              ...reqData,
+              businessId: existingInquiry.customer.starBusinessDetails.id,
+              businessDetails: existingInquiry.customer.starBusinessDetails,
+              inquiry: existingInquiry,
+              qty: reqData.quantity,
+              // Calculate total weight for requested item
+              totalWeight: totalWeight || reqData.totalWeight,
+            });
+
+            return requestItem;
+          });
+
+          await this.requestRepository.save(requestEntities);
+        }
+      }
+
+      // Handle status synchronization logic
       if (status && status !== existingInquiry.status) {
+        // Get updated inquiry with requests
+        const updatedInquiry = await this.inquiryRepository.findOne({
+          where: { id },
+          relations: ["requests"],
+        });
+
         // If inquiry is NOT an assembly, update all request statuses
-        if (!existingInquiry.isAssembly && existingInquiry.requests) {
+        if (
+          updatedInquiry &&
+          !updatedInquiry.isAssembly &&
+          updatedInquiry.requests &&
+          updatedInquiry.requests.length > 0
+        ) {
           await Promise.all(
-            existingInquiry.requests.map(async (requestItem: any) => {
-              await this.requestRepository.update(requestItem.id, { status });
+            updatedInquiry.requests.map(async (requestItem: any) => {
+              await this.requestRepository.update(requestItem.id, {
+                status: status,
+              });
             })
           );
         }
@@ -345,11 +627,14 @@ export class InquiryController {
         // (they remain independent)
       }
 
-      await this.inquiryRepository.update(id, updateData);
-
       const updatedInquiry = await this.inquiryRepository.findOne({
         where: { id },
-        relations: ["customer", "contactPerson", "deliveryAddress", "requests"],
+        relations: [
+          "customer",
+          "contactPerson",
+          "requests",
+          "customer.starBusinessDetails",
+        ],
       });
 
       return response.status(200).json({
@@ -416,7 +701,6 @@ export class InquiryController {
         .createQueryBuilder("inquiry")
         .leftJoinAndSelect("inquiry.customer", "customer")
         .leftJoinAndSelect("inquiry.contactPerson", "contactPerson")
-        .leftJoinAndSelect("inquiry.deliveryAddress", "deliveryAddress")
         .leftJoinAndSelect("inquiry.requests", "requests")
         .where("inquiry.customerId = :customerId", { customerId })
         .orderBy("inquiry.createdAt", "DESC");
@@ -474,9 +758,18 @@ export class InquiryController {
         });
       }
 
+      // Calculate total weight if unit weight and quantity are provided
+      let totalWeight = null;
+      if (requestData.unitWeight && requestData.quantity) {
+        totalWeight =
+          parseFloat(requestData.unitWeight) * parseFloat(requestData.quantity);
+      }
+
       const requestItem = this.requestRepository.create({
         ...requestData,
         inquiry,
+        qty: requestData.quantity,
+        totalWeight: totalWeight || requestData.totalWeight,
       });
 
       const savedRequest = await this.requestRepository.save(requestItem);
@@ -528,6 +821,17 @@ export class InquiryController {
         });
       }
 
+      // Calculate total weight if unit weight and quantity are provided
+      if (requestData.unitWeight && requestData.quantity) {
+        requestData.totalWeight =
+          parseFloat(requestData.unitWeight) * parseFloat(requestData.quantity);
+      }
+
+      // Map quantity to qty if provided
+      if (requestData.quantity !== undefined) {
+        requestData.qty = requestData.quantity;
+      }
+
       await this.requestRepository.update(requestId, requestData);
 
       const updatedRequest = await this.requestRepository.findOne({
@@ -544,6 +848,336 @@ export class InquiryController {
       return response.status(500).json({
         success: false,
         message: "Internal server error",
+      });
+    }
+  }
+
+  async convertInquiryToItem(request: Request, response: Response) {
+    try {
+      const { inquiryId } = request.params;
+      const conversionData = plainToInstance(
+        ConvertInquiryToItemDto,
+        request.body
+      );
+
+      // Validate conversion data
+      const errors = await validate(conversionData);
+      if (errors.length > 0) {
+        return response.status(400).json({
+          success: false,
+          errors: errors.map((error: any) => ({
+            property: error.property,
+            constraints: error.constraints,
+          })),
+        });
+      }
+
+      const inquiryRepository = AppDataSource.getRepository(Inquiry);
+      const itemRepository = AppDataSource.getRepository(Item);
+      const taricRepository = AppDataSource.getRepository(Taric);
+
+      // Find the inquiry
+      const inquiry = await inquiryRepository.findOne({
+        where: { id: inquiryId },
+        relations: ["requests"],
+      });
+
+      if (!inquiry) {
+        return response.status(404).json({
+          success: false,
+          message: "Inquiry not found",
+        });
+      }
+
+      // Generate new item ID and EAN
+      const itemId = await ItemGenerator.generateItemId();
+      const ean = ItemGenerator.generateEAN(itemId);
+
+      let taric: Taric | null = null;
+
+      if (conversionData.taricId) {
+        // Try to find existing TARIC by ID
+        taric = await taricRepository.findOne({
+          where: { id: conversionData.taricId },
+        });
+
+        if (!taric) {
+          // If TARIC ID is provided but not found, create a new one with the provided ID
+          taric = taricRepository.create({
+            id: conversionData.taricId,
+            code: undefined,
+            name_de: inquiry.name,
+            name_en: inquiry.name,
+            name_cn: conversionData.itemNameCN || inquiry.description,
+            description_de: inquiry.description,
+            description_en: inquiry.description,
+            reguler_artikel: "Y",
+            duty_rate: 0,
+          });
+          await taricRepository.save(taric);
+        }
+      }
+
+      if (!taric) {
+        // Create new TARIC with auto-generated ID
+        taric = await ItemGenerator.createTaricForItem(inquiry.name);
+      }
+
+      // Prepare item data based on inquiry type
+      let itemData: any = {
+        id: itemId,
+        ean: ean,
+        taric_id: taric.id,
+        taric: taric,
+        category: null,
+        parent: null,
+        is_dimension_special: "N",
+        is_qty_dividable: "Y",
+        ISBN: 0,
+        is_npr: "N",
+        is_rmb_special: "N",
+        is_eur_special: "N",
+        is_pu_item: 0,
+        is_meter_item: 0,
+        is_new: "Y",
+        isActive: "Y",
+        cat_id: conversionData.catId || null,
+        photo: inquiry.image,
+      };
+
+      if (inquiry.isAssembly) {
+        // For assembly inquiries: Use inquiry fields directly
+        itemData = {
+          ...itemData,
+          item_name: inquiry.name,
+          item_name_cn: conversionData.itemNameCN || inquiry.description,
+          photo: inquiry.image,
+          remark: conversionData.remark || inquiry.description,
+          note: conversionData.note || inquiry.internalNotes,
+          // Use dimension fields from inquiry or conversion data
+          weight: conversionData.weight || inquiry.weight,
+          width: conversionData.width || inquiry.width,
+          height: conversionData.height || inquiry.height,
+          length: conversionData.length || inquiry.length,
+          isEstimated: inquiry.isEstimated,
+          // Parse quantity from first requested item if exists
+          FOQ:
+            conversionData.FOQ ||
+            (inquiry.requests?.[0]?.qty
+              ? parseInt(inquiry.requests[0].qty) || 0
+              : 0),
+          // Use purchase price if available
+          RMB_Price: conversionData.RMBPrice || inquiry.purchasePrice || 0,
+        };
+      } else {
+        // For non-assembly: Use inquiry fields where available, body fields for others
+        itemData = {
+          ...itemData,
+          item_name: inquiry.name,
+          item_name_cn: conversionData.itemNameCN || inquiry.description,
+          photo: inquiry.image,
+          model: conversionData.model,
+          supp_cat: conversionData.suppCat,
+          // Use dimension fields from inquiry or conversion data
+          isEstimated: inquiry.isEstimated,
+          weight: conversionData.weight || inquiry.weight,
+          width: conversionData.width || inquiry.width,
+          height: conversionData.height || inquiry.height,
+          length: conversionData.length || inquiry.length,
+          FOQ:
+            conversionData.FOQ ||
+            (inquiry.requests?.[0]?.qty
+              ? parseInt(inquiry.requests[0].qty) || 0
+              : 0),
+          FSQ: conversionData.FSQ,
+          remark: conversionData.remark || inquiry.description,
+          note: conversionData.note || inquiry.internalNotes,
+          RMB_Price: conversionData.RMBPrice || inquiry.purchasePrice || 0,
+        };
+      }
+
+      // Create and save the item
+      const item = itemRepository.create(itemData);
+      const savedItem = await itemRepository.save(item);
+
+      // Update inquiry status to "Quoted" or similar
+      inquiry.status = "Quoted";
+      await inquiryRepository.save(inquiry);
+
+      return response.status(201).json({
+        success: true,
+        message: "Item created successfully from inquiry",
+        data: {
+          item: savedItem,
+          taric: taric,
+        },
+      });
+    } catch (error) {
+      console.error("Error converting inquiry to item:", error);
+      return response.status(500).json({
+        success: false,
+        message: "Internal server error",
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  }
+
+  async convertRequestToItem(request: Request, response: Response) {
+    try {
+      const { requestId } = request.params;
+      const conversionData = plainToInstance(
+        ConvertRequestToItemDto,
+        request.body
+      );
+
+      // Validate conversion data
+      const errors = await validate(conversionData);
+      if (errors.length > 0) {
+        return response.status(400).json({
+          success: false,
+          errors: errors.map((error) => ({
+            property: error.property,
+            constraints: error.constraints,
+          })),
+        });
+      }
+
+      const requestedItemRepository =
+        AppDataSource.getRepository(RequestedItem);
+      const itemRepository = AppDataSource.getRepository(Item);
+      const taricRepository = AppDataSource.getRepository(Taric);
+      const inquiryRepository = AppDataSource.getRepository(Inquiry);
+
+      // Find the requested item
+      const requestedItem = await requestedItemRepository.findOne({
+        where: { id: requestId },
+        relations: ["inquiry", "business"],
+      });
+
+      if (!requestedItem) {
+        return response.status(404).json({
+          success: false,
+          message: "Requested item not found",
+        });
+      }
+
+      const itemId = await ItemGenerator.generateItemId();
+      const ean = ItemGenerator.generateEAN(itemId);
+
+      let taric: Taric | null = null;
+
+      if (conversionData.taricId) {
+        taric = await taricRepository.findOne({
+          where: { id: conversionData.taricId },
+        });
+
+        if (!taric) {
+          taric = taricRepository.create({
+            id: conversionData.taricId,
+            code: undefined,
+            name_de: requestedItem.itemName,
+            name_en: requestedItem.itemName,
+            name_cn: conversionData.itemNameCN || requestedItem.specification,
+            description_de: requestedItem.specification,
+            description_en: requestedItem.specification,
+            reguler_artikel: "Y",
+            duty_rate: 0,
+          });
+          await taricRepository.save(taric);
+        }
+      }
+
+      if (!taric) {
+        // Create new TARIC with auto-generated ID
+        taric = await ItemGenerator.createTaricForItem(requestedItem.itemName);
+      }
+
+      const itemData: any = {
+        id: itemId,
+        ean: ean,
+        taric_id: taric.id,
+        taric: taric,
+        category: null,
+        parent: null,
+        item_name: requestedItem.itemName,
+        item_name_cn: conversionData.itemNameCN || requestedItem.specification,
+        model: conversionData.model,
+        supp_cat: conversionData.suppCat,
+        material: requestedItem.material,
+        specification: requestedItem.specification,
+        photo: "",
+        isEstimated: requestedItem.isEstimated,
+        weight: conversionData.weight || requestedItem.weight,
+        width: conversionData.width || requestedItem.width,
+        height: conversionData.height || requestedItem.height,
+        length: conversionData.length || requestedItem.length,
+        FOQ:
+          conversionData.FOQ ||
+          (requestedItem.qty ? parseInt(requestedItem.qty) || 0 : 0),
+        FSQ:
+          conversionData.FSQ ||
+          (requestedItem.sampleQty
+            ? parseInt(requestedItem.sampleQty) || 0
+            : 0),
+        remark: conversionData.remark || requestedItem.comment,
+        note: conversionData.note || requestedItem.extraNote,
+        RMB_Price: conversionData.RMBPrice || requestedItem.purchasePrice || 0,
+        cat_id: conversionData.catId || null,
+        is_dimension_special: "N",
+        is_qty_dividable: "Y",
+        ISBN: 0,
+        is_npr: "N",
+        is_rmb_special: "N",
+        is_eur_special: "N",
+        is_pu_item: 0,
+        is_meter_item: 0,
+        is_new: "Y",
+        isActive: "Y",
+      };
+
+      const item = itemRepository.create(itemData);
+      const savedItem = await itemRepository.save(item);
+
+      requestedItem.requestStatus = "Converted to Item";
+      await requestedItemRepository.save(requestedItem);
+
+      if (requestedItem.inquiry) {
+        const inquiry = await inquiryRepository.findOne({
+          where: { id: requestedItem.inquiry.id },
+          relations: ["requests"],
+        });
+
+        if (inquiry) {
+          const allConverted = inquiry.requests.every(
+            (req) => req.requestStatus === "Converted to Item"
+          );
+
+          if (allConverted) {
+            inquiry.status = "Quoted";
+            await inquiryRepository.save(inquiry);
+          }
+        }
+      }
+
+      return response.status(201).json({
+        success: true,
+        message: "Item created successfully from requested item",
+        data: {
+          item: savedItem,
+          taric: taric,
+          originalRequest: {
+            id: requestedItem.id,
+            itemName: requestedItem.itemName,
+            status: requestedItem.requestStatus,
+          },
+        },
+      });
+    } catch (error) {
+      console.error("Error converting requested item to item:", error);
+      return response.status(500).json({
+        success: false,
+        message: "Internal server error",
+        error: error instanceof Error ? error.message : "Unknown error",
       });
     }
   }
@@ -582,6 +1216,84 @@ export class InquiryController {
       });
     } catch (error) {
       console.error("Error removing request from inquiry:", error);
+      return response.status(500).json({
+        success: false,
+        message: "Internal server error",
+      });
+    }
+  }
+
+  // New method to calculate total dimensions for an inquiry
+  async calculateInquiryDimensions(request: Request, response: Response) {
+    try {
+      const { id } = request.params;
+
+      const inquiry = await this.inquiryRepository.findOne({
+        where: { id },
+        relations: ["requests"],
+      });
+
+      if (!inquiry) {
+        return response.status(404).json({
+          success: false,
+          message: "Inquiry not found",
+        });
+      }
+
+      let totalWeight = 0;
+      let maxLength = 0;
+      let maxWidth = 0;
+      let maxHeight = 0;
+      let totalVolume = 0;
+
+      if (inquiry.requests && inquiry.requests.length > 0) {
+        inquiry.requests.forEach((req: RequestedItem) => {
+          if (req.length && req.length > maxLength) {
+            maxLength = parseFloat(req.length.toString());
+          }
+          if (req.width && req.width > maxWidth) {
+            maxWidth = parseFloat(req.width.toString());
+          }
+          if (req.height && req.height > maxHeight) {
+            maxHeight = parseFloat(req.height.toString());
+          }
+          if (req.length && req.width && req.height) {
+            const volume =
+              parseFloat(req.length.toString()) *
+              parseFloat(req.width.toString()) *
+              parseFloat(req.height.toString());
+            totalVolume += volume;
+          }
+        });
+      }
+
+      // Update inquiry with calculated dimensions
+      inquiry.weight = totalWeight > 0 ? totalWeight : inquiry.weight;
+      inquiry.length = maxLength > 0 ? maxLength : inquiry.length;
+      inquiry.width = maxWidth > 0 ? maxWidth : inquiry.width;
+      inquiry.height = maxHeight > 0 ? maxHeight : inquiry.height;
+
+      await this.inquiryRepository.save(inquiry);
+
+      return response.status(200).json({
+        success: true,
+        message: "Dimensions calculated successfully",
+        data: {
+          totalWeight,
+          maxLength,
+          maxWidth,
+          maxHeight,
+          totalVolume,
+          calculatedPackageDimensions: {
+            weight: inquiry.weight,
+            length: inquiry.length,
+            width: inquiry.width,
+            height: inquiry.height,
+          },
+        },
+      });
+    } catch (error) {
+      console.error("Error calculating inquiry dimensions:", error);
       return response.status(500).json({
         success: false,
         message: "Internal server error",

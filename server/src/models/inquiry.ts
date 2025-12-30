@@ -12,6 +12,7 @@ import {
 import { Customer } from "./customers";
 import { ContactPerson } from "./contact_person";
 import { RequestedItem } from "./requested_items";
+import { Offer } from "./offer";
 
 export type Currency = "RMB" | "HKD" | "EUR" | "USD";
 
@@ -64,15 +65,36 @@ export class Inquiry {
 
   @Column({ type: "varchar", length: 255 })
   name!: string;
+
   @Column({ type: "text", nullable: true })
-  @Column({ type: "varchar", length: 500, nullable: true })
   image?: string;
 
   @Column({ type: "boolean", default: false })
   isAssembly!: boolean;
 
+  @Column({ type: "boolean", default: false })
+  isEstimated!: boolean;
+
   @Column({ type: "text", nullable: true })
   assemblyInstructions?: string;
+
+  @Column({
+    type: "decimal",
+    precision: 12,
+    scale: 2,
+    nullable: true,
+    comment: "Purchase price for assembly inquiries only",
+  })
+  purchasePrice?: number;
+
+  @Column({
+    type: "enum",
+    enum: ["RMB", "HKD", "EUR", "USD"],
+    default: "RMB",
+    comment: "Currency for purchase price",
+    nullable: true,
+  })
+  purchasePriceCurrency?: Currency;
 
   @ManyToOne(() => Customer, (customer) => customer.inquiries, {
     nullable: false,
@@ -98,6 +120,21 @@ export class Inquiry {
     cascade: true,
   })
   requests!: RequestedItem[];
+
+  @Column({ type: "float", nullable: true })
+  weight?: number;
+
+  @Column({ type: "float", nullable: true })
+  width?: number;
+
+  @Column({ type: "float", nullable: true })
+  height?: number;
+
+  @Column({ type: "float", nullable: true })
+  length?: number;
+
+  @Column({ type: "text", nullable: true })
+  description?: string;
 
   @Column({
     type: "enum",
@@ -144,6 +181,26 @@ export class Inquiry {
 
   @Column({ type: "text", nullable: true })
   termsConditions?: string;
+
+  @Column({ default: false })
+  isFragile: boolean;
+
+  @Column({ default: false })
+  requiresSpecialHandling: boolean;
+
+  @Column({ type: "text", nullable: true })
+  handlingInstructions: string;
+
+  @Column({ type: "int", nullable: true })
+  numberOfPackages: number;
+
+  @Column({ nullable: true })
+  packageType: string;
+
+  @OneToMany(() => Offer, (offer) => offer.inquiry, {
+    cascade: false,
+  })
+  offers!: Offer[];
 
   @Column({ type: "varchar", length: 500, nullable: true })
   projectLink?: string;

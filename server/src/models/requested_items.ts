@@ -19,6 +19,7 @@ export type Interval =
   | "halbjährlich"
   | "jährlich";
 export type Priority = "High" | "Normal";
+export type Currency = "RMB" | "HKD" | "EUR" | "USD";
 
 @Entity()
 export class RequestedItem {
@@ -83,6 +84,18 @@ export class RequestedItem {
   @Column({ type: "varchar", length: 255, nullable: true, default: "Open" })
   requestStatus!: string;
 
+  @Column({ type: "float", nullable: true })
+  weight?: number;
+
+  @Column({ type: "float", nullable: true })
+  width?: number;
+
+  @Column({ type: "float", nullable: true })
+  height?: number;
+
+  @Column({ type: "float", nullable: true })
+  length?: number;
+
   @ManyToOne(
     () => ContactPerson,
     (contactPerson) => contactPerson.requestedItems,
@@ -102,6 +115,27 @@ export class RequestedItem {
 
   @Column({ type: "text", nullable: true })
   asanaLink!: string;
+
+  // Purchase price and currency fields
+  @Column({
+    type: "decimal",
+    precision: 12,
+    scale: 2,
+    nullable: true,
+    comment: "Purchase price for this requested item",
+  })
+  purchasePrice!: number;
+
+  @Column({
+    type: "enum",
+    enum: ["RMB", "HKD", "EUR", "USD"],
+    default: "RMB",
+    comment: "Currency for the purchase price",
+  })
+  currency!: Currency;
+
+  @Column({ type: "boolean", default: false })
+  isEstimated!: boolean;
 
   @ManyToOne(() => Inquiry, (inquiry) => inquiry.requests, {
     nullable: true,

@@ -1637,3 +1637,539 @@ export const deleteQualityCriterion = async (
     return next(error);
   }
 };
+
+export const getAllTarics = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const taricRepository = AppDataSource.getRepository(Taric);
+
+    // Get query parameters
+    const {
+      page = "1",
+      limit = "30",
+      search = "",
+      code = "",
+      name = "",
+      sortBy = "id",
+      sortOrder = "ASC",
+    } = req.query;
+
+    const pageNum = parseInt(page as string);
+    const limitNum = parseInt(limit as string);
+    const skip = (pageNum - 1) * limitNum;
+
+    // Build where conditions
+    const whereConditions: FindOptionsWhere<Taric> = {};
+
+    // Search across multiple fields
+    if (search) {
+      whereConditions.code = ILike(`%${search}%`);
+      whereConditions.name_de = ILike(`%${search}%`);
+      whereConditions.name_en = ILike(`%${search}%`);
+      whereConditions.name_cn = ILike(`%${search}%`);
+    }
+
+    // Filter by specific fields
+    if (code) {
+      whereConditions.code = ILike(`%${code}%`);
+    }
+
+    if (name) {
+      whereConditions.name_de = ILike(`%${name}%`);
+    }
+
+    // Get total count
+    const totalRecords = await taricRepository.count({
+      where: whereConditions,
+    });
+
+    // Get paginated tarics
+    const tarics = await taricRepository.find({
+      where: whereConditions,
+      order: {
+        [sortBy as string]: sortOrder === "DESC" ? "DESC" : "ASC",
+      },
+      skip,
+      take: limitNum,
+    });
+
+    // Format response
+    const formattedTarics = tarics.map((taric) => ({
+      id: taric.id,
+      code: taric.code,
+      name_de: taric.name_de,
+      name_en: taric.name_en,
+      name_cn: taric.name_cn,
+      description_de: taric.description_de,
+      description_en: taric.description_en,
+      reguler_artikel: taric.reguler_artikel,
+      duty_rate: taric.duty_rate,
+      item_count: taric.items?.length || 0,
+      parent_count: taric.parents?.length || 0,
+      created_at: taric.created_at,
+      updated_at: taric.updated_at,
+    }));
+
+    return res.status(200).json({
+      success: true,
+      data: formattedTarics,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        totalRecords,
+        totalPages: Math.ceil(totalRecords / limitNum),
+      },
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+// Get taric by ID with relationships
+export const getTaricById = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { id } = req.params;
+
+    if (!id) {
+      return next(new ErrorHandler("TARIC ID is required", 400));
+    }
+
+    const taricRepository = AppDataSource.getRepository(Taric);
+    const itemRepository = AppDataSource.getRepository(Item);
+    const parentRepository = AppDataSource.getRepository(Parent);
+
+    // Get taric with relations
+    const taric = await taricRepository.findOne({
+      where: { id: parseInt(id) },
+    });
+
+    if (!taric) {
+      return next(new ErrorHandler("TARIC not found", 404));
+    }
+
+    // Get related items
+    const items = await itemRepository.find({
+      where: { taric_id: parseInt(id) },
+      relations: ["parent", "category"],
+      take: 10, // Limit to 10 items for preview
+    });
+
+    // Get related parents
+    const parents = await parentRepository.find({
+      where: { taric_id: parseInt(id) },
+      take: 10, // Limit to 10 parents for preview
+    });
+
+    // Format response
+    const formattedTaric = {
+      id: taric.id,
+      code: taric.code,
+      name_de: taric.name_de,
+      name_en: taric.name_en,
+      name_cn: taric.name_cn,
+      description_de: taric.description_de,
+      description_en: taric.description_en,
+      reguler_artikel: taric.reguler_artikel,
+      duty_rate: taric.duty_rate,
+      created_at: taric.created_at,
+      updated_at: taric.updated_at,
+      items: items.map((item) => ({
+        id: item.id,
+        item_name: item.item_name,
+        item_name_cn: item.item_name_cn,
+        ean: item.ean,
+        parent: item.parent?.name_de || null,
+        category: item.category?.name || null,
+      })),
+      parents: parents.map((parent) => ({
+        id: parent.id,
+        de_no: parent.de_no,
+        name_de: parent.name_de,
+        name_en: parent.name_en,
+      })),
+      statistics: {
+        total_items: await itemRepository.count({
+          where: { taric_id: parseInt(id) },
+        }),
+        total_parents: await parentRepository.count({
+          where: { taric_id: parseInt(id) },
+        }),
+      },
+    };
+
+    return res.status(200).json({
+      success: true,
+      data: formattedTaric,
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+// Create new taric
+export const createTaric = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const taricRepository = AppDataSource.getRepository(Taric);
+
+    const {
+      code,
+      name_de,
+      name_en,
+      name_cn,
+      description_de,
+      description_en,
+      reguler_artikel = "Y",
+      duty_rate = 0,
+    } = req.body;
+
+    // Validate required fields
+    if (!code) {
+      return next(new ErrorHandler("TARIC code is required", 400));
+    }
+
+    // Check if code already exists
+    const existingTaric = await taricRepository.findOne({ where: { code } });
+    if (existingTaric) {
+      return next(new ErrorHandler("TARIC with this code already exists", 400));
+    }
+
+    // Create new taric
+    const newTaric = taricRepository.create({
+      code,
+      name_de,
+      name_en,
+      name_cn,
+      description_de,
+      description_en,
+      reguler_artikel,
+      duty_rate,
+      created_at: new Date(),
+      updated_at: new Date(),
+    });
+
+    await taricRepository.save(newTaric);
+
+    return res.status(201).json({
+      success: true,
+      message: "TARIC created successfully",
+      data: {
+        id: newTaric.id,
+        code: newTaric.code,
+        name_de: newTaric.name_de,
+        name_en: newTaric.name_en,
+        duty_rate: newTaric.duty_rate,
+      },
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+// Update taric
+export const updateTaric = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { id } = req.params;
+    const taricRepository = AppDataSource.getRepository(Taric);
+
+    if (!id) {
+      return next(new ErrorHandler("TARIC ID is required", 400));
+    }
+
+    const taric = await taricRepository.findOne({
+      where: { id: parseInt(id) },
+    });
+    if (!taric) {
+      return next(new ErrorHandler("TARIC not found", 404));
+    }
+
+    // Update fields
+    const updatableFields = [
+      "code",
+      "name_de",
+      "name_en",
+      "name_cn",
+      "description_de",
+      "description_en",
+      "reguler_artikel",
+      "duty_rate",
+    ];
+
+    updatableFields.forEach((field) => {
+      if (req.body[field] !== undefined) {
+        (taric as any)[field] = req.body[field];
+      }
+    });
+
+    taric.updated_at = new Date();
+
+    await taricRepository.save(taric);
+
+    return res.status(200).json({
+      success: true,
+      message: "TARIC updated successfully",
+      data: {
+        id: taric.id,
+        code: taric.code,
+        name_de: taric.name_de,
+        updated_at: taric.updated_at,
+      },
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+// Delete taric
+export const deleteTaric = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { id } = req.params;
+
+    if (!id) {
+      return next(new ErrorHandler("TARIC ID is required", 400));
+    }
+
+    const taricRepository = AppDataSource.getRepository(Taric);
+    const itemRepository = AppDataSource.getRepository(Item);
+    const parentRepository = AppDataSource.getRepository(Parent);
+
+    // Check if taric exists
+    const taric = await taricRepository.findOne({
+      where: { id: parseInt(id) },
+    });
+    if (!taric) {
+      return next(new ErrorHandler("TARIC not found", 404));
+    }
+
+    // Check if taric has related items
+    const relatedItems = await itemRepository.count({
+      where: { taric_id: parseInt(id) },
+    });
+
+    // Check if taric has related parents
+    const relatedParents = await parentRepository.count({
+      where: { taric_id: parseInt(id) },
+    });
+
+    if (relatedItems > 0 || relatedParents > 0) {
+      return next(
+        new ErrorHandler(
+          "Cannot delete TARIC. It has related items or parents. Please reassign them first.",
+          400
+        )
+      );
+    }
+
+    await taricRepository.delete(parseInt(id));
+
+    return res.status(200).json({
+      success: true,
+      message: "TARIC deleted successfully",
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+// Search tarics by code or name
+export const searchTarics = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { q, limit = "20" } = req.query;
+
+    if (!q) {
+      return next(new ErrorHandler("Search query is required", 400));
+    }
+
+    const taricRepository = AppDataSource.getRepository(Taric);
+    const searchTerm = `%${q}%`;
+
+    const tarics = await taricRepository
+      .createQueryBuilder("taric")
+      .where("taric.code ILIKE :search", { search: searchTerm })
+      .orWhere("taric.name_de ILIKE :search", { search: searchTerm })
+      .orWhere("taric.name_en ILIKE :search", { search: searchTerm })
+      .orWhere("taric.name_cn ILIKE :search", { search: searchTerm })
+      .orderBy("taric.code", "ASC")
+      .take(parseInt(limit as string))
+      .getMany();
+
+    const formattedTarics = tarics.map((taric) => ({
+      id: taric.id,
+      code: taric.code,
+      name_de: taric.name_de,
+      name_en: taric.name_en,
+      name_cn: taric.name_cn,
+      duty_rate: taric.duty_rate,
+    }));
+
+    return res.status(200).json({
+      success: true,
+      data: formattedTarics,
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+// Get taric statistics
+export const getTaricStatistics = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const taricRepository = AppDataSource.getRepository(Taric);
+    const itemRepository = AppDataSource.getRepository(Item);
+    const parentRepository = AppDataSource.getRepository(Parent);
+
+    // Total tarics count
+    const totalTarics = await taricRepository.count();
+
+    // Tarics with items count
+    const taricsWithItems = await itemRepository
+      .createQueryBuilder("item")
+      .select("COUNT(DISTINCT item.taric_id)", "count")
+      .where("item.taric_id IS NOT NULL")
+      .getRawOne();
+
+    // Tarics with parents count
+    const taricsWithParents = await parentRepository
+      .createQueryBuilder("parent")
+      .select("COUNT(DISTINCT parent.taric_id)", "count")
+      .where("parent.taric_id IS NOT NULL")
+      .getRawOne();
+
+    // Top tarics by item count
+    const topTaricsByItems = await taricRepository
+      .createQueryBuilder("taric")
+      .leftJoin("taric.items", "item")
+      .select("taric.id", "id")
+      .addSelect("taric.code", "code")
+      .addSelect("taric.name_de", "name_de")
+      .addSelect("COUNT(item.id)", "item_count")
+      .groupBy("taric.id")
+      .orderBy("item_count", "DESC")
+      .take(10)
+      .getRawMany();
+
+    // Top tarics by parent count
+    const topTaricsByParents = await taricRepository
+      .createQueryBuilder("taric")
+      .leftJoin("taric.parents", "parent")
+      .select("taric.id", "id")
+      .addSelect("taric.code", "code")
+      .addSelect("taric.name_de", "name_de")
+      .addSelect("COUNT(parent.id)", "parent_count")
+      .groupBy("taric.id")
+      .orderBy("parent_count", "DESC")
+      .take(10)
+      .getRawMany();
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        totalTarics,
+        taricsWithItems: parseInt(taricsWithItems.count) || 0,
+        taricsWithParents: parseInt(taricsWithParents.count) || 0,
+        taricsWithoutRelations:
+          totalTarics - (parseInt(taricsWithItems.count) || 0),
+        topTaricsByItems,
+        topTaricsByParents,
+      },
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+// Bulk create/update tarics
+export const bulkUpsertTarics = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { tarics } = req.body; // Array of taric objects
+
+    if (!tarics || !Array.isArray(tarics) || tarics.length === 0) {
+      return next(new ErrorHandler("TARICS array is required", 400));
+    }
+
+    const taricRepository = AppDataSource.getRepository(Taric);
+    const results = {
+      created: 0,
+      updated: 0,
+      failed: 0,
+      errors: [] as any[],
+    };
+
+    // Process each taric
+    for (const taricData of tarics) {
+      try {
+        if (!taricData.code) {
+          results.failed++;
+          results.errors.push({ data: taricData, error: "Code is required" });
+          continue;
+        }
+
+        // Check if taric exists by code
+        let taric: any = await taricRepository.findOne({
+          where: { code: taricData.code },
+        });
+
+        if (taric) {
+          // Update existing taric
+          Object.assign(taric, taricData);
+          taric.updated_at = new Date();
+          results.updated++;
+        } else {
+          // Create new taric
+          taric = taricRepository.create({
+            ...taricData,
+            created_at: new Date(),
+            updated_at: new Date(),
+          });
+          results.created++;
+        }
+
+        await taricRepository.save(taric);
+      } catch (error) {
+        results.failed++;
+        results.errors.push({
+          data: taricData,
+          error: error instanceof Error ? error.message : "Unknown error",
+        });
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Bulk TARIC operation completed",
+      data: results,
+    });
+  } catch (error) {
+    return next(error);
+  }
+};

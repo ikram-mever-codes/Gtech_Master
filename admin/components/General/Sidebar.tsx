@@ -24,7 +24,7 @@ import {
   Drawer,
   Button,
   Tooltip,
-  listItemSecondaryActionClasses,
+  Fade,
 } from "@mui/material";
 import {
   LucideHome,
@@ -46,11 +46,14 @@ import {
   DollarSign,
   IceCream2,
   PackageSearchIcon,
+  LucideChevronUp,
+  LucideChevronDown,
+  BoxesIcon,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useDispatch, useSelector } from "react-redux";
 
 // Define all possible menu items and their required resources
@@ -67,13 +70,6 @@ const allMenuItems = [
     path: "/users",
     resource: "Users",
   },
-  // {
-  //   icon: BookUser,
-  //   text: "Customers",
-  //   path: "/customers",
-  //   resource: "Users",
-  // },
-
   {
     icon: ShopSharp,
     text: "Items Management",
@@ -100,9 +96,15 @@ const allMenuItems = [
   },
   {
     icon: PackageSearchIcon,
-    text: "Requested Items",
-    path: "/requested-items",
-    resource: "RequestedItems",
+    text: "Inquiries & Requests",
+    path: "/inquiry",
+    resource: "inquiries",
+  },
+  {
+    icon: BoxesIcon,
+    text: "Offers",
+    path: "/offers",
+    resource: "offers",
   },
   {
     icon: DollarSign,
@@ -110,32 +112,20 @@ const allMenuItems = [
     path: "/invoices",
     resource: "Invoices",
   },
-
   {
     icon: LibraryAdd,
     text: "Library",
     path: "/library",
     resource: "Library",
   },
-
-  // {
-  //   icon: LucideMail,
-  //   text: "Messages",
-  //   path: "/messages",
-  //   resource: "Messages",
-  // },
-
-  // {
-  //   icon: LucideSettings,
-  //   text: "Settings",
-  //   path: "/settings",
-  //   resource: "Settings",
-  // },
 ];
 
 const Sidebar = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(true);
+  const [showScrollUp, setShowScrollUp] = useState(false);
+  const [showScrollDown, setShowScrollDown] = useState(false);
+  const [hasOverflow, setHasOverflow] = useState(false);
   const dispatch = useDispatch();
   const { user } = useSelector((state: RootState) => state.user);
   const isMobile = useMediaQuery((theme: Theme) =>
@@ -143,31 +133,12 @@ const Sidebar = () => {
   );
 
   const activePath = usePathname();
+  const menuContainerRef = useRef<HTMLDivElement>(null);
+  const menuContentRef = useRef<HTMLDivElement>(null);
 
   // Filter menu items based on user role and assigned resources
   const menuItems = useMemo(() => {
-    // If user is admin, show all menu items
-    // if (user?.role === "ADMIN") {
     return allMenuItems;
-    // }
-
-    // // Otherwise, filter based on assigned resources
-    // if (user?.assignedResources && user.assignedResources.length > 0) {
-    //   return allMenuItems.filter((item) =>
-    //     user.assignedResources.includes(item.resource)
-    //   );
-    // }
-
-    // // If no assigned resources but has permissions with resources
-    // if (user?.permissions && user.permissions.length > 0) {
-    //   const permissionResources = user.permissions.map((perm) => perm.resource);
-    //   return allMenuItems.filter((item) =>
-    //     permissionResources.includes(item.resource)
-    //   );
-    // }
-
-    // Fallback to just Dashboard if no permissions
-    // return   allMenuItems.filter((item) => item.resource === "Dashboard");
   }, [user]);
 
   const handleDrawerToggle = () => {
@@ -178,16 +149,56 @@ const Sidebar = () => {
     await logoutUser(dispatch);
   };
 
-  // Check if user has view access to a specific resource
-  const hasViewPermission = (resource: string) => {
-    if (user?.role === "ADMIN") return true;
+  // Check scroll position and update arrow visibility
+  const updateScrollButtons = useCallback(() => {
+    if (menuContainerRef.current && menuContentRef.current) {
+      const container = menuContainerRef.current;
+      const content = menuContentRef.current;
 
-    if (user?.permissions && user.permissions.length > 0) {
-      const permission = user.permissions.find((p) => p.resource === resource);
-      return permission ? permission.actions.includes("view") : false;
+      const canScrollUp = container.scrollTop > 0;
+      const canScrollDown =
+        container.scrollTop + container.clientHeight < content.scrollHeight - 1;
+
+      setShowScrollUp(canScrollUp);
+      setShowScrollDown(canScrollDown);
+      setHasOverflow(content.scrollHeight > container.clientHeight);
     }
+  }, []);
 
-    return user?.assignedResources?.includes(resource) || false;
+  // Handle scroll up
+  const scrollUp = () => {
+    if (menuContainerRef.current) {
+      menuContainerRef.current.scrollBy({ top: -100, behavior: "smooth" });
+    }
+  };
+
+  // Handle scroll down
+  const scrollDown = () => {
+    if (menuContainerRef.current) {
+      menuContainerRef.current.scrollBy({ top: 100, behavior: "smooth" });
+    }
+  };
+
+  // Update scroll buttons on resize and menu items change
+  useEffect(() => {
+    updateScrollButtons();
+    const handleResize = () => {
+      setTimeout(updateScrollButtons, 100); // Small delay to ensure DOM is updated
+    };
+
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [updateScrollButtons, menuItems, isCollapsed]);
+
+  // Update scroll buttons when sidebar state changes
+  useEffect(() => {
+    const timer = setTimeout(updateScrollButtons, 150);
+    return () => clearTimeout(timer);
+  }, [isCollapsed, updateScrollButtons]);
+
+  // Handle scroll events
+  const handleScroll = () => {
+    updateScrollButtons();
   };
 
   const drawerContent = (
@@ -258,87 +269,174 @@ const Sidebar = () => {
         sx={{
           width: "100%",
           height: "100%",
+          display: "flex",
+          flexDirection: "column",
+          flex: 1,
           overflow: "hidden",
-          overflowX: "hidden",
         }}
       >
         <Divider sx={{ borderColor: "divider", mb: 2 }} />
-        <Box sx={{ width: "100%", px: 1, overflow: "hidden " }}>
-          {menuItems.map((item) => (
-            <Tooltip
-              key={item.text}
-              title={isCollapsed ? item.text : ""}
-              placement="right"
-              arrow
-            >
-              <ListItem
-                component={Link}
-                href={item.path}
-                sx={{
-                  borderTopLeftRadius: "5px",
-                  borderBottomLeftRadius: "5px",
-                  mb: 0.5,
-                  mx: 1,
-                  backgroundColor:
-                    activePath === item.path || activePath.includes(item.path)
-                      ? "rgba(255, 255, 255, 0.15)"
-                      : "transparent",
-                  transition: "all 0.2s ease",
-                  "&:hover": {
-                    backgroundColor: "rgba(255, 255, 255, 0.1)",
-                    transform: "translateX(4px)",
-                  },
-                  minHeight: 48,
-                  overflow: "hidden",
-                  position: "relative",
-                  "&::after": {
-                    content: '""',
-                    position: "absolute",
-                    left: 0,
-                    top: 0,
-                    height: "100%",
-                    width:
-                      activePath === item.path || activePath.includes(item.path)
-                        ? "3px"
-                        : 0,
-                    backgroundColor: "primary.main",
-                    transition: "width 0.3s ease",
-                  },
-                }}
-              >
-                <ListItemIcon
-                  sx={{
-                    minWidth: 40,
-                    color:
-                      activePath === item.path || activePath.includes(item.path)
-                        ? "white"
-                        : "text.secondary",
-                    transition: "color 0.2s ease",
-                  }}
-                >
-                  <item.icon size={20} />
-                </ListItemIcon>
 
-                <Typography
+        {/* Scroll Up Button - Only shows when needed */}
+        <Fade in={hasOverflow && showScrollUp}>
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "center",
+              mb: 0.5,
+              position: "relative",
+              zIndex: 1,
+            }}
+          >
+            <IconButton
+              onClick={scrollUp}
+              size="small"
+              sx={{
+                backgroundColor: "rgba(255, 255, 255, 0.1)",
+                "&:hover": {
+                  backgroundColor: "rgba(255, 255, 255, 0.15)",
+                },
+                width: 24,
+                height: 24,
+              }}
+            >
+              <LucideChevronUp size={16} color={"white"} />
+            </IconButton>
+          </Box>
+        </Fade>
+
+        {/* Scrollable Menu Container */}
+        <Box
+          ref={menuContainerRef}
+          onScroll={handleScroll}
+          sx={{
+            flex: 1,
+            overflowY: "auto",
+            overflowX: "hidden",
+            // Hide scrollbar for all browsers
+            scrollbarWidth: "none", // Firefox
+            "&::-webkit-scrollbar": {
+              display: "none", // Chrome, Safari, Edge
+            },
+            // Hide scrollbar for IE/Edge
+            msOverflowStyle: "none",
+          }}
+        >
+          {/* Menu Content */}
+          <Box
+            ref={menuContentRef}
+            sx={{
+              width: "100%",
+              px: 1,
+              pb: 1, // Padding at bottom for better scroll end visibility
+            }}
+          >
+            {menuItems.map((item) => (
+              <Tooltip
+                key={item.text}
+                title={isCollapsed ? item.text : ""}
+                placement="right"
+                arrow
+              >
+                <ListItem
+                  component={Link}
+                  href={item.path}
                   sx={{
-                    fontWeight: 400,
-                    opacity: isCollapsed ? 0 : 1,
-                    transition: "opacity 0.2s ease, color 0.2s ease",
-                    whiteSpace: "nowrap",
-                    color: activePath === item.path ? "white" : "#777777",
+                    borderTopLeftRadius: "5px",
+                    borderBottomLeftRadius: "5px",
+                    mb: 0.5,
+                    mx: 1,
+                    backgroundColor:
+                      activePath === item.path || activePath.includes(item.path)
+                        ? "rgba(255, 255, 255, 0.15)"
+                        : "transparent",
+                    transition: "all 0.2s ease",
+                    "&:hover": {
+                      backgroundColor: "rgba(255, 255, 255, 0.1)",
+                      transform: "translateX(4px)",
+                    },
+                    minHeight: 48,
+                    overflow: "hidden",
+                    position: "relative",
+                    "&::after": {
+                      content: '""',
+                      position: "absolute",
+                      left: 0,
+                      top: 0,
+                      height: "100%",
+                      width:
+                        activePath === item.path ||
+                        activePath.includes(item.path)
+                          ? "3px"
+                          : 0,
+                      backgroundColor: "primary.main",
+                      transition: "width 0.3s ease",
+                    },
                   }}
                 >
-                  {item.text}
-                </Typography>
-              </ListItem>
-            </Tooltip>
-          ))}
+                  <ListItemIcon
+                    sx={{
+                      minWidth: 40,
+                      color:
+                        activePath === item.path ||
+                        activePath.includes(item.path)
+                          ? "white"
+                          : "text.secondary",
+                      transition: "color 0.2s ease",
+                    }}
+                  >
+                    <item.icon size={20} />
+                  </ListItemIcon>
+
+                  <Typography
+                    sx={{
+                      fontWeight: 400,
+                      opacity: isCollapsed ? 0 : 1,
+                      transition: "opacity 0.2s ease, color 0.2s ease",
+                      whiteSpace: "nowrap",
+                      color: activePath === item.path ? "white" : "#777777",
+                    }}
+                  >
+                    {item.text}
+                  </Typography>
+                </ListItem>
+              </Tooltip>
+            ))}
+          </Box>
         </Box>
+        {/* Scroll Down Button - Only shows when needed */}
+        <Fade in={hasOverflow && showScrollDown}>
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "center",
+              mt: 0.5,
+              position: "relative",
+              zIndex: 1,
+            }}
+          >
+            <IconButton
+              onClick={scrollDown}
+              size="small"
+              sx={{
+                backgroundColor: "rgba(255, 255, 255, 0.1)",
+                "&:hover": {
+                  backgroundColor: "rgba(255, 255, 255, 0.15)",
+                },
+                width: 24,
+                height: 24,
+              }}
+            >
+              <LucideChevronDown size={16} color={"white"} />
+            </IconButton>
+          </Box>
+        </Fade>
+
         <Divider sx={{ borderColor: "divider", my: 2 }} />
 
         {/* If admin, show a section with user role info */}
-        {user?.role && (
-          <Box sx={{ px: 3, mb: 2, opacity: isCollapsed ? 0 : 1 }}>
+        {user?.role && !isCollapsed && (
+          <Box sx={{ px: 3, mb: 2 }}>
             <Box
               sx={{
                 display: "flex",
@@ -369,6 +467,7 @@ const Sidebar = () => {
           px: 2,
           width: "100%",
           py: 2,
+          flexShrink: 0,
         }}
       >
         <Button

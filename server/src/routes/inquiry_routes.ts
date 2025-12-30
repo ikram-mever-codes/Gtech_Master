@@ -11,6 +11,15 @@ router.post("/", inquiryController.createInquiry.bind(inquiryController));
 router.put("/:id", inquiryController.updateInquiry.bind(inquiryController));
 router.delete("/:id", inquiryController.deleteInquiry.bind(inquiryController));
 
+router.post(
+  "/:id/convert-to-item",
+  inquiryController.convertInquiryToItem.bind(inquiryController)
+);
+router.post(
+  "/:id/requests/:requestId/convert-to-item",
+  inquiryController.convertRequestToItem.bind(inquiryController)
+);
+
 // Customer-specific inquiries
 router.get(
   "/customer/:customerId",

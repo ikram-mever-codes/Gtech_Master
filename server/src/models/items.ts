@@ -1,4 +1,3 @@
-// src/entities/items.ts - COMPLETE VERSION
 import {
   Entity,
   Column,

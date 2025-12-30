@@ -206,9 +206,6 @@ const UsersPage = () => {
             >
               Users Management
             </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Manage all registered users and their permissions
-            </Typography>
           </div>
 
           <div className="flex gap-4 w-full md:w-auto">

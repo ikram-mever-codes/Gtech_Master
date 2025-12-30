@@ -356,6 +356,252 @@ export const searchItems = async (query: string, limit: number = 10) => {
   }
 };
 
+export interface Taric {
+  id: number;
+  code: string;
+  name_de: string | null;
+  name_en: string | null;
+  name_cn: string | null;
+  description_de: string | null;
+  description_en: string | null;
+  reguler_artikel: string;
+  duty_rate: number | null;
+  item_count: number;
+  parent_count: number;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface TaricDetails {
+  id: number;
+  code: string;
+  name_de: string | null;
+  name_en: string | null;
+  name_cn: string | null;
+  description_de: string | null;
+  description_en: string | null;
+  reguler_artikel: string;
+  duty_rate: number | null;
+  created_at: Date;
+  updated_at: Date;
+  items: Array<{
+    id: number;
+    item_name: string;
+    item_name_cn: string | null;
+    ean: bigint | null;
+    parent: string | null;
+    category: string | null;
+  }>;
+  parents: Array<{
+    id: number;
+    de_no: string;
+    name_de: string;
+    name_en: string | null;
+  }>;
+  statistics: {
+    total_items: number;
+    total_parents: number;
+  };
+}
+
+export interface PaginatedTaricResponse {
+  success: boolean;
+  data: Taric[];
+  pagination: {
+    page: number;
+    limit: number;
+    totalRecords: number;
+    totalPages: number;
+  };
+}
+
+export interface TaricStatistics {
+  success: boolean;
+  data: {
+    totalTarics: number;
+    taricsWithItems: number;
+    taricsWithParents: number;
+    taricsWithoutRelations: number;
+    topTaricsByItems: Array<{
+      id: number;
+      code: string;
+      name_de: string;
+      item_count: number;
+    }>;
+    topTaricsByParents: Array<{
+      id: number;
+      code: string;
+      name_de: string;
+      parent_count: number;
+    }>;
+  };
+}
+
+// Get all tarics with pagination and filters
+export const getAllTarics = async (params?: {
+  page?: number;
+  limit?: number;
+  search?: string;
+  code?: string;
+  name?: string;
+  sortBy?: string;
+  sortOrder?: "ASC" | "DESC";
+}) => {
+  try {
+    const response = await api.get("/items/tarics/all", {
+      params,
+    });
+    return response;
+  } catch (error) {
+    handleApiError(error, "Failed to fetch TARICs");
+    throw error;
+  }
+};
+
+// Get taric by ID
+export const getTaricById = async (id: number) => {
+  try {
+    const response: ResponseInterface = await api.get(`/items/tarics/${id}`);
+    return response;
+  } catch (error) {
+    handleApiError(error, "Failed to fetch TARIC details");
+    throw error;
+  }
+};
+
+// Create new taric
+export const createTaric = async (taricData: {
+  code: string;
+  name_de?: string;
+  name_en?: string;
+  name_cn?: string;
+  description_de?: string;
+  description_en?: string;
+  reguler_artikel?: string;
+  duty_rate?: number;
+}) => {
+  try {
+    toast.loading("Creating TARIC...", loadingStyles);
+    const response = await api.post("/items/tarics/create", taricData);
+    toast.dismiss();
+    toast.success("TARIC created successfully", successStyles);
+    return response;
+  } catch (error) {
+    handleApiError(error, "Failed to create TARIC");
+    throw error;
+  }
+};
+
+// Update taric
+export const updateTaric = async (
+  id: number,
+  taricData: Partial<{
+    code: string;
+    name_de: string;
+    name_en: string;
+    name_cn: string;
+    description_de: string;
+    description_en: string;
+    reguler_artikel: string;
+    duty_rate: number;
+  }>
+) => {
+  try {
+    toast.loading("Updating TARIC...", loadingStyles);
+    const response = await api.put(`/items/tarics/edit/${id}`, taricData);
+    toast.dismiss();
+    toast.success("TARIC updated successfully", successStyles);
+    return response;
+  } catch (error) {
+    handleApiError(error, "Failed to update TARIC");
+    throw error;
+  }
+};
+
+// Delete taric
+export const deleteTaric = async (id: number) => {
+  try {
+    toast.loading("Deleting TARIC...", loadingStyles);
+    const response = await api.delete(`/items/tarics/delete/${id}`);
+    toast.dismiss();
+    toast.success("TARIC deleted successfully", successStyles);
+    return response;
+  } catch (error) {
+    handleApiError(error, "Failed to delete TARIC");
+    throw error;
+  }
+};
+
+// Search tarics by code or name
+export const searchTarics = async (query: string, limit: number = 20) => {
+  try {
+    const response: ResponseInterface = await api.get(
+      "/items/tarics/search/quick-search",
+      {
+        params: { q: query, limit },
+      }
+    );
+    return response;
+  } catch (error) {
+    handleApiError(error, "Failed to search TARICs");
+    throw error;
+  }
+};
+
+// Get taric statistics
+export const getTaricStatistics = async () => {
+  try {
+    const response: ResponseInterface = await api.get(
+      "/items/tarics/stats/statistics"
+    );
+    return response;
+  } catch (error) {
+    handleApiError(error, "Failed to fetch TARIC statistics");
+    throw error;
+  }
+};
+
+// Bulk create/update tarics
+export const bulkUpsertTarics = async (
+  tarics: Array<{
+    code: string;
+    name_de?: string;
+    name_en?: string;
+    name_cn?: string;
+    description_de?: string;
+    description_en?: string;
+    reguler_artikel?: string;
+    duty_rate?: number;
+  }>
+) => {
+  try {
+    toast.loading("Processing TARICs...", loadingStyles);
+    const response = await api.post("/items/tarics/bulk-upsert", { tarics });
+    toast.dismiss();
+    toast.success("TARICs processed successfully", successStyles);
+    return response;
+  } catch (error) {
+    handleApiError(error, "Failed to process TARICs");
+    throw error;
+  }
+};
+
+// Get all tarics (simple list for dropdowns)
+export const getAllTaricsSimple = async () => {
+  try {
+    const response = await api.get("/items/tarics", {
+      params: {
+        limit: 10000, // Get all tarics
+        sortBy: "code",
+        sortOrder: "ASC",
+      },
+    });
+    return response;
+  } catch (error) {
+    handleApiError(error, "Failed to fetch TARICs list");
+    throw error;
+  }
+};
 // ============================================
 // PARENT API FUNCTIONS
 // ============================================

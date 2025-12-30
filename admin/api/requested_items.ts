@@ -71,6 +71,14 @@ export interface RequestedItem {
   material?: string;
   specification?: string;
   extraItems: "YES" | "NO";
+  purchasePrice: any;
+  weight?: number;
+  length?: number;
+  currency?: any;
+
+  inquiry?: any;
+  height?: number;
+  width?: number;
   extraNote?: string;
   asanaLink?: string;
   extraItemsDescriptions?: string;
@@ -94,12 +102,19 @@ export interface RequestedItemCreatePayload {
   extraNote?: string;
   material?: string;
   asanaLink?: string;
+  weight?: number;
+  height?: number;
+  width?: number;
+  length?: number;
   specification?: string;
   extraItems?: "YES" | "NO";
   extraItemsDescriptions?: string;
   qty: string;
   interval?: Interval;
   sampleQty?: string;
+  purchasePrice: any;
+  currency: any;
+  inquiryId: any;
   expectedDelivery?: string;
   priority?: Priority;
   requestStatus?: RequestStatus;
@@ -138,6 +153,9 @@ export interface RequestedItemsSearchFilters {
   extraItems?: "YES" | "NO";
   sortBy?: string;
   sortOrder?: "ASC" | "DESC";
+  minWeight?: any;
+  maxWeight?: any;
+  hasDimensions?: any;
 }
 
 export interface RequestedItemsStatistics {

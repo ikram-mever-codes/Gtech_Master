@@ -13,6 +13,9 @@ import {
   ShoppingCartIcon,
   ClipboardDocumentListIcon,
   DocumentTextIcon,
+  PencilIcon,
+  TrashIcon,
+  EyeIcon as EyeIconOutline,
 } from "@heroicons/react/24/outline";
 import { useRouter } from "next/navigation";
 import CustomButton from "@/components/UI/CustomButton";
@@ -43,17 +46,27 @@ import {
   createQualityCriterion,
   updateQualityCriterion,
   deleteQualityCriterion,
+  getAllTarics,
+  getTaricById,
+  createTaric,
+  updateTaric,
+  deleteTaric,
+  searchTarics,
+  getTaricStatistics,
+  bulkUpsertTarics,
   Item,
   Parent,
   WarehouseItem,
   VariationValue,
   QualityCriterion,
+  Taric,
+  TaricDetails,
   PaginatedResponse,
   StatisticsResponse,
 } from "@/api/items";
 import { loadingStyles, successStyles, errorStyles } from "@/utils/constants";
 
-type TabType = "items" | "parents" | "warehouse" | "variations" | "quality";
+type TabType = "items" | "parents" | "warehouse" | "tarics";
 
 interface FilterState {
   search: string;
@@ -61,6 +74,12 @@ interface FilterState {
   category: string;
   supplier: string;
   isActive: string;
+}
+
+interface TaricFilterState {
+  search: string;
+  code: string;
+  name: string;
 }
 
 interface PaginationState {
@@ -75,10 +94,8 @@ const ItemsManagementPage: React.FC = () => {
   const [items, setItems] = useState<Item[]>([]);
   const [parents, setParents] = useState<Parent[]>([]);
   const [warehouseItems, setWarehouseItems] = useState<WarehouseItem[]>([]);
-  const [variations, setVariations] = useState<VariationValue[]>([]);
-  const [qualityCriteria, setQualityCriteria] = useState<QualityCriterion[]>(
-    []
-  );
+  const [tarics, setTarics] = useState<Taric[]>([]);
+
   const [loading, setLoading] = useState(false);
   const [pagination, setPagination] = useState<PaginationState>({
     page: 1,
@@ -88,6 +105,7 @@ const ItemsManagementPage: React.FC = () => {
   });
   const [showFilters, setShowFilters] = useState(true);
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
+  const [selectedTarics, setSelectedTarics] = useState<Set<string>>(new Set());
   const [statistics, setStatistics] = useState({
     totalItems: 0,
     activeItems: 0,
@@ -102,6 +120,29 @@ const ItemsManagementPage: React.FC = () => {
     category: "",
     supplier: "",
     isActive: "",
+  });
+
+  const [taricFilters, setTaricFilters] = useState<TaricFilterState>({
+    search: "",
+    code: "",
+    name: "",
+  });
+
+  // TARIC modal states
+  const [showTaricModal, setShowTaricModal] = useState(false);
+  const [taricModalMode, setTaricModalMode] = useState<"create" | "edit">(
+    "create"
+  );
+  const [editingTaricId, setEditingTaricId] = useState<number | null>(null);
+  const [taricFormData, setTaricFormData] = useState({
+    code: "",
+    name_de: "",
+    name_en: "",
+    name_cn: "",
+    description_de: "",
+    description_en: "",
+    reguler_artikel: "Y",
+    duty_rate: 0,
   });
 
   const router = useRouter();
@@ -144,7 +185,7 @@ const ItemsManagementPage: React.FC = () => {
         return "bg-gray-100 text-gray-700";
     }
   };
-  console.log(items);
+
   // Fetch data based on active tab
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -158,7 +199,6 @@ const ItemsManagementPage: React.FC = () => {
             isActive: filters.isActive,
             category: filters.category,
           });
-          console.log(itemsResponse);
           setItems(itemsResponse.data);
           setPagination(itemsResponse.pagination);
           break;
@@ -184,14 +224,26 @@ const ItemsManagementPage: React.FC = () => {
           setWarehouseItems(warehouseResponse.data);
           setPagination(warehouseResponse.pagination);
           break;
+
+        case "tarics":
+          const taricsResponse: any = await getAllTarics({
+            page: pagination.page,
+            limit: pagination.limit,
+            search:
+              taricFilters.search || taricFilters.code || taricFilters.name,
+            code: taricFilters.code,
+            name: taricFilters.name,
+          });
+          setTarics(taricsResponse.data);
+          setPagination(taricsResponse.pagination);
+          break;
       }
     } catch (error) {
-      toast.error("Failed to fetch data", errorStyles);
       console.error("Error fetching data:", error);
     } finally {
       setLoading(false);
     }
-  }, [activeTab, pagination.page, pagination.limit, filters]);
+  }, [activeTab, pagination.page, pagination.limit, filters, taricFilters]);
 
   const fetchStatistics = useCallback(async () => {
     try {
@@ -223,11 +275,8 @@ const ItemsManagementPage: React.FC = () => {
 
     try {
       await deleteItem(itemId);
-      toast.success("Item deleted successfully", successStyles);
       fetchData(); // Refresh the list
-    } catch (error) {
-      toast.error("Failed to delete item", errorStyles);
-    }
+    } catch (error) {}
   };
 
   const handleToggleStatus = async (itemId: number, currentStatus: string) => {
@@ -239,9 +288,7 @@ const ItemsManagementPage: React.FC = () => {
         successStyles
       );
       fetchData(); // Refresh the list
-    } catch (error) {
-      toast.error("Failed to update status", errorStyles);
-    }
+    } catch (error) {}
   };
 
   const handleCreateItem = () => {
@@ -252,7 +299,111 @@ const ItemsManagementPage: React.FC = () => {
     router.push("/parents/new");
   };
 
-  // Handle bulk actions
+  // TARIC Management Functions
+  const handleCreateTaric = () => {
+    setTaricModalMode("create");
+    setTaricFormData({
+      code: "",
+      name_de: "",
+      name_en: "",
+      name_cn: "",
+      description_de: "",
+      description_en: "",
+      reguler_artikel: "Y",
+      duty_rate: 0,
+    });
+    setShowTaricModal(true);
+  };
+
+  const handleEditTaric = async (taric: Taric) => {
+    try {
+      setLoading(true);
+      const response: any = await getTaricById(taric.id);
+      setTaricFormData({
+        code: response.data.code || "",
+        name_de: response.data.name_de || "",
+        name_en: response.data.name_en || "",
+        name_cn: response.data.name_cn || "",
+        description_de: response.data.description_de || "",
+        description_en: response.data.description_en || "",
+        reguler_artikel: response.data.reguler_artikel || "Y",
+        duty_rate: response.data.duty_rate || 0,
+      });
+      setTaricModalMode("edit");
+      setEditingTaricId(taric.id);
+      setShowTaricModal(true);
+    } catch (error) {
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleViewTaric = (taricId: number) => {
+    // You can create a detail page or show in a modal
+    router.push(`/tarics/${taricId}`);
+  };
+
+  const handleDeleteTaric = async (taricId: number) => {
+    if (
+      !confirm(
+        "Are you sure you want to delete this TARIC? This action cannot be undone."
+      )
+    )
+      return;
+
+    try {
+      await deleteTaric(taricId);
+      fetchData(); // Refresh the list
+    } catch (error) {
+      toast.error("Failed to delete TARIC", errorStyles);
+    }
+  };
+
+  const handleSubmitTaric = async () => {
+    if (!taricFormData.code) {
+      toast.error("TARIC code is required", errorStyles);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      if (taricModalMode === "create") {
+        await createTaric(taricFormData);
+      } else if (taricModalMode === "edit" && editingTaricId) {
+        await updateTaric(editingTaricId, taricFormData);
+      }
+      setShowTaricModal(false);
+      fetchData(); // Refresh the list
+    } catch (error: any) {
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle bulk actions for TARICs
+  const handleBulkDeleteTarics = async () => {
+    if (selectedTarics.size === 0) {
+      toast.error("No TARICs selected", errorStyles);
+      return;
+    }
+
+    if (
+      !confirm(`Are you sure you want to delete ${selectedTarics.size} TARICs?`)
+    ) {
+      return;
+    }
+
+    try {
+      const ids = Array.from(selectedTarics).map((id) => parseInt(id));
+      for (const id of ids) {
+        await deleteTaric(id);
+      }
+      setSelectedTarics(new Set());
+      fetchData();
+    } catch (error) {}
+  };
+
+  // Handle bulk actions for items
   const handleBulkDelete = async () => {
     if (selectedItems.size === 0) {
       toast.error("No items selected", errorStyles);
@@ -322,23 +473,45 @@ const ItemsManagementPage: React.FC = () => {
   // Selection handlers
   const handleSelectAll = () => {
     const currentData = getCurrentData();
-    if (selectedItems.size === currentData.length) {
-      setSelectedItems(new Set());
+    const currentSelection =
+      activeTab === "tarics" ? selectedTarics : selectedItems;
+
+    if (currentSelection.size === currentData.length) {
+      if (activeTab === "tarics") {
+        setSelectedTarics(new Set());
+      } else {
+        setSelectedItems(new Set());
+      }
     } else {
-      setSelectedItems(
-        new Set(currentData.map((item: any) => item.id.toString()))
+      const newSelection = new Set(
+        currentData.map((item: any) => item.id.toString())
       );
+      if (activeTab === "tarics") {
+        setSelectedTarics(newSelection);
+      } else {
+        setSelectedItems(newSelection);
+      }
     }
   };
 
   const handleSelectItem = (id: string) => {
-    const newSelection = new Set(selectedItems);
-    if (newSelection.has(id)) {
-      newSelection.delete(id);
+    if (activeTab === "tarics") {
+      const newSelection = new Set(selectedTarics);
+      if (newSelection.has(id)) {
+        newSelection.delete(id);
+      } else {
+        newSelection.add(id);
+      }
+      setSelectedTarics(newSelection);
     } else {
-      newSelection.add(id);
+      const newSelection = new Set(selectedItems);
+      if (newSelection.has(id)) {
+        newSelection.delete(id);
+      } else {
+        newSelection.add(id);
+      }
+      setSelectedItems(newSelection);
     }
-    setSelectedItems(newSelection);
   };
 
   const getCurrentData = () => {
@@ -349,6 +522,8 @@ const ItemsManagementPage: React.FC = () => {
         return parents;
       case "warehouse":
         return warehouseItems;
+      case "tarics":
+        return tarics;
       default:
         return [];
     }
@@ -357,16 +532,59 @@ const ItemsManagementPage: React.FC = () => {
   const getFilteredData = () => {
     const data = getCurrentData();
     return data.filter((item) => {
-      const matchesSearch =
-        !filters.search ||
-        Object.values(item).some((value: any) =>
-          value?.toString().toLowerCase().includes(filters.search.toLowerCase())
-        );
+      // For TARICs, use different filtering
+      if (activeTab === "tarics") {
+        const taricItem = item as any;
+        const matchesSearch =
+          !taricFilters.search ||
+          taricItem.code
+            ?.toLowerCase()
+            .includes(taricFilters.search.toLowerCase()) ||
+          taricItem.name_de
+            ?.toLowerCase()
+            .includes(taricFilters.search.toLowerCase()) ||
+          taricItem.name_en
+            ?.toLowerCase()
+            .includes(taricFilters.search.toLowerCase()) ||
+          taricItem.name_cn
+            ?.toLowerCase()
+            .includes(taricFilters.search.toLowerCase());
 
-      const matchesActive =
-        !filters.isActive || item.is_active === filters.isActive;
+        const matchesCode =
+          !taricFilters.code ||
+          taricItem.code
+            ?.toLowerCase()
+            .includes(taricFilters.code.toLowerCase());
 
-      return matchesSearch && matchesActive;
+        const matchesName =
+          !taricFilters.name ||
+          taricItem.name_de
+            ?.toLowerCase()
+            .includes(taricFilters.name.toLowerCase()) ||
+          taricItem.name_en
+            ?.toLowerCase()
+            .includes(taricFilters.name.toLowerCase()) ||
+          taricItem.name_cn
+            ?.toLowerCase()
+            .includes(taricFilters.name.toLowerCase());
+
+        return matchesSearch && matchesCode && matchesName;
+      } else {
+        // For other tabs
+        const matchesSearch =
+          !filters.search ||
+          Object.values(item).some((value: any) =>
+            value
+              ?.toString()
+              .toLowerCase()
+              .includes(filters.search.toLowerCase())
+          );
+
+        const matchesActive =
+          !filters.isActive || (item as any).is_active === filters.isActive;
+
+        return matchesSearch && matchesActive;
+      }
     });
   };
 
@@ -378,7 +596,7 @@ const ItemsManagementPage: React.FC = () => {
       case "items":
         return (
           <>
-            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+            <th className="px-4 py-3 text-left text-xs text-nowrap font-semibold text-gray-600 uppercase tracking-wider">
               DE Number
             </th>
             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
@@ -395,9 +613,6 @@ const ItemsManagementPage: React.FC = () => {
             </th>
             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
               Created
-            </th>
-            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-              Actions
             </th>
           </>
         );
@@ -459,6 +674,36 @@ const ItemsManagementPage: React.FC = () => {
           </>
         );
 
+      case "tarics":
+        return (
+          <>
+            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+              TARIC Code
+            </th>
+            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+              German Name
+            </th>
+            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+              English Name
+            </th>
+            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+              Chinese Name
+            </th>
+            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+              Duty Rate
+            </th>
+            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+              Item Count
+            </th>
+            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+              Created
+            </th>
+            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+              Actions
+            </th>
+          </>
+        );
+
       default:
         return null;
     }
@@ -470,12 +715,21 @@ const ItemsManagementPage: React.FC = () => {
     switch (activeTab) {
       case "items":
         return data.map((item: any) => (
-          <tr key={item.id} className="hover:bg-gray-50 transition-colors">
+          <tr
+            key={item.id}
+            onClick={() => {
+              router.push(`/items/${item.id}`);
+            }}
+            className="hover:bg-gray-50 cursor-pointer transition-colors"
+          >
             <td className="p-4">
               <input
                 type="checkbox"
                 checked={selectedItems.has(item.id.toString())}
-                onChange={() => handleSelectItem(item.id.toString())}
+                onChange={(e) => {
+                  e.stopPropagation();
+                  handleSelectItem(item.id.toString());
+                }}
                 className="w-4 h-4 text-primary focus:ring-primary border-gray-300 rounded"
               />
             </td>
@@ -507,40 +761,8 @@ const ItemsManagementPage: React.FC = () => {
               </span>
             </td>
             <td className="px-4 py-3">
-              <div className="text-sm text-gray-600">
+              <div className="text-sm text-gray-600 text-nowrap">
                 {formatDate(item.created_at)}
-              </div>
-            </td>
-            <td className="px-4 py-3">
-              <div className="flex gap-2">
-                <button
-                  onClick={() => handleViewItem(item.id)}
-                  className="text-blue-600 hover:text-blue-900"
-                >
-                  <EyeIcon className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => handleEditItem(item.id)}
-                  className="text-green-600 hover:text-green-900"
-                >
-                  <EditIcon className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => handleDeleteItem(item.id)}
-                  className="text-red-600 hover:text-red-900"
-                >
-                  <Delete className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => handleToggleStatus(item.id, item.is_active)}
-                  className={`${
-                    item.is_active === "Y"
-                      ? "text-red-600 hover:text-red-900"
-                      : "text-green-600 hover:text-green-900"
-                  }`}
-                >
-                  {item.is_active === "Y" ? "Deactivate" : "Activate"}
-                </button>
               </div>
             </td>
           </tr>
@@ -594,20 +816,29 @@ const ItemsManagementPage: React.FC = () => {
             <td className="px-4 py-3">
               <div className="flex gap-2">
                 <button
-                  onClick={() => router.push(`/parents/${parent.id}`)}
-                  className="text-blue-600 hover:text-blue-900"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    router.push(`/parents/${parent.id}`);
+                  }}
+                  className="text-blue-600 hover:text-blue-900 p-1"
                 >
                   <EyeIcon className="w-4 h-4" />
                 </button>
                 <button
-                  onClick={() => router.push(`/parents/${parent.id}/edit`)}
-                  className="text-green-600 hover:text-green-900"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    router.push(`/parents/${parent.id}/edit`);
+                  }}
+                  className="text-green-600 hover:text-green-900 p-1"
                 >
                   <EditIcon className="w-4 h-4" />
                 </button>
                 <button
-                  onClick={() => handleDeleteItem(parent.id)}
-                  className="text-red-600 hover:text-red-900"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDeleteItem(parent.id);
+                  }}
+                  className="text-red-600 hover:text-red-900 p-1"
                 >
                   <Delete className="w-4 h-4" />
                 </button>
@@ -667,27 +898,112 @@ const ItemsManagementPage: React.FC = () => {
             <td className="px-4 py-3">
               <div className="flex gap-2">
                 <button
-                  onClick={() =>
+                  onClick={(e) => {
+                    e.stopPropagation();
                     updateWarehouseStock(warehouse.id, {
                       stock_qty: warehouse.stock_qty + 1,
-                    })
-                  }
+                    });
+                  }}
                   className="text-green-600 hover:text-green-900"
                 >
                   + Stock
                 </button>
                 <button
-                  onClick={() =>
+                  onClick={(e) => {
+                    e.stopPropagation();
                     updateWarehouseStock(warehouse.id, {
                       is_stock_item:
                         warehouse.is_stock_item === "Y" ? "N" : "Y",
-                    })
-                  }
+                    });
+                  }}
                   className="text-blue-600 hover:text-blue-900"
                 >
                   {warehouse.is_stock_item === "Y"
                     ? "Remove Stock"
                     : "Add Stock"}
+                </button>
+              </div>
+            </td>
+          </tr>
+        ));
+
+      case "tarics":
+        return data.map((taric: any) => (
+          <tr key={taric.id} className="hover:bg-gray-50 transition-colors">
+            <td className="p-4">
+              <input
+                type="checkbox"
+                checked={selectedTarics.has(taric.id.toString())}
+                onChange={() => handleSelectItem(taric.id.toString())}
+                className="w-4 h-4 text-primary focus:ring-primary border-gray-300 rounded"
+              />
+            </td>
+            <td className="px-4 py-3">
+              <div className="font-medium text-gray-900">
+                {taric.code || "-"}
+              </div>
+            </td>
+            <td className="px-4 py-3">
+              <div className="text-sm text-gray-900">
+                {taric.name_de || "-"}
+              </div>
+            </td>
+            <td className="px-4 py-3">
+              <div className="text-sm text-gray-900">
+                {taric.name_en || "-"}
+              </div>
+            </td>
+            <td className="px-4 py-3">
+              <div className="text-sm text-gray-900">
+                {taric.name_cn || "-"}
+              </div>
+            </td>
+            <td className="px-4 py-3">
+              <div className="text-sm text-gray-900">
+                {taric.duty_rate ? `${taric.duty_rate}%` : "-"}
+              </div>
+            </td>
+            <td className="px-4 py-3">
+              <div className="text-sm text-gray-900">
+                {taric.item_count || 0}
+              </div>
+            </td>
+            <td className="px-4 py-3">
+              <div className="text-sm text-gray-600">
+                {formatDate(taric.created_at)}
+              </div>
+            </td>
+            <td className="px-4 py-3">
+              <div className="flex gap-2">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleViewTaric(taric.id);
+                  }}
+                  className="text-blue-600 hover:text-blue-900 p-1"
+                  title="View Details"
+                >
+                  <EyeIconOutline className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleEditTaric(taric);
+                  }}
+                  className="text-green-600 hover:text-green-900 p-1"
+                  title="Edit"
+                >
+                  <PencilIcon className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDeleteTaric(taric.id);
+                  }}
+                  className="text-red-600 hover:text-red-900 p-1"
+                  title="Delete"
+                >
+                  <TrashIcon className="w-4 h-4" />
                 </button>
               </div>
             </td>
@@ -715,6 +1031,18 @@ const ItemsManagementPage: React.FC = () => {
     });
   };
 
+  const resetTaricFilters = () => {
+    setTaricFilters({
+      search: "",
+      code: "",
+      name: "",
+    });
+  };
+
+  const getSelectedCount = () => {
+    return activeTab === "tarics" ? selectedTarics.size : selectedItems.size;
+  };
+
   return (
     <div className="w-full max-w-[85vw] mx-auto">
       <div
@@ -731,44 +1059,54 @@ const ItemsManagementPage: React.FC = () => {
               <Package className="w-8 h-8 text-primary" />
               Items Management
             </h1>
-            <p className="mt-2 text-text-secondary">
-              {/* {statistics.totalItems.toLocaleString()} */}
-              Manage items across all categories
-            </p>
-            <div className="flex gap-4 mt-2">
-              <span className="text-sm text-green-600">
-                {statistics.activeItems} Active
-              </span>
-              <span className="text-sm text-red-600">
-                {statistics.inactiveItems} Inactive
-              </span>
-              <span className="text-sm text-blue-600">
-                {statistics.itemsWithStock} With Stock
-              </span>
-            </div>
+
+            {activeTab === "items" && (
+              <div className="flex gap-4 mt-2">
+                <span className="text-sm text-green-600">
+                  {statistics.activeItems} Active
+                </span>
+                <span className="text-sm text-red-600">
+                  {statistics.inactiveItems} Inactive
+                </span>
+                <span className="text-sm text-blue-600">
+                  {statistics.itemsWithStock} With Stock
+                </span>
+              </div>
+            )}
           </div>
 
           <div className="flex gap-3">
-            {selectedItems.size > 0 && (
+            {getSelectedCount() > 0 && (
               <>
-                <button
-                  onClick={handleBulkActivate}
-                  className="px-4 py-2.5 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-all flex items-center gap-2"
-                >
-                  Activate Selected
-                </button>
-                <button
-                  onClick={handleBulkDeactivate}
-                  className="px-4 py-2.5 bg-yellow-600 text-white rounded-lg font-medium hover:bg-yellow-700 transition-all flex items-center gap-2"
-                >
-                  Deactivate Selected
-                </button>
-                <button
-                  onClick={handleBulkDelete}
-                  className="px-4 py-2.5 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-all flex items-center gap-2"
-                >
-                  Delete Selected
-                </button>
+                {activeTab === "tarics" ? (
+                  <button
+                    onClick={handleBulkDeleteTarics}
+                    className="px-4 py-2.5 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-all flex items-center gap-2"
+                  >
+                    Delete Selected ({selectedTarics.size})
+                  </button>
+                ) : (
+                  <>
+                    <button
+                      onClick={handleBulkActivate}
+                      className="px-4 py-2.5 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-all flex items-center gap-2"
+                    >
+                      Activate Selected
+                    </button>
+                    <button
+                      onClick={handleBulkDeactivate}
+                      className="px-4 py-2.5 bg-yellow-600 text-white rounded-lg font-medium hover:bg-yellow-700 transition-all flex items-center gap-2"
+                    >
+                      Deactivate Selected
+                    </button>
+                    <button
+                      onClick={handleBulkDelete}
+                      className="px-4 py-2.5 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-all flex items-center gap-2"
+                    >
+                      Delete Selected
+                    </button>
+                  </>
+                )}
               </>
             )}
 
@@ -811,6 +1149,16 @@ const ItemsManagementPage: React.FC = () => {
                 New Parent
               </button>
             )}
+
+            {activeTab === "tarics" && (
+              <button
+                onClick={handleCreateTaric}
+                className="px-4 py-2.5 bg-primary text-white rounded-lg font-medium hover:bg-primary-dark transition-all flex items-center gap-2"
+              >
+                <PlusIcon className="w-5 h-5" />
+                New TARIC
+              </button>
+            )}
           </div>
         </div>
 
@@ -822,16 +1170,7 @@ const ItemsManagementPage: React.FC = () => {
                 { key: "items", label: "Items", icon: CubeIcon },
                 { key: "parents", label: "Parents", icon: BuildingOfficeIcon },
                 { key: "warehouse", label: "Warehouse", icon: ArchiveBoxIcon },
-                {
-                  key: "variations",
-                  label: "Variations",
-                  icon: ShoppingCartIcon,
-                },
-                {
-                  key: "quality",
-                  label: "Quality",
-                  icon: ClipboardDocumentListIcon,
-                },
+                { key: "tarics", label: "TARICs", icon: DocumentTextIcon },
               ].map((tab) => (
                 <button
                   key={tab.key}
@@ -850,76 +1189,144 @@ const ItemsManagementPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Filters */}
+        {/* Filters - Different for TARICs */}
         {showFilters && (
           <div className="mb-6 bg-gray-50 p-4 rounded-lg">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Status
-                </label>
-                <select
-                  value={filters.isActive}
-                  onChange={(e) =>
-                    setFilters({ ...filters, isActive: e.target.value })
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                >
-                  <option value="">All Status</option>
-                  <option value="Y">Active</option>
-                  <option value="N">Inactive</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Category
-                </label>
-                <select
-                  value={filters.category}
-                  onChange={(e) =>
-                    setFilters({ ...filters, category: e.target.value })
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                >
-                  <option value="">All Categories</option>
-                  {/* Categories will be loaded dynamically */}
-                </select>
-              </div>
-              <div className="md:col-span-2">
-                <button
-                  onClick={resetFilters}
-                  className="px-4 py-2 text-sm bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
-                >
-                  Reset Filters
-                </button>
-              </div>
+              {activeTab === "tarics" ? (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Search
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Search code or name..."
+                      value={taricFilters.search}
+                      onChange={(e) =>
+                        setTaricFilters({
+                          ...taricFilters,
+                          search: e.target.value,
+                        })
+                      }
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Code
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="TARIC code..."
+                      value={taricFilters.code}
+                      onChange={(e) =>
+                        setTaricFilters({
+                          ...taricFilters,
+                          code: e.target.value,
+                        })
+                      }
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Name
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Name in any language..."
+                      value={taricFilters.name}
+                      onChange={(e) =>
+                        setTaricFilters({
+                          ...taricFilters,
+                          name: e.target.value,
+                        })
+                      }
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                    />
+                  </div>
+                  <div className="flex items-end">
+                    <button
+                      onClick={resetTaricFilters}
+                      className="px-4 py-2 text-sm bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+                    >
+                      Reset Filters
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Status
+                    </label>
+                    <select
+                      value={filters.isActive}
+                      onChange={(e) =>
+                        setFilters({ ...filters, isActive: e.target.value })
+                      }
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                    >
+                      <option value="">All Status</option>
+                      <option value="Y">Active</option>
+                      <option value="N">Inactive</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Category
+                    </label>
+                    <select
+                      value={filters.category}
+                      onChange={(e) =>
+                        setFilters({ ...filters, category: e.target.value })
+                      }
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                    >
+                      <option value="">All Categories</option>
+                      {/* Categories will be loaded dynamically */}
+                    </select>
+                  </div>
+                  <div className="md:col-span-2 flex items-end">
+                    <button
+                      onClick={resetFilters}
+                      className="px-4 py-2 text-sm bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+                    >
+                      Reset Filters
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         )}
 
         {/* Search Bar */}
-        <div className="mb-6">
-          <div className="relative">
-            <MagnifyingGlassIcon className="w-6 h-6 absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" />
-            <input
-              type="text"
-              placeholder={`Search ${activeTab}...`}
-              value={filters.search}
-              onChange={(e) =>
-                setFilters({ ...filters, search: e.target.value })
-              }
-              className="w-full pl-12 pr-4 py-3.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary transition-all text-gray-700 placeholder-gray-400"
-            />
-            {filters.search && (
-              <button
-                onClick={() => setFilters({ ...filters, search: "" })}
-                className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-              >
-                <XMarkIcon className="w-5 h-5" />
-              </button>
-            )}
+        {activeTab !== "tarics" && (
+          <div className="mb-6">
+            <div className="relative">
+              <MagnifyingGlassIcon className="w-6 h-6 absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                placeholder={`Search ${activeTab}...`}
+                value={filters.search}
+                onChange={(e) =>
+                  setFilters({ ...filters, search: e.target.value })
+                }
+                className="w-full pl-12 pr-4 py-3.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary transition-all text-gray-700 placeholder-gray-400"
+              />
+              {filters.search && (
+                <button
+                  onClick={() => setFilters({ ...filters, search: "" })}
+                  className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  <XMarkIcon className="w-5 h-5" />
+                </button>
+              )}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Data Table */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
@@ -940,7 +1347,9 @@ const ItemsManagementPage: React.FC = () => {
                         <input
                           type="checkbox"
                           checked={
-                            selectedItems.size === filteredData.length &&
+                            (activeTab === "tarics"
+                              ? selectedTarics.size === filteredData.length
+                              : selectedItems.size === filteredData.length) &&
                             filteredData.length > 0
                           }
                           onChange={handleSelectAll}
@@ -983,9 +1392,9 @@ const ItemsManagementPage: React.FC = () => {
                     )}{" "}
                     of {pagination.totalRecords} {activeTab}
                   </p>
-                  {selectedItems.size > 0 && (
+                  {getSelectedCount() > 0 && (
                     <span className="text-sm font-medium text-primary">
-                      {selectedItems.size} selected
+                      {getSelectedCount()} selected
                     </span>
                   )}
                 </div>
@@ -1014,6 +1423,193 @@ const ItemsManagementPage: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* TARIC Modal */}
+      {showTaricModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex  items-center justify-center p-4 z-50">
+          <div className="bg-white/95 backdrop-blur-md rounded-2xl h-full shadow-xl max-w-md w-full">
+            <div className="p-6 max-h-[80vh] overflow-y-auto">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-bold text-gray-900">
+                  {taricModalMode === "edit"
+                    ? "Edit TARIC"
+                    : "Create New TARIC"}
+                </h2>
+                <button
+                  onClick={() => setShowTaricModal(false)}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <XMarkIcon className="h-5 w-5" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    TARIC Code *
+                  </label>
+                  <input
+                    type="text"
+                    value={taricFormData.code}
+                    onChange={(e) =>
+                      setTaricFormData({
+                        ...taricFormData,
+                        code: e.target.value,
+                      })
+                    }
+                    className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all"
+                    placeholder="Enter TARIC code"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    German Name
+                  </label>
+                  <input
+                    type="text"
+                    value={taricFormData.name_de}
+                    onChange={(e) =>
+                      setTaricFormData({
+                        ...taricFormData,
+                        name_de: e.target.value,
+                      })
+                    }
+                    className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all"
+                    placeholder="Enter German name"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    English Name
+                  </label>
+                  <input
+                    type="text"
+                    value={taricFormData.name_en}
+                    onChange={(e) =>
+                      setTaricFormData({
+                        ...taricFormData,
+                        name_en: e.target.value,
+                      })
+                    }
+                    className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all"
+                    placeholder="Enter English name"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Chinese Name
+                  </label>
+                  <input
+                    type="text"
+                    value={taricFormData.name_cn}
+                    onChange={(e) =>
+                      setTaricFormData({
+                        ...taricFormData,
+                        name_cn: e.target.value,
+                      })
+                    }
+                    className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all"
+                    placeholder="Enter Chinese name"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Duty Rate (%)
+                  </label>
+                  <input
+                    type="number"
+                    value={taricFormData.duty_rate}
+                    onChange={(e) =>
+                      setTaricFormData({
+                        ...taricFormData,
+                        duty_rate: parseFloat(e.target.value) || 0,
+                      })
+                    }
+                    className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all"
+                    placeholder="Enter duty rate"
+                    step="0.01"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Regular Artikel
+                  </label>
+                  <select
+                    value={taricFormData.reguler_artikel}
+                    onChange={(e) =>
+                      setTaricFormData({
+                        ...taricFormData,
+                        reguler_artikel: e.target.value,
+                      })
+                    }
+                    className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all"
+                  >
+                    <option value="Y">Yes</option>
+                    <option value="N">No</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    German Description
+                  </label>
+                  <textarea
+                    value={taricFormData.description_de}
+                    onChange={(e) =>
+                      setTaricFormData({
+                        ...taricFormData,
+                        description_de: e.target.value,
+                      })
+                    }
+                    rows={2}
+                    className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all"
+                    placeholder="Enter German description"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    English Description
+                  </label>
+                  <textarea
+                    value={taricFormData.description_en}
+                    onChange={(e) =>
+                      setTaricFormData({
+                        ...taricFormData,
+                        description_en: e.target.value,
+                      })
+                    }
+                    rows={2}
+                    className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all"
+                    placeholder="Enter English description"
+                  />
+                </div>
+
+                <div className="flex gap-2 pt-4">
+                  <button
+                    onClick={() => setShowTaricModal(false)}
+                    className="flex-1 px-4 py-2 text-sm text-gray-700 bg-white/80 backdrop-blur-sm border border-gray-300/80 rounded-lg hover:bg-white/60 transition-all"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleSubmitTaric}
+                    disabled={!taricFormData.code}
+                    className="flex-1 px-4 py-2 text-sm bg-primary text-white rounded-lg hover:bg-primary-dark transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {taricModalMode === "edit" ? "Update" : "Create"} TARIC
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

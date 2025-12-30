@@ -24,6 +24,14 @@ import {
   createQualityCriterion,
   updateQualityCriterion,
   deleteQualityCriterion,
+  getAllTarics,
+  getTaricById,
+  createTaric,
+  updateTaric,
+  deleteTaric,
+  searchTarics,
+  getTaricStatistics,
+  bulkUpsertTarics,
 } from "../controllers/items_controller";
 import { authenticateUser } from "../middlewares/authorized";
 
@@ -118,7 +126,30 @@ router.post("/:itemId/quality", createQualityCriterion);
 // Update quality criterion
 router.put("/quality/:id", updateQualityCriterion);
 
-// Delete quality criterion
+// Delete quality criterions
 router.delete("/quality/:id", deleteQualityCriterion);
+
+router.get("/tarics/all", getAllTarics);
+
+// Get taric by ID with relationships
+router.get("/tarics/:id", getTaricById);
+
+// Create new taric
+router.post("/tarics/create", createTaric);
+
+// Update taric
+router.put("/tarics/edit/:id", updateTaric);
+
+// Delete taric
+router.delete("/tarics/delete/:id", deleteTaric);
+
+// Search tarics by code or name
+router.get("/tarics/search/quick-search", searchTarics);
+
+// Get taric statistics
+router.get("/tarics/stats/statistics", getTaricStatistics);
+
+// Bulk create/update tarics
+router.post("/tarics/bulk-upsert", bulkUpsertTarics);
 
 export default router;

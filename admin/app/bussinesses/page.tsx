@@ -392,9 +392,6 @@ const BusinessSearchPage: React.FC = () => {
               <BuildingOfficeIcon className="w-8 h-8 text-primary" />
               Business Directory
             </h1>
-            <p className="mt-2 text-text-secondary">
-              Search and manage {totalRecords.toLocaleString()} businesses
-            </p>
           </div>
 
           <div className="flex gap-3">
