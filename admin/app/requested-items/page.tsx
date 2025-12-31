@@ -139,7 +139,7 @@ const RequestedItemsPage: React.FC = () => {
   });
 
   // Create/Edit form state
-  const [formData, setFormData] = useState<RequestedItemCreatePayload>({
+  const [formData, setFormData] = useState<any>({
     businessId: "",
     contactPersonId: "",
     itemName: "",
