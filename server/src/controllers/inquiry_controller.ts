@@ -1035,7 +1035,7 @@ export class InquiryController {
       if (errors.length > 0) {
         return response.status(400).json({
           success: false,
-          errors: errors.map((error) => ({
+          errors: errors.map((error: any) => ({
             property: error.property,
             constraints: error.constraints,
           })),
