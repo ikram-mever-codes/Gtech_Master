@@ -1114,7 +1114,7 @@ const ItemsManagementPage: React.FC = () => {
               onClick={() => setShowFilters(!showFilters)}
               className={`px-4 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2 ${
                 showFilters
-                  ? "bg-primary text-white"
+                  ? "bg-[#8CC21B] text-white"
                   : "bg-gray-100 text-gray-700 hover:bg-gray-200"
               }`}
             >
@@ -1133,27 +1133,27 @@ const ItemsManagementPage: React.FC = () => {
             {activeTab === "items" && (
               <button
                 onClick={handleCreateItem}
-                className="px-4 py-2.5 bg-primary text-white rounded-lg font-medium hover:bg-primary-dark transition-all flex items-center gap-2"
+                className="px-4 py-2.5 bg-[#8CC21B] text-white rounded-lg font-medium hover:bg-[#8CC21B] transition-all flex items-center gap-2"
               >
                 <PlusIcon className="w-5 h-5" />
                 New Item
               </button>
             )}
 
-            {activeTab === "parents" && (
+            {/* {activeTab === "parents" && (
               <button
                 onClick={handleCreateParent}
-                className="px-4 py-2.5 bg-primary text-white rounded-lg font-medium hover:bg-primary-dark transition-all flex items-center gap-2"
+                className="px-4 py-2.5 bg-[#8CC21B] text-white rounded-lg font-medium hover:bg-[#8CC21B] transition-all flex items-center gap-2"
               >
                 <PlusIcon className="w-5 h-5" />
                 New Parent
               </button>
-            )}
+            )} */}
 
             {activeTab === "tarics" && (
               <button
                 onClick={handleCreateTaric}
-                className="px-4 py-2.5 bg-primary text-white rounded-lg font-medium hover:bg-primary-dark transition-all flex items-center gap-2"
+                className="px-4 py-2.5 bg-[#8CC21B] text-white rounded-lg font-medium hover:bg-[#8CC21B] transition-all flex items-center gap-2"
               >
                 <PlusIcon className="w-5 h-5" />
                 New TARIC
@@ -1600,7 +1600,7 @@ const ItemsManagementPage: React.FC = () => {
                   <button
                     onClick={handleSubmitTaric}
                     disabled={!taricFormData.code}
-                    className="flex-1 px-4 py-2 text-sm bg-primary text-white rounded-lg hover:bg-primary-dark transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex-1 px-4 py-2 text-sm bg-[#8CC21B] text-white rounded-lg hover:bg-[#8CC21B] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {taricModalMode === "edit" ? "Update" : "Create"} TARIC
                   </button>

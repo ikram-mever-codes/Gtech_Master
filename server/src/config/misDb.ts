@@ -24,6 +24,6 @@ const dbConfig: DatabaseConfig = {
   queueLimit: 0,
 };
 
-const pool = mysql.createPool(dbConfig);
+export const pool = mysql.createPool(dbConfig);
 
 export const getConnection = () => pool.getConnection();

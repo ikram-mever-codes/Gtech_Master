@@ -20,6 +20,7 @@ import {
   ILike,
 } from "typeorm";
 import ErrorHandler from "../utils/errorHandler";
+import { pool } from "../config/misDb";
 
 export const getItems = async (
   req: Request,
@@ -1812,13 +1813,89 @@ export const getTaricById = async (
     return next(error);
   }
 };
+// MIS database connection helper functions
+const syncTaricToMIS = async (
+  taricData: any,
+  operation: "create" | "update" | "delete"
+) => {
+  let connection;
+  try {
+    connection = await pool.getConnection();
 
-// Create new taric
+    // Helper function to convert undefined to null
+    const convertUndefinedToNull = (value: any) => {
+      return value === undefined ? null : value;
+    };
+
+    if (operation === "create") {
+      const query = `
+        INSERT INTO tarics   
+        (code, reguler_artikel, duty_rate, name_de, description_de, name_en, description_en, name_cn, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `;
+
+      await connection.execute(query, [
+        convertUndefinedToNull(taricData.code),
+        convertUndefinedToNull(taricData.reguler_artikel) || "Y",
+        convertUndefinedToNull(taricData.duty_rate) || 0,
+        convertUndefinedToNull(taricData.name_de),
+        convertUndefinedToNull(taricData.description_de),
+        convertUndefinedToNull(taricData.name_en),
+        convertUndefinedToNull(taricData.description_en),
+        convertUndefinedToNull(taricData.name_cn),
+        convertUndefinedToNull(taricData.created_at) || new Date(),
+        convertUndefinedToNull(taricData.updated_at) || new Date(),
+      ]);
+    } else if (operation === "update") {
+      const query = `
+        UPDATE taric SET
+          code = ?,
+          reguler_artikel = ?,
+          duty_rate = ?,
+          name_de = ?,
+          description_de = ?,
+          name_en = ?,
+          description_en = ?,
+          name_cn = ?,
+          updated_at = ?
+        WHERE code = ?
+      `;
+
+      await connection.execute(query, [
+        convertUndefinedToNull(taricData.code),
+        convertUndefinedToNull(taricData.reguler_artikel) || "Y",
+        convertUndefinedToNull(taricData.duty_rate) || 0,
+        convertUndefinedToNull(taricData.name_de),
+        convertUndefinedToNull(taricData.description_de),
+        convertUndefinedToNull(taricData.name_en),
+        convertUndefinedToNull(taricData.description_en),
+        convertUndefinedToNull(taricData.name_cn),
+        convertUndefinedToNull(taricData.updated_at) || new Date(),
+        convertUndefinedToNull(taricData.originalCode) ||
+          convertUndefinedToNull(taricData.code),
+      ]);
+    } else if (operation === "delete") {
+      const query = `DELETE FROM tarics WHERE code = ?`;
+      await connection.execute(query, [convertUndefinedToNull(taricData.code)]);
+    }
+  } catch (error: any) {
+    console.error("Error syncing to MIS database:", error);
+    throw new Error(`Failed to sync TARIC to MIS: ${error.message}`);
+  } finally {
+    if (connection) {
+      connection.release();
+    }
+  }
+};
+
+// Create TARIC with MIS sync
+// Create TARIC with MIS sync and ID generation
 export const createTaric = async (
   req: Request,
   res: Response,
   next: NextFunction
 ) => {
+  let connection;
   try {
     const taricRepository = AppDataSource.getRepository(Taric);
 
@@ -1844,8 +1921,17 @@ export const createTaric = async (
       return next(new ErrorHandler("TARIC with this code already exists", 400));
     }
 
-    // Create new taric
+    // Find the highest ID to generate the next ID
+    const maxIdResult = await taricRepository
+      .createQueryBuilder("taric")
+      .select("MAX(taric.id)", "max")
+      .getRawOne();
+
+    const nextId = (maxIdResult?.max || 0) + 1;
+
+    // Create new taric in local database
     const newTaric = taricRepository.create({
+      id: nextId, // Set the generated ID
       code,
       name_de,
       name_en,
@@ -1860,9 +1946,38 @@ export const createTaric = async (
 
     await taricRepository.save(newTaric);
 
+    // Sync to MIS database (MIS has AUTO_INCREMENT for id, so we don't need to pass id)
+    try {
+      await syncTaricToMIS(
+        {
+          id: nextId,
+          code,
+          name_de,
+          name_en,
+          name_cn,
+          description_de,
+          description_en,
+          reguler_artikel,
+          duty_rate,
+          created_at: newTaric.created_at,
+          updated_at: newTaric.updated_at,
+        },
+        "create"
+      );
+    } catch (misError: any) {
+      // Rollback local creation if MIS sync fails
+      await taricRepository.delete(newTaric.id);
+      return next(
+        new ErrorHandler(
+          `TARIC created locally but failed to sync to MIS: ${misError.message}`,
+          500
+        )
+      );
+    }
+
     return res.status(201).json({
       success: true,
-      message: "TARIC created successfully",
+      message: "TARIC created successfully and synced to MIS",
       data: {
         id: newTaric.id,
         code: newTaric.code,
@@ -1876,12 +1991,13 @@ export const createTaric = async (
   }
 };
 
-// Update taric
+// Update TARIC with MIS sync
 export const updateTaric = async (
   req: Request,
   res: Response,
   next: NextFunction
 ) => {
+  let connection;
   try {
     const { id } = req.params;
     const taricRepository = AppDataSource.getRepository(Taric);
@@ -1896,6 +2012,9 @@ export const updateTaric = async (
     if (!taric) {
       return next(new ErrorHandler("TARIC not found", 404));
     }
+
+    // Store original code for MIS update
+    const originalCode = taric.code;
 
     // Update fields
     const updatableFields = [
@@ -1919,9 +2038,38 @@ export const updateTaric = async (
 
     await taricRepository.save(taric);
 
+    // Sync to MIS database
+    try {
+      await syncTaricToMIS(
+        {
+          ...taric,
+          originalCode, // Pass original code for the WHERE clause
+        },
+        "update"
+      );
+    } catch (misError: any) {
+      // Rollback local update if MIS sync fails
+      await taricRepository.save({
+        ...taric,
+        code: originalCode,
+        ...Object.fromEntries(
+          Object.entries(req.body).map(([key, value]) => [
+            key,
+            (taric as any)[key],
+          ])
+        ),
+      });
+      return next(
+        new ErrorHandler(
+          `TARIC updated locally but failed to sync to MIS: ${misError.message}`,
+          500
+        )
+      );
+    }
+
     return res.status(200).json({
       success: true,
-      message: "TARIC updated successfully",
+      message: "TARIC updated successfully and synced to MIS",
       data: {
         id: taric.id,
         code: taric.code,
@@ -1934,12 +2082,14 @@ export const updateTaric = async (
   }
 };
 
-// Delete taric
+// Delete TARIC with MIS sync
+// Delete TARIC with MIS sync
 export const deleteTaric = async (
   req: Request,
   res: Response,
   next: NextFunction
 ) => {
+  let connection;
   try {
     const { id } = req.params;
 
@@ -1978,11 +2128,34 @@ export const deleteTaric = async (
       );
     }
 
+    // Store code for MIS deletion - ensure it's not undefined
+    const taricCode = taric.code || null;
+    if (!taricCode) {
+      return next(
+        new ErrorHandler("Cannot delete TARIC: code is missing", 400)
+      );
+    }
+
+    // Delete from local database first
     await taricRepository.delete(parseInt(id));
+
+    // Sync to MIS database
+    try {
+      await syncTaricToMIS({ code: taricCode }, "delete");
+    } catch (misError: any) {
+      // If MIS deletion fails, restore local record
+      await taricRepository.save(taric);
+      return next(
+        new ErrorHandler(
+          `TARIC deleted locally but failed to sync to MIS: ${misError.message}`,
+          500
+        )
+      );
+    }
 
     return res.status(200).json({
       success: true,
-      message: "TARIC deleted successfully",
+      message: "TARIC deleted successfully and synced from MIS",
     });
   } catch (error) {
     return next(error);

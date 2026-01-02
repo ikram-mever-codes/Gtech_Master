@@ -4,6 +4,7 @@ import {
   Offer,
   CustomerSnapshot,
   QuantityPrice,
+  UnitPrice,
   OfferLineItem,
 } from "../models/offer";
 import { Inquiry } from "../models/inquiry";
@@ -38,6 +39,8 @@ const getValidator = (): ValidatorModule => {
       IsString: () => () => {},
       Max: () => () => {},
       Min: () => () => {},
+      IsBoolean: () => () => {},
+      IsArray: () => () => {},
       validate: async () => [],
     };
   }
@@ -77,6 +80,8 @@ const {
   IsString,
   Max,
   Min,
+  IsBoolean,
+  IsArray,
   validate,
 } = getValidator();
 
@@ -86,6 +91,7 @@ const { createCanvas } = getCanvas();
 import PDFDocument from "pdfkit";
 import fs from "fs";
 import path from "path";
+import { v4 as uuidv4 } from "uuid";
 
 export class CreateOfferDto {
   @IsOptional()
@@ -263,25 +269,115 @@ export class UpdateOfferDto {
   totalAmount?: number;
 }
 
+export class UnitPriceDto {
+  @IsOptional()
+  @IsString()
+  id?: string;
+
+  @IsString()
+  quantity!: string;
+
+  @IsNumber()
+  @Min(0)
+  unitPrice!: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  totalPrice?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
+}
+
 export class UpdateLineItemDto {
+  @IsOptional()
+  @IsString()
   itemName?: string;
+
+  @IsOptional()
+  @IsString()
   material?: string;
+
+  @IsOptional()
+  @IsString()
   specification?: string;
+
+  @IsOptional()
+  @IsString()
   description?: string;
+
+  @IsOptional()
+  @IsArray()
   quantityPrices?: QuantityPrice[];
+
+  @IsOptional()
+  @IsArray()
+  unitPrices?: UnitPriceDto[];
+
+  @IsOptional()
+  @IsBoolean()
+  useUnitPrices?: boolean;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(2)
+  @Max(4)
+  unitPriceDecimalPlaces?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(2)
+  @Max(4)
+  totalPriceDecimalPlaces?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(10)
+  maxUnitPriceColumns?: number;
+
+  @IsOptional()
+  @IsString()
   baseQuantity?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
   basePrice?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
   samplePrice?: number;
+
+  @IsOptional()
+  @IsString()
   sampleQuantity?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
   lineTotal?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
   position?: number;
+
+  @IsOptional()
+  @IsString()
   notes?: string;
 }
 
 export class BulkUpdateLineItemsDto {
+  @IsArray()
   lineItems!: Array<{
     id: string;
     quantityPrices?: QuantityPrice[];
+    unitPrices?: UnitPriceDto[];
+    useUnitPrices?: boolean;
     basePrice?: number;
     samplePrice?: number;
     lineTotal?: number;
@@ -290,6 +386,7 @@ export class BulkUpdateLineItemsDto {
 }
 
 export class CopyPastePricesDto {
+  @IsString()
   data!: string;
 }
 
@@ -477,11 +574,17 @@ export class OfferController {
           isAssemblyItem: true,
           isEstimated: inquiry.isEstimated,
           notes: savedOffer.assemblyNotes,
+          // Unit prices configuration
+          useUnitPrices: false, // Default to false for assembly items
+          unitPriceDecimalPlaces: 3,
+          totalPriceDecimalPlaces: 2,
+          maxUnitPriceColumns: 0,
           // Copy purchase price from inquiry if available
           purchasePrice: inquiry.purchasePrice,
           purchaseCurrency: inquiry.purchasePriceCurrency,
-          // Set initial quantity prices (empty, will be filled later)
+          // Set initial prices (empty, will be filled later)
           quantityPrices: [],
+          unitPrices: [],
           lineTotal: 0,
         });
         lineItems.push(assemblyLineItem);
@@ -514,7 +617,14 @@ export class OfferController {
               isEstimated: request.isEstimated,
               parentItemId: savedAssemblyItem.id,
               notes: request.comment,
-              quantityPrices: [], // Components don't have customer-facing prices
+              // Unit prices configuration
+              useUnitPrices: false,
+              unitPriceDecimalPlaces: 3,
+              totalPriceDecimalPlaces: 2,
+              maxUnitPriceColumns: 0,
+              // Components don't have customer-facing prices
+              quantityPrices: [],
+              unitPrices: [],
               lineTotal: 0,
             });
             lineItems.push(componentItem);
@@ -542,7 +652,14 @@ export class OfferController {
               position: position++,
               isEstimated: request.isEstimated,
               notes: request.comment,
-              quantityPrices: [], // Empty initially, will be set by user
+              // Unit prices configuration
+              useUnitPrices: false, // Default to false, can be enabled later
+              unitPriceDecimalPlaces: 3,
+              totalPriceDecimalPlaces: 2,
+              maxUnitPriceColumns: 3, // Default to 3 columns
+              // Set initial prices (empty, will be filled later)
+              quantityPrices: [],
+              unitPrices: [],
               lineTotal: 0,
             });
             lineItems.push(lineItem);
@@ -590,29 +707,42 @@ export class OfferController {
 
       // Calculate subtotal from line items
       for (const item of lineItems) {
-        if (item.lineTotal && !isNaN(item.lineTotal)) {
-          subtotal += parseFloat(item.lineTotal.toString());
-        } else if (item.basePrice && item.baseQuantity) {
-          // Calculate from base price if no line total
-          const quantity = parseFloat(item.baseQuantity) || 1;
-          const price = parseFloat(item.basePrice.toString()) || 0;
-          const lineTotal = quantity * price;
-          item.lineTotal = lineTotal;
-          subtotal += lineTotal;
-          // Save updated line total
-          await this.lineItemRepository.save(item);
+        let lineTotal = 0;
+
+        if (
+          item.useUnitPrices &&
+          item.unitPrices &&
+          item.unitPrices.length > 0
+        ) {
+          // Calculate from active unit price
+          const activeUnitPrice = item.unitPrices.find(
+            (up: UnitPrice) => up.isActive
+          );
+          if (activeUnitPrice) {
+            lineTotal = activeUnitPrice.totalPrice || 0;
+          }
         } else if (item.quantityPrices && item.quantityPrices.length > 0) {
-          // Calculate from active quantity price
+          // Calculate from active quantity price (legacy)
           const activePrice = item.quantityPrices.find(
-            (qp: any) => qp.isActive
+            (qp: QuantityPrice) => qp.isActive
           );
           if (activePrice) {
-            item.lineTotal = activePrice.total || 0;
-            subtotal += item.lineTotal;
-            // Save updated line total
-            await this.lineItemRepository.save(item);
+            lineTotal = activePrice.total || 0;
           }
+        } else if (item.basePrice && item.baseQuantity) {
+          // Calculate from base price if no unit prices
+          const quantity = parseFloat(item.baseQuantity) || 1;
+          const price = parseFloat(item.basePrice.toString()) || 0;
+          lineTotal = quantity * price;
         }
+
+        // Update line total if calculated
+        if (lineTotal > 0 && item.lineTotal !== lineTotal) {
+          item.lineTotal = lineTotal;
+          await this.lineItemRepository.save(item);
+        }
+
+        subtotal += lineTotal;
       }
 
       // Get offer to update
@@ -649,6 +779,26 @@ export class OfferController {
     } catch (error) {
       console.error("Error calculating offer totals:", error);
     }
+  }
+
+  // Helper function to process unit prices
+  private processUnitPrices(unitPricesDto: UnitPriceDto[]): UnitPrice[] {
+    const now = new Date();
+    return unitPricesDto.map((upDto: UnitPriceDto) => {
+      const quantity = parseFloat(upDto.quantity) || 0;
+      const unitPrice = parseFloat(upDto.unitPrice.toString()) || 0;
+      const totalPrice = upDto.totalPrice || quantity * unitPrice;
+
+      return {
+        id: upDto.id || uuidv4(),
+        quantity: upDto.quantity,
+        unitPrice,
+        totalPrice,
+        isActive: upDto.isActive || false,
+        createdAt: now,
+        updatedAt: now,
+      };
+    });
   }
 
   async getAllOffers(request: Request, response: Response) {
@@ -761,11 +911,27 @@ export class OfferController {
 
       // Calculate which price is active for each line item
       if (offer.lineItems) {
-        offer.lineItems = offer.lineItems.map((item: any) => ({
-          ...item,
-          activePrice:
-            item.quantityPrices?.find((qp: any) => qp.isActive) || null,
-        }));
+        offer.lineItems = offer.lineItems.map((item: any) => {
+          let activePrice = null;
+
+          if (
+            item.useUnitPrices &&
+            item.unitPrices &&
+            item.unitPrices.length > 0
+          ) {
+            activePrice =
+              item.unitPrices.find((up: UnitPrice) => up.isActive) || null;
+          } else if (item.quantityPrices && item.quantityPrices.length > 0) {
+            activePrice =
+              item.quantityPrices.find((qp: QuantityPrice) => qp.isActive) ||
+              null;
+          }
+
+          return {
+            ...item,
+            activePrice,
+          };
+        });
       }
 
       return response.status(200).json({
@@ -893,8 +1059,34 @@ export class OfferController {
         });
       }
 
-      // If quantityPrices are being updated, ensure only one is active
-      if (updateLineItemDto.quantityPrices) {
+      // Process unit prices if provided
+      if (updateLineItemDto.unitPrices && updateLineItemDto.useUnitPrices) {
+        const processedUnitPrices = this.processUnitPrices(
+          updateLineItemDto.unitPrices
+        );
+
+        // Ensure only one is active
+        const activeCount = processedUnitPrices.filter(
+          (up) => up.isActive
+        ).length;
+        if (activeCount > 1) {
+          // Keep only the first one active
+          processedUnitPrices.forEach((up, index) => {
+            up.isActive = index === 0;
+          });
+        } else if (activeCount === 0 && processedUnitPrices.length > 0) {
+          // Set first one as active if none are active
+          processedUnitPrices[0].isActive = true;
+        }
+
+        updateLineItemDto.unitPrices = processedUnitPrices;
+      }
+
+      // If quantityPrices are being updated (legacy), ensure only one is active
+      if (
+        updateLineItemDto.quantityPrices &&
+        !updateLineItemDto.useUnitPrices
+      ) {
         updateLineItemDto.quantityPrices = updateLineItemDto.quantityPrices.map(
           (qp: any) => ({
             ...qp,
@@ -913,14 +1105,34 @@ export class OfferController {
               ...qp,
               isActive: index === 0,
             }));
+        } else if (
+          activeCount === 0 &&
+          updateLineItemDto.quantityPrices.length > 0
+        ) {
+          // Set first one as active if none are active
+          updateLineItemDto.quantityPrices[0].isActive = true;
         }
       }
 
       // Update line item fields
       Object.assign(lineItem, updateLineItemDto);
 
-      // Calculate line total if quantity prices or base price changes
-      if (updateLineItemDto.quantityPrices) {
+      // Calculate line total
+      if (
+        updateLineItemDto.useUnitPrices &&
+        updateLineItemDto.unitPrices &&
+        updateLineItemDto.unitPrices.length > 0
+      ) {
+        const activeUnitPrice = updateLineItemDto.unitPrices.find(
+          (up: UnitPrice) => up.isActive
+        );
+        if (activeUnitPrice) {
+          lineItem.lineTotal = activeUnitPrice.totalPrice;
+        }
+      } else if (
+        updateLineItemDto.quantityPrices &&
+        updateLineItemDto.quantityPrices.length > 0
+      ) {
         const activePrice = updateLineItemDto.quantityPrices.find(
           (qp: any) => qp.isActive
         );
@@ -960,7 +1172,101 @@ export class OfferController {
     }
   }
 
-  // Add quantity-price to line item
+  // Add unit price to line item
+  async addUnitPrice(request: Request, response: Response) {
+    try {
+      const { lineItemId } = request.params;
+      const { quantity, unitPrice, isActive = false } = request.body;
+
+      if (!quantity || !unitPrice) {
+        return response.status(400).json({
+          success: false,
+          message: "Quantity and unit price are required",
+        });
+      }
+
+      const lineItem = await this.lineItemRepository.findOne({
+        where: { id: lineItemId },
+      });
+
+      if (!lineItem) {
+        return response.status(404).json({
+          success: false,
+          message: "Line item not found",
+        });
+      }
+
+      // Ensure useUnitPrices is enabled
+      lineItem.useUnitPrices = true;
+
+      // Initialize or update unitPrices array
+      let unitPrices = lineItem.unitPrices || [];
+      const qty = parseFloat(quantity) || 0;
+      const price = parseFloat(unitPrice) || 0;
+      const totalPrice = qty * price;
+      const now = new Date();
+
+      // If setting as active, deactivate others
+      if (isActive) {
+        unitPrices = unitPrices.map((up: UnitPrice) => ({
+          ...up,
+          isActive: false,
+          updatedAt: now,
+        }));
+      }
+
+      const newUnitPrice: UnitPrice = {
+        id: uuidv4(),
+        quantity,
+        unitPrice: price,
+        totalPrice,
+        isActive,
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      unitPrices.push(newUnitPrice);
+
+      // Sort by quantity
+      unitPrices.sort(
+        (a: UnitPrice, b: UnitPrice) =>
+          parseFloat(a.quantity) - parseFloat(b.quantity)
+      );
+
+      lineItem.unitPrices = unitPrices;
+
+      // Update line total from active price
+      const activeUnitPrice = unitPrices.find((up: UnitPrice) => up.isActive);
+      if (activeUnitPrice) {
+        lineItem.lineTotal = activeUnitPrice.totalPrice;
+      } else if (unitPrices.length > 0) {
+        // If no active price, use the first one
+        lineItem.unitPrices[0].isActive = true;
+        lineItem.lineTotal = lineItem.unitPrices[0].totalPrice;
+      }
+
+      const updatedLineItem = await this.lineItemRepository.save(lineItem);
+
+      // Recalculate offer totals
+      if (lineItem.offerId) {
+        await this.calculateOfferTotals(lineItem.offerId);
+      }
+
+      return response.status(200).json({
+        success: true,
+        message: "Unit price added successfully",
+        data: updatedLineItem,
+      });
+    } catch (error) {
+      console.error("Error adding unit price:", error);
+      return response.status(500).json({
+        success: false,
+        message: "Internal server error",
+      });
+    }
+  }
+
+  // Add quantity-price to line item (legacy)
   async addQuantityPrice(request: Request, response: Response) {
     try {
       const { lineItemId } = request.params;
@@ -983,6 +1289,9 @@ export class OfferController {
           message: "Line item not found",
         });
       }
+
+      // Ensure useUnitPrices is disabled
+      lineItem.useUnitPrices = false;
 
       // Initialize or update quantityPrices array
       let quantityPrices = lineItem.quantityPrices || [];
@@ -1087,7 +1396,18 @@ export class OfferController {
                 total: parseFloat(qp.quantity) * qp.price,
               })
             );
+            lineItem.useUnitPrices = false;
           }
+
+          if (itemUpdate.unitPrices !== undefined) {
+            lineItem.unitPrices = this.processUnitPrices(itemUpdate.unitPrices);
+            lineItem.useUnitPrices = true;
+          }
+
+          if (itemUpdate.useUnitPrices !== undefined) {
+            lineItem.useUnitPrices = itemUpdate.useUnitPrices;
+          }
+
           if (itemUpdate.basePrice !== undefined)
             lineItem.basePrice = itemUpdate.basePrice;
           if (itemUpdate.samplePrice !== undefined)
@@ -1165,29 +1485,43 @@ export class OfferController {
 
         // Expecting format: Item Name | Quantity 1 | Price 1 | Quantity 2 | Price 2 | ...
         if (row.length >= 3) {
-          const quantityPrices: QuantityPrice[] = [];
+          const unitPrices: UnitPriceDto[] = [];
+          const now = new Date();
 
           // Start from column 1 (skip item name at column 0)
           for (let j = 1; j < row.length - 1; j += 2) {
             const quantity = row[j]?.trim();
-            const price = parseFloat(row[j + 1]?.trim() || "0");
+            const unitPrice = parseFloat(row[j + 1]?.trim() || "0");
 
-            if (quantity && !isNaN(price) && price > 0) {
-              quantityPrices.push({
+            if (quantity && !isNaN(unitPrice) && unitPrice > 0) {
+              const qty = parseFloat(quantity) || 0;
+              const totalPrice = qty * unitPrice;
+
+              unitPrices.push({
+                id: uuidv4(),
                 quantity,
-                price,
+                unitPrice,
+                totalPrice,
                 isActive: j === 1, // First price is active by default
-                total: parseFloat(quantity) * price,
               });
             }
           }
 
-          if (quantityPrices.length > 0) {
-            lineItem.quantityPrices = quantityPrices;
+          if (unitPrices.length > 0) {
+            lineItem.useUnitPrices = true;
+            lineItem.unitPrices = unitPrices.map((upDto: UnitPriceDto) => ({
+              ...upDto,
+              createdAt: now,
+              updatedAt: now,
+            }));
+            lineItem.unitPriceDecimalPlaces = 3;
+            lineItem.totalPriceDecimalPlaces = 2;
+            lineItem.maxUnitPriceColumns = Math.min(unitPrices.length, 5); // Max 5 columns
+
             // Calculate line total from active price
-            const activePrice = quantityPrices.find((qp) => qp.isActive);
-            if (activePrice) {
-              lineItem.lineTotal = activePrice.total;
+            const activeUnitPrice = unitPrices.find((up) => up.isActive);
+            if (activeUnitPrice) {
+              lineItem.lineTotal = activeUnitPrice.totalPrice || 0;
             }
             updates.push(lineItem);
           }
@@ -1216,7 +1550,7 @@ export class OfferController {
 
   async setActivePrice(request: Request, response: Response) {
     try {
-      const { lineItemId, priceIndex } = request.params;
+      const { lineItemId, priceType, priceIndex } = request.params;
 
       const lineItem = await this.lineItemRepository.findOne({
         where: { id: lineItemId },
@@ -1229,36 +1563,69 @@ export class OfferController {
         });
       }
 
-      if (!lineItem.quantityPrices || lineItem.quantityPrices.length === 0) {
-        return response.status(400).json({
-          success: false,
-          message: "No quantity prices found",
-        });
-      }
-
       const index = parseInt(priceIndex);
-      if (
-        isNaN(index) ||
-        index < 0 ||
-        index >= lineItem.quantityPrices.length
-      ) {
+      if (isNaN(index) || index < 0) {
         return response.status(400).json({
           success: false,
           message: "Invalid price index",
         });
       }
 
-      // Update all prices, set only the selected one as active
-      lineItem.quantityPrices = lineItem.quantityPrices.map(
-        (qp: any, i: number) => ({
-          ...qp,
-          isActive: i === index,
-        })
-      );
+      if (priceType === "unit" && lineItem.useUnitPrices) {
+        if (!lineItem.unitPrices || lineItem.unitPrices.length === 0) {
+          return response.status(400).json({
+            success: false,
+            message: "No unit prices found",
+          });
+        }
 
-      // Update line total from active price
-      const activePrice = lineItem.quantityPrices[index];
-      lineItem.lineTotal = activePrice.total;
+        if (index >= lineItem.unitPrices.length) {
+          return response.status(400).json({
+            success: false,
+            message: "Invalid unit price index",
+          });
+        }
+
+        // Update all unit prices, set only the selected one as active
+        const now = new Date();
+        lineItem.unitPrices = lineItem.unitPrices.map(
+          (up: UnitPrice, i: number) => ({
+            ...up,
+            isActive: i === index,
+            updatedAt: i === index ? now : up.updatedAt,
+          })
+        );
+
+        // Update line total from active price
+        const activeUnitPrice = lineItem.unitPrices[index];
+        lineItem.lineTotal = activeUnitPrice.totalPrice;
+      } else {
+        if (!lineItem.quantityPrices || lineItem.quantityPrices.length === 0) {
+          return response.status(400).json({
+            success: false,
+            message: "No quantity prices found",
+          });
+        }
+
+        if (index >= lineItem.quantityPrices.length) {
+          return response.status(400).json({
+            success: false,
+            message: "Invalid price index",
+          });
+        }
+
+        // Update all prices, set only the selected one as active
+        lineItem.quantityPrices = lineItem.quantityPrices.map(
+          (qp: any, i: number) => ({
+            ...qp,
+            isActive: i === index,
+          })
+        );
+
+        // Update line total from active price
+        const activePrice = lineItem.quantityPrices[index];
+        lineItem.lineTotal = activePrice.total;
+      }
 
       const updatedLineItem = await this.lineItemRepository.save(lineItem);
 
@@ -1274,6 +1641,69 @@ export class OfferController {
       });
     } catch (error) {
       console.error("Error setting active price:", error);
+      return response.status(500).json({
+        success: false,
+        message: "Internal server error",
+      });
+    }
+  }
+
+  // Toggle unit prices for line item
+  async toggleUnitPrices(request: Request, response: Response) {
+    try {
+      const { lineItemId } = request.params;
+      const { useUnitPrices } = request.body;
+
+      if (useUnitPrices === undefined) {
+        return response.status(400).json({
+          success: false,
+          message: "useUnitPrices is required",
+        });
+      }
+
+      const lineItem = await this.lineItemRepository.findOne({
+        where: { id: lineItemId },
+      });
+
+      if (!lineItem) {
+        return response.status(404).json({
+          success: false,
+          message: "Line item not found",
+        });
+      }
+
+      lineItem.useUnitPrices = useUnitPrices;
+
+      // Set default values if enabling unit prices
+      if (useUnitPrices) {
+        if (!lineItem.unitPriceDecimalPlaces)
+          lineItem.unitPriceDecimalPlaces = 3;
+        if (!lineItem.totalPriceDecimalPlaces)
+          lineItem.totalPriceDecimalPlaces = 2;
+        if (!lineItem.maxUnitPriceColumns) lineItem.maxUnitPriceColumns = 3;
+
+        // Initialize empty unit prices if not exist
+        if (!lineItem.unitPrices) {
+          lineItem.unitPrices = [];
+        }
+      } else {
+        // Initialize empty quantity prices if not exist (legacy)
+        if (!lineItem.quantityPrices) {
+          lineItem.quantityPrices = [];
+        }
+      }
+
+      const updatedLineItem = await this.lineItemRepository.save(lineItem);
+
+      return response.status(200).json({
+        success: true,
+        message: `Unit prices ${
+          useUnitPrices ? "enabled" : "disabled"
+        } successfully`,
+        data: updatedLineItem,
+      });
+    } catch (error) {
+      console.error("Error toggling unit prices:", error);
       return response.status(500).json({
         success: false,
         message: "Internal server error",
@@ -1403,7 +1833,7 @@ export class OfferController {
     }
   }
 
-  // Generate PDF for offer
+  // Generate PDF for offer (updated to handle unit prices)
   async generatePdf(request: Request, response: Response) {
     try {
       const { id } = request.params;
@@ -1556,8 +1986,36 @@ export class OfferController {
           doc.text(`${index + 1}.`, itemX, y);
           doc.text(item.itemName || "", descX, y, { width: 200 });
 
-          // Show quantity prices if available
-          if (item.quantityPrices && item.quantityPrices.length > 0) {
+          // Show unit prices if enabled and available
+          if (
+            item.useUnitPrices &&
+            item.unitPrices &&
+            item.unitPrices.length > 0
+          ) {
+            const maxColumns = item.maxUnitPriceColumns || 3;
+            const displayedPrices = item.unitPrices.slice(0, maxColumns);
+
+            displayedPrices.forEach((up: UnitPrice, upIndex: number) => {
+              const qty = getSafeNumber(up.quantity);
+              const unitPrice = getSafeNumber(up.unitPrice);
+              const priceText = `${qty} pcs: €${unitPrice.toFixed(3)} (unit)`;
+              const highlight = up.isActive ? { color: "red" } : {};
+              doc.text(priceText, qtyX, y + upIndex * 15, {
+                ...highlight,
+                width: 150,
+              });
+            });
+
+            // Show total price for active unit price
+            const activeUnitPrice = item.unitPrices.find(
+              (up: UnitPrice) => up.isActive
+            );
+            if (activeUnitPrice) {
+              doc.text(`€${activeUnitPrice.totalPrice.toFixed(2)}`, totalX, y);
+            }
+          }
+          // Fallback to legacy quantity prices
+          else if (item.quantityPrices && item.quantityPrices.length > 0) {
             item.quantityPrices.forEach((qp: any, qpIndex: number) => {
               const qpQuantity = getSafeNumber(qp.quantity);
               const qpPrice = getSafeNumber(qp.price);
@@ -1568,7 +2026,17 @@ export class OfferController {
                 width: 150,
               });
             });
-          } else if (item.baseQuantity || item.basePrice) {
+
+            // Show total price for active quantity price
+            const activePrice = item.quantityPrices.find(
+              (qp: any) => qp.isActive
+            );
+            if (activePrice) {
+              doc.text(`€${activePrice.total.toFixed(2)}`, totalX, y);
+            }
+          }
+          // Fallback to base price
+          else if (item.baseQuantity || item.basePrice) {
             const quantity = getSafeNumber(item.baseQuantity);
             const price = getSafeNumber(item.basePrice);
 
@@ -1583,7 +2051,13 @@ export class OfferController {
             doc.text("N/A", totalX, y);
           }
 
-          y += Math.max(30, (item.quantityPrices?.length || 1) * 20);
+          // Calculate height based on number of prices
+          const numPrices = Math.max(
+            item.useUnitPrices && item.unitPrices ? item.unitPrices.length : 0,
+            item.quantityPrices ? item.quantityPrices.length : 0,
+            1
+          );
+          y += Math.max(30, numPrices * 20);
         });
       }
 
@@ -1791,6 +2265,55 @@ export class OfferController {
       });
     } catch (error) {
       console.error("Error fetching offers by inquiry:", error);
+      return response.status(500).json({
+        success: false,
+        message: "Internal server error",
+      });
+    }
+  }
+
+  // Get offer statuses
+  async getOfferStatuses(request: Request, response: Response) {
+    try {
+      const statuses = [
+        { value: "Draft", label: "Draft" },
+        { value: "Submitted", label: "Submitted" },
+        { value: "Negotiation", label: "Negotiation" },
+        { value: "Accepted", label: "Accepted" },
+        { value: "Rejected", label: "Rejected" },
+        { value: "Expired", label: "Expired" },
+        { value: "Cancelled", label: "Cancelled" },
+      ];
+
+      return response.status(200).json({
+        success: true,
+        data: statuses,
+      });
+    } catch (error) {
+      console.error("Error fetching offer statuses:", error);
+      return response.status(500).json({
+        success: false,
+        message: "Internal server error",
+      });
+    }
+  }
+
+  // Get available currencies
+  async getAvailableCurrencies(request: Request, response: Response) {
+    try {
+      const currencies = [
+        { code: "EUR", symbol: "€", name: "Euro" },
+        { code: "USD", symbol: "$", name: "US Dollar" },
+        { code: "RMB", symbol: "¥", name: "Chinese Yuan" },
+        { code: "HKD", symbol: "HK$", name: "Hong Kong Dollar" },
+      ];
+
+      return response.status(200).json({
+        success: true,
+        data: currencies,
+      });
+    } catch (error) {
+      console.error("Error fetching currencies:", error);
       return response.status(500).json({
         success: false,
         message: "Internal server error",

@@ -31,6 +31,16 @@ export interface QuantityPrice {
   total: number;
 }
 
+export interface UnitPrice {
+  id: string;
+  quantity: string;
+  unitPrice: number; // 3 decimal places for unit price
+  totalPrice: number; // 2 decimal places for total price
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export interface CustomerSnapshot {
   id: string;
   companyName: string;
@@ -283,7 +293,6 @@ export class OfferLineItem {
   @Column({ name: "requested_item_id", nullable: true })
   requestedItemId?: string;
 
-  // Snapshot of item data at creation time
   @Column({ type: "varchar", length: 255 })
   itemName!: string;
 
@@ -296,7 +305,6 @@ export class OfferLineItem {
   @Column({ type: "text", nullable: true })
   description?: string;
 
-  // Item dimensions snapshot
   @Column({ type: "float", nullable: true })
   weight?: number;
 
@@ -309,11 +317,24 @@ export class OfferLineItem {
   @Column({ type: "float", nullable: true })
   length?: number;
 
-  // Quantity
   @Column({ type: "varchar", length: 100, nullable: true })
   quantity?: string;
 
-  // Internal reference prices (not shown to customer)
+  @Column({ type: "boolean", default: false })
+  useUnitPrices!: boolean;
+
+  @Column({ type: "integer", default: 3, nullable: true })
+  unitPriceDecimalPlaces!: number;
+
+  @Column({ type: "integer", default: 2, nullable: true })
+  totalPriceDecimalPlaces!: number;
+
+  @Column({ type: "json", nullable: true })
+  unitPrices?: UnitPrice[];
+
+  @Column({ type: "integer", default: 0, nullable: true })
+  maxUnitPriceColumns!: number;
+
   @Column({ type: "decimal", precision: 12, scale: 3, nullable: true })
   purchasePrice?: number;
 
@@ -324,7 +345,6 @@ export class OfferLineItem {
   })
   purchaseCurrency?: string;
 
-  // Customer-facing prices
   @Column({ type: "json", nullable: true })
   quantityPrices?: QuantityPrice[];
 
@@ -334,7 +354,6 @@ export class OfferLineItem {
   @Column({ type: "decimal", precision: 10, scale: 3, nullable: true })
   basePrice?: number;
 
-  // Sample pricing
   @Column({ type: "decimal", precision: 10, scale: 3, nullable: true })
   samplePrice?: number;
 
@@ -344,7 +363,6 @@ export class OfferLineItem {
   @Column({ type: "decimal", precision: 12, scale: 2, default: 0 })
   lineTotal!: number;
 
-  // Additional fields
   @Column({ type: "integer", default: 1 })
   position!: number;
 
@@ -369,6 +387,14 @@ export class OfferLineItem {
   @BeforeInsert()
   @BeforeUpdate()
   calculateLineTotal() {
+    if (this.useUnitPrices && this.unitPrices && this.unitPrices.length > 0) {
+      const activeUnitPrice = this.unitPrices.find((up) => up.isActive);
+      if (activeUnitPrice) {
+        this.lineTotal = activeUnitPrice.totalPrice || 0;
+        return;
+      }
+    }
+
     if (this.quantityPrices && this.quantityPrices.length > 0) {
       const activePrice = this.quantityPrices.find((qp) => qp.isActive);
       if (activePrice) {
@@ -376,7 +402,6 @@ export class OfferLineItem {
         return;
       }
     }
-
     if (this.basePrice && this.baseQuantity) {
       const quantity = parseFloat(this.baseQuantity) || 1;
       this.lineTotal = this.basePrice * quantity;
