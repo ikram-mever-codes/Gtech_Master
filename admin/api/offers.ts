@@ -314,7 +314,7 @@ export const createOfferFromInquiry = async (
   try {
     toast.loading("Creating offer...", loadingStyles);
     const response: any = await api.post(
-      `/inquiry/${inquiryId}/offers`,
+      `/offers/inquiry/${inquiryId}`,
       offerData
     );
     toast.dismiss();

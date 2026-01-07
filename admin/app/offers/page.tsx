@@ -134,12 +134,14 @@ const OffersPage: React.FC = () => {
     page: 1,
     limit: 20,
   });
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
 
   const { user } = useSelector((state: RootState) => state.user);
   const itemsPerPage = 20;
 
   // Expanded offers for details view
   const [expandedOfferId, setExpandedOfferId] = useState<string | null>(null);
+  const [filteredInquiries, setFilteredInquiries] = useState<Inquiry[]>([]);
 
   // Editing state for inline editing
   const [editingLineItemId, setEditingLineItemId] = useState<string | null>(
@@ -178,12 +180,12 @@ const OffersPage: React.FC = () => {
           ? response.data
           : response.data.inquiries || [];
         setInquiries(inquiryData);
+        setFilteredInquiries(inquiryData); // Initialize filtered inquiries
       }
     } catch (error) {
       console.error("Error fetching inquiries:", error);
     }
   };
-
   const fetchCustomers = async () => {
     try {
       const response = await getAllCustomers();
@@ -199,6 +201,29 @@ const OffersPage: React.FC = () => {
     }
   };
 
+  const handleCustomerChange = (customerId: string) => {
+    setSelectedCustomerId(customerId);
+
+    if (customerId) {
+      // Filter inquiries for the selected customer
+      const filtered = inquiries.filter(
+        (inquiry) => inquiry.customer?.id === customerId
+      );
+      setFilteredInquiries(filtered);
+      // Reset selected inquiry when customer changes
+      setSelectedInquiry(null);
+    } else {
+      // Show all inquiries if no customer is selected
+      setFilteredInquiries(inquiries);
+      setSelectedInquiry(null);
+    }
+  };
+  const handleOpenCreateModal = () => {
+    setSelectedCustomerId("");
+    setSelectedInquiry(null);
+    setFilteredInquiries(inquiries);
+    setShowCreateModal(true);
+  };
   // Handle offer creation
   const handleCreateOffer = async () => {
     if (!selectedInquiry) {
@@ -555,8 +580,6 @@ const OffersPage: React.FC = () => {
       toast.error("Failed to delete unit price");
     }
   };
-
-  // Reset forms
   const resetCreateForm = () => {
     setOfferFormData({
       title: "",
@@ -564,6 +587,8 @@ const OffersPage: React.FC = () => {
       validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
     });
     setSelectedInquiry(null);
+    setSelectedCustomerId(""); // Reset customer filter
+    setFilteredInquiries(inquiries); // Reset to all inquiries
   };
 
   // Format date
@@ -1756,52 +1781,79 @@ const OffersPage: React.FC = () => {
               </div>
 
               <div className="space-y-4">
-                {/* Inquiry Selection */}
+                {/* NEW: Customer Filter */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Filter by Customer (Optional)
+                  </label>
+                  <select
+                    value={selectedCustomerId}
+                    onChange={(e) => handleCustomerChange(e.target.value)}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent"
+                  >
+                    <option value="">All Customers</option>
+                    {customers.map((customer) => (
+                      <option key={customer.id} value={customer.id}>
+                        {customer.companyName}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Inquiry Selection - UPDATED to use filteredInquiries */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Select Inquiry *
                   </label>
                   <div className="space-y-2 max-h-60 overflow-y-auto">
-                    {inquiries.map((inquiry) => (
-                      <div
-                        key={inquiry.id}
-                        onClick={() => setSelectedInquiry(inquiry)}
-                        className={`p-3 border rounded-lg cursor-pointer transition-all ${
-                          selectedInquiry?.id === inquiry.id
-                            ? "border-gray-600 bg-gray-50"
-                            : "border-gray-200 hover:bg-gray-50"
-                        }`}
-                      >
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <div className="font-medium text-gray-900">
-                              {inquiry.name}
+                    {filteredInquiries.length === 0 ? (
+                      <div className="text-center py-4 text-gray-500">
+                        {selectedCustomerId
+                          ? "No inquiries found for this customer"
+                          : "No inquiries available"}
+                      </div>
+                    ) : (
+                      filteredInquiries.map((inquiry) => (
+                        <div
+                          key={inquiry.id}
+                          onClick={() => setSelectedInquiry(inquiry)}
+                          className={`p-3 border rounded-lg cursor-pointer transition-all ${
+                            selectedInquiry?.id === inquiry.id
+                              ? "border-gray-600 bg-gray-50"
+                              : "border-gray-200 hover:bg-gray-50"
+                          }`}
+                        >
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <div className="font-medium text-gray-900">
+                                {inquiry.name}
+                              </div>
+                              <div className="text-sm text-gray-600">
+                                Customer: {inquiry.customer?.companyName}
+                              </div>
+                              <div className="text-xs text-gray-500 mt-1">
+                                {inquiry.requests?.length || 0} items •{" "}
+                                {inquiry.isAssembly ? "Assembly" : "Standard"}
+                              </div>
                             </div>
-                            <div className="text-sm text-gray-600">
-                              Customer: {inquiry.customer?.companyName}
-                            </div>
-                            <div className="text-xs text-gray-500 mt-1">
-                              {inquiry.requests?.length || 0} items •{" "}
-                              {inquiry.isAssembly ? "Assembly" : "Standard"}
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <div className="text-sm text-gray-600">
-                              {inquiry.status}
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              {formatDate(inquiry.createdAt)}
+                            <div className="text-right">
+                              <div className="text-sm text-gray-600">
+                                {inquiry.status}
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                {formatDate(inquiry.createdAt)}
+                              </div>
                             </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      ))
+                    )}
                   </div>
                 </div>
 
                 {selectedInquiry && (
                   <>
-                    {/* Offer Details */}
+                    {/* Offer Details - this section remains the same */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Offer Title *
@@ -1871,7 +1923,7 @@ const OffersPage: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Assembly specific fields */}
+                    {/* Assembly specific fields - this section remains the same */}
                     {selectedInquiry.isAssembly && (
                       <div className="space-y-3">
                         <h4 className="font-medium text-gray-900">
@@ -1919,7 +1971,7 @@ const OffersPage: React.FC = () => {
                       </div>
                     )}
 
-                    {/* Summary */}
+                    {/* Summary - this section remains the same */}
                     <div className="bg-gray-50 p-4 rounded-lg">
                       <h4 className="font-medium text-gray-900 mb-2">
                         Summary
@@ -1980,6 +2032,7 @@ const OffersPage: React.FC = () => {
           </div>
         </div>
       )}
+
       {showEditModal && selectedOffer && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
