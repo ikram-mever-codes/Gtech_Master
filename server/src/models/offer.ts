@@ -34,8 +34,8 @@ export interface QuantityPrice {
 export interface UnitPrice {
   id: string;
   quantity: string;
-  unitPrice: number; // 3 decimal places for unit price
-  totalPrice: number; // 2 decimal places for total price
+  unitPrice: number;
+  totalPrice: number;
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -79,7 +79,6 @@ export class Offer {
   @Column({ name: "inquiry_id" })
   inquiryId!: string;
 
-  // Inquiry snapshot - stored as JSON
   @Column({ type: "json", nullable: true })
   inquirySnapshot!: {
     id: string;
@@ -89,11 +88,9 @@ export class Offer {
     createdAt: Date;
   };
 
-  // Customer snapshot - stored as JSON
   @Column({ type: "json", nullable: false })
   customerSnapshot!: CustomerSnapshot;
 
-  // Delivery address (can be different from billing address)
   @Column({ type: "json", nullable: true })
   deliveryAddress?: {
     street?: string;
@@ -106,7 +103,6 @@ export class Offer {
     contactPhone?: string;
   };
 
-  // Offer details
   @Column({
     type: "enum",
     enum: [
@@ -180,14 +176,12 @@ export class Offer {
   @Column({ type: "decimal", precision: 12, scale: 2, default: 0 })
   totalAmount!: number;
 
-  // Notes
   @Column({ type: "text", nullable: true })
   notes?: string;
 
   @Column({ type: "text", nullable: true })
   internalNotes?: string;
 
-  // Assembly specific fields
   @Column({ type: "boolean", default: false })
   isAssembly!: boolean;
 
@@ -200,7 +194,21 @@ export class Offer {
   @Column({ type: "text", nullable: true })
   assemblyNotes?: string;
 
-  // PDF generation
+  @Column({ type: "boolean", default: false })
+  useUnitPrices!: boolean;
+
+  @Column({ type: "integer", default: 3, nullable: true })
+  unitPriceDecimalPlaces!: number;
+
+  @Column({ type: "integer", default: 2, nullable: true })
+  totalPriceDecimalPlaces!: number;
+
+  @Column({ type: "integer", default: 3, nullable: true })
+  maxUnitPriceColumns!: number;
+
+  @Column({ type: "json", nullable: true })
+  defaultUnitPrices?: UnitPrice[];
+
   @Column({ type: "text", nullable: true })
   pdfPath?: string;
 
@@ -216,14 +224,12 @@ export class Offer {
   @UpdateDateColumn()
   updatedAt!: Date;
 
-  // Revision tracking
   @Column({ type: "integer", default: 1 })
   revision!: number;
 
   @Column({ type: "varchar", length: 100, nullable: true })
   previousOfferNumber?: string;
 
-  // Relationships
   @OneToMany(() => OfferLineItem, (lineItem) => lineItem.offer, {
     cascade: true,
     eager: true,
@@ -245,24 +251,104 @@ export class Offer {
   }
 
   @BeforeInsert()
+  @BeforeUpdate()
   calculateTotals() {
-    if (!this.subtotal && this.lineItems) {
-      this.subtotal = this.lineItems.reduce(
-        (sum, item) => sum + (item.lineTotal || 0),
-        0
-      );
+    if (this.lineItems && this.lineItems.length > 0) {
+      this.subtotal = this.lineItems.reduce((sum, item) => {
+        if (
+          this.useUnitPrices &&
+          item.unitPrices &&
+          item.unitPrices.length > 0
+        ) {
+          const activeUnitPrice = item.unitPrices.find((up) => up.isActive);
+          if (activeUnitPrice) {
+            return sum + (activeUnitPrice.totalPrice || 0);
+          }
+        } else if (item.quantityPrices && item.quantityPrices.length > 0) {
+          const activePrice = item.quantityPrices.find((qp) => qp.isActive);
+          if (activePrice) {
+            return sum + (activePrice.total || 0);
+          }
+        } else if (item.basePrice && item.baseQuantity) {
+          const quantity = parseFloat(item.baseQuantity) || 1;
+          return sum + item.basePrice * quantity;
+        }
+        return sum + (item.lineTotal || 0);
+      }, 0);
     }
 
     if (this.discountPercentage > 0) {
       this.discountAmount = (this.subtotal * this.discountPercentage) / 100;
     }
 
-    // Calculate VAT (19% as default)
     const taxableAmount =
       this.subtotal - this.discountAmount + (this.shippingCost || 0);
     this.taxAmount = taxableAmount * 0.19;
 
     this.totalAmount = taxableAmount + this.taxAmount;
+  }
+
+  @BeforeInsert()
+  initializeDefaultUnitPrices() {
+    if (this.useUnitPrices && !this.defaultUnitPrices) {
+      this.defaultUnitPrices = [
+        {
+          id: `unit-price-default-1-${Date.now()}`,
+          quantity: "1000",
+          unitPrice: 0,
+          totalPrice: 0,
+          isActive: true,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        {
+          id: `unit-price-default-2-${Date.now()}`,
+          quantity: "5000",
+          unitPrice: 0,
+          totalPrice: 0,
+          isActive: false,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        {
+          id: `unit-price-default-3-${Date.now()}`,
+          quantity: "10000",
+          unitPrice: 0,
+          totalPrice: 0,
+          isActive: false,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      ];
+    }
+  }
+
+  getActiveUnitPrice(): UnitPrice | null {
+    if (
+      this.useUnitPrices &&
+      this.defaultUnitPrices &&
+      this.defaultUnitPrices.length > 0
+    ) {
+      return this.defaultUnitPrices.find((up) => up.isActive) || null;
+    }
+    return null;
+  }
+
+  updateLineItemsForUnitPricing(): void {
+    if (!this.lineItems) return;
+
+    this.lineItems.forEach((lineItem) => {
+      if (
+        this.useUnitPrices &&
+        (!lineItem.unitPrices || lineItem.unitPrices.length === 0)
+      ) {
+        lineItem.unitPrices = this.defaultUnitPrices
+          ? JSON.parse(JSON.stringify(this.defaultUnitPrices)) // Deep copy
+          : [];
+      }
+
+      lineItem.calculateLineTotal(this.useUnitPrices);
+    });
   }
 
   constructor(partial?: Partial<Offer>) {
@@ -320,20 +406,8 @@ export class OfferLineItem {
   @Column({ type: "varchar", length: 100, nullable: true })
   quantity?: string;
 
-  @Column({ type: "boolean", default: false })
-  useUnitPrices!: boolean;
-
-  @Column({ type: "integer", default: 3, nullable: true })
-  unitPriceDecimalPlaces!: number;
-
-  @Column({ type: "integer", default: 2, nullable: true })
-  totalPriceDecimalPlaces!: number;
-
   @Column({ type: "json", nullable: true })
   unitPrices?: UnitPrice[];
-
-  @Column({ type: "integer", default: 0, nullable: true })
-  maxUnitPriceColumns!: number;
 
   @Column({ type: "decimal", precision: 12, scale: 3, nullable: true })
   purchasePrice?: number;
@@ -386,8 +460,13 @@ export class OfferLineItem {
 
   @BeforeInsert()
   @BeforeUpdate()
-  calculateLineTotal() {
-    if (this.useUnitPrices && this.unitPrices && this.unitPrices.length > 0) {
+  calculateLineTotal(useUnitPrices?: boolean) {
+    const shouldUseUnitPrices =
+      useUnitPrices !== undefined
+        ? useUnitPrices
+        : this.offer?.useUnitPrices || false;
+
+    if (shouldUseUnitPrices && this.unitPrices && this.unitPrices.length > 0) {
       const activeUnitPrice = this.unitPrices.find((up) => up.isActive);
       if (activeUnitPrice) {
         this.lineTotal = activeUnitPrice.totalPrice || 0;
@@ -402,9 +481,67 @@ export class OfferLineItem {
         return;
       }
     }
+
     if (this.basePrice && this.baseQuantity) {
       const quantity = parseFloat(this.baseQuantity) || 1;
       this.lineTotal = this.basePrice * quantity;
+    }
+  }
+
+  getActivePrice(useUnitPrices?: boolean): QuantityPrice | UnitPrice | null {
+    const shouldUseUnitPrices =
+      useUnitPrices !== undefined
+        ? useUnitPrices
+        : this.offer?.useUnitPrices || false;
+
+    if (shouldUseUnitPrices && this.unitPrices && this.unitPrices.length > 0) {
+      return this.unitPrices.find((up) => up.isActive) || null;
+    } else if (this.quantityPrices && this.quantityPrices.length > 0) {
+      return this.quantityPrices.find((qp) => qp.isActive) || null;
+    }
+    return null;
+  }
+
+  getActivePriceType(useUnitPrices?: boolean): "quantity" | "unit" | null {
+    const activePrice = this.getActivePrice(useUnitPrices);
+    if (activePrice) {
+      return "totalPrice" in activePrice ? "unit" : "quantity";
+    }
+    return null;
+  }
+
+  formatUnitPrice(price: number, offer?: Offer): string {
+    const decimalPlaces = offer?.unitPriceDecimalPlaces || 3;
+    if (isNaN(price) || !isFinite(price)) {
+      return `0.${"0".repeat(decimalPlaces)}`;
+    }
+    return price.toFixed(decimalPlaces);
+  }
+
+  formatTotalPrice(price: number, offer?: Offer): string {
+    const decimalPlaces = offer?.totalPriceDecimalPlaces || 2;
+    if (isNaN(price) || !isFinite(price)) {
+      return `0.${"0".repeat(decimalPlaces)}`;
+    }
+    return price.toFixed(decimalPlaces);
+  }
+
+  syncUnitPricesWithOffer(offer: Offer): void {
+    if (offer.useUnitPrices && offer.defaultUnitPrices) {
+      this.unitPrices = JSON.parse(JSON.stringify(offer.defaultUnitPrices));
+
+      if (this.unitPrices && this.unitPrices.length > 0) {
+        const existingPrices = this.unitPrices || [];
+        this.unitPrices.forEach((newUp, index) => {
+          const existingUp = existingPrices.find(
+            (up) => up.quantity === newUp.quantity
+          );
+          if (existingUp) {
+            newUp.unitPrice = existingUp.unitPrice;
+            newUp.totalPrice = existingUp.totalPrice;
+          }
+        });
+      }
     }
   }
 

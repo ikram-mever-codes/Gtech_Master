@@ -11,7 +11,6 @@ import {
 import { Item } from "./items";
 import { Order } from "./orders";
 
-// Alternative OrderItem entity (use this if order_no shouldn't be unique)
 @Entity()
 export class OrderItem {
   @PrimaryColumn()

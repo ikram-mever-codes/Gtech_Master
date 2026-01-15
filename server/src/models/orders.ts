@@ -18,7 +18,7 @@ export class Order {
   @PrimaryColumn()
   id!: number;
 
-  @Column({ type: "varchar", length: 255, unique: true }) // ADDED: unique: true
+  @Column({ type: "varchar", length: 255, unique: true })
   order_no!: string;
 
   @Column({ type: "varchar", length: 50, nullable: true })

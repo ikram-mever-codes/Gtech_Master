@@ -12,11 +12,9 @@ interface DatabaseConfig {
 }
 
 const dbConfig: DatabaseConfig = {
-  host:
-    process.env.MIS_DB_HOST ||
-    "g-tech.c5i6oqis88l0.eu-central-1.rds.amazonaws.com",
+  host: process.env.MIS_DB_HOST || "",
   user: process.env.MIS_DB_USER || "admin",
-  password: process.env.MIS_DB_PASSWORD || "1aYgTHBvji8qaoUNbbcI",
+  password: process.env.MIS_DB_PASSWORD || "",
   database: process.env.MIS_DB_NAME || "misgtech",
   port: parseInt(process.env.MIS_DB_PORT || "3306"),
   waitForConnections: true,

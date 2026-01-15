@@ -145,6 +145,28 @@ const ItemsManagementPage: React.FC = () => {
     duty_rate: 0,
   });
 
+  // Item modal states
+  const [showItemModal, setShowItemModal] = useState(false);
+  const [itemFormData, setItemFormData] = useState({
+    item_name: "",
+    item_name_cn: "",
+    ean: "",
+    parent_id: "",
+    taric_id: "",
+    cat_id: "",
+    weight: "",
+    length: "",
+    width: "",
+    height: "",
+    remark: "",
+    model: "",
+    isActive: "Y",
+    is_qty_dividable: "Y",
+    is_npr: "N",
+    is_eur_special: "N",
+    is_rmb_special: "N",
+  });
+
   const router = useRouter();
 
   // Format date function
@@ -291,13 +313,76 @@ const ItemsManagementPage: React.FC = () => {
     } catch (error) {}
   };
 
-  const handleCreateItem = () => {
-    router.push("/items/new");
+  // Item creation modal functions
+  const handleOpenCreateItemModal = () => {
+    setItemFormData({
+      item_name: "",
+      item_name_cn: "",
+      ean: "",
+      parent_id: "",
+      taric_id: "",
+      cat_id: "",
+      weight: "",
+      length: "",
+      width: "",
+      height: "",
+      remark: "",
+      model: "",
+      isActive: "Y",
+      is_qty_dividable: "Y",
+      is_npr: "N",
+      is_eur_special: "N",
+      is_rmb_special: "N",
+    });
+    setShowItemModal(true);
+  };
+
+  const handleCreateItemSubmit = async () => {
+    if (!itemFormData.item_name || !itemFormData.parent_id) {
+      toast.error("Item name and parent are required", errorStyles);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      await createItem({
+        item_name: itemFormData.item_name,
+        item_name_cn: itemFormData.item_name_cn,
+        ean: itemFormData.ean,
+        parent_id: parseInt(itemFormData.parent_id),
+        taric_id: itemFormData.taric_id
+          ? parseInt(itemFormData.taric_id)
+          : undefined,
+        cat_id: itemFormData.cat_id ? parseInt(itemFormData.cat_id) : undefined,
+        weight: itemFormData.weight
+          ? parseFloat(itemFormData.weight)
+          : undefined,
+        length: itemFormData.length
+          ? parseFloat(itemFormData.length)
+          : undefined,
+        width: itemFormData.width ? parseFloat(itemFormData.width) : undefined,
+        height: itemFormData.height
+          ? parseFloat(itemFormData.height)
+          : undefined,
+        remark: itemFormData.remark,
+        model: itemFormData.model,
+        isActive: itemFormData.isActive,
+      });
+
+      toast.success("Item created successfully", successStyles);
+      setShowItemModal(false);
+      fetchData(); // Refresh the list
+    } catch (error: any) {
+      toast.error(error.message || "Failed to create item", errorStyles);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleCreateParent = () => {
     router.push("/parents/new");
   };
+  console.log(parents);
 
   // TARIC Management Functions
   const handleCreateTaric = () => {
@@ -1132,7 +1217,7 @@ const ItemsManagementPage: React.FC = () => {
 
             {activeTab === "items" && (
               <button
-                onClick={handleCreateItem}
+                onClick={handleOpenCreateItemModal}
                 className="px-4 py-2.5 bg-[#8CC21B] text-white rounded-lg font-medium hover:bg-[#8CC21B] transition-all flex items-center gap-2"
               >
                 <PlusIcon className="w-5 h-5" />
@@ -1141,14 +1226,14 @@ const ItemsManagementPage: React.FC = () => {
             )}
 
             {/* {activeTab === "parents" && (
-              <button
-                onClick={handleCreateParent}
-                className="px-4 py-2.5 bg-[#8CC21B] text-white rounded-lg font-medium hover:bg-[#8CC21B] transition-all flex items-center gap-2"
-              >
-                <PlusIcon className="w-5 h-5" />
-                New Parent
-              </button>
-            )} */}
+                <button
+                  onClick={handleCreateParent}
+                  className="px-4 py-2.5 bg-[#8CC21B] text-white rounded-lg font-medium hover:bg-[#8CC21B] transition-all flex items-center gap-2"
+                >
+                  <PlusIcon className="w-5 h-5" />
+                  New Parent
+                </button>
+              )} */}
 
             {activeTab === "tarics" && (
               <button
@@ -1426,8 +1511,8 @@ const ItemsManagementPage: React.FC = () => {
 
       {/* TARIC Modal */}
       {showTaricModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex  items-center justify-center p-4 z-50">
-          <div className="bg-white/95 backdrop-blur-md rounded-2xl h-full shadow-xl max-w-md w-full">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl max-w-md w-full">
             <div className="p-6 max-h-[80vh] overflow-y-auto">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-xl font-bold text-gray-900">
@@ -1605,6 +1690,295 @@ const ItemsManagementPage: React.FC = () => {
                     {taricModalMode === "edit" ? "Update" : "Create"} TARIC
                   </button>
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Item Creation Modal */}
+      {showItemModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-bold text-gray-900">
+                  Create New Item
+                </h2>
+                <button
+                  onClick={() => setShowItemModal(false)}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <XMarkIcon className="h-5 w-5" />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Item Name *
+                  </label>
+                  <input
+                    type="text"
+                    value={itemFormData.item_name}
+                    onChange={(e) =>
+                      setItemFormData({
+                        ...itemFormData,
+                        item_name: e.target.value,
+                      })
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                    placeholder="Enter item name"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Chinese Name
+                  </label>
+                  <input
+                    type="text"
+                    value={itemFormData.item_name_cn}
+                    onChange={(e) =>
+                      setItemFormData({
+                        ...itemFormData,
+                        item_name_cn: e.target.value,
+                      })
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                    placeholder="Enter Chinese name"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    EAN
+                  </label>
+                  <input
+                    type="text"
+                    value={itemFormData.ean}
+                    onChange={(e) =>
+                      setItemFormData({
+                        ...itemFormData,
+                        ean: e.target.value,
+                      })
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                    placeholder="Enter EAN"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Parent *
+                  </label>
+                  <select
+                    value={itemFormData.parent_id}
+                    onChange={(e) =>
+                      setItemFormData({
+                        ...itemFormData,
+                        parent_id: e.target.value,
+                      })
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  >
+                    <option value="">Select Parent</option>
+                    {parents.map((parent) => (
+                      <option key={parent.id} value={parent.id}>
+                        {parent.name_de} ({parent.de_no})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    TARIC
+                  </label>
+                  <select
+                    value={itemFormData.taric_id}
+                    onChange={(e) =>
+                      setItemFormData({
+                        ...itemFormData,
+                        taric_id: e.target.value,
+                      })
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  >
+                    <option value="">Select TARIC</option>
+                    {tarics.map((taric) => (
+                      <option key={taric.id} value={taric.id}>
+                        {taric.code} - {taric.name_de}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Weight (kg)
+                  </label>
+                  <input
+                    type="number"
+                    value={itemFormData.weight}
+                    onChange={(e) =>
+                      setItemFormData({
+                        ...itemFormData,
+                        weight: e.target.value,
+                      })
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                    placeholder="Enter weight"
+                    step="0.01"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Length (cm)
+                  </label>
+                  <input
+                    type="number"
+                    value={itemFormData.length}
+                    onChange={(e) =>
+                      setItemFormData({
+                        ...itemFormData,
+                        length: e.target.value,
+                      })
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                    placeholder="Enter length"
+                    step="0.1"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Width (cm)
+                  </label>
+                  <input
+                    type="number"
+                    value={itemFormData.width}
+                    onChange={(e) =>
+                      setItemFormData({
+                        ...itemFormData,
+                        width: e.target.value,
+                      })
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                    placeholder="Enter width"
+                    step="0.1"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Height (cm)
+                  </label>
+                  <input
+                    type="number"
+                    value={itemFormData.height}
+                    onChange={(e) =>
+                      setItemFormData({
+                        ...itemFormData,
+                        height: e.target.value,
+                      })
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                    placeholder="Enter height"
+                    step="0.1"
+                  />
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Model
+                  </label>
+                  <input
+                    type="text"
+                    value={itemFormData.model}
+                    onChange={(e) =>
+                      setItemFormData({
+                        ...itemFormData,
+                        model: e.target.value,
+                      })
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                    placeholder="Enter model"
+                  />
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Remarks
+                  </label>
+                  <textarea
+                    value={itemFormData.remark}
+                    onChange={(e) =>
+                      setItemFormData({
+                        ...itemFormData,
+                        remark: e.target.value,
+                      })
+                    }
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                    placeholder="Enter remarks"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Status
+                  </label>
+                  <select
+                    value={itemFormData.isActive}
+                    onChange={(e) =>
+                      setItemFormData({
+                        ...itemFormData,
+                        isActive: e.target.value,
+                      })
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  >
+                    <option value="Y">Active</option>
+                    <option value="N">Inactive</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Quantity Dividable
+                  </label>
+                  <select
+                    value={itemFormData.is_qty_dividable}
+                    onChange={(e) =>
+                      setItemFormData({
+                        ...itemFormData,
+                        is_qty_dividable: e.target.value,
+                      })
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  >
+                    <option value="Y">Yes</option>
+                    <option value="N">No</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex gap-2 pt-6 mt-6 border-t">
+                <button
+                  onClick={() => setShowItemModal(false)}
+                  className="flex-1 px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleCreateItemSubmit}
+                  disabled={!itemFormData.item_name || !itemFormData.parent_id}
+                  className="flex-1 px-4 py-2 bg-[#8CC21B] text-white rounded-lg hover:bg-[#8CC21B] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Create Item
+                </button>
               </div>
             </div>
           </div>

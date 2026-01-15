@@ -45,7 +45,7 @@ import {
   getOfferStatuses,
   getAvailableCurrencies,
   formatCurrency,
-  formatPrice,
+  formatUnitPrice,
   formatTotalPrice,
   calculateLineTotal,
   calculateUnitPriceTotal,
@@ -53,7 +53,6 @@ import {
   updateLineItem,
   addQuantityPrice,
   addUnitPrice,
-  toggleUnitPrices,
   setActivePrice,
   type UnitPrice,
   type UnitPriceDto,
@@ -61,7 +60,17 @@ import {
   processUnitPricesForUpdate,
   getActivePrice,
   getActivePriceType,
-  prepareLineItemForUnitPrices,
+  prepareLineItemForUnitPricesLegacy,
+  // New offer-level unit pricing functions
+  toggleOfferUnitPrices,
+  bulkUpdateOfferUnitPrices,
+  syncUnitPricesAcrossOffer,
+  migrateOfferToUnitPrices,
+  offerUsesUnitPrices,
+  getOfferUnitPriceSettings,
+  formatUnitPriceForOffer,
+  formatTotalPriceForOffer,
+  calculateLineItemTotal,
 } from "@/api/offers";
 import { getAllInquiries, type Inquiry } from "@/api/inquiry";
 import { getAllCustomers } from "@/api/customers";
@@ -94,6 +103,8 @@ const OffersPage: React.FC = () => {
   const [showCopyPasteModal, setShowCopyPasteModal] = useState(false);
   const [showUnitPriceSettingsModal, setShowUnitPriceSettingsModal] =
     useState(false);
+  const [showOfferUnitPriceSettingsModal, setShowOfferUnitPriceSettingsModal] =
+    useState(false);
 
   // Selected items
   const [selectedOffer, setSelectedOffer] = useState<any>(null);
@@ -109,19 +120,25 @@ const OffersPage: React.FC = () => {
     title: "",
     currency: "EUR",
     validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+    useUnitPrices: false,
+    unitPriceDecimalPlaces: 3,
+    totalPriceDecimalPlaces: 2,
+    maxUnitPriceColumns: 3,
   });
 
   const [editFormData, setEditFormData] = useState<any>({});
   const [copyPasteData, setCopyPasteData] = useState("");
 
-  // Unit price form states
+  // Unit price form states (for line items)
   const [unitPriceFormData, setUnitPriceFormData] = useState({
     quantity: "",
     unitPrice: "",
     isActive: false,
   });
 
-  const [unitPriceSettings, setUnitPriceSettings] = useState({
+  // Unit price settings at offer level
+  const [offerUnitPriceSettings, setOfferUnitPriceSettings] = useState({
+    useUnitPrices: false,
     unitPriceDecimalPlaces: 3,
     totalPriceDecimalPlaces: 2,
     maxUnitPriceColumns: 3,
@@ -186,6 +203,7 @@ const OffersPage: React.FC = () => {
       console.error("Error fetching inquiries:", error);
     }
   };
+
   const fetchCustomers = async () => {
     try {
       const response = await getAllCustomers();
@@ -218,12 +236,14 @@ const OffersPage: React.FC = () => {
       setSelectedInquiry(null);
     }
   };
+
   const handleOpenCreateModal = () => {
     setSelectedCustomerId("");
     setSelectedInquiry(null);
     setFilteredInquiries(inquiries);
     setShowCreateModal(true);
   };
+
   // Handle offer creation
   const handleCreateOffer = async () => {
     if (!selectedInquiry) {
@@ -279,6 +299,10 @@ const OffersPage: React.FC = () => {
     try {
       const response = await createOfferRevision(offer.id, {
         title: `Revision of ${offer.offerNumber}`,
+        useUnitPrices: offer.useUnitPrices,
+        unitPriceDecimalPlaces: offer.unitPriceDecimalPlaces,
+        totalPriceDecimalPlaces: offer.totalPriceDecimalPlaces,
+        maxUnitPriceColumns: offer.maxUnitPriceColumns,
       });
       if (response.success) {
         fetchOffers();
@@ -359,6 +383,11 @@ const OffersPage: React.FC = () => {
       shippingCost: offer.shippingCost,
       currency: offer.currency,
       deliveryAddress: offer.deliveryAddress,
+      // Unit pricing settings at offer level
+      useUnitPrices: offer.useUnitPrices,
+      unitPriceDecimalPlaces: offer.unitPriceDecimalPlaces,
+      totalPriceDecimalPlaces: offer.totalPriceDecimalPlaces,
+      maxUnitPriceColumns: offer.maxUnitPriceColumns,
     });
     setShowEditModal(true);
   };
@@ -415,28 +444,29 @@ const OffersPage: React.FC = () => {
     setEditingLineItemData({});
   };
 
-  // Handle toggle unit prices for line item
-  const handleToggleUnitPrices = async (
-    lineItemId: string,
+  // Handle toggle unit prices for entire offer
+  const handleToggleOfferUnitPrices = async (
+    offerId: string,
     useUnitPrices: boolean
   ) => {
     try {
-      await toggleUnitPrices(lineItemId, useUnitPrices);
+      await toggleOfferUnitPrices(offerId, useUnitPrices);
 
       // Refresh offer data
       if (selectedOffer) {
         const updatedOffer = await getOfferById(selectedOffer.id);
         if (updatedOffer.success) {
           setSelectedOffer(updatedOffer.data);
+          fetchOffers();
         }
       }
     } catch (error) {
-      console.error("Error toggling unit prices:", error);
+      console.error("Error toggling offer unit prices:", error);
       toast.error("Failed to toggle unit prices");
     }
   };
 
-  // Handle adding unit price
+  // Handle adding unit price to line item
   const handleAddUnitPrice = async (lineItemId: string) => {
     if (!unitPriceFormData.quantity || !unitPriceFormData.unitPrice) {
       toast.error("Please enter quantity and unit price");
@@ -470,26 +500,29 @@ const OffersPage: React.FC = () => {
     }
   };
 
-  // Handle updating unit price settings
-  const handleUpdateUnitPriceSettings = async (lineItemId: string) => {
+  // Handle updating unit price settings at offer level
+  const handleUpdateOfferUnitPriceSettings = async () => {
+    if (!selectedOffer) return;
+
     try {
       const updateData = {
-        unitPriceDecimalPlaces: unitPriceSettings.unitPriceDecimalPlaces,
-        totalPriceDecimalPlaces: unitPriceSettings.totalPriceDecimalPlaces,
-        maxUnitPriceColumns: unitPriceSettings.maxUnitPriceColumns,
+        unitPriceDecimalPlaces: offerUnitPriceSettings.unitPriceDecimalPlaces,
+        totalPriceDecimalPlaces: offerUnitPriceSettings.totalPriceDecimalPlaces,
+        maxUnitPriceColumns: offerUnitPriceSettings.maxUnitPriceColumns,
       };
 
-      await updateLineItem(selectedOffer.id, lineItemId, updateData);
+      await updateOffer(selectedOffer.id, updateData);
 
       // Refresh offer data
       const updatedOffer = await getOfferById(selectedOffer.id);
       if (updatedOffer.success) {
         setSelectedOffer(updatedOffer.data);
+        fetchOffers();
       }
 
-      setShowUnitPriceSettingsModal(false);
+      setShowOfferUnitPriceSettingsModal(false);
     } catch (error) {
-      console.error("Error updating unit price settings:", error);
+      console.error("Error updating offer unit price settings:", error);
       toast.error("Failed to update settings");
     }
   };
@@ -580,11 +613,33 @@ const OffersPage: React.FC = () => {
       toast.error("Failed to delete unit price");
     }
   };
+
+  // Sync unit prices across all line items
+  const handleSyncUnitPricesAcrossOffer = async (offerId: string) => {
+    try {
+      await syncUnitPricesAcrossOffer(offerId);
+
+      // Refresh offer data
+      const updatedOffer = await getOfferById(offerId);
+      if (updatedOffer.success) {
+        setSelectedOffer(updatedOffer.data);
+        fetchOffers();
+      }
+    } catch (error) {
+      console.error("Error syncing unit prices:", error);
+      toast.error("Failed to sync unit prices");
+    }
+  };
+
   const resetCreateForm = () => {
     setOfferFormData({
       title: "",
       currency: "EUR",
       validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      useUnitPrices: false,
+      unitPriceDecimalPlaces: 3,
+      totalPriceDecimalPlaces: 2,
+      maxUnitPriceColumns: 3,
     });
     setSelectedInquiry(null);
     setSelectedCustomerId(""); // Reset customer filter
@@ -610,24 +665,79 @@ const OffersPage: React.FC = () => {
     }
   };
 
-  // Open unit price settings modal
+  // Helper function to determine what to display in the amount column
+  const getOfferAmountDisplay = (offer: any) => {
+    if (offer.useUnitPrices) {
+      // For unit price offers, count unit price sets across all line items
+      const unitPriceSets =
+        offer.lineItems
+          ?.filter((item: any) => !item.isComponent)
+          .reduce((total: number, item: any) => {
+            return total + (item.unitPrices?.length || 0);
+          }, 0) || 0;
+
+      return (
+        <div className="text-center">
+          <div className="text-sm font-medium text-green-700">
+            {unitPriceSets} unit sets
+          </div>
+          <div className="text-xs text-gray-500">
+            {formatCurrency(offer.totalAmount || 0, offer.currency)}
+          </div>
+        </div>
+      );
+    } else {
+      // For normal offers, show the total amount
+      return (
+        <div className="space-y-1 text-center">
+          <div className="text-sm font-bold text-gray-900">
+            {formatCurrency(offer.totalAmount || 0, offer.currency)}
+          </div>
+          <div className="text-xs text-gray-500">
+            {offer.lineItems?.filter((li: any) => !li.isComponent).length || 0}{" "}
+            items
+          </div>
+        </div>
+      );
+    }
+  };
+  // Open unit price settings modal for line item (deprecated but kept for migration)
   const openUnitPriceSettings = (lineItem: any) => {
+    console.warn(
+      "Line item unit price settings are deprecated. Use offer-level settings instead."
+    );
     setSelectedLineItem(lineItem);
-    setUnitPriceSettings({
-      unitPriceDecimalPlaces: lineItem.unitPriceDecimalPlaces || 3,
-      totalPriceDecimalPlaces: lineItem.totalPriceDecimalPlaces || 2,
-      maxUnitPriceColumns: lineItem.maxUnitPriceColumns || 3,
+    // Set to offer's settings instead of line item's
+    setOfferUnitPriceSettings({
+      useUnitPrices: selectedOffer?.useUnitPrices || false,
+      unitPriceDecimalPlaces: selectedOffer?.unitPriceDecimalPlaces || 3,
+      totalPriceDecimalPlaces: selectedOffer?.totalPriceDecimalPlaces || 2,
+      maxUnitPriceColumns: selectedOffer?.maxUnitPriceColumns || 3,
     });
-    setShowUnitPriceSettingsModal(true);
+    setShowOfferUnitPriceSettingsModal(true);
+  };
+
+  // Open offer-level unit price settings modal
+  const openOfferUnitPriceSettings = (offer: any) => {
+    setSelectedOffer(offer);
+    setOfferUnitPriceSettings({
+      useUnitPrices: offer.useUnitPrices || false,
+      unitPriceDecimalPlaces: offer.unitPriceDecimalPlaces || 3,
+      totalPriceDecimalPlaces: offer.totalPriceDecimalPlaces || 2,
+      maxUnitPriceColumns: offer.maxUnitPriceColumns || 3,
+    });
+    setShowOfferUnitPriceSettingsModal(true);
   };
 
   // Render price display based on type
   const renderPriceDisplay = (item: any, offer: any) => {
-    if (item.useUnitPrices && item.unitPrices && item.unitPrices.length > 0) {
+    const usesUnitPrices = offerUsesUnitPrices(offer);
+
+    if (usesUnitPrices && item.unitPrices && item.unitPrices.length > 0) {
       return (
         <div className="space-y-1">
           {item.unitPrices
-            .slice(0, item.maxUnitPriceColumns || 3)
+            .slice(0, offer.maxUnitPriceColumns || 3)
             .map((up: UnitPrice, idx: number) => (
               <div
                 key={up.id}
@@ -636,7 +746,10 @@ const OffersPage: React.FC = () => {
                 }`}
               >
                 {up.quantity} pcs:{" "}
-                {formatPrice(up.unitPrice, item.unitPriceDecimalPlaces || 3)}
+                {formatUnitPrice(
+                  up.unitPrice,
+                  offer.unitPriceDecimalPlaces || 3
+                )}
                 /unit
                 {up.isActive && (
                   <CheckCircleIcon className="h-3 w-3 inline ml-1" />
@@ -655,7 +768,7 @@ const OffersPage: React.FC = () => {
                 qp.isActive ? "font-bold text-green-700" : "text-gray-600"
               }`}
             >
-              {qp.quantity} pcs: {formatPrice(qp.price, 3)}
+              {qp.quantity} pcs: {formatUnitPrice(qp.price, 3)}
               {qp.isActive && (
                 <CheckCircleIcon className="h-3 w-3 inline ml-1" />
               )}
@@ -666,7 +779,7 @@ const OffersPage: React.FC = () => {
     } else if (item.basePrice) {
       return (
         <div className="text-sm text-gray-600">
-          {item.baseQuantity || "1"} × {formatPrice(item.basePrice, 3)}
+          {item.baseQuantity || "1"} × {formatUnitPrice(item.basePrice, 3)}
         </div>
       );
     } else {
@@ -727,7 +840,7 @@ const OffersPage: React.FC = () => {
 
               <CustomButton
                 gradient={true}
-                onClick={() => setShowCreateModal(true)}
+                onClick={handleOpenCreateModal}
                 className="px-3 py-2 text-sm bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-all flex items-center gap-2"
               >
                 <PlusIcon className="h-4 w-4" />
@@ -808,6 +921,11 @@ const OffersPage: React.FC = () => {
                                 </div>
                                 <div className="text-xs text-gray-400 mt-1">
                                   Created: {formatDate(offer.createdAt)}
+                                  {offer.useUnitPrices && (
+                                    <span className="ml-2 px-1.5 py-0.5 text-xs bg-green-100 text-green-800 rounded">
+                                      Unit Pricing
+                                    </span>
+                                  )}
                                 </div>
                               </div>
                             </div>
@@ -829,20 +947,7 @@ const OffersPage: React.FC = () => {
                           </div>
                         </td>
                         <td className="px-4 py-3 text-center">
-                          <div className="space-y-1">
-                            <div className="text-sm font-bold text-gray-900">
-                              {formatCurrency(
-                                offer.totalAmount || 0,
-                                offer.currency
-                              )}
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              {offer.lineItems?.filter(
-                                (li: any) => !li.isComponent
-                              ).length || 0}{" "}
-                              items
-                            </div>
-                          </div>
+                          {getOfferAmountDisplay(offer)}
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex flex-col gap-1 items-center">
@@ -917,6 +1022,76 @@ const OffersPage: React.FC = () => {
                         <tr className="bg-gray-50/50">
                           <td colSpan={5} className="px-4 py-3">
                             <div className="pl-8">
+                              {/* Unit pricing status for offer */}
+                              <div className="mb-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                                <div className="flex justify-between items-center">
+                                  <div className="flex items-center gap-2">
+                                    <CalculatorIcon className="h-4 w-4 text-gray-600" />
+                                    <h4 className="font-medium text-gray-900">
+                                      Pricing Configuration
+                                    </h4>
+                                  </div>
+                                  <div className="flex items-center gap-3">
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-sm text-gray-600">
+                                        Unit Pricing:
+                                      </span>
+                                      <button
+                                        onClick={() =>
+                                          handleToggleOfferUnitPrices(
+                                            offer.id,
+                                            !offer.useUnitPrices
+                                          )
+                                        }
+                                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                                          offer.useUnitPrices
+                                            ? "bg-green-500"
+                                            : "bg-gray-300"
+                                        }`}
+                                      >
+                                        <span
+                                          className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
+                                            offer.useUnitPrices
+                                              ? "translate-x-5"
+                                              : "translate-x-1"
+                                          }`}
+                                        />
+                                      </button>
+                                    </div>
+                                    <button
+                                      onClick={() =>
+                                        openOfferUnitPriceSettings(offer)
+                                      }
+                                      className="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                                    >
+                                      <CogIcon className="h-4 w-4" />
+                                      Settings
+                                    </button>
+                                    {/* {offer.useUnitPrices && (
+                                      <button
+                                        onClick={() =>
+                                          handleSyncUnitPricesAcrossOffer(
+                                            offer.id
+                                          )
+                                        }
+                                        className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
+                                      >
+                                        Sync All Line Items
+                                      </button>
+                                    )} */}
+                                  </div>
+                                </div>
+                                {offer.useUnitPrices && (
+                                  <div className="mt-2 text-xs text-gray-600">
+                                    Decimal places:{" "}
+                                    {offer.unitPriceDecimalPlaces || 3} for unit
+                                    prices, {offer.totalPriceDecimalPlaces || 2}{" "}
+                                    for totals • Max columns:{" "}
+                                    {offer.maxUnitPriceColumns || 3}
+                                  </div>
+                                )}
+                              </div>
+
                               {/* Show inquiry snapshot */}
                               {offer.inquirySnapshot && (
                                 <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
@@ -1120,47 +1295,6 @@ const OffersPage: React.FC = () => {
                                                     {item.notes}
                                                   </div>
                                                 )}
-
-                                                {/* Unit Price Toggle */}
-                                                <div className="flex items-center gap-2 mt-2">
-                                                  <span className="text-xs text-gray-500">
-                                                    Unit Prices:
-                                                  </span>
-                                                  <button
-                                                    onClick={() =>
-                                                      handleToggleUnitPrices(
-                                                        item.id,
-                                                        !item.useUnitPrices
-                                                      )
-                                                    }
-                                                    className={`relative inline-flex h-4 w-8 items-center rounded-full transition-colors ${
-                                                      item.useUnitPrices
-                                                        ? "bg-green-500"
-                                                        : "bg-gray-300"
-                                                    }`}
-                                                  >
-                                                    <span
-                                                      className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
-                                                        item.useUnitPrices
-                                                          ? "translate-x-4"
-                                                          : "translate-x-1"
-                                                      }`}
-                                                    />
-                                                  </button>
-                                                  {item.useUnitPrices && (
-                                                    <button
-                                                      onClick={() =>
-                                                        openUnitPriceSettings(
-                                                          item
-                                                        )
-                                                      }
-                                                      className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1"
-                                                    >
-                                                      <CogIcon className="h-3 w-3" />
-                                                      Settings
-                                                    </button>
-                                                  )}
-                                                </div>
                                               </div>
                                               <div className="text-right">
                                                 <div className="flex items-center gap-2">
@@ -1180,7 +1314,10 @@ const OffersPage: React.FC = () => {
                                                 </div>
                                                 <div className="text-sm font-bold text-gray-900 mt-1">
                                                   {formatCurrency(
-                                                    item.lineTotal || 0,
+                                                    calculateLineItemTotal(
+                                                      item,
+                                                      offer.useUnitPrices
+                                                    ) || 0,
                                                     offer.currency
                                                   )}
                                                 </div>
@@ -1232,67 +1369,48 @@ const OffersPage: React.FC = () => {
                                   <h4 className="font-medium text-gray-900 mb-2">
                                     Summary
                                   </h4>
-                                  <div className="space-y-2">
-                                    <div className="flex justify-between text-sm">
-                                      <span className="text-gray-600">
-                                        Subtotal:
-                                      </span>
-                                      <span className="font-medium">
-                                        {formatCurrency(
-                                          offer.subtotal || 0,
-                                          offer.currency
-                                        )}
-                                      </span>
-                                    </div>
-                                    {offer.discountAmount > 0 && (
-                                      <div className="flex justify-between text-sm">
+                                  {offer.useUnitPrices && (
+                                    <div className="mb-3 pb-3 border-b">
+                                      <div className="flex justify-between items-center text-sm">
                                         <span className="text-gray-600">
-                                          Discount:
+                                          Unit Price Sets:
                                         </span>
-                                        <span className="font-medium text-red-600">
-                                          -
-                                          {formatCurrency(
-                                            offer.discountAmount,
-                                            offer.currency
-                                          )}
-                                        </span>
-                                      </div>
-                                    )}
-                                    {offer.shippingCost > 0 && (
-                                      <div className="flex justify-between text-sm">
-                                        <span className="text-gray-600">
-                                          Shipping:
-                                        </span>
-                                        <span className="font-medium">
-                                          {formatCurrency(
-                                            offer.shippingCost,
-                                            offer.currency
-                                          )}
+                                        <span className="font-medium text-green-700">
+                                          {offer.lineItems
+                                            ?.filter(
+                                              (item: any) => !item.isComponent
+                                            )
+                                            .reduce(
+                                              (total: number, item: any) => {
+                                                return (
+                                                  total +
+                                                  (item.unitPrices?.length || 0)
+                                                );
+                                              },
+                                              0
+                                            ) || 0}{" "}
+                                          sets
                                         </span>
                                       </div>
-                                    )}
-                                    <div className="flex justify-between text-sm">
-                                      <span className="text-gray-600">
-                                        VAT (19%):
-                                      </span>
-                                      <span className="font-medium">
-                                        {formatCurrency(
-                                          offer.taxAmount || 0,
-                                          offer.currency
-                                        )}
-                                      </span>
-                                    </div>
-                                    <div className="border-t pt-2">
-                                      <div className="flex justify-between font-bold">
-                                        <span>Total:</span>
-                                        <span>
-                                          {formatCurrency(
-                                            offer.totalAmount || 0,
-                                            offer.currency
-                                          )}
-                                        </span>
+                                      <div className="text-xs text-gray-500 mt-1">
+                                        Configured at offer level with{" "}
+                                        {offer.maxUnitPriceColumns || 3} max
+                                        columns
                                       </div>
                                     </div>
+                                  )}
+                                </div>
+                                <div className="space-y-2">
+                                  <div className="flex justify-between text-sm">
+                                    <span className="text-gray-600">
+                                      Subtotal:
+                                    </span>
+                                    <span className="font-medium">
+                                      {formatCurrency(
+                                        offer.subtotal || 0,
+                                        offer.currency
+                                      )}
+                                    </span>
                                   </div>
 
                                   {/* Customer snapshot */}
@@ -1443,6 +1561,17 @@ const OffersPage: React.FC = () => {
                     Offer {selectedOffer.offerNumber}
                   </h2>
                   <p className="text-sm text-gray-600">{selectedOffer.title}</p>
+                  {selectedOffer.useUnitPrices && (
+                    <div className="mt-1 flex items-center gap-2">
+                      <span className="px-2 py-0.5 text-xs bg-green-100 text-green-800 rounded">
+                        Unit Pricing Enabled
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        {selectedOffer.unitPriceDecimalPlaces || 3} decimal
+                        places
+                      </span>
+                    </div>
+                  )}
                 </div>
                 <div className="flex gap-2">
                   <button
@@ -1596,7 +1725,9 @@ const OffersPage: React.FC = () => {
                             Item Description
                           </th>
                           <th className="px-3 py-2 text-left font-medium text-gray-700">
-                            Quantity Prices
+                            {selectedOffer.useUnitPrices
+                              ? "Unit Prices"
+                              : "Quantity Prices"}
                           </th>
                           <th className="px-3 py-2 text-left font-medium text-gray-700">
                             Total
@@ -1622,7 +1753,36 @@ const OffersPage: React.FC = () => {
                                 </div>
                               </td>
                               <td className="px-3 py-2">
-                                {item.quantityPrices?.length > 0 ? (
+                                {selectedOffer.useUnitPrices &&
+                                item.unitPrices?.length > 0 ? (
+                                  <div className="space-y-1">
+                                    {item.unitPrices
+                                      .slice(
+                                        0,
+                                        selectedOffer.maxUnitPriceColumns || 3
+                                      )
+                                      .map((up: UnitPrice, idx: number) => (
+                                        <div
+                                          key={up.id}
+                                          className={`flex items-center gap-2 ${
+                                            up.isActive ? "font-bold" : ""
+                                          }`}
+                                        >
+                                          <span>{up.quantity} pcs</span>
+                                          <span>×</span>
+                                          <span>
+                                            {formatUnitPriceForOffer(
+                                              up.unitPrice,
+                                              selectedOffer
+                                            )}
+                                          </span>
+                                          {up.isActive && (
+                                            <CheckCircleIcon className="h-3 w-3 text-green-600" />
+                                          )}
+                                        </div>
+                                      ))}
+                                  </div>
+                                ) : item.quantityPrices?.length > 0 ? (
                                   <div className="space-y-1">
                                     {item.quantityPrices.map(
                                       (qp: any, idx: any) => (
@@ -1666,7 +1826,10 @@ const OffersPage: React.FC = () => {
                               </td>
                               <td className="px-3 py-2 font-medium">
                                 {formatCurrency(
-                                  item.lineTotal || 0,
+                                  calculateLineItemTotal(
+                                    item,
+                                    selectedOffer.useUnitPrices
+                                  ) || 0,
                                   selectedOffer.currency
                                 )}
                               </td>
@@ -1781,7 +1944,7 @@ const OffersPage: React.FC = () => {
               </div>
 
               <div className="space-y-4">
-                {/* NEW: Customer Filter */}
+                {/* Customer Filter */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Filter by Customer (Optional)
@@ -1800,7 +1963,7 @@ const OffersPage: React.FC = () => {
                   </select>
                 </div>
 
-                {/* Inquiry Selection - UPDATED to use filteredInquiries */}
+                {/* Inquiry Selection */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Select Inquiry *
@@ -1853,7 +2016,7 @@ const OffersPage: React.FC = () => {
 
                 {selectedInquiry && (
                   <>
-                    {/* Offer Details - this section remains the same */}
+                    {/* Offer Details */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Offer Title *
@@ -1923,7 +2086,107 @@ const OffersPage: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Assembly specific fields - this section remains the same */}
+                    {/* Unit Pricing Configuration */}
+                    <div className="p-4 bg-gray-50 rounded-lg">
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="font-medium text-gray-900">
+                          Unit Pricing Configuration
+                        </h4>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-gray-600">
+                            Enable Unit Pricing:
+                          </span>
+                          <button
+                            onClick={() =>
+                              setOfferFormData({
+                                ...offerFormData,
+                                useUnitPrices: !offerFormData.useUnitPrices,
+                              })
+                            }
+                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                              offerFormData.useUnitPrices
+                                ? "bg-green-500"
+                                : "bg-gray-300"
+                            }`}
+                          >
+                            <span
+                              className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
+                                offerFormData.useUnitPrices
+                                  ? "translate-x-5"
+                                  : "translate-x-1"
+                              }`}
+                            />
+                          </button>
+                        </div>
+                      </div>
+
+                      {offerFormData.useUnitPrices && (
+                        <div className="grid grid-cols-3 gap-3">
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                              Unit Price Decimals
+                            </label>
+                            <select
+                              value={offerFormData.unitPriceDecimalPlaces}
+                              onChange={(e) =>
+                                setOfferFormData({
+                                  ...offerFormData,
+                                  unitPriceDecimalPlaces: parseInt(
+                                    e.target.value
+                                  ),
+                                })
+                              }
+                              className="w-full px-2 py-1 text-xs border border-gray-300 rounded"
+                            >
+                              <option value={2}>2</option>
+                              <option value={3}>3</option>
+                              <option value={4}>4</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                              Total Price Decimals
+                            </label>
+                            <select
+                              value={offerFormData.totalPriceDecimalPlaces}
+                              onChange={(e) =>
+                                setOfferFormData({
+                                  ...offerFormData,
+                                  totalPriceDecimalPlaces: parseInt(
+                                    e.target.value
+                                  ),
+                                })
+                              }
+                              className="w-full px-2 py-1 text-xs border border-gray-300 rounded"
+                            >
+                              <option value={2}>2</option>
+                              <option value={3}>3</option>
+                              <option value={4}>4</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                              Max Columns
+                            </label>
+                            <input
+                              type="number"
+                              min="1"
+                              max="10"
+                              value={offerFormData.maxUnitPriceColumns}
+                              onChange={(e) =>
+                                setOfferFormData({
+                                  ...offerFormData,
+                                  maxUnitPriceColumns: parseInt(e.target.value),
+                                })
+                              }
+                              className="w-full px-2 py-1 text-xs border border-gray-300 rounded"
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Assembly specific fields */}
                     {selectedInquiry.isAssembly && (
                       <div className="space-y-3">
                         <h4 className="font-medium text-gray-900">
@@ -1971,7 +2234,7 @@ const OffersPage: React.FC = () => {
                       </div>
                     )}
 
-                    {/* Summary - this section remains the same */}
+                    {/* Summary */}
                     <div className="bg-gray-50 p-4 rounded-lg">
                       <h4 className="font-medium text-gray-900 mb-2">
                         Summary
@@ -2001,6 +2264,14 @@ const OffersPage: React.FC = () => {
                             {selectedInquiry.isAssembly
                               ? "Assembly"
                               : "Standard"}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Pricing Mode:</span>
+                          <span className="font-medium">
+                            {offerFormData.useUnitPrices
+                              ? "Unit Pricing"
+                              : "Quantity Pricing"}
                           </span>
                         </div>
                       </div>
@@ -2160,22 +2431,100 @@ const OffersPage: React.FC = () => {
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Payment Terms
-                  </label>
-                  <input
-                    type="text"
-                    value={editFormData.paymentTerms || ""}
-                    onChange={(e) =>
-                      setEditFormData({
-                        ...editFormData,
-                        paymentTerms: e.target.value,
-                      })
-                    }
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent"
-                    placeholder="e.g., 30 days net"
-                  />
+                {/* Unit Pricing Configuration */}
+                <div className="p-4 bg-gray-50 rounded-lg">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="font-medium text-gray-900">
+                      Unit Pricing Configuration
+                    </h4>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-gray-600">
+                        Enable Unit Pricing:
+                      </span>
+                      <button
+                        onClick={() =>
+                          setEditFormData({
+                            ...editFormData,
+                            useUnitPrices: !editFormData.useUnitPrices,
+                          })
+                        }
+                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                          editFormData.useUnitPrices
+                            ? "bg-green-500"
+                            : "bg-gray-300"
+                        }`}
+                      >
+                        <span
+                          className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
+                            editFormData.useUnitPrices
+                              ? "translate-x-5"
+                              : "translate-x-1"
+                          }`}
+                        />
+                      </button>
+                    </div>
+                  </div>
+
+                  {editFormData.useUnitPrices && (
+                    <div className="grid grid-cols-3 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                          Unit Price Decimals
+                        </label>
+                        <select
+                          value={editFormData.unitPriceDecimalPlaces || 3}
+                          onChange={(e) =>
+                            setEditFormData({
+                              ...editFormData,
+                              unitPriceDecimalPlaces: parseInt(e.target.value),
+                            })
+                          }
+                          className="w-full px-2 py-1 text-xs border border-gray-300 rounded"
+                        >
+                          <option value={2}>2</option>
+                          <option value={3}>3</option>
+                          <option value={4}>4</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                          Total Price Decimals
+                        </label>
+                        <select
+                          value={editFormData.totalPriceDecimalPlaces || 2}
+                          onChange={(e) =>
+                            setEditFormData({
+                              ...editFormData,
+                              totalPriceDecimalPlaces: parseInt(e.target.value),
+                            })
+                          }
+                          className="w-full px-2 py-1 text-xs border border-gray-300 rounded"
+                        >
+                          <option value={2}>2</option>
+                          <option value={3}>3</option>
+                          <option value={4}>4</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                          Max Columns
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          max="10"
+                          value={editFormData.maxUnitPriceColumns || 3}
+                          onChange={(e) =>
+                            setEditFormData({
+                              ...editFormData,
+                              maxUnitPriceColumns: parseInt(e.target.value),
+                            })
+                          }
+                          className="w-full px-2 py-1 text-xs border border-gray-300 rounded"
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
@@ -2262,7 +2611,7 @@ const OffersPage: React.FC = () => {
         </div>
       )}
 
-      {/* Edit Pricing Modal - UPDATED for Unit Prices */}
+      {/* Edit Pricing Modal - UPDATED for Offer-Level Unit Pricing */}
       {showPricingModal && selectedOffer && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl shadow-xl max-w-5xl w-full max-h-[90vh] overflow-y-auto">
@@ -2273,8 +2622,9 @@ const OffersPage: React.FC = () => {
                     Edit Pricing - {selectedOffer.offerNumber}
                   </h2>
                   <p className="text-sm text-gray-600">
-                    Set prices for each item. Toggle between unit prices (3
-                    decimal places) and quantity prices.
+                    {selectedOffer.useUnitPrices
+                      ? "Using unit prices (configured at offer level)"
+                      : "Using legacy quantity prices"}
                   </p>
                 </div>
                 <div className="flex gap-2">
@@ -2285,6 +2635,17 @@ const OffersPage: React.FC = () => {
                     <ClipboardIcon className="h-4 w-4" />
                     Copy/Paste from Spreadsheet
                   </button>
+                  {/* {selectedOffer.useUnitPrices && (
+                    <button
+                      onClick={() =>
+                        handleSyncUnitPricesAcrossOffer(selectedOffer.id)
+                      }
+                      className="px-3 py-2 text-sm text-green-700 bg-white border border-green-300 rounded-lg hover:bg-green-50 transition-all flex items-center gap-2"
+                    >
+                      <ArrowPathIcon className="h-4 w-4" />
+                      Sync All Line Items
+                    </button>
+                  )} */}
                   <button
                     onClick={() => setShowPricingModal(false)}
                     className="text-gray-400 hover:text-gray-600 transition-colors"
@@ -2295,11 +2656,91 @@ const OffersPage: React.FC = () => {
               </div>
 
               <div className="space-y-6">
+                {/* Offer-Level Unit Pricing Configuration */}
+                <div className="p-4 border border-gray-200 rounded-lg bg-gray-50">
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <h3 className="font-medium text-gray-900">
+                        Offer-Level Unit Pricing Configuration
+                      </h3>
+                      <p className="text-sm text-gray-600">
+                        Settings apply to all line items in this offer
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() =>
+                          openOfferUnitPriceSettings(selectedOffer)
+                        }
+                        className="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                      >
+                        <CogIcon className="h-4 w-4" />
+                        Settings
+                      </button>
+                      <button
+                        onClick={() =>
+                          handleToggleOfferUnitPrices(
+                            selectedOffer.id,
+                            !selectedOffer.useUnitPrices
+                          )
+                        }
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                          selectedOffer.useUnitPrices
+                            ? "bg-green-500"
+                            : "bg-gray-300"
+                        }`}
+                      >
+                        <span
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                            selectedOffer.useUnitPrices
+                              ? "translate-x-6"
+                              : "translate-x-1"
+                          }`}
+                        />
+                      </button>
+                    </div>
+                  </div>
+                  {selectedOffer.useUnitPrices && (
+                    <div className="grid grid-cols-3 gap-4 text-sm">
+                      <div>
+                        <div className="font-medium text-gray-900">
+                          Unit Price Decimals
+                        </div>
+                        <div className="text-gray-600">
+                          {selectedOffer.unitPriceDecimalPlaces || 3}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="font-medium text-gray-900">
+                          Total Price Decimals
+                        </div>
+                        <div className="text-gray-600">
+                          {selectedOffer.totalPriceDecimalPlaces || 2}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="font-medium text-gray-900">
+                          Max Columns
+                        </div>
+                        <div className="text-gray-600">
+                          {selectedOffer.maxUnitPriceColumns || 3}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 {selectedOffer.lineItems
                   ?.filter((item: any) => !item.isComponent)
                   .map((item: any) => {
-                    const activePrice = getActivePrice(item);
-                    const activePriceType = getActivePriceType(item);
+                    const activePrice = getActivePrice(
+                      item,
+                      selectedOffer.useUnitPrices
+                    );
+                    const activePriceType = getActivePriceType(
+                      item,
+                      selectedOffer.useUnitPrices
+                    );
 
                     return (
                       <div
@@ -2320,7 +2761,10 @@ const OffersPage: React.FC = () => {
                           <div className="text-right">
                             <div className="text-lg font-bold text-gray-900">
                               {formatCurrency(
-                                item.lineTotal || 0,
+                                calculateLineItemTotal(
+                                  item,
+                                  selectedOffer.useUnitPrices
+                                ) || 0,
                                 selectedOffer.currency
                               )}
                             </div>
@@ -2335,57 +2779,14 @@ const OffersPage: React.FC = () => {
                           </div>
                         </div>
 
-                        {/* Unit Price Toggle */}
-                        <div className="flex items-center justify-between mb-4 p-3 bg-gray-50 rounded-lg">
-                          <div>
-                            <div className="font-medium text-gray-900">
-                              Unit Prices Feature
-                            </div>
-                            <div className="text-xs text-gray-600">
-                              {item.useUnitPrices
-                                ? "Using unit prices (3 decimal places)"
-                                : "Using legacy quantity prices"}
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <button
-                              onClick={() => openUnitPriceSettings(item)}
-                              className="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1"
-                            >
-                              <CogIcon className="h-4 w-4" />
-                              Settings
-                            </button>
-                            <button
-                              onClick={() =>
-                                handleToggleUnitPrices(
-                                  item.id,
-                                  !item.useUnitPrices
-                                )
-                              }
-                              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                                item.useUnitPrices
-                                  ? "bg-green-500"
-                                  : "bg-gray-300"
-                              }`}
-                            >
-                              <span
-                                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                                  item.useUnitPrices
-                                    ? "translate-x-6"
-                                    : "translate-x-1"
-                                }`}
-                              />
-                            </button>
-                          </div>
-                        </div>
-
                         {/* Price Tables */}
-                        {item.useUnitPrices ? (
+                        {selectedOffer.useUnitPrices ? (
                           // Unit Prices Table
                           <div className="space-y-3">
                             <div className="flex items-center justify-between">
                               <h4 className="font-medium text-gray-900">
-                                Unit Prices ({item.unitPriceDecimalPlaces || 3}{" "}
+                                Unit Prices (
+                                {selectedOffer.unitPriceDecimalPlaces || 3}{" "}
                                 decimal places)
                               </h4>
                               <button
@@ -2447,7 +2848,9 @@ const OffersPage: React.FC = () => {
                                                     totalPrice:
                                                       calculateUnitPriceTotal(
                                                         e.target.value,
-                                                        up.unitPrice
+                                                        up.unitPrice,
+                                                        selectedOffer.totalPriceDecimalPlaces ||
+                                                          2
                                                       ),
                                                   }
                                                 )
@@ -2462,7 +2865,15 @@ const OffersPage: React.FC = () => {
                                               </span>
                                               <input
                                                 type="number"
-                                                step="0.001"
+                                                step={
+                                                  selectedOffer.unitPriceDecimalPlaces ===
+                                                  3
+                                                    ? "0.001"
+                                                    : selectedOffer.unitPriceDecimalPlaces ===
+                                                      2
+                                                    ? "0.01"
+                                                    : "0.0001"
+                                                }
                                                 value={up.unitPrice}
                                                 onChange={(e) =>
                                                   handleUpdateUnitPrice(
@@ -2477,7 +2888,9 @@ const OffersPage: React.FC = () => {
                                                           up.quantity,
                                                           parseFloat(
                                                             e.target.value
-                                                          )
+                                                          ),
+                                                          selectedOffer.totalPriceDecimalPlaces ||
+                                                            2
                                                         ),
                                                     }
                                                   )
@@ -2815,7 +3228,13 @@ const OffersPage: React.FC = () => {
                             </label>
                             <input
                               type="number"
-                              step="0.001"
+                              step={
+                                selectedOffer?.unitPriceDecimalPlaces === 3
+                                  ? "0.001"
+                                  : selectedOffer?.unitPriceDecimalPlaces === 2
+                                  ? "0.01"
+                                  : "0.0001"
+                              }
                               value={unitPriceFormData.unitPrice}
                               onChange={(e) =>
                                 setUnitPriceFormData({
@@ -2865,17 +3284,19 @@ const OffersPage: React.FC = () => {
                   </div>
                 )}
 
-                {/* Unit Price Settings Modal */}
-                {showUnitPriceSettingsModal && selectedLineItem && (
+                {/* Offer-Level Unit Price Settings Modal */}
+                {showOfferUnitPriceSettingsModal && selectedOffer && (
                   <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-[60]">
                     <div className="bg-white rounded-2xl shadow-xl max-w-md w-full">
                       <div className="p-6">
                         <div className="flex items-center justify-between mb-6">
                           <h3 className="text-lg font-bold text-gray-900">
-                            Unit Price Settings
+                            Offer Unit Price Settings
                           </h3>
                           <button
-                            onClick={() => setShowUnitPriceSettingsModal(false)}
+                            onClick={() =>
+                              setShowOfferUnitPriceSettingsModal(false)
+                            }
                             className="text-gray-400 hover:text-gray-600"
                           >
                             <XMarkIcon className="h-5 w-5" />
@@ -2887,10 +3308,12 @@ const OffersPage: React.FC = () => {
                               Unit Price Decimal Places
                             </label>
                             <select
-                              value={unitPriceSettings.unitPriceDecimalPlaces}
+                              value={
+                                offerUnitPriceSettings.unitPriceDecimalPlaces
+                              }
                               onChange={(e) =>
-                                setUnitPriceSettings({
-                                  ...unitPriceSettings,
+                                setOfferUnitPriceSettings({
+                                  ...offerUnitPriceSettings,
                                   unitPriceDecimalPlaces: parseInt(
                                     e.target.value
                                   ),
@@ -2908,10 +3331,12 @@ const OffersPage: React.FC = () => {
                               Total Price Decimal Places
                             </label>
                             <select
-                              value={unitPriceSettings.totalPriceDecimalPlaces}
+                              value={
+                                offerUnitPriceSettings.totalPriceDecimalPlaces
+                              }
                               onChange={(e) =>
-                                setUnitPriceSettings({
-                                  ...unitPriceSettings,
+                                setOfferUnitPriceSettings({
+                                  ...offerUnitPriceSettings,
                                   totalPriceDecimalPlaces: parseInt(
                                     e.target.value
                                   ),
@@ -2932,10 +3357,10 @@ const OffersPage: React.FC = () => {
                               type="number"
                               min="1"
                               max="10"
-                              value={unitPriceSettings.maxUnitPriceColumns}
+                              value={offerUnitPriceSettings.maxUnitPriceColumns}
                               onChange={(e) =>
-                                setUnitPriceSettings({
-                                  ...unitPriceSettings,
+                                setOfferUnitPriceSettings({
+                                  ...offerUnitPriceSettings,
                                   maxUnitPriceColumns: parseInt(e.target.value),
                                 })
                               }
@@ -2945,18 +3370,14 @@ const OffersPage: React.FC = () => {
                           <div className="flex justify-end gap-2 pt-4">
                             <button
                               onClick={() =>
-                                setShowUnitPriceSettingsModal(false)
+                                setShowOfferUnitPriceSettingsModal(false)
                               }
                               className="px-4 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
                             >
                               Cancel
                             </button>
                             <button
-                              onClick={() =>
-                                handleUpdateUnitPriceSettings(
-                                  selectedLineItem.id
-                                )
-                              }
+                              onClick={handleUpdateOfferUnitPriceSettings}
                               className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                             >
                               Save Settings
@@ -3015,131 +3436,145 @@ const OffersPage: React.FC = () => {
         </div>
       )}
 
-      {/* Copy/Paste Prices Modal - Keep as is */}
+      {/* Copy/Paste Prices Modal */}
       {showCopyPasteModal && selectedOffer && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          {/* Copy/Paste Prices Modal */}
-          {showCopyPasteModal && selectedOffer && (
-            <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-              <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-                <div className="p-6">
-                  <div className="flex items-center justify-between mb-6">
-                    <div>
-                      <h2 className="text-xl font-bold text-gray-900">
-                        Copy/Paste Prices from Spreadsheet
-                      </h2>
-                    </div>
-                    <button
-                      onClick={() => setShowCopyPasteModal(false)}
-                      className="text-gray-400 hover:text-gray-600 transition-colors"
-                    >
-                      <XMarkIcon className="h-5 w-5" />
-                    </button>
+          <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900">
+                    Copy/Paste Prices from Spreadsheet
+                  </h2>
+                </div>
+                <button
+                  onClick={() => setShowCopyPasteModal(false)}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <XMarkIcon className="h-5 w-5" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Instructions
+                  </label>
+                  <div className="bg-blue-50 p-4 rounded-lg text-sm text-blue-800">
+                    <p className="font-medium mb-2">
+                      Expected format for{" "}
+                      {selectedOffer.useUnitPrices ? "Unit" : "Quantity"}{" "}
+                      Prices:
+                    </p>
+                    <ul className="list-disc pl-5 space-y-1">
+                      <li>One line per price level</li>
+                      <li>Columns separated by tabs or commas</li>
+                      <li>
+                        Format: Item Position, Quantity,{" "}
+                        {selectedOffer.useUnitPrices ? "Unit Price" : "Price"}
+                      </li>
+                      <li>Example: "1, 1000, 4.500" or "1\t1000\t4.500"</li>
+                      {selectedOffer.useUnitPrices && (
+                        <li>
+                          Unit prices should have{" "}
+                          {selectedOffer.unitPriceDecimalPlaces || 3} decimal
+                          places
+                        </li>
+                      )}
+                    </ul>
+                    <p className="mt-3">
+                      Position should match the item position in the offer. This
+                      will update the item's{" "}
+                      {selectedOffer.useUnitPrices
+                        ? "unit prices"
+                        : "quantity prices"}
+                      .
+                    </p>
                   </div>
+                </div>
 
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Instructions
-                      </label>
-                      <div className="bg-blue-50 p-4 rounded-lg text-sm text-blue-800">
-                        <p className="font-medium mb-2">
-                          Expected format for Unit Prices:
-                        </p>
-                        <ul className="list-disc pl-5 space-y-1">
-                          <li>One line per price level</li>
-                          <li>Columns separated by tabs or commas</li>
-                          <li>Format: Item Position, Quantity, Unit Price</li>
-                          <li>Example: "1, 1000, 4.500" or "1\t1000\t4.500"</li>
-                          <li>Unit prices should have 3 decimal places</li>
-                        </ul>
-                        <p className="mt-3">
-                          Position should match the item position in the offer.
-                          This will update the item's unit prices.
-                        </p>
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Paste Your Data
-                      </label>
-                      <textarea
-                        value={copyPasteData}
-                        onChange={(e) => setCopyPasteData(e.target.value)}
-                        rows={10}
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent font-mono"
-                        placeholder={`Example for Unit Prices (3 decimal places):
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Paste Your Data
+                  </label>
+                  <textarea
+                    value={copyPasteData}
+                    onChange={(e) => setCopyPasteData(e.target.value)}
+                    rows={10}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent font-mono"
+                    placeholder={
+                      selectedOffer.useUnitPrices
+                        ? `Example for Unit Prices (${
+                            selectedOffer.unitPriceDecimalPlaces || 3
+                          } decimal places):
 1, 1000, 4.500
 1, 5000, 4.200
 2, 1000, 8.750
 2, 5000, 8.250
 3, 500, 12.000
-3, 2000, 11.500
-
-Or for Quantity Prices:
+3, 2000, 11.500`
+                        : `Example for Quantity Prices:
 1, 1000, 4.50
 1, 5000, 4.20
 2, 1000, 8.75
 2, 5000, 8.25
 3, 500, 12.00
-3, 2000, 11.50`}
-                      />
-                    </div>
+3, 2000, 11.50`
+                    }
+                  />
+                </div>
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Preview
-                      </label>
-                      <div className="bg-gray-50 p-4 rounded-lg max-h-40 overflow-y-auto">
-                        {copyPasteData.trim() ? (
-                          <div className="space-y-2">
-                            {copyPasteData.split("\n").map(
-                              (line, idx) =>
-                                line.trim() && (
-                                  <div
-                                    key={idx}
-                                    className="text-sm text-gray-700 font-mono flex items-start gap-2"
-                                  >
-                                    <span className="text-gray-500 w-6">
-                                      {idx + 1}.
-                                    </span>
-                                    <span>{line}</span>
-                                  </div>
-                                )
-                            )}
-                          </div>
-                        ) : (
-                          <div className="text-gray-500 text-sm">
-                            Paste data to see preview...
-                          </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Preview
+                  </label>
+                  <div className="bg-gray-50 p-4 rounded-lg max-h-40 overflow-y-auto">
+                    {copyPasteData.trim() ? (
+                      <div className="space-y-2">
+                        {copyPasteData.split("\n").map(
+                          (line, idx) =>
+                            line.trim() && (
+                              <div
+                                key={idx}
+                                className="text-sm text-gray-700 font-mono flex items-start gap-2"
+                              >
+                                <span className="text-gray-500 w-6">
+                                  {idx + 1}.
+                                </span>
+                                <span>{line}</span>
+                              </div>
+                            )
                         )}
                       </div>
-                    </div>
-
-                    <div className="flex justify-end gap-2 pt-4">
-                      <button
-                        onClick={() => {
-                          setShowCopyPasteModal(false);
-                          setCopyPasteData("");
-                        }}
-                        className="px-4 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-all"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={handleCopyPastePrices}
-                        disabled={!copyPasteData.trim()}
-                        className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        Process Data
-                      </button>
-                    </div>
+                    ) : (
+                      <div className="text-gray-500 text-sm">
+                        Paste data to see preview...
+                      </div>
+                    )}
                   </div>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-4">
+                  <button
+                    onClick={() => {
+                      setShowCopyPasteModal(false);
+                      setCopyPasteData("");
+                    }}
+                    className="px-4 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-all"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleCopyPastePrices}
+                    disabled={!copyPasteData.trim()}
+                    className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Process Data
+                  </button>
                 </div>
               </div>
             </div>
-          )}{" "}
+          </div>
         </div>
       )}
     </div>

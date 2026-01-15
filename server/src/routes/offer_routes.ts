@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { OfferController } from "../controllers/offer_controller";
+
 const router: any = Router();
 const offerController = new OfferController();
 
@@ -38,6 +39,8 @@ router.put(
   "/:offerId/line-items/bulk",
   offerController.bulkUpdateLineItems.bind(offerController)
 );
+
+// Price management operations
 router.post(
   "/line-items/:lineItemId/quantity-prices",
   offerController.addQuantityPrice.bind(offerController)
@@ -46,10 +49,22 @@ router.post(
   "/line-items/:lineItemId/unit-prices",
   offerController.addUnitPrice.bind(offerController)
 );
+
+// Unit price operations (offer level)
 router.post(
-  "/line-items/:lineItemId/toggle-unit-prices",
-  offerController.toggleUnitPrices.bind(offerController)
+  "/:offerId/toggle-unit-prices",
+  offerController.toggleOfferUnitPrices.bind(offerController)
 );
+router.put(
+  "/:offerId/bulk-update-unit-prices",
+  offerController.bulkUpdateOfferUnitPrices.bind(offerController)
+);
+router.post(
+  "/:offerId/sync-unit-prices",
+  offerController.syncUnitPricesAcrossOffer.bind(offerController)
+);
+
+// Set active price for line items
 router.put(
   "/line-items/:lineItemId/active-price/:priceType/:priceIndex",
   offerController.setActivePrice.bind(offerController)

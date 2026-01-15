@@ -2,7 +2,6 @@ import { api, handleApiError } from "@/utils/api";
 import { toast } from "react-hot-toast";
 import { loadingStyles, successStyles } from "@/utils/constants";
 
-// Types
 export interface QuantityPrice {
   quantity: string;
   price: number;
@@ -61,41 +60,22 @@ export interface OfferLineItem {
   purchasePrice?: number;
   purchaseCurrency?: "RMB" | "HKD" | "EUR" | "USD";
 
-  // Legacy quantity prices
   quantityPrices: QuantityPrice[];
 
-  // New unit prices functionality
-  useUnitPrices: boolean;
-  unitPriceDecimalPlaces: number;
-  totalPriceDecimalPlaces: number;
   unitPrices: UnitPrice[];
-  maxUnitPriceColumns: number;
 
-  // Base pricing
   baseQuantity?: string;
   basePrice?: number;
-
-  // Sample pricing
   samplePrice?: number;
   sampleQuantity?: string;
-
-  // Line item totals
   lineTotal: number;
   position: number;
-
-  // Assembly related
   isAssemblyItem: boolean;
   isComponent: boolean;
   parentItemId?: string;
-
-  // Notes
   notes?: string;
-
-  // Timestamps
   createdAt: Date;
   updatedAt: Date;
-
-  // Helper fields
   activePrice?: QuantityPrice | UnitPrice;
   activePriceType?: "quantity" | "unit";
 }
@@ -133,6 +113,14 @@ export interface Offer {
   assemblyName?: string;
   assemblyDescription?: string;
   assemblyNotes?: string;
+
+  // Unit pricing configuration at offer level
+  useUnitPrices: boolean;
+  unitPriceDecimalPlaces: number;
+  totalPriceDecimalPlaces: number;
+  maxUnitPriceColumns: number;
+  defaultUnitPrices?: UnitPrice[];
+
   pdfPath?: string;
   pdfGenerated: boolean;
   pdfGeneratedAt?: Date;
@@ -165,6 +153,13 @@ export interface CreateOfferPayload {
   assemblyName?: string;
   assemblyDescription?: string;
   assemblyNotes?: string;
+
+  // Unit pricing settings for offer
+  useUnitPrices?: boolean;
+  unitPriceDecimalPlaces?: number;
+  totalPriceDecimalPlaces?: number;
+  maxUnitPriceColumns?: number;
+  defaultUnitPrices?: UnitPrice[];
 }
 
 export interface UpdateOfferPayload extends Partial<CreateOfferPayload> {
@@ -187,30 +182,15 @@ export interface UpdateLineItemPayload {
   material?: string;
   specification?: string;
   description?: string;
-
-  // Legacy quantity prices
   quantityPrices?: QuantityPrice[];
-
-  // Unit prices functionality
   unitPrices?: UnitPriceDto[];
-  useUnitPrices?: boolean;
-  unitPriceDecimalPlaces?: number;
-  totalPriceDecimalPlaces?: number;
-  maxUnitPriceColumns?: number;
-
-  // Base pricing
   baseQuantity?: string;
   basePrice?: number;
-
-  // Sample pricing
   samplePrice?: number;
   sampleQuantity?: string;
 
-  // Totals and positioning
   lineTotal?: number;
   position?: number;
-
-  // Notes
   notes?: string;
 }
 
@@ -219,7 +199,6 @@ export interface BulkUpdateLineItemsPayload {
     id: string;
     quantityPrices?: QuantityPrice[];
     unitPrices?: UnitPriceDto[];
-    useUnitPrices?: boolean;
     basePrice?: number;
     samplePrice?: number;
     lineTotal?: number;
@@ -228,7 +207,7 @@ export interface BulkUpdateLineItemsPayload {
 }
 
 export interface CopyPastePricesPayload {
-  data: string; // Tab-separated values
+  data: string;
 }
 
 export interface OfferSearchFilters {
@@ -240,7 +219,6 @@ export interface OfferSearchFilters {
   limit?: number;
 }
 
-// Status options for offers
 export const getOfferStatuses = () => [
   { value: "Draft", label: "Draft", color: "bg-gray-100 text-gray-800" },
   {
@@ -271,7 +249,6 @@ export const getOfferStatuses = () => [
   },
 ];
 
-// Currency options
 export const getAvailableCurrencies = () => [
   { value: "EUR", label: "EUR (€)" },
   { value: "USD", label: "USD ($)" },
@@ -279,14 +256,13 @@ export const getAvailableCurrencies = () => [
   { value: "HKD", label: "HKD (HK$)" },
 ];
 
-// Unit price configuration defaults
 export const getUnitPriceDefaults = () => ({
+  useUnitPrices: false,
   unitPriceDecimalPlaces: 3,
   totalPriceDecimalPlaces: 2,
   maxUnitPriceColumns: 3,
 });
 
-// Main API functions
 export const getAllOffers = async (filters?: OfferSearchFilters) => {
   try {
     const response: any = await api.get("/offers", { params: filters });
@@ -373,7 +349,74 @@ export const createOfferRevision = async (
   }
 };
 
-// Line item operations
+export const toggleOfferUnitPrices = async (
+  offerId: string,
+  useUnitPrices: boolean
+) => {
+  try {
+    toast.loading(
+      useUnitPrices ? "Enabling unit prices..." : "Disabling unit prices...",
+      loadingStyles
+    );
+    const response: any = await api.post(
+      `/offers/${offerId}/toggle-unit-prices`,
+      { useUnitPrices }
+    );
+    toast.dismiss();
+    toast.success(
+      `Unit prices ${
+        useUnitPrices ? "enabled" : "disabled"
+      } successfully for all line items`,
+      successStyles
+    );
+    return response.data;
+  } catch (error) {
+    handleApiError(
+      error,
+      `Failed to ${useUnitPrices ? "enable" : "disable"} unit prices`
+    );
+    throw error;
+  }
+};
+
+export const bulkUpdateOfferUnitPrices = async (
+  offerId: string,
+  unitPrices: UnitPriceDto[]
+) => {
+  try {
+    toast.loading("Updating unit prices for all line items...", loadingStyles);
+    const response: any = await api.put(`/offers/${offerId}/bulk-unit-prices`, {
+      unitPrices,
+    });
+    toast.dismiss();
+    toast.success("Unit prices updated for all line items", successStyles);
+    return response.data;
+  } catch (error) {
+    handleApiError(error, "Failed to update unit prices");
+    throw error;
+  }
+};
+
+export const syncUnitPricesAcrossOffer = async (
+  offerId: string,
+  templateUnitPrices?: UnitPriceDto[]
+) => {
+  try {
+    toast.loading("Syncing unit prices across line items...", loadingStyles);
+    const payload = templateUnitPrices ? { templateUnitPrices } : {};
+    const response: any = await api.post(
+      `/offers/${offerId}/sync-unit-prices`,
+      payload
+    );
+    toast.dismiss();
+    toast.success("Unit prices synced across all line items", successStyles);
+    return response.data;
+  } catch (error) {
+    handleApiError(error, "Failed to sync unit prices");
+    throw error;
+  }
+};
+
 export const updateLineItem = async (
   offerId: string,
   lineItemId: string,
@@ -413,9 +456,6 @@ export const bulkUpdateLineItems = async (
   }
 };
 
-// Price management operations
-
-// Add quantity price (legacy)
 export const addQuantityPrice = async (
   lineItemId: string,
   data: { quantity: string; price: number; isActive?: boolean }
@@ -435,7 +475,6 @@ export const addQuantityPrice = async (
   }
 };
 
-// Add unit price (new)
 export const addUnitPrice = async (
   lineItemId: string,
   data: { quantity: string; unitPrice: number; isActive?: boolean }
@@ -455,7 +494,6 @@ export const addUnitPrice = async (
   }
 };
 
-// Set active price (supports both types)
 export const setActivePrice = async (
   lineItemId: string,
   priceType: "quantity" | "unit",
@@ -475,36 +513,6 @@ export const setActivePrice = async (
   }
 };
 
-// Toggle unit prices feature
-export const toggleUnitPrices = async (
-  lineItemId: string,
-  useUnitPrices: boolean
-) => {
-  try {
-    toast.loading(
-      useUnitPrices ? "Enabling unit prices..." : "Disabling unit prices...",
-      loadingStyles
-    );
-    const response: any = await api.post(
-      `/offers/line-items/${lineItemId}/toggle-unit-prices`,
-      { useUnitPrices }
-    );
-    toast.dismiss();
-    toast.success(
-      `Unit prices ${useUnitPrices ? "enabled" : "disabled"} successfully`,
-      successStyles
-    );
-    return response.data;
-  } catch (error) {
-    handleApiError(
-      error,
-      `Failed to ${useUnitPrices ? "enable" : "disable"} unit prices`
-    );
-    throw error;
-  }
-};
-
-// Copy/paste operations
 export const copyPastePrices = async (
   offerId: string,
   data: CopyPastePricesPayload
@@ -524,7 +532,6 @@ export const copyPastePrices = async (
   }
 };
 
-// PDF operations
 export const generateOfferPdf = async (id: string) => {
   try {
     toast.loading("Generating PDF...", loadingStyles);
@@ -544,7 +551,6 @@ export const downloadOfferPdf = async (id: string) => {
       responseType: "blob",
     });
 
-    // Create blob URL for download
     const url = window.URL.createObjectURL(new Blob([response.data]));
     const link = document.createElement("a");
     link.href = url;
@@ -560,7 +566,6 @@ export const downloadOfferPdf = async (id: string) => {
   }
 };
 
-// Get offers by inquiry
 export const getOffersByInquiry = async (
   inquiryId: string,
   page = 1,
@@ -588,7 +593,6 @@ export const getOfferStatistics = async () => {
   }
 };
 
-// Get offer statuses
 export const getOfferStatusesFromApi = async () => {
   try {
     const response: any = await api.get("/offers/statuses");
@@ -599,7 +603,6 @@ export const getOfferStatusesFromApi = async () => {
   }
 };
 
-// Get available currencies
 export const getAvailableCurrenciesFromApi = async () => {
   try {
     const response: any = await api.get("/offers/currencies");
@@ -610,7 +613,6 @@ export const getAvailableCurrenciesFromApi = async () => {
   }
 };
 
-// Helper functions
 export const formatCurrency = (amount: any, currency: any) => {
   const formatter = new Intl.NumberFormat("de-DE", {
     style: "currency",
@@ -622,19 +624,19 @@ export const formatCurrency = (amount: any, currency: any) => {
   return formatter.format(amount);
 };
 
-// Format price with specified decimal places
-export const formatPrice = (price: number, digits = 3): string => {
+export const formatUnitPrice = (price: number, decimalPlaces = 3): string => {
   if (isNaN(price) || !isFinite(price)) {
-    return "0.000";
+    return `0.${"0".repeat(decimalPlaces)}`;
   }
-  return price.toFixed(digits);
+  price = Number(price);
+  return price.toFixed(decimalPlaces);
 };
 
-// Format total price (2 decimal places)
 export const formatTotalPrice = (price: number): string => {
   if (isNaN(price) || !isFinite(price)) {
     return "0.00";
   }
+
   return price.toFixed(2);
 };
 
@@ -645,10 +647,11 @@ export const calculateLineTotal = (quantity: string, price: number): number => {
 
 export const calculateUnitPriceTotal = (
   quantity: string,
-  unitPrice: number
+  unitPrice: number,
+  decimalPlaces = 2
 ): number => {
   const qty = parseFloat(quantity) || 0;
-  return parseFloat((qty * unitPrice).toFixed(2));
+  return parseFloat((qty * unitPrice).toFixed(decimalPlaces));
 };
 
 export const getOfferStatusColor = (status: string) => {
@@ -656,12 +659,12 @@ export const getOfferStatusColor = (status: string) => {
   return statusObj?.color || "bg-gray-100 text-gray-800";
 };
 
-// Unit price helper functions
 export const getActivePrice = (
-  lineItem: OfferLineItem
+  lineItem: OfferLineItem,
+  offerUsesUnitPrices: boolean
 ): QuantityPrice | UnitPrice | null => {
   if (
-    lineItem.useUnitPrices &&
+    offerUsesUnitPrices &&
     lineItem.unitPrices &&
     lineItem.unitPrices.length > 0
   ) {
@@ -673,10 +676,11 @@ export const getActivePrice = (
 };
 
 export const getActivePriceType = (
-  lineItem: OfferLineItem
+  lineItem: OfferLineItem,
+  offerUsesUnitPrices: boolean
 ): "quantity" | "unit" | null => {
   if (
-    lineItem.useUnitPrices &&
+    offerUsesUnitPrices &&
     lineItem.unitPrices &&
     lineItem.unitPrices.length > 0
   ) {
@@ -691,8 +695,11 @@ export const getActivePriceType = (
   return null;
 };
 
-export const calculateLineItemTotal = (lineItem: OfferLineItem): number => {
-  const activePrice = getActivePrice(lineItem);
+export const calculateLineItemTotal = (
+  lineItem: OfferLineItem,
+  offerUsesUnitPrices: boolean
+): number => {
+  const activePrice = getActivePrice(lineItem, offerUsesUnitPrices);
   if (activePrice) {
     if ("totalPrice" in activePrice) {
       // Unit price
@@ -707,14 +714,16 @@ export const calculateLineItemTotal = (lineItem: OfferLineItem): number => {
   return 0;
 };
 
-// Process unit prices from DTO to proper format
 export const processUnitPricesForUpdate = (
-  unitPricesDto: UnitPriceDto[]
+  unitPricesDto: UnitPriceDto[],
+  totalPriceDecimalPlaces = 2
 ): any => {
   return unitPricesDto.map((upDto, index) => {
     const qty = parseFloat(upDto.quantity) || 0;
     const unitPrice = parseFloat(upDto.unitPrice.toString()) || 0;
-    const totalPrice = upDto.totalPrice || qty * unitPrice;
+    const totalPrice =
+      upDto.totalPrice ||
+      parseFloat((qty * unitPrice).toFixed(totalPriceDecimalPlaces));
 
     return {
       id: upDto.id || `unit-price-${index}-${Date.now()}`,
@@ -728,10 +737,9 @@ export const processUnitPricesForUpdate = (
   });
 };
 
-// Default unit price structure for new line items
 export const createDefaultUnitPrices = (
   quantities: string[] = ["1000", "5000", "10000"]
-): UnitPriceDto[] => {
+): UnitPrice[] => {
   const now = new Date();
   return quantities.map((quantity, index) => ({
     id: `unit-price-default-${index}`,
@@ -739,28 +747,104 @@ export const createDefaultUnitPrices = (
     unitPrice: 0,
     totalPrice: 0,
     isActive: index === 0,
+    createdAt: now,
+    updatedAt: now,
   }));
 };
 
-// Prepare line item data for unit prices
 export const prepareLineItemForUnitPrices = (
-  lineItem: Partial<OfferLineItem>
+  lineItem: Partial<OfferLineItem>,
+  offerUnitPriceSettings: {
+    unitPriceDecimalPlaces: number;
+    totalPriceDecimalPlaces: number;
+    maxUnitPriceColumns: number;
+  }
 ) => {
-  const defaults = getUnitPriceDefaults();
-
   return {
     ...lineItem,
-    useUnitPrices: true,
-    unitPriceDecimalPlaces: defaults.unitPriceDecimalPlaces,
-    totalPriceDecimalPlaces: defaults.totalPriceDecimalPlaces,
-    maxUnitPriceColumns: defaults.maxUnitPriceColumns,
-    unitPrices: lineItem.unitPrices || createDefaultUnitPrices(),
+    unitPrices:
+      lineItem.unitPrices ||
+      createDefaultUnitPrices().map((up) => ({
+        ...up,
+        totalPrice: parseFloat(
+          (parseFloat(up.quantity) * up.unitPrice).toFixed(
+            offerUnitPriceSettings.totalPriceDecimalPlaces
+          )
+        ),
+      })),
     quantityPrices: lineItem.quantityPrices || [],
   };
 };
 
-// Export function to migrate legacy quantity prices to unit prices
+export const migrateOfferToUnitPrices = async (offerId: string) => {
+  try {
+    toast.loading("Migrating offer to unit prices...", loadingStyles);
+    const response: any = await api.post(
+      `/offers/${offerId}/migrate-to-unit-prices`
+    );
+    toast.dismiss();
+    toast.success("Offer migrated to unit prices successfully", successStyles);
+    return response.data;
+  } catch (error) {
+    handleApiError(error, "Failed to migrate offer to unit prices");
+    throw error;
+  }
+};
+
+// Check if offer uses unit prices
+export const offerUsesUnitPrices = (offer: Offer): boolean => {
+  return offer.useUnitPrices || false;
+};
+
+export const getOfferUnitPriceSettings = (offer: Offer) => ({
+  useUnitPrices: offer.useUnitPrices || false,
+  unitPriceDecimalPlaces: offer.unitPriceDecimalPlaces || 3,
+  totalPriceDecimalPlaces: offer.totalPriceDecimalPlaces || 2,
+  maxUnitPriceColumns: offer.maxUnitPriceColumns || 3,
+  defaultUnitPrices: offer.defaultUnitPrices || createDefaultUnitPrices(),
+});
+
+export const formatUnitPriceForOffer = (
+  price: number,
+  offer: Offer
+): string => {
+  return formatUnitPrice(price, offer.unitPriceDecimalPlaces || 3);
+};
+
+export const formatTotalPriceForOffer = (
+  price: number,
+  offer: Offer
+): string => {
+  return formatTotalPrice(price);
+};
+
+export const calculateOfferTotals = (
+  lineItems: OfferLineItem[],
+  offerUsesUnitPrices: boolean
+) => {
+  const subtotal = lineItems.reduce(
+    (sum, item) => sum + calculateLineItemTotal(item, offerUsesUnitPrices),
+    0
+  );
+
+  return {
+    subtotal,
+  };
+};
+
+export const updateLineItemsForUnitPriceChange = async (
+  offerId: string,
+  useUnitPrices: boolean
+): Promise<void> => {
+  if (useUnitPrices) {
+    await syncUnitPricesAcrossOffer(offerId);
+  }
+};
+
 export const migrateToUnitPrices = async (lineItemId: string) => {
+  console.warn(
+    "migrateToUnitPrices is deprecated. Use migrateOfferToUnitPrices instead."
+  );
   try {
     toast.loading("Migrating to unit prices...", loadingStyles);
     const response: any = await api.post(
@@ -775,6 +859,51 @@ export const migrateToUnitPrices = async (lineItemId: string) => {
   }
 };
 
-// Alias functions to maintain backward compatibility
+export const toggleUnitPrices = async (
+  lineItemId: string,
+  useUnitPrices: boolean
+) => {
+  console.warn(
+    "toggleUnitPrices for individual line items is deprecated. Use toggleOfferUnitPrices instead."
+  );
+  try {
+    toast.loading(
+      useUnitPrices ? "Enabling unit prices..." : "Disabling unit prices...",
+      loadingStyles
+    );
+    const response: any = await api.post(
+      `/offers/line-items/${lineItemId}/toggle-unit-prices`,
+      { useUnitPrices }
+    );
+    toast.dismiss();
+    toast.success(
+      `Unit prices ${useUnitPrices ? "enabled" : "disabled"} successfully`,
+      successStyles
+    );
+    return response.data;
+  } catch (error) {
+    handleApiError(
+      error,
+      `Failed to ${useUnitPrices ? "enable" : "disable"} unit prices`
+    );
+    throw error;
+  }
+};
+
 export const getOfferStatusesFromApiAlias = getOfferStatusesFromApi;
 export const getAvailableCurrenciesFromApiAlias = getAvailableCurrenciesFromApi;
+
+export const formatPrice = formatUnitPrice;
+export const prepareLineItemForUnitPricesLegacy = (
+  lineItem: Partial<OfferLineItem>
+) => {
+  console.warn(
+    "prepareLineItemForUnitPricesLegacy is deprecated. Use prepareLineItemForUnitPrices with offer settings instead."
+  );
+  const defaults = getUnitPriceDefaults();
+  return {
+    ...lineItem,
+    unitPrices: lineItem.unitPrices || createDefaultUnitPrices(),
+    quantityPrices: lineItem.quantityPrices || [],
+  };
+};
