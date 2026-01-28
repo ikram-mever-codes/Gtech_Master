@@ -54,6 +54,7 @@ const UsersPage = () => {
     try {
       const response = await getAllUsers();
       if (response && response.data) {
+        console.log(response.data);
         setUsers(response.data);
       } else {
         setUsers([]);

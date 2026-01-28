@@ -118,6 +118,12 @@ const allMenuItems = [
     path: "/library",
     resource: "Library",
   },
+    {
+    icon: LucideFileText,
+    text: "Orders",
+    path: "/orders",
+    resource: "Orders",
+  },
 ];
 
 const Sidebar = () => {

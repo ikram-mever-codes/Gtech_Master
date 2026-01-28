@@ -135,6 +135,7 @@ const availableResources: ResourceConfig[] = [
 
 // Countries list for dropdown
 const countries = [
+  "Afghanistan",
   "United States",
   "United Kingdom",
   "Canada",

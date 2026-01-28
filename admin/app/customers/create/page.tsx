@@ -105,6 +105,7 @@ const validationSchema = Yup.object({
 
 // Countries list for dropdown
 const countries = [
+  "Afghanistan",
   "United States",
   "United Kingdom",
   "Canada",

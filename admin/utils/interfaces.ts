@@ -66,3 +66,13 @@ export enum CustomerVerificationStatus {
   APPROVED = "verified",
   REJECTED = "rejected",
 }
+
+// orders
+export enum OrderStatus {
+  COMPLETED = "completed",
+  PROCESSING = "processing",
+  PENDING = "pending",
+  CANCELLED = "cancelled",
+  SHIPPED = "shipped",
+}
+

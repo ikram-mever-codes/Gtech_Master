@@ -33,7 +33,7 @@ export const getItems = async (
     // Get query parameters
     const {
       page = "1",
-      limit = "30",
+      limit = "50",
       search = "",
       status = "",
       category = "",
@@ -289,7 +289,6 @@ export const getItemById = async (
     return next(error);
   }
 };
-
 // Create new item
 export const createItem = async (
   req: Request,

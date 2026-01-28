@@ -17,6 +17,9 @@ import bussinessRoutes from "./routes/bussiness_routes";
 import libraryRoutes from "./routes/library_routes";
 import inquiryRoutes from "./routes/inquiry_routes";
 import offerRoutes from "./routes/offer_routes";
+import orderRoutes from "./routes/orderRoutes";
+import qtyRoutes from "./routes/qtyRoutes";
+
 
 const app: any = express();
 
@@ -53,6 +56,8 @@ app.use("/api/v1/items", itemRoutes);
 app.use("/api/v1/library", libraryRoutes);
 app.use("/api/v1/inquiries", inquiryRoutes);
 app.use("/api/v1/offers", offerRoutes);
+app.use("/api/v1/orders", orderRoutes);
+app.use("/api/v1/categories", qtyRoutes);
 // Configuring the Uploads Dir
 
 const __uploads_dirname = path.resolve();

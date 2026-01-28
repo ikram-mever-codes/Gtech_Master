@@ -15,14 +15,14 @@ import { Category } from "./categories";
 
 @Entity()
 export class Order {
-  @PrimaryColumn()
+  @PrimaryGeneratedColumn()
   id!: number;
 
   @Column({ type: "varchar", length: 255, unique: true })
   order_no!: string;
 
   @Column({ type: "varchar", length: 50, nullable: true })
-  category_id?: string;
+  customer_id?: string;
 
   @Column({ type: "int", nullable: true })
   status?: number;
@@ -39,9 +39,19 @@ export class Order {
   @Column({ type: "varchar", length: 255, nullable: true })
   date_delivery?: string;
 
+  // @Column({ type: "varchar", length: 50, nullable: true })
+  // category_id?: string;
+  @Column({ type: "int", nullable: true })
+category_id?: number;
+
+  // @ManyToOne(() => Category, (category) => category.orders)
+  // @JoinColumn({ name: "category_id", referencedColumnName: "de_cat" })
+  // category!: Category;
   @ManyToOne(() => Category, (category) => category.orders)
-  @JoinColumn({ name: "category_id", referencedColumnName: "de_cat" })
+  @JoinColumn({ name: "category_id", referencedColumnName: "id" })
+
   category!: Category;
+
 
   @OneToMany(() => OrderItem, (orderItem) => orderItem.order)
   orderItems!: OrderItem[];
