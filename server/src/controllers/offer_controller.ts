@@ -92,6 +92,9 @@ import PDFDocument from "pdfkit";
 import fs from "fs";
 import path from "path";
 import { v4 as uuidv4 } from "uuid";
+import { ConvertInquiryToItemDto, ItemGenerator } from "./inquiry_controller";
+import { Item } from "../models/items";
+import { Taric } from "../models/tarics";
 
 export class CreateOfferDto {
   @IsOptional()
@@ -629,9 +632,8 @@ export class OfferController {
         lineItems.push(assemblyLineItem);
 
         // Save assembly item first to get its ID
-        const savedAssemblyItem = await this.lineItemRepository.save(
-          assemblyLineItem
-        );
+        const savedAssemblyItem =
+          await this.lineItemRepository.save(assemblyLineItem);
 
         // Add components as hidden items
         if (inquiry.requests && inquiry.requests.length > 0) {
@@ -763,6 +765,187 @@ export class OfferController {
     ];
   }
 
+  async convertOfferToItem(request: Request, response: Response) {
+    try {
+      const { offerId } = request.params;
+      const { lineItemId } = request.query;
+
+      // 1. Transform and Validate DTO
+      const conversionData = plainToInstance(
+        ConvertInquiryToItemDto,
+        request.body,
+      );
+
+      const errors = await validate(conversionData);
+      if (errors.length > 0) {
+        return response.status(400).json({
+          success: false,
+          errors: errors.map((error: any) => ({
+            property: error.property,
+            constraints: error.constraints,
+          })),
+        });
+      }
+
+      // 2. Initialize Repositories
+      const offerRepository = AppDataSource.getRepository(Offer);
+      const itemRepository = AppDataSource.getRepository(Item);
+      const taricRepository = AppDataSource.getRepository(Taric);
+      const lineItemRepository = AppDataSource.getRepository(OfferLineItem);
+
+      // 3. Find Offer with Relations
+      const offer = await offerRepository.findOne({
+        where: { id: offerId },
+        relations: ["lineItems", "inquiry"],
+      });
+
+      if (!offer) {
+        return response.status(404).json({
+          success: false,
+          message: "Offer not found",
+        });
+      }
+
+      // 4. Extract Source Data (Assembly vs Single Line Item)
+      let sourceData: any;
+      if (offer.isAssembly) {
+        // Find the specific assembly header item among line items
+        const assemblyItem = offer.lineItems?.find((li) => li.isAssemblyItem);
+
+        sourceData = {
+          itemName: offer.assemblyName || offer.title || "New Assembly Item",
+          specification: offer.assemblyDescription || offer.notes || "",
+          weight:
+            conversionData.weight ||
+            assemblyItem?.weight ||
+            offer.inquiry?.weight ||
+            0,
+          width:
+            conversionData.width ||
+            assemblyItem?.width ||
+            offer.inquiry?.width ||
+            0,
+          height:
+            conversionData.height ||
+            assemblyItem?.height ||
+            offer.inquiry?.height ||
+            0,
+          length:
+            conversionData.length ||
+            assemblyItem?.length ||
+            offer.inquiry?.length ||
+            0,
+          purchasePrice:
+            assemblyItem?.purchasePrice || offer.inquiry?.purchasePrice || 0,
+          description: offer.assemblyDescription || offer.notes,
+          photo: offer.inquiry?.image || "",
+        };
+      } else {
+        // Find specific line item via query param OR grab the first one
+        const targetLineItem = lineItemId
+          ? offer.lineItems.find((li) => li.id === lineItemId)
+          : offer.lineItems[0];
+
+        if (!targetLineItem) {
+          return response.status(400).json({
+            success: false,
+            message: "No valid line items found in this offer to convert",
+          });
+        }
+        sourceData = targetLineItem;
+      }
+
+      // 5. Generate Item Identifiers
+      const itemId = await ItemGenerator.generateItemId();
+      const ean = ItemGenerator.generateEAN(itemId);
+      let taric: any = null;
+
+      // 6. Handle Taric Logic
+      if (conversionData.taricId) {
+        taric = await taricRepository.findOne({
+          where: { id: conversionData.taricId },
+        });
+
+        if (!taric) {
+          taric = taricRepository.create({
+            id: conversionData.taricId,
+            code: undefined,
+            name_de: sourceData.itemName,
+            name_en: sourceData.itemName,
+            name_cn: conversionData.itemNameCN || sourceData.specification,
+            description_de: sourceData.specification,
+            description_en: sourceData.specification,
+            reguler_artikel: "Y",
+            duty_rate: 0,
+          });
+          await taricRepository.save(taric);
+        }
+      }
+
+      if (!taric) {
+        taric = await ItemGenerator.createTaricForItem(sourceData.itemName);
+      }
+
+      // 7. Map Data to Item Entity
+      const itemData: any = {
+        id: itemId,
+        ean: ean,
+        taric_id: taric.id,
+        taric: taric,
+        item_name: sourceData.itemName,
+        item_name_cn: conversionData.itemNameCN || sourceData.itemName,
+        photo: sourceData.photo || offer.inquiry?.image || "",
+        weight: conversionData.weight || sourceData.weight,
+        width: conversionData.width || sourceData.width,
+        height: conversionData.height || sourceData.height,
+        length: conversionData.length || sourceData.length,
+        model: conversionData.model || sourceData.specification,
+        remark: conversionData.remark || offer.notes || sourceData.description,
+        note: conversionData.note || offer.internalNotes || sourceData.notes,
+        RMB_Price: conversionData.RMBPrice || sourceData.purchasePrice || 0,
+        cat_id: conversionData.catId || null,
+        // Fixed system values
+        is_dimension_special: "N",
+        is_qty_dividable: "Y",
+        ISBN: 0,
+        is_npr: "N",
+        is_rmb_special: "N",
+        is_eur_special: "N",
+        is_pu_item: 0,
+        is_meter_item: 0,
+        is_new: "Y",
+        isActive: "Y",
+        category: null,
+        parent: null,
+      };
+
+      // 8. Final Save and Status Update
+      const item = itemRepository.create(itemData);
+      const savedItem = await itemRepository.save(item);
+
+      offer.status = "Accepted";
+      await offerRepository.save(offer);
+
+      // 9. Send Response
+      return response.status(201).json({
+        success: true,
+        message: "Offer successfully converted to Item",
+        data: {
+          item: savedItem,
+          taric: taric,
+          offerId: offer.id,
+        },
+      });
+    } catch (error) {
+      console.error("Error converting offer to item:", error);
+      return response.status(500).json({
+        success: false,
+        message: "Internal server error",
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  }
+
   private async calculateOfferTotals(offerId: string): Promise<void> {
     try {
       const offer = await this.offerRepository.findOne({
@@ -791,7 +974,7 @@ export class OfferController {
         ) {
           // Calculate from active unit price based on offer's unit pricing setting
           const activeUnitPrice = item.unitPrices.find(
-            (up: UnitPrice) => up.isActive
+            (up: UnitPrice) => up.isActive,
           );
           if (activeUnitPrice) {
             lineTotal = activeUnitPrice.totalPrice || 0;
@@ -799,7 +982,7 @@ export class OfferController {
         } else if (item.quantityPrices && item.quantityPrices.length > 0) {
           // Calculate from active quantity price (legacy)
           const activePrice = item.quantityPrices.find(
-            (qp: QuantityPrice) => qp.isActive
+            (qp: QuantityPrice) => qp.isActive,
           );
           if (activePrice) {
             lineTotal = activePrice.total || 0;
@@ -862,7 +1045,7 @@ export class OfferController {
   // Helper function to process unit prices
   private processUnitPrices(
     unitPricesDto: UnitPriceDto[],
-    totalPriceDecimalPlaces: number = 2
+    totalPriceDecimalPlaces: number = 2,
   ): UnitPrice[] {
     const now = new Date();
     return unitPricesDto.map((upDto: UnitPriceDto) => {
@@ -919,7 +1102,7 @@ export class OfferController {
       if (search) {
         queryBuilder.andWhere(
           "(offer.offerNumber LIKE :search OR offer.title LIKE :search OR offer.customerSnapshot->>'companyName' LIKE :search OR offer.inquirySnapshot->>'name' LIKE :search)",
-          { search: `%${search}%` }
+          { search: `%${search}%` },
         );
       }
 
@@ -1034,11 +1217,76 @@ export class OfferController {
     try {
       const { id } = request.params;
 
+      // Get raw body first for custom processing
+      const rawBody = request.body;
+
+      console.log("Raw body received:", JSON.stringify(rawBody, null, 2));
+
+      // Transform numeric fields from German format to standard numeric
+      const processedBody = {
+        ...rawBody,
+        // Only process fields that are actually being sent
+        discountPercentage:
+          rawBody.discountPercentage !== undefined
+            ? this.cleanNumberForDB(rawBody.discountPercentage)
+            : undefined,
+        discountAmount:
+          rawBody.discountAmount !== undefined
+            ? this.cleanNumberForDB(rawBody.discountAmount)
+            : undefined,
+        shippingCost:
+          rawBody.shippingCost !== undefined
+            ? this.cleanNumberForDB(rawBody.shippingCost)
+            : undefined,
+        // ONLY process subtotal/taxAmount/totalAmount if they're being sent
+        subtotal:
+          rawBody.subtotal !== undefined
+            ? this.cleanNumberForDB(rawBody.subtotal)
+            : undefined,
+        taxAmount:
+          rawBody.taxAmount !== undefined
+            ? this.cleanNumberForDB(rawBody.taxAmount)
+            : undefined,
+        totalAmount:
+          rawBody.totalAmount !== undefined
+            ? this.cleanNumberForDB(rawBody.totalAmount)
+            : undefined,
+      };
+
+      console.log("Processed body:", JSON.stringify(processedBody, null, 2));
+
+      // Get the offer FIRST to see what's already in the database
+      const offer = await this.offerRepository.findOne({
+        where: { id },
+        relations: ["lineItems"],
+      });
+
+      if (!offer) {
+        return response.status(404).json({
+          success: false,
+          message: "Offer not found",
+        });
+      }
+
+      console.log("Current offer from DB:", {
+        subtotal: offer.subtotal,
+        taxAmount: offer.taxAmount,
+        totalAmount: offer.totalAmount,
+        discountPercentage: offer.discountPercentage,
+        discountAmount: offer.discountAmount,
+        shippingCost: offer.shippingCost,
+      });
+
       // Transform and create DTO instance with explicit options
-      const updateOfferDto = plainToInstance(UpdateOfferDto, request.body, {
+      const updateOfferDto = plainToInstance(UpdateOfferDto, processedBody, {
         excludeExtraneousValues: false,
         enableImplicitConversion: true,
       });
+
+      console.log(
+        "UpdateOfferDto created:",
+        JSON.stringify(updateOfferDto, null, 2),
+      );
 
       // Check if DTO was properly created
       if (!updateOfferDto || typeof updateOfferDto !== "object") {
@@ -1064,32 +1312,103 @@ export class OfferController {
         });
       }
 
-      const offer = await this.offerRepository.findOne({
-        where: { id },
-        relations: ["lineItems"],
-      });
-
-      if (!offer) {
-        return response.status(404).json({
-          success: false,
-          message: "Offer not found",
-        });
-      }
-
       // Check if unit pricing mode is changing
       const unitPricingChanged =
         updateOfferDto.useUnitPrices !== undefined &&
         updateOfferDto.useUnitPrices !== offer.useUnitPrices;
 
-      // Update offer fields
-      Object.assign(offer, updateOfferDto);
+      // CLEAN ALL NUMERIC FIELDS IN THE EXISTING OFFER FIRST
+      // This is the key fix: clean the existing database values
+      if (offer.subtotal && typeof offer.subtotal === "string") {
+        console.log("Cleaning existing subtotal from DB:", offer.subtotal);
+        offer.subtotal = this.cleanNumberForDB(offer.subtotal) || 0;
+      }
+
+      if (offer.taxAmount && typeof offer.taxAmount === "string") {
+        console.log("Cleaning existing taxAmount from DB:", offer.taxAmount);
+        offer.taxAmount = this.cleanNumberForDB(offer.taxAmount) || 0;
+      }
+
+      if (offer.totalAmount && typeof offer.totalAmount === "string") {
+        console.log(
+          "Cleaning existing totalAmount from DB:",
+          offer.totalAmount,
+        );
+        offer.totalAmount = this.cleanNumberForDB(offer.totalAmount) || 0;
+      }
+
+      // Update only the fields that are being sent in the request
+      // DO NOT include subtotal/taxAmount/totalAmount unless they're in the request
+      const fieldsToUpdate = [
+        "title",
+        "status",
+        "validUntil",
+        "deliveryTime",
+        "paymentTerms",
+        "deliveryTerms",
+        "termsConditions",
+        "notes",
+        "currency",
+        "deliveryAddress",
+        "useUnitPrices",
+        "unitPriceDecimalPlaces",
+        "totalPriceDecimalPlaces",
+        "maxUnitPriceColumns",
+      ];
+
+      fieldsToUpdate.forEach((field) => {
+        if (updateOfferDto[field] !== undefined) {
+          offer[field] = updateOfferDto[field];
+        }
+      });
+
+      // Only update numeric fields if they're in the request
+      if (updateOfferDto.discountPercentage !== undefined) {
+        offer.discountPercentage =
+          this.cleanNumberForDB(updateOfferDto.discountPercentage) || 0;
+      }
+
+      if (updateOfferDto.discountAmount !== undefined) {
+        offer.discountAmount =
+          this.cleanNumberForDB(updateOfferDto.discountAmount) || 0;
+      }
+
+      if (updateOfferDto.shippingCost !== undefined) {
+        offer.shippingCost =
+          this.cleanNumberForDB(updateOfferDto.shippingCost) || 0;
+      }
+
+      // Only update subtotal/taxAmount/totalAmount if they're explicitly in the request
+      if (updateOfferDto.subtotal !== undefined) {
+        offer.subtotal = this.cleanNumberForDB(updateOfferDto.subtotal) || 0;
+      }
+
+      if (updateOfferDto.taxAmount !== undefined) {
+        offer.taxAmount = this.cleanNumberForDB(updateOfferDto.taxAmount) || 0;
+      }
+
+      if (updateOfferDto.totalAmount !== undefined) {
+        offer.totalAmount =
+          this.cleanNumberForDB(updateOfferDto.totalAmount) || 0;
+      }
+
+      console.log("Offer before save:", {
+        subtotal: offer.subtotal,
+        taxAmount: offer.taxAmount,
+        totalAmount: offer.totalAmount,
+        type_subtotal: typeof offer.subtotal,
+        type_taxAmount: typeof offer.taxAmount,
+        type_totalAmount: typeof offer.totalAmount,
+      });
+
+      // Save the offer
       const updatedOffer = await this.offerRepository.save(offer);
 
       // If unit pricing mode changed, update line items
       if (unitPricingChanged && offer.lineItems) {
         await this.updateLineItemsForUnitPricingChange(
           offer.id,
-          updateOfferDto.useUnitPrices!
+          updateOfferDto.useUnitPrices!,
         );
       }
 
@@ -1116,8 +1435,28 @@ export class OfferController {
         message: "Offer updated successfully",
         data: completeOffer,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating offer:", error);
+
+      // Log full error details
+      if (error) {
+        console.error("SQL Error details:", {
+          query: error.query,
+          parameters: error.parameters,
+          driverError: error.driverError,
+        });
+      }
+
+      if (error.code === "22P02") {
+        return response.status(400).json({
+          success: false,
+          message:
+            "Invalid numeric value format. Please use numbers without thousand separators.",
+          error: "Database rejected the numeric format",
+          details: error.message,
+        });
+      }
+
       return response.status(500).json({
         success: false,
         message: "Internal server error",
@@ -1126,9 +1465,42 @@ export class OfferController {
     }
   }
 
+  // SIMPLIFIED cleanNumberForDB method
+  private cleanNumberForDB(value: any): number | undefined {
+    if (value === null || value === undefined || value === "") {
+      return undefined;
+    }
+
+    console.log(`cleanNumberForDB input: ${value}, type: ${typeof value}`);
+
+    // If it's already a number, return it
+    if (typeof value === "number") {
+      return isNaN(value) ? 0 : value;
+    }
+
+    const str = String(value);
+
+    // SPECIAL CASE: Handle "00.000.000" format
+    if (str === "00.000.000" || str === "0.000.000") {
+      console.log("Converting German zero format to 0");
+      return 0;
+    }
+
+    // Remove all dots (they're thousand separators in German format)
+    // Replace comma with dot (German decimal separator)
+    const cleaned = str.replace(/\./g, "").replace(",", ".");
+
+    // Parse to number
+    const num = parseFloat(cleaned);
+
+    console.log(`Result: ${num}`);
+
+    return isNaN(num) ? 0 : num;
+  }
+
   private async updateLineItemsForUnitPricingChange(
     offerId: string,
-    useUnitPrices: boolean
+    useUnitPrices: boolean,
   ): Promise<void> {
     try {
       const lineItems = await this.lineItemRepository.find({
@@ -1156,7 +1528,7 @@ export class OfferController {
     } catch (error) {
       console.error(
         "Error updating line items for unit pricing change:",
-        error
+        error,
       );
     }
   }
@@ -1166,7 +1538,7 @@ export class OfferController {
       const { offerId, lineItemId } = request.params;
       const updateLineItemDto = plainToInstance(
         UpdateLineItemDto,
-        request.body
+        request.body,
       );
 
       // Validate DTO
@@ -1207,12 +1579,12 @@ export class OfferController {
       if (updateLineItemDto.unitPrices && offer.useUnitPrices) {
         const processedUnitPrices = this.processUnitPrices(
           updateLineItemDto.unitPrices,
-          offer.totalPriceDecimalPlaces || 2
+          offer.totalPriceDecimalPlaces || 2,
         );
 
         // Ensure only one is active
         const activeCount = processedUnitPrices.filter(
-          (up) => up.isActive
+          (up) => up.isActive,
         ).length;
         if (activeCount > 1) {
           // Keep only the first one active
@@ -1233,12 +1605,12 @@ export class OfferController {
           (qp: any) => ({
             ...qp,
             total: parseFloat(qp.quantity) * qp.price,
-          })
+          }),
         );
 
         // Ensure only one price is active
         const activeCount = updateLineItemDto.quantityPrices.filter(
-          (qp: any) => qp.isActive
+          (qp: any) => qp.isActive,
         ).length;
         if (activeCount > 1) {
           // Keep only the first one active
@@ -1266,7 +1638,7 @@ export class OfferController {
         updateLineItemDto.unitPrices.length > 0
       ) {
         const activeUnitPrice = updateLineItemDto.unitPrices.find(
-          (up: UnitPrice) => up.isActive
+          (up: UnitPrice) => up.isActive,
         );
         if (activeUnitPrice) {
           lineItem.lineTotal = activeUnitPrice.totalPrice;
@@ -1276,7 +1648,7 @@ export class OfferController {
         updateLineItemDto.quantityPrices.length > 0
       ) {
         const activePrice = updateLineItemDto.quantityPrices.find(
-          (qp: any) => qp.isActive
+          (qp: any) => qp.isActive,
         );
         if (activePrice) {
           lineItem.lineTotal = activePrice.total;
@@ -1353,7 +1725,7 @@ export class OfferController {
       const price = parseFloat(unitPrice) || 0;
       const totalPriceDecimalPlaces = offer.totalPriceDecimalPlaces || 2;
       const totalPrice = parseFloat(
-        (qty * price).toFixed(totalPriceDecimalPlaces)
+        (qty * price).toFixed(totalPriceDecimalPlaces),
       );
       const now = new Date();
 
@@ -1381,7 +1753,7 @@ export class OfferController {
       // Sort by quantity
       unitPrices.sort(
         (a: UnitPrice, b: UnitPrice) =>
-          parseFloat(a.quantity) - parseFloat(b.quantity)
+          parseFloat(a.quantity) - parseFloat(b.quantity),
       );
 
       lineItem.unitPrices = unitPrices;
@@ -1472,7 +1844,7 @@ export class OfferController {
 
       // Sort by quantity
       quantityPrices.sort(
-        (a: any, b: any) => parseFloat(a.quantity) - parseFloat(b.quantity)
+        (a: any, b: any) => parseFloat(a.quantity) - parseFloat(b.quantity),
       );
 
       lineItem.quantityPrices = quantityPrices;
@@ -1514,7 +1886,7 @@ export class OfferController {
       const { offerId } = request.params;
       const bulkUpdateDto = plainToInstance(
         BulkUpdateLineItemsDto,
-        request.body
+        request.body,
       );
 
       // Validate DTO
@@ -1563,14 +1935,14 @@ export class OfferController {
               (qp: any) => ({
                 ...qp,
                 total: parseFloat(qp.quantity) * qp.price,
-              })
+              }),
             );
           }
 
           if (itemUpdate.unitPrices !== undefined && offer.useUnitPrices) {
             lineItem.unitPrices = this.processUnitPrices(
               itemUpdate.unitPrices,
-              offer.totalPriceDecimalPlaces || 2
+              offer.totalPriceDecimalPlaces || 2,
             );
           }
 
@@ -1675,7 +2047,7 @@ export class OfferController {
               const totalPriceDecimalPlaces =
                 offer.totalPriceDecimalPlaces || 2;
               const totalPrice = parseFloat(
-                (qty * unitPrice).toFixed(totalPriceDecimalPlaces)
+                (qty * unitPrice).toFixed(totalPriceDecimalPlaces),
               );
 
               unitPrices.push({
@@ -1709,12 +2081,12 @@ export class OfferController {
                   price: upDto.unitPrice,
                   isActive: upDto.isActive || false,
                   total: upDto.totalPrice || 0,
-                })
+                }),
               );
 
               // Calculate line total from active price
               const activePrice = lineItem.quantityPrices.find(
-                (qp: any) => qp.isActive
+                (qp: any) => qp.isActive,
               );
               if (activePrice) {
                 lineItem.lineTotal = activePrice.total || 0;
@@ -1806,7 +2178,7 @@ export class OfferController {
             ...up,
             isActive: i === index,
             updatedAt: i === index ? now : up.updatedAt,
-          })
+          }),
         );
 
         // Update line total from active price
@@ -1840,7 +2212,7 @@ export class OfferController {
           (qp: any, i: number) => ({
             ...qp,
             isActive: i === index,
-          })
+          }),
         );
 
         // Update line total from active price
@@ -1978,7 +2350,7 @@ export class OfferController {
         } catch (calcError) {
           console.error(
             "Error calculating totals after toggling unit prices:",
-            calcError
+            calcError,
           );
           // Don't fail the entire operation
         }
@@ -2038,7 +2410,7 @@ export class OfferController {
       // Process unit prices with offer's decimal places
       const processedUnitPrices = this.processUnitPrices(
         unitPrices,
-        offer.totalPriceDecimalPlaces || 2
+        offer.totalPriceDecimalPlaces || 2,
       );
 
       // Update offer's default unit prices
@@ -2057,7 +2429,7 @@ export class OfferController {
         const updatedUnitPrices = processedUnitPrices.map(
           (newUp: UnitPrice) => {
             const existingUp = existingUnitPrices.find(
-              (up: UnitPrice) => up.quantity === newUp.quantity
+              (up: UnitPrice) => up.quantity === newUp.quantity,
             );
             if (existingUp) {
               return {
@@ -2066,19 +2438,19 @@ export class OfferController {
                 totalPrice: parseFloat(
                   (
                     parseFloat(existingUp.quantity) * existingUp.unitPrice
-                  ).toFixed(offer.totalPriceDecimalPlaces || 2)
+                  ).toFixed(offer.totalPriceDecimalPlaces || 2),
                 ),
               };
             }
             return newUp;
-          }
+          },
         );
 
         lineItem.unitPrices = updatedUnitPrices;
 
         // Update line total from active price
         const activeUnitPrice = updatedUnitPrices.find(
-          (up: UnitPrice) => up.isActive
+          (up: UnitPrice) => up.isActive,
         );
         if (activeUnitPrice) {
           lineItem.lineTotal = activeUnitPrice.totalPrice;
@@ -2147,7 +2519,7 @@ export class OfferController {
         const updatedUnitPrices = templateUnitPrices.map(
           (templateUp: UnitPrice) => {
             const existingUp = existingUnitPrices.find(
-              (up: UnitPrice) => up.quantity === templateUp.quantity
+              (up: UnitPrice) => up.quantity === templateUp.quantity,
             );
             if (existingUp) {
               return {
@@ -2156,20 +2528,20 @@ export class OfferController {
                 totalPrice: parseFloat(
                   (
                     parseFloat(existingUp.quantity) * existingUp.unitPrice
-                  ).toFixed(offer.totalPriceDecimalPlaces || 2)
+                  ).toFixed(offer.totalPriceDecimalPlaces || 2),
                 ),
                 isActive: existingUp.isActive,
               };
             }
             return templateUp;
-          }
+          },
         );
 
         lineItem.unitPrices = updatedUnitPrices;
 
         // Update line total from active price
         const activeUnitPrice = updatedUnitPrices.find(
-          (up: UnitPrice) => up.isActive
+          (up: UnitPrice) => up.isActive,
         );
         if (activeUnitPrice) {
           lineItem.lineTotal = activeUnitPrice.totalPrice;
@@ -2334,10 +2706,16 @@ export class OfferController {
     }
   }
 
-  // Generate PDF for offer (updated to handle unit prices at offer level)
   async generatePdf(request: Request, response: Response) {
     try {
       const { id } = request.params;
+
+      if (!id) {
+        return response.status(400).json({
+          success: false,
+          message: "Offer ID is required",
+        });
+      }
 
       const offer = await this.offerRepository.findOne({
         where: { id },
@@ -2354,71 +2732,121 @@ export class OfferController {
       // Helper function to safely format dates
       const formatDate = (dateValue: any): string => {
         if (!dateValue) return "N/A";
-
-        // Convert to Date object if it's a string
         const date =
           typeof dateValue === "string" ? new Date(dateValue) : dateValue;
-
-        // Check if it's a valid date
-        if (!(date instanceof Date) || isNaN(date.getTime())) {
-          return "N/A";
-        }
-
+        if (!(date instanceof Date) || isNaN(date.getTime())) return "N/A";
         return date.toLocaleDateString();
-      };
-
-      // Helper function to safely format numbers with specific decimal places
-      const formatNumber = (numValue: any, decimals: number = 2): string => {
-        if (numValue === null || numValue === undefined) {
-          return `0.${"0".repeat(decimals)}`;
-        }
-
-        // Convert to number if it's a string
-        const num =
-          typeof numValue === "string"
-            ? parseFloat(numValue)
-            : Number(numValue);
-
-        // Check if it's a valid number
-        if (isNaN(num)) {
-          return `0.${"0".repeat(decimals)}`;
-        }
-
-        return num.toFixed(decimals);
       };
 
       // Helper function to get safe number value
       const getSafeNumber = (numValue: any): number => {
-        if (numValue === null || numValue === undefined) {
+        if (numValue === null || numValue === undefined || numValue === "")
           return 0;
+        if (typeof numValue === "string") {
+          const cleaned = numValue.replace(/[^0-9.-]/g, "");
+          if (cleaned === "" || cleaned === "-") return 0;
+          const num = parseFloat(cleaned);
+          return isNaN(num) ? 0 : num;
         }
-
-        const num =
-          typeof numValue === "string"
-            ? parseFloat(numValue)
-            : Number(numValue);
-
+        const num = Number(numValue);
         return isNaN(num) ? 0 : num;
       };
 
-      // Create PDF document
+      // Helper function to format numbers
+      const formatNumber = (numValue: any, decimals: number = 2): string => {
+        const num = getSafeNumber(numValue);
+        const factor = Math.pow(10, decimals);
+        const rounded = Math.round((num + Number.EPSILON) * factor) / factor;
+        const fixedNum = Math.abs(rounded).toFixed(decimals);
+        return rounded < 0 ? `-${fixedNum}` : fixedNum;
+      };
+
+      // Calculate totals
+      const calculateTotals = (offerData: any) => {
+        let subtotal = 0;
+
+        if (offerData.lineItems && Array.isArray(offerData.lineItems)) {
+          const customerItems = offerData.lineItems.filter(
+            (item: any) => !item.isComponent,
+          );
+
+          customerItems.forEach((item: any) => {
+            if (
+              offerData.useUnitPrices &&
+              item.unitPrices &&
+              Array.isArray(item.unitPrices)
+            ) {
+              const activeUnitPrice = item.unitPrices.find(
+                (up: any) => up.isActive,
+              );
+              if (activeUnitPrice) {
+                subtotal += getSafeNumber(activeUnitPrice.totalPrice);
+              }
+            } else if (
+              item.quantityPrices &&
+              Array.isArray(item.quantityPrices)
+            ) {
+              const activePrice = item.quantityPrices.find(
+                (qp: any) => qp.isActive,
+              );
+              if (activePrice) {
+                subtotal += getSafeNumber(activePrice.total);
+              }
+            } else if (item.baseQuantity || item.basePrice) {
+              const quantity = getSafeNumber(item.baseQuantity);
+              const price = getSafeNumber(item.basePrice);
+              subtotal += quantity * price;
+            }
+          });
+        }
+
+        const discount = getSafeNumber(
+          offerData.discountAmount || offerData.discount,
+        );
+        let discountedSubtotal = subtotal - discount;
+        if (discountedSubtotal < 0) discountedSubtotal = 0;
+
+        const shipping = getSafeNumber(
+          offerData.shippingCost || offerData.shipping,
+        );
+        const amountBeforeTax = discountedSubtotal + shipping;
+
+        const taxRate = offerData.taxRate
+          ? getSafeNumber(offerData.taxRate) / 100
+          : 0.19;
+        const taxAmount = amountBeforeTax * taxRate;
+
+        const totalAmount = amountBeforeTax + taxAmount;
+
+        return {
+          subtotal: subtotal.toFixed(2),
+          taxAmount: taxAmount.toFixed(2),
+          totalAmount: totalAmount.toFixed(2),
+          discountAmount: discount.toFixed(2),
+          shippingCost: shipping.toFixed(2),
+        };
+      };
+
+      // Calculate totals
+      const totals = calculateTotals(offer);
+
+      // Create PDF document - THIS IS WHERE doc IS DEFINED
       const doc = new PDFDocument({ margin: 50, size: "A4" });
 
       // Set up PDF content
       // Header
-      doc.fontSize(20).text(`OFFER ${offer.offerNumber}`, { align: "center" });
+      doc
+        .fontSize(20)
+        .text(`OFFER ${offer.offerNumber || "N/A"}`, { align: "center" });
       doc.moveDown();
 
       doc.fontSize(12);
       doc.text(`Date: ${formatDate(offer.createdAt)}`);
       doc.text(`Valid Until: ${formatDate(offer.validUntil)}`);
 
-      // Show unit pricing mode if enabled
       if (offer.useUnitPrices) {
         doc.text(
-          `Pricing Mode: Unit Pricing (${
-            offer.maxUnitPriceColumns || 3
-          } columns)`
+          `Pricing Mode: Unit Pricing (${offer.maxUnitPriceColumns || 3} columns)`,
         );
       }
       doc.moveDown();
@@ -2427,30 +2855,61 @@ export class OfferController {
       doc.fontSize(14).text("Customer Information:", { underline: true });
       doc.fontSize(11);
       if (offer.customerSnapshot) {
-        const customer = offer.customerSnapshot;
-        doc.text(`${customer.companyName || ""}`);
-        if (customer.legalName) doc.text(`${customer.legalName}`);
-        if (customer.address) doc.text(`${customer.address}`);
-        if (customer.postalCode && customer.city)
-          doc.text(`${customer.postalCode} ${customer.city}`);
-        if (customer.country) doc.text(`${customer.country}`);
-        if (customer.vatId) doc.text(`VAT ID: ${customer.vatId}`);
+        let customer;
+        try {
+          customer =
+            typeof offer.customerSnapshot === "string"
+              ? JSON.parse(offer.customerSnapshot)
+              : offer.customerSnapshot;
+        } catch (e) {
+          customer = offer.customerSnapshot;
+        }
+
+        if (customer && typeof customer === "object") {
+          doc.text(`${customer.companyName || customer.name || ""}`);
+          if (
+            customer.legalName &&
+            customer.legalName !== customer.companyName
+          ) {
+            doc.text(`${customer.legalName}`);
+          }
+          if (customer.address) doc.text(`${customer.address}`);
+          if (customer.postalCode && customer.city)
+            doc.text(`${customer.postalCode} ${customer.city}`);
+          if (customer.country) doc.text(`${customer.country}`);
+          if (customer.vatId) doc.text(`VAT ID: ${customer.vatId}`);
+        }
       }
       doc.moveDown();
 
-      // Delivery Address (if different)
+      // Delivery Address
       if (offer.deliveryAddress) {
-        doc.fontSize(14).text("Delivery Address:", { underline: true });
-        doc.fontSize(11);
-        const addr = offer.deliveryAddress;
-        if (addr.contactName) doc.text(`${addr.contactName}`);
-        if (addr.street) doc.text(`${addr.street}`);
-        if (addr.postalCode && addr.city)
-          doc.text(`${addr.postalCode} ${addr.city}`);
-        if (addr.state) doc.text(`${addr.state}`);
-        if (addr.country) doc.text(`${addr.country}`);
-        if (addr.contactPhone) doc.text(`Phone: ${addr.contactPhone}`);
-        doc.moveDown();
+        try {
+          let deliveryAddress;
+          if (typeof offer.deliveryAddress === "string") {
+            deliveryAddress = JSON.parse(offer.deliveryAddress);
+          } else {
+            deliveryAddress = offer.deliveryAddress;
+          }
+
+          if (deliveryAddress && typeof deliveryAddress === "object") {
+            doc.fontSize(14).text("Delivery Address:", { underline: true });
+            doc.fontSize(11);
+
+            if (deliveryAddress.contactName)
+              doc.text(`${deliveryAddress.contactName}`);
+            if (deliveryAddress.street) doc.text(`${deliveryAddress.street}`);
+            if (deliveryAddress.postalCode && deliveryAddress.city)
+              doc.text(`${deliveryAddress.postalCode} ${deliveryAddress.city}`);
+            if (deliveryAddress.state) doc.text(`${deliveryAddress.state}`);
+            if (deliveryAddress.country) doc.text(`${deliveryAddress.country}`);
+            if (deliveryAddress.contactPhone)
+              doc.text(`Phone: ${deliveryAddress.contactPhone}`);
+            doc.moveDown();
+          }
+        } catch (e) {
+          console.warn("Failed to parse delivery address:", e);
+        }
       }
 
       // Line Items Table
@@ -2479,136 +2938,522 @@ export class OfferController {
 
       let y = tableTop + 30;
 
-      // Get safe numeric values for totals
-      const subtotal = getSafeNumber(offer.subtotal);
-      const taxAmount = getSafeNumber(offer.taxAmount);
-      const totalAmount = getSafeNumber(offer.totalAmount);
-      const shippingCost = getSafeNumber(offer.shippingCost);
-      const discountAmount = getSafeNumber(offer.discountAmount);
+      // Line Items
+      if (offer.lineItems && Array.isArray(offer.lineItems)) {
+        const customerItems = offer.lineItems.filter(
+          (item: any) => !item.isComponent,
+        );
+
+        if (customerItems.length === 0) {
+          doc.text("No items in this offer", itemX, y);
+          y += 30;
+        } else {
+          customerItems.forEach((item: any, index: number) => {
+            const itemNumber = `${index + 1}.`;
+            const itemName =
+              item.itemName || item.description || "Unnamed Item";
+
+            doc.text(itemNumber, itemX, y);
+            doc.text(itemName, descX, y, { width: 180 });
+
+            if (
+              offer.useUnitPrices &&
+              item.unitPrices &&
+              Array.isArray(item.unitPrices)
+            ) {
+              const maxColumns = offer.maxUnitPriceColumns || 3;
+              const displayedPrices = item.unitPrices.slice(0, maxColumns);
+              let itemY = y;
+
+              displayedPrices.forEach((up: any, upIndex: number) => {
+                const qty = getSafeNumber(up.quantity);
+                const unitPrice = getSafeNumber(up.unitPrice);
+                const unitPriceDecimalPlaces =
+                  offer.unitPriceDecimalPlaces || 3;
+                const priceText = `${qty} pcs: €${formatNumber(unitPrice, unitPriceDecimalPlaces)} (unit)`;
+                const highlight = up.isActive ? { color: "red" } : {};
+                doc.text(priceText, qtyX, itemY + upIndex * 15, {
+                  ...highlight,
+                  width: 150,
+                });
+              });
+
+              const activeUnitPrice = item.unitPrices.find(
+                (up: any) => up.isActive,
+              );
+              if (activeUnitPrice) {
+                const totalPriceDecimalPlaces =
+                  offer.totalPriceDecimalPlaces || 2;
+                doc.text(
+                  `€${formatNumber(activeUnitPrice.totalPrice, totalPriceDecimalPlaces)}`,
+                  totalX,
+                  y,
+                );
+              }
+            } else if (
+              item.quantityPrices &&
+              Array.isArray(item.quantityPrices)
+            ) {
+              let itemY = y;
+              item.quantityPrices.forEach((qp: any, qpIndex: number) => {
+                const qpQuantity = getSafeNumber(qp.quantity);
+                const qpPrice = getSafeNumber(qp.price);
+                const priceText = `${qpQuantity} pcs: €${formatNumber(qpPrice, 3)}`;
+                const highlight = qp.isActive ? { color: "red" } : {};
+                doc.text(priceText, qtyX, itemY + qpIndex * 15, {
+                  ...highlight,
+                  width: 150,
+                });
+              });
+
+              const activePrice = item.quantityPrices.find(
+                (qp: any) => qp.isActive,
+              );
+              if (activePrice) {
+                doc.text(`€${formatNumber(activePrice.total, 2)}`, totalX, y);
+              }
+            } else if (item.baseQuantity || item.basePrice) {
+              const quantity = getSafeNumber(item.baseQuantity);
+              const price = getSafeNumber(item.basePrice);
+
+              doc.text(quantity.toString(), qtyX, y);
+              doc.text(`€${formatNumber(price, 3)}`, priceX, y);
+              const total = quantity * price;
+              doc.text(`€${formatNumber(total, 2)}`, totalX, y);
+            } else {
+              doc.text("N/A", qtyX, y);
+              doc.text("N/A", priceX, y);
+              doc.text("N/A", totalX, y);
+            }
+
+            const numPrices = Math.max(
+              offer.useUnitPrices && item.unitPrices
+                ? item.unitPrices.length
+                : 0,
+              item.quantityPrices ? item.quantityPrices.length : 0,
+              1,
+            );
+            y += Math.max(30, numPrices * 20);
+          });
+        }
+      }
+
+      // Get safe numeric values for PDF display
+      const displaySubtotal = getSafeNumber(totals.subtotal);
+      const displayTaxAmount = getSafeNumber(totals.taxAmount);
+      const displayTotalAmount = getSafeNumber(totals.totalAmount);
+      const displayShippingCost = getSafeNumber(totals.shippingCost);
+      const displayDiscountAmount = getSafeNumber(totals.discountAmount);
+
+      // Totals section
+      y += 20;
+      doc.moveTo(400, y).lineTo(550, y).stroke();
+      y += 10;
+
+      doc.fontSize(10);
+      doc.text("Subtotal:", 400, y);
+      doc.text(`€${formatNumber(displaySubtotal, 2)}`, 500, y);
+      y += 20;
+
+      if (displayDiscountAmount > 0) {
+        doc.text("Discount:", 400, y);
+        doc.text(`-€${formatNumber(displayDiscountAmount, 2)}`, 500, y);
+        y += 20;
+      }
+
+      if (displayShippingCost > 0) {
+        doc.text("Shipping:", 400, y);
+        doc.text(`€${formatNumber(displayShippingCost, 2)}`, 500, y);
+        y += 20;
+      }
+
+      const taxRate = offer.taxRate ? getSafeNumber(offer.taxRate) : 19;
+      doc.text(`VAT (${taxRate}%):`, 400, y);
+      doc.text(`€${formatNumber(displayTaxAmount, 2)}`, 500, y);
+      y += 20;
+
+      doc.fontSize(12).font("Helvetica-Bold");
+      doc.text("TOTAL:", 400, y);
+      doc.text(`€${formatNumber(displayTotalAmount, 2)}`, 500, y);
+
+      // Footer Notes
+      y += 40;
+      doc.fontSize(10).font("Helvetica");
+      doc.text("All prices are net prices.", 50, y);
+      y += 15;
+
+      if (offer.deliveryTime) {
+        doc.text(`Delivery Time: ${offer.deliveryTime}`, 50, y);
+        y += 15;
+      }
+
+      if (offer.paymentTerms) {
+        doc.text(`Payment Terms: ${offer.paymentTerms}`, 50, y);
+        y += 15;
+      }
+
+      if (offer.notes) {
+        const notes =
+          offer.notes.length > 200
+            ? offer.notes.substring(0, 200) + "..."
+            : offer.notes;
+        doc.text(`Notes: ${notes}`, 50, y, { width: 500 });
+      }
+
+      // Save PDF to file
+      const uploadsDir = path.join(__dirname, "../../uploads/offers");
+      if (!fs.existsSync(uploadsDir)) {
+        fs.mkdirSync(uploadsDir, { recursive: true });
+      }
+
+      const pdfFileName = `${offer.offerNumber || "offer"}.pdf`;
+      const pdfPath = path.join(uploadsDir, pdfFileName);
+
+      // Create a write stream and pipe the PDF to it
+      const writeStream = fs.createWriteStream(pdfPath);
+
+      // Create promise for PDF writing
+      const pdfWritePromise = new Promise<void>((resolve, reject) => {
+        writeStream.on("finish", resolve);
+        writeStream.on("error", reject);
+
+        // Pipe the PDF document to the file stream
+        doc.pipe(writeStream);
+        doc.end();
+      });
+
+      // Wait for PDF to be written
+      await pdfWritePromise;
+
+      // Try to update database (optional)
+      try {
+        offer.pdfPath = `/uploads/offers/${pdfFileName}`;
+        offer.pdfGenerated = true;
+        offer.pdfGeneratedAt = new Date();
+        await this.offerRepository.save(offer);
+      } catch (dbError) {
+        console.warn("Database update failed but PDF was created:", dbError);
+      }
+
+      // Send the PDF file directly
+      response.setHeader("Content-Type", "application/pdf");
+      response.setHeader(
+        "Content-Disposition",
+        `attachment; filename="${pdfFileName}"`,
+      );
+
+      const fileStream = fs.createReadStream(pdfPath);
+      fileStream.pipe(response);
+    } catch (error: any) {
+      console.error("Error generating PDF:", error);
+
+      // Send JSON error response
+      return response.status(500).json({
+        success: false,
+        message: "Internal server error while generating PDF",
+        error:
+          process.env.NODE_ENV === "development" ? error.message : undefined,
+      });
+    }
+  }
+
+  async generateAndDownloadPdf(request: Request, response: Response) {
+    try {
+      const { id } = request.params;
+
+      if (!id) {
+        return response.status(400).json({
+          success: false,
+          message: "Offer ID is required",
+        });
+      }
+
+      const offer = await this.offerRepository.findOne({
+        where: { id },
+        relations: ["lineItems"],
+      });
+
+      if (!offer) {
+        return response.status(404).json({
+          success: false,
+          message: "Offer not found",
+        });
+      }
+
+      // Helper functions
+      const formatDate = (dateValue: any): string => {
+        if (!dateValue) return "N/A";
+        const date =
+          typeof dateValue === "string" ? new Date(dateValue) : dateValue;
+        if (!(date instanceof Date) || isNaN(date.getTime())) return "N/A";
+        return date.toLocaleDateString();
+      };
+
+      const getSafeNumber = (numValue: any): number => {
+        if (numValue === null || numValue === undefined || numValue === "")
+          return 0;
+        if (typeof numValue === "string") {
+          const cleaned = numValue.replace(/[^0-9.-]/g, "");
+          if (cleaned === "" || cleaned === "-") return 0;
+          const num = parseFloat(cleaned);
+          return isNaN(num) ? 0 : num;
+        }
+        const num = Number(numValue);
+        return isNaN(num) ? 0 : num;
+      };
+
+      const formatNumber = (numValue: any, decimals: number = 2): string => {
+        const num = getSafeNumber(numValue);
+        const factor = Math.pow(10, decimals);
+        const rounded = Math.round((num + Number.EPSILON) * factor) / factor;
+        const fixedNum = Math.abs(rounded).toFixed(decimals);
+        return rounded < 0 ? `-${fixedNum}` : fixedNum;
+      };
+
+      // Create PDF document
+      const doc = new PDFDocument({ margin: 50, size: "A4" });
+
+      // Header
+      doc
+        .fontSize(20)
+        .text(`OFFER ${offer.offerNumber || "N/A"}`, { align: "center" });
+      doc.moveDown();
+
+      doc.fontSize(12);
+      doc.text(`Date: ${formatDate(offer.createdAt)}`);
+      doc.text(`Valid Until: ${formatDate(offer.validUntil)}`);
+
+      if (offer.useUnitPrices) {
+        doc.text(
+          `Pricing Mode: Unit Pricing (${offer.maxUnitPriceColumns || 3} columns)`,
+        );
+      }
+      doc.moveDown();
+
+      // Customer Information
+      doc.fontSize(14).text("Customer Information:", { underline: true });
+      doc.fontSize(11);
+      if (offer.customerSnapshot) {
+        let customer;
+        try {
+          customer =
+            typeof offer.customerSnapshot === "string"
+              ? JSON.parse(offer.customerSnapshot)
+              : offer.customerSnapshot;
+        } catch (e) {
+          customer = offer.customerSnapshot;
+        }
+
+        if (customer && typeof customer === "object") {
+          doc.text(`${customer.companyName || customer.name || ""}`);
+          if (
+            customer.legalName &&
+            customer.legalName !== customer.companyName
+          ) {
+            doc.text(`${customer.legalName}`);
+          }
+          if (customer.address) doc.text(`${customer.address}`);
+          if (customer.postalCode && customer.city)
+            doc.text(`${customer.postalCode} ${customer.city}`);
+          if (customer.country) doc.text(`${customer.country}`);
+          if (customer.vatId) doc.text(`VAT ID: ${customer.vatId}`);
+        }
+      }
+      doc.moveDown();
+
+      // Delivery Address
+      if (offer.deliveryAddress) {
+        try {
+          let deliveryAddress;
+          if (typeof offer.deliveryAddress === "string") {
+            deliveryAddress = JSON.parse(offer.deliveryAddress);
+          } else {
+            deliveryAddress = offer.deliveryAddress;
+          }
+
+          if (deliveryAddress && typeof deliveryAddress === "object") {
+            doc.fontSize(14).text("Delivery Address:", { underline: true });
+            doc.fontSize(11);
+
+            if (deliveryAddress.contactName)
+              doc.text(`${deliveryAddress.contactName}`);
+            if (deliveryAddress.street) doc.text(`${deliveryAddress.street}`);
+            if (deliveryAddress.postalCode && deliveryAddress.city)
+              doc.text(`${deliveryAddress.postalCode} ${deliveryAddress.city}`);
+            if (deliveryAddress.state) doc.text(`${deliveryAddress.state}`);
+            if (deliveryAddress.country) doc.text(`${deliveryAddress.country}`);
+            if (deliveryAddress.contactPhone)
+              doc.text(`Phone: ${deliveryAddress.contactPhone}`);
+            doc.moveDown();
+          }
+        } catch (e) {
+          console.warn("Failed to parse delivery address:", e);
+        }
+      }
+
+      // Line Items Table
+      doc.fontSize(14).text("Offer Positions:", { underline: true });
+      doc.moveDown();
+
+      const tableTop = doc.y;
+      const itemX = 50;
+      const descX = 150;
+      const qtyX = 350;
+      const priceX = 400;
+      const totalX = 500;
+
+      // Table Headers
+      doc.fontSize(10);
+      doc.text("Pos.", itemX, tableTop);
+      doc.text("Description", descX, tableTop);
+      doc.text("Qty", qtyX, tableTop);
+      doc.text("Price", priceX, tableTop);
+      doc.text("Total", totalX, tableTop);
+
+      doc
+        .moveTo(50, tableTop + 20)
+        .lineTo(550, tableTop + 20)
+        .stroke();
+
+      let y = tableTop + 30;
+
+      // Calculate totals as we render
+      let subtotal = 0;
 
       // Line Items
-      if (offer.lineItems) {
+      if (offer.lineItems && Array.isArray(offer.lineItems)) {
         const customerItems = offer.lineItems.filter(
-          (item: any) => !item.isComponent
+          (item: any) => !item.isComponent,
         );
 
         customerItems.forEach((item: any, index: number) => {
-          doc.text(`${index + 1}.`, itemX, y);
-          doc.text(item.itemName || "", descX, y, { width: 200 });
+          const itemNumber = `${index + 1}.`;
+          const itemName = item.itemName || item.description || "Unnamed Item";
 
-          // Show unit prices if enabled at offer level and available
+          doc.text(itemNumber, itemX, y);
+          doc.text(itemName, descX, y, { width: 180 });
+
+          let itemTotal = 0;
+
           if (
             offer.useUnitPrices &&
             item.unitPrices &&
-            item.unitPrices.length > 0
+            Array.isArray(item.unitPrices)
           ) {
             const maxColumns = offer.maxUnitPriceColumns || 3;
             const displayedPrices = item.unitPrices.slice(0, maxColumns);
+            let itemY = y;
 
-            displayedPrices.forEach((up: UnitPrice, upIndex: number) => {
+            displayedPrices.forEach((up: any, upIndex: number) => {
               const qty = getSafeNumber(up.quantity);
               const unitPrice = getSafeNumber(up.unitPrice);
               const unitPriceDecimalPlaces = offer.unitPriceDecimalPlaces || 3;
-              const priceText = `${qty} pcs: €${formatNumber(
-                unitPrice,
-                unitPriceDecimalPlaces
-              )} (unit)`;
+              const priceText = `${qty} pcs: €${formatNumber(unitPrice, unitPriceDecimalPlaces)} (unit)`;
               const highlight = up.isActive ? { color: "red" } : {};
-              doc.text(priceText, qtyX, y + upIndex * 15, {
+              doc.text(priceText, qtyX, itemY + upIndex * 15, {
                 ...highlight,
                 width: 150,
               });
             });
 
-            // Show total price for active unit price
             const activeUnitPrice = item.unitPrices.find(
-              (up: UnitPrice) => up.isActive
+              (up: any) => up.isActive,
             );
             if (activeUnitPrice) {
               const totalPriceDecimalPlaces =
                 offer.totalPriceDecimalPlaces || 2;
+              itemTotal = getSafeNumber(activeUnitPrice.totalPrice);
               doc.text(
-                `€${formatNumber(
-                  activeUnitPrice.totalPrice,
-                  totalPriceDecimalPlaces
-                )}`,
+                `€${formatNumber(activeUnitPrice.totalPrice, totalPriceDecimalPlaces)}`,
                 totalX,
-                y
+                y,
               );
             }
-          }
-          // Fallback to legacy quantity prices
-          else if (item.quantityPrices && item.quantityPrices.length > 0) {
+          } else if (
+            item.quantityPrices &&
+            Array.isArray(item.quantityPrices)
+          ) {
+            let itemY = y;
             item.quantityPrices.forEach((qp: any, qpIndex: number) => {
               const qpQuantity = getSafeNumber(qp.quantity);
               const qpPrice = getSafeNumber(qp.price);
-              const priceText = `${qpQuantity} pcs: €${formatNumber(
-                qpPrice,
-                3
-              )}`;
+              const priceText = `${qpQuantity} pcs: €${formatNumber(qpPrice, 3)}`;
               const highlight = qp.isActive ? { color: "red" } : {};
-              doc.text(priceText, qtyX, y + qpIndex * 15, {
+              doc.text(priceText, qtyX, itemY + qpIndex * 15, {
                 ...highlight,
                 width: 150,
               });
             });
 
-            // Show total price for active quantity price
             const activePrice = item.quantityPrices.find(
-              (qp: any) => qp.isActive
+              (qp: any) => qp.isActive,
             );
             if (activePrice) {
+              itemTotal = getSafeNumber(activePrice.total);
               doc.text(`€${formatNumber(activePrice.total, 2)}`, totalX, y);
             }
-          }
-          // Fallback to base price
-          else if (item.baseQuantity || item.basePrice) {
+          } else if (item.baseQuantity || item.basePrice) {
             const quantity = getSafeNumber(item.baseQuantity);
             const price = getSafeNumber(item.basePrice);
+            itemTotal = quantity * price;
 
             doc.text(quantity.toString(), qtyX, y);
             doc.text(`€${formatNumber(price, 3)}`, priceX, y);
-            const total = quantity * price;
-            doc.text(`€${formatNumber(total, 2)}`, totalX, y);
+            doc.text(`€${formatNumber(itemTotal, 2)}`, totalX, y);
           } else {
-            // Fallback for items without prices
             doc.text("N/A", qtyX, y);
             doc.text("N/A", priceX, y);
             doc.text("N/A", totalX, y);
           }
 
-          // Calculate height based on number of prices
+          subtotal += itemTotal;
+
           const numPrices = Math.max(
             offer.useUnitPrices && item.unitPrices ? item.unitPrices.length : 0,
             item.quantityPrices ? item.quantityPrices.length : 0,
-            1
+            1,
           );
           y += Math.max(30, numPrices * 20);
         });
       }
 
-      // Totals
+      // Calculate final totals
+      const discount = getSafeNumber(offer.discountAmount || offer.discount);
+      let discountedSubtotal = subtotal - discount;
+      if (discountedSubtotal < 0) discountedSubtotal = 0;
+
+      const shipping = getSafeNumber(offer.shippingCost || offer.shipping);
+      const amountBeforeTax = discountedSubtotal + shipping;
+
+      const taxRate = offer.taxRate ? getSafeNumber(offer.taxRate) / 100 : 0.19;
+      const taxAmount = amountBeforeTax * taxRate;
+
+      const totalAmount = amountBeforeTax + taxAmount;
+
+      // Totals section
       y += 20;
       doc.moveTo(400, y).lineTo(550, y).stroke();
       y += 10;
 
+      doc.fontSize(10);
       doc.text("Subtotal:", 400, y);
       doc.text(`€${formatNumber(subtotal, 2)}`, 500, y);
       y += 20;
 
-      if (discountAmount > 0) {
+      if (discount > 0) {
         doc.text("Discount:", 400, y);
-        doc.text(`-€${formatNumber(discountAmount, 2)}`, 500, y);
+        doc.text(`-€${formatNumber(discount, 2)}`, 500, y);
         y += 20;
       }
 
-      if (shippingCost > 0) {
+      if (shipping > 0) {
         doc.text("Shipping:", 400, y);
-        doc.text(`€${formatNumber(shippingCost, 2)}`, 500, y);
+        doc.text(`€${formatNumber(shipping, 2)}`, 500, y);
         y += 20;
       }
 
-      doc.text("VAT (19%):", 400, y);
+      const displayTaxRate = offer.taxRate ? getSafeNumber(offer.taxRate) : 19;
+      doc.text(`VAT (${displayTaxRate}%):`, 400, y);
       doc.text(`€${formatNumber(taxAmount, 2)}`, 500, y);
       y += 20;
 
@@ -2633,93 +3478,40 @@ export class OfferController {
       }
 
       if (offer.notes) {
-        doc.text(`Notes: ${offer.notes}`, 50, y);
+        const notes =
+          offer.notes.length > 200
+            ? offer.notes.substring(0, 200) + "..."
+            : offer.notes;
+        doc.text(`Notes: ${notes}`, 50, y, { width: 500 });
       }
 
-      // Save PDF to file
-      const uploadsDir = path.join(__dirname, "../../uploads/offers");
-      if (!fs.existsSync(uploadsDir)) {
-        fs.mkdirSync(uploadsDir, { recursive: true });
-      }
-
-      const pdfPath = path.join(uploadsDir, `${offer.offerNumber}.pdf`);
-      const writeStream = fs.createWriteStream(pdfPath);
-      doc.pipe(writeStream);
-      doc.end();
-
-      // Wait for PDF to be written
-      await new Promise((resolve: any, reject) => {
-        writeStream.on("finish", resolve);
-        writeStream.on("error", reject);
-      });
-
-      // Update offer with PDF info
-      offer.pdfPath = `/uploads/offers/${offer.offerNumber}.pdf`;
-      offer.pdfGenerated = true;
-      offer.pdfGeneratedAt = new Date();
-      await this.offerRepository.save(offer);
-
-      return response.status(200).json({
-        success: true,
-        message: "PDF generated successfully",
-        data: {
-          pdfPath: offer.pdfPath,
-          downloadUrl: `/api/offers/${id}/download-pdf`,
-        },
-      });
-    } catch (error) {
-      console.error("Error generating PDF:", error);
-      return response.status(500).json({
-        success: false,
-        message: "Internal server error",
-        error: error instanceof Error ? error.message : "Unknown error",
-      });
-    }
-  }
-
-  // Download PDF
-  async downloadPdf(request: Request, response: Response) {
-    try {
-      const { id } = request.params;
-
-      const offer = await this.offerRepository.findOne({
-        where: { id },
-      });
-
-      if (!offer || !offer.pdfPath) {
-        return response.status(404).json({
-          success: false,
-          message: "PDF not found",
-        });
-      }
-
-      const pdfPath = path.join(__dirname, "../..", offer.pdfPath);
-
-      if (!fs.existsSync(pdfPath)) {
-        return response.status(404).json({
-          success: false,
-          message: "PDF file not found",
-        });
-      }
-
+      // Set response headers BEFORE piping
       response.setHeader("Content-Type", "application/pdf");
       response.setHeader(
         "Content-Disposition",
-        `attachment; filename="${offer.offerNumber}.pdf"`
+        `attachment; filename="Offer-${offer.offerNumber || id}.pdf"`,
       );
 
-      const fileStream = fs.createReadStream(pdfPath);
-      fileStream.pipe(response);
-    } catch (error) {
-      console.error("Error downloading PDF:", error);
+      // Pipe PDF directly to response
+      doc.pipe(response);
+      doc.end();
+    } catch (error: any) {
+      console.error("Error generating PDF:", error);
+
+      // If headers already sent, we can't send JSON
+      if (response.headersSent) {
+        return;
+      }
+
       return response.status(500).json({
         success: false,
-        message: "Internal server error",
+        message: "Internal server error while generating PDF",
+        error:
+          process.env.NODE_ENV === "development" ? error.message : undefined,
       });
     }
   }
 
-  // Delete offer
   async deleteOffer(request: Request, response: Response) {
     try {
       const { id } = request.params;

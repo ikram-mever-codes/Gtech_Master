@@ -36,7 +36,6 @@ import {
   deleteOffer,
   createOfferRevision,
   generateOfferPdf,
-  downloadOfferPdf,
   copyPastePrices,
   getOffersByInquiry,
   type Offer,
@@ -125,6 +124,12 @@ const OffersPage: React.FC = () => {
     totalPriceDecimalPlaces: 2,
     maxUnitPriceColumns: 3,
   });
+  const [localUnitPrices, setLocalUnitPrices] = useState<Record<string, any>>(
+    {},
+  );
+  const [savingUnitPrices, setSavingUnitPrices] = useState<
+    Record<string, boolean>
+  >({});
 
   const [editFormData, setEditFormData] = useState<any>({});
   const [copyPasteData, setCopyPasteData] = useState("");
@@ -162,9 +167,12 @@ const OffersPage: React.FC = () => {
 
   // Editing state for inline editing
   const [editingLineItemId, setEditingLineItemId] = useState<string | null>(
-    null
+    null,
   );
   const [editingLineItemData, setEditingLineItemData] = useState<any>({});
+
+  // Default quantities for unit pricing
+  const defaultQuantities = ["1", "100", "200", "500", "1000", "2000", "5000"];
 
   // Fetch data on mount
   useEffect(() => {
@@ -183,7 +191,6 @@ const OffersPage: React.FC = () => {
         setTotalPages(response.pagination?.pages || 1);
       }
     } catch (error) {
-      console.error("Error fetching offers:", error);
     } finally {
       setLoading(false);
     }
@@ -199,9 +206,7 @@ const OffersPage: React.FC = () => {
         setInquiries(inquiryData);
         setFilteredInquiries(inquiryData); // Initialize filtered inquiries
       }
-    } catch (error) {
-      console.error("Error fetching inquiries:", error);
-    }
+    } catch (error) {}
   };
 
   const fetchCustomers = async () => {
@@ -211,12 +216,10 @@ const OffersPage: React.FC = () => {
         setCustomers(
           Array.isArray(response.data)
             ? response.data
-            : response.data.customers || []
+            : response.data.customers || [],
         );
       }
-    } catch (error) {
-      console.error("Error fetching customers:", error);
-    }
+    } catch (error) {}
   };
 
   const handleCustomerChange = (customerId: string) => {
@@ -225,7 +228,7 @@ const OffersPage: React.FC = () => {
     if (customerId) {
       // Filter inquiries for the selected customer
       const filtered = inquiries.filter(
-        (inquiry) => inquiry.customer?.id === customerId
+        (inquiry) => inquiry.customer?.id === customerId,
       );
       setFilteredInquiries(filtered);
       // Reset selected inquiry when customer changes
@@ -241,6 +244,18 @@ const OffersPage: React.FC = () => {
     setSelectedCustomerId("");
     setSelectedInquiry(null);
     setFilteredInquiries(inquiries);
+
+    // Reset form with defaults including title
+    setOfferFormData({
+      title: "",
+      currency: "EUR",
+      validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      useUnitPrices: false,
+      unitPriceDecimalPlaces: 3,
+      totalPriceDecimalPlaces: 2,
+      maxUnitPriceColumns: 3,
+    });
+
     setShowCreateModal(true);
   };
 
@@ -252,30 +267,101 @@ const OffersPage: React.FC = () => {
     }
 
     try {
+      // Use inquiry title as default offer title if not provided
+      const finalFormData = {
+        ...offerFormData,
+        title: offerFormData.title || selectedInquiry.name || "New Offer",
+      };
+
       const response = await createOfferFromInquiry(
         selectedInquiry.id,
-        offerFormData
+        finalFormData,
       );
       if (response.success) {
         setShowCreateModal(false);
         resetCreateForm();
         fetchOffers();
+
+        if (response.data?.id) {
+          // You can add logic here to automatically open the new offer
+          // For example:
+          // const newOffer = await getOfferById(response.data.id);
+          // setSelectedOffer(newOffer.data);
+          // setShowViewModal(true);
+        }
+      } else {
       }
-    } catch (error) {
-      console.error("Error creating offer:", error);
-    }
+    } catch (error) {}
+  };
+  // Add this helper function
+  const cleanNumericData = (data: any) => {
+    const cleaned = { ...data };
+
+    const numericFields = [
+      "discountPercentage",
+      "discountAmount",
+      "shippingCost",
+      "subtotal",
+      "taxAmount",
+      "totalAmount",
+    ];
+
+    numericFields.forEach((field) => {
+      if (cleaned[field] !== undefined && cleaned[field] !== null) {
+        const value = cleaned[field];
+
+        // If it's a string with German formatting, convert it
+        if (typeof value === "string") {
+          // Remove all dots (thousand separators) and convert comma to dot
+          const stringValue = value.toString();
+
+          // Check if it's in German format (contains dots as thousand separators)
+          if (stringValue.includes(".") && stringValue.includes(",")) {
+            // German format: 1.234,56
+            cleaned[field] =
+              parseFloat(stringValue.replace(/\./g, "").replace(",", ".")) || 0;
+          } else if (stringValue.includes(".")) {
+            // Could be decimal or thousand separator
+            // If there are multiple dots, it's likely thousand separators
+            const dotCount = (stringValue.match(/\./g) || []).length;
+            if (dotCount > 1) {
+              // Multiple dots = thousand separators
+              cleaned[field] = parseFloat(stringValue.replace(/\./g, "")) || 0;
+            } else {
+              // Single dot = decimal point
+              cleaned[field] = parseFloat(stringValue) || 0;
+            }
+          } else {
+            // No formatting, just parse
+            cleaned[field] = parseFloat(stringValue) || 0;
+          }
+        } else if (typeof value === "number") {
+          // Already a number, ensure it's valid
+          cleaned[field] = isNaN(value) ? 0 : value;
+        }
+      }
+    });
+
+    return cleaned;
   };
 
-  // Handle offer update
+  // Update handleUpdateOffer to use it
   const handleUpdateOffer = async () => {
     if (!selectedOffer) return;
 
     try {
-      const response = await updateOffer(selectedOffer.id, editFormData);
+      // Clean the data before sending
+      const cleanedData = cleanNumericData(editFormData);
+
+      // Log for debugging
+      console.log("Sending cleaned data:", cleanedData);
+
+      const response = await updateOffer(selectedOffer.id, cleanedData);
       if (response.success) {
         setShowEditModal(false);
         setSelectedOffer(null);
         fetchOffers();
+      } else {
       }
     } catch (error) {
       console.error("Error updating offer:", error);
@@ -306,22 +392,38 @@ const OffersPage: React.FC = () => {
       });
       if (response.success) {
         fetchOffers();
+      } else {
       }
     } catch (error) {
       console.error("Error creating revision:", error);
     }
   };
 
-  // Handle PDF generation
-  const handleGeneratePdf = async (offerId: string) => {
+  const downloadPdf = async (offerId: string) => {
     try {
-      const response = await generateOfferPdf(offerId);
-      if (response.success) {
-        // Download the PDF
-        await downloadOfferPdf(offerId);
+      // First, ensure PDF is generated
+      await generateOfferPdf(offerId);
+
+      // Then download it
+      const downloadUrl = `/api/offers/${offerId}/download-pdf`;
+
+      // Better approach: Use fetch and create blob
+      const response = await fetch(downloadUrl);
+      if (!response.ok) {
+        throw new Error("Failed to download PDF");
       }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `offer-${offerId}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
     } catch (error) {
-      console.error("Error generating PDF:", error);
+      console.error("Error downloading PDF:", error);
     }
   };
 
@@ -337,6 +439,7 @@ const OffersPage: React.FC = () => {
         data: copyPasteData,
       });
       if (response.success) {
+        toast.success("Prices copied successfully");
         setShowCopyPasteModal(false);
         setCopyPasteData("");
 
@@ -347,6 +450,7 @@ const OffersPage: React.FC = () => {
         }
 
         fetchOffers();
+      } else {
       }
     } catch (error) {
       console.error("Error processing copied data:", error);
@@ -360,6 +464,7 @@ const OffersPage: React.FC = () => {
       if (response.success) {
         setSelectedOffer(response.data);
         setShowViewModal(true);
+      } else {
       }
     } catch (error) {
       console.error("Error fetching offer details:", error);
@@ -416,7 +521,7 @@ const OffersPage: React.FC = () => {
       const response = await updateLineItem(
         offerId,
         lineItemId,
-        editingLineItemData
+        editingLineItemData,
       );
       if (response.success) {
         // Refresh offer data
@@ -425,17 +530,17 @@ const OffersPage: React.FC = () => {
           setSelectedOffer(updatedOffer.data);
           // Update offers list
           const updatedOffers = offers.map((offer: any) =>
-            offer.id === offerId ? updatedOffer.data : offer
+            offer.id === offerId ? updatedOffer.data : offer,
           );
           setOffers(updatedOffers);
         }
 
         setEditingLineItemId(null);
         setEditingLineItemData({});
+      } else {
       }
     } catch (error) {
       console.error("Error updating line item:", error);
-      toast.error("Failed to update line item");
     }
   };
 
@@ -447,10 +552,11 @@ const OffersPage: React.FC = () => {
   // Handle toggle unit prices for entire offer
   const handleToggleOfferUnitPrices = async (
     offerId: string,
-    useUnitPrices: boolean
+    useUnitPrices: boolean,
   ) => {
     try {
       await toggleOfferUnitPrices(offerId, useUnitPrices);
+      toast.success(`Unit pricing ${useUnitPrices ? "enabled" : "disabled"}`);
 
       // Refresh offer data
       if (selectedOffer) {
@@ -462,7 +568,6 @@ const OffersPage: React.FC = () => {
       }
     } catch (error) {
       console.error("Error toggling offer unit prices:", error);
-      toast.error("Failed to toggle unit prices");
     }
   };
 
@@ -479,6 +584,8 @@ const OffersPage: React.FC = () => {
         unitPrice: parseFloat(unitPriceFormData.unitPrice),
         isActive: unitPriceFormData.isActive,
       });
+
+      toast.success("Unit price added successfully");
 
       // Reset form
       setUnitPriceFormData({
@@ -512,6 +619,7 @@ const OffersPage: React.FC = () => {
       };
 
       await updateOffer(selectedOffer.id, updateData);
+      toast.success("Unit price settings updated");
 
       // Refresh offer data
       const updatedOffer = await getOfferById(selectedOffer.id);
@@ -527,14 +635,91 @@ const OffersPage: React.FC = () => {
     }
   };
 
+  const handleLocalUnitPriceUpdate = (
+    lineItemId: string,
+    unitPriceId: string,
+    updates: Partial<UnitPrice>,
+  ) => {
+    setLocalUnitPrices((prev) => {
+      const lineItemKey = `${lineItemId}`;
+      const currentLineItem = prev[lineItemKey] || {};
+      const currentUnitPrices = currentLineItem.unitPrices || [];
+
+      const updatedUnitPrices = currentUnitPrices.map((up: UnitPrice) =>
+        up.id === unitPriceId ? { ...up, ...updates } : up,
+      );
+
+      return {
+        ...prev,
+        [lineItemKey]: {
+          ...currentLineItem,
+          unitPrices: updatedUnitPrices,
+        },
+      };
+    });
+  };
+
+  // Add this function to save unit prices for a specific line item
+  const handleSaveUnitPrices = async (lineItemId: string) => {
+    const lineItemKey = `${lineItemId}`;
+    const localData = localUnitPrices[lineItemKey];
+
+    if (!localData || !localData.unitPrices) {
+      toast.error("No changes to save");
+      return;
+    }
+
+    setSavingUnitPrices((prev) => ({ ...prev, [lineItemId]: true }));
+
+    try {
+      await updateLineItem(selectedOffer.id, lineItemId, {
+        unitPrices: localData.unitPrices,
+      });
+
+      toast.success("Unit prices saved successfully");
+
+      // Refresh offer data
+      const updatedOffer = await getOfferById(selectedOffer.id);
+      if (updatedOffer.success) {
+        setSelectedOffer(updatedOffer.data);
+        // Clear local data for this line item
+        setLocalUnitPrices((prev) => {
+          const newState = { ...prev };
+          delete newState[lineItemId];
+          return newState;
+        });
+      }
+    } catch (error) {
+      console.error("Error saving unit prices:", error);
+      toast.error("Failed to save unit prices");
+    } finally {
+      setSavingUnitPrices((prev) => ({ ...prev, [lineItemId]: false }));
+    }
+  };
+
+  // Add this function to get current unit prices (local or from server)
+  const getCurrentUnitPrices = (lineItem: any, lineItemId: string) => {
+    const lineItemKey = `${lineItemId}`;
+    if (localUnitPrices[lineItemKey]?.unitPrices) {
+      return localUnitPrices[lineItemKey].unitPrices;
+    }
+    return lineItem.unitPrices || [];
+  };
+
+  // Add this function to check if there are unsaved changes
+  const hasUnsavedChanges = (lineItemId: string) => {
+    return !!localUnitPrices[lineItemId];
+  };
+
   // Handle setting active price (for both unit prices and quantity prices)
   const handleSetActivePrice = async (
     lineItemId: string,
     priceType: "quantity" | "unit",
-    priceIndex: number
+    priceIndex: number,
   ) => {
     try {
       await setActivePrice(lineItemId, priceType, priceIndex);
+      toast.success("Active price updated");
 
       // Refresh offer data
       if (selectedOffer) {
@@ -553,21 +738,23 @@ const OffersPage: React.FC = () => {
   const handleUpdateUnitPrice = async (
     lineItemId: string,
     unitPriceId: string,
-    updates: Partial<UnitPrice>
+    updates: Partial<UnitPrice>,
   ) => {
     try {
       const lineItem = selectedOffer.lineItems.find(
-        (li: any) => li.id === lineItemId
+        (li: any) => li.id === lineItemId,
       );
       if (!lineItem) return;
 
       const updatedUnitPrices = lineItem.unitPrices.map((up: UnitPrice) =>
-        up.id === unitPriceId ? { ...up, ...updates } : up
+        up.id === unitPriceId ? { ...up, ...updates } : up,
       );
 
       await updateLineItem(selectedOffer.id, lineItemId, {
         unitPrices: updatedUnitPrices,
       });
+
+      toast.success("Unit price updated");
 
       // Refresh offer data
       const updatedOffer = await getOfferById(selectedOffer.id);
@@ -583,7 +770,7 @@ const OffersPage: React.FC = () => {
   // Handle deleting unit price
   const handleDeleteUnitPrice = async (
     lineItemId: string,
-    unitPriceId: string
+    unitPriceId: string,
   ) => {
     if (!window.confirm("Are you sure you want to delete this unit price?")) {
       return;
@@ -591,17 +778,19 @@ const OffersPage: React.FC = () => {
 
     try {
       const lineItem = selectedOffer.lineItems.find(
-        (li: any) => li.id === lineItemId
+        (li: any) => li.id === lineItemId,
       );
       if (!lineItem) return;
 
       const updatedUnitPrices = lineItem.unitPrices.filter(
-        (up: UnitPrice) => up.id !== unitPriceId
+        (up: UnitPrice) => up.id !== unitPriceId,
       );
 
       await updateLineItem(selectedOffer.id, lineItemId, {
         unitPrices: updatedUnitPrices,
       });
+
+      toast.success("Unit price deleted");
 
       // Refresh offer data
       const updatedOffer = await getOfferById(selectedOffer.id);
@@ -618,6 +807,7 @@ const OffersPage: React.FC = () => {
   const handleSyncUnitPricesAcrossOffer = async (offerId: string) => {
     try {
       await syncUnitPricesAcrossOffer(offerId);
+      toast.success("Unit prices synced across all line items");
 
       // Refresh offer data
       const updatedOffer = await getOfferById(offerId);
@@ -642,8 +832,8 @@ const OffersPage: React.FC = () => {
       maxUnitPriceColumns: 3,
     });
     setSelectedInquiry(null);
-    setSelectedCustomerId(""); // Reset customer filter
-    setFilteredInquiries(inquiries); // Reset to all inquiries
+    setSelectedCustomerId("");
+    setFilteredInquiries(inquiries);
   };
 
   // Format date
@@ -701,21 +891,6 @@ const OffersPage: React.FC = () => {
       );
     }
   };
-  // Open unit price settings modal for line item (deprecated but kept for migration)
-  const openUnitPriceSettings = (lineItem: any) => {
-    console.warn(
-      "Line item unit price settings are deprecated. Use offer-level settings instead."
-    );
-    setSelectedLineItem(lineItem);
-    // Set to offer's settings instead of line item's
-    setOfferUnitPriceSettings({
-      useUnitPrices: selectedOffer?.useUnitPrices || false,
-      unitPriceDecimalPlaces: selectedOffer?.unitPriceDecimalPlaces || 3,
-      totalPriceDecimalPlaces: selectedOffer?.totalPriceDecimalPlaces || 2,
-      maxUnitPriceColumns: selectedOffer?.maxUnitPriceColumns || 3,
-    });
-    setShowOfferUnitPriceSettingsModal(true);
-  };
 
   // Open offer-level unit price settings modal
   const openOfferUnitPriceSettings = (offer: any) => {
@@ -748,7 +923,7 @@ const OffersPage: React.FC = () => {
                 {up.quantity} pcs:{" "}
                 {formatUnitPrice(
                   up.unitPrice,
-                  offer.unitPriceDecimalPlaces || 3
+                  offer.unitPriceDecimalPlaces || 3,
                 )}
                 /unit
                 {up.isActive && (
@@ -785,6 +960,39 @@ const OffersPage: React.FC = () => {
     } else {
       return <div className="text-xs text-gray-400">No price set</div>;
     }
+  };
+
+  // Add function to auto-populate default quantities
+  const populateDefaultQuantities = (lineItemId: string) => {
+    const currentUnitPrices = getCurrentUnitPrices(
+      { id: lineItemId },
+      lineItemId,
+    );
+    const newUnitPrices = [...currentUnitPrices];
+
+    // Add default quantities if not already present
+    defaultQuantities.forEach((qty, index) => {
+      const exists = newUnitPrices.some((up) => up.quantity === qty);
+      if (!exists) {
+        newUnitPrices.push({
+          id: `temp-${Date.now()}-${index}`,
+          quantity: qty,
+          unitPrice: 0,
+          totalPrice: 0,
+          isActive: false,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+      }
+    });
+
+    setLocalUnitPrices((prev) => ({
+      ...prev,
+      [lineItemId]: {
+        ...prev[lineItemId],
+        unitPrices: newUnitPrices,
+      },
+    }));
   };
 
   return (
@@ -953,7 +1161,7 @@ const OffersPage: React.FC = () => {
                           <div className="flex flex-col gap-1 items-center">
                             <span
                               className={`text-xs px-2 py-1 rounded-full font-medium ${getOfferStatusColor(
-                                offer.status
+                                offer.status,
                               )}`}
                             >
                               {offer.status}
@@ -988,7 +1196,7 @@ const OffersPage: React.FC = () => {
 
                             {offer.pdfGenerated ? (
                               <button
-                                onClick={() => downloadOfferPdf(offer.id)}
+                                onClick={() => downloadPdf(offer.id)}
                                 className="text-purple-600 hover:text-purple-800 transition-colors p-1"
                                 title="Download PDF"
                               >
@@ -996,7 +1204,7 @@ const OffersPage: React.FC = () => {
                               </button>
                             ) : (
                               <button
-                                onClick={() => handleGeneratePdf(offer.id)}
+                                onClick={() => downloadPdf(offer.id)}
                                 className="text-purple-600 hover:text-purple-800 transition-colors p-1"
                                 title="Generate PDF"
                               >
@@ -1040,7 +1248,7 @@ const OffersPage: React.FC = () => {
                                         onClick={() =>
                                           handleToggleOfferUnitPrices(
                                             offer.id,
-                                            !offer.useUnitPrices
+                                            !offer.useUnitPrices,
                                           )
                                         }
                                         className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
@@ -1067,18 +1275,6 @@ const OffersPage: React.FC = () => {
                                       <CogIcon className="h-4 w-4" />
                                       Settings
                                     </button>
-                                    {/* {offer.useUnitPrices && (
-                                      <button
-                                        onClick={() =>
-                                          handleSyncUnitPricesAcrossOffer(
-                                            offer.id
-                                          )
-                                        }
-                                        className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
-                                      >
-                                        Sync All Line Items
-                                      </button>
-                                    )} */}
                                   </div>
                                 </div>
                                 {offer.useUnitPrices && (
@@ -1125,7 +1321,7 @@ const OffersPage: React.FC = () => {
                                       <div className="text-xs text-gray-500 mt-1">
                                         Created:{" "}
                                         {formatDate(
-                                          offer.inquirySnapshot.createdAt
+                                          offer.inquirySnapshot.createdAt,
                                         )}
                                         {offer.isAssembly && " • Assembly"}
                                         {offer.inquirySnapshot.requestsCount >
@@ -1149,7 +1345,7 @@ const OffersPage: React.FC = () => {
                                     <h4 className="font-medium text-gray-900">
                                       Line Items (
                                       {offer.lineItems?.filter(
-                                        (li: any) => !li.isComponent
+                                        (li: any) => !li.isComponent,
                                       ).length || 0}
                                       )
                                     </h4>
@@ -1232,7 +1428,7 @@ const OffersPage: React.FC = () => {
                                                     ...editingLineItemData,
                                                     basePrice: e.target.value
                                                       ? parseFloat(
-                                                          e.target.value
+                                                          e.target.value,
                                                         )
                                                       : undefined,
                                                   })
@@ -1254,7 +1450,7 @@ const OffersPage: React.FC = () => {
                                                 onClick={() =>
                                                   handleSaveLineItem(
                                                     offer.id,
-                                                    item.id
+                                                    item.id,
                                                   )
                                                 }
                                                 className="px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700"
@@ -1309,16 +1505,16 @@ const OffersPage: React.FC = () => {
                                                   </button>
                                                   {renderPriceDisplay(
                                                     item,
-                                                    offer
+                                                    offer,
                                                   )}
                                                 </div>
                                                 <div className="text-sm font-bold text-gray-900 mt-1">
                                                   {formatCurrency(
                                                     calculateLineItemTotal(
                                                       item,
-                                                      offer.useUnitPrices
+                                                      offer.useUnitPrices,
                                                     ) || 0,
-                                                    offer.currency
+                                                    offer.currency,
                                                   )}
                                                 </div>
                                               </div>
@@ -1335,7 +1531,7 @@ const OffersPage: React.FC = () => {
                                                     (comp: any) =>
                                                       comp.parentItemId ===
                                                         item.id &&
-                                                      comp.isComponent
+                                                      comp.isComponent,
                                                   )
                                                   .map((component: any) => (
                                                     <div
@@ -1378,7 +1574,7 @@ const OffersPage: React.FC = () => {
                                         <span className="font-medium text-green-700">
                                           {offer.lineItems
                                             ?.filter(
-                                              (item: any) => !item.isComponent
+                                              (item: any) => !item.isComponent,
                                             )
                                             .reduce(
                                               (total: number, item: any) => {
@@ -1387,7 +1583,7 @@ const OffersPage: React.FC = () => {
                                                   (item.unitPrices?.length || 0)
                                                 );
                                               },
-                                              0
+                                              0,
                                             ) || 0}{" "}
                                           sets
                                         </span>
@@ -1408,7 +1604,7 @@ const OffersPage: React.FC = () => {
                                     <span className="font-medium">
                                       {formatCurrency(
                                         offer.subtotal || 0,
-                                        offer.currency
+                                        offer.currency,
                                       )}
                                     </span>
                                   </div>
@@ -1550,7 +1746,6 @@ const OffersPage: React.FC = () => {
           )}
         </div>
       </div>
-
       {showViewModal && selectedOffer && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
@@ -1575,13 +1770,11 @@ const OffersPage: React.FC = () => {
                 </div>
                 <div className="flex gap-2">
                   <button
-                    onClick={() => handleGeneratePdf(selectedOffer.id)}
+                    onClick={() => downloadPdf(selectedOffer.id)}
                     className="px-3 py-2 text-sm text-purple-700 bg-white border border-purple-300 rounded-lg hover:bg-purple-50 transition-all flex items-center gap-2"
                   >
                     <PrinterIcon className="h-4 w-4" />
-                    {selectedOffer.pdfGenerated
-                      ? "Regenerate PDF"
-                      : "Generate PDF"}
+                    Download PDF
                   </button>
                   <button
                     onClick={() => setShowViewModal(false)}
@@ -1759,7 +1952,7 @@ const OffersPage: React.FC = () => {
                                     {item.unitPrices
                                       .slice(
                                         0,
-                                        selectedOffer.maxUnitPriceColumns || 3
+                                        selectedOffer.maxUnitPriceColumns || 3,
                                       )
                                       .map((up: UnitPrice, idx: number) => (
                                         <div
@@ -1773,7 +1966,7 @@ const OffersPage: React.FC = () => {
                                           <span>
                                             {formatUnitPriceForOffer(
                                               up.unitPrice,
-                                              selectedOffer
+                                              selectedOffer,
                                             )}
                                           </span>
                                           {up.isActive && (
@@ -1797,14 +1990,14 @@ const OffersPage: React.FC = () => {
                                           <span>
                                             {formatCurrency(
                                               qp.price,
-                                              selectedOffer.currency
+                                              selectedOffer.currency,
                                             )}
                                           </span>
                                           {qp.isActive && (
                                             <CheckCircleIcon className="h-3 w-3 text-green-600" />
                                           )}
                                         </div>
-                                      )
+                                      ),
                                     )}
                                   </div>
                                 ) : item.basePrice ? (
@@ -1814,7 +2007,7 @@ const OffersPage: React.FC = () => {
                                     <span>
                                       {formatCurrency(
                                         item.basePrice,
-                                        selectedOffer.currency
+                                        selectedOffer.currency,
                                       )}
                                     </span>
                                   </div>
@@ -1828,9 +2021,9 @@ const OffersPage: React.FC = () => {
                                 {formatCurrency(
                                   calculateLineItemTotal(
                                     item,
-                                    selectedOffer.useUnitPrices
+                                    selectedOffer.useUnitPrices,
                                   ) || 0,
-                                  selectedOffer.currency
+                                  selectedOffer.currency,
                                 )}
                               </td>
                             </tr>
@@ -1849,7 +2042,7 @@ const OffersPage: React.FC = () => {
                         <span className="font-medium">
                           {formatCurrency(
                             selectedOffer.subtotal || 0,
-                            selectedOffer.currency
+                            selectedOffer.currency,
                           )}
                         </span>
                       </div>
@@ -1860,7 +2053,7 @@ const OffersPage: React.FC = () => {
                             -
                             {formatCurrency(
                               selectedOffer.discountAmount,
-                              selectedOffer.currency
+                              selectedOffer.currency,
                             )}
                           </span>
                         </div>
@@ -1871,7 +2064,7 @@ const OffersPage: React.FC = () => {
                           <span className="font-medium">
                             {formatCurrency(
                               selectedOffer.shippingCost,
-                              selectedOffer.currency
+                              selectedOffer.currency,
                             )}
                           </span>
                         </div>
@@ -1881,7 +2074,7 @@ const OffersPage: React.FC = () => {
                         <span className="font-medium">
                           {formatCurrency(
                             selectedOffer.taxAmount || 0,
-                            selectedOffer.currency
+                            selectedOffer.currency,
                           )}
                         </span>
                       </div>
@@ -1891,7 +2084,7 @@ const OffersPage: React.FC = () => {
                           <span>
                             {formatCurrency(
                               selectedOffer.totalAmount || 0,
-                              selectedOffer.currency
+                              selectedOffer.currency,
                             )}
                           </span>
                         </div>
@@ -1924,6 +2117,7 @@ const OffersPage: React.FC = () => {
         </div>
       )}
 
+      {/* Create Offer Modal - FIXED to auto-populate title from inquiry */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
@@ -1979,7 +2173,14 @@ const OffersPage: React.FC = () => {
                       filteredInquiries.map((inquiry) => (
                         <div
                           key={inquiry.id}
-                          onClick={() => setSelectedInquiry(inquiry)}
+                          onClick={() => {
+                            setSelectedInquiry(inquiry);
+                            // Auto-populate offer title with inquiry name
+                            setOfferFormData((prev) => ({
+                              ...prev,
+                              title: inquiry.name,
+                            }));
+                          }}
                           className={`p-3 border rounded-lg cursor-pointer transition-all ${
                             selectedInquiry?.id === inquiry.id
                               ? "border-gray-600 bg-gray-50"
@@ -2016,14 +2217,14 @@ const OffersPage: React.FC = () => {
 
                 {selectedInquiry && (
                   <>
-                    {/* Offer Details */}
+                    {/* Offer Details - FIXED: Show inquiry title as default */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Offer Title *
                       </label>
                       <input
                         type="text"
-                        value={offerFormData.title}
+                        value={offerFormData.title || selectedInquiry.name}
                         onChange={(e) =>
                           setOfferFormData({
                             ...offerFormData,
@@ -2031,8 +2232,11 @@ const OffersPage: React.FC = () => {
                           })
                         }
                         className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent"
-                        placeholder="e.g., Offer for Product XYZ"
+                        placeholder="Offer title"
                       />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Default: "{selectedInquiry.name}"
+                      </p>
                     </div>
 
                     <div className="grid grid-cols-2 gap-3">
@@ -2132,7 +2336,7 @@ const OffersPage: React.FC = () => {
                                 setOfferFormData({
                                   ...offerFormData,
                                   unitPriceDecimalPlaces: parseInt(
-                                    e.target.value
+                                    e.target.value,
                                   ),
                                 })
                               }
@@ -2153,7 +2357,7 @@ const OffersPage: React.FC = () => {
                                 setOfferFormData({
                                   ...offerFormData,
                                   totalPriceDecimalPlaces: parseInt(
-                                    e.target.value
+                                    e.target.value,
                                   ),
                                 })
                               }
@@ -2292,7 +2496,7 @@ const OffersPage: React.FC = () => {
                   <CustomButton
                     gradient={true}
                     onClick={handleCreateOffer}
-                    disabled={!selectedInquiry || !offerFormData.title}
+                    disabled={!selectedInquiry}
                     className="px-4 py-2 text-sm bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-all disabled:opacity-50"
                   >
                     Create Offer
@@ -2303,7 +2507,6 @@ const OffersPage: React.FC = () => {
           </div>
         </div>
       )}
-
       {showEditModal && selectedOffer && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
@@ -2610,7 +2813,6 @@ const OffersPage: React.FC = () => {
           </div>
         </div>
       )}
-
       {/* Edit Pricing Modal - UPDATED for Offer-Level Unit Pricing */}
       {showPricingModal && selectedOffer && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
@@ -2635,17 +2837,6 @@ const OffersPage: React.FC = () => {
                     <ClipboardIcon className="h-4 w-4" />
                     Copy/Paste from Spreadsheet
                   </button>
-                  {/* {selectedOffer.useUnitPrices && (
-                    <button
-                      onClick={() =>
-                        handleSyncUnitPricesAcrossOffer(selectedOffer.id)
-                      }
-                      className="px-3 py-2 text-sm text-green-700 bg-white border border-green-300 rounded-lg hover:bg-green-50 transition-all flex items-center gap-2"
-                    >
-                      <ArrowPathIcon className="h-4 w-4" />
-                      Sync All Line Items
-                    </button>
-                  )} */}
                   <button
                     onClick={() => setShowPricingModal(false)}
                     className="text-gray-400 hover:text-gray-600 transition-colors"
@@ -2681,7 +2872,7 @@ const OffersPage: React.FC = () => {
                         onClick={() =>
                           handleToggleOfferUnitPrices(
                             selectedOffer.id,
-                            !selectedOffer.useUnitPrices
+                            !selectedOffer.useUnitPrices,
                           )
                         }
                         className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
@@ -2735,11 +2926,11 @@ const OffersPage: React.FC = () => {
                   .map((item: any) => {
                     const activePrice = getActivePrice(
                       item,
-                      selectedOffer.useUnitPrices
+                      selectedOffer.useUnitPrices,
                     );
                     const activePriceType = getActivePriceType(
                       item,
-                      selectedOffer.useUnitPrices
+                      selectedOffer.useUnitPrices,
                     );
 
                     return (
@@ -2763,9 +2954,9 @@ const OffersPage: React.FC = () => {
                               {formatCurrency(
                                 calculateLineItemTotal(
                                   item,
-                                  selectedOffer.useUnitPrices
+                                  selectedOffer.useUnitPrices,
                                 ) || 0,
-                                selectedOffer.currency
+                                selectedOffer.currency,
                               )}
                             </div>
                             {activePrice && (
@@ -2779,34 +2970,48 @@ const OffersPage: React.FC = () => {
                           </div>
                         </div>
 
-                        {/* Price Tables */}
                         {selectedOffer.useUnitPrices ? (
-                          // Unit Prices Table
+                          // Unit Prices Table - UPDATED with default quantities
                           <div className="space-y-3">
                             <div className="flex items-center justify-between">
                               <h4 className="font-medium text-gray-900">
                                 Unit Prices (
-                                {selectedOffer.unitPriceDecimalPlaces || 3}{" "}
+                                {selectedOffer.unitPriceDecimalPlaces || 3}
                                 decimal places)
                               </h4>
-                              <button
-                                onClick={() => {
-                                  // Open add unit price form
-                                  setSelectedLineItem(item);
-                                  setUnitPriceFormData({
-                                    quantity: "",
-                                    unitPrice: "",
-                                    isActive: false,
-                                  });
-                                }}
-                                className="px-3 py-1 text-sm bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-all flex items-center gap-1"
-                              >
-                                <PlusIcon className="h-4 w-4" />
-                                Add Unit Price
-                              </button>
+                              <div className="flex items-center gap-2">
+                                {hasUnsavedChanges(item.id) && (
+                                  <span className="px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded">
+                                    Unsaved changes
+                                  </span>
+                                )}
+                                <button
+                                  onClick={() =>
+                                    populateDefaultQuantities(item.id)
+                                  }
+                                  className="px-3 py-1 text-sm bg-green-100 text-green-700 rounded hover:bg-green-200 transition-all flex items-center gap-1"
+                                >
+                                  <PlusIcon className="h-4 w-4" />
+                                  Add Default Quantities
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setSelectedLineItem(item);
+                                    setUnitPriceFormData({
+                                      quantity: "",
+                                      unitPrice: "",
+                                      isActive: false,
+                                    });
+                                  }}
+                                  className="px-3 py-1 text-sm bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-all flex items-center gap-1"
+                                >
+                                  <PlusIcon className="h-4 w-4" />
+                                  Add Custom Unit Price
+                                </button>
+                              </div>
                             </div>
 
-                            {item.unitPrices?.length > 0 ? (
+                            {getCurrentUnitPrices(item, item.id).length > 0 ? (
                               <div className="overflow-x-auto">
                                 <table className="w-full text-sm">
                                   <thead className="bg-gray-50">
@@ -2829,7 +3034,7 @@ const OffersPage: React.FC = () => {
                                     </tr>
                                   </thead>
                                   <tbody className="divide-y divide-gray-200">
-                                    {item.unitPrices.map(
+                                    {getCurrentUnitPrices(item, item.id).map(
                                       (up: UnitPrice, idx: number) => (
                                         <tr
                                           key={up.id}
@@ -2840,7 +3045,7 @@ const OffersPage: React.FC = () => {
                                               type="text"
                                               value={up.quantity}
                                               onChange={(e) =>
-                                                handleUpdateUnitPrice(
+                                                handleLocalUnitPriceUpdate(
                                                   item.id,
                                                   up.id,
                                                   {
@@ -2850,9 +3055,9 @@ const OffersPage: React.FC = () => {
                                                         e.target.value,
                                                         up.unitPrice,
                                                         selectedOffer.totalPriceDecimalPlaces ||
-                                                          2
+                                                          2,
                                                       ),
-                                                  }
+                                                  },
                                                 )
                                               }
                                               className="w-24 px-2 py-1 text-sm border border-gray-300 rounded"
@@ -2870,29 +3075,33 @@ const OffersPage: React.FC = () => {
                                                   3
                                                     ? "0.001"
                                                     : selectedOffer.unitPriceDecimalPlaces ===
-                                                      2
-                                                    ? "0.01"
-                                                    : "0.0001"
+                                                        2
+                                                      ? "0.01"
+                                                      : "0.0001"
                                                 }
-                                                value={up.unitPrice}
+                                                value={up.unitPrice || ""}
                                                 onChange={(e) =>
-                                                  handleUpdateUnitPrice(
+                                                  handleLocalUnitPriceUpdate(
                                                     item.id,
                                                     up.id,
                                                     {
-                                                      unitPrice: parseFloat(
-                                                        e.target.value
-                                                      ),
+                                                      unitPrice: e.target.value
+                                                        ? parseFloat(
+                                                            e.target.value,
+                                                          )
+                                                        : 0,
                                                       totalPrice:
                                                         calculateUnitPriceTotal(
                                                           up.quantity,
-                                                          parseFloat(
-                                                            e.target.value
-                                                          ),
+                                                          e.target.value
+                                                            ? parseFloat(
+                                                                e.target.value,
+                                                              )
+                                                            : 0,
                                                           selectedOffer.totalPriceDecimalPlaces ||
-                                                            2
+                                                            2,
                                                         ),
-                                                    }
+                                                    },
                                                   )
                                                 }
                                                 className="w-32 px-2 py-1 text-sm border border-gray-300 rounded"
@@ -2908,10 +3117,10 @@ const OffersPage: React.FC = () => {
                                               name={`active-unit-price-${item.id}`}
                                               checked={up.isActive}
                                               onChange={() =>
-                                                handleSetActivePrice(
+                                                handleLocalUnitPriceUpdate(
                                                   item.id,
-                                                  "unit",
-                                                  idx
+                                                  up.id,
+                                                  { isActive: true },
                                                 )
                                               }
                                               className="h-4 w-4 text-gray-600"
@@ -2919,26 +3128,67 @@ const OffersPage: React.FC = () => {
                                           </td>
                                           <td className="px-3 py-2">
                                             <button
-                                              onClick={() =>
-                                                handleDeleteUnitPrice(
-                                                  item.id,
-                                                  up.id
-                                                )
-                                              }
+                                              onClick={() => {
+                                                const currentUnitPrices =
+                                                  getCurrentUnitPrices(
+                                                    item,
+                                                    item.id,
+                                                  );
+                                                const updatedUnitPrices =
+                                                  currentUnitPrices.filter(
+                                                    (price: UnitPrice) =>
+                                                      price.id !== up.id,
+                                                  );
+
+                                                setLocalUnitPrices((prev) => ({
+                                                  ...prev,
+                                                  [item.id]: {
+                                                    ...prev[item.id],
+                                                    unitPrices:
+                                                      updatedUnitPrices,
+                                                  },
+                                                }));
+                                              }}
                                               className="text-red-600 hover:text-red-800 text-xs"
                                             >
                                               Delete
                                             </button>
                                           </td>
                                         </tr>
-                                      )
+                                      ),
                                     )}
                                   </tbody>
                                 </table>
+
+                                {/* Save button for this line item */}
+                                {hasUnsavedChanges(item.id) && (
+                                  <div className="mt-4 flex justify-end">
+                                    <button
+                                      onClick={() =>
+                                        handleSaveUnitPrices(item.id)
+                                      }
+                                      disabled={savingUnitPrices[item.id]}
+                                      className="px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all flex items-center gap-2 disabled:opacity-50"
+                                    >
+                                      {savingUnitPrices[item.id] ? (
+                                        <>
+                                          <ArrowPathIcon className="h-4 w-4 animate-spin" />
+                                          Saving...
+                                        </>
+                                      ) : (
+                                        <>
+                                          <CheckCircleIcon className="h-4 w-4" />
+                                          Save Unit Prices
+                                        </>
+                                      )}
+                                    </button>
+                                  </div>
+                                )}
                               </div>
                             ) : (
                               <div className="text-center py-4 text-gray-500">
-                                No unit prices set. Add your first unit price.
+                                No unit prices set. Add default quantities or
+                                custom prices.
                               </div>
                             )}
                           </div>
@@ -2952,29 +3202,37 @@ const OffersPage: React.FC = () => {
                               <button
                                 onClick={() => {
                                   const newQuantity = prompt(
-                                    "Enter quantity (e.g., 1000):"
+                                    "Enter quantity (e.g., 1000):",
                                   );
                                   const newPrice = prompt(
-                                    `Enter price per unit in ${selectedOffer.currency}:`
+                                    `Enter price per unit in ${selectedOffer.currency}:`,
                                   );
 
                                   if (newQuantity && newPrice) {
-                                    addQuantityPrice(item.id, {
+                                    // Add to local state first
+                                    const currentPrices =
+                                      item.quantityPrices || [];
+                                    const newPriceObj = {
                                       quantity: newQuantity,
                                       price: parseFloat(newPrice),
                                       isActive: false,
-                                    }).then((updatedItem: any) => {
-                                      const updatedItems =
-                                        selectedOffer.lineItems.map((li: any) =>
-                                          li.id === item.id
-                                            ? updatedItem.data
-                                            : li
-                                        );
-                                      setSelectedOffer({
-                                        ...selectedOffer,
-                                        lineItems: updatedItems,
-                                      });
-                                    });
+                                      id: `temp-${Date.now()}`,
+                                      total: calculateLineTotal(
+                                        newQuantity,
+                                        parseFloat(newPrice),
+                                      ),
+                                    };
+
+                                    setLocalUnitPrices((prev) => ({
+                                      ...prev,
+                                      [item.id]: {
+                                        ...prev[item.id],
+                                        quantityPrices: [
+                                          ...currentPrices,
+                                          newPriceObj,
+                                        ],
+                                      },
+                                    }));
                                   }
                                 }}
                                 className="px-3 py-1 text-sm bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-all"
@@ -3006,175 +3264,226 @@ const OffersPage: React.FC = () => {
                                     </tr>
                                   </thead>
                                   <tbody className="divide-y divide-gray-200">
-                                    {item.quantityPrices.map(
-                                      (qp: any, idx: number) => (
-                                        <tr
-                                          key={idx}
-                                          className="hover:bg-gray-50"
-                                        >
-                                          <td className="px-3 py-2">
+                                    {(
+                                      localUnitPrices[item.id]
+                                        ?.quantityPrices || item.quantityPrices
+                                    ).map((qp: any, idx: number) => (
+                                      <tr
+                                        key={qp.id || idx}
+                                        className="hover:bg-gray-50"
+                                      >
+                                        <td className="px-3 py-2">
+                                          <input
+                                            type="text"
+                                            value={qp.quantity}
+                                            onChange={(e) => {
+                                              const updatedPrices = (
+                                                localUnitPrices[item.id]
+                                                  ?.quantityPrices ||
+                                                item.quantityPrices
+                                              ).map((p: any, i: number) =>
+                                                i === idx
+                                                  ? {
+                                                      ...p,
+                                                      quantity: e.target.value,
+                                                      total: calculateLineTotal(
+                                                        e.target.value,
+                                                        p.price,
+                                                      ),
+                                                    }
+                                                  : p,
+                                              );
+
+                                              setLocalUnitPrices((prev) => ({
+                                                ...prev,
+                                                [item.id]: {
+                                                  ...prev[item.id],
+                                                  quantityPrices: updatedPrices,
+                                                },
+                                              }));
+                                            }}
+                                            className="w-24 px-2 py-1 text-sm border border-gray-300 rounded"
+                                          />
+                                        </td>
+                                        <td className="px-3 py-2">
+                                          <div className="flex items-center gap-1">
+                                            <span className="text-gray-500">
+                                              {selectedOffer.currency}
+                                            </span>
                                             <input
-                                              type="text"
-                                              value={qp.quantity}
+                                              type="number"
+                                              step="0.001"
+                                              value={qp.price}
                                               onChange={(e) => {
-                                                const updatedPrices =
-                                                  item.quantityPrices.map(
-                                                    (p: any, i: number) =>
-                                                      i === idx
-                                                        ? {
-                                                            ...p,
-                                                            quantity:
+                                                const updatedPrices = (
+                                                  localUnitPrices[item.id]
+                                                    ?.quantityPrices ||
+                                                  item.quantityPrices
+                                                ).map((p: any, i: number) =>
+                                                  i === idx
+                                                    ? {
+                                                        ...p,
+                                                        price: parseFloat(
+                                                          e.target.value,
+                                                        ),
+                                                        total:
+                                                          calculateLineTotal(
+                                                            p.quantity,
+                                                            parseFloat(
                                                               e.target.value,
-                                                            total:
-                                                              calculateLineTotal(
-                                                                e.target.value,
-                                                                p.price
-                                                              ),
-                                                          }
-                                                        : p
-                                                  );
-                                                updateLineItem(
-                                                  selectedOffer.id,
-                                                  item.id,
-                                                  {
+                                                            ),
+                                                          ),
+                                                      }
+                                                    : p,
+                                                );
+
+                                                setLocalUnitPrices((prev) => ({
+                                                  ...prev,
+                                                  [item.id]: {
+                                                    ...prev[item.id],
                                                     quantityPrices:
                                                       updatedPrices,
-                                                  }
-                                                ).then((updatedItem) => {
-                                                  const updatedItems =
-                                                    selectedOffer.lineItems.map(
-                                                      (li: any) =>
-                                                        li.id === item.id
-                                                          ? updatedItem.data
-                                                          : li
-                                                    );
-                                                  setSelectedOffer({
-                                                    ...selectedOffer,
-                                                    lineItems: updatedItems,
-                                                  });
-                                                });
+                                                  },
+                                                }));
                                               }}
-                                              className="w-24 px-2 py-1 text-sm border border-gray-300 rounded"
+                                              className="w-32 px-2 py-1 text-sm border border-gray-300 rounded"
                                             />
-                                          </td>
-                                          <td className="px-3 py-2">
-                                            <div className="flex items-center gap-1">
-                                              <span className="text-gray-500">
-                                                {selectedOffer.currency}
-                                              </span>
-                                              <input
-                                                type="number"
-                                                step="0.001"
-                                                value={qp.price}
-                                                onChange={(e) => {
-                                                  const updatedPrices =
-                                                    item.quantityPrices.map(
-                                                      (p: any, i: number) =>
-                                                        i === idx
-                                                          ? {
-                                                              ...p,
-                                                              price: parseFloat(
-                                                                e.target.value
-                                                              ),
-                                                              total:
-                                                                calculateLineTotal(
-                                                                  p.quantity,
-                                                                  parseFloat(
-                                                                    e.target
-                                                                      .value
-                                                                  )
-                                                                ),
-                                                            }
-                                                          : p
-                                                    );
-                                                  updateLineItem(
-                                                    selectedOffer.id,
-                                                    item.id,
-                                                    {
-                                                      quantityPrices:
-                                                        updatedPrices,
-                                                    }
-                                                  ).then((updatedItem) => {
-                                                    const updatedItems =
-                                                      selectedOffer.lineItems.map(
-                                                        (li: any) =>
-                                                          li.id === item.id
-                                                            ? updatedItem.data
-                                                            : li
-                                                      );
-                                                    setSelectedOffer({
-                                                      ...selectedOffer,
-                                                      lineItems: updatedItems,
-                                                    });
-                                                  });
-                                                }}
-                                                className="w-32 px-2 py-1 text-sm border border-gray-300 rounded"
-                                              />
-                                            </div>
-                                          </td>
-                                          <td className="px-3 py-2 font-medium">
-                                            {formatTotalPrice(qp.total)}
-                                          </td>
-                                          <td className="px-3 py-2">
-                                            <input
-                                              type="radio"
-                                              name={`active-price-${item.id}`}
-                                              checked={qp.isActive}
-                                              onChange={() =>
-                                                handleSetActivePrice(
-                                                  item.id,
-                                                  "quantity",
-                                                  idx
+                                          </div>
+                                        </td>
+                                        <td className="px-3 py-2 font-medium">
+                                          {formatTotalPrice(qp.total)}
+                                        </td>
+                                        <td className="px-3 py-2">
+                                          <input
+                                            type="radio"
+                                            name={`active-price-${item.id}`}
+                                            checked={qp.isActive}
+                                            onChange={() => {
+                                              const updatedPrices = (
+                                                localUnitPrices[item.id]
+                                                  ?.quantityPrices ||
+                                                item.quantityPrices
+                                              ).map((p: any, i: number) => ({
+                                                ...p,
+                                                isActive: i === idx,
+                                              }));
+
+                                              setLocalUnitPrices((prev) => ({
+                                                ...prev,
+                                                [item.id]: {
+                                                  ...prev[item.id],
+                                                  quantityPrices: updatedPrices,
+                                                },
+                                              }));
+                                            }}
+                                            className="h-4 w-4 text-gray-600"
+                                          />
+                                        </td>
+                                        <td className="px-3 py-2">
+                                          <button
+                                            onClick={() => {
+                                              if (
+                                                window.confirm(
+                                                  "Delete this price level?",
                                                 )
+                                              ) {
+                                                const updatedPrices = (
+                                                  localUnitPrices[item.id]
+                                                    ?.quantityPrices ||
+                                                  item.quantityPrices
+                                                ).filter(
+                                                  (_: any, i: number) =>
+                                                    i !== idx,
+                                                );
+
+                                                setLocalUnitPrices((prev) => ({
+                                                  ...prev,
+                                                  [item.id]: {
+                                                    ...prev[item.id],
+                                                    quantityPrices:
+                                                      updatedPrices,
+                                                  },
+                                                }));
                                               }
-                                              className="h-4 w-4 text-gray-600"
-                                            />
-                                          </td>
-                                          <td className="px-3 py-2">
-                                            <button
-                                              onClick={() => {
-                                                if (
-                                                  window.confirm(
-                                                    "Delete this price level?"
-                                                  )
-                                                ) {
-                                                  const updatedPrices =
-                                                    item.quantityPrices.filter(
-                                                      (_: any, i: number) =>
-                                                        i !== idx
-                                                    );
-                                                  updateLineItem(
-                                                    selectedOffer.id,
-                                                    item.id,
-                                                    {
-                                                      quantityPrices:
-                                                        updatedPrices,
-                                                    }
-                                                  ).then((updatedItem) => {
-                                                    const updatedItems =
-                                                      selectedOffer.lineItems.map(
-                                                        (li: any) =>
-                                                          li.id === item.id
-                                                            ? updatedItem.data
-                                                            : li
-                                                      );
-                                                    setSelectedOffer({
-                                                      ...selectedOffer,
-                                                      lineItems: updatedItems,
-                                                    });
-                                                  });
-                                                }
-                                              }}
-                                              className="text-red-600 hover:text-red-800 text-xs"
-                                            >
-                                              Delete
-                                            </button>
-                                          </td>
-                                        </tr>
-                                      )
-                                    )}
+                                            }}
+                                            className="text-red-600 hover:text-red-800 text-xs"
+                                          >
+                                            Delete
+                                          </button>
+                                        </td>
+                                      </tr>
+                                    ))}
                                   </tbody>
                                 </table>
+
+                                {/* Save button for quantity prices */}
+                                {hasUnsavedChanges(item.id) && (
+                                  <div className="mt-4 flex justify-end">
+                                    <button
+                                      onClick={async () => {
+                                        setSavingUnitPrices((prev) => ({
+                                          ...prev,
+                                          [item.id]: true,
+                                        }));
+                                        try {
+                                          const localData =
+                                            localUnitPrices[item.id];
+                                          await updateLineItem(
+                                            selectedOffer.id,
+                                            item.id,
+                                            {
+                                              quantityPrices:
+                                                localData.quantityPrices,
+                                            },
+                                          );
+
+                                          const updatedOffer =
+                                            await getOfferById(
+                                              selectedOffer.id,
+                                            );
+                                          if (updatedOffer.success) {
+                                            setSelectedOffer(updatedOffer.data);
+                                            setLocalUnitPrices((prev) => {
+                                              const newState = { ...prev };
+                                              delete newState[item.id];
+                                              return newState;
+                                            });
+                                          }
+                                          toast.success(
+                                            "Quantity prices saved successfully",
+                                          );
+                                        } catch (error) {
+                                          console.error(
+                                            "Error saving quantity prices:",
+                                            error,
+                                          );
+                                          toast.error(
+                                            "Failed to save quantity prices",
+                                          );
+                                        } finally {
+                                          setSavingUnitPrices((prev) => ({
+                                            ...prev,
+                                            [item.id]: false,
+                                          }));
+                                        }
+                                      }}
+                                      disabled={savingUnitPrices[item.id]}
+                                      className="px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all flex items-center gap-2 disabled:opacity-50"
+                                    >
+                                      {savingUnitPrices[item.id] ? (
+                                        <>
+                                          <ArrowPathIcon className="h-4 w-4 animate-spin" />
+                                          Saving...
+                                        </>
+                                      ) : (
+                                        <>
+                                          <CheckCircleIcon className="h-4 w-4" />
+                                          Save Quantity Prices
+                                        </>
+                                      )}
+                                    </button>
+                                  </div>
+                                )}
                               </div>
                             ) : (
                               <div className="text-center py-4 text-gray-500">
@@ -3232,8 +3541,8 @@ const OffersPage: React.FC = () => {
                                 selectedOffer?.unitPriceDecimalPlaces === 3
                                   ? "0.001"
                                   : selectedOffer?.unitPriceDecimalPlaces === 2
-                                  ? "0.01"
-                                  : "0.0001"
+                                    ? "0.01"
+                                    : "0.0001"
                               }
                               value={unitPriceFormData.unitPrice}
                               onChange={(e) =>
@@ -3262,6 +3571,110 @@ const OffersPage: React.FC = () => {
                               Set as active price
                             </label>
                           </div>
+
+                          <div className="flex justify-between items-center pt-6 border-t">
+                            <div>
+                              {Object.keys(localUnitPrices).length > 0 && (
+                                <span className="text-sm text-yellow-600">
+                                  You have unsaved changes in{" "}
+                                  {Object.keys(localUnitPrices).length} item(s)
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => {
+                                  if (Object.keys(localUnitPrices).length > 0) {
+                                    if (
+                                      !window.confirm(
+                                        "You have unsaved changes. Are you sure you want to cancel?",
+                                      )
+                                    ) {
+                                      return;
+                                    }
+                                  }
+                                  setLocalUnitPrices({});
+                                  setShowPricingModal(false);
+                                }}
+                                className="px-4 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-all"
+                              >
+                                Cancel
+                              </button>
+
+                              {Object.keys(localUnitPrices).length > 0 && (
+                                <button
+                                  onClick={async () => {
+                                    try {
+                                      // Save all changes
+                                      for (const lineItemId of Object.keys(
+                                        localUnitPrices,
+                                      )) {
+                                        const localData =
+                                          localUnitPrices[lineItemId];
+                                        if (localData.unitPrices) {
+                                          await updateLineItem(
+                                            selectedOffer.id,
+                                            lineItemId,
+                                            {
+                                              unitPrices: localData.unitPrices,
+                                            },
+                                          );
+                                        } else if (localData.quantityPrices) {
+                                          await updateLineItem(
+                                            selectedOffer.id,
+                                            lineItemId,
+                                            {
+                                              quantityPrices:
+                                                localData.quantityPrices,
+                                            },
+                                          );
+                                        }
+                                      }
+
+                                      // Refresh offer data
+                                      const updatedOffer = await getOfferById(
+                                        selectedOffer.id,
+                                      );
+                                      if (updatedOffer.success) {
+                                        setSelectedOffer(updatedOffer.data);
+                                        setLocalUnitPrices({});
+                                      }
+
+                                      toast.success(
+                                        "All changes saved successfully",
+                                      );
+                                      setShowPricingModal(false);
+                                      fetchOffers();
+                                    } catch (error) {
+                                      console.error(
+                                        "Error saving all changes:",
+                                        error,
+                                      );
+                                      toast.error(
+                                        "Failed to save some changes",
+                                      );
+                                    }
+                                  }}
+                                  className="px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all flex items-center gap-2"
+                                >
+                                  <CheckCircleIcon className="h-4 w-4" />
+                                  Save All Changes
+                                </button>
+                              )}
+
+                              <button
+                                onClick={() => {
+                                  setShowPricingModal(false);
+                                  if (Object.keys(localUnitPrices).length > 0) {
+                                    // Optionally save changes before closing
+                                  }
+                                }}
+                                className="px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all"
+                              >
+                                Save Changes
+                              </button>
+                            </div>
+                          </div>
                           <div className="flex justify-end gap-2 pt-4">
                             <button
                               onClick={() => setSelectedLineItem(null)}
@@ -3270,9 +3683,62 @@ const OffersPage: React.FC = () => {
                               Cancel
                             </button>
                             <button
-                              onClick={() =>
-                                handleAddUnitPrice(selectedLineItem.id)
-                              }
+                              onClick={() => {
+                                if (
+                                  !unitPriceFormData.quantity ||
+                                  !unitPriceFormData.unitPrice
+                                ) {
+                                  toast.error(
+                                    "Please enter quantity and unit price",
+                                  );
+                                  return;
+                                }
+
+                                const newUnitPrice: UnitPrice = {
+                                  id: `temp-${Date.now()}`,
+                                  quantity: unitPriceFormData.quantity,
+                                  unitPrice: parseFloat(
+                                    unitPriceFormData.unitPrice,
+                                  ),
+                                  totalPrice: calculateUnitPriceTotal(
+                                    unitPriceFormData.quantity,
+                                    parseFloat(unitPriceFormData.unitPrice),
+                                    selectedOffer.totalPriceDecimalPlaces || 2,
+                                  ),
+                                  isActive: unitPriceFormData.isActive,
+                                  createdAt: new Date().toISOString(),
+                                  updatedAt: new Date().toISOString(),
+                                };
+
+                                const currentUnitPrices =
+                                  selectedLineItem.unitPrices || [];
+
+                                setLocalUnitPrices((prev) => ({
+                                  ...prev,
+                                  [selectedLineItem.id]: {
+                                    ...prev[selectedLineItem.id],
+                                    unitPrices: unitPriceFormData.isActive
+                                      ? currentUnitPrices
+                                          .map((up: UnitPrice) => ({
+                                            ...up,
+                                            isActive: false,
+                                          }))
+                                          .concat(newUnitPrice)
+                                      : [...currentUnitPrices, newUnitPrice],
+                                  },
+                                }));
+
+                                setSelectedLineItem(null);
+                                setUnitPriceFormData({
+                                  quantity: "",
+                                  unitPrice: "",
+                                  isActive: false,
+                                });
+
+                                toast.success(
+                                  "Unit price added locally. Click Save to apply.",
+                                );
+                              }}
                               className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                             >
                               Add Unit Price
@@ -3315,7 +3781,7 @@ const OffersPage: React.FC = () => {
                                 setOfferUnitPriceSettings({
                                   ...offerUnitPriceSettings,
                                   unitPriceDecimalPlaces: parseInt(
-                                    e.target.value
+                                    e.target.value,
                                   ),
                                 })
                               }
@@ -3338,7 +3804,7 @@ const OffersPage: React.FC = () => {
                                 setOfferUnitPriceSettings({
                                   ...offerUnitPriceSettings,
                                   totalPriceDecimalPlaces: parseInt(
-                                    e.target.value
+                                    e.target.value,
                                   ),
                                 })
                               }
@@ -3403,7 +3869,7 @@ const OffersPage: React.FC = () => {
                       <div className="text-2xl font-bold text-gray-900">
                         {formatCurrency(
                           selectedOffer.totalAmount || 0,
-                          selectedOffer.currency
+                          selectedOffer.currency,
                         )}
                       </div>
                       <div className="text-sm text-gray-600">
@@ -3435,7 +3901,6 @@ const OffersPage: React.FC = () => {
           </div>
         </div>
       )}
-
       {/* Copy/Paste Prices Modal */}
       {showCopyPasteModal && selectedOffer && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
@@ -3507,19 +3972,19 @@ const OffersPage: React.FC = () => {
                         ? `Example for Unit Prices (${
                             selectedOffer.unitPriceDecimalPlaces || 3
                           } decimal places):
-1, 1000, 4.500
-1, 5000, 4.200
-2, 1000, 8.750
-2, 5000, 8.250
-3, 500, 12.000
-3, 2000, 11.500`
+  1, 1000, 4.500
+  1, 5000, 4.200
+  2, 1000, 8.750
+  2, 5000, 8.250
+  3, 500, 12.000
+  3, 2000, 11.500`
                         : `Example for Quantity Prices:
-1, 1000, 4.50
-1, 5000, 4.20
-2, 1000, 8.75
-2, 5000, 8.25
-3, 500, 12.00
-3, 2000, 11.50`
+  1, 1000, 4.50
+  1, 5000, 4.20
+  2, 1000, 8.75
+  2, 5000, 8.25
+  3, 500, 12.00
+  3, 2000, 11.50`
                     }
                   />
                 </div>
@@ -3543,7 +4008,7 @@ const OffersPage: React.FC = () => {
                                 </span>
                                 <span>{line}</span>
                               </div>
-                            )
+                            ),
                         )}
                       </div>
                     ) : (

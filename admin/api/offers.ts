@@ -15,8 +15,8 @@ export interface UnitPrice {
   unitPrice: number;
   totalPrice: number;
   isActive: boolean;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: any;
+  updatedAt: any;
 }
 
 export interface CustomerSnapshot {
@@ -285,17 +285,17 @@ export const getOfferById = async (id: string) => {
 
 export const createOfferFromInquiry = async (
   inquiryId: string,
-  offerData: CreateOfferPayload
+  offerData: CreateOfferPayload,
 ) => {
   try {
     toast.loading("Creating offer...", loadingStyles);
     const response: any = await api.post(
       `/offers/inquiry/${inquiryId}`,
-      offerData
+      offerData,
     );
     toast.dismiss();
     toast.success("Offer created successfully", successStyles);
-    return response.data;
+    return response;
   } catch (error) {
     handleApiError(error, "Offer creation failed");
     throw error;
@@ -304,14 +304,14 @@ export const createOfferFromInquiry = async (
 
 export const updateOffer = async (
   id: string,
-  offerData: UpdateOfferPayload
+  offerData: UpdateOfferPayload,
 ) => {
   try {
     toast.loading("Updating offer...", loadingStyles);
     const response: any = await api.put(`/offers/${id}`, offerData);
     toast.dismiss();
     toast.success("Offer updated successfully", successStyles);
-    return response.data;
+    return response;
   } catch (error) {
     handleApiError(error, "Offer update failed");
     throw error;
@@ -332,13 +332,13 @@ export const deleteOffer = async (id: string) => {
 
 export const createOfferRevision = async (
   id: string,
-  revisionData: CreateOfferPayload
+  revisionData: CreateOfferPayload,
 ) => {
   try {
     toast.loading("Creating revision...", loadingStyles);
     const response: any = await api.post(
       `/offers/${id}/revisions`,
-      revisionData
+      revisionData,
     );
     toast.dismiss();
     toast.success("Offer revision created successfully", successStyles);
@@ -351,29 +351,29 @@ export const createOfferRevision = async (
 
 export const toggleOfferUnitPrices = async (
   offerId: string,
-  useUnitPrices: boolean
+  useUnitPrices: boolean,
 ) => {
   try {
     toast.loading(
       useUnitPrices ? "Enabling unit prices..." : "Disabling unit prices...",
-      loadingStyles
+      loadingStyles,
     );
     const response: any = await api.post(
       `/offers/${offerId}/toggle-unit-prices`,
-      { useUnitPrices }
+      { useUnitPrices },
     );
     toast.dismiss();
     toast.success(
       `Unit prices ${
         useUnitPrices ? "enabled" : "disabled"
       } successfully for all line items`,
-      successStyles
+      successStyles,
     );
     return response.data;
   } catch (error) {
     handleApiError(
       error,
-      `Failed to ${useUnitPrices ? "enable" : "disable"} unit prices`
+      `Failed to ${useUnitPrices ? "enable" : "disable"} unit prices`,
     );
     throw error;
   }
@@ -381,7 +381,7 @@ export const toggleOfferUnitPrices = async (
 
 export const bulkUpdateOfferUnitPrices = async (
   offerId: string,
-  unitPrices: UnitPriceDto[]
+  unitPrices: UnitPriceDto[],
 ) => {
   try {
     toast.loading("Updating unit prices for all line items...", loadingStyles);
@@ -399,14 +399,14 @@ export const bulkUpdateOfferUnitPrices = async (
 
 export const syncUnitPricesAcrossOffer = async (
   offerId: string,
-  templateUnitPrices?: UnitPriceDto[]
+  templateUnitPrices?: UnitPriceDto[],
 ) => {
   try {
     toast.loading("Syncing unit prices across line items...", loadingStyles);
     const payload = templateUnitPrices ? { templateUnitPrices } : {};
     const response: any = await api.post(
       `/offers/${offerId}/sync-unit-prices`,
-      payload
+      payload,
     );
     toast.dismiss();
     toast.success("Unit prices synced across all line items", successStyles);
@@ -420,13 +420,13 @@ export const syncUnitPricesAcrossOffer = async (
 export const updateLineItem = async (
   offerId: string,
   lineItemId: string,
-  data: UpdateLineItemPayload
+  data: UpdateLineItemPayload,
 ) => {
   try {
     toast.loading("Updating line item...", loadingStyles);
     const response: any = await api.put(
       `/offers/${offerId}/line-items/${lineItemId}`,
-      data
+      data,
     );
     toast.dismiss();
     toast.success("Line item updated successfully", successStyles);
@@ -439,13 +439,13 @@ export const updateLineItem = async (
 
 export const bulkUpdateLineItems = async (
   offerId: string,
-  data: BulkUpdateLineItemsPayload
+  data: BulkUpdateLineItemsPayload,
 ) => {
   try {
     toast.loading("Updating line items...", loadingStyles);
     const response: any = await api.put(
       `/offers/${offerId}/line-items/bulk`,
-      data
+      data,
     );
     toast.dismiss();
     toast.success("Line items updated successfully", successStyles);
@@ -458,13 +458,13 @@ export const bulkUpdateLineItems = async (
 
 export const addQuantityPrice = async (
   lineItemId: string,
-  data: { quantity: string; price: number; isActive?: boolean }
+  data: { quantity: string; price: number; isActive?: boolean },
 ) => {
   try {
     toast.loading("Adding price...", loadingStyles);
     const response: any = await api.post(
       `/offers/line-items/${lineItemId}/quantity-prices`,
-      data
+      data,
     );
     toast.dismiss();
     toast.success("Price added successfully", successStyles);
@@ -477,13 +477,13 @@ export const addQuantityPrice = async (
 
 export const addUnitPrice = async (
   lineItemId: string,
-  data: { quantity: string; unitPrice: number; isActive?: boolean }
+  data: { quantity: string; unitPrice: number; isActive?: boolean },
 ) => {
   try {
     toast.loading("Adding unit price...", loadingStyles);
     const response: any = await api.post(
       `/offers/line-items/${lineItemId}/unit-prices`,
-      data
+      data,
     );
     toast.dismiss();
     toast.success("Unit price added successfully", successStyles);
@@ -497,12 +497,12 @@ export const addUnitPrice = async (
 export const setActivePrice = async (
   lineItemId: string,
   priceType: "quantity" | "unit",
-  priceIndex: number
+  priceIndex: number,
 ) => {
   try {
     toast.loading("Setting active price...", loadingStyles);
     const response: any = await api.put(
-      `/offers/line-items/${lineItemId}/active-price/${priceType}/${priceIndex}`
+      `/offers/line-items/${lineItemId}/active-price/${priceType}/${priceIndex}`,
     );
     toast.dismiss();
     toast.success("Active price set successfully", successStyles);
@@ -515,13 +515,13 @@ export const setActivePrice = async (
 
 export const copyPastePrices = async (
   offerId: string,
-  data: CopyPastePricesPayload
+  data: CopyPastePricesPayload,
 ) => {
   try {
     toast.loading("Processing copied data...", loadingStyles);
     const response: any = await api.post(
       `/offers/${offerId}/copy-paste-prices`,
-      data
+      data,
     );
     toast.dismiss();
     toast.success("Prices copied successfully", successStyles);
@@ -531,14 +531,13 @@ export const copyPastePrices = async (
     throw error;
   }
 };
-
 export const generateOfferPdf = async (id: string) => {
   try {
     toast.loading("Generating PDF...", loadingStyles);
     const response: any = await api.post(`/offers/${id}/generate-pdf`);
     toast.dismiss();
     toast.success("PDF generated successfully", successStyles);
-    return response;
+    return response.data; // Return the data property, not the full response
   } catch (error) {
     handleApiError(error, "Failed to generate PDF");
     throw error;
@@ -547,21 +546,33 @@ export const generateOfferPdf = async (id: string) => {
 
 export const downloadOfferPdf = async (id: string) => {
   try {
-    const response: any = await api.get(`/offers/${id}/download-pdf`, {
-      responseType: "blob",
-    });
+    // Check if PDF is already generated
+    const offerResponse = await getOfferById(id);
+    if (offerResponse.data && !offerResponse.data.pdfGenerated) {
+      // Generate PDF first
+      await generateOfferPdf(id);
+    }
 
-    const url = window.URL.createObjectURL(new Blob([response.data]));
-    const link = document.createElement("a");
-    link.href = url;
-    link.setAttribute("download", `offer-${id}.pdf`);
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
+    // Use fetch to download
+    const response = await fetch(`/api/offers/${id}/download-pdf`);
+    if (response.ok) {
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `offer-${id}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } else {
+      throw new Error("Failed to download PDF");
+    }
 
     return true;
   } catch (error) {
-    handleApiError(error, "Failed to download PDF");
+    console.error("Error downloading PDF:", error);
+    toast.error("Failed to download PDF");
     throw error;
   }
 };
@@ -569,7 +580,7 @@ export const downloadOfferPdf = async (id: string) => {
 export const getOffersByInquiry = async (
   inquiryId: string,
   page = 1,
-  limit = 20
+  limit = 20,
 ) => {
   try {
     const response: any = await api.get(`/inquiry/${inquiryId}/offers`, {
@@ -648,7 +659,7 @@ export const calculateLineTotal = (quantity: string, price: number): number => {
 export const calculateUnitPriceTotal = (
   quantity: string,
   unitPrice: number,
-  decimalPlaces = 2
+  decimalPlaces = 2,
 ): number => {
   const qty = parseFloat(quantity) || 0;
   return parseFloat((qty * unitPrice).toFixed(decimalPlaces));
@@ -661,7 +672,7 @@ export const getOfferStatusColor = (status: string) => {
 
 export const getActivePrice = (
   lineItem: OfferLineItem,
-  offerUsesUnitPrices: boolean
+  offerUsesUnitPrices: boolean,
 ): QuantityPrice | UnitPrice | null => {
   if (
     offerUsesUnitPrices &&
@@ -677,7 +688,7 @@ export const getActivePrice = (
 
 export const getActivePriceType = (
   lineItem: OfferLineItem,
-  offerUsesUnitPrices: boolean
+  offerUsesUnitPrices: boolean,
 ): "quantity" | "unit" | null => {
   if (
     offerUsesUnitPrices &&
@@ -688,7 +699,7 @@ export const getActivePriceType = (
     return activeUnitPrice ? "unit" : null;
   } else if (lineItem.quantityPrices && lineItem.quantityPrices.length > 0) {
     const activeQuantityPrice = lineItem.quantityPrices.find(
-      (qp) => qp.isActive
+      (qp) => qp.isActive,
     );
     return activeQuantityPrice ? "quantity" : null;
   }
@@ -697,7 +708,7 @@ export const getActivePriceType = (
 
 export const calculateLineItemTotal = (
   lineItem: OfferLineItem,
-  offerUsesUnitPrices: boolean
+  offerUsesUnitPrices: boolean,
 ): number => {
   const activePrice = getActivePrice(lineItem, offerUsesUnitPrices);
   if (activePrice) {
@@ -716,7 +727,7 @@ export const calculateLineItemTotal = (
 
 export const processUnitPricesForUpdate = (
   unitPricesDto: UnitPriceDto[],
-  totalPriceDecimalPlaces = 2
+  totalPriceDecimalPlaces = 2,
 ): any => {
   return unitPricesDto.map((upDto, index) => {
     const qty = parseFloat(upDto.quantity) || 0;
@@ -738,7 +749,7 @@ export const processUnitPricesForUpdate = (
 };
 
 export const createDefaultUnitPrices = (
-  quantities: string[] = ["1000", "5000", "10000"]
+  quantities: string[] = ["1000", "5000", "10000"],
 ): UnitPrice[] => {
   const now = new Date();
   return quantities.map((quantity, index) => ({
@@ -758,7 +769,7 @@ export const prepareLineItemForUnitPrices = (
     unitPriceDecimalPlaces: number;
     totalPriceDecimalPlaces: number;
     maxUnitPriceColumns: number;
-  }
+  },
 ) => {
   return {
     ...lineItem,
@@ -768,8 +779,8 @@ export const prepareLineItemForUnitPrices = (
         ...up,
         totalPrice: parseFloat(
           (parseFloat(up.quantity) * up.unitPrice).toFixed(
-            offerUnitPriceSettings.totalPriceDecimalPlaces
-          )
+            offerUnitPriceSettings.totalPriceDecimalPlaces,
+          ),
         ),
       })),
     quantityPrices: lineItem.quantityPrices || [],
@@ -780,7 +791,7 @@ export const migrateOfferToUnitPrices = async (offerId: string) => {
   try {
     toast.loading("Migrating offer to unit prices...", loadingStyles);
     const response: any = await api.post(
-      `/offers/${offerId}/migrate-to-unit-prices`
+      `/offers/${offerId}/migrate-to-unit-prices`,
     );
     toast.dismiss();
     toast.success("Offer migrated to unit prices successfully", successStyles);
@@ -806,25 +817,25 @@ export const getOfferUnitPriceSettings = (offer: Offer) => ({
 
 export const formatUnitPriceForOffer = (
   price: number,
-  offer: Offer
+  offer: Offer,
 ): string => {
   return formatUnitPrice(price, offer.unitPriceDecimalPlaces || 3);
 };
 
 export const formatTotalPriceForOffer = (
   price: number,
-  offer: Offer
+  offer: Offer,
 ): string => {
   return formatTotalPrice(price);
 };
 
 export const calculateOfferTotals = (
   lineItems: OfferLineItem[],
-  offerUsesUnitPrices: boolean
+  offerUsesUnitPrices: boolean,
 ) => {
   const subtotal = lineItems.reduce(
     (sum, item) => sum + calculateLineItemTotal(item, offerUsesUnitPrices),
-    0
+    0,
   );
 
   return {
@@ -834,7 +845,7 @@ export const calculateOfferTotals = (
 
 export const updateLineItemsForUnitPriceChange = async (
   offerId: string,
-  useUnitPrices: boolean
+  useUnitPrices: boolean,
 ): Promise<void> => {
   if (useUnitPrices) {
     await syncUnitPricesAcrossOffer(offerId);
@@ -843,12 +854,12 @@ export const updateLineItemsForUnitPriceChange = async (
 
 export const migrateToUnitPrices = async (lineItemId: string) => {
   console.warn(
-    "migrateToUnitPrices is deprecated. Use migrateOfferToUnitPrices instead."
+    "migrateToUnitPrices is deprecated. Use migrateOfferToUnitPrices instead.",
   );
   try {
     toast.loading("Migrating to unit prices...", loadingStyles);
     const response: any = await api.post(
-      `/offers/line-items/${lineItemId}/migrate-to-unit-prices`
+      `/offers/line-items/${lineItemId}/migrate-to-unit-prices`,
     );
     toast.dismiss();
     toast.success("Migrated to unit prices successfully", successStyles);
@@ -861,30 +872,30 @@ export const migrateToUnitPrices = async (lineItemId: string) => {
 
 export const toggleUnitPrices = async (
   lineItemId: string,
-  useUnitPrices: boolean
+  useUnitPrices: boolean,
 ) => {
   console.warn(
-    "toggleUnitPrices for individual line items is deprecated. Use toggleOfferUnitPrices instead."
+    "toggleUnitPrices for individual line items is deprecated. Use toggleOfferUnitPrices instead.",
   );
   try {
     toast.loading(
       useUnitPrices ? "Enabling unit prices..." : "Disabling unit prices...",
-      loadingStyles
+      loadingStyles,
     );
     const response: any = await api.post(
       `/offers/line-items/${lineItemId}/toggle-unit-prices`,
-      { useUnitPrices }
+      { useUnitPrices },
     );
     toast.dismiss();
     toast.success(
       `Unit prices ${useUnitPrices ? "enabled" : "disabled"} successfully`,
-      successStyles
+      successStyles,
     );
     return response.data;
   } catch (error) {
     handleApiError(
       error,
-      `Failed to ${useUnitPrices ? "enable" : "disable"} unit prices`
+      `Failed to ${useUnitPrices ? "enable" : "disable"} unit prices`,
     );
     throw error;
   }
@@ -895,10 +906,10 @@ export const getAvailableCurrenciesFromApiAlias = getAvailableCurrenciesFromApi;
 
 export const formatPrice = formatUnitPrice;
 export const prepareLineItemForUnitPricesLegacy = (
-  lineItem: Partial<OfferLineItem>
+  lineItem: Partial<OfferLineItem>,
 ) => {
   console.warn(
-    "prepareLineItemForUnitPricesLegacy is deprecated. Use prepareLineItemForUnitPrices with offer settings instead."
+    "prepareLineItemForUnitPricesLegacy is deprecated. Use prepareLineItemForUnitPrices with offer settings instead.",
   );
   const defaults = getUnitPriceDefaults();
   return {

@@ -158,7 +158,7 @@ export class Offer {
   })
   discountAmount!: number;
 
-  @Column({ type: "decimal", precision: 12, scale: 2, default: 0 })
+  @Column({ type: "text", nullable: true })
   subtotal!: number;
 
   @Column({
@@ -534,7 +534,7 @@ export class OfferLineItem {
         const existingPrices = this.unitPrices || [];
         this.unitPrices.forEach((newUp, index) => {
           const existingUp = existingPrices.find(
-            (up) => up.quantity === newUp.quantity
+            (up) => up.quantity === newUp.quantity,
           );
           if (existingUp) {
             newUp.unitPrice = existingUp.unitPrice;
