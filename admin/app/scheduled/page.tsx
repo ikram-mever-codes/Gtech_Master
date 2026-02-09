@@ -150,7 +150,9 @@ import {
   acknowledgeListItemChanges,
   acknowledgeItemFieldChanges,
   updateListContactPerson,
+  updateListItemDeliveryInfo,
 } from "@/api/list";
+import { getAllCustomers } from "@/api/customers";
 import {
   DELIVERY_STATUS,
   INTERVAL_OPTIONS,
@@ -161,6 +163,8 @@ import { DataGrid } from "react-data-grid";
 import { useSelector } from "react-redux";
 import { RootState } from "../Redux/store";
 import { getAllContactPersons } from "@/api/contacts";
+import { log } from "console";
+import { json } from "stream/consumers";
 
 function AddItemDialog({
   open,
@@ -283,6 +287,8 @@ function AddItemDialog({
     }
   };
 
+  console.log(JSON.stringify(customers));
+
   return (
     <Dialog
       open={open}
@@ -331,7 +337,7 @@ function AddItemDialog({
             >
               {customers.map((customer: any) => (
                 <MenuItem key={customer.id} value={customer.id}>
-                  {customer.name}
+                  {customer.companyName || customer.name}
                 </MenuItem>
               ))}
             </Select>
@@ -922,7 +928,7 @@ function ActivityLogCard({ log, customerName, listName }: any) {
               borderRadius: "50%",
               bgcolor: alpha(
                 theme.palette[getActionColor()]?.main ||
-                  theme.palette.grey[500],
+                theme.palette.grey[500],
                 0.1
               ),
               flexShrink: 0,
@@ -1507,8 +1513,8 @@ function EditableCommentCell({ row, onUpdateItem, onAcknowledgeField }: any) {
             color: hasUnacknowledgedChanges
               ? "#d32f2f"
               : row.comment
-              ? "text.primary"
-              : "text.secondary",
+                ? "text.primary"
+                : "text.secondary",
             fontStyle: row.comment ? "normal" : "italic",
             flex: 1,
           }}
@@ -1707,13 +1713,16 @@ function CreateListDialog({
     customers.find((c: any) => c.id === selectedCustomerId) || null;
 
   useEffect(() => {
+    if (open) {
+      console.log("CreateListDialog open. Customers:", customers);
+    }
     if (!open) {
-      setSelectedCustomerId(null);
+      setSelectedCustomerId("");
       setListName("");
       setDescription("");
       setDeliveryDate("");
     }
-  }, [open]);
+  }, [open, customers]);
 
   const handleCreateList = async () => {
     if (!selectedCustomerId || !listName.trim()) {
@@ -1795,7 +1804,7 @@ function CreateListDialog({
                 <MenuItem key={customer.id} value={customer.id}>
                   <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                     <Business fontSize="small" />
-                    <Typography>{customer.name}</Typography>
+                    <Typography>{customer.companyName || customer.name}</Typography>
                   </Box>
                 </MenuItem>
               ))}
@@ -1867,7 +1876,7 @@ function CreateListDialog({
                 </Box>
                 <Box sx={{ flex: 1 }}>
                   <Typography variant="h6" fontWeight={600}>
-                    {selectedCustomer.name}
+                    {selectedCustomer.companyName || selectedCustomer.name}
                   </Typography>
                   {selectedCustomer.email && (
                     <Typography variant="body2" color="text.secondary">
@@ -2067,10 +2076,48 @@ const AdminAllItemsPage = () => {
           }
         });
 
+        // Fetch all customers to ensure we have a complete list for the dropdown
+        try {
+          const allCustomersResponse = await getAllCustomers();
+          if (allCustomersResponse && allCustomersResponse.data) {
+            const allCustomers = allCustomersResponse.data;
+
+            // Merge customers from lists with all customers to ensure we have everyone
+            allCustomers.forEach((customer: any) => {
+              if (!uniqueCustomers.find((c) => c.id === customer.id)) {
+                uniqueCustomers.push({
+                  id: customer.id,
+                  name: customer.companyName || customer.legalName,
+                  companyName: customer.companyName || customer.legalName,
+                  email: customer.email,
+                });
+              }
+            });
+          }
+        } catch (err) {
+          console.error("Failed to fetch all customers:", err);
+        }
+
         setAllItems(allCombinedItems);
         setAllActivityLogs(allCombinedActivityLogs);
         setCustomers(uniqueCustomers);
         setLists(allListsData);
+      } else {
+        // If no lists found, still try to fetch customers
+        try {
+          const allCustomersResponse = await getAllCustomers();
+          if (allCustomersResponse && allCustomersResponse.data) {
+            const formattedCustomers = allCustomersResponse.data.map((customer: any) => ({
+              id: customer.id,
+              name: customer.companyName || customer.legalName,
+              companyName: customer.companyName || customer.legalName,
+              email: customer.email,
+            }));
+            setCustomers(formattedCustomers);
+          }
+        } catch (err) {
+          console.error("Failed to fetch all customers:", err);
+        }
       }
     } catch (error) {
       console.error("Failed to load all items:", error);
@@ -2192,8 +2239,8 @@ const AdminAllItemsPage = () => {
           })
         );
 
-        // Make API call in background (you would add the actual API call here)
-        // await updateListItemDelivery(itemId, period, deliveryData);
+        // Make API call in background
+        await updateListItemDeliveryInfo(itemId, { ...deliveryData, period });
       } catch (error) {
         console.error("Failed to update delivery:", error);
         toast.error("Failed to update delivery");
@@ -3125,8 +3172,7 @@ const AdminAllItemsPage = () => {
 
                         if (result?.success) {
                           toast.success(
-                            `Acknowledged ${
-                              result.data?.acknowledgedCount || 0
+                            `Acknowledged ${result.data?.acknowledgedCount || 0
                             } changes`,
                             successStyles
                           );
@@ -3136,11 +3182,11 @@ const AdminAllItemsPage = () => {
                             prev.map((item) =>
                               item.id === props.row.id
                                 ? {
-                                    ...item,
-                                    hasUnacknowledgedChanges: false,
-                                    unacknowledgedFields: [],
-                                    changedFields: [],
-                                  }
+                                  ...item,
+                                  hasUnacknowledgedChanges: false,
+                                  unacknowledgedFields: [],
+                                  changedFields: [],
+                                }
                                 : item
                             )
                           );
@@ -3271,105 +3317,104 @@ const AdminAllItemsPage = () => {
             {saving && <CircularProgress size={20} sx={{ ml: 2 }} />}
           </Box>
           <CardContent sx={{ paddingLeft: 4, paddingRight: 4 }}>
-            <div className="w-full flex justify-between items-center">
-              <Grid container spacing={3} alignItems="center">
-                <Grid item xs={12} sm={2.5}>
-                  <FormControl sx={{ width: "200px" }} fullWidth size="small">
-                    <InputLabel>Filter by Customer</InputLabel>
-                    <Select
-                      value={selectedCustomer}
-                      onChange={(e) => {
-                        setSelectedCustomer(e.target.value);
-                        setSelectedList("");
-                      }}
-                      label="Filter by Customer"
-                    >
-                      <MenuItem value="">
-                        <em>All Customers</em>
+            <Grid container spacing={2} alignItems="center">
+              <Grid size={{ xs: 12, sm: 6, md: 2.5 }}>
+                <FormControl fullWidth size="small">
+                  <InputLabel>Filter by Customer</InputLabel>
+                  <Select
+                    value={selectedCustomer}
+                    onChange={(e) => {
+                      setSelectedCustomer(e.target.value);
+                      setSelectedList("");
+                    }}
+                    label="Filter by Customer"
+                  >
+                    <MenuItem value="">
+                      <em>All Customers</em>
+                    </MenuItem>
+                    {customers.map((customer) => (
+                      <MenuItem key={customer.id} value={customer.id}>
+                        {customer.companyName || customer.name}
                       </MenuItem>
-                      {customers.map((customer) => (
-                        <MenuItem key={customer.id} value={customer.id}>
-                          {customer.name}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
-                </Grid>
-
-                <Grid item xs={12} sm={2.5}>
-                  <FormControl sx={{ width: "200px" }} fullWidth size="small">
-                    <InputLabel>Filter by List</InputLabel>
-                    <Select
-                      value={selectedList}
-                      onChange={(e) => setSelectedList(e.target.value)}
-                      label="Filter by List"
-                      disabled={!selectedCustomer}
-                    >
-                      <MenuItem value="">
-                        <em>All Lists</em>
-                      </MenuItem>
-                      {availableLists.map((list) => (
-                        <MenuItem key={list.id} value={list.id}>
-                          {list.name}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
-                </Grid>
-
-                <Grid item xs={12} sm={2.5}>
-                  <FormControl sx={{ width: "200px" }} fullWidth size="small">
-                    <InputLabel>Show Items</InputLabel>
-                    <Select
-                      value={showOnlyChanges ? "changes" : "all"}
-                      onChange={(e) =>
-                        setShowOnlyChanges(e.target.value === "changes")
-                      }
-                      label="Show Items"
-                    >
-                      <MenuItem value="all">All Items</MenuItem>
-                      <MenuItem value="changes">
-                        <Box
-                          sx={{ display: "flex", alignItems: "center", gap: 1 }}
-                        >
-                          <Warning
-                            fontSize="small"
-                            sx={{ color: "warning.main" }}
-                          />
-                          Items with Changes
-                          {itemsWithChanges.length > 0 && (
-                            <Chip
-                              label={itemsWithChanges.length}
-                              size="small"
-                              color="warning"
-                              sx={{ ml: 1 }}
-                            />
-                          )}
-                        </Box>
-                      </MenuItem>
-                    </Select>
-                  </FormControl>
-                </Grid>
-
-                <Grid item xs={12} sm={2.5}>
-                  <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
-                    <Button
-                      variant="outlined"
-                      startIcon={<Clear />}
-                      onClick={() => {
-                        setSelectedCustomer("");
-                        setSelectedList("");
-                        setSearchTerm("");
-                        setShowOnlyChanges(false);
-                      }}
-                      size="small"
-                    >
-                      Clear Filters
-                    </Button>
-                  </Box>
-                </Grid>
+                    ))}
+                  </Select>
+                </FormControl>
               </Grid>
-              <Grid item xs={12} sm={2}>
+
+              <Grid size={{ xs: 12, sm: 6, md: 2.5 }}>
+                <FormControl fullWidth size="small">
+                  <InputLabel>Filter by List</InputLabel>
+                  <Select
+                    value={selectedList}
+                    onChange={(e) => setSelectedList(e.target.value)}
+                    label="Filter by List"
+                    disabled={!selectedCustomer}
+                  >
+                    <MenuItem value="">
+                      <em>All Lists</em>
+                    </MenuItem>
+                    {availableLists.map((list) => (
+                      <MenuItem key={list.id} value={list.id}>
+                        {list.name}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Grid>
+
+              <Grid size={{ xs: 12, sm: 6, md: 2.5 }}>
+                <FormControl fullWidth size="small">
+                  <InputLabel>Show Items</InputLabel>
+                  <Select
+                    value={showOnlyChanges ? "changes" : "all"}
+                    onChange={(e) =>
+                      setShowOnlyChanges(e.target.value === "changes")
+                    }
+                    label="Show Items"
+                  >
+                    <MenuItem value="all">All Items</MenuItem>
+                    <MenuItem value="changes">
+                      <Box
+                        sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                      >
+                        <Warning
+                          fontSize="small"
+                          sx={{ color: "warning.main" }}
+                        />
+                        Items with Changes
+                        {itemsWithChanges.length > 0 && (
+                          <Chip
+                            label={itemsWithChanges.length}
+                            size="small"
+                            color="warning"
+                            sx={{ ml: 1 }}
+                          />
+                        )}
+                      </Box>
+                    </MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+
+              <Grid size={{ xs: 12, sm: 6, md: 2.5 }}>
+                <Button
+                  fullWidth
+                  variant="outlined"
+                  startIcon={<Clear />}
+                  onClick={() => {
+                    setSelectedCustomer("");
+                    setSelectedList("");
+                    setSearchTerm("");
+                    setShowOnlyChanges(false);
+                  }}
+                  size="small"
+                  sx={{ height: "40px" }}
+                >
+                  Clear Filters
+                </Button>
+              </Grid>
+
+              <Grid size={{ xs: 12, sm: 12, md: 2 }}>
                 <Box
                   sx={{ display: "flex", gap: 1, justifyContent: "flex-end" }}
                 >
@@ -3377,12 +3422,13 @@ const AdminAllItemsPage = () => {
                     variant="contained"
                     startIcon={<Add />}
                     onClick={() => setCreateListDialog(true)}
+                    fullWidth
                   >
                     Create List
                   </CustomButton>
                 </Box>
               </Grid>
-            </div>
+            </Grid>
           </CardContent>
         </Box>
 

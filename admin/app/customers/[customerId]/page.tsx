@@ -338,7 +338,7 @@ const CustomersPage = () => {
             anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
             badgeContent={
               row.accountVerificationStatus ===
-              CustomerVerificationStatus.APPROVED ? (
+                CustomerVerificationStatus.APPROVED ? (
                 <Box
                   sx={{
                     width: 16,
@@ -437,43 +437,43 @@ const CustomersPage = () => {
         <Stack direction="row" spacing={0.5}>
           {row.accountVerificationStatus ===
             CustomerVerificationStatus.PENDING && (
-            <>
-              <Tooltip title="Approve" placement="top">
-                <IconButton
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setSelectedCustomer(row);
-                    setApproveDialogOpen(true);
-                  }}
-                  size="small"
-                  sx={{
-                    backgroundColor: "#e8f5e8",
-                    color: "#2e7d32",
-                    "&:hover": { backgroundColor: "#c8e6c9" },
-                  }}
-                >
-                  <LucideCheck size={16} />
-                </IconButton>
-              </Tooltip>
-              <Tooltip title="Reject" placement="top">
-                <IconButton
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setSelectedCustomer(row);
-                    setRejectDialogOpen(true);
-                  }}
-                  size="small"
-                  sx={{
-                    backgroundColor: "#ffebee",
-                    color: "#c62828",
-                    "&:hover": { backgroundColor: "#ffcdd2" },
-                  }}
-                >
-                  <LucideX size={16} />
-                </IconButton>
-              </Tooltip>
-            </>
-          )}
+              <>
+                <Tooltip title="Approve" placement="top">
+                  <IconButton
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedCustomer(row);
+                      setApproveDialogOpen(true);
+                    }}
+                    size="small"
+                    sx={{
+                      backgroundColor: "#e8f5e8",
+                      color: "#2e7d32",
+                      "&:hover": { backgroundColor: "#c8e6c9" },
+                    }}
+                  >
+                    <LucideCheck size={16} />
+                  </IconButton>
+                </Tooltip>
+                <Tooltip title="Reject" placement="top">
+                  <IconButton
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedCustomer(row);
+                      setRejectDialogOpen(true);
+                    }}
+                    size="small"
+                    sx={{
+                      backgroundColor: "#ffebee",
+                      color: "#c62828",
+                      "&:hover": { backgroundColor: "#ffcdd2" },
+                    }}
+                  >
+                    <LucideX size={16} />
+                  </IconButton>
+                </Tooltip>
+              </>
+            )}
           <IconButton
             onClick={(e) => {
               e.stopPropagation();
@@ -615,7 +615,7 @@ const CustomersPage = () => {
 
           {/* Stats Cards */}
           <Grid container spacing={3} sx={{ mb: 3 }}>
-            <Grid item xs={12} sm={6} md={3}>
+            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
               <Card
                 elevation={0}
                 sx={{
@@ -669,7 +669,7 @@ const CustomersPage = () => {
               </Card>
             </Grid>
 
-            <Grid item xs={12} sm={6} md={3}>
+            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
               <Card
                 elevation={0}
                 sx={{
@@ -723,7 +723,7 @@ const CustomersPage = () => {
               </Card>
             </Grid>
 
-            <Grid item xs={12} sm={6} md={3}>
+            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
               <Card
                 elevation={0}
                 sx={{
@@ -777,7 +777,7 @@ const CustomersPage = () => {
               </Card>
             </Grid>
 
-            <Grid item xs={12} sm={6} md={3}>
+            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
               <Card
                 elevation={0}
                 sx={{
@@ -1286,8 +1286,8 @@ const CustomersPage = () => {
                 {newStatus === CustomerVerificationStatus.APPROVED
                   ? "Approving will grant the customer access to the platform."
                   : newStatus === CustomerVerificationStatus.REJECTED
-                  ? "Rejecting will block the customer from accessing the platform."
-                  : "Setting to pending will put the customer in the approval queue."}
+                    ? "Rejecting will block the customer from accessing the platform."
+                    : "Setting to pending will put the customer in the approval queue."}
               </Typography>
             </Box>
           </DialogContent>

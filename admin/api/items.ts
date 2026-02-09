@@ -741,11 +741,6 @@ export const searchParents = async (query: string, limit: number = 10) => {
   }
 };
 
-// ============================================
-// WAREHOUSE API FUNCTIONS
-// ============================================
-
-// Get warehouse items
 export const getWarehouseItems = async (params?: {
   page?: number;
   limit?: number;

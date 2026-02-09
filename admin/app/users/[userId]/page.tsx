@@ -30,6 +30,7 @@ import {
   Alert,
   Stack,
   Badge,
+  alpha,
 } from "@mui/material";
 import {
   ArrowLeft,
@@ -64,6 +65,7 @@ import {
 } from "@/api/user";
 import { UserRole } from "@/utils/interfaces";
 import CustomButton from "@/components/UI/CustomButton";
+import { availableResources } from "@/utils/resources";
 
 // Interface for user data
 interface UserData {
@@ -592,7 +594,7 @@ const UserProfile = () => {
         {tabValue === 0 && (
           <Grid container spacing={3}>
             {/* Personal Information */}
-            <Grid item xs={12} md={6}>
+            <Grid size={{ xs: 12, md: 6 }}>
               <Card
                 elevation={0}
                 sx={{
@@ -676,7 +678,7 @@ const UserProfile = () => {
                     </Box>
 
                     <Grid container spacing={2}>
-                      <Grid item xs={6}>
+                      <Grid size={6}>
                         <Typography
                           variant="caption"
                           sx={{
@@ -695,7 +697,7 @@ const UserProfile = () => {
                           {userData.gender || "Not specified"}
                         </Typography>
                       </Grid>
-                      <Grid item xs={6}>
+                      <Grid size={6}>
                         <Typography
                           variant="caption"
                           sx={{
@@ -773,7 +775,7 @@ const UserProfile = () => {
             </Grid>
 
             {/* Account Information */}
-            <Grid item xs={12} md={6}>
+            <Grid size={{ xs: 12, md: 6 }}>
               <Card
                 elevation={0}
                 sx={{
@@ -813,7 +815,7 @@ const UserProfile = () => {
 
                   <Stack spacing={3}>
                     <Grid container spacing={2}>
-                      <Grid item xs={6}>
+                      <Grid size={6}>
                         <Typography
                           variant="caption"
                           sx={{
@@ -838,7 +840,7 @@ const UserProfile = () => {
                           />
                         </Box>
                       </Grid>
-                      <Grid item xs={6}>
+                      <Grid size={6}>
                         <Typography
                           variant="caption"
                           sx={{
@@ -866,7 +868,7 @@ const UserProfile = () => {
                     </Grid>
 
                     <Grid container spacing={2}>
-                      <Grid item xs={6}>
+                      <Grid size={6}>
                         <Typography
                           variant="caption"
                           sx={{
@@ -883,7 +885,7 @@ const UserProfile = () => {
                         </Box>
                       </Grid>
                       {userData.phoneNumber && (
-                        <Grid item xs={6}>
+                        <Grid size={6}>
                           <Typography
                             variant="caption"
                             sx={{
@@ -947,7 +949,7 @@ const UserProfile = () => {
             </Grid>
 
             {/* Assigned Resources */}
-            <Grid item xs={12}>
+            <Grid size={12}>
               <Card
                 elevation={0}
                 sx={{
@@ -985,7 +987,19 @@ const UserProfile = () => {
                   </Box>
 
                   <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1.5 }}>
-                    {userData.assignedResources?.length > 0 ? (
+                    {userData.role === UserRole.ADMIN ? (
+                      <Chip
+                        label="All Resources"
+                        sx={{
+                          backgroundColor: "#e8f5e8",
+                          color: "#2e7d32",
+                          border: "1px solid #c8e6c9",
+                          fontWeight: 700,
+                          fontSize: "0.875rem",
+                          px: 1,
+                        }}
+                      />
+                    ) : userData.assignedResources?.length > 0 ? (
                       userData.assignedResources.map((resource, index) => (
                         <Chip
                           key={index}
@@ -1085,115 +1099,205 @@ const UserProfile = () => {
               </Button>
             </Box>
 
-            <TableContainer sx={{ backgroundColor: "white" }}>
-              <Table>
-                <TableHead>
-                  <TableRow sx={{ backgroundColor: "#fafafa" }}>
-                    <TableCell
-                      sx={{
-                        fontWeight: 700,
-                        color: "#1a1a1a",
-                        fontSize: "0.95rem",
-                      }}
-                    >
-                      Resource
-                    </TableCell>
-                    <TableCell
-                      sx={{
-                        fontWeight: 700,
-                        color: "#1a1a1a",
-                        fontSize: "0.95rem",
-                      }}
-                    >
-                      Permissions
-                    </TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {userData.permissions?.length > 0 ? (
-                    userData.permissions.map((permission) => (
-                      <TableRow
-                        key={permission.id}
-                        sx={{ "&:hover": { backgroundColor: "#f8f9ff" } }}
-                      >
-                        <TableCell sx={{ py: 3 }}>
-                          <Typography
-                            variant="body1"
-                            sx={{ fontWeight: 600, color: "#1a1a1a" }}
-                          >
-                            {permission.resource}
-                          </Typography>
-                        </TableCell>
-                        <TableCell sx={{ py: 3 }}>
-                          <Box
-                            sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}
-                          >
-                            {permission.actions.map((action, index) => {
-                              const colorMap: any = {
-                                view: {
-                                  bg: "#e3f2fd",
-                                  color: "#1565c0",
-                                  border: "#bbdefb",
-                                },
-                                create: {
-                                  bg: "#e8f5e8",
-                                  color: "#2e7d32",
-                                  border: "#c8e6c9",
-                                },
-                                edit: {
-                                  bg: "#fff3e0",
-                                  color: "#f57c00",
-                                  border: "#ffe0b2",
-                                },
-                                delete: {
-                                  bg: "#ffebee",
-                                  color: "#c62828",
-                                  border: "#ffcdd2",
-                                },
-                              };
-                              const colors = colorMap[action] || {
-                                bg: "#f5f5f5",
-                                color: "#757575",
-                                border: "#e0e0e0",
-                              };
-
-                              return (
-                                <Chip
-                                  key={index}
-                                  label={action}
-                                  sx={{
-                                    backgroundColor: colors.bg,
-                                    color: colors.color,
-                                    border: `1px solid ${colors.border}`,
-                                    fontWeight: 600,
-                                    textTransform: "capitalize",
-                                    fontSize: "0.8rem",
-                                  }}
-                                />
-                              );
-                            })}
-                          </Box>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  ) : (
-                    <TableRow>
+            {userData.role === UserRole.ADMIN ? (
+              <Box sx={{ p: 6, textAlign: "center", bgcolor: alpha("#1976d2", 0.02), borderTop: "1px solid #e8eaed" }}>
+                <Box
+                  sx={{
+                    width: 64,
+                    height: 64,
+                    borderRadius: "50%",
+                    bgcolor: alpha("#1976d2", 0.1),
+                    color: "#1976d2",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    mx: "auto",
+                    mb: 2,
+                  }}
+                >
+                  <Shield size={32} />
+                </Box>
+                <Typography variant="h5" sx={{ fontWeight: 800, color: "#1976d2", mb: 1 }}>
+                  Full Administrative Access
+                </Typography>
+                <Typography variant="body1" color="text.secondary" sx={{ maxWidth: 500, mx: "auto" }}>
+                  This user has the Administrator role, which grants unrestricted access to all system resources, modules, and administrative functions.
+                </Typography>
+              </Box>
+            ) : (
+              <TableContainer sx={{ backgroundColor: "white" }}>
+                <Table>
+                  <TableHead>
+                    <TableRow sx={{ backgroundColor: "#fafafa" }}>
                       <TableCell
-                        colSpan={2}
-                        sx={{ py: 6, textAlign: "center" }}
+                        sx={{
+                          fontWeight: 700,
+                          color: "#1a1a1a",
+                          fontSize: "0.95rem",
+                        }}
                       >
-                        <Typography
-                          color="text.secondary"
-                          sx={{ fontStyle: "italic", fontSize: "1rem" }}
-                        >
-                          No permissions assigned
-                        </Typography>
+                        Resource
+                      </TableCell>
+                      <TableCell
+                        sx={{
+                          fontWeight: 700,
+                          color: "#1a1a1a",
+                          fontSize: "0.95rem",
+                        }}
+                      >
+                        Permissions
                       </TableCell>
                     </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </TableContainer>
+                  </TableHead>
+                  <TableBody>
+                    {(() => {
+                      const displayPermissions = [
+                        ...(userData.permissions || []),
+                        ...(userData.assignedResources || [])
+                          .filter(res => {
+                            const trimmedRes = res.trim();
+                            return !userData.permissions?.some(p => p.resource.trim().toLowerCase() === trimmedRes.toLowerCase());
+                          })
+                          .map(res => ({
+                            id: `derived-${res.trim()}`,
+                            resource: res.trim(),
+                            actions: []
+                          }))
+                      ];
+
+                      return displayPermissions.length > 0 ? (
+                        displayPermissions.map((permission) => (
+                          <TableRow
+                            key={permission.id}
+                            sx={{ "&:hover": { backgroundColor: "#f8f9ff" } }}
+                          >
+                            <TableCell sx={{ py: 3 }}>
+                              <Typography
+                                variant="body1"
+                                sx={{ fontWeight: 600, color: "#1a1a1a" }}
+                              >
+                                {permission.resource}
+                              </Typography>
+                            </TableCell>
+                            <TableCell sx={{ py: 3 }}>
+                              <Box
+                                sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}
+                              >
+                                {(() => {
+                                  const actions = Array.isArray(permission.actions)
+                                    ? permission.actions
+                                    : typeof permission.actions === 'string' && (permission.actions as string).length > 0
+                                      ? (permission.actions as string).split(',')
+                                      : [];
+
+                                  if (actions.length > 0) {
+                                    return actions.map((action, index) => {
+                                      const colorMap: any = {
+                                        view: {
+                                          bg: "#e3f2fd",
+                                          color: "#1565c0",
+                                          border: "#bbdefb",
+                                        },
+                                        create: {
+                                          bg: "#e8f5e8",
+                                          color: "#2e7d32",
+                                          border: "#c8e6c9",
+                                        },
+                                        read: {
+                                          bg: "#e3f2fd",
+                                          color: "#1565c0",
+                                          border: "#bbdefb",
+                                        },
+                                        edit: {
+                                          bg: "#fff3e0",
+                                          color: "#f57c00",
+                                          border: "#ffe0b2",
+                                        },
+                                        delete: {
+                                          bg: "#ffebee",
+                                          color: "#c62828",
+                                          border: "#ffcdd2",
+                                        },
+                                        cancel: {
+                                          bg: "#ffebee",
+                                          color: "#c62828",
+                                          border: "#ffcdd2",
+                                        },
+                                        refund: {
+                                          bg: "#efebe9",
+                                          color: "#5d4037",
+                                          border: "#d7ccc8",
+                                        },
+                                        update: {
+                                          bg: "#fff3e0",
+                                          color: "#f57c00",
+                                          border: "#ffe0b2",
+                                        },
+                                        send: {
+                                          bg: "#e8f5e9",
+                                          color: "#2e7d32",
+                                          border: "#c8e6c9",
+                                        },
+                                        export: {
+                                          bg: "#f3e5f5",
+                                          color: "#7b1fa2",
+                                          border: "#e1bee7",
+                                        },
+                                      };
+                                      const colors = colorMap[action.toLowerCase().trim()] || {
+                                        bg: "#f5f5f5",
+                                        color: "#757575",
+                                        border: "#e0e0e0",
+                                      };
+
+                                      return (
+                                        <Chip
+                                          key={index}
+                                          label={action.trim()}
+                                          sx={{
+                                            backgroundColor: colors.bg,
+                                            color: colors.color,
+                                            border: `1px solid ${colors.border}`,
+                                            fontWeight: 600,
+                                            textTransform: "capitalize",
+                                            fontSize: "0.8rem",
+                                          }}
+                                        />
+                                      );
+                                    });
+                                  } else {
+                                    // If no specific actions selected, show it clearly
+                                    return (
+                                      <Typography variant="caption" sx={{ color: 'text.disabled', fontStyle: 'italic' }}>
+                                        Full Access (No restricted actions)
+                                      </Typography>
+                                    );
+                                  }
+                                })()}
+                              </Box>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      ) : (
+                        <TableRow>
+                          <TableCell
+                            colSpan={2}
+                            sx={{ py: 6, textAlign: "center" }}
+                          >
+                            <Typography
+                              color="text.secondary"
+                              sx={{ fontStyle: "italic", fontSize: "1rem" }}
+                            >
+                              No permissions assigned
+                            </Typography>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })()}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            )}
           </Card>
         )}
 
@@ -1348,10 +1452,10 @@ const UserProfile = () => {
             {confirmDialog.action === "delete"
               ? "Deletion"
               : confirmDialog.action === "block"
-              ? "Block"
-              : confirmDialog.action === "resend"
-              ? "Resend Verification"
-              : "Reset Password"}
+                ? "Block"
+                : confirmDialog.action === "resend"
+                  ? "Resend Verification"
+                  : "Reset Password"}
           </Typography>
         </DialogTitle>
         <DialogContent sx={{ pb: 2 }}>
@@ -1365,10 +1469,10 @@ const UserProfile = () => {
               {confirmDialog.action === "delete"
                 ? "Are you sure you want to delete this user? This action cannot be undone and all user data will be permanently removed."
                 : confirmDialog.action === "block"
-                ? "Are you sure you want to block this user? They will not be able to access the system until unblocked."
-                : confirmDialog.action === "resend"
-                ? "Resend verification email to this user? They will receive a new verification link."
-                : "Send password reset instructions to this user? They will receive an email with reset instructions."}
+                  ? "Are you sure you want to block this user? They will not be able to access the system until unblocked."
+                  : confirmDialog.action === "resend"
+                    ? "Resend verification email to this user? They will receive a new verification link."
+                    : "Send password reset instructions to this user? They will receive an email with reset instructions."}
             </Typography>
           </Box>
         </DialogContent>

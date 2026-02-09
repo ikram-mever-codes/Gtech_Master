@@ -28,7 +28,7 @@ import {
   HelpCircle,
 } from "lucide-react";
 import { use, useState } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useMediaQuery, Theme } from "@mui/material";
 import theme from "@/styles/theme";
 import { useDispatch, useSelector } from "react-redux";
@@ -40,6 +40,7 @@ const Header = () => {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const { user } = useSelector((state: RootState) => state.user);
   const pathname = usePathname();
+  const router = useRouter();
   const dispatch = useDispatch();
   const isMobile = useMediaQuery((theme: Theme) =>
     theme.breakpoints.down("md")
@@ -281,7 +282,13 @@ const Header = () => {
             </MenuItem>
 
             {/* Profile */}
-            <MenuItem sx={{ py: 1.5 }}>
+            <MenuItem
+              sx={{ py: 1.5 }}
+              onClick={() => {
+                router.push("/profile");
+                closeMenu();
+              }}
+            >
               <ListItemIcon>
                 <LucideUser size={18} color={theme.palette.text.secondary} />
               </ListItemIcon>

@@ -37,7 +37,7 @@ export default function RootLayout({ children }: any) {
           rel="stylesheet"
         />
       </head>
-      <body>
+      <body suppressHydrationWarning={true}>
         <LayoutProvider>
           <AuthProvider>{children}</AuthProvider>
         </LayoutProvider>

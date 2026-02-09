@@ -9,6 +9,8 @@ export enum UserRole {
   MANAGER = "MANAGER",
   STAFF = "STAFF",
   SUPPORT = "SUPPORT",
+  SALES = "SALES",
+  PURCHASING = "PURCHASING",
 }
 
 export enum UserStatus {

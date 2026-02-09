@@ -46,6 +46,7 @@ import { toast } from "react-hot-toast";
 import { useRouter } from "next/navigation";
 import { createNewUser } from "@/api/user";
 import CustomButton from "@/components/UI/CustomButton";
+import { availableResources } from "@/utils/resources";
 
 interface Permission {
   id: string;
@@ -90,48 +91,8 @@ const validationSchema = Yup.object({
 });
 
 // Expanded resource configuration with descriptions
-const availableResources: ResourceConfig[] = [
-  {
-    name: "Dashboard",
-    description: "Access to main dashboard and overview data",
-    actions: ["view", "export"],
-  },
-  {
-    name: "Products",
-    description: "Manage product catalog and inventory",
-    actions: ["create", "read", "update", "delete"],
-  },
-  {
-    name: "Orders",
-    description: "Manage customer orders and processing",
-    actions: ["create", "read", "update", "cancel", "refund"],
-  },
-  {
-    name: "Users",
-    description: "Manage user accounts and permissions",
-    actions: ["create", "read", "update", "disable"],
-  },
-  {
-    name: "Analytics",
-    description: "Access to data reports and insights",
-    actions: ["read", "export"],
-  },
-  {
-    name: "Settings",
-    description: "Manage system configuration",
-    actions: ["read", "update"],
-  },
-  {
-    name: "Reports",
-    description: "Access to business reports",
-    actions: ["read", "create", "export"],
-  },
-  {
-    name: "Messages",
-    description: "Internal communication system",
-    actions: ["read", "send", "delete"],
-  },
-];
+// Resource configuration moved to @/utils/resources
+
 
 // Countries list for dropdown
 const countries = [
@@ -241,11 +202,11 @@ const UserCreatePage: React.FC = () => {
       prev.map((p) =>
         p.resource === resource
           ? {
-              ...p,
-              actions: p.actions.includes(action)
-                ? p.actions.filter((a) => a !== action)
-                : [...p.actions, action],
-            }
+            ...p,
+            actions: p.actions.includes(action)
+              ? p.actions.filter((a) => a !== action)
+              : [...p.actions, action],
+          }
           : p
       )
     );
@@ -612,11 +573,10 @@ const UserCreatePage: React.FC = () => {
                                     action
                                   )
                                 }
-                                className={`px-3 py-1.5 rounded-md flex items-center gap-1.5 transition-all ${
-                                  isActive
-                                    ? `bg-[#8CC21B] text-white`
-                                    : "bg-white border border-gray-200 text-gray-700 hover:border-primary-light"
-                                }`}
+                                className={`px-3 py-1.5 rounded-md flex items-center gap-1.5 transition-all ${isActive
+                                  ? `bg-[#8CC21B] text-white`
+                                  : "bg-white border border-gray-200 text-gray-700 hover:border-primary-light"
+                                  }`}
                               >
                                 {isActive && <LucideCheck size={16} />}
                                 <span>
@@ -654,7 +614,6 @@ const UserCreatePage: React.FC = () => {
           </div>
         </Box>
 
-        {/* Add Resource Dialog */}
         <Dialog
           open={showResourceDialog}
           onClose={() => setShowResourceDialog(false)}
@@ -685,38 +644,39 @@ const UserCreatePage: React.FC = () => {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {availableResources.map((resource) => {
-                const isAssigned = permissions.some(
-                  (p) => p.resource === resource.name
-                );
+              {availableResources
+                .filter((resource) => !resource.adminOnly)
+                .map((resource) => {
+                  const isAssigned = permissions.some(
+                    (p) => p.resource === resource.name
+                  );
 
-                return (
-                  <div
-                    key={resource.name}
-                    onClick={() =>
-                      !isAssigned && handleAddResource(resource.name)
-                    }
-                    className={`p-3 border rounded-lg cursor-pointer transition-all ${
-                      isAssigned
+                  return (
+                    <div
+                      key={resource.name}
+                      onClick={() =>
+                        !isAssigned && handleAddResource(resource.name)
+                      }
+                      className={`p-3 border rounded-lg cursor-pointer transition-all ${isAssigned
                         ? "bg-blue-50 border-indigo-200 opacity-70 cursor-not-allowed"
                         : "hover:border-indigo-300 hover:bg-blue-50"
-                    }`}
-                  >
-                    <div className="flex justify-between items-center mb-2">
-                      <h3 className="font-medium">{resource.name}</h3>
-                      {isAssigned && (
-                        <div className="text-xs bg-indigo-500 text-white px-2 py-0.5 rounded-full flex items-center gap-1">
-                          <LucideCheck size={12} />
-                          Added
-                        </div>
-                      )}
+                        }`}
+                    >
+                      <div className="flex justify-between items-center mb-2">
+                        <h3 className="font-medium">{resource.name}</h3>
+                        {isAssigned && (
+                          <div className="text-xs bg-indigo-500 text-white px-2 py-0.5 rounded-full flex items-center gap-1">
+                            <LucideCheck size={12} />
+                            Added
+                          </div>
+                        )}
+                      </div>
+                      <p className="text-sm text-gray-600">
+                        {resource.description}
+                      </p>
                     </div>
-                    <p className="text-sm text-gray-600">
-                      {resource.description}
-                    </p>
-                  </div>
-                );
-              })}
+                  );
+                })}
             </div>
 
             <div className="flex justify-end mt-6">
@@ -738,7 +698,6 @@ const UserCreatePage: React.FC = () => {
           </div>
         </Dialog>
 
-        {/* Alert Snackbar */}
         <Snackbar
           open={alertInfo.show}
           autoHideDuration={6000}

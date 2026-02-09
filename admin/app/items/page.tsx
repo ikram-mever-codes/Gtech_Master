@@ -22,6 +22,7 @@ import CustomButton from "@/components/UI/CustomButton";
 import { EditIcon, EyeIcon, Plus, Package, LinkIcon } from "lucide-react";
 import { Delete } from "@mui/icons-material";
 import { toast } from "react-hot-toast";
+
 import {
   getItems,
   getItemById,
@@ -64,6 +65,7 @@ import {
   PaginatedResponse,
   StatisticsResponse,
 } from "@/api/items";
+import { getCategories } from "@/api/categories";
 import { loadingStyles, successStyles, errorStyles } from "@/utils/constants";
 
 type TabType = "items" | "parents" | "warehouse" | "tarics";
@@ -141,9 +143,12 @@ const ItemsManagementPage: React.FC = () => {
     name_cn: "",
     description_de: "",
     description_en: "",
-    reguler_artikel: "Y",
+    reguler_artikel: true,
     duty_rate: 0,
   });
+
+  const [categories, setCategories] = useState<any[]>([]);
+
 
   // Item modal states
   const [showItemModal, setShowItemModal] = useState(false);
@@ -151,25 +156,24 @@ const ItemsManagementPage: React.FC = () => {
     item_name: "",
     item_name_cn: "",
     ean: "",
-    parent_id: "",
-    taric_id: "",
-    cat_id: "",
-    weight: "",
-    length: "",
-    width: "",
-    height: "",
+    parent_id: 0,
+    taric_id: 0,
+    cat_id: 0,
+    weight: 0,
+    length: 0,
+    width: 0,
+    height: 0,
     remark: "",
     model: "",
-    isActive: "Y",
-    is_qty_dividable: "Y",
-    is_npr: "N",
-    is_eur_special: "N",
-    is_rmb_special: "N",
+    isActive: true,
+    is_qty_dividable: true,
+    is_npr: false,
+    is_eur_special: false,
+    is_rmb_special: false,
   });
 
   const router = useRouter();
 
-  // Format date function
   const formatDate = (dateString: string | Date) => {
     const date = new Date(dateString);
     return date.toLocaleDateString("en-US", {
@@ -283,6 +287,32 @@ const ItemsManagementPage: React.FC = () => {
     }
   }, [fetchData, fetchStatistics, activeTab]);
 
+  useEffect(() => {
+    const fetchInitialData = async () => {
+      try {
+        const [parentsRes, taricsRes, catsRes]: any = await Promise.all([
+          getParents({ limit: 1000, isActive: "Y" }),
+          getAllTarics({ limit: 1000 }),
+          getCategories(),
+        ]);
+
+        if (parentsRes?.data) setParents(parentsRes.data);
+        if (taricsRes?.data) setTarics(taricsRes.data);
+        if (catsRes?.data) setCategories(catsRes.data);
+
+        // Verification check
+        if ((!parentsRes?.data || parentsRes.data.length === 0) && activeTab === "items") {
+          console.warn("No parents found in database.");
+        }
+      } catch (error) {
+        console.error("Failed to fetch initial data", error);
+      }
+    };
+
+    fetchInitialData();
+  }, [activeTab]);
+
+
   // Handle item actions
   const handleViewItem = (itemId: number) => {
     router.push(`/items/${itemId}`);
@@ -298,7 +328,7 @@ const ItemsManagementPage: React.FC = () => {
     try {
       await deleteItem(itemId);
       fetchData(); // Refresh the list
-    } catch (error) {}
+    } catch (error) { }
   };
 
   const handleToggleStatus = async (itemId: number, currentStatus: string) => {
@@ -310,7 +340,7 @@ const ItemsManagementPage: React.FC = () => {
         successStyles
       );
       fetchData(); // Refresh the list
-    } catch (error) {}
+    } catch (error) { }
   };
 
   // Item creation modal functions
@@ -319,54 +349,50 @@ const ItemsManagementPage: React.FC = () => {
       item_name: "",
       item_name_cn: "",
       ean: "",
-      parent_id: "",
-      taric_id: "",
-      cat_id: "",
-      weight: "",
-      length: "",
-      width: "",
-      height: "",
+      parent_id: 0,
+      taric_id: 0,
+      cat_id: 0,
+      weight: 0,
+      length: 0,
+      width: 0,
+      height: 0,
       remark: "",
       model: "",
-      isActive: "Y",
-      is_qty_dividable: "Y",
-      is_npr: "N",
-      is_eur_special: "N",
-      is_rmb_special: "N",
+      isActive: true,
+      is_qty_dividable: true,
+      is_npr: false,
+      is_eur_special: false,
+      is_rmb_special: false,
     });
     setShowItemModal(true);
   };
 
   const handleCreateItemSubmit = async () => {
-    if (!itemFormData.item_name || !itemFormData.parent_id) {
-      toast.error("Item name and parent are required", errorStyles);
+    if (!itemFormData.item_name?.trim()) {
+      toast.error("Item name is required");
       return;
     }
 
+    if (!itemFormData.parent_id) {
+      toast.error("Parent is required");
+      return;
+    }
     try {
       setLoading(true);
       await createItem({
         item_name: itemFormData.item_name,
         item_name_cn: itemFormData.item_name_cn,
         ean: itemFormData.ean,
-        parent_id: parseInt(itemFormData.parent_id),
-        taric_id: itemFormData.taric_id
-          ? parseInt(itemFormData.taric_id)
-          : undefined,
-        cat_id: itemFormData.cat_id ? parseInt(itemFormData.cat_id) : undefined,
-        weight: itemFormData.weight
-          ? parseFloat(itemFormData.weight)
-          : undefined,
-        length: itemFormData.length
-          ? parseFloat(itemFormData.length)
-          : undefined,
-        width: itemFormData.width ? parseFloat(itemFormData.width) : undefined,
-        height: itemFormData.height
-          ? parseFloat(itemFormData.height)
-          : undefined,
+        parent_id: itemFormData.parent_id,
+        taric_id: itemFormData.taric_id || undefined,
+        cat_id: itemFormData.cat_id || undefined,
+        weight: itemFormData.weight || undefined,
+        length: itemFormData.length || undefined,
+        width: itemFormData.width || undefined,
+        height: itemFormData.height || undefined,
         remark: itemFormData.remark,
         model: itemFormData.model,
-        isActive: itemFormData.isActive,
+        isActive: itemFormData.isActive ? "Y" : "N",
       });
 
       toast.success("Item created successfully", successStyles);
@@ -394,7 +420,7 @@ const ItemsManagementPage: React.FC = () => {
       name_cn: "",
       description_de: "",
       description_en: "",
-      reguler_artikel: "Y",
+      reguler_artikel: true,
       duty_rate: 0,
     });
     setShowTaricModal(true);
@@ -411,7 +437,7 @@ const ItemsManagementPage: React.FC = () => {
         name_cn: response.data.name_cn || "",
         description_de: response.data.description_de || "",
         description_en: response.data.description_en || "",
-        reguler_artikel: response.data.reguler_artikel || "Y",
+        reguler_artikel: response.data.reguler_artikel === "Y",
         duty_rate: response.data.duty_rate || 0,
       });
       setTaricModalMode("edit");
@@ -452,10 +478,14 @@ const ItemsManagementPage: React.FC = () => {
 
     try {
       setLoading(true);
+      const payload = {
+        ...taricFormData,
+        reguler_artikel: taricFormData.reguler_artikel ? "Y" : "N",
+      };
       if (taricModalMode === "create") {
-        await createTaric(taricFormData);
+        await createTaric(payload);
       } else if (taricModalMode === "edit" && editingTaricId) {
-        await updateTaric(editingTaricId, taricFormData);
+        await updateTaric(editingTaricId, payload);
       }
       setShowTaricModal(false);
       fetchData(); // Refresh the list
@@ -485,7 +515,7 @@ const ItemsManagementPage: React.FC = () => {
       }
       setSelectedTarics(new Set());
       fetchData();
-    } catch (error) {}
+    } catch (error) { }
   };
 
   // Handle bulk actions for items
@@ -1197,11 +1227,10 @@ const ItemsManagementPage: React.FC = () => {
 
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className={`px-4 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2 ${
-                showFilters
-                  ? "bg-[#8CC21B] text-white"
-                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-              }`}
+              className={`px-4 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2 ${showFilters
+                ? "bg-[#8CC21B] text-white"
+                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                }`}
             >
               <FunnelIcon className="w-5 h-5" />
               Filters
@@ -1260,11 +1289,10 @@ const ItemsManagementPage: React.FC = () => {
                 <button
                   key={tab.key}
                   onClick={() => setActiveTab(tab.key as TabType)}
-                  className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${
-                    activeTab === tab.key
-                      ? "border-primary text-primary"
-                      : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                  }`}
+                  className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${activeTab === tab.key
+                    ? "border-primary text-primary"
+                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                    }`}
                 >
                   <tab.icon className="w-5 h-5" />
                   {tab.label}
@@ -1611,7 +1639,7 @@ const ItemsManagementPage: React.FC = () => {
                     onChange={(e) =>
                       setTaricFormData({
                         ...taricFormData,
-                        duty_rate: parseFloat(e.target.value) || 0,
+                        duty_rate: Number(e.target.value),
                       })
                     }
                     className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all"
@@ -1625,11 +1653,11 @@ const ItemsManagementPage: React.FC = () => {
                     Regular Artikel
                   </label>
                   <select
-                    value={taricFormData.reguler_artikel}
+                    value={taricFormData.reguler_artikel ? "Y" : "N"}
                     onChange={(e) =>
                       setTaricFormData({
                         ...taricFormData,
-                        reguler_artikel: e.target.value,
+                        reguler_artikel: e.target.value === "Y",
                       })
                     }
                     className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all"
@@ -1768,22 +1796,23 @@ const ItemsManagementPage: React.FC = () => {
                   />
                 </div>
 
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Parent *
                   </label>
                   <select
-                    value={itemFormData.parent_id}
+                    value={itemFormData.parent_id || 0}
                     onChange={(e) =>
                       setItemFormData({
                         ...itemFormData,
-                        parent_id: e.target.value,
+                        parent_id: Number(e.target.value),
                       })
                     }
                     className="w-full px-3 py-2 border border-gray-300 rounded-md"
                   >
-                    <option value="">Select Parent</option>
-                    {parents.map((parent) => (
+                    <option value="0">Select Parent</option>
+                    {parents && parents.map((parent) => (
                       <option key={parent.id} value={parent.id}>
                         {parent.name_de} ({parent.de_no})
                       </option>
@@ -1800,15 +1829,38 @@ const ItemsManagementPage: React.FC = () => {
                     onChange={(e) =>
                       setItemFormData({
                         ...itemFormData,
-                        taric_id: e.target.value,
+                        taric_id: Number(e.target.value),
                       })
                     }
                     className="w-full px-3 py-2 border border-gray-300 rounded-md"
                   >
-                    <option value="">Select TARIC</option>
-                    {tarics.map((taric) => (
+                    <option value="">Select a Taric</option>
+                    {tarics?.map((taric) => (
                       <option key={taric.id} value={taric.id}>
                         {taric.code} - {taric.name_de}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Category
+                  </label>
+                  <select
+                    value={itemFormData.cat_id}
+                    onChange={(e) =>
+                      setItemFormData({
+                        ...itemFormData,
+                        cat_id: Number(e.target.value),
+                      })
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  >
+                    <option value="0">Select Category</option>
+                    {categories && categories.map((cat) => (
+                      <option key={cat.id} value={cat.id}>
+                        {cat.name}
                       </option>
                     ))}
                   </select>
@@ -1824,7 +1876,7 @@ const ItemsManagementPage: React.FC = () => {
                     onChange={(e) =>
                       setItemFormData({
                         ...itemFormData,
-                        weight: e.target.value,
+                        weight: Number(e.target.value),
                       })
                     }
                     className="w-full px-3 py-2 border border-gray-300 rounded-md"
@@ -1843,7 +1895,7 @@ const ItemsManagementPage: React.FC = () => {
                     onChange={(e) =>
                       setItemFormData({
                         ...itemFormData,
-                        length: e.target.value,
+                        length: Number(e.target.value),
                       })
                     }
                     className="w-full px-3 py-2 border border-gray-300 rounded-md"
@@ -1862,7 +1914,7 @@ const ItemsManagementPage: React.FC = () => {
                     onChange={(e) =>
                       setItemFormData({
                         ...itemFormData,
-                        width: e.target.value,
+                        width: Number(e.target.value),
                       })
                     }
                     className="w-full px-3 py-2 border border-gray-300 rounded-md"
@@ -1881,7 +1933,7 @@ const ItemsManagementPage: React.FC = () => {
                     onChange={(e) =>
                       setItemFormData({
                         ...itemFormData,
-                        height: e.target.value,
+                        height: Number(e.target.value),
                       })
                     }
                     className="w-full px-3 py-2 border border-gray-300 rounded-md"
@@ -1931,11 +1983,11 @@ const ItemsManagementPage: React.FC = () => {
                     Status
                   </label>
                   <select
-                    value={itemFormData.isActive}
+                    value={itemFormData.isActive ? "Y" : "N"}
                     onChange={(e) =>
                       setItemFormData({
                         ...itemFormData,
-                        isActive: e.target.value,
+                        isActive: e.target.value === "Y",
                       })
                     }
                     className="w-full px-3 py-2 border border-gray-300 rounded-md"
@@ -1950,11 +2002,11 @@ const ItemsManagementPage: React.FC = () => {
                     Quantity Dividable
                   </label>
                   <select
-                    value={itemFormData.is_qty_dividable}
+                    value={itemFormData.is_qty_dividable ? "Y" : "N"}
                     onChange={(e) =>
                       setItemFormData({
                         ...itemFormData,
-                        is_qty_dividable: e.target.value,
+                        is_qty_dividable: e.target.value === "Y",
                       })
                     }
                     className="w-full px-3 py-2 border border-gray-300 rounded-md"
@@ -1974,7 +2026,7 @@ const ItemsManagementPage: React.FC = () => {
                 </button>
                 <button
                   onClick={handleCreateItemSubmit}
-                  disabled={!itemFormData.item_name || !itemFormData.parent_id}
+                  disabled={!itemFormData.item_name?.trim() || !itemFormData.parent_id}
                   className="flex-1 px-4 py-2 bg-[#8CC21B] text-white rounded-lg hover:bg-[#8CC21B] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Create Item

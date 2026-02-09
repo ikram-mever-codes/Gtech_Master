@@ -149,6 +149,15 @@ interface UpdateProfilePayload {
   avatar?: File;
 }
 
+export const getMe = async () => {
+  try {
+    const response = await api.get("/auth/users/me");
+    return response.data;
+  } catch (error) {
+    handleApiError(error);
+  }
+};
+
 export const updateUserProfile = async (
   formData: FormData,
   dispatch: AppDispatch
@@ -270,5 +279,5 @@ export const deleteUser = async (userId: string) => {
 
 export const resetPassword = async () => {
   try {
-  } catch (error) {}
+  } catch (error) { }
 };

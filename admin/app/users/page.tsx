@@ -90,15 +90,12 @@ const UsersPage = () => {
       render: (value: any, row: any) => (
         <div className="flex items-center gap-4">
           <Avatar
-            src={
-              row.avatar ||
-              `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                row.name
-              )}&background=random`
-            }
-            className="w-10 h-10 rounded-full"
+            src={row.avatar || ""}
+            className="w-10 h-10 rounded-full bg-indigo-100 text-indigo-700 font-bold"
             alt={`${row.name}'s avatar`}
-          />
+          >
+            {row.name?.charAt(0).toUpperCase()}
+          </Avatar>
           <div>
             <div className="text-gray-800 font-medium">{row.name}</div>
             <div className="text-sm text-gray-500">{row.email}</div>
@@ -139,13 +136,12 @@ const UsersPage = () => {
       label: "Status",
       render: (value: boolean) => (
         <span
-          className={`px-3 py-1 rounded-full text-xs font-medium ${
-            value === true
-              ? "bg-green-200/80 text-green-600"
-              : value === false
+          className={`px-3 py-1 rounded-full text-xs font-medium ${value === true
+            ? "bg-green-200/80 text-green-600"
+            : value === false
               ? "bg-yellow-200/80 text-yellow-800"
               : "bg-red-200/80 text-red-800"
-          }`}
+            }`}
         >
           {value === true ? "Verified" : "Unverified"}
         </span>
