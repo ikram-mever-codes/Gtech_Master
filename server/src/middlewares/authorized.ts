@@ -1,23 +1,25 @@
-import { Request, Response, NextFunction } from "express";
+import { Request, Response, NextFunction, RequestHandler } from "express";
 import jwt from "jsonwebtoken";
-import { getRepository } from "typeorm";
 import { User, UserRole } from "../models/users";
 import ErrorHandler from "../utils/errorHandler";
 import { AppDataSource } from "../config/database";
-import { USER_ROLE } from "../models/list";
 
 export interface AuthorizedRequest extends Request {
   user?: User;
 }
 
-export const authenticateUser = async (
-  req: AuthorizedRequest,
-  res: Response,
-  next: NextFunction
-) => {
-  const token = req.cookies?.token;
+export const authenticateUser: RequestHandler = async (
+  req,
+  res,
+  next
+): Promise<void> => {
+  const authReq = req as AuthorizedRequest; // ✅ CAST HERE
+
+  const token = authReq.cookies?.token;
   if (!token) {
-    return next(new ErrorHandler("Session expired! Please login again", 401));
+    return next(
+      new ErrorHandler("Session expired! Please login again", 401)
+    );
   }
 
   try {
@@ -37,27 +39,34 @@ export const authenticateUser = async (
     }
 
     if (!user.isEmailVerified) {
-      return next(new ErrorHandler("Please verify your email first", 401));
+      return next(
+        new ErrorHandler("Please verify your email first", 401)
+      );
     }
 
-    req.user = user;
+    authReq.user = user; // ✅ safe
     next();
   } catch (error) {
-    console.log(error);
-    return next(new ErrorHandler("Session expired! Please login again", 401));
+    console.error(error);
+    return next(
+      new ErrorHandler("Session expired! Please login again", 401)
+    );
   }
 };
 
-export const isAdmin = async (
-  req: AuthorizedRequest,
-  res: Response,
-  next: NextFunction
-) => {
+export const isAdmin: RequestHandler = async (
+  req,
+  res,
+  next
+): Promise<void> => {
+  const authReq = req as AuthorizedRequest;
+
   try {
-    if (!req.user) {
+    if (!authReq.user) {
       return next(new ErrorHandler("Authentication required", 401));
     }
-    if (req.user.role !== UserRole.ADMIN) {
+
+    if (authReq.user.role !== UserRole.ADMIN) {
       return next(new ErrorHandler("Admin access required", 403));
     }
 
@@ -66,4 +75,33 @@ export const isAdmin = async (
     console.error("Admin check error:", error);
     return next(new ErrorHandler("Authorization failed", 500));
   }
+};
+
+/**
+ * Middleware to restrict access based on user roles.
+ * Admins always bypass this check.
+ */
+export const authorize = (...roles: UserRole[]): RequestHandler => {
+  return (req, res, next) => {
+    const authReq = req as AuthorizedRequest;
+
+    if (!authReq.user) {
+      return next(new ErrorHandler("Authentication required", 401));
+    }
+
+    if (authReq.user.role === UserRole.ADMIN) {
+      return next();
+    }
+
+    if (roles.length && !roles.includes(authReq.user.role)) {
+      return next(
+        new ErrorHandler(
+          `Forbidden: ${authReq.user.role} role does not have access to this resource`,
+          403
+        )
+      );
+    }
+
+    next();
+  };
 };

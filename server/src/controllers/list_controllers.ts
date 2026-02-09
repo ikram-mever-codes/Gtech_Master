@@ -400,7 +400,7 @@ export const createList = async (
       return next(new ErrorHandler("Customer not found", 404));
     }
 
-    const createdBy = await createCreator(null, customerId);
+    const createdBy = await createCreator(userId || null, customerId);
 
     const list = listRepository.create({
       name,
@@ -1493,12 +1493,12 @@ export const getAllLists = async (
       // Include refresh statistics for each list
       refreshStats: shouldRefresh
         ? {
-            itemsRefreshed:
-              list.items?.filter(
-                (item) => item.updatedAt > new Date(Date.now() - 60000) // Items updated in last minute
-              ).length || 0,
-            totalItems: list.items?.length || 0,
-          }
+          itemsRefreshed:
+            list.items?.filter(
+              (item) => item.updatedAt > new Date(Date.now() - 60000) // Items updated in last minute
+            ).length || 0,
+          totalItems: list.items?.length || 0,
+        }
         : undefined,
     }));
 
@@ -2140,9 +2140,8 @@ export const refreshItemsFromMIS = async (
 
     return res.status(200).json({
       success: true,
-      message: `Refreshed ${refreshedCount} items from MIS${
-        failedCount > 0 ? `, ${failedCount} failed` : ""
-      }`,
+      message: `Refreshed ${refreshedCount} items from MIS${failedCount > 0 ? `, ${failedCount} failed` : ""
+        }`,
       data: {
         refreshedItems,
         statistics: {
@@ -2360,14 +2359,14 @@ export const updateListContactPerson = async (
           id: list.id,
           contactPerson: contactPerson
             ? {
-                id: contactPerson.id,
-                name: contactPerson.name,
-                familyName: contactPerson.familyName,
-                position: contactPerson.position,
-                email: contactPerson.email,
-                phone: contactPerson.phone,
-                linkedInLink: contactPerson.linkedInLink,
-              }
+              id: contactPerson.id,
+              name: contactPerson.name,
+              familyName: contactPerson.familyName,
+              position: contactPerson.position,
+              email: contactPerson.email,
+              phone: contactPerson.phone,
+              linkedInLink: contactPerson.linkedInLink,
+            }
             : null,
         },
       },

@@ -1,23 +1,39 @@
+import dotenv from "dotenv";
+dotenv.config();
+
 import app from "./app";
 import { initializeDatabase } from "./config/database";
 import { getConnection } from "./config/misDb";
 import ErrorHandler from "./utils/errorHandler";
+
 const PORT = process.env.PORT || 1000;
 
-initializeDatabase();
+(async () => {
+  try {
+    await initializeDatabase();
 
-async function fetchItemData(itemId: number) {
+    app.listen(PORT, () => {
+      console.log(`Server is running on port ${PORT}`);
+      console.log(`WebSocket server is running`);
+    });
+  } catch (error) {
+    console.error("Failed to start server:", error);
+    process.exit(1);
+  }
+})();
+
+// Function to fetch item data from MIS DB
+export async function fetchItemData(itemId: number) {
   const connection = await getConnection();
 
   try {
-    // Fetch from items table
     const [itemRows]: any = await connection.query(
       `
       SELECT i.*, os.cargo_id 
       FROM items i
       LEFT JOIN order_statuses os ON i.ItemID_DE = os.ItemID_DE
       WHERE i.id = ?
-    `,
+      `,
       [itemId]
     );
 
@@ -62,8 +78,3 @@ async function fetchItemData(itemId: number) {
     connection.release();
   }
 }
-
-app.listen(PORT, async () => {
-  console.log(`Server is running on port ${PORT}`);
-  console.log(`WebSocket server is running`);
-});

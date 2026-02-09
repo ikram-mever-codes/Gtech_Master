@@ -253,8 +253,7 @@ class MySQLToPostgresMigrator {
         } catch (error: any) {
           errorCount++;
           console.log(
-            `   Error on record ${(row as any).id || "unknown"}: ${
-              error.message
+            `   Error on record ${(row as any).id || "unknown"}: ${error.message
             }`
           );
         }
@@ -815,7 +814,7 @@ class MySQLToPostgresMigrator {
         FROM orders
       `);
 
-      const orderRepository = AppDataSource.getRepository(Order);
+      const orderRepository: any = AppDataSource.getRepository(Order);
       const orders = rows as any[];
       this.orderIdMap.clear();
 
@@ -826,7 +825,7 @@ class MySQLToPostgresMigrator {
           const order = orderRepository.create({
             id: mysqlId,
             order_no: DataSanitizer.sanitizeString(row.order_no, 255, ""),
-            category_id: DataSanitizer.sanitizeString(row.category_id, 50, ""),
+            category_id: DataSanitizer.sanitizeNumber(row.category_id),
             status: DataSanitizer.sanitizeNumber(row.status),
             comment: DataSanitizer.sanitizeString(row.comment, undefined, ""),
             date_created: DataSanitizer.sanitizeString(
@@ -834,6 +833,7 @@ class MySQLToPostgresMigrator {
               255,
               ""
             ),
+
             date_emailed: DataSanitizer.sanitizeString(
               row.date_emailed,
               255,

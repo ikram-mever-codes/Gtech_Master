@@ -9,6 +9,9 @@ import { Taric } from "../models/tarics";
 import { Item } from "../models/items";
 import { validate } from "class-validator";
 import { plainToInstance } from "class-transformer";
+import { UserRole } from "../models/users";
+import { filterDataByRole } from "../utils/dataFilter";
+import { AuthorizedRequest } from "../middlewares/authorized";
 
 // Alternative: Simplified DTOs
 
@@ -87,7 +90,7 @@ export class BaseItemConversionDto {
   note?: string;
 }
 
-export class ConvertInquiryToItemDto extends BaseItemConversionDto {}
+export class ConvertInquiryToItemDto extends BaseItemConversionDto { }
 
 export class ConvertRequestToItemDto extends BaseItemConversionDto {
   @IsOptional()
@@ -258,9 +261,12 @@ export class InquiryController {
         .take(Number(limit))
         .getManyAndCount();
 
+      const user = (request as AuthorizedRequest).user;
+      const filteredData = filterDataByRole(inquiries, user?.role || UserRole.STAFF);
+
       return response.status(200).json({
         success: true,
-        data: inquiries,
+        data: filteredData,
         pagination: {
           page: Number(page),
           limit: Number(limit),
@@ -293,9 +299,12 @@ export class InquiryController {
         });
       }
 
+      const user = (request as AuthorizedRequest).user;
+      const filteredData = filterDataByRole(inquiry, user?.role || UserRole.STAFF);
+
       return response.status(200).json({
         success: true,
-        data: inquiry,
+        data: filteredData,
       });
     } catch (error) {
       console.error("Error fetching inquiry:", error);

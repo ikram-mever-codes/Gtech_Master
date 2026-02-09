@@ -1,4 +1,3 @@
-// routes/contactPersonRoutes.ts
 import { Router } from "express";
 import {
   createContactPerson,
@@ -17,11 +16,15 @@ import {
   quickAddContactPerson,
   getAllStarBusinesses,
 } from "../controllers/contact_controllers";
-import { authenticateUser } from "../middlewares/authorized";
+import { authenticateUser, authorize } from "../middlewares/authorized";
+import { UserRole } from "../models/users";
 
 const router: any = Router();
 
 router.use(authenticateUser);
+
+// Restricted to Admin and Sales
+router.use(authorize(UserRole.SALES));
 
 // Contact Person CRUD Operations
 router.post("/", createContactPerson);

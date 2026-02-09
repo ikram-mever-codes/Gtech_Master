@@ -1,5 +1,5 @@
 // src/routes/itemRoutes.ts
-import express from "express";
+import express, { Request, Response } from "express";
 import {
   getItems,
   getItemById,
@@ -33,13 +33,18 @@ import {
   getTaricStatistics,
   bulkUpsertTarics,
 } from "../controllers/items_controller";
-import { authenticateUser } from "../middlewares/authorized";
+import { authenticateUser, authorize } from "../middlewares/authorized";
+import { AppDataSource } from "../config/database";
+import { Parent } from "../models/parents";
+import { UserRole } from "../models/users";
 
 const router: any = express.Router();
 
 router.use(authenticateUser);
 
-// =============
+// Items, Parents, Warehouse, Tarics are shared between Sales and Purchasing
+router.use(authorize(UserRole.SALES, UserRole.PURCHASING));
+
 // ===============================
 // ITEM ROUTES
 // ============================================
@@ -74,6 +79,21 @@ router.get("/search/quick-search", searchItems);
 // ============================================
 // PARENT ROUTES
 // ============================================
+
+// TEMPORARY: Test route for parents dropdown
+router.get("/parents/simple", async (req: Request, res: Response) => {
+  try {
+    const parents = await AppDataSource.getRepository(Parent).find({
+      select: ["id", "name_de", "de_no"],
+      where: { is_active: "Y" },
+      order: { name_de: "ASC" },
+    });
+    res.json({ success: true, data: parents });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: "Failed to fetch parents" });
+  }
+});
 
 // Get all parents with pagination and filters
 router.get("/parents/items", getParents);

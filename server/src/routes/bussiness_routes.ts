@@ -11,10 +11,16 @@ import {
   getBusinessStatistics,
   bulkUpdateStatus,
 } from "../controllers/bussiness_controller";
-import { authenticateUser, isAdmin } from "../middlewares/authorized";
+import { authenticateUser, isAdmin, authorize } from "../middlewares/authorized";
+import { UserRole } from "../models/users";
 
 const router: any = Router();
+
 router.use(authenticateUser);
+
+// Restricted to Admin and Sales
+router.use(authorize(UserRole.SALES));
+
 // Bulk operations
 router.post("/bulk-import", bulkImportBusinesses);
 router.post("/bulk-delete", isAdmin, bulkDeleteBusinesses);

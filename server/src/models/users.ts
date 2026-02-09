@@ -10,6 +10,8 @@ import { Permission } from "./permissions";
 
 export enum UserRole {
   ADMIN = "ADMIN",
+  SALES = "SALES",
+  PURCHASING = "PURCHASING",
   MANAGER = "MANAGER",
   STAFF = "STAFF",
   SUPPORT = "SUPPORT",

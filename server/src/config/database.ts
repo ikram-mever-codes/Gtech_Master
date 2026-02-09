@@ -1,7 +1,7 @@
 import { DataSource } from "typeorm";
 import dotenv from "dotenv";
 import path from "path";
-import { User } from "../models/users";
+import { User, UserRole } from "../models/users";
 import { Permission } from "../models/permissions";
 import { hashSync } from "bcryptjs";
 import { Customer } from "../models/customers";
@@ -47,9 +47,7 @@ export const AppDataSource = new DataSource({
   logging: false,
 
   entities: [
-    // EXISTING ENTITIES
     User,
-
     Customer,
     List,
     LibraryFile,
@@ -87,12 +85,51 @@ export const AppDataSource = new DataSource({
     ssl:
       process.env.DB_SSL === "true"
         ? {
-            rejectUnauthorized: false,
-          }
+          rejectUnauthorized: false,
+        }
         : false,
   },
   poolSize: 10,
 });
+
+const bootstrapAdminUser = async () => {
+  const email = process.env.ADMIN_EMAIL;
+  const password = process.env.ADMIN_PASSWORD;
+
+  if (!email || !password) return;
+
+  try {
+    const userRepository = AppDataSource.getRepository(User);
+    const existingUser = await userRepository.findOne({ where: { email } });
+
+    if (existingUser) {
+      let updated = false;
+      if (existingUser.role !== UserRole.ADMIN) {
+        existingUser.role = UserRole.ADMIN;
+        updated = true;
+      }
+      if (!existingUser.isEmailVerified) {
+        existingUser.isEmailVerified = true;
+        updated = true;
+      }
+      if (updated) {
+        await userRepository.save(existingUser);
+      }
+    } else {
+      const hashedPassword = hashSync(password, 10);
+      const newUser = userRepository.create({
+        name: "Admin User",
+        email,
+        password: hashedPassword,
+        role: UserRole.ADMIN,
+        isEmailVerified: true,
+      });
+      await userRepository.save(newUser);
+    }
+  } catch (error) {
+    console.error("Admin bootstrap error:", error);
+  }
+};
 
 export const initializeDatabase = async (): Promise<DataSource> => {
   try {
@@ -103,6 +140,12 @@ export const initializeDatabase = async (): Promise<DataSource> => {
       await AppDataSource.runMigrations();
       console.log("Migrations executed successfully");
     }
+
+    await bootstrapAdminUser();
+
+    // Seed database with initial data
+    const { seedDatabase } = await import("../services/seedDatabase");
+    await seedDatabase();
 
     return AppDataSource;
   } catch (error) {

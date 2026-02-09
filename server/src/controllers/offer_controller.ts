@@ -31,16 +31,16 @@ const getValidator = (): ValidatorModule => {
   } catch {
     // Mock implementation if module is not installed
     return {
-      IsDate: () => () => {},
-      IsEnum: () => () => {},
-      IsNumber: () => () => {},
-      IsObject: () => () => {},
-      IsOptional: () => () => {},
-      IsString: () => () => {},
-      Max: () => () => {},
-      Min: () => () => {},
-      IsBoolean: () => () => {},
-      IsArray: () => () => {},
+      IsDate: () => () => { },
+      IsEnum: () => () => { },
+      IsNumber: () => () => { },
+      IsObject: () => () => { },
+      IsOptional: () => () => { },
+      IsString: () => () => { },
+      Max: () => () => { },
+      Min: () => () => { },
+      IsBoolean: () => () => { },
+      IsArray: () => () => { },
       validate: async () => [],
     };
   }
@@ -52,7 +52,7 @@ const getTransformer = (): TransformerModule => {
   } catch {
     // Mock implementation if module is not installed
     return {
-      Type: () => () => {},
+      Type: () => () => { },
       plainToInstance: <T>(cls: ClassConstructor<T>, plain: any): T =>
         plain as T,
     };
@@ -1991,9 +1991,8 @@ export class OfferController {
 
       return response.status(200).json({
         success: true,
-        message: `Unit prices ${
-          useUnitPrices ? "enabled" : "disabled"
-        } successfully for entire offer`,
+        message: `Unit prices ${useUnitPrices ? "enabled" : "disabled"
+          } successfully for entire offer`,
         data: updatedOffer,
       });
     } catch (error) {
@@ -2416,8 +2415,7 @@ export class OfferController {
       // Show unit pricing mode if enabled
       if (offer.useUnitPrices) {
         doc.text(
-          `Pricing Mode: Unit Pricing (${
-            offer.maxUnitPriceColumns || 3
+          `Pricing Mode: Unit Pricing (${offer.maxUnitPriceColumns || 3
           } columns)`
         );
       }

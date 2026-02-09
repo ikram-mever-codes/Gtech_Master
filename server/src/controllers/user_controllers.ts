@@ -6,7 +6,7 @@ import crypto from "crypto";
 import { User, UserRole } from "../models/users";
 import { Permission } from "../models/permissions";
 import ErrorHandler from "../utils/errorHandler";
-import sendEmail from "../services/emailService";
+import { sendEmailSafe } from "../services/notification.service";
 import cloudinary from "../config/cloudinary";
 import fs from "fs";
 import { AppDataSource } from "../config/database";
@@ -15,6 +15,7 @@ import { AuthorizedRequest } from "../middlewares/authorized";
 import { CustomerCreator, List, LIST_STATUS, ListItem } from "../models/list";
 import { Invoice, InvoiceItem } from "../models/invoice";
 import { StarCustomerDetails } from "../models/star_customer_details";
+import { cookieOptions } from "../utils/cookieOptions";
 
 // Create User with Permissions (Admin/Super Admin only)
 export const createUser = async (
@@ -112,7 +113,7 @@ export const createUser = async (
         <p><strong>Note:</strong> This verification code will expire in 24 hours.</p>
       `;
 
-    await sendEmail({
+    sendEmailSafe({
       to: email,
       subject: "Your Admin Account Credentials - Verify Your Email",
       html: message,
@@ -209,6 +210,7 @@ export const login = async (
     }
 
     const isMatch = await bcrypt.compare(password, user.password);
+
     if (!isMatch) {
       return next(new ErrorHandler("Invalid credentials", 401));
     }
@@ -235,12 +237,7 @@ export const login = async (
 
     return res
       .status(200)
-      .cookie("token", token, {
-        httpOnly: true,
-        secure: true,
-        sameSite: "none",
-        maxAge: 24 * 60 * 60 * 1000,
-      })
+      .cookie("token", token, cookieOptions)
       .json({
         success: true,
         message: "Logged in successfully",
@@ -258,16 +255,60 @@ export const logout = async (
 ) => {
   try {
     return res
-      .clearCookie("token", {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "strict",
-      })
+      .clearCookie("token", cookieOptions)
       .status(200)
       .json({
         success: true,
         message: "Logged out successfully",
       });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const getMe = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const userId = (req as any).user.id;
+    const userRepository = AppDataSource.getRepository(User);
+    const user = await userRepository.findOne({
+      where: { id: userId },
+      relations: ["permissions"],
+    });
+
+    if (!user) {
+      return next(new ErrorHandler("User not found", 404));
+    }
+
+    // Filter sensitive data and sanitize resources
+    const cleanResources = (user.assignedResources || []).map(r => r.trim()).filter(r => r.length > 0);
+    const derivedResources = user.permissions?.map(p => p.resource.trim()) || [];
+    const finalResources = Array.from(new Set([...cleanResources, ...derivedResources]));
+
+    const userData = {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      permissions: user.permissions || [],
+      assignedResources: finalResources || [],
+      avatar: user.avatar,
+      phoneNumber: user.phoneNumber,
+      gender: user.gender,
+      dateOfBirth: user.dateOfBirth,
+      address: user.address,
+      country: user.country,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+    };
+
+    return res.status(200).json({
+      success: true,
+      data: userData,
+    });
   } catch (error) {
     return next(error);
   }
@@ -315,12 +356,7 @@ export const refresh = async (
 
     return res
       .status(200)
-      .cookie("token", newToken, {
-        httpOnly: true,
-        secure: true,
-        sameSite: "none",
-        maxAge: 24 * 60 * 60 * 1000,
-      })
+      .cookie("token", newToken, cookieOptions)
       .json({
         success: true,
         data: userData,
@@ -370,7 +406,7 @@ export const changePassword = async (
         <p>If you didn't make this change, please contact support immediately.</p>
       `;
 
-    await sendEmail({
+    sendEmailSafe({
       to: user.email,
       subject: "Password Change Notification",
       html: message,
@@ -445,17 +481,33 @@ export const editProfile = async (
 
     await userRepository.save(user);
 
+    // Re-fetch user with relations to ensure we return full data
+    const updatedUser = await userRepository.findOne({
+      where: { id: userId },
+      relations: ["permissions"],
+    });
+
+    if (!updatedUser) {
+      return next(new ErrorHandler("User not found after update", 404));
+    }
+
+    const cleanResources = (updatedUser.assignedResources || []).map(r => r.trim()).filter(r => r.length > 0);
+    const derivedResources = updatedUser.permissions?.map(p => p.resource) || [];
+    const finalResources = cleanResources.length > 0 ? cleanResources : Array.from(new Set(derivedResources));
+
     // Filter sensitive data
     const userData = {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      avatar: user.avatar,
-      phoneNumber: user.phoneNumber,
-      gender: user.gender,
-      dateOfBirth: user.dateOfBirth,
-      address: user.address,
+      id: updatedUser.id,
+      name: updatedUser.name,
+      email: updatedUser.email,
+      role: updatedUser.role,
+      permissions: updatedUser.permissions || [],
+      assignedResources: finalResources || [],
+      avatar: updatedUser.avatar,
+      phoneNumber: updatedUser.phoneNumber,
+      gender: updatedUser.gender,
+      dateOfBirth: updatedUser.dateOfBirth,
+      address: updatedUser.address,
     };
 
     return res.status(200).json({
@@ -506,13 +558,18 @@ export const getUserById = async (
       return next(new ErrorHandler("User not found", 404));
     }
 
+    // Sanitize resources and handle derivation
+    const cleanResources = (user.assignedResources || []).map(r => r.trim()).filter(r => r.length > 0);
+    const derivedResources = user.permissions?.map(p => p.resource) || [];
+    const finalResources = cleanResources.length > 0 ? cleanResources : Array.from(new Set(derivedResources));
+
     const userData = {
       id: user.id,
       name: user.name,
       email: user.email,
       role: user.role,
-      permissions: user.permissions,
-      assignedResources: user.assignedResources,
+      permissions: user.permissions || [],
+      assignedResources: finalResources || [],
       avatar: user.avatar,
       phoneNumber: user.phoneNumber,
       gender: user.gender,
@@ -586,7 +643,7 @@ export const forgetPassword = async (
         </div>
       `;
 
-    await sendEmail({
+    sendEmailSafe({
       to: email,
       subject: "Passwort zurücksetzen – GTech Star-Kundenportal",
       html: message,
@@ -651,7 +708,7 @@ export const resetPassword = async (
         <p>If you didn't make this change, please contact support immediately.</p>
       `;
 
-    await sendEmail({
+    sendEmailSafe({
       to: user.email,
       subject: "Password Updated",
       html: message,
@@ -793,7 +850,7 @@ export const createCompany = async (
         <p>A default list "${list.name}" has been created for your company.</p>
       `;
 
-    await sendEmail({
+    sendEmailSafe({
       to: email,
       subject: "Your Company Account Credentials",
       html: message,
@@ -801,7 +858,7 @@ export const createCompany = async (
 
     // Also send to contact email if different
     if (contactEmail !== email) {
-      await sendEmail({
+      sendEmailSafe({
         to: contactEmail,
         subject: "Your Company Account Credentials",
         html: message,
@@ -950,19 +1007,19 @@ export const updateCustomer = async (
       stage: updatedCustomer.stage,
       starCustomerDetails: updatedCustomer.starCustomerDetails
         ? {
-            taxNumber: updatedCustomer.starCustomerDetails.taxNumber,
-            accountVerificationStatus:
-              updatedCustomer.starCustomerDetails.accountVerificationStatus,
-            deliveryAddressLine1:
-              updatedCustomer.starCustomerDetails.deliveryAddressLine1,
-            deliveryAddressLine2:
-              updatedCustomer.starCustomerDetails.deliveryAddressLine2,
-            deliveryPostalCode:
-              updatedCustomer.starCustomerDetails.deliveryPostalCode,
-            deliveryCity: updatedCustomer.starCustomerDetails.deliveryCity,
-            deliveryCountry:
-              updatedCustomer.starCustomerDetails.deliveryCountry,
-          }
+          taxNumber: updatedCustomer.starCustomerDetails.taxNumber,
+          accountVerificationStatus:
+            updatedCustomer.starCustomerDetails.accountVerificationStatus,
+          deliveryAddressLine1:
+            updatedCustomer.starCustomerDetails.deliveryAddressLine1,
+          deliveryAddressLine2:
+            updatedCustomer.starCustomerDetails.deliveryAddressLine2,
+          deliveryPostalCode:
+            updatedCustomer.starCustomerDetails.deliveryPostalCode,
+          deliveryCity: updatedCustomer.starCustomerDetails.deliveryCity,
+          deliveryCountry:
+            updatedCustomer.starCustomerDetails.deliveryCountry,
+        }
         : null,
     };
 
@@ -1033,7 +1090,10 @@ export const updateUser = async (
     user.name = name;
     user.email = email;
     user.role = role;
-    user.assignedResources = assignedResources || [];
+
+    // Sanitize assignedResources from frontend
+    const rawResources = Array.isArray(assignedResources) ? assignedResources : [];
+    user.assignedResources = rawResources.map((r: string) => r.trim()).filter((r: string) => r.length > 0);
     user.phoneNumber = phoneNumber;
     user.gender = gender;
     user.dateOfBirth = dateOfBirth;
@@ -1066,12 +1126,16 @@ export const updateUser = async (
       return next(new ErrorHandler("Failed to fetch updated user", 500));
     }
 
+    const cleanResources = (updatedUser.assignedResources || []).map(r => r.trim()).filter(r => r.length > 0);
+    const derivedResources = updatedUser.permissions?.map(p => p.resource.trim()) || [];
+    const finalResources = Array.from(new Set([...cleanResources, ...derivedResources]));
+
     const userData = {
       id: updatedUser.id,
       name: updatedUser.name,
       email: updatedUser.email,
       role: updatedUser.role,
-      assignedResources: updatedUser.assignedResources,
+      assignedResources: finalResources,
       permissions: updatedUser.permissions,
       phoneNumber: updatedUser.phoneNumber,
       gender: updatedUser.gender,
@@ -1244,7 +1308,7 @@ export const deleteUser = async (
           <p>If you believe this was a mistake, please contact support immediately.</p>
         `;
 
-      await sendEmail({
+      sendEmailSafe({
         to: user.email,
         subject: "Account Deletion Notification",
         html: message,
@@ -1324,7 +1388,7 @@ export const resendVerificationEmail = async (
         <p>If you didn't request this verification, please ignore this email.</p>
       `;
 
-    await sendEmail({
+    sendEmailSafe({
       to: email,
       subject: "Verify Your Email Address",
       html: message,
