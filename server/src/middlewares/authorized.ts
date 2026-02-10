@@ -44,6 +44,12 @@ export const authenticateUser: RequestHandler = async (
       );
     }
 
+    if (!user.isLoginEnabled) {
+      return next(
+        new ErrorHandler("Your account has been disabled. Please contact support.", 403)
+      );
+    }
+
     authReq.user = user; // ✅ safe
     next();
   } catch (error) {

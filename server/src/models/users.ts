@@ -89,6 +89,18 @@ export class User {
   @Column({ type: "timestamp", nullable: true })
   resetPasswordExp?: Date;
 
+  @Column({ nullable: true })
+  partnerName?: string;
+
+  @Column({ nullable: true })
+  emergencyContact?: string;
+
+  @Column({ type: "date", nullable: true })
+  joiningDate?: Date;
+
+  @Column({ type: "boolean", default: true })
+  isLoginEnabled!: boolean;
+
   @OneToMany(() => Permission, (permission) => permission.user)
   permissions: Permission[];
 
