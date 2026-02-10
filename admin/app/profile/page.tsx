@@ -65,6 +65,11 @@ const validationSchema = Yup.object({
     dateOfBirth: Yup.date().nullable(),
     address: Yup.string().nullable(),
     country: Yup.string().nullable(),
+    partnerName: Yup.string().nullable(),
+    emergencyContact: Yup.string().matches(
+        /^[+]?[(]?[0-9]{3}[)]?[-\s.]?[0-9]{3}[-\s.]?[0-9]{4,6}$/,
+        "Invalid emergency contact number"
+    ).nullable(),
 });
 
 const ProfilePage = () => {
@@ -81,12 +86,12 @@ const ProfilePage = () => {
         try {
             setLoading(true);
             const response = await getMe();
-            // The api interceptor returns response.data, so response is { success, data: userData }
+
             let userData = null;
             if (response && response.success && response.data) {
                 userData = response.data;
             } else if (response && response.id) {
-                // If it returns userData directly
+
                 userData = response;
             }
 
@@ -99,6 +104,8 @@ const ProfilePage = () => {
                     dateOfBirth: userData.dateOfBirth ? userData.dateOfBirth.split("T")[0] : "",
                     address: userData.address || "",
                     country: userData.country || "",
+                    partnerName: userData.partnerName || "",
+                    emergencyContact: userData.emergencyContact || "",
                 });
                 setAvatarPreview(userData.avatar);
             }
@@ -121,6 +128,8 @@ const ProfilePage = () => {
             dateOfBirth: "",
             address: "",
             country: "",
+            partnerName: "",
+            emergencyContact: "",
         },
         enableReinitialize: true,
         validationSchema,
@@ -201,7 +210,7 @@ const ProfilePage = () => {
 
     return (
         <Box sx={{ maxWidth: "1200px", mx: "auto", px: { xs: 2, md: 4 }, py: 4 }}>
-            {/* Header Section */}
+
             <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 4 }}>
                 <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: "primary.main", color: "white" }}>
                     <User size={28} />
@@ -217,7 +226,7 @@ const ProfilePage = () => {
             </Stack>
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                {/* Left Column - User Summary */}
+
                 <div className="lg:col-span-4">
                     <Paper elevation={0} sx={{ p: 4, borderRadius: 3, border: "1px solid #e0e0e0", textAlign: "center", position: "relative", overflow: "hidden" }}>
                         <Box sx={{ position: "absolute", top: 0, left: 0, right: 0, height: "100px", background: "linear-gradient(45deg, #1976d2 0%, #64b5f6 100%)", opacity: 0.1, zIndex: 0 }} />
@@ -284,11 +293,11 @@ const ProfilePage = () => {
                                         <Typography variant="body2" sx={{ fontWeight: 500 }}>{profileData?.phoneNumber}</Typography>
                                     </Box>
                                 )}
-                                {profileData?.createdAt && (
+                                {(profileData?.joiningDate || profileData?.createdAt) && (
                                     <Box sx={{ display: "flex", alignItems: "center" }}>
                                         <Calendar size={18} style={{ marginRight: 12, color: "#757575" }} />
                                         <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                            Member since {format(new Date(profileData.createdAt), "MMM yyyy")}
+                                            Joined {format(new Date(profileData.joiningDate || profileData.createdAt), "MMM d, yyyy")}
                                         </Typography>
                                     </Box>
                                 )}
@@ -296,7 +305,7 @@ const ProfilePage = () => {
                         </Box>
                     </Paper>
 
-                    {/* Quick Stats or Actions */}
+
                     <Card elevation={0} sx={{ mt: 3, borderRadius: 3, border: "1px solid #e0e0e0" }}>
                         <CardContent>
                             <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 2, display: "flex", alignItems: "center", gap: 1 }}>
@@ -316,7 +325,7 @@ const ProfilePage = () => {
                     </Card>
                 </div>
 
-                {/* Right Column - Tabs/Forms */}
+
                 <div className="lg:col-span-8">
                     <Paper elevation={0} sx={{ borderRadius: 3, border: "1px solid #e0e0e0", overflow: "hidden" }}>
                         <Tabs
@@ -340,7 +349,7 @@ const ProfilePage = () => {
                         </Tabs>
 
                         <Box sx={{ p: { xs: 3, md: 4 } }}>
-                            {/* Personal Info Tab */}
+
                             {tabValue === 0 && (
                                 <form onSubmit={formik.handleSubmit}>
                                     <div className="flex justify-between items-center mb-6">
@@ -427,6 +436,26 @@ const ProfilePage = () => {
                                                 placeholder="Your physical address..."
                                             />
                                         </div>
+                                        <div>
+                                            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>Project Partner Name</Typography>
+                                            <TextField
+                                                fullWidth
+                                                name="partnerName"
+                                                value={formik.values.partnerName}
+                                                onChange={formik.handleChange}
+                                                placeholder="Project Partner Name"
+                                            />
+                                        </div>
+                                        <div>
+                                            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>Emergency Contact</Typography>
+                                            <TextField
+                                                fullWidth
+                                                name="emergencyContact"
+                                                value={formik.values.emergencyContact}
+                                                onChange={formik.handleChange}
+                                                placeholder="Emergency Contact Number"
+                                            />
+                                        </div>
                                     </div>
 
                                     <Box sx={{ mt: 4, display: "flex", justifyContent: "flex-end", gap: 2 }}>
@@ -443,7 +472,7 @@ const ProfilePage = () => {
                                 </form>
                             )}
 
-                            {/* Permissions Tab */}
+
                             {tabValue === 1 && (
                                 <Box>
                                     <Typography variant="h6" sx={{ mb: 3, fontWeight: 700, display: "flex", alignItems: "center", gap: 1 }}>
@@ -467,7 +496,7 @@ const ProfilePage = () => {
                                         </Box>
                                     ) : (
                                         <Stack spacing={4}>
-                                            {/* Assigned Resources Section */}
+
                                             <Box>
                                                 <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 2, display: "flex", alignItems: "center", gap: 1 }}>
                                                     <Building size={16} color="#2e7d32" /> Assigned System Resources
@@ -498,7 +527,7 @@ const ProfilePage = () => {
                                                 )}
                                             </Box>
 
-                                            {/* Granular Permissions Section */}
+
                                             <Box>
                                                 <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 2, display: "flex", alignItems: "center", gap: 1 }}>
                                                     <Lock size={16} color="#1976d2" /> Granular Access Controls
@@ -583,7 +612,7 @@ const ProfilePage = () => {
                                 </Box>
                             )}
 
-                            {/* Account Settings Tab */}
+
                             {tabValue === 2 && (
                                 <Box>
                                     <Typography variant="h6" sx={{ mb: 4, fontWeight: 700 }}>Security & Settings</Typography>

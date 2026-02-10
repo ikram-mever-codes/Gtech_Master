@@ -68,6 +68,10 @@ interface FormValues {
   role: UserRole;
   country: string;
   assignedResources: string[];
+  partnerName: string;
+  emergencyContact: string;
+  joiningDate: string;
+  isLoginEnabled: boolean;
 }
 
 const validationSchema = Yup.object({
@@ -84,6 +88,14 @@ const validationSchema = Yup.object({
   gender: Yup.string().required("Gender is required"),
   role: Yup.string().required("Role is required"),
   country: Yup.string().required("Country is required"),
+  partnerName: Yup.string(),
+  emergencyContact: Yup.string()
+    .matches(
+      /^[+]?[(]?[0-9]{3}[)]?[-\s.]?[0-9]{3}[-\s.]?[0-9]{4,6}$/,
+      "Invalid emergency contact number"
+    ),
+  joiningDate: Yup.date(),
+  isLoginEnabled: Yup.boolean(),
 });
 
 
@@ -147,6 +159,10 @@ const UserUpdatePage: React.FC = () => {
           role: userData.role,
           country: userData.country || "",
           assignedResources: userData.assignedResources || [],
+          partnerName: userData.partnerName || "",
+          emergencyContact: userData.emergencyContact || "",
+          joiningDate: userData.joiningDate?.split("T")[0] || "",
+          isLoginEnabled: userData.isLoginEnabled !== undefined ? userData.isLoginEnabled : true,
         });
 
         const existingPermissions = userData.permissions || [];
@@ -199,6 +215,10 @@ const UserUpdatePage: React.FC = () => {
       role: UserRole.STAFF,
       country: "",
       assignedResources: [],
+      partnerName: "",
+      emergencyContact: "",
+      joiningDate: "",
+      isLoginEnabled: true,
     },
     validationSchema,
     onSubmit: async (values) => {
@@ -280,7 +300,7 @@ const UserUpdatePage: React.FC = () => {
           boxShadow: "0 4px 15px rgba(0, 0, 0, 0.05)",
         }}
       >
-        {/* Header */}
+
         <Box
           sx={{
             p: 3,
@@ -420,6 +440,79 @@ const UserUpdatePage: React.FC = () => {
                 multiline
                 rows={2}
               />
+            </div>
+
+            <div>
+              <FormInput
+                name="partnerName"
+                label="Project Partner"
+                icon={<LucideUser size={20} />}
+                formik={formik}
+                placeholder="Project Partner's name (optional)"
+              />
+            </div>
+
+            <div>
+              <FormInput
+                name="emergencyContact"
+                label="Emergency Contact"
+                icon={<LucidePhone size={20} />}
+                formik={formik}
+                placeholder="+1 (555) 987-6543"
+              />
+            </div>
+
+            <div>
+              <FormInput
+                name="joiningDate"
+                label="Joining Date"
+                type="date"
+                icon={<LucideCalendar size={20} />}
+                formik={formik}
+              />
+            </div>
+
+            <div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-gray-700 block">
+                  Login Access
+                </label>
+                <div className="flex items-center gap-3 p-3 border rounded-lg bg-gray-50">
+                  <LucideLock size={20} className="text-gray-500" />
+                  <div className="flex-1">
+                    <Typography variant="body2" fontWeight={500}>
+                      {formik.values.isLoginEnabled
+                        ? "Login Enabled"
+                        : "Login Disabled"}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {formik.values.isLoginEnabled
+                        ? "User can access the system"
+                        : "User cannot login to the system"}
+                    </Typography>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      formik.setFieldValue(
+                        "isLoginEnabled",
+                        !formik.values.isLoginEnabled
+                      )
+                    }
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${formik.values.isLoginEnabled
+                      ? "bg-green-500"
+                      : "bg-gray-300"
+                      }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${formik.values.isLoginEnabled
+                        ? "translate-x-6"
+                        : "translate-x-1"
+                        }`}
+                    />
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -563,7 +656,7 @@ const UserUpdatePage: React.FC = () => {
           </div>
         </Box>
 
-        {/* Add Resource Dialog */}
+
         <Dialog
           open={showResourceDialog}
           onClose={() => setShowResourceDialog(false)}

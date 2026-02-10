@@ -71,14 +71,18 @@ interface FormValues {
   password: string;
   country: string;
   assignedResources: string[];
+  partnerName: string;
+  emergencyContact: string;
+  joiningDate: string;
+  isLoginEnabled: boolean;
 }
 
-// Updated validation schema - only name, email, and role are required
+
 const validationSchema = Yup.object({
   name: Yup.string().required("Full name is required"),
   email: Yup.string().email("Invalid email").required("Email is required"),
   role: Yup.string().required("Role is required"),
-  // Optional fields - no validation required
+
   phoneNumber: Yup.string().matches(
     /^[+]?[(]?[0-9]{3}[)]?[-\s.]?[0-9]{3}[-\s.]?[0-9]{4,6}$/,
     "Invalid phone number"
@@ -88,13 +92,17 @@ const validationSchema = Yup.object({
   gender: Yup.string(),
   password: Yup.string().min(8, "Password must be at least 8 characters"),
   country: Yup.string(),
+  partnerName: Yup.string(),
+  emergencyContact: Yup.string().matches(
+    /^[+]?[(]?[0-9]{3}[)]?[-\s.]?[0-9]{3}[-\s.]?[0-9]{4,6}$/,
+    "Invalid emergency contact number"
+  ),
+  joiningDate: Yup.date(),
+  isLoginEnabled: Yup.boolean(),
 });
 
-// Expanded resource configuration with descriptions
-// Resource configuration moved to @/utils/resources
 
 
-// Countries list for dropdown
 const countries = [
   "Afghanistan",
   "United States",
@@ -147,6 +155,10 @@ const UserCreatePage: React.FC = () => {
       password: "",
       country: "",
       assignedResources: [],
+      partnerName: "",
+      emergencyContact: "",
+      joiningDate: "",
+      isLoginEnabled: true,
     },
     validationSchema,
     onSubmit: async (values) => {
@@ -163,6 +175,10 @@ const UserCreatePage: React.FC = () => {
           ...(values.gender && { gender: values.gender }),
           ...(values.password && { password: values.password }),
           ...(values.country && { country: values.country }),
+          ...(values.partnerName && { partnerName: values.partnerName }),
+          ...(values.emergencyContact && { emergencyContact: values.emergencyContact }),
+          ...(values.joiningDate && { joiningDate: values.joiningDate }),
+          isLoginEnabled: values.isLoginEnabled,
           assignedResources: permissions.map((p) => p.resource),
           permissions: permissions.map((p) => ({
             resource: p.resource,
@@ -183,7 +199,7 @@ const UserCreatePage: React.FC = () => {
   });
 
   const handleAddResource = (resourceName: string): void => {
-    // Add to form's assignedResources
+
     if (!permissions.some((p) => p.resource === resourceName)) {
       setPermissions((prev) => [
         ...prev,
@@ -212,7 +228,7 @@ const UserCreatePage: React.FC = () => {
     );
   };
 
-  // Generate a random password
+
   const generateRandomPassword = (): void => {
     const chars =
       "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*";
@@ -223,7 +239,7 @@ const UserCreatePage: React.FC = () => {
     formik.setFieldValue("password", password);
   };
 
-  // Handle alert close
+
   const handleAlertClose = (): void => {
     setAlertInfo({ ...alertInfo, show: false });
   };
@@ -240,7 +256,7 @@ const UserCreatePage: React.FC = () => {
           boxShadow: "0 4px 15px rgba(0, 0, 0, 0.05)",
         }}
       >
-        {/* Header */}
+
         <Box
           sx={{
             p: 3,
@@ -289,7 +305,7 @@ const UserCreatePage: React.FC = () => {
         </Box>
 
         <Box component="form" onSubmit={formik.handleSubmit} sx={{ p: 3 }}>
-          {/* Required Fields Section */}
+
           <div className="mb-6">
             <div className="flex items-center gap-3 mb-4">
               <div className="text-primary-main bg-primary-50 p-2 rounded-lg">
@@ -348,7 +364,7 @@ const UserCreatePage: React.FC = () => {
             </div>
           </div>
 
-          {/* Optional Fields Collapsible Section */}
+
           <div className="mb-6">
             <button
               type="button"
@@ -464,11 +480,84 @@ const UserCreatePage: React.FC = () => {
                     rows={2}
                   />
                 </div>
+
+                <div>
+                  <FormInput
+                    name="partnerName"
+                    label="Project Partner"
+                    icon={<LucideUser size={20} />}
+                    formik={formik}
+                    placeholder="Project Partner's name (optional)"
+                  />
+                </div>
+
+                <div>
+                  <FormInput
+                    name="emergencyContact"
+                    label="Emergency Contact"
+                    icon={<LucidePhone size={20} />}
+                    formik={formik}
+                    placeholder="+1 (555) 987-6543"
+                  />
+                </div>
+
+                <div>
+                  <FormInput
+                    name="joiningDate"
+                    label="Joining Date"
+                    type="date"
+                    icon={<LucideCalendar size={20} />}
+                    formik={formik}
+                  />
+                </div>
+
+                <div>
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium text-gray-700 block">
+                      Login Access
+                    </label>
+                    <div className="flex items-center gap-3 p-3 border rounded-lg bg-white">
+                      <LucideLock size={20} className="text-gray-500" />
+                      <div className="flex-1">
+                        <Typography variant="body2" fontWeight={500}>
+                          {formik.values.isLoginEnabled
+                            ? "Login Enabled"
+                            : "Login Disabled"}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {formik.values.isLoginEnabled
+                            ? "User can access the system"
+                            : "User cannot login to the system"}
+                        </Typography>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          formik.setFieldValue(
+                            "isLoginEnabled",
+                            !formik.values.isLoginEnabled
+                          )
+                        }
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${formik.values.isLoginEnabled
+                          ? "bg-green-500"
+                          : "bg-gray-300"
+                          }`}
+                      >
+                        <span
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${formik.values.isLoginEnabled
+                            ? "translate-x-6"
+                            : "translate-x-1"
+                            }`}
+                        />
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
             </Collapse>
           </div>
 
-          {/* Beautiful Divider */}
+
           <div className="relative py-4">
             <div className="absolute inset-0 flex items-center">
               <div className="w-full border-t border-indigo-100"></div>
@@ -480,7 +569,7 @@ const UserCreatePage: React.FC = () => {
             </div>
           </div>
 
-          {/* Access Permissions Section */}
+
           <div className="mb-6">
             <div className="flex items-center gap-3 mb-4">
               <div className="text-primary-main bg-primary-50 p-2 rounded-lg">
@@ -595,7 +684,7 @@ const UserCreatePage: React.FC = () => {
             )}
           </div>
 
-          {/* Submit Button */}
+
           <div className="border-t border-indigo-100 pt-6 mt-6 flex justify-end">
             <CustomButton
               type="submit"

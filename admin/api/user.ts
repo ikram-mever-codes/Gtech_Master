@@ -125,6 +125,10 @@ interface CreateUserPayload {
   dateOfBirth?: string;
   address?: string;
   country: string;
+  partnerName?: string;
+  emergencyContact?: string;
+  joiningDate?: string;
+  isLoginEnabled?: boolean;
 }
 
 export const createNewUser = async (userData: CreateUserPayload) => {
@@ -146,6 +150,9 @@ interface UpdateProfilePayload {
   gender?: string;
   dateOfBirth?: Date;
   address?: string;
+  country?: string;
+  partnerName?: string;
+  emergencyContact?: string;
   avatar?: File;
 }
 
@@ -193,11 +200,14 @@ export const prepareProfileFormData = (
   const formData = new FormData();
 
   if (data.name) formData.append("name", data.name);
-  if (data.phoneNumber) formData.append("phoneNumber", data.phoneNumber);
-  if (data.gender) formData.append("gender", data.gender);
+  if (data.phoneNumber !== undefined) formData.append("phoneNumber", data.phoneNumber);
+  if (data.gender !== undefined) formData.append("gender", data.gender);
   if (data.dateOfBirth)
     formData.append("dateOfBirth", data.dateOfBirth.toISOString());
-  if (data.address) formData.append("address", data.address);
+  if (data.address !== undefined) formData.append("address", data.address);
+  if (data.country !== undefined) formData.append("country", data.country);
+  if (data.partnerName !== undefined) formData.append("partnerName", data.partnerName);
+  if (data.emergencyContact !== undefined) formData.append("emergencyContact", data.emergencyContact);
   if (data.avatar) formData.append("avatar", data.avatar);
 
   return formData;
