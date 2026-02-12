@@ -337,24 +337,20 @@ const CombinedInquiriesPage: React.FC = () => {
     termsConditions: "",
     projectLink: "",
     assemblyInstructions: "",
-    // New dimension fields
     weight: undefined,
     width: undefined,
     height: undefined,
     length: undefined,
-    // New shipping fields
     isFragile: false,
     requiresSpecialHandling: false,
     handlingInstructions: "",
     numberOfPackages: undefined,
     packageType: "",
-    // Purchase price fields
     purchasePrice: undefined,
     purchasePriceCurrency: "RMB" as "RMB" | "HKD" | "EUR" | "USD",
     requests: [],
   });
 
-  // Form state for requested items (standalone) with dimension fields
   const [requestItemFormData, setRequestItemFormData] =
     useState<RequestedItemCreatePayload>({
       businessId: "",
@@ -373,18 +369,15 @@ const CombinedInquiriesPage: React.FC = () => {
       requestStatus: "Open",
       comment: "",
       asanaLink: "",
-      // New dimension fields
       weight: undefined,
       width: undefined,
       height: undefined,
       length: undefined,
-      // Purchase price fields
       purchasePrice: undefined,
       currency: "RMB" as "RMB" | "HKD" | "EUR" | "USD",
       inquiryId: undefined,
     });
 
-  // Multiple requests for inquiry creation with dimension fields
   const [inquiryRequests, setInquiryRequests] = useState<
     Array<{
       itemName: string;
@@ -396,7 +389,6 @@ const CombinedInquiriesPage: React.FC = () => {
       material: string;
       specifications: string;
       images?: string[];
-      // New dimension fields
       weight?: number;
       width?: number;
       height?: number;
