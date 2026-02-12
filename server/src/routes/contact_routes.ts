@@ -23,10 +23,8 @@ const router: any = Router();
 
 router.use(authenticateUser);
 
-// Restricted to Admin and Sales
 router.use(authorize(UserRole.SALES));
 
-// Contact Person CRUD Operations
 router.post("/", createContactPerson);
 router.get("/", getAllContactPersons);
 router.get("/statistics", getContactPersonStatistics);
@@ -49,12 +47,10 @@ router.post(
   quickAddContactPerson
 );
 
-// Bulk Operations
 router.post("/bulk-import", bulkImportContactPersons);
 router.post("/bulk-delete", bulkDeleteContactPersons);
 router.post("/bulk-update-linkedin-state", bulkUpdateLinkedInState);
 
-// Get Contact Persons by Star Business
 router.get(
   "/star-business/:starBusinessDetailsId",
   getContactPersonsByStarBusiness

@@ -132,21 +132,43 @@ export const createContactPerson = async (
       AppDataSource.getRepository(StarBusinessDetails);
 
     // Verify star business exists
-    const starBusinessDetails = await starBusinessDetailsRepository.findOne({
+    let starBusinessDetails = await starBusinessDetailsRepository.findOne({
       where: { id: starBusinessDetailsId },
       relations: ["customer"],
     });
 
     if (!starBusinessDetails) {
-      return next(new ErrorHandler("Star business not found", 404));
+      const customerRepository = AppDataSource.getRepository(Customer);
+      const customer = await customerRepository.findOne({
+        where: { id: starBusinessDetailsId },
+        relations: ["starBusinessDetails"],
+      });
+
+      if (customer) {
+        if (customer.starBusinessDetails) {
+          starBusinessDetails = customer.starBusinessDetails;
+        } else {
+          if (["star_business", "star_customer"].includes(customer.stage)) {
+            starBusinessDetails = starBusinessDetailsRepository.create({
+              customer: customer,
+            });
+            await starBusinessDetailsRepository.save(starBusinessDetails);
+          }
+        }
+      }
     }
 
-    // Check for duplicate contact person
+    if (!starBusinessDetails) {
+      return next(new ErrorHandler("Star business or customer not found", 404));
+    }
+
+    const actualStarBusinessDetailsId = starBusinessDetails.id;
+
     if (email) {
       const existingContactByEmail = await contactPersonRepository.findOne({
         where: {
           email: email.toLowerCase(),
-          starBusinessDetailsId,
+          starBusinessDetailsId: actualStarBusinessDetailsId,
         },
       });
 
@@ -160,7 +182,6 @@ export const createContactPerson = async (
       }
     }
 
-    // Create new contact person
     const contactPerson = new ContactPerson();
     contactPerson.sex = sanitizeSex(sex);
     contactPerson.starBusinessDetailsId = starBusinessDetailsId;
@@ -192,7 +213,6 @@ export const createContactPerson = async (
     contactPerson.stateLinkedIn = sanitizeLinkedInState(stateLinkedIn);
     contactPerson.contact = sanitizeContactType(contact);
 
-    // Add decisionMakerState handling
     if (decisionMakerState !== undefined) {
       contactPerson.decisionMakerState =
         sanitizeDecisionMakerState(decisionMakerState);
@@ -207,7 +227,6 @@ export const createContactPerson = async (
       // Set isDecisionMaker based on contact type first
       setDecisionMakerFromContactType(contactPerson);
 
-      // Only allow decisionMakerNote if the person is a decision maker
       if (contactPerson.isDecisionMaker) {
         contactPerson.decisionMakerNote = decisionMakerNote.trim();
       } else {
@@ -1692,8 +1711,10 @@ export const getAllStarBusinesses = async (
 
     const formattedRecords = await Promise.all(
       starRecords.map(async (record) => {
+        const id = record.starBusinessDetails?.id || record.id;
+        console.log(`[DEBUG] Mapping customer ${record.companyName}: id=${id}, record.id=${record.id}, starBusinessDetails.id=${record.starBusinessDetails?.id}`);
         const baseData = {
-          id: record.starBusinessDetails?.id,
+          id: id,
           customerId: record.id,
           companyName: record.companyName,
           legalName: record.legalName,
