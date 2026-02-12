@@ -6,10 +6,8 @@ import { UserRole } from "../models/users";
 const router: any = Router();
 const inquiryController = new InquiryController();
 
-// Apply authentication to all inquiry routes
 router.use(authenticateUser);
 
-// Inquiry routes - Restricted to Admin, Sales, and Purchasing
 router.get(
   "/",
   authorize(UserRole.SALES, UserRole.PURCHASING),
@@ -47,14 +45,11 @@ router.post(
   inquiryController.convertRequestToItem.bind(inquiryController)
 );
 
-// Customer-specific inquiries
 router.get(
   "/customer/:customerId",
-  authorize(UserRole.SALES), // Restricted to Sales only for customer identity
+  authorize(UserRole.SALES),
   inquiryController.getInquiriesByCustomer.bind(inquiryController)
 );
-
-// Request management within inquiries
 router.post(
   "/:id/requests",
   authorize(UserRole.SALES, UserRole.PURCHASING),
