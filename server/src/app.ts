@@ -33,16 +33,13 @@ const corsOptions = {
   ],
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
-  allowedHeaders: ["Content-Type", "Authorization"],
+  allowedHeaders: ["Content-Type", "Authorization", "Cache-Control", "Pragma", "Expires"],
 };
 
-// Middleware
 app.use(express.json());
 app.use(cookieParser());
 app.use(express.urlencoded({ extended: true }));
 app.use(cors(corsOptions));
-
-// Coniguring Api Routes
 
 app.use("/api/v1/auth", userRoutes);
 app.use("/api/v1/contacts", contactRoutes);
@@ -58,7 +55,6 @@ app.use("/api/v1/inquiries", inquiryRoutes);
 app.use("/api/v1/offers", offerRoutes);
 app.use("/api/v1/orders", orderRoutes);
 app.use("/api/v1/categories", qtyRoutes);
-// Configuring the Uploads Dir
 
 const __uploads_dirname = path.resolve();
 app.use("/uploads", express.static(path.join(__uploads_dirname, "/uploads")));

@@ -1238,7 +1238,6 @@ export const deleteContactPerson = async (
   }
 };
 
-// 7. Bulk Delete Contact Persons
 export const bulkDeleteContactPersons = async (
   req: Request,
   res: Response,
