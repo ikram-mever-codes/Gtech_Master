@@ -57,7 +57,7 @@ type ItemSelectorProps = {
 };
 
 type OrdersTableProps = {
-  orders: any[];
+  orders: Order[];
   loading: boolean;
   getCategoryName: (id: any) => string;
   getOrderStatusColor: (status: any) => string;
@@ -555,7 +555,7 @@ const OrderPage = () => {
     if (isTab1 && category_id) await fetchItemsByCategory(category_id);
     else setItemsByCategory([]);
 
-    const detailRes: any = await getOrderById(String(order.id));
+    const detailRes: any = await getOrderById(order.id);
     const detail = detailRes?.data ?? detailRes;
     const lines = detail?.items ?? detail?.data?.items ?? [];
 
@@ -577,7 +577,6 @@ const OrderPage = () => {
     }
   };
 
-  // Convert opens same modal but locks everything except qty (and remark in tab2 only)
   const openConvert = async (order: Order) => {
     setMode("convert");
     setSelectedOrder(order);
@@ -590,7 +589,7 @@ const OrderPage = () => {
       status: String(order.status ?? ""),
     });
 
-    const detailRes: any = await getOrderById(String(order.id));
+    const detailRes: any = await getOrderById(order.id);
     const detail = detailRes?.data ?? detailRes;
     const lines = detail?.items ?? detail?.data?.items ?? [];
 
@@ -617,13 +616,12 @@ const OrderPage = () => {
     resetForm();
   };
 
-  // ✅ View modal open/close
   const openView = async (order: Order) => {
     setViewOrder(order);
     setShowViewModal(true);
 
     try {
-      const detailRes: any = await getOrderById(String(order.id));
+      const detailRes: any = await getOrderById(order.id);
       const detail = detailRes?.data ?? detailRes;
       const lines = detail?.items ?? detail?.data?.items ?? [];
 
@@ -656,7 +654,6 @@ const OrderPage = () => {
     setViewItems([]);
   };
 
-  // -------------------- Actions --------------------
   const handleCreateOrder = async () => {
     if (!form.comment?.trim()) return toast.error("Please add a comment");
     if (orderItems.length === 0) return toast.error("Please add at least one item");
@@ -697,25 +694,21 @@ const OrderPage = () => {
       })),
     };
 
-    await updateOrder(String(selectedOrder.id), payload);
+    await updateOrder(selectedOrder.id, payload);
     setShowModal(false);
     resetForm();
     fetchOrders();
   };
 
-  // REAL CONVERT:
-  // 1) create new order with customer_id=null (normal order)
-  // 2) update old customer order status to 4 (Converted)
   const handleConvertOrder = async () => {
     if (!selectedOrder?.id) return;
     if (orderItems.length === 0) return toast.error("No items to convert");
 
-    const originalId = String(selectedOrder.id);
+    const originalId = selectedOrder.id;
     const originalOrderNo = String(selectedOrder.order_no || "");
     const category_id = selectedOrder.category_id ?? form.category_id ?? null;
 
     try {
-      // 1) create new "Order" (no customer_id)
       const createPayload = {
         customer_id: null,
         category_id: category_id ? String(category_id) : null,
@@ -732,7 +725,6 @@ const OrderPage = () => {
       const newOrderNo =
         created?.data?.order_no || created?.data?.data?.order_no || created?.order_no || "";
 
-      // 2) mark original customer order as Converted (status=4)
       const marker = newOrderNo ? ` | Converted to ${newOrderNo}` : ` | Converted`;
       const nextComment = ((selectedOrder.comment ?? "") + marker).slice(0, 200);
 
@@ -809,7 +801,6 @@ const OrderPage = () => {
     ),
   };
 
-  // lock rules in convert mode: only qty editable (+ remark editable in tab2)
   const lockAllExceptQty = isConvertMode;
 
   return (
@@ -852,18 +843,17 @@ const OrderPage = () => {
               loading={loadingOrders}
               getCategoryName={getCategoryName}
               getOrderStatusColor={getOrderStatusColor}
-              onView={openView} // ✅ FIXED
+              onView={openView}
               onEdit={openEdit}
               onDelete={handleDeleteOrder}
               canDelete={user?.role === UserRole.ADMIN}
-              showConvert={activeTab === "tab2"} // ✅ only tab2
+              showConvert={activeTab === "tab2"}
               onConvert={openConvert}
             />
           </div>
         </div>
       </div>
 
-      {/* -------------------- VIEW MODAL -------------------- */}
       {showViewModal && viewOrder && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
@@ -959,7 +949,6 @@ const OrderPage = () => {
         </div>
       )}
 
-      {/* -------------------- CREATE / EDIT / CONVERT MODAL -------------------- */}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
@@ -1084,7 +1073,6 @@ const OrderPage = () => {
                             <td className="px-4 py-2 text-sm text-gray-700 border-b">{row.item_id}</td>
                             <td className="px-4 py-2 text-sm text-gray-700 border-b">{row.itemName}</td>
 
-                            {/*  qty always editable (even convert mode) */}
                             <td className="px-4 py-2 text-sm text-gray-700 border-b">
                               <input
                                 type="number"
@@ -1097,7 +1085,6 @@ const OrderPage = () => {
                               />
                             </td>
 
-                            {/* Item remark editable only in convert + tab2 */}
                             <td className="px-4 py-2 text-sm text-gray-700 border-b">
                               <input
                                 type="text"

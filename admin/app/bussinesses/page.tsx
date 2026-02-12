@@ -398,8 +398,8 @@ const BusinessSearchPage: React.FC = () => {
             <button
               onClick={() => setShowFilters(!showFilters)}
               className={`px-4 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2 ${showFilters
-                  ? "bg-primary text-white"
-                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                ? "bg-primary text-white"
+                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                 }`}
             >
               <FunnelIcon className="w-5 h-5" />
@@ -790,7 +790,7 @@ const BusinessSearchPage: React.FC = () => {
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                         Device Maker
-                      </th>{" "}
+                      </th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                         Check Date+ Time
                       </th>
@@ -799,11 +799,11 @@ const BusinessSearchPage: React.FC = () => {
                       </th>
                       {/* Add Stage Column */}
                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                        Tags{" "}
+                        Tags
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                         Added On
-                      </th>{" "}
+                      </th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                         Actions
                       </th>
@@ -909,7 +909,7 @@ const BusinessSearchPage: React.FC = () => {
                             );
                           }}
                         >
-                          {business.isDeviceMaker}{" "}
+                          {business.isDeviceMaker}
                         </td>
                         <td
                           className="px-4 py-3 cursor-pointer"

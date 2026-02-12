@@ -48,10 +48,7 @@ import { useSelector } from "react-redux";
 import { UserRole } from "@/utils/interfaces";
 import Link from "next/link";
 
-// Tab type
 type TabType = "all" | "no-contacts" | "sales";
-
-// Modal mode type
 type ModalMode = "create" | "edit";
 
 interface ContactFormData {
@@ -69,14 +66,13 @@ interface ContactFormData {
   decisionMakerState: string;
   note: string;
   noteContactPreference: string;
-  decisionMakerNote: string; // NEW FIELD
+  decisionMakerNote: string;
 }
 
 const ContactPersonsPage: React.FC = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // State management
   const [activeTab, setActiveTab] = useState<TabType>("no-contacts");
   const [contactPersons, setContactPersons] = useState<ContactPersonData[]>([]);
   const [decisionMakers, setDecisionMakers] = useState<ContactPersonData[]>([]);
@@ -240,6 +236,7 @@ const ContactPersonsPage: React.FC = () => {
   const fetchAllStarBusinesses = async (search?: string) => {
     try {
       const businesses = await fetchStarBusinessesForDropdown(search);
+      console.log("[DEBUG] allStarBusinesses from API:", businesses);
       setAllStarBusinesses(businesses);
     } catch (error) {
       console.error("Error fetching star businesses:", error);
@@ -469,14 +466,25 @@ const ContactPersonsPage: React.FC = () => {
     }
   };
 
-  // Handle create/edit contact submission
   const handleCreateContact = async () => {
+    console.log("=== CREATE CONTACT DEBUG ===");
+    console.log("selectedBusiness:", selectedBusiness);
+    console.log("createForm.starBusinessDetailsId:", createForm.starBusinessDetailsId);
+
     if (!createForm.name || !createForm.familyName || !createForm.position) {
       toast.error("Please fill in all required fields");
       return;
     }
 
-    if (!selectedBusiness?.id && !createForm.starBusinessDetailsId) {
+    const businessId = typeof selectedBusiness === 'string'
+      ? selectedBusiness
+      : selectedBusiness?.id || selectedBusiness?.value;
+
+    console.log("businessId extracted:", businessId);
+    console.log("typeof selectedBusiness:", typeof selectedBusiness);
+
+    if (!businessId && !createForm.starBusinessDetailsId) {
+      console.log("VALIDATION FAILED: No business selected");
       toast.error("Please select a business");
       return;
     }
@@ -489,9 +497,10 @@ const ContactPersonsPage: React.FC = () => {
     try {
       const payload: any = {
         ...createForm,
-        starBusinessDetailsId:
-          selectedBusiness?.id || createForm.starBusinessDetailsId,
+        starBusinessDetailsId: businessId || createForm.starBusinessDetailsId,
       };
+
+      console.log("Payload to send:", payload);
 
       if (modalMode === "edit" && editingContactId) {
         await updateContactPerson(editingContactId, payload);
@@ -755,7 +764,6 @@ const ContactPersonsPage: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Filter Panel */}
                 {showFilters && (
                   <div className="mt-6 pt-6 border-t border-gray-200/50">
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -876,7 +884,6 @@ const ContactPersonsPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Contacts Table */}
             <div className="bg-white/80 backdrop-blur-sm rounded-xl shadow-lg border border-gray-100/50 overflow-hidden">
               {loading ? (
                 <div className="p-12 text-center">
@@ -1674,15 +1681,16 @@ const ContactPersonsPage: React.FC = () => {
                         />
                         {allStarBusinesses.length > 0 && (
                           <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto z-10">
-                            {allStarBusinesses.map((business) => (
+                            {allStarBusinesses.map((business, index) => (
                               <button
-                                key={business.id || business.value}
+                                key={business.value || business.id || `business-${index}`}
                                 onClick={() => {
+                                  console.log("[DEBUG] Selected business from dropdown:", business);
                                   setSelectedBusiness(business);
                                   setCreateForm({
                                     ...createForm,
                                     starBusinessDetailsId:
-                                      business.id || business.value,
+                                      business.value || business.id,
                                   });
                                   setBusinessSearchTerm("");
                                 }}
