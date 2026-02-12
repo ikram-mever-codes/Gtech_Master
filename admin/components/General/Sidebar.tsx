@@ -56,7 +56,6 @@ import { usePathname } from "next/navigation";
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useDispatch, useSelector } from "react-redux";
 
-// Define all possible menu items and their required resources
 const allMenuItems = [
   {
     icon: LucideHome,
@@ -80,7 +79,7 @@ const allMenuItems = [
     icon: Timer,
     text: "Scheduled Items",
     path: "/scheduled",
-    resource: "Users",
+    resource: "Scheduled Items",
   },
   {
     icon: BusinessCenterSharp,
@@ -98,13 +97,13 @@ const allMenuItems = [
     icon: PackageSearchIcon,
     text: "Inquiries & Requests",
     path: "/inquiry",
-    resource: "inquiries",
+    resource: "Inquiries",
   },
   {
     icon: BoxesIcon,
     text: "Offers",
     path: "/offers",
-    resource: "offers",
+    resource: "Offers",
   },
   {
     icon: DollarSign,
@@ -118,11 +117,17 @@ const allMenuItems = [
     path: "/library",
     resource: "Library",
   },
-    {
+  {
     icon: LucideFileText,
     text: "Orders",
     path: "/orders",
     resource: "Orders",
+  },
+  {
+    icon: Person,
+    text: "Customers",
+    path: "/customers",
+    resource: "Customers",
   },
 ];
 
@@ -142,9 +147,16 @@ const Sidebar = () => {
   const menuContainerRef = useRef<HTMLDivElement>(null);
   const menuContentRef = useRef<HTMLDivElement>(null);
 
-  // Filter menu items based on user role and assigned resources
   const menuItems = useMemo(() => {
-    return allMenuItems;
+    if (!user || user.role === "ADMIN") {
+      return allMenuItems;
+    }
+    const userResources = user.assignedResources || [];
+
+    return allMenuItems.filter((item) => {
+      if (item.resource === "Dashboard") return true;
+      return userResources.includes(item.resource);
+    });
   }, [user]);
 
   const handleDrawerToggle = () => {
@@ -155,7 +167,6 @@ const Sidebar = () => {
     await logoutUser(dispatch);
   };
 
-  // Check scroll position and update arrow visibility
   const updateScrollButtons = useCallback(() => {
     if (menuContainerRef.current && menuContentRef.current) {
       const container = menuContainerRef.current;
@@ -171,38 +182,33 @@ const Sidebar = () => {
     }
   }, []);
 
-  // Handle scroll up
   const scrollUp = () => {
     if (menuContainerRef.current) {
       menuContainerRef.current.scrollBy({ top: -100, behavior: "smooth" });
     }
   };
 
-  // Handle scroll down
   const scrollDown = () => {
     if (menuContainerRef.current) {
       menuContainerRef.current.scrollBy({ top: 100, behavior: "smooth" });
     }
   };
 
-  // Update scroll buttons on resize and menu items change
   useEffect(() => {
     updateScrollButtons();
     const handleResize = () => {
-      setTimeout(updateScrollButtons, 100); // Small delay to ensure DOM is updated
+      setTimeout(updateScrollButtons, 100);
     };
 
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, [updateScrollButtons, menuItems, isCollapsed]);
 
-  // Update scroll buttons when sidebar state changes
   useEffect(() => {
     const timer = setTimeout(updateScrollButtons, 150);
     return () => clearTimeout(timer);
   }, [isCollapsed, updateScrollButtons]);
 
-  // Handle scroll events
   const handleScroll = () => {
     updateScrollButtons();
   };
@@ -311,7 +317,6 @@ const Sidebar = () => {
           </Box>
         </Fade>
 
-        {/* Scrollable Menu Container */}
         <Box
           ref={menuContainerRef}
           onScroll={handleScroll}
@@ -319,22 +324,19 @@ const Sidebar = () => {
             flex: 1,
             overflowY: "auto",
             overflowX: "hidden",
-            // Hide scrollbar for all browsers
-            scrollbarWidth: "none", // Firefox
+            scrollbarWidth: "none",
             "&::-webkit-scrollbar": {
-              display: "none", // Chrome, Safari, Edge
+              display: "none",
             },
-            // Hide scrollbar for IE/Edge
             msOverflowStyle: "none",
           }}
         >
-          {/* Menu Content */}
           <Box
             ref={menuContentRef}
             sx={{
               width: "100%",
               px: 1,
-              pb: 1, // Padding at bottom for better scroll end visibility
+              pb: 1,
             }}
           >
             {menuItems.map((item) => (
@@ -372,7 +374,7 @@ const Sidebar = () => {
                       height: "100%",
                       width:
                         activePath === item.path ||
-                        activePath.includes(item.path)
+                          activePath.includes(item.path)
                           ? "3px"
                           : 0,
                       backgroundColor: "primary.main",
@@ -385,7 +387,7 @@ const Sidebar = () => {
                       minWidth: 40,
                       color:
                         activePath === item.path ||
-                        activePath.includes(item.path)
+                          activePath.includes(item.path)
                           ? "white"
                           : "text.secondary",
                       transition: "color 0.2s ease",
@@ -410,7 +412,6 @@ const Sidebar = () => {
             ))}
           </Box>
         </Box>
-        {/* Scroll Down Button - Only shows when needed */}
         <Fade in={hasOverflow && showScrollDown}>
           <Box
             sx={{

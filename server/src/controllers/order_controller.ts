@@ -5,11 +5,6 @@ import { AppDataSource } from "../config/database";
 import { Order } from "../models/orders";
 import { OrderItem } from "../models/order_items";
 
-// ────────────────────────────────────────────────
-//              ORDER MANAGEMENT
-// ────────────────────────────────────────────────
-
-// DE0001, DE0002...
 const padorder_no = (n: number) => `MA${String(n).padStart(4, "0")}`;
 
 const parseorder_noNumber = (order_no: string) => {
@@ -32,7 +27,7 @@ export const createOrder = async (req: Request, res: Response, next: NextFunctio
       customer_id,
       status,
       comment,
-      items, // REQUIRED: [{ item_id, qty, remark_de? }]
+      items,
     } = req.body;
 
     if (!Array.isArray(items) || items.length === 0) {
@@ -42,7 +37,6 @@ export const createOrder = async (req: Request, res: Response, next: NextFunctio
     const orderRepo = queryRunner.manager.getRepository(Order);
     const orderItemsRepo = queryRunner.manager.getRepository(OrderItem);
 
-    // Generate next order_no safely (lock inside transaction)
     const lastOrder = await orderRepo
       .createQueryBuilder("o")
       .setLock("pessimistic_write")
@@ -58,7 +52,6 @@ export const createOrder = async (req: Request, res: Response, next: NextFunctio
 
     const generatedorder_no = padorder_no(nextNumber);
 
-    // Create order header
     const order = orderRepo.create({
       order_no: generatedorder_no,
       category_id: category_id || null,
@@ -71,7 +64,6 @@ export const createOrder = async (req: Request, res: Response, next: NextFunctio
 
     await orderRepo.save(order);
 
-    // Create order item lines
     const lines = items.map((it: any) => {
       const item_id = Number(it.item_id);
       const qty = Number(it.qty);
@@ -121,12 +113,12 @@ export const createOrder = async (req: Request, res: Response, next: NextFunctio
   } catch (error) {
     try {
       await queryRunner.rollbackTransaction();
-    } catch {}
+    } catch { }
     return next(error);
   } finally {
     try {
       await queryRunner.release();
-    } catch {}
+    } catch { }
   }
 };
 
@@ -148,14 +140,12 @@ export const updateOrder = async (req: Request, res: Response, next: NextFunctio
     const order = await orderRepo.findOne({ where: { id: Number(orderId) } });
     if (!order) return next(new ErrorHandler("Order not found", 404));
 
-    // order_no OPTIONAL; if provided validate uniqueness
     if (typeof order_no === "string" && order_no.trim() && order_no.trim() !== order.order_no) {
       const existing = await orderRepo.findOne({ where: { order_no: order_no.trim() } });
       if (existing) return next(new ErrorHandler("Order number already exists", 400));
       order.order_no = order_no.trim();
     }
 
-    // Update header fields if provided
     if (category_id !== undefined) order.category_id = category_id || null;
     if (customer_id !== undefined) (order as any).customer_id = customer_id || null;
     if (status !== undefined) order.status = status ?? order.status;
@@ -164,11 +154,9 @@ export const updateOrder = async (req: Request, res: Response, next: NextFunctio
 
     await orderRepo.save(order);
 
-    // Optional: replace item lines
     if (Array.isArray(items)) {
       if (items.length === 0) return next(new ErrorHandler("items[] cannot be empty when provided", 400));
 
-      // delete existing lines
       await orderItemsRepo
         .createQueryBuilder()
         .delete()
@@ -225,12 +213,12 @@ export const updateOrder = async (req: Request, res: Response, next: NextFunctio
   } catch (error) {
     try {
       await queryRunner.rollbackTransaction();
-    } catch {}
+    } catch { }
     return next(error);
   } finally {
     try {
       await queryRunner.release();
-    } catch {}
+    } catch { }
   }
 };
 
@@ -337,11 +325,11 @@ export const deleteOrder = async (req: Request, res: Response, next: NextFunctio
   } catch (error) {
     try {
       await queryRunner.rollbackTransaction();
-    } catch {}
+    } catch { }
     return next(error);
   } finally {
     try {
       await queryRunner.release();
-    } catch {}
+    } catch { }
   }
 };

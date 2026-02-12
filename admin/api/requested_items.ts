@@ -4,7 +4,6 @@ import { api, handleApiError } from "../utils/api";
 import { loadingStyles, successStyles } from "@/utils/constants";
 import { ResponseInterface } from "@/utils/interfaces";
 
-// Types
 export type Interval =
   | "Monatlich"
   | "2 monatlich"
@@ -166,9 +165,6 @@ export interface RequestedItemsStatistics {
   recentItems: number;
 }
 
-// ======================== CRUD Operations ========================
-
-// Create requested item
 export const createRequestedItem = async (
   itemData: RequestedItemCreatePayload
 ) => {
@@ -184,7 +180,6 @@ export const createRequestedItem = async (
   }
 };
 
-// Get all requested items with pagination and filtering
 export const getAllRequestedItems = async (
   filters: RequestedItemsSearchFilters = {}
 ) => {
@@ -205,7 +200,6 @@ export const getAllRequestedItems = async (
   }
 };
 
-// Get requested item by ID
 export const getRequestedItemById = async (id: string) => {
   try {
     const response = await api.get(`/requested-items/${id}`);
@@ -216,7 +210,6 @@ export const getRequestedItemById = async (id: string) => {
   }
 };
 
-// Update requested item
 export const updateRequestedItem = async (
   id: string,
   updateData: RequestedItemUpdatePayload
@@ -233,13 +226,8 @@ export const updateRequestedItem = async (
   }
 };
 
-// Delete requested item
 export const deleteRequestedItem = async (id: string) => {
   try {
-    const cfs = window.confirm(
-      "Are you sure you want to delete this requested item?"
-    );
-    if (!cfs) return;
     toast.loading("Deleting requested item...", loadingStyles);
     const response = await api.delete(`/requested-items/${id}`);
     toast.dismiss();
@@ -251,9 +239,6 @@ export const deleteRequestedItem = async (id: string) => {
   }
 };
 
-// ======================== Business-specific Operations ========================
-
-// Get requested items by business
 export const getRequestedItemsByBusiness = async (
   businessId: string,
   filters: Omit<RequestedItemsSearchFilters, "businessId"> = {}
@@ -277,9 +262,6 @@ export const getRequestedItemsByBusiness = async (
   }
 };
 
-// ======================== Bulk Operations ========================
-
-// Bulk delete requested items
 export const bulkDeleteRequestedItems = async (
   payload: BulkRequestedItemsOperationPayload
 ) => {
@@ -301,7 +283,6 @@ export const bulkDeleteRequestedItems = async (
   }
 };
 
-// Bulk update requested items status
 export const bulkUpdateRequestedItemsStatus = async (
   payload: BulkStatusUpdatePayload
 ) => {
@@ -326,7 +307,6 @@ export const bulkUpdateRequestedItemsStatus = async (
   }
 };
 
-// Bulk update requested items priority
 export const bulkUpdateRequestedItemsPriority = async (
   payload: BulkPriorityUpdatePayload
 ) => {
@@ -351,9 +331,6 @@ export const bulkUpdateRequestedItemsPriority = async (
   }
 };
 
-// ======================== Statistics and Analytics ========================
-
-// Get requested items statistics
 export const getRequestedItemsStatistics = async (): Promise<{
   data: RequestedItemsStatistics;
 }> => {
@@ -366,7 +343,6 @@ export const getRequestedItemsStatistics = async (): Promise<{
   }
 };
 
-// Get business requested items statistics
 export const getBusinessRequestedItemsStatistics = async (
   businessId: string
 ) => {
@@ -381,9 +357,6 @@ export const getBusinessRequestedItemsStatistics = async (
   }
 };
 
-// ======================== Utility Functions ========================
-
-// Validate requested item data
 export const validateRequestedItemData = (
   item: RequestedItemCreatePayload
 ): { isValid: boolean; errors: string[] } => {
@@ -414,17 +387,14 @@ export const validateRequestedItemData = (
   };
 };
 
-// Format quantity display
 export const formatQuantityDisplay = (qty: string): string => {
   return qty || "0 Stk";
 };
 
-// Format priority badge
 export const getPriorityBadgeVariant = (priority: Priority): string => {
   return priority === "High" ? "danger" : "secondary";
 };
 
-// Format status badge
 export const getStatusBadgeVariant = (status: RequestStatus): string => {
   if (status.includes("gestoppt") || status.includes("stopped")) {
     return "danger";
@@ -438,7 +408,6 @@ export const getStatusBadgeVariant = (status: RequestStatus): string => {
   return "primary";
 };
 
-// Check if item needs attention (high priority and early status)
 export const needsAttention = (item: RequestedItem): boolean => {
   return (
     item.priority === "High" &&
@@ -448,7 +417,6 @@ export const needsAttention = (item: RequestedItem): boolean => {
   );
 };
 
-// Check if item is overdue (created more than 30 days ago and still in early phases)
 export const isOverdue = (item: RequestedItem): boolean => {
   const earlyStatuses = [
     "1_Anfrage gestoppt",
@@ -465,7 +433,6 @@ export const isOverdue = (item: RequestedItem): boolean => {
   return new Date(item.createdAt) < thirtyDaysAgo;
 };
 
-// Filter items by status
 export const filterItemsByStatus = (
   items: RequestedItem[],
   status: string
@@ -473,7 +440,6 @@ export const filterItemsByStatus = (
   return items.filter((item) => item.requestStatus === status);
 };
 
-// Filter items by priority
 export const filterItemsByPriority = (
   items: RequestedItem[],
   priority: string
@@ -481,21 +447,17 @@ export const filterItemsByPriority = (
   return items.filter((item) => item.priority === priority);
 };
 
-// Sort items by priority and creation date
 export const sortItemsByPriorityAndDate = (
   items: RequestedItem[]
 ): RequestedItem[] => {
   return items.sort((a, b) => {
-    // First sort by priority (High first)
     if (a.priority !== b.priority) {
       return a.priority === "High" ? -1 : 1;
     }
-    // Then by creation date (newest first)
     return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
   });
 };
 
-// Export requested items to CSV
 export const exportRequestedItemsToCSV = async (
   filters: RequestedItemsSearchFilters = {}
 ) => {
@@ -506,7 +468,6 @@ export const exportRequestedItemsToCSV = async (
       responseType: "blob",
     });
 
-    // Create download link
     const url = window.URL.createObjectURL(new Blob([response.data]));
     const link = document.createElement("a");
     link.href = url;
@@ -527,7 +488,6 @@ export const exportRequestedItemsToCSV = async (
   }
 };
 
-// Check service health
 export const checkRequestedItemsServiceHealth = async () => {
   try {
     const response = await api.get("/requested-items/health");
@@ -538,7 +498,6 @@ export const checkRequestedItemsServiceHealth = async () => {
   }
 };
 
-// Get available intervals
 export const getAvailableIntervals = (): Array<{
   value: string;
   label: string;
@@ -552,7 +511,6 @@ export const getAvailableIntervals = (): Array<{
   ];
 };
 
-// Get available priorities
 export const getAvailablePriorities = (): Array<{
   value: string;
   label: string;
@@ -563,7 +521,6 @@ export const getAvailablePriorities = (): Array<{
   ];
 };
 
-// Get available statuses with proper numbering
 export const getAvailableStatuses = (): Array<{
   value: RequestStatus;
   label: string;
@@ -808,7 +765,6 @@ export const getAvailableStatuses = (): Array<{
   ];
 };
 
-// Get status groups for organized display
 export const getStatusGroups = (): Array<{
   name: string;
   statuses: Array<{ value: RequestStatus; label: string }>;

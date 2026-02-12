@@ -142,12 +142,12 @@ import { successStyles } from "@/utils/constants";
 interface ActivityLog {
   id: string;
   type:
-    | "create"
-    | "update"
-    | "delete"
-    | "quantity_change"
-    | "status_change"
-    | "delivery_update";
+  | "create"
+  | "update"
+  | "delete"
+  | "quantity_change"
+  | "status_change"
+  | "delivery_update";
   description: string;
   itemName?: string;
   oldValue?: any;
@@ -810,8 +810,8 @@ function extractDeliveryPeriods(items: any[]): {
             const cargoNos =
               typeof deliveryDetails.cargoNo === "string"
                 ? deliveryDetails.cargoNo
-                    .split(",")
-                    .map((c: string) => c.trim())
+                  .split(",")
+                  .map((c: string) => c.trim())
                 : [deliveryDetails.cargoNo];
 
             const existingCargos = periodCargoMap.get(period)!;
@@ -1155,25 +1155,24 @@ function ActivityLogCard({
               justifyContent: "center",
               minWidth: 56,
               height: 56,
-              border: `2px solid ${
-                isPending
-                  ? alpha(theme.palette.warning.main, 0.2)
-                  : alpha(theme.palette.primary.main, 0.1)
-              }`,
+              border: `2px solid ${isPending
+                ? alpha(theme.palette.warning.main, 0.2)
+                : alpha(theme.palette.primary.main, 0.1)
+                }`,
               position: "relative",
               "&::after": isPending
                 ? {
-                    content: '""',
-                    position: "absolute",
-                    top: -2,
-                    left: -2,
-                    right: -2,
-                    bottom: -2,
-                    borderRadius: 3,
-                    background: `linear-gradient(45deg, ${theme.palette.warning.main}, ${theme.palette.warning.light})`,
-                    opacity: 0.3,
-                    animation: "pulse 2s infinite",
-                  }
+                  content: '""',
+                  position: "absolute",
+                  top: -2,
+                  left: -2,
+                  right: -2,
+                  bottom: -2,
+                  borderRadius: 3,
+                  background: `linear-gradient(45deg, ${theme.palette.warning.main}, ${theme.palette.warning.light})`,
+                  opacity: 0.3,
+                  animation: "pulse 2s infinite",
+                }
                 : {},
             }}
           >
@@ -1956,15 +1955,15 @@ const AdminListDetailPage = () => {
         prev.map((list) =>
           list.id === currentListId
             ? {
-                ...list,
-                items: list.items.map((item: any) => ({
-                  ...item,
-                  changesNeedAcknowledgment: false,
-                  hasChanges: false,
-                  shouldHighlight: false,
-                  changedFields: [],
-                })),
-              }
+              ...list,
+              items: list.items.map((item: any) => ({
+                ...item,
+                changesNeedAcknowledgment: false,
+                hasChanges: false,
+                shouldHighlight: false,
+                changedFields: [],
+              })),
+            }
             : list
         )
       );
@@ -2018,11 +2017,11 @@ const AdminListDetailPage = () => {
         prev.map((list) =>
           list.id === currentListId
             ? {
-                ...list,
-                items: list.items.map((item: any) =>
-                  item.id === itemId ? { ...item, ...updateData } : item
-                ),
-              }
+              ...list,
+              items: list.items.map((item: any) =>
+                item.id === itemId ? { ...item, ...updateData } : item
+              ),
+            }
             : list
         )
       );
@@ -2052,11 +2051,11 @@ const AdminListDetailPage = () => {
         prev.map((list) =>
           list.id === currentListId
             ? {
-                ...list,
-                items: list.items.filter(
-                  (item: any) => !selectedRows.has(item.id)
-                ),
-              }
+              ...list,
+              items: list.items.filter(
+                (item: any) => !selectedRows.has(item.id)
+              ),
+            }
             : list
         )
       );
@@ -2104,28 +2103,28 @@ const AdminListDetailPage = () => {
           prev.map((list) =>
             list.id === currentListId
               ? {
-                  ...list,
-                  items: list.items.map((item: any) => {
-                    if (item.id === itemId) {
-                      const updatedDeliveries = {
-                        ...item.deliveries,
-                        [period]: {
-                          ...item.deliveries?.[period],
-                          ...deliveryData,
-                          cargoNo:
-                            deliveryData.cargoNo ||
-                            item.deliveries?.[period]?.cargoNo ||
-                            "",
-                        },
-                      };
-                      return {
-                        ...item,
-                        deliveries: updatedDeliveries,
-                      };
-                    }
-                    return item;
-                  }),
-                }
+                ...list,
+                items: list.items.map((item: any) => {
+                  if (item.id === itemId) {
+                    const updatedDeliveries = {
+                      ...item.deliveries,
+                      [period]: {
+                        ...item.deliveries?.[period],
+                        ...deliveryData,
+                        cargoNo:
+                          deliveryData.cargoNo ||
+                          item.deliveries?.[period]?.cargoNo ||
+                          "",
+                      },
+                    };
+                    return {
+                      ...item,
+                      deliveries: updatedDeliveries,
+                    };
+                  }
+                  return item;
+                }),
+              }
               : list
           )
         );
@@ -2145,10 +2144,10 @@ const AdminListDetailPage = () => {
         prev.map((log) =>
           log.id === logId
             ? {
-                ...log,
-                status: "approved" as const,
-                approvalStatus: "approved" as const,
-              }
+              ...log,
+              status: "approved" as const,
+              approvalStatus: "approved" as const,
+            }
             : log
         )
       );
@@ -2167,10 +2166,10 @@ const AdminListDetailPage = () => {
         prev.map((log) =>
           log.id === logId
             ? {
-                ...log,
-                status: "rejected" as const,
-                approvalStatus: "rejected" as const,
-              }
+              ...log,
+              status: "rejected" as const,
+              approvalStatus: "rejected" as const,
+            }
             : log
         )
       );

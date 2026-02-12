@@ -18,6 +18,7 @@ import ErrorHandler from "../utils/errorHandler";
 import { getConnection } from "../config/misDb";
 import { Customer } from "../models/customers";
 import { User } from "../models/users";
+import { Item } from "../models/items";
 import { In } from "typeorm";
 import { ContactPerson } from "../models/contact_person";
 
@@ -77,17 +78,14 @@ async function fetchItemData(itemId: number) {
         shippedAt: string;
         eta: string;
         cargoType: string;
-        isUnassigned: boolean; // New field to track unassigned cargos
+        isUnassigned: boolean;
       }
     >();
 
-    // Counter for cargos without dates
     let noDateCounter = 0;
-    // Counter for unassigned cargos
     let unassignedCounter = 0;
 
     itemRows.forEach((row: any) => {
-      // Handle unassigned cargos (cargo_id IS NULL but has order_status)
       if (row.cargo_id === null && row.order_status) {
         unassignedCounter++;
         const unassignedKey = `unassigned-${unassignedCounter}`;
@@ -99,13 +97,13 @@ async function fetchItemData(itemId: number) {
             quantity,
             status: row.order_status || "Open",
             deliveredAt: null,
-            cargoNo: [], // Empty array for cargo numbers
-            cargoStatus: "UNASSIGNED", // Special status for unassigned
+            cargoNo: [],
+            cargoStatus: "UNASSIGNED",
             remark: row.remark || "Not yet assigned to cargo",
             shippedAt: "",
             eta: "",
             cargoType: "",
-            isUnassigned: true, // Mark as unassigned
+            isUnassigned: true,
           });
         } else {
           const existing = deliveryMap.get(unassignedKey)!;
@@ -123,9 +121,7 @@ async function fetchItemData(itemId: number) {
           });
         }
       }
-      // Handle assigned cargos (existing logic)
       else if (row.cargo_id && row.cargo_no) {
-        // Get all possible dates, use fallbacks if primary dates are null
         const possibleDates = [
           row.pickup_date,
           row.dep_date,
@@ -133,7 +129,6 @@ async function fetchItemData(itemId: number) {
           row.eta,
         ].filter((date) => date !== null);
 
-        // If no dates available, create a unique key for cargos without dates
         if (possibleDates.length === 0) {
           noDateCounter++;
           const uniqueKey = `no-date-${noDateCounter}`;
@@ -179,7 +174,6 @@ async function fetchItemData(itemId: number) {
             });
           }
         } else {
-          // Process each available date
           possibleDates.forEach((date: Date) => {
             const dateKey = date.toISOString().split("T")[0];
             const quantity = Number(row.quantity) || 0;
@@ -240,7 +234,7 @@ async function fetchItemData(itemId: number) {
         shippedAt: string;
         eta: string;
         cargoType: string;
-        isUnassigned?: boolean; // Optional field in final output
+        isUnassigned?: boolean;
       };
     } = {};
 
@@ -291,7 +285,6 @@ export async function updateLocalListItem(item: ListItem): Promise<ListItem> {
       return item;
     }
 
-    // Store original values for comparison
     const originalValues = {
       articleName: item.articleName,
       articleNumber: item.articleNumber,
@@ -300,14 +293,12 @@ export async function updateLocalListItem(item: ListItem): Promise<ListItem> {
       imageUrl: item.imageUrl,
     };
 
-    // Update all fields from MIS data
     item.articleName = itemData.articleName || item.articleName;
     item.articleNumber = itemData.articleNumber || item.articleNumber;
     item.item_no_de = itemData.itemNoDe || item.item_no_de;
     item.quantity = item.quantity;
     item.imageUrl = itemData.imageUrl || item.imageUrl;
 
-    // Check if any values actually changed
     const hasChanges =
       item.articleName !== originalValues.articleName ||
       item.articleNumber !== originalValues.articleNumber ||
@@ -315,7 +306,6 @@ export async function updateLocalListItem(item: ListItem): Promise<ListItem> {
       item.quantity !== originalValues.quantity ||
       item.imageUrl !== originalValues.imageUrl;
 
-    // Update deliveries if available
     if (itemData.deliveries && Object.keys(itemData.deliveries).length > 0) {
       const currentDeliveries = item.deliveries || {};
       const mergedDeliveries: any = {};
@@ -370,14 +360,12 @@ async function createCreator(userId: string | null, customerId: string | null) {
   throw new ErrorHandler("Creator information missing", 400);
 }
 
-// Helper function to determine user role
 function getUserRole(userId?: string, customerId?: string): USER_ROLE {
   if (userId) return USER_ROLE.ADMIN;
   if (customerId) return USER_ROLE.CUSTOMER;
-  return USER_ROLE.ADMIN; // Default fallback
+  return USER_ROLE.ADMIN;
 }
 
-// 1. Create New List
 export const createList = async (
   req: Request,
   res: Response,
@@ -400,7 +388,7 @@ export const createList = async (
       return next(new ErrorHandler("Customer not found", 404));
     }
 
-    const createdBy = await createCreator(null, customerId);
+    const createdBy = await createCreator(userId || null, customerId);
 
     const list = listRepository.create({
       name,
@@ -487,7 +475,6 @@ export const addListItem = async (
 
     list.items = [...(list.items || []), listItem];
 
-    // Add activity log using the new simplified method
     list.addActivityLog(
       `${userRole} added item ${itemData.articleName} to the list`,
       userRole,
@@ -539,7 +526,6 @@ export const updateListItem = async (
     const listItemRepository = AppDataSource.getRepository(ListItem);
     const listRepository = AppDataSource.getRepository(List);
 
-    // Fetch item with list and ensure relations are loaded
     const item = await listItemRepository.findOne({
       where: { id: itemId },
       relations: ["list", "list.customer"],
@@ -549,7 +535,6 @@ export const updateListItem = async (
       return next(new ErrorHandler("List item not found", 404));
     }
 
-    // Fetch list explicitly to ensure activityLogs is loaded
     const list = await listRepository.findOne({
       where: { id: item.list.id },
       relations: ["customer", "items"],
@@ -559,7 +544,6 @@ export const updateListItem = async (
       return next(new ErrorHandler("Associated list not found", 404));
     }
 
-    // Initialize activityLogs and pendingChanges if null
     if (!list.activityLogs) {
       list.activityLogs = [];
     }
@@ -570,13 +554,10 @@ export const updateListItem = async (
     const performerId = userId || customerId || "system";
     const userRole = getUserRole(userId, customerId);
 
-    // Track what fields actually changed
     const changedFields: string[] = [];
 
-    // Normalize nullable fields to avoid comparison issues
     const normalizeValue = (value: any) => (value === undefined ? null : value);
 
-    // Update fields using the item's updateField method
     if (quantity !== undefined && normalizeValue(quantity) !== item.quantity) {
       if (
         item.updateField(
@@ -684,7 +665,6 @@ export const updateListItem = async (
       changedFields.push("marked");
     }
 
-    // Handle delivery updates with validation
     if (deliveries) {
       if (typeof deliveries !== "object" || Array.isArray(deliveries)) {
         return next(new ErrorHandler("Invalid deliveries format", 400));
@@ -709,7 +689,6 @@ export const updateListItem = async (
       await transactionalEntityManager.save(List, list);
     });
 
-    // Check if there are pending changes for highlighting
     const hasPendingChanges = item.hasUnacknowledgedCustomerChanges();
     const highlightedFields = getHighlightedFields(item);
 
@@ -729,7 +708,6 @@ export const updateListItem = async (
   }
 };
 
-// Separate controller for updating only comments with logging
 export const updateListItemComment = async (
   req: Request,
   res: Response,
@@ -750,7 +728,6 @@ export const updateListItemComment = async (
     const listItemRepository = AppDataSource.getRepository(ListItem);
     const listRepository = AppDataSource.getRepository(List);
 
-    // Fetch item with list relation
     const item = await listItemRepository.findOne({
       where: { id: itemId },
       relations: ["list"],
@@ -760,7 +737,6 @@ export const updateListItemComment = async (
       return next(new ErrorHandler("List item not found", 404));
     }
 
-    // Fetch the associated list
     const list = await listRepository.findOne({
       where: { id: item.list.id },
     });
@@ -772,10 +748,8 @@ export const updateListItemComment = async (
     const performerId = userId || customerId || "system";
     const userRole = getUserRole(userId, customerId);
 
-    // Store old comment for logging
     const oldComment = item.comment;
 
-    // Check if comment actually changed
     if (comment === undefined || comment === item.comment) {
       return res.status(200).json({
         success: true,
@@ -784,14 +758,12 @@ export const updateListItemComment = async (
       });
     }
 
-    // Update the comment directly
     item.comment = comment;
 
     const namee =
       userRole === USER_ROLE.CUSTOMER
         ? (req as any).customer?.companyName
         : (req as any).user.name;
-    // Log the change to the list activity logs
     if (list) {
       list.logFieldChange(
         "comment",
@@ -805,7 +777,6 @@ export const updateListItemComment = async (
       );
     }
 
-    // Save both item and list
     await listItemRepository.save(item);
     if (list) {
       await listRepository.save(list);
@@ -813,7 +784,6 @@ export const updateListItemComment = async (
 
     console.log("Comment updated successfully:", item.comment);
 
-    // Check if there are pending changes for highlighting
     const hasPendingChanges = item.hasUnacknowledgedCustomerChanges();
     const highlightedFields = getHighlightedFields(item);
 
@@ -832,7 +802,6 @@ export const updateListItemComment = async (
   }
 };
 
-// 4. Update Delivery Info
 export const updateDeliveryInfo = async (
   req: Request,
   res: Response,
@@ -869,7 +838,6 @@ export const updateDeliveryInfo = async (
       return next(new ErrorHandler("List item not found", 404));
     }
 
-    // Use the item's updateDelivery method which handles logging
     item.updateDelivery(
       period,
       {
@@ -888,7 +856,6 @@ export const updateDeliveryInfo = async (
 
     await listItemRepository.save(item);
 
-    // Save the list to persist the activity logs
     const listRepository = AppDataSource.getRepository(List);
     await listRepository.save(item.list);
 
@@ -902,7 +869,6 @@ export const updateDeliveryInfo = async (
   }
 };
 
-// 5. Get List with Items
 export const getListWithItems = async (
   req: Request,
   res: Response,
@@ -930,7 +896,6 @@ export const getListWithItems = async (
       for (const item of list.items) {
         const updatedItem = await updateLocalListItem(item);
 
-        // Add unacknowledged fields information using new methods
         const highlightedFields = getHighlightedFields(updatedItem);
         const pendingChanges = updatedItem.getPendingChanges();
         const itemWithFieldStatus = {
@@ -947,7 +912,6 @@ export const getListWithItems = async (
       await listRepository.save(list);
     }
 
-    // Get pending changes using new method
     const pendingChanges = list.getPendingFieldChanges();
     const changesByField = getPendingChangesByField(list);
 
@@ -974,7 +938,6 @@ export const getListWithItems = async (
   }
 };
 
-// 6. Get Customer Deliveries
 export const getCustomerDeliveries = async (
   req: Request,
   res: Response,
@@ -1059,7 +1022,6 @@ export const getCustomerDeliveries = async (
   }
 };
 
-// 7. Get Customer List
 export const getCustomerList = async (
   req: Request,
   res: Response,
@@ -1114,7 +1076,6 @@ export const getCustomerList = async (
   }
 };
 
-// 8. Delete List Item
 export const deleteListItem = async (
   req: Request,
   res: Response,
@@ -1152,7 +1113,6 @@ export const deleteListItem = async (
     const performerId = userId || customerId || "system";
     const userRole = getUserRole(userId, customerId);
 
-    // Log the deletion
     item.list.addActivityLog(
       `${userRole} deleted item ${item.articleName} from the list`,
       userRole,
@@ -1175,7 +1135,6 @@ export const deleteListItem = async (
   }
 };
 
-// 9. Acknowledge List Item Changes - UPDATED
 export const acknowledgeListItemChanges = async (
   req: Request,
   res: Response,
@@ -1183,7 +1142,7 @@ export const acknowledgeListItemChanges = async (
 ) => {
   try {
     const { listId, itemId } = req.params;
-    const { logIds, fields } = req.body; // Now supports both log IDs and field names
+    const { logIds, fields } = req.body;
     const userId = (req as any).user?.id;
 
     if (!listId) {
@@ -1209,7 +1168,6 @@ export const acknowledgeListItemChanges = async (
       return next(new ErrorHandler("List not found", 404));
     }
 
-    // Find the specific item
     const item = list.items.find((listItem) => listItem.id === itemId);
     if (!item) {
       return next(
@@ -1219,19 +1177,14 @@ export const acknowledgeListItemChanges = async (
 
     let acknowledgedCount = 0;
 
-    // Acknowledge by log IDs if provided
     if (logIds && Array.isArray(logIds)) {
       list.acknowledgeCustomerChanges(userId, logIds);
       acknowledgedCount = logIds.length;
     }
-
-    // Acknowledge by field names if provided
     if (fields && Array.isArray(fields)) {
       list.acknowledgeFieldChanges(userId, fields);
       acknowledgedCount += fields.length;
     }
-
-    // If neither provided, acknowledge all pending changes for the item
     if (!logIds && !fields) {
       const itemPendingChanges = list.getItemPendingChanges(itemId);
       const fieldNames = itemPendingChanges.map((change) => change.field);
@@ -1256,7 +1209,6 @@ export const acknowledgeListItemChanges = async (
   }
 };
 
-// 10. Reject List Item Changes (Not applicable with new schema, keeping for compatibility)
 export const rejectListItemChanges = async (
   req: Request,
   res: Response,
@@ -1270,8 +1222,6 @@ export const rejectListItemChanges = async (
       return next(new ErrorHandler("Item ID and reason are required", 400));
     }
 
-    // With the new schema, there's no concept of rejecting changes
-    // They are simply logged and can be acknowledged
     return res.status(200).json({
       success: true,
       message: "Change rejection noted in activity log",
@@ -1281,7 +1231,6 @@ export const rejectListItemChanges = async (
   }
 };
 
-// 11. Search Items
 export const searchItems = async (
   req: Request,
   res: Response,
@@ -1294,56 +1243,67 @@ export const searchItems = async (
       return next(new ErrorHandler("Search query is required", 400));
     }
 
-    const connection = await getConnection();
     const searchTerm = `%${q}%`;
 
-    // Check if the search query is a numeric value (potentially an ItemID_DE)
+    // Check if the search query is a numeric value (potentially an ItemID_DE or id)
     const isNumericSearch = !isNaN(Number(q));
 
     try {
-      let query = `
-            SELECT 
-              id, 
-              item_name AS name,
-              ItemID_DE AS articleNumber,
-              photo AS imageUrl
-            FROM items 
-            WHERE (item_name LIKE ? 
-          `;
+      const itemRepository = AppDataSource.getRepository(Item);
 
-      const params: any[] = [searchTerm];
+      // Build query with TypeORM QueryBuilder
+      const queryBuilder = itemRepository
+        .createQueryBuilder("item")
+        .select([
+          "item.id",
+          "item.item_name",
+          "item.ItemID_DE",
+          "item.photo",
+        ])
+        .where("item.item_name LIKE :searchTerm", { searchTerm });
 
-      // If it's a numeric search, also search by ItemID_DE
+      // If it's a numeric search, also search by ItemID_DE or id
       if (isNumericSearch) {
-        query += ` OR ItemID_DE = ?`;
-        params.push(Number(q));
+        queryBuilder.orWhere("item.ItemID_DE = :numericValue", {
+          numericValue: Number(q),
+        });
+        queryBuilder.orWhere("item.id = :id", {
+          id: Number(q),
+        });
       }
 
-      query += `)
-            AND photo IS NOT NULL
-            AND photo != ''
-            LIMIT 10`;
+      // Only return items that have photos
+      queryBuilder.andWhere("item.photo IS NOT NULL");
+      queryBuilder.andWhere("item.photo != ''");
 
-      const [items]: any = await connection.query(query, params);
+      // Limit results
+      queryBuilder.limit(10);
+
+      const items = await queryBuilder.getMany();
 
       const results = items.map((item: any) => ({
-        ...item,
-        imageUrl: item.imageUrl,
+        id: item.id,
+        name: item.item_name,
+        articleNumber: item.ItemID_DE,
+        imageUrl: item.photo,
       }));
 
       return res.status(200).json({
         success: true,
         data: results,
       });
-    } finally {
-      connection.release();
+    } catch (queryError) {
+      console.error("Database query error in searchItems:", queryError);
+      return next(
+        new ErrorHandler("Failed to search items in database", 500)
+      );
     }
   } catch (error) {
+    console.error("Error in searchItems:", error);
     return next(error);
   }
 };
 
-// 12. Get Customer Lists - UPDATED
 export const getCustomerLists = async (
   req: Request,
   res: Response,
@@ -1377,7 +1337,6 @@ export const getCustomerLists = async (
       ],
     });
 
-    // Enhance lists with pending changes information
     const listsWithChanges = lists.map((list) => ({
       ...list,
       pendingChangesCount: list.getPendingFieldChanges().length,
@@ -1407,7 +1366,6 @@ export const getAllLists = async (
 
     console.log(`Fetching all lists. Refresh from MIS: ${shouldRefresh}`);
 
-    // Fetch all lists with their relationships
     const lists = await listRepository.find({
       relations: [
         "customer",
@@ -1425,7 +1383,6 @@ export const getAllLists = async (
     let refreshedItems = 0;
     let failedRefreshes = 0;
 
-    // Refresh all items from MIS if requested
     if (shouldRefresh) {
       console.log("Refreshing all items from MIS...");
 
@@ -1440,29 +1397,24 @@ export const getAllLists = async (
 
           for (const item of list.items) {
             try {
-              // Refresh item data from MIS
               const refreshedItem = await updateLocalListItem(item);
               updatedItems.push(refreshedItem);
               refreshedItems++;
 
-              // Update the item in the database
               await listItemRepository.save(refreshedItem);
 
               console.log(`Successfully refreshed item: ${item.articleName}`);
             } catch (error) {
               console.error(`Failed to refresh item ${item.id}:`, error);
-              updatedItems.push(item); // Keep the original item if refresh fails
+              updatedItems.push(item);
               failedRefreshes++;
             }
           }
 
-          // Update the list with refreshed items
           list.items = updatedItems;
 
-          // Save the updated list
           await listRepository.save(list);
 
-          // Log the refresh activity for the list
           list.addActivityLog(
             `System refreshed ${updatedItems.length} items from MIS`,
             USER_ROLE.ADMIN,
@@ -1478,27 +1430,24 @@ export const getAllLists = async (
         `Refresh completed: ${refreshedItems} items refreshed, ${failedRefreshes} failed`
       );
     } else {
-      // Just count total items without refreshing
       totalItems = lists.reduce(
         (count, list) => count + (list.items?.length || 0),
         0
       );
     }
 
-    // Enhance lists with pending changes information
     const listsWithChanges = lists.map((list) => ({
       ...list,
       pendingChangesCount: list.getPendingFieldChanges().length,
       hasPendingChanges: list.hasPendingChanges(),
-      // Include refresh statistics for each list
       refreshStats: shouldRefresh
         ? {
-            itemsRefreshed:
-              list.items?.filter(
-                (item) => item.updatedAt > new Date(Date.now() - 60000) // Items updated in last minute
-              ).length || 0,
-            totalItems: list.items?.length || 0,
-          }
+          itemsRefreshed:
+            list.items?.filter(
+              (item) => item.updatedAt > new Date(Date.now() - 60000) // Items updated in last minute
+            ).length || 0,
+          totalItems: list.items?.length || 0,
+        }
         : undefined,
     }));
 
@@ -1515,7 +1464,6 @@ export const getAllLists = async (
   }
 };
 
-// 14. Duplicate List
 export const duplicateList = async (
   req: Request,
   res: Response,
@@ -1604,7 +1552,6 @@ export const duplicateList = async (
   }
 };
 
-// 15. Update List
 export const updateList = async (
   req: Request,
   res: Response,
@@ -1701,7 +1648,6 @@ export const updateList = async (
   }
 };
 
-// 16. Delete List
 export const deleteList = async (
   req: Request,
   res: Response,
@@ -1735,7 +1681,6 @@ export const deleteList = async (
       return next(new ErrorHandler("Not authorized to delete this list", 403));
     }
 
-    // Check if list has any items
     if (list.items && list.items.length > 0) {
       return next(
         new ErrorHandler(
@@ -1745,7 +1690,6 @@ export const deleteList = async (
       );
     }
 
-    // Delete the list
     await listRepository.remove(list);
 
     return res.status(200).json({
@@ -1757,7 +1701,6 @@ export const deleteList = async (
   }
 };
 
-// 17. Search Lists by List Number
 export const searchListsByNumber = async (
   req: Request,
   res: Response,
@@ -1791,7 +1734,6 @@ export const searchListsByNumber = async (
   }
 };
 
-// 18. Get Lists by Company Name
 export const getListsByCompanyName = async (
   req: Request,
   res: Response,
@@ -1839,7 +1781,6 @@ export const getListsByCompanyName = async (
   }
 };
 
-// 19. Bulk Acknowledge Changes - UPDATED
 export const bulkAcknowledgeChanges = async (
   req: Request,
   res: Response,
@@ -1874,7 +1815,6 @@ export const bulkAcknowledgeChanges = async (
       const pendingBefore = list.getPendingFieldChanges().length;
 
       if (itemIds && Array.isArray(itemIds)) {
-        // Acknowledge changes for specific items
         for (const itemId of itemIds) {
           const itemPendingChanges = list.getItemPendingChanges(itemId);
           const fieldNames = itemPendingChanges.map((change) => change.field);
@@ -1882,11 +1822,9 @@ export const bulkAcknowledgeChanges = async (
           totalAcknowledgedCount += fieldNames.length;
         }
       } else if (fields && Array.isArray(fields)) {
-        // Acknowledge specific fields across the list
         list.acknowledgeFieldChanges(userId, fields);
         totalAcknowledgedCount += fields.length;
       } else {
-        // Acknowledge all changes in the list
         const pendingChanges = list.getPendingFieldChanges();
         const fieldNames = pendingChanges.map((change) => change.field);
         list.acknowledgeFieldChanges(userId, fieldNames);
@@ -1919,7 +1857,6 @@ export const bulkAcknowledgeChanges = async (
   }
 };
 
-// 20. Get Pending Changes for Admin Dashboard
 export const getPendingChangesForAdmin = async (
   req: Request,
   res: Response,
@@ -1977,7 +1914,6 @@ export const getPendingChangesForAdmin = async (
   }
 };
 
-// 21. Fetch All Lists and Items - UPDATED
 export const fetchAllListsAndItems = async (
   req: Request,
   res: Response,
@@ -1993,7 +1929,6 @@ export const fetchAllListsAndItems = async (
       `Fetching all lists and items. Refresh from MIS: ${shouldRefresh}`
     );
 
-    // Fetch all lists with their relationships
     const lists = await listRepository.find({
       relations: ["customer", "items", "createdBy.user", "createdBy.customer"],
       order: { createdAt: "DESC" },
@@ -2005,7 +1940,6 @@ export const fetchAllListsAndItems = async (
     let refreshedItems = 0;
     let failedRefreshes = 0;
 
-    // Process each list and its items
     for (const list of lists) {
       if (list.items && list.items.length > 0) {
         totalItems += list.items.length;
@@ -2018,29 +1952,24 @@ export const fetchAllListsAndItems = async (
 
           for (const item of list.items) {
             try {
-              // Refresh item data from MIS
               const refreshedItem = await updateLocalListItem(item);
               updatedItems.push(refreshedItem);
               refreshedItems++;
-
-              // Also update the item in the database
               await listItemRepository.save(refreshedItem);
             } catch (error) {
               console.error(`Failed to refresh item ${item.id}:`, error);
-              updatedItems.push(item); // Keep the original item if refresh fails
+              updatedItems.push(item);
               failedRefreshes++;
             }
           }
 
           list.items = updatedItems;
 
-          // Save the updated list
           await listRepository.save(list);
         }
       }
     }
 
-    // Enhance lists with pending changes information
     const listsWithChanges = lists.map((list) => ({
       ...list,
       pendingChangesCount: list.getPendingFieldChanges().length,
@@ -2081,7 +2010,6 @@ export const fetchAllListsAndItems = async (
   }
 };
 
-// 22. Refresh Specific Items from MIS
 export const refreshItemsFromMIS = async (
   req: Request,
   res: Response,
@@ -2121,7 +2049,6 @@ export const refreshItemsFromMIS = async (
         refreshedItems.push(refreshedItem);
         refreshedCount++;
 
-        // Log the refresh activity
         if (item.list) {
           item.list.addActivityLog(
             `System refreshed item ${item.articleName} from MIS`,
@@ -2140,9 +2067,8 @@ export const refreshItemsFromMIS = async (
 
     return res.status(200).json({
       success: true,
-      message: `Refreshed ${refreshedCount} items from MIS${
-        failedCount > 0 ? `, ${failedCount} failed` : ""
-      }`,
+      message: `Refreshed ${refreshedCount} items from MIS${failedCount > 0 ? `, ${failedCount} failed` : ""
+        }`,
       data: {
         refreshedItems,
         statistics: {
@@ -2159,7 +2085,6 @@ export const refreshItemsFromMIS = async (
   }
 };
 
-// 23. Get List Item with MIS Refresh - UPDATED
 export const getListItemWithRefresh = async (
   req: Request,
   res: Response,
@@ -2192,7 +2117,6 @@ export const getListItemWithRefresh = async (
         refreshedItem = await updateLocalListItem(item);
         await listItemRepository.save(refreshedItem);
 
-        // Log the refresh activity
         if (refreshedItem.list) {
           refreshedItem.list.addActivityLog(
             `System refreshed item ${refreshedItem.articleName} from MIS`,
@@ -2208,7 +2132,6 @@ export const getListItemWithRefresh = async (
       }
     }
 
-    // Add pending changes information
     const hasPendingChanges = refreshedItem.hasUnacknowledgedCustomerChanges();
     const highlightedFields = getHighlightedFields(refreshedItem);
     const pendingChanges = refreshedItem.getPendingChanges();
@@ -2231,7 +2154,6 @@ export const getListItemWithRefresh = async (
   }
 };
 
-// 24. Acknowledge Field Changes for Specific Item
 export const acknowledgeItemFieldChanges = async (
   req: Request,
   res: Response,
@@ -2262,7 +2184,6 @@ export const acknowledgeItemFieldChanges = async (
       return next(new ErrorHandler("List not found", 404));
     }
 
-    // Use the utility function to acknowledge item changes
     acknowledgeItemChangesUtil(list, itemId, userId);
 
     await listRepository.save(list);
@@ -2316,8 +2237,6 @@ export const updateListContactPerson = async (
       if (!contactPerson) {
         return next(new ErrorHandler("Contact person not found", 404));
       }
-      // console.log(contactPerson.starBusinessDetails.id, list.customer);
-      // Validate that contact person belongs to the same company
       if (
         contactPerson.starBusinessDetailsId !==
         list?.customer?.starBusinessDetails?.id
@@ -2331,13 +2250,10 @@ export const updateListContactPerson = async (
       }
     }
 
-    // Store old contact person for logging
     const oldContactPerson = list.contactPerson;
 
-    // Update the contact person
     list.contactPerson = contactPerson;
 
-    // Add activity log
     const action = contactPerson
       ? `assigned contact person ${contactPerson.name} ${contactPerson.familyName} to the list`
       : "removed contact person from the list";
@@ -2360,14 +2276,14 @@ export const updateListContactPerson = async (
           id: list.id,
           contactPerson: contactPerson
             ? {
-                id: contactPerson.id,
-                name: contactPerson.name,
-                familyName: contactPerson.familyName,
-                position: contactPerson.position,
-                email: contactPerson.email,
-                phone: contactPerson.phone,
-                linkedInLink: contactPerson.linkedInLink,
-              }
+              id: contactPerson.id,
+              name: contactPerson.name,
+              familyName: contactPerson.familyName,
+              position: contactPerson.position,
+              email: contactPerson.email,
+              phone: contactPerson.phone,
+              linkedInLink: contactPerson.linkedInLink,
+            }
             : null,
         },
       },

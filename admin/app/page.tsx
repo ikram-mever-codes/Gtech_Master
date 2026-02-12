@@ -5,7 +5,11 @@ import React from "react";
 const page = () => {
   const router = useRouter();
 
-  return router.push("/scheduled");
+  React.useEffect(() => {
+    router.push("/scheduled");
+  }, [router]);
+
+  return null;
 };
 
 export default page;

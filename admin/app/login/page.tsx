@@ -55,8 +55,14 @@ const Login = () => {
     }
   };
 
+  useEffect(() => {
+    if (user && !loading) {
+      router.push("/scheduled");
+    }
+  }, [user, loading, router]);
+
   if (user && !loading) {
-    return router.push("/scheduled");
+    return null;
   }
 
   return (

@@ -21,7 +21,7 @@ export type Order = {
   customer_id?: string | null;
   status?: number | null;
   comment?: string | null;
-  
+
   created_at?: string | Date;
   updated_at?: string | Date;
   items?: OrderItemLine[];
@@ -62,7 +62,7 @@ const toQueryString = (filters?: OrderSearchFilters) => {
   if (!filters) return "";
   const params = new URLSearchParams();
   if (filters.search) params.set("search", filters.search);
-  if (filters.status) params.set("status", filters.status);
+  if (filters.status) params.set("status", String(filters.status));
   const qs = params.toString();
   return qs ? `?${qs}` : "";
 };
@@ -86,7 +86,7 @@ export const createOrder = async (orderData: CreateOrderPayload) => {
   }
 };
 
-export const getOrderById = async (orderId: number) => {
+export const getOrderById = async (orderId: string | number) => {
   try {
     const res = await api.get(`/orders/${orderId}`);
     return res;
@@ -96,18 +96,17 @@ export const getOrderById = async (orderId: number) => {
   }
 };
 
-// Get all orders
-export const getAllOrders = async () => {
+export const getAllOrders = async (filters?: OrderSearchFilters) => {
   try {
-    const res = await api.get("/orders");
-    //console.log(res);
+    const qs = toQueryString(filters);
+    const res = await api.get(`/orders${qs}`);
     return res;
   } catch (error) {
     handleApiError(error);
   }
 };
 
-export const updateOrder = async (orderId: string, orderData: UpdateOrderPayload) => {
+export const updateOrder = async (orderId: string | number, orderData: UpdateOrderPayload) => {
   try {
     toast.loading("Updating order...", loadingStyles);
     const response = await api.put(`/orders/${orderId}`, orderData);
@@ -121,7 +120,7 @@ export const updateOrder = async (orderId: string, orderData: UpdateOrderPayload
   }
 };
 
-export const deleteOrder = async (orderId: string) => {
+export const deleteOrder = async (orderId: string | number) => {
   try {
     toast.loading("Deleting order...", loadingStyles);
     const response = await api.delete(`/orders/${orderId}`); // ✅ fixed endpoint
@@ -139,8 +138,8 @@ export const deleteOrder = async (orderId: string) => {
   }
 };
 
-export const getOrderStatusColor = (status: string) => {
-  const statusObj = getOrderStatuses().find((s) => s.value === status);
+export const getOrderStatusColor = (status: string | number) => {
+  const statusObj = getOrderStatuses().find((s) => String(s.value) === String(status));
   return statusObj?.color || "bg-gray-100 text-gray-800";
 };
 

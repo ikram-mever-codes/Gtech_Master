@@ -132,21 +132,43 @@ export const createContactPerson = async (
       AppDataSource.getRepository(StarBusinessDetails);
 
     // Verify star business exists
-    const starBusinessDetails = await starBusinessDetailsRepository.findOne({
+    let starBusinessDetails = await starBusinessDetailsRepository.findOne({
       where: { id: starBusinessDetailsId },
       relations: ["customer"],
     });
 
     if (!starBusinessDetails) {
-      return next(new ErrorHandler("Star business not found", 404));
+      const customerRepository = AppDataSource.getRepository(Customer);
+      const customer = await customerRepository.findOne({
+        where: { id: starBusinessDetailsId },
+        relations: ["starBusinessDetails"],
+      });
+
+      if (customer) {
+        if (customer.starBusinessDetails) {
+          starBusinessDetails = customer.starBusinessDetails;
+        } else {
+          if (["star_business", "star_customer"].includes(customer.stage)) {
+            starBusinessDetails = starBusinessDetailsRepository.create({
+              customer: customer,
+            });
+            await starBusinessDetailsRepository.save(starBusinessDetails);
+          }
+        }
+      }
     }
 
-    // Check for duplicate contact person
+    if (!starBusinessDetails) {
+      return next(new ErrorHandler("Star business or customer not found", 404));
+    }
+
+    const actualStarBusinessDetailsId = starBusinessDetails.id;
+
     if (email) {
       const existingContactByEmail = await contactPersonRepository.findOne({
         where: {
           email: email.toLowerCase(),
-          starBusinessDetailsId,
+          starBusinessDetailsId: actualStarBusinessDetailsId,
         },
       });
 
@@ -160,7 +182,6 @@ export const createContactPerson = async (
       }
     }
 
-    // Create new contact person
     const contactPerson = new ContactPerson();
     contactPerson.sex = sanitizeSex(sex);
     contactPerson.starBusinessDetailsId = starBusinessDetailsId;
@@ -192,7 +213,6 @@ export const createContactPerson = async (
     contactPerson.stateLinkedIn = sanitizeLinkedInState(stateLinkedIn);
     contactPerson.contact = sanitizeContactType(contact);
 
-    // Add decisionMakerState handling
     if (decisionMakerState !== undefined) {
       contactPerson.decisionMakerState =
         sanitizeDecisionMakerState(decisionMakerState);
@@ -207,7 +227,6 @@ export const createContactPerson = async (
       // Set isDecisionMaker based on contact type first
       setDecisionMakerFromContactType(contactPerson);
 
-      // Only allow decisionMakerNote if the person is a decision maker
       if (contactPerson.isDecisionMaker) {
         contactPerson.decisionMakerNote = decisionMakerNote.trim();
       } else {
@@ -342,8 +361,8 @@ export const updateContactPerson = async (
       const willBeDecisionMaker = contactTypeChanged
         ? isDecisionMakerFromContactType(contactPerson.contact)
         : isDecisionMaker !== undefined
-        ? Boolean(isDecisionMaker)
-        : contactPerson.isDecisionMaker;
+          ? Boolean(isDecisionMaker)
+          : contactPerson.isDecisionMaker;
 
       if (decisionMakerNote && !willBeDecisionMaker) {
         return next(
@@ -1055,17 +1074,15 @@ export const getAllContactPersons = async (
           createdAt: contactPerson.createdAt,
           updatedAt: contactPerson.updatedAt,
           starBusinessDetailsId: contactPerson.starBusinessDetailsId,
-          isDecisionMaker: true,
+          isDecisionMaker: contactPerson.isDecisionMaker,
           decisionMakerState: contactPerson.decisionMakerState,
-          // Business info
+          decisionMakerNote: contactPerson.decisionMakerNote,
           businessId: customer?.id || null,
           businessName: customer?.companyName || null,
           businessLegalName: customer?.legalName,
           businessEmail: customer?.email || null,
           businessContactEmail: customer?.contactEmail || null,
           businessContactPhone: customer?.contactPhoneNumber || null,
-
-          // Business details
           website: businessDetails?.website || null,
           city: businessDetails?.city || null,
           state: businessDetails?.state || null,
@@ -1076,10 +1093,8 @@ export const getAllContactPersons = async (
           industry:
             starBusinessDetails?.industry || businessDetails?.industry || null,
 
-          // Display fields
-          fullName: `${contactPerson.name || ""} ${
-            contactPerson.familyName || ""
-          }`.trim(),
+          fullName: `${contactPerson.name || ""} ${contactPerson.familyName || ""
+            }`.trim(),
           displayPosition: contactPerson.position || "",
           note: contactPerson.note || null,
           noteContactPreference: contactPerson.noteContactPreference || null,
@@ -1106,7 +1121,6 @@ export const getAllContactPersons = async (
   }
 };
 
-// 5. Get Contact Persons by Star Business
 export const getContactPersonsByStarBusiness = async (
   req: Request,
   res: Response,
@@ -1117,7 +1131,6 @@ export const getContactPersonsByStarBusiness = async (
 
     const customerRepository = AppDataSource.getRepository(Customer);
 
-    // Find the customer that has this star business details
     const customer = await customerRepository.findOne({
       where: {
         starBusinessDetails: { id: starBusinessDetailsId },
@@ -1154,6 +1167,9 @@ export const getContactPersonsByStarBusiness = async (
         createdAt: contactPerson.createdAt,
         updatedAt: contactPerson.updatedAt,
         starBusinessDetailsId: contactPerson.starBusinessDetailsId,
+        isDecisionMaker: contactPerson.isDecisionMaker,
+        decisionMakerState: contactPerson.decisionMakerState,
+        decisionMakerNote: contactPerson.decisionMakerNote,
 
         // Business info
         businessId: customer.id,
@@ -1175,9 +1191,8 @@ export const getContactPersonsByStarBusiness = async (
           starBusinessDetails?.industry || businessDetails?.industry || null,
 
         // Display fields
-        fullName: `${contactPerson.name || ""} ${
-          contactPerson.familyName || ""
-        }`.trim(),
+        fullName: `${contactPerson.name || ""} ${contactPerson.familyName || ""
+          }`.trim(),
         displayPosition: contactPerson.position || "",
         note: contactPerson.note || null,
         noteContactPreference: contactPerson.noteContactPreference || null,
@@ -1197,8 +1212,6 @@ export const getContactPersonsByStarBusiness = async (
   }
 };
 
-// 6. Delete Contact Person
-// 6. Delete Contact Person
 export const deleteContactPerson = async (
   req: Request,
   res: Response,
@@ -1244,7 +1257,6 @@ export const deleteContactPerson = async (
   }
 };
 
-// 7. Bulk Delete Contact Persons
 export const bulkDeleteContactPersons = async (
   req: Request,
   res: Response,
@@ -1629,6 +1641,8 @@ function formatContactPersonResponse(contactPerson: any) {
     stateLinkedIn: contactPerson.stateLinkedIn,
     contact: contactPerson.contact,
     isDecisionMaker: contactPerson.isDecisionMaker,
+    decisionMakerState: contactPerson.decisionMakerState,
+    decisionMakerNote: contactPerson.decisionMakerNote,
     note: contactPerson.note,
     createdAt: contactPerson.createdAt,
     updatedAt: contactPerson.updatedAt,
@@ -1697,8 +1711,10 @@ export const getAllStarBusinesses = async (
 
     const formattedRecords = await Promise.all(
       starRecords.map(async (record) => {
+        const id = record.starBusinessDetails?.id || record.id;
+        console.log(`[DEBUG] Mapping customer ${record.companyName}: id=${id}, record.id=${record.id}, starBusinessDetails.id=${record.starBusinessDetails?.id}`);
         const baseData = {
-          id: record.starBusinessDetails?.id,
+          id: id,
           customerId: record.id,
           companyName: record.companyName,
           legalName: record.legalName,
@@ -1902,10 +1918,10 @@ export const getStarBusinessesWithoutContacts = async (
           comment: starBusiness?.comment,
           daysSinceConverted: starBusiness?.converted_timestamp
             ? Math.floor(
-                (Date.now() -
-                  new Date(starBusiness.converted_timestamp).getTime()) /
-                  (1000 * 60 * 60 * 24)
-              )
+              (Date.now() -
+                new Date(starBusiness.converted_timestamp).getTime()) /
+              (1000 * 60 * 60 * 24)
+            )
             : null,
         };
       }
@@ -1926,11 +1942,11 @@ export const getStarBusinessesWithoutContacts = async (
     const averageDaysSinceConverted =
       starBusinessesWithDays.length > 0
         ? Math.round(
-            starBusinessesWithDays.reduce(
-              (acc, b: any) => acc + (b.daysSinceConverted || 0),
-              0
-            ) / starBusinessesWithDays.length
-          )
+          starBusinessesWithDays.reduce(
+            (acc, b: any) => acc + (b.daysSinceConverted || 0),
+            0
+          ) / starBusinessesWithDays.length
+        )
         : 0;
 
     return res.status(200).json({
@@ -2028,9 +2044,9 @@ export const getStarBusinessesWithContactSummary = async (
     const avgContactsPerBusiness =
       withContacts > 0
         ? allStarBusinesses.reduce(
-            (sum: number, b: any) => sum + (b.contactPersonsCount || 0),
-            0
-          ) / withContacts
+          (sum: number, b: any) => sum + (b.contactPersonsCount || 0),
+          0
+        ) / withContacts
         : 0;
 
     return res.status(200).json({
