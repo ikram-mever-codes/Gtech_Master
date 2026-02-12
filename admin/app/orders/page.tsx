@@ -340,9 +340,9 @@ const OrderPage = () => {
   const isConvertMode = mode === "convert";
 
   const effectiveItems: Item[] = useMemo(() => {
-    if (isTab1 && form.category_id) return itemsByCategory;
+    if (form.category_id) return itemsByCategory;
     return itemsAll;
-  }, [isTab1, form.category_id, itemsByCategory, itemsAll]);
+  }, [form.category_id, itemsByCategory, itemsAll]);
 
   const loadingItems =
     loadingItemsAll || (isTab1 && !!form.category_id && loadingItemsByCategory);
@@ -494,7 +494,7 @@ const OrderPage = () => {
     setSelectedItemId("");
     if (resetOrderItemsFlag) setOrderItems([]);
 
-    if (isTab1 && category_id) {
+    if (category_id) {
       await fetchItemsByCategory(category_id);
       return;
     }
@@ -760,15 +760,10 @@ const OrderPage = () => {
     fetchOrders();
   };
 
-  // allow remark edit ONLY in tab2 + convert mode
-  // const allowRemarkEdit = mode === "convert" && activeTab === "tab2";
-
-  // -------------------- Derived lists --------------------
   const ordersOnly = useMemo(() => orders.filter((o: any) => o.customer_id == null), [orders]);
   const customerOrders = useMemo(() => orders.filter((o: any) => o.customer_id != null), [orders]);
   const visibleOrders = activeTab === "tab2" ? customerOrders : ordersOnly;
 
-  // -------------------- UI actions --------------------
   const tabActions: Record<(typeof tabs)[number]["id"], React.ReactNode> = {
     tab1: (
       <div className="flex gap-2">
@@ -840,11 +835,10 @@ const OrderPage = () => {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`py-3 px-1 border-b-2 font-medium text-sm ${
-                    activeTab === tab.id
-                      ? "border-gray-600 text-gray-900"
-                      : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                  }`}
+                  className={`py-3 px-1 border-b-2 font-medium text-sm ${activeTab === tab.id
+                    ? "border-gray-600 text-gray-900"
+                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                    }`}
                 >
                   {tab.label}
                 </button>
@@ -975,10 +969,10 @@ const OrderPage = () => {
                   {mode === "convert"
                     ? "CONVERT ORDER"
                     : mode === "edit"
-                    ? "Edit Order"
-                    : isTab2
-                    ? "Create Customer Order"
-                    : "Create New Order"}
+                      ? "Edit Order"
+                      : isTab2
+                        ? "Create Customer Order"
+                        : "Create New Order"}
                 </h2>
 
                 <button
@@ -1004,7 +998,7 @@ const OrderPage = () => {
                     <select
                       value={form.category_id}
                       onChange={(e) => handleCategoryChange(e.target.value)}
-                      disabled={activeTab === "tab2" || lockAllExceptQty}
+                      disabled={lockAllExceptQty}
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:bg-gray-50"
                     >
                       <option value="">Select Category</option>
@@ -1023,7 +1017,7 @@ const OrderPage = () => {
                     <select
                       value={form.customer_id}
                       onChange={(e) => handleCustomerChange(e.target.value)}
-                      disabled={activeTab === "tab1" || lockAllExceptQty}
+                      disabled={lockAllExceptQty}
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:bg-gray-50"
                     >
                       <option value="">Select Customer</option>
@@ -1112,7 +1106,7 @@ const OrderPage = () => {
                                 onChange={(e) =>
                                   handleUpdateOrderItemRemark(row.item_id, String(e.target.value))
                                 }
-                                
+
                                 className="w-64 px-2 py-1 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:bg-gray-50"
                               />
                             </td>
@@ -1149,16 +1143,16 @@ const OrderPage = () => {
                       mode === "convert"
                         ? handleConvertOrder
                         : mode === "edit"
-                        ? handleUpdateOrder
-                        : handleCreateOrder
+                          ? handleUpdateOrder
+                          : handleCreateOrder
                     }
                     className="px-4 py-2 text-sm bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-all disabled:opacity-50"
                   >
                     {mode === "convert"
                       ? "CONVERT ORDER"
                       : mode === "edit"
-                      ? "Update Order"
-                      : "Create Order"}
+                        ? "Update Order"
+                        : "Create Order"}
                   </CustomButton>
                 </div>
               </div>

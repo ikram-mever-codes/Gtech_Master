@@ -133,7 +133,7 @@ const UsersPage = () => {
     },
     {
       key: "isEmailVerified",
-      label: "Status",
+      label: "Verification",
       render: (value: boolean) => (
         <span
           className={`px-3 py-1 rounded-full text-xs font-medium ${value === true
@@ -144,6 +144,20 @@ const UsersPage = () => {
             }`}
         >
           {value === true ? "Verified" : "Unverified"}
+        </span>
+      ),
+    },
+    {
+      key: "isLoginEnabled",
+      label: "Login",
+      render: (value: boolean) => (
+        <span
+          className={`px-3 py-1 rounded-full text-xs font-medium ${value !== false
+            ? "bg-green-200/80 text-green-600"
+            : "bg-red-200/80 text-red-800"
+            }`}
+        >
+          {value !== false ? "Enabled" : "Disabled"}
         </span>
       ),
     },
@@ -186,7 +200,7 @@ const UsersPage = () => {
   };
 
   return (
-    <div className="w-full max-w-[80vw] mx-auto px-0">
+    <div className="w-full mx-auto px-0">
       <div
         className="bg-white rounded-lg shadow-sm pb-[7rem] p-8 px-9"
         style={{

@@ -327,7 +327,16 @@ const ItemsManagementPage: React.FC = () => {
 
     try {
       await deleteItem(itemId);
-      fetchData(); // Refresh the list
+      fetchData();
+    } catch (error) { }
+  };
+
+  const handleDeleteParent = async (parentId: number) => {
+    if (!confirm("Are you sure you want to delete this parent and all its items?")) return;
+
+    try {
+      await deleteParent(parentId);
+      fetchData();
     } catch (error) { }
   };
 
@@ -339,11 +348,10 @@ const ItemsManagementPage: React.FC = () => {
         `Item ${!isActive ? "activated" : "deactivated"} successfully`,
         successStyles
       );
-      fetchData(); // Refresh the list
+      fetchData();
     } catch (error) { }
   };
 
-  // Item creation modal functions
   const handleOpenCreateItemModal = () => {
     setItemFormData({
       item_name: "",
@@ -397,7 +405,7 @@ const ItemsManagementPage: React.FC = () => {
 
       toast.success("Item created successfully", successStyles);
       setShowItemModal(false);
-      fetchData(); // Refresh the list
+      fetchData();
     } catch (error: any) {
       toast.error(error.message || "Failed to create item", errorStyles);
     } finally {
@@ -410,7 +418,6 @@ const ItemsManagementPage: React.FC = () => {
   };
   console.log(parents);
 
-  // TARIC Management Functions
   const handleCreateTaric = () => {
     setTaricModalMode("create");
     setTaricFormData({
@@ -450,7 +457,6 @@ const ItemsManagementPage: React.FC = () => {
   };
 
   const handleViewTaric = (taricId: number) => {
-    // You can create a detail page or show in a modal
     router.push(`/tarics/${taricId}`);
   };
 
@@ -464,7 +470,7 @@ const ItemsManagementPage: React.FC = () => {
 
     try {
       await deleteTaric(taricId);
-      fetchData(); // Refresh the list
+      fetchData();
     } catch (error) {
       toast.error("Failed to delete TARIC", errorStyles);
     }
@@ -488,14 +494,13 @@ const ItemsManagementPage: React.FC = () => {
         await updateTaric(editingTaricId, payload);
       }
       setShowTaricModal(false);
-      fetchData(); // Refresh the list
+      fetchData();
     } catch (error: any) {
     } finally {
       setLoading(false);
     }
   };
 
-  // Handle bulk actions for TARICs
   const handleBulkDeleteTarics = async () => {
     if (selectedTarics.size === 0) {
       toast.error("No TARICs selected", errorStyles);
@@ -518,7 +523,6 @@ const ItemsManagementPage: React.FC = () => {
     } catch (error) { }
   };
 
-  // Handle bulk actions for items
   const handleBulkDelete = async () => {
     if (selectedItems.size === 0) {
       toast.error("No items selected", errorStyles);
@@ -533,7 +537,7 @@ const ItemsManagementPage: React.FC = () => {
 
     try {
       const ids = Array.from(selectedItems).map((id) => parseInt(id));
-      await bulkUpdateItems(ids, { isActive: "N" }); // Soft delete by deactivating
+      await bulkUpdateItems(ids, { isActive: "N" });
       toast.success(
         `${selectedItems.size} items deactivated successfully`,
         successStyles
@@ -585,7 +589,6 @@ const ItemsManagementPage: React.FC = () => {
     }
   };
 
-  // Selection handlers
   const handleSelectAll = () => {
     const currentData = getCurrentData();
     const currentSelection =
@@ -647,7 +650,6 @@ const ItemsManagementPage: React.FC = () => {
   const getFilteredData = () => {
     const data = getCurrentData();
     return data.filter((item) => {
-      // For TARICs, use different filtering
       if (activeTab === "tarics") {
         const taricItem = item as any;
         const matchesSearch =
@@ -728,6 +730,9 @@ const ItemsManagementPage: React.FC = () => {
             </th>
             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
               Created
+            </th>
+            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+              Actions
             </th>
           </>
         );
@@ -880,6 +885,37 @@ const ItemsManagementPage: React.FC = () => {
                 {formatDate(item.created_at)}
               </div>
             </td>
+            <td className="px-4 py-3">
+              <div className="flex gap-2">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleViewItem(item.id);
+                  }}
+                  className="text-blue-600 hover:text-blue-900 p-1"
+                >
+                  <EyeIcon className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleEditItem(item.id);
+                  }}
+                  className="text-green-600 hover:text-green-900 p-1"
+                >
+                  <EditIcon className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDeleteItem(item.id);
+                  }}
+                  className="text-red-600 hover:text-red-900 p-1"
+                >
+                  <Delete className="w-4 h-4" />
+                </button>
+              </div>
+            </td>
           </tr>
         ));
 
@@ -951,7 +987,7 @@ const ItemsManagementPage: React.FC = () => {
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    handleDeleteItem(parent.id);
+                    handleDeleteParent(parent.id);
                   }}
                   className="text-red-600 hover:text-red-900 p-1"
                 >
@@ -1159,7 +1195,7 @@ const ItemsManagementPage: React.FC = () => {
   };
 
   return (
-    <div className="w-full max-w-[85vw] mx-auto">
+    <div className="w-full mx-auto">
       <div
         className="bg-white min-h-[80vh] rounded-lg shadow-sm pb-8 p-6"
         style={{

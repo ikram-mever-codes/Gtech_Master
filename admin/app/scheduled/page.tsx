@@ -3256,7 +3256,7 @@ const AdminAllItemsPage = () => {
 
   return (
     <Box sx={{ width: "100%", py: 3, px: 0, pt: 0 }}>
-      <Box sx={{ maxWidth: "90vw", mx: "auto" }}>
+      <Box sx={{ width: "100%", mx: "auto" }}>
         {/* Header */}
         <Box
           sx={{

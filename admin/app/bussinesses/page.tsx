@@ -189,8 +189,8 @@ const BusinessSearchPage: React.FC = () => {
           filters.hasWebsite === "yes"
             ? true
             : filters.hasWebsite === "no"
-            ? false
-            : undefined,
+              ? false
+              : undefined,
         status: filters.status,
         source: filters.source || undefined,
         minRating: filters.minRating
@@ -279,8 +279,8 @@ const BusinessSearchPage: React.FC = () => {
         filters.hasWebsite === "yes"
           ? true
           : filters.hasWebsite === "no"
-          ? false
-          : undefined,
+            ? false
+            : undefined,
       status: filters.status,
       source: filters.source || undefined,
       minRating: filters.minRating ? parseFloat(filters.minRating) : undefined,
@@ -377,7 +377,7 @@ const BusinessSearchPage: React.FC = () => {
   };
 
   return (
-    <div className="w-full max-w-[85vw] mx-auto">
+    <div className="w-full mx-auto">
       <div
         className="bg-white rounded-lg shadow-sm pb-8 p-6"
         style={{
@@ -397,11 +397,10 @@ const BusinessSearchPage: React.FC = () => {
           <div className="flex gap-3">
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className={`px-4 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2 ${
-                showFilters
+              className={`px-4 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2 ${showFilters
                   ? "bg-primary text-white"
                   : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-              }`}
+                }`}
             >
               <FunnelIcon className="w-5 h-5" />
               Filters

@@ -84,6 +84,7 @@ interface UserData {
   avatar: string;
   isEmailVerified: boolean;
   isPhoneVerified: boolean;
+  isLoginEnabled: boolean;
   permissions: {
     id: string;
     resource: string;
@@ -854,13 +855,13 @@ const UserProfile = () => {
                         </Typography>
                         <Box sx={{ mt: 0.5 }}>
                           <Chip
-                            icon={<CheckCircle size={14} />}
-                            label="Active"
+                            icon={userData.isLoginEnabled ? <CheckCircle size={14} /> : <Ban size={14} />}
+                            label={userData.isLoginEnabled ? "Active" : "Disabled"}
                             sx={{
-                              backgroundColor: "#e8f5e8",
-                              color: "#2e7d32",
+                              backgroundColor: userData.isLoginEnabled ? "#e8f5e8" : "#ffebee",
+                              color: userData.isLoginEnabled ? "#2e7d32" : "#c62828",
                               fontWeight: 600,
-                              "& .MuiChip-icon": { color: "#2e7d32" },
+                              "& .MuiChip-icon": { color: userData.isLoginEnabled ? "#2e7d32" : "#c62828" },
                             }}
                           />
                         </Box>
@@ -1082,7 +1083,7 @@ const UserProfile = () => {
               <Button
                 variant="contained"
                 startIcon={<Edit size={16} />}
-                onClick={() => router.push(`/users/edit/${userData.id}`)}
+                onClick={() => router.push(`/users/${userData.id}/edit`)}
                 sx={{
                   borderRadius: 1,
                   px: 3,
