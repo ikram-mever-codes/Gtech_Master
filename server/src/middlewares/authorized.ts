@@ -13,7 +13,7 @@ export const authenticateUser: RequestHandler = async (
   res,
   next
 ): Promise<void> => {
-  const authReq = req as AuthorizedRequest; // ✅ CAST HERE
+  const authReq = req as AuthorizedRequest;
 
   const token = authReq.cookies?.token;
   if (!token) {
@@ -50,7 +50,7 @@ export const authenticateUser: RequestHandler = async (
       );
     }
 
-    authReq.user = user; // ✅ safe
+    authReq.user = user;
     next();
   } catch (error) {
     console.error(error);

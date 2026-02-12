@@ -164,12 +164,10 @@ export const verifyEmail = async (
       return next(new ErrorHandler("Invalid verification code or email", 400));
     }
 
-    // Check if verification code has expired
     if (user.emailVerificationExp && user.emailVerificationExp < new Date()) {
       return next(new ErrorHandler("Verification code has expired", 400));
     }
 
-    // Update user verification status
     user.isEmailVerified = true;
     user.emailVerificationCode = undefined;
     user.emailVerificationExp = null;
@@ -1070,9 +1068,11 @@ export const updateUser = async (
       dateOfBirth,
       address,
       country,
+      partnerName,
+      emergencyContact,
+      joiningDate,
+      isLoginEnabled,
     } = req.body;
-
-
     if (!id) {
       return next(new ErrorHandler("User ID is required", 400));
     }
@@ -1108,14 +1108,17 @@ export const updateUser = async (
     user.email = email;
     user.role = role;
 
-
     const rawResources = Array.isArray(assignedResources) ? assignedResources : [];
     user.assignedResources = rawResources.map((r: string) => r.trim()).filter((r: string) => r.length > 0);
-    user.phoneNumber = phoneNumber;
-    user.gender = gender;
-    user.dateOfBirth = dateOfBirth;
-    user.address = address;
-    user.country = country;
+    user.phoneNumber = phoneNumber || null;
+    user.gender = gender || null;
+    user.dateOfBirth = dateOfBirth || null;
+    user.address = address || null;
+    user.country = country || null;
+    if (partnerName !== undefined) user.partnerName = partnerName || null;
+    if (emergencyContact !== undefined) user.emergencyContact = emergencyContact || null;
+    if (joiningDate !== undefined) user.joiningDate = joiningDate || null;
+    if (isLoginEnabled !== undefined) user.isLoginEnabled = isLoginEnabled;
 
     if (permissions) {
       await permissionRepository.delete({ user: { id: user.id } });
