@@ -228,7 +228,7 @@ const ProfilePage = () => {
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
 
                 <div className="lg:col-span-4">
-                    <Paper elevation={0} sx={{ p: 4, borderRadius: 3, border: "1px solid #e0e0e0", textAlign: "center", position: "relative", overflow: "hidden" }}>
+                    <Paper elevation={0} sx={{ p: 4, borderRadius: 1, border: "1px solid #e0e0e0", textAlign: "center", position: "relative", overflow: "hidden" }}>
                         <Box sx={{ position: "absolute", top: 0, left: 0, right: 0, height: "100px", background: "linear-gradient(45deg, #1976d2 0%, #64b5f6 100%)", opacity: 0.1, zIndex: 0 }} />
 
                         <Box sx={{ position: "relative", zIndex: 1, mt: 2 }}>
@@ -306,7 +306,7 @@ const ProfilePage = () => {
                     </Paper>
 
 
-                    <Card elevation={0} sx={{ mt: 3, borderRadius: 3, border: "1px solid #e0e0e0" }}>
+                    <Card elevation={0} sx={{ mt: 3, borderRadius: 1, border: "1px solid #e0e0e0" }}>
                         <CardContent>
                             <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 2, display: "flex", alignItems: "center", gap: 1 }}>
                                 <Info size={16} /> Status Info
@@ -327,7 +327,7 @@ const ProfilePage = () => {
 
 
                 <div className="lg:col-span-8">
-                    <Paper elevation={0} sx={{ borderRadius: 3, border: "1px solid #e0e0e0", overflow: "hidden" }}>
+                    <Paper elevation={0} sx={{ borderRadius: 1, border: "1px solid #e0e0e0", overflow: "hidden" }}>
                         <Tabs
                             value={tabValue}
                             onChange={(_, v) => setTabValue(v)}
@@ -464,7 +464,7 @@ const ProfilePage = () => {
                                             variant="contained"
                                             disabled={isSubmitting}
                                             startIcon={isSubmitting ? <CircularProgress size={16} /> : <Save size={18} />}
-                                            sx={{ px: 4, py: 1.5, borderRadius: "8px", fontWeight: 700 }}
+                                            sx={{ px: 4, py: 1.5, borderRadius: "4px", fontWeight: 700 }}
                                         >
                                             {isSubmitting ? "Saving..." : "Save Changes"}
                                         </CustomButton>
@@ -483,7 +483,7 @@ const ProfilePage = () => {
                                     </Typography>
 
                                     {profileData?.role === UserRole.ADMIN ? (
-                                        <Box sx={{ p: 4, borderRadius: 3, border: "2px dashed", borderColor: alpha("#1976d2", 0.3), bgcolor: alpha("#1976d2", 0.02), textAlign: "center" }}>
+                                        <Box sx={{ p: 4, borderRadius: 1, border: "2px dashed", borderColor: alpha("#1976d2", 0.3), bgcolor: alpha("#1976d2", 0.02), textAlign: "center" }}>
                                             <Box sx={{ width: 64, height: 64, borderRadius: "50%", bgcolor: alpha("#1976d2", 0.1), color: "primary.main", display: "flex", alignItems: "center", justifyContent: "center", mx: "auto", mb: 2 }}>
                                                 <Shield size={32} />
                                             </Box>
@@ -503,7 +503,7 @@ const ProfilePage = () => {
                                                 </Typography>
 
                                                 {profileData?.assignedResources && profileData.assignedResources.length > 0 ? (
-                                                    <Box sx={{ p: 3, borderRadius: 2, border: "1px solid #e8f5e8", bgcolor: alpha("#2e7d32", 0.02) }}>
+                                                    <Box sx={{ p: 3, borderRadius: 1, border: "1px solid #e8f5e8", bgcolor: alpha("#2e7d32", 0.02) }}>
                                                         <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1.5 }}>
                                                             {profileData.assignedResources.map((res: string, idx: number) => (
                                                                 <Chip
@@ -521,7 +521,7 @@ const ProfilePage = () => {
                                                         </Box>
                                                     </Box>
                                                 ) : (
-                                                    <Box sx={{ p: 3, textAlign: "center", borderRadius: 2, border: "1px dashed #ccc", bgcolor: "#fafafa" }}>
+                                                    <Box sx={{ p: 3, textAlign: "center", borderRadius: 1, border: "1px dashed #ccc", bgcolor: "#fafafa" }}>
                                                         <Typography variant="body2" color="text.secondary">No broad resource assignments found</Typography>
                                                     </Box>
                                                 )}
