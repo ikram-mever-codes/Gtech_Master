@@ -3,7 +3,6 @@ import { loadingStyles, successStyles } from "@/utils/constants";
 import { ResponseInterface } from "@/utils/interfaces";
 import toast from "react-hot-toast";
 
-// Type Definitions
 export type Sex = "male" | "female" | "";
 
 export type Position =
@@ -145,9 +144,6 @@ export type ContactPersonStatistics = {
   };
 };
 
-// API Functions
-
-// Create a new contact person
 export const createContactPerson = async (
   payload: CreateContactPersonPayload
 ) => {
@@ -166,7 +162,6 @@ export const createContactPerson = async (
   }
 };
 
-// Update a contact person
 export const updateContactPerson = async (
   contactPersonId: string,
   payload: UpdateContactPersonPayload
@@ -189,7 +184,6 @@ export const updateContactPerson = async (
   }
 };
 
-// Get single contact person
 export const getSingleContactPerson = async (contactPersonId: string) => {
   try {
     const res: ResponseInterface = await api.get(
@@ -201,7 +195,6 @@ export const getSingleContactPerson = async (contactPersonId: string) => {
   }
 };
 
-// Get all contact persons with filters
 export const getAllContactPersons = async (filters?: any) => {
   try {
     const params = new URLSearchParams();

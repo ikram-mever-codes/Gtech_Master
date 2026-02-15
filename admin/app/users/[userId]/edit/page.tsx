@@ -169,22 +169,30 @@ const UserUpdatePage: React.FC = () => {
         const assignedResourcesList = userData.assignedResources || [];
 
         const initialPermissions = [
-          ...existingPermissions.map((perm: any) => ({
-            id: Math.random().toString(),
-            resource: perm.resource,
-            actions: Array.isArray(perm.actions)
-              ? perm.actions
-              : typeof perm.actions === 'string' && (perm.actions as string).length > 0
-                ? (perm.actions as string).split(',')
-                : [],
-          }))
+          ...(userData.permissions || []).map((perm: any) => {
+            const resourceName = perm.resource?.trim() || "";
+            let actions: string[] = [];
+
+            if (Array.isArray(perm.actions)) {
+              actions = perm.actions.map((a: any) => String(a).trim());
+            } else if (typeof perm.actions === 'string' && perm.actions.length > 0) {
+              actions = perm.actions.split(',').map((a: string) => a.trim());
+            }
+
+            return {
+              id: Math.random().toString(),
+              resource: resourceName,
+              actions: actions,
+            };
+          })
         ];
 
         assignedResourcesList.forEach((res: string) => {
-          if (!initialPermissions.some(p => p.resource === res)) {
+          const trimmedRes = res.trim();
+          if (trimmedRes && !initialPermissions.some(p => p.resource.toLowerCase() === trimmedRes.toLowerCase())) {
             initialPermissions.push({
               id: Math.random().toString(),
-              resource: res,
+              resource: trimmedRes,
               actions: []
             });
           }
@@ -248,28 +256,31 @@ const UserUpdatePage: React.FC = () => {
   });
 
   const handleAddResource = (resourceName: string): void => {
-    if (!permissions.some((p) => p.resource === resourceName)) {
+    const trimmedName = resourceName.trim();
+    if (!permissions.some((p) => p.resource.toLowerCase() === trimmedName.toLowerCase())) {
       setPermissions((prev) => [
         ...prev,
-        { id: Math.random().toString(), resource: resourceName, actions: [] },
+        { id: Math.random().toString(), resource: trimmedName, actions: [] },
       ]);
     }
     setShowResourceDialog(false);
   };
 
   const handleRemoveResource = (resourceName: string): void => {
-    setPermissions((prev) => prev.filter((p) => p.resource !== resourceName));
+    const trimmedName = resourceName.trim();
+    setPermissions((prev) => prev.filter((p) => p.resource.toLowerCase() !== trimmedName.toLowerCase()));
   };
 
   const handlePermissionChange = (resource: string, action: string): void => {
+    const trimmedAction = action.trim();
     setPermissions((prev) =>
       prev.map((p) =>
-        p.resource === resource
+        p.resource.toLowerCase() === resource.toLowerCase().trim()
           ? {
             ...p,
-            actions: p.actions.includes(action)
-              ? p.actions.filter((a) => a !== action)
-              : [...p.actions, action],
+            actions: p.actions.some(a => a.toLowerCase() === trimmedAction.toLowerCase())
+              ? p.actions.filter((a) => a.toLowerCase() !== trimmedAction.toLowerCase())
+              : [...p.actions, trimmedAction],
           }
           : p
       )
@@ -562,7 +573,7 @@ const UserUpdatePage: React.FC = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {permissions.map((permission) => {
                   const resourceConfig = availableResources.find(
-                    (r) => r.name === permission.resource
+                    (r) => r.name.toLowerCase().trim() === permission.resource.toLowerCase().trim()
                   );
 
                   return (
@@ -603,8 +614,10 @@ const UserUpdatePage: React.FC = () => {
 
                         <div className="flex flex-wrap gap-2">
                           {resourceConfig?.actions.map((action) => {
-                            const isActive =
-                              permission.actions.includes(action);
+                            const trimmedAction = action.trim();
+                            const isActive = permission.actions.some(
+                              (a) => a.toLowerCase() === trimmedAction.toLowerCase()
+                            );
 
                             return (
                               <button
@@ -691,7 +704,7 @@ const UserUpdatePage: React.FC = () => {
                 .filter((resource) => !resource.adminOnly)
                 .map((resource) => {
                   const isAssigned = permissions.some(
-                    (p) => p.resource === resource.name
+                    (p) => p.resource.toLowerCase().trim() === resource.name.toLowerCase().trim()
                   );
 
                   return (

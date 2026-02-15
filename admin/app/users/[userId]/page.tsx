@@ -53,6 +53,7 @@ import {
   FileText,
   Clock,
   Lock,
+  Check,
 } from "lucide-react";
 import { format } from "date-fns";
 import Link from "next/link";
@@ -485,42 +486,6 @@ const UserProfile = () => {
                       <Edit size={20} />
                     </IconButton>
                   </Tooltip>
-                  {/* <Tooltip title="Reset Password" placement="top">
-                    <IconButton
-                      onClick={() => handleConfirmAction("resetPassword")}
-                      sx={{
-                        backgroundColor: "#f3e5f5",
-                        color: "#7b1fa2",
-                        "&:hover": { backgroundColor: "#e1bee7" },
-                      }}
-                    >
-                      <Key size={20} />
-                    </IconButton>
-                  </Tooltip>
-                  <Tooltip title="Resend Verification" placement="top">
-                    <IconButton
-                      onClick={() => handleConfirmAction("resend")}
-                      sx={{
-                        backgroundColor: "#e8f5e8",
-                        color: "#2e7d32",
-                        "&:hover": { backgroundColor: "#c8e6c9" },
-                      }}
-                    >
-                      <RefreshCw size={20} />
-                    </IconButton>
-                  </Tooltip>
-                  <Tooltip title="Block User" placement="top">
-                    <IconButton
-                      onClick={() => handleConfirmAction("block")}
-                      sx={{
-                        backgroundColor: "#fff3e0",
-                        color: "#f57c00",
-                        "&:hover": { backgroundColor: "#ffe0b2" },
-                      }}
-                    >
-                      <Ban size={20} />
-                    </IconButton>
-                  </Tooltip> */}
                   <Tooltip title="Delete User" placement="top">
                     <IconButton
                       onClick={() => handleConfirmAction("delete")}
@@ -1185,92 +1150,83 @@ const UserProfile = () => {
                                 sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}
                               >
                                 {(() => {
-                                  const actions = Array.isArray(permission.actions)
-                                    ? permission.actions
-                                    : typeof permission.actions === 'string' && (permission.actions as string).length > 0
-                                      ? (permission.actions as string).split(',')
-                                      : [];
+                                  const resourceConfig = availableResources.find(
+                                    (r) => r.name.toLowerCase().trim() === permission.resource.toLowerCase().trim()
+                                  );
+                                  const allAvailableActions = resourceConfig?.actions || [];
+
+                                  const actionsRaw = permission.actions;
+                                  let actions: string[] = [];
+
+                                  if (Array.isArray(actionsRaw)) {
+                                    actions = actionsRaw.map(a => String(a).trim());
+                                  } else if (typeof actionsRaw === 'string' && actionsRaw.length > 0) {
+                                    actions = actionsRaw.split(',').map(a => a.trim());
+                                  }
+
+                                  const activeActions = allAvailableActions.filter(availableAction =>
+                                    actions.some(userAction => userAction.toLowerCase() === availableAction.toLowerCase().trim())
+                                  );
+
+                                  if (activeActions.length > 0) {
+                                    return (
+                                      <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+                                        {activeActions.map((action, index) => (
+                                          <Box
+                                            key={index}
+                                            sx={{
+                                              display: "flex",
+                                              alignItems: "center",
+                                              gap: 0.5,
+                                              px: 1.5,
+                                              py: 0.75,
+                                              borderRadius: "6px",
+                                              fontSize: "0.8rem",
+                                              fontWeight: 600,
+                                              backgroundColor: "#8CC21B",
+                                              color: "#ffffff",
+                                              border: "1px solid #8CC21B",
+                                              boxShadow: "0 2px 4px rgba(140, 194, 27, 0.2)",
+                                            }}
+                                          >
+                                            <Check size={14} />
+                                            {action.charAt(0).toUpperCase() + action.slice(1)}
+                                          </Box>
+                                        ))}
+                                      </Box>
+                                    );
+                                  }
 
                                   if (actions.length > 0) {
-                                    return actions.map((action, index) => {
-                                      const colorMap: any = {
-                                        view: {
-                                          bg: "#e3f2fd",
-                                          color: "#1565c0",
-                                          border: "#bbdefb",
-                                        },
-                                        create: {
-                                          bg: "#e8f5e8",
-                                          color: "#2e7d32",
-                                          border: "#c8e6c9",
-                                        },
-                                        read: {
-                                          bg: "#e3f2fd",
-                                          color: "#1565c0",
-                                          border: "#bbdefb",
-                                        },
-                                        edit: {
-                                          bg: "#fff3e0",
-                                          color: "#f57c00",
-                                          border: "#ffe0b2",
-                                        },
-                                        delete: {
-                                          bg: "#ffebee",
-                                          color: "#c62828",
-                                          border: "#ffcdd2",
-                                        },
-                                        cancel: {
-                                          bg: "#ffebee",
-                                          color: "#c62828",
-                                          border: "#ffcdd2",
-                                        },
-                                        refund: {
-                                          bg: "#efebe9",
-                                          color: "#5d4037",
-                                          border: "#d7ccc8",
-                                        },
-                                        update: {
-                                          bg: "#fff3e0",
-                                          color: "#f57c00",
-                                          border: "#ffe0b2",
-                                        },
-                                        send: {
-                                          bg: "#e8f5e9",
-                                          color: "#2e7d32",
-                                          border: "#c8e6c9",
-                                        },
-                                        export: {
-                                          bg: "#f3e5f5",
-                                          color: "#7b1fa2",
-                                          border: "#e1bee7",
-                                        },
-                                      };
-                                      const colors = colorMap[action.toLowerCase().trim()] || {
-                                        bg: "#f5f5f5",
-                                        color: "#757575",
-                                        border: "#e0e0e0",
-                                      };
-
-                                      return (
-                                        <Chip
-                                          key={index}
-                                          label={action.trim()}
-                                          sx={{
-                                            backgroundColor: colors.bg,
-                                            color: colors.color,
-                                            border: `1px solid ${colors.border}`,
-                                            fontWeight: 600,
-                                            textTransform: "capitalize",
-                                            fontSize: "0.8rem",
-                                          }}
-                                        />
-                                      );
-                                    });
+                                    return (
+                                      <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+                                        {actions.map((action: string, index: number) => (
+                                          <Box
+                                            key={index}
+                                            sx={{
+                                              display: "flex",
+                                              alignItems: "center",
+                                              gap: 0.5,
+                                              px: 1.5,
+                                              py: 0.75,
+                                              borderRadius: "6px",
+                                              fontSize: "0.8rem",
+                                              fontWeight: 600,
+                                              backgroundColor: "#8CC21B",
+                                              color: "#ffffff",
+                                              border: "1px solid #8CC21B",
+                                            }}
+                                          >
+                                            <Check size={14} />
+                                            {action.charAt(0).toUpperCase() + action.slice(1)}
+                                          </Box>
+                                        ))}
+                                      </Box>
+                                    );
                                   } else {
-                                    // If no specific actions selected, show it clearly
                                     return (
                                       <Typography variant="caption" sx={{ color: 'text.disabled', fontStyle: 'italic' }}>
-                                        Full Access (No restricted actions)
+                                        No specific actions granted
                                       </Typography>
                                     );
                                   }
