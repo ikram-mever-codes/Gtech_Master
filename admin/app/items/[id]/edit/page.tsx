@@ -16,6 +16,8 @@ import {
     LucideImage,
 } from "lucide-react";
 import {
+    Tabs,
+    Tab,
     Typography,
     MenuItem,
     FormControl,
@@ -64,10 +66,15 @@ const EditItemPage = () => {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [activeTab, setActiveTab] = useState(0);
 
     const [parents, setParents] = useState<any[]>([]);
     const [tarics, setTarics] = useState<any[]>([]);
     const [categories, setCategories] = useState<any[]>([]);
+
+    const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+        setActiveTab(newValue);
+    };
 
     const formik = useFormik({
         initialValues: {
@@ -91,6 +98,20 @@ const EditItemPage = () => {
             is_npr: false,
             is_eur_special: false,
             is_rmb_special: false,
+            // New fields
+            isbn: "",
+            mc: "0",
+            er: "0",
+            foq: "0",
+            is_pu_item: false,
+            is_meter_item: false,
+            is_dimension_special: false,
+            id_de: "",
+            msq: "0",
+            buffer: "0",
+            is_nao: false,
+            is_snsi: false,
+            rmb_price: "0",
         },
         validationSchema,
         onSubmit: async (values) => {
@@ -103,13 +124,22 @@ const EditItemPage = () => {
                     is_npr: values.is_npr ? "Y" : "N",
                     is_eur_special: values.is_eur_special ? "Y" : "N",
                     is_rmb_special: values.is_rmb_special ? "Y" : "N",
+                    is_dimension_special: values.is_dimension_special ? "Y" : "N",
+                    is_pu_item: values.is_pu_item ? 1 : 0,
+                    is_meter_item: values.is_meter_item ? 1 : 0,
                     parent_id: Number(values.parent_id),
                     taric_id: values.taric_id ? Number(values.taric_id) : undefined,
                     cat_id: values.cat_id ? Number(values.cat_id) : undefined,
-                    weight: values.weight ? Number(values.weight) : 0,
-                    length: values.length ? Number(values.length) : 0,
-                    width: values.width ? Number(values.width) : 0,
-                    height: values.height ? Number(values.height) : 0,
+                    weight: Number(values.weight),
+                    length: Number(values.length),
+                    width: Number(values.width),
+                    height: Number(values.height),
+                    ISBN: Number(values.isbn),
+                    many_components: Number(values.mc),
+                    effort_rating: Number(values.er),
+                    FOQ: Number(values.foq),
+                    ItemID_DE: Number(values.id_de),
+                    RMB_Price: Number(values.rmb_price),
                 };
 
                 const response: any = await updateItem(Number(id), payload);
@@ -162,6 +192,19 @@ const EditItemPage = () => {
                         is_npr: item.others?.isNPR || false,
                         is_eur_special: item.parent?.isEURSpecial || false,
                         is_rmb_special: item.parent?.isRMBSpecial || false,
+                        isbn: item.dimensions?.isbn || "1",
+                        mc: item.others?.mc || "0",
+                        er: item.others?.er || "0",
+                        foq: item.others?.foq || "0",
+                        is_pu_item: item.others?.isPU || false,
+                        is_meter_item: item.others?.isMeter || false,
+                        is_dimension_special: item.others?.isDimensionSpecial || false,
+                        id_de: item.others?.idDE || "",
+                        msq: item.others?.msq || "0",
+                        buffer: item.others?.buffer || "0",
+                        is_nao: item.others?.isNAO || false,
+                        is_snsi: item.others?.isSnSI || false,
+                        rmb_price: item.others?.rmbPrice || item.parent?.priceRMB || "0",
                     });
                 }
 
@@ -188,7 +231,7 @@ const EditItemPage = () => {
     }
 
     return (
-        <Box sx={{ p: 0, maxWidth: "1200px", mx: "auto" }}>
+        <Box sx={{ p: 0, maxWidth: "1200px", mx: "auto", pb: 8 }}>
             <Box sx={{ mb: 4, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <Box>
                     <Breadcrumbs separator="›" aria-label="breadcrumb" sx={{ mb: 1 }}>
@@ -203,7 +246,7 @@ const EditItemPage = () => {
                     </Breadcrumbs>
                     <Typography variant="h4" sx={{ fontWeight: 700, color: "secondary.main", display: "flex", alignItems: "center", gap: 2 }}>
                         <LucidePackage size={32} color="#8CC21B" />
-                        Edit Item: {formik.values.item_name}
+                        {formik.values.item_name || "Edit Item"}
                     </Typography>
                 </Box>
 
@@ -238,292 +281,149 @@ const EditItemPage = () => {
                 </Box>
             </Box>
 
-            {error && (
-                <Alert severity="error" sx={{ mb: 3, borderRadius: "4px" }}>
-                    {error}
-                </Alert>
-            )}
+            {error && <Alert severity="error" sx={{ mb: 3, borderRadius: "4px" }}>{error}</Alert>}
 
-            <Grid container spacing={3}>
-                <Grid size={{ xs: 12, md: 8 }}>
-                    <Paper elevation={0} sx={{ p: 4, borderRadius: "4px", border: "1px solid #e0e0e0" }}>
-                        <Typography variant="h6" sx={{ mb: 3, fontWeight: 700, display: "flex", alignItems: "center", gap: 1.5 }}>
-                            <LucideBox size={20} color="#8CC21B" />
-                            General Information
-                        </Typography>
+            <Paper elevation={0} sx={{ borderRadius: "8px", border: "1px solid #e0e0e0", overflow: "hidden" }}>
+                <Tabs
+                    value={activeTab}
+                    onChange={handleTabChange}
+                    indicatorColor="primary"
+                    textColor="primary"
+                    variant="fullWidth"
+                    sx={{
+                        borderBottom: 1,
+                        borderColor: 'divider',
+                        bgcolor: '#fafafa',
+                        '& .MuiTab-root': {
+                            py: 2,
+                            fontWeight: 600,
+                            textTransform: 'none',
+                            fontSize: '0.95rem'
+                        }
+                    }}
+                >
+                    <Tab label="General Information" icon={<LucideBox size={18} />} iconPosition="start" />
+                    <Tab label="Logistics & Dims" icon={<LucideSettings size={18} />} iconPosition="start" />
+                    <Tab label="Assets & Remarks" icon={<LucideFileText size={18} />} iconPosition="start" />
+                    <Tab label="Warehouse Info" icon={<LucideInfo size={18} />} iconPosition="start" />
+                </Tabs>
 
+                <Box sx={{ p: 4 }}>
+                    {activeTab === 0 && (
                         <Grid container spacing={3}>
                             <Grid size={{ xs: 12, md: 6 }}>
                                 <TextField
                                     fullWidth
-                                    id="item_name"
-                                    name="item_name"
                                     label="Item Name (German)"
-                                    value={formik.values.item_name}
-                                    onChange={formik.handleChange}
+                                    {...formik.getFieldProps('item_name')}
                                     error={formik.touched.item_name && Boolean(formik.errors.item_name)}
                                     helperText={formik.touched.item_name && formik.errors.item_name}
-                                    sx={{ "& .MuiOutlinedInput-root": { borderRadius: "4px" } }}
                                 />
                             </Grid>
                             <Grid size={{ xs: 12, md: 6 }}>
-                                <TextField
-                                    fullWidth
-                                    id="item_name_cn"
-                                    name="item_name_cn"
-                                    label="Item Name (Chinese)"
-                                    value={formik.values.item_name_cn}
-                                    onChange={formik.handleChange}
-                                    sx={{ "& .MuiOutlinedInput-root": { borderRadius: "4px" } }}
-                                />
+                                <TextField fullWidth label="Item Name (Chinese)" {...formik.getFieldProps('item_name_cn')} />
                             </Grid>
-                            <Grid size={{ xs: 12, md: 6 }}>
-                                <TextField
-                                    fullWidth
-                                    id="ean"
-                                    name="ean"
-                                    label="EAN / Barcode"
-                                    value={formik.values.ean}
-                                    onChange={formik.handleChange}
-                                    sx={{ "& .MuiOutlinedInput-root": { borderRadius: "4px" } }}
-                                />
+                            <Grid size={{ xs: 12, md: 4 }}>
+                                <TextField fullWidth label="EAN / Barcode" {...formik.getFieldProps('ean')} />
                             </Grid>
-                            <Grid size={{ xs: 12, md: 6 }}>
-                                <TextField
-                                    fullWidth
-                                    id="model"
-                                    name="model"
-                                    label="Model"
-                                    value={formik.values.model}
-                                    onChange={formik.handleChange}
-                                    sx={{ "& .MuiOutlinedInput-root": { borderRadius: "4px" } }}
-                                />
+                            <Grid size={{ xs: 12, md: 4 }}>
+                                <TextField fullWidth label="Model" {...formik.getFieldProps('model')} />
                             </Grid>
-
                             <Grid size={{ xs: 12, md: 4 }}>
                                 <FormControl fullWidth>
-                                    <Typography variant="caption" sx={{ mb: 0.5, fontWeight: 600, color: "text.secondary" }}>Parent Product</Typography>
-                                    <Select
-                                        id="parent_id"
-                                        name="parent_id"
-                                        value={formik.values.parent_id}
-                                        onChange={formik.handleChange}
-                                        sx={{ borderRadius: "4px" }}
-                                    >
-                                        <MenuItem value={0}>Select Parent</MenuItem>
-                                        {parents.map((parent) => (
-                                            <MenuItem key={parent.id} value={parent.id}>
-                                                {parent.de_no} - {parent.name_de}
-                                            </MenuItem>
-                                        ))}
+                                    <Typography variant="caption" sx={{ mb: 0.5, fontWeight: 600, color: "text.secondary" }}>Category</Typography>
+                                    <Select {...formik.getFieldProps('cat_id')}>
+                                        <MenuItem value={0}>Select Category</MenuItem>
+                                        {categories.map((cat) => <MenuItem key={cat.id} value={cat.id}>{cat.name}</MenuItem>)}
                                     </Select>
                                 </FormControl>
                             </Grid>
+                            <Grid size={{ xs: 12, md: 6 }}>
+                                <FormControl fullWidth>
+                                    <Typography variant="caption" sx={{ mb: 0.5, fontWeight: 600, color: "text.secondary" }}>Parent Product</Typography>
+                                    <Select {...formik.getFieldProps('parent_id')}>
+                                        <MenuItem value={0}>Select Parent</MenuItem>
+                                        {parents.map((parent) => <MenuItem key={parent.id} value={parent.id}>{parent.de_no} - {parent.name_de}</MenuItem>)}
+                                    </Select>
+                                </FormControl>
+                            </Grid>
+                            <Grid size={{ xs: 12, md: 3 }}>
+                                <FormControlLabel
+                                    control={<Switch checked={formik.values.isActive} onChange={(e) => formik.setFieldValue("isActive", e.target.checked)} />}
+                                    label="Is Active?"
+                                />
+                            </Grid>
+                        </Grid>
+                    )}
+
+                    {activeTab === 1 && (
+                        <Grid container spacing={3}>
+                            <Grid size={{ xs: 12, md: 3 }}><TextField fullWidth label="Weight (kg)" type="number" {...formik.getFieldProps('weight')} /></Grid>
+                            <Grid size={{ xs: 12, md: 3 }}><TextField fullWidth label="Length (cm)" type="number" {...formik.getFieldProps('length')} /></Grid>
+                            <Grid size={{ xs: 12, md: 3 }}><TextField fullWidth label="Width (cm)" type="number" {...formik.getFieldProps('width')} /></Grid>
+                            <Grid size={{ xs: 12, md: 3 }}><TextField fullWidth label="Height (cm)" type="number" {...formik.getFieldProps('height')} /></Grid>
+
+                            <Grid size={{ xs: 12, md: 3 }}><TextField fullWidth label="ISBN" {...formik.getFieldProps('isbn')} /></Grid>
+                            <Grid size={{ xs: 12, md: 3 }}><TextField fullWidth label="MC" {...formik.getFieldProps('mc')} /></Grid>
+                            <Grid size={{ xs: 12, md: 3 }}><TextField fullWidth label="ER" {...formik.getFieldProps('er')} /></Grid>
+                            <Grid size={{ xs: 12, md: 3 }}><TextField fullWidth label="FOQ" {...formik.getFieldProps('foq')} /></Grid>
 
                             <Grid size={{ xs: 12, md: 4 }}>
                                 <FormControl fullWidth>
                                     <Typography variant="caption" sx={{ mb: 0.5, fontWeight: 600, color: "text.secondary" }}>TARIC Code</Typography>
-                                    <Select
-                                        id="taric_id"
-                                        name="taric_id"
-                                        value={formik.values.taric_id}
-                                        onChange={formik.handleChange}
-                                        sx={{ borderRadius: "4px" }}
-                                    >
+                                    <Select {...formik.getFieldProps('taric_id')}>
                                         <MenuItem value={0}>Select TARIC</MenuItem>
-                                        {tarics.map((taric) => (
-                                            <MenuItem key={taric.id} value={taric.id}>
-                                                {taric.code} - {taric.name_en}
-                                            </MenuItem>
-                                        ))}
+                                        {tarics.map((taric) => <MenuItem key={taric.id} value={taric.id}>{taric.code} - {taric.name_en}</MenuItem>)}
                                     </Select>
                                 </FormControl>
                             </Grid>
 
-                            <Grid size={{ xs: 12, md: 4 }}>
-                                <FormControl fullWidth>
-                                    <Typography variant="caption" sx={{ mb: 0.5, fontWeight: 600, color: "text.secondary" }}>Category</Typography>
-                                    <Select
-                                        id="cat_id"
-                                        name="cat_id"
-                                        value={formik.values.cat_id}
-                                        onChange={formik.handleChange}
-                                        sx={{ borderRadius: "4px" }}
-                                    >
-                                        <MenuItem value={0}>Select Category</MenuItem>
-                                        {categories.map((cat) => (
-                                            <MenuItem key={cat.id} value={cat.id}>
-                                                {cat.name}
-                                            </MenuItem>
-                                        ))}
-                                    </Select>
-                                </FormControl>
+                            <Grid size={{ xs: 12, md: 8 }}>
+                                <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 1 }}>
+                                    <FormControlLabel control={<Switch checked={formik.values.is_qty_dividable} onChange={(e) => formik.setFieldValue("is_qty_dividable", e.target.checked)} />} label="Qty Dividable" />
+                                    <FormControlLabel control={<Switch checked={formik.values.is_dimension_special} onChange={(e) => formik.setFieldValue("is_dimension_special", e.target.checked)} />} label="Special Dimensions" />
+                                    <FormControlLabel control={<Switch checked={formik.values.is_pu_item} onChange={(e) => formik.setFieldValue("is_pu_item", e.target.checked)} />} label="Is PU Item" />
+                                    <FormControlLabel control={<Switch checked={formik.values.is_meter_item} onChange={(e) => formik.setFieldValue("is_meter_item", e.target.checked)} />} label="Is Meter Item" />
+                                    <FormControlLabel control={<Switch checked={formik.values.is_eur_special} onChange={(e) => formik.setFieldValue("is_eur_special", e.target.checked)} />} label="EUR Special" />
+                                    <FormControlLabel control={<Switch checked={formik.values.is_rmb_special} onChange={(e) => formik.setFieldValue("is_rmb_special", e.target.checked)} />} label="RMB Special" />
+                                </Box>
                             </Grid>
                         </Grid>
-                    </Paper>
+                    )}
 
-                    <Paper elevation={0} sx={{ p: 4, mt: 3, borderRadius: "4px", border: "1px solid #e0e0e0" }}>
-                        <Typography variant="h6" sx={{ mb: 3, fontWeight: 700, display: "flex", alignItems: "center", gap: 1.5 }}>
-                            <LucideImage size={20} color="#8CC21B" />
-                            Assets & Media
-                        </Typography>
+                    {activeTab === 2 && (
                         <Grid container spacing={3}>
-                            <Grid size={{ xs: 12, md: 6 }}>
-                                <TextField
-                                    fullWidth
-                                    id="photo"
-                                    name="photo"
-                                    label="Shop Photo URL"
-                                    value={formik.values.photo}
-                                    onChange={formik.handleChange}
-                                    sx={{ "& .MuiOutlinedInput-root": { borderRadius: "4px" } }}
-                                />
+                            <Grid size={{ xs: 12, md: 6 }}><TextField fullWidth label="Shop Photo URL" {...formik.getFieldProps('photo')} /></Grid>
+                            <Grid size={{ xs: 12, md: 6 }}><TextField fullWidth label="eBay Pictures Path" {...formik.getFieldProps('pix_path_eBay')} /></Grid>
+                            <Grid size={{ xs: 12 }}>
+                                <TextField fullWidth multiline rows={3} label="General Remarks" {...formik.getFieldProps('remark')} />
                             </Grid>
-                            <Grid size={{ xs: 12, md: 6 }}>
-                                <TextField
-                                    fullWidth
-                                    id="pix_path_eBay"
-                                    name="pix_path_eBay"
-                                    label="eBay Pictures Path"
-                                    value={formik.values.pix_path_eBay}
-                                    onChange={formik.handleChange}
-                                    sx={{ "& .MuiOutlinedInput-root": { borderRadius: "4px" } }}
-                                />
+                            <Grid size={{ xs: 12 }}>
+                                <TextField fullWidth multiline rows={2} label="NPR Remarks" {...formik.getFieldProps('npr_remark')} />
+                            </Grid>
+                            <Grid size={{ xs: 12 }}>
+                                <FormControlLabel control={<Switch checked={formik.values.is_npr} onChange={(e) => formik.setFieldValue("is_npr", e.target.checked)} />} label="Is NPR?" />
                             </Grid>
                         </Grid>
-                    </Paper>
+                    )}
 
-                    <Paper elevation={0} sx={{ p: 4, mt: 3, borderRadius: "4px", border: "1px solid #e0e0e0" }}>
-                        <Typography variant="h6" sx={{ mb: 3, fontWeight: 700, display: "flex", alignItems: "center", gap: 1.5 }}>
-                            <LucideFileText size={20} color="#8CC21B" />
-                            Remarks & Notes
-                        </Typography>
+                    {activeTab === 3 && (
                         <Grid container spacing={3}>
-                            <Grid size={{ xs: 12 }}>
-                                <TextField
-                                    fullWidth
-                                    multiline
-                                    rows={3}
-                                    id="remark"
-                                    name="remark"
-                                    label="General Remarks"
-                                    value={formik.values.remark}
-                                    onChange={formik.handleChange}
-                                    sx={{ "& .MuiOutlinedInput-root": { borderRadius: "4px" } }}
-                                />
-                            </Grid>
-                            <Grid size={{ xs: 12 }}>
-                                <TextField
-                                    fullWidth
-                                    multiline
-                                    rows={2}
-                                    id="npr_remark"
-                                    name="npr_remark"
-                                    label="NPR Remark"
-                                    value={formik.values.npr_remark}
-                                    onChange={formik.handleChange}
-                                    sx={{ "& .MuiOutlinedInput-root": { borderRadius: "4px" } }}
-                                />
+                            <Grid size={{ xs: 12, md: 4 }}><TextField fullWidth label="ID DE" {...formik.getFieldProps('id_de')} /></Grid>
+                            <Grid size={{ xs: 12, md: 4 }}><TextField fullWidth label="MSQ" {...formik.getFieldProps('msq')} /></Grid>
+                            <Grid size={{ xs: 12, md: 4 }}><TextField fullWidth label="Buffer" {...formik.getFieldProps('buffer')} /></Grid>
+                            <Grid size={{ xs: 12, md: 4 }}><TextField fullWidth label="RMB Price" {...formik.getFieldProps('rmb_price')} /></Grid>
+
+                            <Grid size={{ xs: 12, md: 8 }}>
+                                <Box sx={{ display: 'flex', gap: 4 }}>
+                                    <FormControlLabel control={<Switch checked={formik.values.is_nao} onChange={(e) => formik.setFieldValue("is_nao", e.target.checked)} />} label="is NAO" />
+                                    <FormControlLabel control={<Switch checked={formik.values.is_snsi} onChange={(e) => formik.setFieldValue("is_snsi", e.target.checked)} />} label="is SnSI" />
+                                </Box>
                             </Grid>
                         </Grid>
-                    </Paper>
-                </Grid>
-
-                <Grid size={{ xs: 12, md: 4 }}>
-                    <Paper elevation={0} sx={{ p: 4, borderRadius: "4px", border: "1px solid #e0e0e0", mb: 3 }}>
-                        <Typography variant="h6" sx={{ mb: 3, fontWeight: 700, display: "flex", alignItems: "center", gap: 1.5 }}>
-                            <LucideSettings size={20} color="#8CC21B" />
-                            Item Settings
-                        </Typography>
-
-                        <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-                            <FormControlLabel
-                                control={<Switch checked={formik.values.isActive} onChange={(e) => formik.setFieldValue("isActive", e.target.checked)} color="primary" />}
-                                label={<Typography variant="body2" sx={{ fontWeight: 600 }}>Active Status</Typography>}
-                            />
-                            <FormControlLabel
-                                control={<Switch checked={formik.values.is_qty_dividable} onChange={(e) => formik.setFieldValue("is_qty_dividable", e.target.checked)} color="primary" />}
-                                label={<Typography variant="body2" sx={{ fontWeight: 600 }}>Quantity Dividable</Typography>}
-                            />
-                            <FormControlLabel
-                                control={<Switch checked={formik.values.is_npr} onChange={(e) => formik.setFieldValue("is_npr", e.target.checked)} color="primary" />}
-                                label={<Typography variant="body2" sx={{ fontWeight: 600 }}>NPR Status</Typography>}
-                            />
-                            <FormControlLabel
-                                control={<Switch checked={formik.values.is_eur_special} onChange={(e) => formik.setFieldValue("is_eur_special", e.target.checked)} color="primary" />}
-                                label={<Typography variant="body2" sx={{ fontWeight: 600 }}>EUR Special</Typography>}
-                            />
-                            <FormControlLabel
-                                control={<Switch checked={formik.values.is_rmb_special} onChange={(e) => formik.setFieldValue("is_rmb_special", e.target.checked)} color="primary" />}
-                                label={<Typography variant="body2" sx={{ fontWeight: 600 }}>RMB Special</Typography>}
-                            />
-                        </Box>
-                    </Paper>
-
-                    <Paper elevation={0} sx={{ p: 4, borderRadius: "4px", border: "1px solid #e0e0e0" }}>
-                        <Typography variant="h6" sx={{ mb: 3, fontWeight: 700, display: "flex", alignItems: "center", gap: 1.5 }}>
-                            <LucideInfo size={20} color="#8CC21B" />
-                            Dimensions & Weight
-                        </Typography>
-                        <Grid container spacing={2}>
-                            <Grid size={{ xs: 12 }}>
-                                <TextField
-                                    fullWidth
-                                    id="weight"
-                                    name="weight"
-                                    label="Weight"
-                                    type="number"
-                                    value={formik.values.weight}
-                                    onChange={formik.handleChange}
-                                    InputProps={{ endAdornment: <InputAdornment position="end">kg</InputAdornment> }}
-                                    sx={{ "& .MuiOutlinedInput-root": { borderRadius: "4px" } }}
-                                />
-                            </Grid>
-                            <Grid size={{ xs: 4 }}>
-                                <TextField
-                                    fullWidth
-                                    id="length"
-                                    name="length"
-                                    label="L"
-                                    type="number"
-                                    value={formik.values.length}
-                                    onChange={formik.handleChange}
-                                    sx={{ "& .MuiOutlinedInput-root": { borderRadius: "4px" } }}
-                                />
-                            </Grid>
-                            <Grid size={{ xs: 4 }}>
-                                <TextField
-                                    fullWidth
-                                    id="width"
-                                    name="width"
-                                    label="W"
-                                    type="number"
-                                    value={formik.values.width}
-                                    onChange={formik.handleChange}
-                                    sx={{ "& .MuiOutlinedInput-root": { borderRadius: "4px" } }}
-                                />
-                            </Grid>
-                            <Grid size={{ xs: 4 }}>
-                                <TextField
-                                    fullWidth
-                                    id="height"
-                                    name="height"
-                                    label="H"
-                                    type="number"
-                                    value={formik.values.height}
-                                    onChange={formik.handleChange}
-                                    sx={{ "& .MuiOutlinedInput-root": { borderRadius: "4px" } }}
-                                />
-                            </Grid>
-                            <Grid size={{ xs: 12 }}>
-                                <Typography variant="caption" color="text.secondary">
-                                    Dimensions are in centimeters (cm).
-                                </Typography>
-                            </Grid>
-                        </Grid>
-                    </Paper>
-                </Grid>
-            </Grid>
+                    )}
+                </Box>
+            </Paper>
         </Box>
     );
 };

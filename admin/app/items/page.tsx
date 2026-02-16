@@ -131,7 +131,6 @@ const ItemsManagementPage: React.FC = () => {
     name: "",
   });
 
-  // TARIC modal states
   const [showTaricModal, setShowTaricModal] = useState(false);
   const [taricModalMode, setTaricModalMode] = useState<"create" | "edit">(
     "create"
@@ -151,7 +150,6 @@ const ItemsManagementPage: React.FC = () => {
   const [categories, setCategories] = useState<any[]>([]);
 
 
-  // Item modal states
   const [showItemModal, setShowItemModal] = useState(false);
   const [itemFormData, setItemFormData] = useState({
     item_name: "",
@@ -195,7 +193,6 @@ const ItemsManagementPage: React.FC = () => {
     });
   };
 
-  // Get status badge color
   const getStatusBadgeColor = (status: string) => {
     switch (status?.toLowerCase()) {
       case "active":
@@ -213,7 +210,6 @@ const ItemsManagementPage: React.FC = () => {
     }
   };
 
-  // Fetch data based on active tab
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
@@ -301,7 +297,6 @@ const ItemsManagementPage: React.FC = () => {
         if (taricsRes?.data) setTarics(taricsRes.data);
         if (catsRes?.data) setCategories(catsRes.data);
 
-        // Verification check
         if ((!parentsRes?.data || parentsRes.data.length === 0) && activeTab === "items") {
           console.warn("No parents found in database.");
         }
@@ -314,7 +309,6 @@ const ItemsManagementPage: React.FC = () => {
   }, [activeTab]);
 
 
-  // Handle item actions
   const handleViewItem = (itemId: number) => {
     router.push(`/items/${itemId}`);
   };
@@ -688,7 +682,6 @@ const ItemsManagementPage: React.FC = () => {
 
         return matchesSearch && matchesCode && matchesName;
       } else {
-        // For other tabs
         const matchesSearch =
           !filters.search ||
           Object.values(item).some((value: any) =>
@@ -708,7 +701,6 @@ const ItemsManagementPage: React.FC = () => {
 
   const filteredData = getFilteredData();
 
-  // Render different columns based on active tab
   const renderTableHeaders = () => {
     switch (activeTab) {
       case "items":
@@ -1167,7 +1159,6 @@ const ItemsManagementPage: React.FC = () => {
     }
   };
 
-  // Handle page change
   const handlePageChange = (newPage: number) => {
     if (newPage < 1 || newPage > pagination.totalPages) return;
     setPagination({ ...pagination, page: newPage });
@@ -1204,7 +1195,6 @@ const ItemsManagementPage: React.FC = () => {
           background: "linear-gradient(to bottom, #ffffff, #f9f9f9)",
         }}
       >
-        {/* Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
           <div>
             <PageHeader title="Items Management" icon={Package} />
@@ -1285,7 +1275,6 @@ const ItemsManagementPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Tabs */}
         <div className="mb-6">
           <div className="border-b border-gray-200">
             <nav className="-mb-px flex space-x-8">
@@ -1311,7 +1300,6 @@ const ItemsManagementPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Filters - Different for TARICs */}
         {showFilters && (
           <div className="mb-6 bg-gray-50 p-4 rounded-lg">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -1407,7 +1395,6 @@ const ItemsManagementPage: React.FC = () => {
                       className="w-full px-3 py-2 border border-gray-300 rounded-md"
                     >
                       <option value="">All Categories</option>
-                      {/* Categories will be loaded dynamically */}
                     </select>
                   </div>
                   <div className="md:col-span-2 flex items-end">
@@ -1424,7 +1411,6 @@ const ItemsManagementPage: React.FC = () => {
           </div>
         )}
 
-        {/* Search Bar */}
         {activeTab !== "tarics" && (
           <div className="mb-6">
             <div className="relative">
@@ -1450,7 +1436,6 @@ const ItemsManagementPage: React.FC = () => {
           </div>
         )}
 
-        {/* Data Table */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
           {loading ? (
             <div className="p-20 flex justify-center items-center">
@@ -1498,7 +1483,6 @@ const ItemsManagementPage: React.FC = () => {
                 </table>
               </div>
 
-              {/* Pagination */}
               <div className="p-4 border-t border-gray-100 bg-gray-50 flex items-center justify-between">
                 <div className="flex items-center gap-4">
                   <p className="text-sm text-gray-600">
@@ -1546,7 +1530,6 @@ const ItemsManagementPage: React.FC = () => {
         </div>
       </div>
 
-      {/* TARIC Modal */}
       {showTaricModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl max-w-md w-full">
@@ -1733,7 +1716,6 @@ const ItemsManagementPage: React.FC = () => {
         </div>
       )}
 
-      {/* Item Creation Modal */}
       {showItemModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">

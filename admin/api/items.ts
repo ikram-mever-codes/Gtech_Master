@@ -271,6 +271,23 @@ export const updateItem = async (
     is_npr: string;
     is_eur_special: string;
     is_rmb_special: string;
+    ItemID_DE?: number;
+    is_dimension_special?: string;
+    FOQ?: number;
+    FSQ?: number;
+    ISBN?: number;
+    RMB_Price?: number;
+    many_components?: number;
+    effort_rating?: number;
+    is_pu_item?: number;
+    is_meter_item?: number;
+    is_new?: string;
+    supp_cat?: string;
+    note?: string;
+    photo?: string;
+    pix_path?: string;
+    pix_path_eBay?: string;
+    npr_remark?: string;
   }>
 ) => {
   try {
