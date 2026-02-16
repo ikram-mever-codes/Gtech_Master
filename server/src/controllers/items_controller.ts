@@ -32,8 +32,6 @@ export const getItems = async (
 ) => {
   try {
     const itemRepository = AppDataSource.getRepository(Item);
-
-    // Get query parameters
     const {
       page = "1",
       limit = "50",
@@ -52,41 +50,30 @@ export const getItems = async (
     const limitNum = parseInt(limit as string);
     const skip = (pageNum - 1) * limitNum;
 
-    // Build where conditions
     const whereConditions: FindOptionsWhere<Item> = {};
 
-    // Search across multiple fields
     if (search) {
       whereConditions.item_name = ILike(`%${search}%`);
     }
 
-    // Filter by status/active
     if (isActive) {
       whereConditions.isActive = isActive as string;
     }
-
-    // Filter by category
     if (category) {
       whereConditions.cat_id = parseInt(category as string);
     }
 
-    // Filter by parent
     if (parentId) {
       whereConditions.parent_id = parseInt(parentId as string);
     }
-
-    // Filter by taric
     if (taricId) {
       whereConditions.taric_id = parseInt(taricId as string);
     }
 
-    // Build relations
     const relations = ["parent", "taric", "category"];
 
-    // Get total count
     const totalRecords = await itemRepository.count({ where: whereConditions });
 
-    // Get paginated items
     const items = await itemRepository.find({
       where: whereConditions,
       relations,
@@ -97,7 +84,6 @@ export const getItems = async (
       take: limitNum,
     });
 
-    // Format response
     const formattedItems = items.map((item) => ({
       id: item.id,
       de_no: item.parent?.de_no || null,
@@ -140,7 +126,6 @@ export const getItems = async (
   }
 };
 
-// Get item by ID
 export const getItemById = async (
   req: Request,
   res: Response,
@@ -159,7 +144,6 @@ export const getItemById = async (
     const qualityRepository = AppDataSource.getRepository(ItemQuality);
     const orderItemRepository = AppDataSource.getRepository(OrderItem);
 
-    // Get item with relations
     const item = await itemRepository.findOne({
       where: { id: parseInt(id) },
       relations: ["parent", "taric", "category"],
@@ -169,7 +153,6 @@ export const getItemById = async (
       return next(new ErrorHandler("Item not found", 404));
     }
 
-    // Get related data
     const warehouseItems = await warehouseRepository.find({
       where: { item_id: parseInt(id) },
     });
@@ -187,7 +170,6 @@ export const getItemById = async (
     //   relations: ["order"],
     // });
 
-    // Format response based on your frontend structure
     const formattedItem = {
       id: item.id,
       itemNo: `${item.id} / ${item.parent?.de_no || ""}`,
@@ -199,20 +181,18 @@ export const getItemById = async (
       remark: item.remark || "",
       isActive: item.isActive === "Y",
 
-      // Parent details
       parent: {
         noDE: item.parent?.de_no || "NONE",
         nameDE: item.parent?.name_de || "NONE",
         nameEN: item.parent?.name_en || "NONE",
         isActive: item.parent?.is_active === "Y",
         isSpecialItem: item.parent?.is_NwV === "Y",
-        priceEUR: 0, // You'll need to add this to your model
-        priceRMB: 0, // You'll need to add this to your model
+        priceEUR: 0,
+        priceRMB: 0,
         isEURSpecial: item.is_eur_special === "Y",
         isRMBSpecial: item.is_rmb_special === "Y",
       },
 
-      // Dimensions
       dimensions: {
         isbn: item.ISBN?.toString() || "1",
         weight: item.weight?.toString() || "0",
@@ -221,7 +201,6 @@ export const getItemById = async (
         height: item.height?.toString() || "0",
       },
 
-      // Variations
       variationsDE: {
         variations: [
           item.parent?.var_de_1,
@@ -239,7 +218,6 @@ export const getItemById = async (
         values: variationValues.map((v) => v.value_en).filter(Boolean),
       },
 
-      // Others
       others: {
         taricCode: item.taric?.code || "",
         isQTYdiv: item.is_qty_dividable === "Y",
@@ -260,12 +238,16 @@ export const getItemById = async (
           .reduce((sum, wi: any) => sum + wi.stock_qty, 0)
           .toString(),
         msq: warehouseItems[0]?.msq?.toString() || "0",
-        isNAO: false,
+        isNAO: warehouseItems[0]?.is_no_auto_order === "Y",
         buffer: warehouseItems[0]?.buffer?.toString() || "0",
-        isSnSI: false,
+        isSnSI: warehouseItems[0]?.is_SnSI === "Y",
+        foq: item.FOQ?.toString() || "0",
+        fsq: item.FSQ?.toString() || "0",
+        rmbPrice: item.RMB_Price?.toString() || "0",
+        isDimensionSpecial: item.is_dimension_special === "Y",
+        suppCat: item.supp_cat || "",
       },
 
-      // Quality criteria
       qualityCriteria: qualityCriteria.map((qc: any) => ({
         id: qc.id,
         name: qc.name || "",
@@ -274,16 +256,13 @@ export const getItemById = async (
         descriptionCN: qc.description_cn || "",
       })),
 
-      // Attachments
       attachments: [],
 
-      // Pictures
       pictures: {
         shopPicture: item.photo || "",
         ebayPictures: item.pix_path_eBay || "",
       },
 
-      // NPR Remarks
       nprRemarks: item.npr_remark || "",
     };
 
@@ -298,7 +277,7 @@ export const getItemById = async (
     return next(error);
   }
 };
-// Create new item
+
 export const createItem = async (
   req: Request,
   res: Response,
@@ -470,6 +449,18 @@ export const updateItem = async (
       "pix_path",
       "pix_path_eBay",
       "npr_remark",
+      "is_dimension_special",
+      "FOQ",
+      "FSQ",
+      "ISBN",
+      "RMB_Price",
+      "many_components",
+      "effort_rating",
+      "is_pu_item",
+      "is_meter_item",
+      "is_new",
+      "supp_cat",
+      "ItemID_DE",
     ];
 
     updatableFields.forEach((field) => {
@@ -501,7 +492,6 @@ export const updateItem = async (
   }
 };
 
-// Delete item
 export const deleteItem = async (
   req: Request,
   res: Response,
@@ -2332,7 +2322,6 @@ export const bulkUpsertTarics = async (
           taric.updated_at = new Date();
           results.updated++;
         } else {
-          // Create new taric
           taric = taricRepository.create({
             ...taricData,
             created_at: new Date(),
