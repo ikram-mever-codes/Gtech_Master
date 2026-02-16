@@ -37,6 +37,7 @@ import {
   cancelInvoice,
 } from "@/api/invoice";
 import { useRouter } from "next/navigation";
+import PageHeader from "@/components/UI/PageHeader";
 import Link from "next/link";
 
 // Types
@@ -348,45 +349,33 @@ const InvoiceListPage: React.FC = () => {
     >
       <div className="w-full mx-auto p-0">
         {/* Header */}
-        <div
-          className="rounded-md p-6 lg:p-8 mb-6"
-          style={{
-            background: "linear-gradient(135deg, #8CC21B 0%, #7AB017 100%)",
-          }}
-        >
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-            <div>
-              <h1 className="text-2xl lg:text-3xl font-bold text-white mb-1">
-                Invoice Management
-              </h1>
-              <p className="text-white/90 text-sm lg:text-base font-roboto">
-                Manage and track all your invoices in one place
-              </p>
-            </div>
-            <div className="flex flex-col sm:flex-row gap-3">
-              <button
-                onClick={() => {
-                  setLoading(true);
-                  loadInvoices();
-                }}
-                disabled={loading}
-                className="flex items-center font-roboto     justify-center gap-2 px-4 py-2 bg-white/20 text-white rounded-lg hover:bg-white/30 transition-colors disabled:opacity-50"
-              >
-                <RefreshCw
-                  className={`w-4 h-4 ${loading ? "animate-spin" : ""}`}
-                />
-                {loading ? "Loading..." : "Refresh"}
-              </button>
-              <button
-                onClick={() => {
-                  router.push("/invoices/new");
-                }}
-                className="flex items-center font-roboto justify-center gap-2 px-6 py-2 bg-white text-[#8CC21B] rounded-lg hover:bg-gray-50 transition-colors font-medium"
-              >
-                <Plus className="w-4 h-4" />
-                New Invoice
-              </button>
-            </div>
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
+          <div>
+            <PageHeader title="Invoice Management" icon={FileText} />
+          </div>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <button
+              onClick={() => {
+                setLoading(true);
+                loadInvoices();
+              }}
+              disabled={loading}
+              className="px-4 py-2.5 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-all flex items-center gap-2 disabled:opacity-50"
+            >
+              <RefreshCw
+                className={`w-4 h-4 ${loading ? "animate-spin" : ""}`}
+              />
+              {loading ? "Loading..." : "Refresh"}
+            </button>
+            <button
+              onClick={() => {
+                router.push("/invoices/new");
+              }}
+              className="px-6 py-2.5 bg-[#8CC21B] text-white rounded-lg font-medium hover:bg-[#8CC21B]/90 transition-all flex items-center gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              New Invoice
+            </button>
           </div>
         </div>
 
@@ -522,9 +511,8 @@ const InvoiceListPage: React.FC = () => {
                 <Filter className="w-4 h-4" />
                 Filters
                 <ChevronDown
-                  className={`w-4 h-4 transition-transform ${
-                    showFilters ? "rotate-180" : ""
-                  }`}
+                  className={`w-4 h-4 transition-transform ${showFilters ? "rotate-180" : ""
+                    }`}
                 />
               </button>
             </div>
@@ -802,9 +790,8 @@ const InvoiceListPage: React.FC = () => {
                     {currentInvoices.map((invoice, index) => (
                       <tr
                         key={invoice.id}
-                        className={`border-b border-[#F1F3F5] hover:bg-[#F8F9FA] transition-colors ${
-                          index % 2 === 0 ? "bg-white" : "bg-[#FAFBFC]"
-                        }`}
+                        className={`border-b border-[#F1F3F5] hover:bg-[#F8F9FA] transition-colors ${index % 2 === 0 ? "bg-white" : "bg-[#FAFBFC]"
+                          }`}
                       >
                         <td className="py-4 px-6">
                           <div>
@@ -1066,9 +1053,8 @@ const InvoiceListPage: React.FC = () => {
                       <button
                         key={i + 1}
                         onClick={() => setCurrentPage(i + 1)}
-                        className={`px-3 py-2 rounded-lg text-sm transition-colors ${
-                          currentPage === i + 1 ? "font-medium" : ""
-                        }`}
+                        className={`px-3 py-2 rounded-lg text-sm transition-colors ${currentPage === i + 1 ? "font-medium" : ""
+                          }`}
                         style={{
                           backgroundColor:
                             currentPage === i + 1 ? "#8CC21B" : "#F8F9FA",

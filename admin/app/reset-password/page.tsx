@@ -5,6 +5,7 @@ import { Lock, Eye, EyeOff, CheckCircle, AlertCircle } from "lucide-react";
 import { submitPasswordReset } from "@/api/user";
 import theme from "@/styles/theme";
 import { useRouter } from "next/navigation";
+import PageHeader from "@/components/UI/PageHeader";
 
 const ResetPasswordPage = () => {
   const [passwords, setPasswords] = useState({
@@ -136,25 +137,7 @@ const ResetPasswordPage = () => {
               border: "1px solid #E9ECEF",
             }}
           >
-            <div
-              className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6"
-              style={{ backgroundColor: "#ff000020" }}
-            >
-              <AlertCircle
-                className="w-8 h-8"
-                style={{ color: theme.palette.error.main }}
-              />
-            </div>
-
-            <h1
-              className="text-2xl font-semibold mb-4"
-              style={{
-                fontFamily: theme.typography.fontFamily,
-                color: theme.palette.text.primary,
-              }}
-            >
-              Invalid Reset Link
-            </h1>
+            <PageHeader title="Invalid Reset Link" icon={AlertCircle} />
 
             <p
               className="mb-6 leading-relaxed"
@@ -199,25 +182,7 @@ const ResetPasswordPage = () => {
               border: "1px solid #E9ECEF",
             }}
           >
-            <div
-              className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6"
-              style={{ backgroundColor: `${theme.palette.primary.main}1A` }}
-            >
-              <CheckCircle
-                className="w-8 h-8"
-                style={{ color: theme.palette.primary.main }}
-              />
-            </div>
-
-            <h1
-              className="text-2xl font-semibold mb-4"
-              style={{
-                fontFamily: theme.typography.fontFamily,
-                color: theme.palette.text.primary,
-              }}
-            >
-              Password Reset Successful
-            </h1>
+            <PageHeader title="Password Reset Successful" icon={CheckCircle} />
 
             <p
               className="mb-6 leading-relaxed"
@@ -262,31 +227,8 @@ const ResetPasswordPage = () => {
             border: "1px solid #E9ECEF",
           }}
         >
-          {/* Header */}
           <div className="text-center mb-8">
-            <div
-              className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6"
-              style={{ backgroundColor: `${theme.palette.primary.main}1A` }}
-            >
-              <Lock
-                className="w-8 h-8"
-                style={{ color: theme.palette.primary.main }}
-              />
-            </div>
-
-            <h1
-              className="text-2xl font-semibold mb-2"
-              style={{
-                fontFamily: theme.typography.fontFamily,
-                color: theme.palette.text.primary,
-              }}
-            >
-              Set New Password
-            </h1>
-
-            <p style={{ color: theme.palette.text.secondary }}>
-              Create a strong password for your account.
-            </p>
+            <PageHeader title="Set New Password" icon={Lock} />
           </div>
 
           <div className="space-y-6">
@@ -307,9 +249,8 @@ const ResetPasswordPage = () => {
                   onChange={(e: any) =>
                     handleInputChange("newPassword", e.target.value)
                   }
-                  className={`w-full pl-12 pr-12 py-3 border rounded-lg focus:ring-2 transition-colors duration-200 ${
-                    errors.newPassword ? "bg-red-50" : "bg-white"
-                  }`}
+                  className={`w-full pl-12 pr-12 py-3 border rounded-lg focus:ring-2 transition-colors duration-200 ${errors.newPassword ? "bg-red-50" : "bg-white"
+                    }`}
                   style={{
                     borderColor: errors.newPassword
                       ? theme.palette.error.main
@@ -450,9 +391,8 @@ const ResetPasswordPage = () => {
                   onChange={(e: any) =>
                     handleInputChange("confirmPassword", e.target.value)
                   }
-                  className={`w-full pl-12 pr-12 py-3 border rounded-lg focus:ring-2 transition-colors duration-200 ${
-                    errors.confirmPassword ? "bg-red-50" : "bg-white"
-                  }`}
+                  className={`w-full pl-12 pr-12 py-3 border rounded-lg focus:ring-2 transition-colors duration-200 ${errors.confirmPassword ? "bg-red-50" : "bg-white"
+                    }`}
                   style={{
                     borderColor: errors.confirmPassword
                       ? theme.palette.error.main

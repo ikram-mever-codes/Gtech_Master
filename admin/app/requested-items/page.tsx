@@ -44,6 +44,8 @@ import { Delete } from "@mui/icons-material";
 import { RootState } from "../Redux/store";
 import { useSelector } from "react-redux";
 import { UserRole } from "@/utils/interfaces";
+import { ClipboardList } from "lucide-react";
+import PageHeader from "@/components/UI/PageHeader";
 
 // Add interface for ContactPerson
 interface ContactPerson {
@@ -519,9 +521,7 @@ const RequestedItemsPage: React.FC = () => {
         {/* Header */}
         <div className="mb-8 w-full flex justify-between items-center">
           <div className="">
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">
-              Requested Items
-            </h1>
+            <PageHeader title="Requested Items" icon={ClipboardList} />
           </div>
           <div>
             <div className="flex gap-3">
@@ -612,9 +612,8 @@ const RequestedItemsPage: React.FC = () => {
                     </p>
                   </div>
                   <div
-                    className={`rounded-full p-3 ${
-                      getStatusColor(stat.status).split(" ")[0]
-                    }`}
+                    className={`rounded-full p-3 ${getStatusColor(stat.status).split(" ")[0]
+                      }`}
                   >
                     {getStatusIcon(stat.status)}
                   </div>
@@ -671,9 +670,8 @@ const RequestedItemsPage: React.FC = () => {
                   {requestedItems.map((item) => (
                     <tr
                       key={item.id}
-                      className={`transition-colors ${
-                        item.priority === "High" ? "bg-red-300/40" : ""
-                      }`}
+                      className={`transition-colors ${item.priority === "High" ? "bg-red-300/40" : ""
+                        }`}
                     >
                       <td
                         className="px-6 py-4 cursor-pointer"
@@ -807,11 +805,10 @@ const RequestedItemsPage: React.FC = () => {
                       <button
                         key={pageNum}
                         onClick={() => setCurrentPage(pageNum)}
-                        className={`px-3 py-1 text-sm rounded-lg transition-all ${
-                          currentPage === pageNum
+                        className={`px-3 py-1 text-sm rounded-lg transition-all ${currentPage === pageNum
                             ? "bg-gray-600 text-white"
                             : "bg-white/80 backdrop-blur-sm border border-gray-300/80 hover:bg-white/60"
-                        }`}
+                          }`}
                       >
                         {pageNum}
                       </button>
@@ -822,11 +819,10 @@ const RequestedItemsPage: React.FC = () => {
                       <span className="px-2 text-gray-500">...</span>
                       <button
                         onClick={() => setCurrentPage(totalPages)}
-                        className={`px-3 py-1 text-sm rounded-lg transition-all ${
-                          currentPage === totalPages
+                        className={`px-3 py-1 text-sm rounded-lg transition-all ${currentPage === totalPages
                             ? "bg-gray-600 text-white"
                             : "bg-white/80 backdrop-blur-sm border border-gray-300/80 hover:bg-white/60"
-                        }`}
+                          }`}
                       >
                         {totalPages}
                       </button>
@@ -956,15 +952,13 @@ const RequestedItemsPage: React.FC = () => {
                       </span>
                       <button
                         type="button"
-                        className={`${
-                          editModeEnabled ? "bg-gray-600" : "bg-gray-200"
-                        } relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2`}
+                        className={`${editModeEnabled ? "bg-gray-600" : "bg-gray-200"
+                          } relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2`}
                         onClick={() => setEditModeEnabled(!editModeEnabled)}
                       >
                         <span
-                          className={`${
-                            editModeEnabled ? "translate-x-5" : "translate-x-0"
-                          } pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out`}
+                          className={`${editModeEnabled ? "translate-x-5" : "translate-x-0"
+                            } pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out`}
                         />
                       </button>
                     </div>
@@ -1003,7 +997,7 @@ const RequestedItemsPage: React.FC = () => {
                               {person.position ? ` - ${person.position}` : ""}
                               {person.email ? ` (${person.email})` : ""}
                               {modalMode === "create" &&
-                              person.starBusinessDetails?.companyName
+                                person.starBusinessDetails?.companyName
                                 ? ` - ${person.starBusinessDetails.companyName}`
                                 : ""}
                             </option>
@@ -1327,16 +1321,16 @@ const RequestedItemsPage: React.FC = () => {
                       </button>
                       {(modalMode === "create" ||
                         (modalMode === "edit" && editModeEnabled)) && (
-                        <CustomButton
-                          gradient={true}
-                          onClick={handleSubmit}
-                          className="px-4 py-2 bg-gray-600/90 backdrop-blur-sm text-white rounded-lg hover:bg-gray-700/90 transition-all"
-                        >
-                          {modalMode === "edit"
-                            ? "Update Request"
-                            : "Add Request"}
-                        </CustomButton>
-                      )}
+                          <CustomButton
+                            gradient={true}
+                            onClick={handleSubmit}
+                            className="px-4 py-2 bg-gray-600/90 backdrop-blur-sm text-white rounded-lg hover:bg-gray-700/90 transition-all"
+                          >
+                            {modalMode === "edit"
+                              ? "Update Request"
+                              : "Add Request"}
+                          </CustomButton>
+                        )}
                     </div>
                   </div>
                 </div>

@@ -33,7 +33,8 @@ import {
 } from "@/api/bussiness";
 import { useRouter } from "next/navigation";
 import CustomButton from "@/components/UI/CustomButton";
-import { EditIcon, EyeIcon, Plus } from "lucide-react";
+import { EditIcon, EyeIcon, Plus, Building2 } from "lucide-react";
+import PageHeader from "@/components/UI/PageHeader";
 import { Delete } from "@mui/icons-material";
 import { RootState } from "../Redux/store";
 import { useSelector } from "react-redux";
@@ -388,10 +389,7 @@ const BusinessSearchPage: React.FC = () => {
         {/* Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
           <div>
-            <h1 className="text-3xl font-semibold text-secondary flex items-center gap-3">
-              <BuildingOfficeIcon className="w-8 h-8 text-primary" />
-              Business Directory
-            </h1>
+            <PageHeader title="Business Directory" icon={Building2} />
           </div>
 
           <div className="flex gap-3">

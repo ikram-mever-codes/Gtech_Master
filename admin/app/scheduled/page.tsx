@@ -124,7 +124,9 @@ import {
   User,
   Shield,
   Package,
+  Calendar,
 } from "lucide-react";
+import PageHeader from "@/components/UI/PageHeader";
 import { useRouter, useParams } from "next/navigation";
 import { toast } from "react-hot-toast";
 
@@ -3290,29 +3292,7 @@ const AdminAllItemsPage = () => {
             >
               <ArrowBack />
             </IconButton>
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-              <AdminPanelSettings
-                sx={{ color: "primary.main", fontSize: 28 }}
-              />
-              <Box sx={{ display: "flex", flexDirection: "column" }}>
-                <Typography
-                  variant="h4"
-                  component="h1"
-                  sx={{
-                    fontWeight: 700,
-                    background:
-                      "linear-gradient(45deg, #8CC21B 30%, #4CAF50 90%)",
-                    backgroundClip: "text",
-                    textFillColor: "transparent",
-                    letterSpacing: "-0.5px",
-                    fontSize: 30,
-                    lineHeight: 1.2,
-                  }}
-                >
-                  Scheduled Items{" "}
-                </Typography>
-              </Box>
-            </Box>
+            <PageHeader title="Scheduled Items" icon={Calendar} />
 
             {saving && <CircularProgress size={20} sx={{ ml: 2 }} />}
           </Box>

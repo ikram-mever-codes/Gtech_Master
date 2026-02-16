@@ -2,11 +2,13 @@
 import AdminCustomersPage from "../scheduled/lists/page";
 import AdminListDetailPage from "../scheduled/lists/[id]/page";
 import AdminAllItemsPage from "../scheduled/page";
+import { LayoutDashboard } from "lucide-react";
+import PageHeader from "@/components/UI/PageHeader";
 
 export default function Dashboard() {
     return (
         <div>
-            <h1>Dashboard</h1>
+            <PageHeader title="Dashboard" icon={LayoutDashboard} />
             <section>
                 <h2>All Items</h2>
                 <AdminAllItemsPage />

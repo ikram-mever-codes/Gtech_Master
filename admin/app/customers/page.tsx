@@ -66,6 +66,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
 import CustomButton from "@/components/UI/CustomButton";
 import CustomTable from "@/components/UI/CustomTable";
+import PageHeader from "@/components/UI/PageHeader";
 import theme from "@/styles/theme";
 import {
   deleteCustomer,
@@ -575,16 +576,7 @@ const CustomersPage = () => {
             sx={{ mb: 3 }}
           >
             <Box>
-              <Typography
-                variant="h3"
-                sx={{
-                  fontWeight: 700,
-                  color: "#1a1a1a",
-                  letterSpacing: "-0.02em",
-                }}
-              >
-                Customer Management
-              </Typography>
+              <PageHeader title="Customer Management" icon={Users} />
             </Box>
           </Stack>
 

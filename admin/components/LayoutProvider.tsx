@@ -34,7 +34,6 @@ const LayoutProvider = ({ children }: { children: ReactNode }) => {
               <Sidebar />
             </aside>
 
-            {/* Main Content Area */}
             <div className="flex-1 flex flex-col">
               {/* Header */}
               <header className="sticky top-0 z-50">
@@ -42,7 +41,7 @@ const LayoutProvider = ({ children }: { children: ReactNode }) => {
               </header>
 
               <main className="flex-1 p-6 bg-gray-50">
-                <div className="w-full px-0 py-6 mb-[2rem] mx-auto">
+                <div className="w-full px-8 py-6 mb-[2rem] mx-auto">
                   {children}
                 </div>
               </main>

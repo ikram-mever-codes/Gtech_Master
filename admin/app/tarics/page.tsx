@@ -59,7 +59,8 @@ import CustomButton from "@/components/UI/CustomButton";
 import { useSelector } from "react-redux";
 import { RootState } from "@/app/Redux/store";
 import { UserRole } from "@/utils/interfaces";
-import { DownloadCloudIcon, ToggleLeft, ToggleRight } from "lucide-react";
+import { DownloadCloudIcon, ToggleLeft, ToggleRight, FileText } from "lucide-react";
+import PageHeader from "@/components/UI/PageHeader";
 
 interface Customer {
   id: string;
@@ -174,7 +175,7 @@ const OrdersPage: React.FC = () => {
 
   // ✅ MODIFIED: Form state with required fields for order creation
   const [OrderFormData, setOrderFormData] = useState({
-    comment: "",  
+    comment: "",
     order_no: "",
     customerId: "",
     itemId: "",
@@ -194,11 +195,11 @@ const OrdersPage: React.FC = () => {
   const { user } = useSelector((state: RootState) => state.user);
 
   // ✅ MODIFIED: Check if all required fields have values
-  const isCreateOrderEnabled = OrderFormData.comment && 
-                               OrderFormData.order_no && 
-                               OrderFormData.customerId && 
-                               OrderFormData.itemId && 
-                               OrderFormData.quantity;
+  const isCreateOrderEnabled = OrderFormData.comment &&
+    OrderFormData.order_no &&
+    OrderFormData.customerId &&
+    OrderFormData.itemId &&
+    OrderFormData.quantity;
 
   // Fetch data on mount
   useEffect(() => {
@@ -297,7 +298,7 @@ const OrdersPage: React.FC = () => {
         currency: "EUR",
         validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
       };
-      
+
       const response = await createOrder(payload);
       if (response.success) {
         setShowCreateModal(false);
@@ -361,7 +362,7 @@ const OrdersPage: React.FC = () => {
 
   const resetCreateForm = () => {
     setOrderFormData({
-      comment: "",  
+      comment: "",
       order_no: "",
       customerId: "",
       itemId: "",
@@ -387,10 +388,7 @@ const OrdersPage: React.FC = () => {
         <div className="mb-6">
           <div className="flex justify-between items-center mb-4">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900 mb-2">Orders</h1>
-              <p className="text-gray-600 text-sm">
-                Create and manage Orders
-              </p>
+              <PageHeader title="Orders" icon={FileText} />
             </div>
             <div className="flex gap-2">
               <div className="flex gap-2">

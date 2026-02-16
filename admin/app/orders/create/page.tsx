@@ -41,6 +41,8 @@ import {
 import theme from "@/styles/theme";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import PageHeader from "@/components/UI/PageHeader";
+import { PlusCircle, Pencil } from "lucide-react";
 import {
     createNewOrder,
     updateOrderFunction,
@@ -225,29 +227,18 @@ const OrderCreatePage: React.FC = () => {
                         <IconButton
                             sx={{
                                 color: "primary.main",
-                                bgcolor: alpha(theme.palette.primary.main, 0.08),
-                                "&:hover": { bgcolor: alpha(theme.palette.primary.main, 0.15) },
+                                bgcolor: alpha(muiTheme.palette.primary.main, 0.08),
+                                "&:hover": { bgcolor: alpha(muiTheme.palette.primary.main, 0.15) },
                             }}
                         >
                             <LucideArrowLeft size={20} />
                         </IconButton>
                     </Link>
 
-                    <Box>
-                        <Typography
-                            variant="h4"
-                            sx={{
-                                color: "secondary.main",
-                                fontSize: { xs: "1.5rem", md: "1.75rem" },
-                                fontWeight: 600,
-                            }}
-                        >
-                            {isEditMode ? "Edit Order" : "Create New Order"}
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary">
-                            {isEditMode ? "Update order information" : "Add a new order"}
-                        </Typography>
-                    </Box>
+                    <PageHeader
+                        title={isEditMode ? "Edit Order" : "Create New Order"}
+                        icon={isEditMode ? Pencil : PlusCircle}
+                    />
                 </Box>
 
                 {/* Form */}

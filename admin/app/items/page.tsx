@@ -19,6 +19,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { useRouter } from "next/navigation";
 import CustomButton from "@/components/UI/CustomButton";
+import PageHeader from "@/components/UI/PageHeader";
 import { EditIcon, EyeIcon, Plus, Package, LinkIcon } from "lucide-react";
 import { Delete } from "@mui/icons-material";
 import { toast } from "react-hot-toast";
@@ -1206,24 +1207,7 @@ const ItemsManagementPage: React.FC = () => {
         {/* Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
           <div>
-            <h1 className="text-3xl font-semibold text-secondary flex items-center gap-3">
-              <Package className="w-8 h-8 text-primary" />
-              Items Management
-            </h1>
-
-            {activeTab === "items" && (
-              <div className="flex gap-4 mt-2">
-                <span className="text-sm text-green-600">
-                  {statistics.activeItems} Active
-                </span>
-                <span className="text-sm text-red-600">
-                  {statistics.inactiveItems} Inactive
-                </span>
-                <span className="text-sm text-blue-600">
-                  {statistics.itemsWithStock} With Stock
-                </span>
-              </div>
-            )}
+            <PageHeader title="Items Management" icon={Package} />
           </div>
 
           <div className="flex gap-3">
@@ -1289,17 +1273,6 @@ const ItemsManagementPage: React.FC = () => {
                 New Item
               </button>
             )}
-
-            {/* {activeTab === "parents" && (
-                <button
-                  onClick={handleCreateParent}
-                  className="px-4 py-2.5 bg-[#8CC21B] text-white rounded-lg font-medium hover:bg-[#8CC21B] transition-all flex items-center gap-2"
-                >
-                  <PlusIcon className="w-5 h-5" />
-                  New Parent
-                </button>
-              )} */}
-
             {activeTab === "tarics" && (
               <button
                 onClick={handleCreateTaric}

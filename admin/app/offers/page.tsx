@@ -28,6 +28,8 @@ import {
   CogIcon,
 } from "@heroicons/react/24/outline";
 import { toast } from "react-hot-toast";
+import { BadgePercent } from "lucide-react";
+import PageHeader from "@/components/UI/PageHeader";
 import {
   getAllOffers,
   getOfferById,
@@ -741,9 +743,8 @@ const OffersPage: React.FC = () => {
             .map((up: UnitPrice, idx: number) => (
               <div
                 key={up.id}
-                className={`text-xs ${
-                  up.isActive ? "font-bold text-green-700" : "text-gray-600"
-                }`}
+                className={`text-xs ${up.isActive ? "font-bold text-green-700" : "text-gray-600"
+                  }`}
               >
                 {up.quantity} pcs:{" "}
                 {formatUnitPrice(
@@ -764,9 +765,8 @@ const OffersPage: React.FC = () => {
           {item.quantityPrices.map((qp: any, idx: number) => (
             <div
               key={idx}
-              className={`text-xs ${
-                qp.isActive ? "font-bold text-green-700" : "text-gray-600"
-              }`}
+              className={`text-xs ${qp.isActive ? "font-bold text-green-700" : "text-gray-600"
+                }`}
             >
               {qp.quantity} pcs: {formatUnitPrice(qp.price, 3)}
               {qp.isActive && (
@@ -794,10 +794,7 @@ const OffersPage: React.FC = () => {
         <div className="mb-6">
           <div className="flex justify-between items-center mb-4">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900 mb-2">Offers</h1>
-              <p className="text-gray-600 text-sm">
-                Create and manage offers from inquiries
-              </p>
+              <PageHeader title="Offers" icon={BadgePercent} />
             </div>
             <div className="flex gap-2">
               {/* Filters */}
@@ -1043,18 +1040,16 @@ const OffersPage: React.FC = () => {
                                             !offer.useUnitPrices
                                           )
                                         }
-                                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-                                          offer.useUnitPrices
+                                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${offer.useUnitPrices
                                             ? "bg-green-500"
                                             : "bg-gray-300"
-                                        }`}
+                                          }`}
                                       >
                                         <span
-                                          className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
-                                            offer.useUnitPrices
+                                          className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${offer.useUnitPrices
                                               ? "translate-x-5"
                                               : "translate-x-1"
-                                          }`}
+                                            }`}
                                         />
                                       </button>
                                     </div>
@@ -1107,15 +1102,15 @@ const OffersPage: React.FC = () => {
                                         {offer.inquirySnapshot.name}
                                         {offer.inquirySnapshot
                                           .referenceNumber && (
-                                          <span className="ml-2 text-xs text-gray-500">
-                                            (
-                                            {
-                                              offer.inquirySnapshot
-                                                .referenceNumber
-                                            }
-                                            )
-                                          </span>
-                                        )}
+                                            <span className="ml-2 text-xs text-gray-500">
+                                              (
+                                              {
+                                                offer.inquirySnapshot
+                                                  .referenceNumber
+                                              }
+                                              )
+                                            </span>
+                                          )}
                                       </div>
                                       {offer.inquirySnapshot.description && (
                                         <div className="text-sm text-gray-600">
@@ -1232,8 +1227,8 @@ const OffersPage: React.FC = () => {
                                                     ...editingLineItemData,
                                                     basePrice: e.target.value
                                                       ? parseFloat(
-                                                          e.target.value
-                                                        )
+                                                        e.target.value
+                                                      )
                                                       : undefined,
                                                   })
                                                 }
@@ -1334,7 +1329,7 @@ const OffersPage: React.FC = () => {
                                                   ?.filter(
                                                     (comp: any) =>
                                                       comp.parentItemId ===
-                                                        item.id &&
+                                                      item.id &&
                                                       comp.isComponent
                                                   )
                                                   .map((component: any) => (
@@ -1503,11 +1498,10 @@ const OffersPage: React.FC = () => {
                           setCurrentPage(pageNum);
                           setFilters({ ...filters, page: pageNum });
                         }}
-                        className={`px-2 py-1 text-sm rounded-lg transition-all ${
-                          currentPage === pageNum
+                        className={`px-2 py-1 text-sm rounded-lg transition-all ${currentPage === pageNum
                             ? "bg-gray-600 text-white"
                             : "bg-white border border-gray-300 hover:bg-gray-50"
-                        }`}
+                          }`}
                       >
                         {pageNum}
                       </button>
@@ -1521,11 +1515,10 @@ const OffersPage: React.FC = () => {
                           setCurrentPage(totalPages);
                           setFilters({ ...filters, page: totalPages });
                         }}
-                        className={`px-2 py-1 text-sm rounded-lg transition-all ${
-                          currentPage === totalPages
+                        className={`px-2 py-1 text-sm rounded-lg transition-all ${currentPage === totalPages
                             ? "bg-gray-600 text-white"
                             : "bg-white border border-gray-300 hover:bg-gray-50"
-                        }`}
+                          }`}
                       >
                         {totalPages}
                       </button>
@@ -1617,11 +1610,11 @@ const OffersPage: React.FC = () => {
                       )}
                       {(selectedOffer.customerSnapshot.postalCode ||
                         selectedOffer.customerSnapshot.city) && (
-                        <div className="text-gray-600">
-                          {selectedOffer.customerSnapshot.postalCode}{" "}
-                          {selectedOffer.customerSnapshot.city}
-                        </div>
-                      )}
+                          <div className="text-gray-600">
+                            {selectedOffer.customerSnapshot.postalCode}{" "}
+                            {selectedOffer.customerSnapshot.city}
+                          </div>
+                        )}
                       {selectedOffer.customerSnapshot.country && (
                         <div className="text-gray-600">
                           {selectedOffer.customerSnapshot.country}
@@ -1652,11 +1645,11 @@ const OffersPage: React.FC = () => {
                       )}
                       {(selectedOffer.deliveryAddress?.postalCode ||
                         selectedOffer.deliveryAddress?.city) && (
-                        <div className="text-gray-600">
-                          {selectedOffer.deliveryAddress.postalCode}{" "}
-                          {selectedOffer.deliveryAddress.city}
-                        </div>
-                      )}
+                          <div className="text-gray-600">
+                            {selectedOffer.deliveryAddress.postalCode}{" "}
+                            {selectedOffer.deliveryAddress.city}
+                          </div>
+                        )}
                       {selectedOffer.deliveryAddress?.country && (
                         <div className="text-gray-600">
                           {selectedOffer.deliveryAddress.country}
@@ -1754,7 +1747,7 @@ const OffersPage: React.FC = () => {
                               </td>
                               <td className="px-3 py-2">
                                 {selectedOffer.useUnitPrices &&
-                                item.unitPrices?.length > 0 ? (
+                                  item.unitPrices?.length > 0 ? (
                                   <div className="space-y-1">
                                     {item.unitPrices
                                       .slice(
@@ -1764,9 +1757,8 @@ const OffersPage: React.FC = () => {
                                       .map((up: UnitPrice, idx: number) => (
                                         <div
                                           key={up.id}
-                                          className={`flex items-center gap-2 ${
-                                            up.isActive ? "font-bold" : ""
-                                          }`}
+                                          className={`flex items-center gap-2 ${up.isActive ? "font-bold" : ""
+                                            }`}
                                         >
                                           <span>{up.quantity} pcs</span>
                                           <span>×</span>
@@ -1788,9 +1780,8 @@ const OffersPage: React.FC = () => {
                                       (qp: any, idx: any) => (
                                         <div
                                           key={idx}
-                                          className={`flex items-center gap-2 ${
-                                            qp.isActive ? "font-bold" : ""
-                                          }`}
+                                          className={`flex items-center gap-2 ${qp.isActive ? "font-bold" : ""
+                                            }`}
                                         >
                                           <span>{qp.quantity} pcs</span>
                                           <span>×</span>
@@ -1980,11 +1971,10 @@ const OffersPage: React.FC = () => {
                         <div
                           key={inquiry.id}
                           onClick={() => setSelectedInquiry(inquiry)}
-                          className={`p-3 border rounded-lg cursor-pointer transition-all ${
-                            selectedInquiry?.id === inquiry.id
+                          className={`p-3 border rounded-lg cursor-pointer transition-all ${selectedInquiry?.id === inquiry.id
                               ? "border-gray-600 bg-gray-50"
                               : "border-gray-200 hover:bg-gray-50"
-                          }`}
+                            }`}
                         >
                           <div className="flex justify-between items-start">
                             <div>
@@ -2071,8 +2061,8 @@ const OffersPage: React.FC = () => {
                           value={
                             offerFormData.validUntil
                               ? new Date(offerFormData.validUntil)
-                                  .toISOString()
-                                  .split("T")[0]
+                                .toISOString()
+                                .split("T")[0]
                               : ""
                           }
                           onChange={(e) =>
@@ -2103,18 +2093,16 @@ const OffersPage: React.FC = () => {
                                 useUnitPrices: !offerFormData.useUnitPrices,
                               })
                             }
-                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-                              offerFormData.useUnitPrices
+                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${offerFormData.useUnitPrices
                                 ? "bg-green-500"
                                 : "bg-gray-300"
-                            }`}
+                              }`}
                           >
                             <span
-                              className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
-                                offerFormData.useUnitPrices
+                              className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${offerFormData.useUnitPrices
                                   ? "translate-x-5"
                                   : "translate-x-1"
-                              }`}
+                                }`}
                             />
                           </button>
                         </div>
@@ -2398,8 +2386,8 @@ const OffersPage: React.FC = () => {
                       value={
                         editFormData.validUntil
                           ? new Date(editFormData.validUntil)
-                              .toISOString()
-                              .split("T")[0]
+                            .toISOString()
+                            .split("T")[0]
                           : ""
                       }
                       onChange={(e) =>
@@ -2448,18 +2436,16 @@ const OffersPage: React.FC = () => {
                             useUnitPrices: !editFormData.useUnitPrices,
                           })
                         }
-                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-                          editFormData.useUnitPrices
+                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${editFormData.useUnitPrices
                             ? "bg-green-500"
                             : "bg-gray-300"
-                        }`}
+                          }`}
                       >
                         <span
-                          className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
-                            editFormData.useUnitPrices
+                          className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${editFormData.useUnitPrices
                               ? "translate-x-5"
                               : "translate-x-1"
-                          }`}
+                            }`}
                         />
                       </button>
                     </div>
@@ -2684,18 +2670,16 @@ const OffersPage: React.FC = () => {
                             !selectedOffer.useUnitPrices
                           )
                         }
-                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                          selectedOffer.useUnitPrices
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${selectedOffer.useUnitPrices
                             ? "bg-green-500"
                             : "bg-gray-300"
-                        }`}
+                          }`}
                       >
                         <span
-                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                            selectedOffer.useUnitPrices
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${selectedOffer.useUnitPrices
                               ? "translate-x-6"
                               : "translate-x-1"
-                          }`}
+                            }`}
                         />
                       </button>
                     </div>
@@ -2850,7 +2834,7 @@ const OffersPage: React.FC = () => {
                                                         e.target.value,
                                                         up.unitPrice,
                                                         selectedOffer.totalPriceDecimalPlaces ||
-                                                          2
+                                                        2
                                                       ),
                                                   }
                                                 )
@@ -2867,12 +2851,12 @@ const OffersPage: React.FC = () => {
                                                 type="number"
                                                 step={
                                                   selectedOffer.unitPriceDecimalPlaces ===
-                                                  3
+                                                    3
                                                     ? "0.001"
                                                     : selectedOffer.unitPriceDecimalPlaces ===
                                                       2
-                                                    ? "0.01"
-                                                    : "0.0001"
+                                                      ? "0.01"
+                                                      : "0.0001"
                                                 }
                                                 value={up.unitPrice}
                                                 onChange={(e) =>
@@ -2890,7 +2874,7 @@ const OffersPage: React.FC = () => {
                                                             e.target.value
                                                           ),
                                                           selectedOffer.totalPriceDecimalPlaces ||
-                                                            2
+                                                          2
                                                         ),
                                                     }
                                                   )
@@ -3022,15 +3006,15 @@ const OffersPage: React.FC = () => {
                                                     (p: any, i: number) =>
                                                       i === idx
                                                         ? {
-                                                            ...p,
-                                                            quantity:
+                                                          ...p,
+                                                          quantity:
+                                                            e.target.value,
+                                                          total:
+                                                            calculateLineTotal(
                                                               e.target.value,
-                                                            total:
-                                                              calculateLineTotal(
-                                                                e.target.value,
-                                                                p.price
-                                                              ),
-                                                          }
+                                                              p.price
+                                                            ),
+                                                        }
                                                         : p
                                                   );
                                                 updateLineItem(
@@ -3072,19 +3056,19 @@ const OffersPage: React.FC = () => {
                                                       (p: any, i: number) =>
                                                         i === idx
                                                           ? {
-                                                              ...p,
-                                                              price: parseFloat(
-                                                                e.target.value
+                                                            ...p,
+                                                            price: parseFloat(
+                                                              e.target.value
+                                                            ),
+                                                            total:
+                                                              calculateLineTotal(
+                                                                p.quantity,
+                                                                parseFloat(
+                                                                  e.target
+                                                                    .value
+                                                                )
                                                               ),
-                                                              total:
-                                                                calculateLineTotal(
-                                                                  p.quantity,
-                                                                  parseFloat(
-                                                                    e.target
-                                                                      .value
-                                                                  )
-                                                                ),
-                                                            }
+                                                          }
                                                           : p
                                                     );
                                                   updateLineItem(
@@ -3232,8 +3216,8 @@ const OffersPage: React.FC = () => {
                                 selectedOffer?.unitPriceDecimalPlaces === 3
                                   ? "0.001"
                                   : selectedOffer?.unitPriceDecimalPlaces === 2
-                                  ? "0.01"
-                                  : "0.0001"
+                                    ? "0.01"
+                                    : "0.0001"
                               }
                               value={unitPriceFormData.unitPrice}
                               onChange={(e) =>
@@ -3504,9 +3488,8 @@ const OffersPage: React.FC = () => {
                     className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent font-mono"
                     placeholder={
                       selectedOffer.useUnitPrices
-                        ? `Example for Unit Prices (${
-                            selectedOffer.unitPriceDecimalPlaces || 3
-                          } decimal places):
+                        ? `Example for Unit Prices (${selectedOffer.unitPriceDecimalPlaces || 3
+                        } decimal places):
 1, 1000, 4.500
 1, 5000, 4.200
 2, 1000, 8.750

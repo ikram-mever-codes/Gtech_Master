@@ -57,6 +57,7 @@ import { UserRole } from "@/utils/interfaces";
 import CustomButton from "@/components/UI/CustomButton";
 import { format } from "date-fns";
 import { availableResources } from "@/utils/resources";
+import PageHeader from "@/components/UI/PageHeader";
 
 const validationSchema = Yup.object({
     name: Yup.string().required("Name is required"),
@@ -211,19 +212,9 @@ const ProfilePage = () => {
     return (
         <Box sx={{ maxWidth: "1200px", mx: "auto", px: { xs: 2, md: 4 }, py: 4 }}>
 
-            <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 4 }}>
-                <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: "primary.main", color: "white" }}>
-                    <User size={28} />
-                </Box>
-                <Box>
-                    <Typography variant="h4" sx={{ fontWeight: 800, color: "text.primary", letterSpacing: "-0.02em" }}>
-                        My Profile
-                    </Typography>
-                    <Typography variant="body1" color="text.secondary">
-                        Manage your personal information, security and account settings
-                    </Typography>
-                </Box>
-            </Stack>
+            <Box sx={{ mb: 4 }}>
+                <PageHeader title="My Profile" icon={User} />
+            </Box>
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
 

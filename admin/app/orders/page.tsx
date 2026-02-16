@@ -28,6 +28,8 @@ import { getAllCustomers } from "@/api/customers";
 import { getItems } from "@/api/items";
 import { getCategories } from "@/api/categories";
 import CustomButton from "@/components/UI/CustomButton";
+import PageHeader from "@/components/UI/PageHeader";
+import { ShoppingCart } from "lucide-react";
 import { useSelector } from "react-redux";
 import { RootState } from "@/app/Redux/store";
 import { UserRole } from "@/utils/interfaces";
@@ -810,10 +812,7 @@ const OrderPage = () => {
           <div className="mb-6">
             <div className="flex justify-between items-center mb-4">
               <div>
-                <h1 className="text-2xl font-bold text-gray-900 mb-2">
-                  {activeTabObj?.label || "Select a tab"}
-                </h1>
-                <p className="text-gray-600 text-sm">{activeTabObj?.description || "-"}</p>
+                <PageHeader title={activeTabObj?.label || "Orders"} icon={ShoppingCart} />
               </div>
 
               {tabActions[activeTab]}

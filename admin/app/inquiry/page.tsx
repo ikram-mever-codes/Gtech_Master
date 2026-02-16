@@ -66,6 +66,8 @@ import { getAllBusinesses } from "@/api/bussiness";
 import CustomButton from "@/components/UI/CustomButton";
 import { useSelector } from "react-redux";
 import { RootState } from "@/app/Redux/store";
+import { MessagesSquare, ClipboardList } from "lucide-react";
+import PageHeader from "@/components/UI/PageHeader";
 import { UserRole } from "@/utils/interfaces";
 import { getAllTarics } from "@/api/items";
 
@@ -1291,12 +1293,12 @@ const CombinedInquiriesPage: React.FC = () => {
         <div className="mb-6">
           <div className="flex justify-between items-center mb-4">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900 mb-2">
-                {activeTab === "inquiries" ? "Inquiries" : "Requested Items"}
-              </h1>
+              <PageHeader
+                title={activeTab === "inquiries" ? "Inquiries" : "Requested Items"}
+                icon={activeTab === "inquiries" ? MessagesSquare : ClipboardList}
+              />
             </div>
             <div className="flex gap-2">
-              {/* Tab-specific filters */}
               {activeTab === "inquiries" ? (
                 <select
                   value={selectedCustomerId}

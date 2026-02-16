@@ -80,6 +80,7 @@ import {
   UserCircle,
 } from "lucide-react";
 import CustomButton from "@/components/UI/CustomButton";
+import PageHeader from "@/components/UI/PageHeader";
 import theme from "@/styles/theme";
 import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
@@ -300,15 +301,7 @@ const AdminCustomersPage = () => {
         {/* Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <div>
-            <Typography
-              variant="h4"
-              sx={{ color: "secondary.main", fontSize: "30px" }}
-            >
-              List Management
-            </Typography>
-            <h3 className="font-roboto mt-1">
-              View and manage all registered customers
-            </h3>
+            <PageHeader title="List Management" icon={ClipboardList} />
           </div>
 
           <div className="flex gap-4 w-full md:w-auto">

@@ -18,7 +18,8 @@ import {
 } from "@heroicons/react/24/outline";
 import { toast } from "react-hot-toast";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Linkedin, Users, Building2, UserCheck } from "lucide-react";
+import { Linkedin, Users, Building2, UserCheck, BookUser } from "lucide-react";
+import PageHeader from "@/components/UI/PageHeader";
 import {
   getAllContactPersons,
   createContactPerson,
@@ -641,9 +642,7 @@ const ContactPersonsPage: React.FC = () => {
 
         <div className="w-full items-center  flex justify-between">
           <div className="mb-3">
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">
-              Contact Persons Management
-            </h1>
+            <PageHeader title="Contact Persons Management" icon={BookUser} />
           </div>
           {activeTab === "sales" && (
             <CustomButton

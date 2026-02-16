@@ -43,6 +43,8 @@ import { RootState } from "@/app/Redux/store";
 import { UserRole } from "@/utils/interfaces";
 import { getAllCustomers } from "@/api/customers";
 import Image from "next/image";
+import { LibraryBig } from "lucide-react";
+import PageHeader from "@/components/UI/PageHeader";
 
 const LibraryPage: React.FC = () => {
   // State management
@@ -371,7 +373,7 @@ const LibraryPage: React.FC = () => {
         {/* Header */}
         <div className="mb-8 w-full flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Library</h1>
+            <PageHeader title="Library" icon={LibraryBig} />
           </div>
           <div>
             <div className="flex gap-3">
@@ -735,31 +737,31 @@ const LibraryPage: React.FC = () => {
                           </a>
                           {(user?.role === UserRole.ADMIN ||
                             file.uploadedById === user?.id) && (
-                            <>
-                              <button
-                                onClick={() => {
-                                  setEditingFileId(file.id);
-                                  setEditForm({
-                                    description: file.description || "",
-                                    tags: file.tags.join(", "),
-                                    isPublic: file.isPublic,
-                                  });
-                                  setEditModeEnabled(true);
-                                }}
-                                className="text-gray-500 hover:text-gray-700 transition-colors p-1"
-                                title="Edit"
-                              >
-                                <PencilIcon className="h-5 w-5" />
-                              </button>
-                              <button
-                                onClick={() => handleDeleteFile(file.id)}
-                                className="text-red-500 hover:text-red-700 transition-colors p-1"
-                                title="Delete"
-                              >
-                                <TrashIcon className="h-5 w-5" />
-                              </button>
-                            </>
-                          )}
+                              <>
+                                <button
+                                  onClick={() => {
+                                    setEditingFileId(file.id);
+                                    setEditForm({
+                                      description: file.description || "",
+                                      tags: file.tags.join(", "),
+                                      isPublic: file.isPublic,
+                                    });
+                                    setEditModeEnabled(true);
+                                  }}
+                                  className="text-gray-500 hover:text-gray-700 transition-colors p-1"
+                                  title="Edit"
+                                >
+                                  <PencilIcon className="h-5 w-5" />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteFile(file.id)}
+                                  className="text-red-500 hover:text-red-700 transition-colors p-1"
+                                  title="Delete"
+                                >
+                                  <TrashIcon className="h-5 w-5" />
+                                </button>
+                              </>
+                            )}
                         </div>
                       </td>
                     </tr>
@@ -793,11 +795,10 @@ const LibraryPage: React.FC = () => {
                       <button
                         key={pageNum}
                         onClick={() => setCurrentPage(pageNum)}
-                        className={`px-3 py-1 text-sm rounded-lg transition-all ${
-                          currentPage === pageNum
+                        className={`px-3 py-1 text-sm rounded-lg transition-all ${currentPage === pageNum
                             ? "bg-gray-600 text-white"
                             : "bg-white/80 backdrop-blur-sm border border-gray-300/80 hover:bg-white/60"
-                        }`}
+                          }`}
                       >
                         {pageNum}
                       </button>
@@ -808,11 +809,10 @@ const LibraryPage: React.FC = () => {
                       <span className="px-2 text-gray-500">...</span>
                       <button
                         onClick={() => setCurrentPage(totalPages)}
-                        className={`px-3 py-1 text-sm rounded-lg transition-all ${
-                          currentPage === totalPages
+                        className={`px-3 py-1 text-sm rounded-lg transition-all ${currentPage === totalPages
                             ? "bg-gray-600 text-white"
                             : "bg-white/80 backdrop-blur-sm border border-gray-300/80 hover:bg-white/60"
-                        }`}
+                          }`}
                       >
                         {totalPages}
                       </button>

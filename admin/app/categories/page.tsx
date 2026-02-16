@@ -1,9 +1,11 @@
 'use client'
 import React, { useEffect, useState } from 'react'
 import { getCategories } from '@/api/categories'
-import { EyeIcon, PencilIcon, TrashIcon } from 'lucide-react'
+import { EyeIcon, PencilIcon, TrashIcon, Layers } from 'lucide-react'
 import { UserRole } from '@/utils/interfaces'
 import { useSelector } from 'react-redux'
+import PageHeader from '@/components/UI/PageHeader'
+import { RootState } from '../Redux/store'
 
 const CategoryPage = () => {
     const { user } = useSelector((state: RootState) => state.user);
@@ -12,15 +14,15 @@ const CategoryPage = () => {
 
     const fetchCategories = async () => {
         try {
-      const response = await getCategories();
-      if (response?.data) {
-        setCategories(Array.isArray(response.data) ? response.data : response.data.categories || []);
-      }
-    } catch (error) {
-      console.error("Error fetching customers:", error);
-     
-    }
-  
+            const response = await getCategories();
+            if (response?.data) {
+                setCategories(Array.isArray(response.data) ? response.data : response.data.categories || []);
+            }
+        } catch (error) {
+            console.error("Error fetching customers:", error);
+
+        }
+
     }
     useEffect(() => {
         fetchCategories()
@@ -33,14 +35,15 @@ const CategoryPage = () => {
     function handleEditCategory(Category: any): void {
         throw new Error('Function not implemented.')
     }
-
     function handleDeleteCategory(id: any): void {
         throw new Error('Function not implemented.')
     }
 
     return (
-        <div>
-            Category page
+        <div className="p-8 bg-white min-h-screen">
+            <div className="mb-6">
+                <PageHeader title="Category Management" icon={Layers} />
+            </div>
             <div className="overflow-x-auto">
                 <table className="w-full">
                     <thead className="bg-gray-50 border-b border-gray-200">

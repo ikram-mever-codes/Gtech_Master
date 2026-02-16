@@ -25,6 +25,8 @@ import {
   ItemDetails,
 } from "@/api/items";
 import { loadingStyles, successStyles, errorStyles } from "@/utils/constants";
+import { Package } from "lucide-react";
+import PageHeader from "@/components/UI/PageHeader";
 
 const ItemDetailsPage = () => {
   const { id } = useParams();
@@ -226,10 +228,7 @@ const ItemDetailsPage = () => {
         <div className="mb-8">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">
-                Item Details: {itemData.itemNo}
-              </h1>
-              <p className="text-gray-600 mt-1">{itemData.name}</p>
+              <PageHeader title={`Item Details: ${itemData.itemNo}`} icon={Package} />
             </div>
             <div className="flex gap-3">
               <CustomButton
@@ -276,8 +275,8 @@ const ItemDetailsPage = () => {
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 className={`px-4 py-2 text-sm font-medium whitespace-nowrap transition-colors ${activeTab === tab.id
-                    ? "text-gray-900 border-b-2 border-gray-600"
-                    : "text-gray-500 hover:text-gray-700"
+                  ? "text-gray-900 border-b-2 border-gray-600"
+                  : "text-gray-500 hover:text-gray-700"
                   }`}
               >
                 {tab.label}
