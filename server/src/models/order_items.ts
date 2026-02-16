@@ -22,7 +22,7 @@ export class OrderItem {
   @Column({ type: "int", nullable: true })
   ItemID_DE!: number;
 
-  @Column()
+  @Column({ nullable: true })
   item_id!: number;
 
   @Column({ type: "int", nullable: true })
@@ -50,5 +50,4 @@ export class OrderItem {
 
   @UpdateDateColumn()
   updated_at!: Date;
-
 }
