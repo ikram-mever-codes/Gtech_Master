@@ -88,6 +88,7 @@ export type CreateContactPersonPayload = {
   contact?: ContactType;
   decisionMakerState?: DecisionMakerState;
   note?: string;
+  decisionMakerNote?: string;
 };
 
 export type UpdateContactPersonPayload = {
@@ -104,6 +105,7 @@ export type UpdateContactPersonPayload = {
   contact?: ContactType;
   decisionMakerState?: DecisionMakerState;
   note?: string;
+  decisionMakerNote?: string;
 };
 
 export type ContactPersonFilters = {
@@ -284,9 +286,8 @@ export const bulkImportContactPersons = async (payload: BulkImportPayload) => {
     toast.dismiss();
 
     const data = res.data as any;
-    const message = `Imported ${data?.imported || 0} of ${
-      data?.total || 0
-    } contact persons`;
+    const message = `Imported ${data?.imported || 0} of ${data?.total || 0
+      } contact persons`;
 
     if (data?.duplicates > 0) {
       toast.success(
@@ -319,8 +320,7 @@ export const bulkUpdateLinkedInState = async (
 
     const data = res.data as any;
     toast.success(
-      `Updated LinkedIn state for ${
-        data?.updatedCount || ids.length
+      `Updated LinkedIn state for ${data?.updatedCount || ids.length
       } contact persons`,
       successStyles
     );
@@ -640,8 +640,7 @@ export const getAllStarBusinesses = async (filters?: StarBusinessFilters) => {
     }
 
     const res: ResponseInterface = await api.get(
-      `/contacts/star-businesses/all${
-        params.toString() ? `?${params.toString()}` : ""
+      `/contacts/star-businesses/all${params.toString() ? `?${params.toString()}` : ""
       }`
     );
     return res;
@@ -666,8 +665,7 @@ export const getStarBusinessesWithoutContacts = async (
     }
 
     const res: ResponseInterface = await api.get(
-      `/contacts/star-businesses/without-contacts${
-        params.toString() ? `?${params.toString()}` : ""
+      `/contacts/star-businesses/without-contacts${params.toString() ? `?${params.toString()}` : ""
       }`
     );
     return res;
@@ -692,8 +690,7 @@ export const getStarBusinessesContactSummary = async (
     }
 
     const res: ResponseInterface = await api.get(
-      `/contacts/star-businesses/contact-summary${
-        params.toString() ? `?${params.toString()}` : ""
+      `/contacts/star-businesses/contact-summary${params.toString() ? `?${params.toString()}` : ""
       }`
     );
     return res;
@@ -744,9 +741,8 @@ export const fetchStarBusinessesForDropdown = async (search?: string) => {
       return res.data.starBusinesses.map((business: StarBusinessData) => ({
         value: business.id,
         label: business.companyName,
-        description: `${business.city || ""}${
-          business.city && business.country ? ", " : ""
-        }${business.country || ""}`,
+        description: `${business.city || ""}${business.city && business.country ? ", " : ""
+          }${business.country || ""}`,
         email: business.email,
         contactEmail: business.contactEmail,
       }));

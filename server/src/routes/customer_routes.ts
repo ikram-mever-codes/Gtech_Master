@@ -15,7 +15,12 @@ import {
   getSingleUser,
   updateCustomerStatus,
 } from "../controllers/customer_controllers";
-import { authenticateUser, AuthorizedRequest } from "../middlewares/authorized";
+import {
+  authenticateUser,
+  AuthorizedRequest,
+  authorize,
+} from "../middlewares/authorized";
+import { UserRole } from "../models/users";
 
 const router: any = express.Router();
 
@@ -36,9 +41,13 @@ router.put("/change-password", authenticateCustomer, changePassword);
 // Profile Management
 router.put("/me", authenticateCustomer, uploadSingleFile, editCustomerProfile);
 
-// For admins
-
-router.get("/all", authenticateUser, getAllCustomers);
+// For admins and Sales team
+router.get(
+  "/all",
+  authenticateUser,
+  authorize(UserRole.SALES),
+  getAllCustomers
+);
 
 router.get(
   "/single/:customerId",
@@ -56,12 +65,17 @@ router.get(
         authenticateCustomer(req, res, next);
       }
     } else {
-      return res.status(401).json({ error: "Authentication required" });
+      authenticateCustomer(req, res, next);
     }
   },
   getSingleUser
 );
 
-router.put("/:customerId/status", authenticateUser, updateCustomerStatus);
+router.put(
+  "/:customerId/status",
+  authenticateUser,
+  authorize(UserRole.SALES),
+  updateCustomerStatus
+);
 
 export default router;

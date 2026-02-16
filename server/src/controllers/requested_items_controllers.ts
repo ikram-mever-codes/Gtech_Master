@@ -5,6 +5,9 @@ import { ContactPerson } from "../models/contact_person";
 import { AppDataSource } from "../config/database";
 import { Customer } from "../models/customers";
 import { Inquiry } from "../models/inquiry";
+import { UserRole } from "../models/users";
+import { filterDataByRole } from "../utils/dataFilter";
+import { AuthorizedRequest } from "../middlewares/authorized";
 
 export class RequestedItemController {
   private requestedItemRepository = AppDataSource.getRepository(RequestedItem);
@@ -99,26 +102,29 @@ export class RequestedItemController {
               ...item.business,
               customer: customer
                 ? {
-                    id: customer.id,
-                    companyName: customer.companyName,
-                    legalName: customer.legalName,
-                    email: customer.email,
-                    contactEmail: customer.contactEmail,
-                    contactPhoneNumber: customer.contactPhoneNumber,
-                    stage: customer.stage,
-                    avatar: customer.avatar,
-                    createdAt: customer.createdAt,
-                    updatedAt: customer.updatedAt,
-                  }
+                  id: customer.id,
+                  companyName: customer.companyName,
+                  legalName: customer.legalName,
+                  email: customer.email,
+                  contactEmail: customer.contactEmail,
+                  contactPhoneNumber: customer.contactPhoneNumber,
+                  stage: customer.stage,
+                  avatar: customer.avatar,
+                  createdAt: customer.createdAt,
+                  updatedAt: customer.updatedAt,
+                }
                 : null,
             },
           };
         })
       );
 
+      const user = (request as AuthorizedRequest).user;
+      const filteredData = filterDataByRole(enrichedItems, user?.role || UserRole.STAFF);
+
       return response.status(200).json({
         success: true,
-        data: enrichedItems,
+        data: filteredData,
         pagination: {
           page: Number(page),
           limit: Number(limit),
@@ -163,24 +169,27 @@ export class RequestedItemController {
           ...item.business,
           customer: customer
             ? {
-                id: customer.id,
-                companyName: customer.companyName,
-                legalName: customer.legalName,
-                email: customer.email,
-                contactEmail: customer.contactEmail,
-                contactPhoneNumber: customer.contactPhoneNumber,
-                stage: customer.stage,
-                avatar: customer.avatar,
-                createdAt: customer.createdAt,
-                updatedAt: customer.updatedAt,
-              }
+              id: customer.id,
+              companyName: customer.companyName,
+              legalName: customer.legalName,
+              email: customer.email,
+              contactEmail: customer.contactEmail,
+              contactPhoneNumber: customer.contactPhoneNumber,
+              stage: customer.stage,
+              avatar: customer.avatar,
+              createdAt: customer.createdAt,
+              updatedAt: customer.updatedAt,
+            }
             : null,
         },
       };
 
+      const user = (request as AuthorizedRequest).user;
+      const filteredData = filterDataByRole(enrichedItem, user?.role || UserRole.STAFF);
+
       return response.status(200).json({
         success: true,
-        data: enrichedItem,
+        data: filteredData,
       });
     } catch (error) {
       console.error("Error fetching requested item:", error);

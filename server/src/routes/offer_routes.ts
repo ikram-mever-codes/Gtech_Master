@@ -1,18 +1,40 @@
 import { Router } from "express";
 import { OfferController } from "../controllers/offer_controller";
+import { authenticateUser, authorize } from "../middlewares/authorized";
+import { UserRole } from "../models/users";
 
 const router: any = Router();
 const offerController = new OfferController();
 
-// Offer CRUD operations
+// Apply authentication to all offer routes
+router.use(authenticateUser);
+
+// Offer CRUD operations - Restricted to Admin and Sales
 router.post(
   "/inquiry/:inquiryId",
+  authorize(UserRole.SALES),
   offerController.createOfferFromInquiry.bind(offerController),
 );
-router.get("", offerController.getAllOffers.bind(offerController));
-router.get("/:id", offerController.getOfferById.bind(offerController));
-router.put("/:id", offerController.updateOffer.bind(offerController));
-router.delete("/:id", offerController.deleteOffer.bind(offerController));
+router.get(
+  "",
+  authorize(UserRole.SALES),
+  offerController.getAllOffers.bind(offerController),
+);
+router.get(
+  "/:id",
+  authorize(UserRole.SALES),
+  offerController.getOfferById.bind(offerController),
+);
+router.put(
+  "/:id",
+  authorize(UserRole.SALES),
+  offerController.updateOffer.bind(offerController),
+);
+router.delete(
+  "/:id",
+  authorize(UserRole.SALES),
+  offerController.deleteOffer.bind(offerController),
+);
 
 // Offer revisions
 router.post(

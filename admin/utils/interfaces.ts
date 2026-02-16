@@ -9,6 +9,8 @@ export enum UserRole {
   MANAGER = "MANAGER",
   STAFF = "STAFF",
   SUPPORT = "SUPPORT",
+  SALES = "SALES",
+  PURCHASING = "PURCHASING",
 }
 
 export enum UserStatus {
@@ -60,9 +62,17 @@ export const INTERVAL_OPTIONS = [
   { value: "daily", label: "Täglich" },
 ];
 
-// Enum for customer verification status
 export enum CustomerVerificationStatus {
   PENDING = "pending",
   APPROVED = "verified",
   REJECTED = "rejected",
 }
+
+export enum OrderStatus {
+  COMPLETED = "completed",
+  PROCESSING = "processing",
+  PENDING = "pending",
+  CANCELLED = "cancelled",
+  SHIPPED = "shipped",
+}
+

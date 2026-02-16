@@ -211,6 +211,17 @@ export const getItemById = async (id: number) => {
   }
 };
 
+// Get item by Category ID
+export const getItemByCategory = async (categoryId: number) => {
+  try {
+    const response: ResponseInterface = await api.get(`/items/${categoryId}`);
+    return response;
+  } catch (error) {
+    handleApiError(error, "Failed to fetch item details by category");
+    throw error;
+  }
+};
+
 // Create new item
 export const createItem = async (itemData: {
   item_name: string;
@@ -730,11 +741,6 @@ export const searchParents = async (query: string, limit: number = 10) => {
   }
 };
 
-// ============================================
-// WAREHOUSE API FUNCTIONS
-// ============================================
-
-// Get warehouse items
 export const getWarehouseItems = async (params?: {
   page?: number;
   limit?: number;
@@ -883,6 +889,27 @@ export const deleteQualityCriterion = async (id: number) => {
     return response;
   } catch (error) {
     handleApiError(error, "Failed to delete quality criterion");
+    throw error;
+  }
+};
+
+export const downloadOrderPdf = async (id: string) => {
+  try {
+    const response: any = await api.get(`/offers/${id}/download-pdf`, {
+      responseType: "blob",
+    });
+
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", `offer-${id}.pdf`);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+
+    return true;
+  } catch (error) {
+    handleApiError(error, "Failed to download PDF");
     throw error;
   }
 };

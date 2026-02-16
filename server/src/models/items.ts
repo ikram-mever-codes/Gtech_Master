@@ -6,15 +6,16 @@ import {
   ManyToOne,
   OneToMany,
   JoinColumn,
-  PrimaryColumn,
+  PrimaryGeneratedColumn,
 } from "typeorm";
 import { Parent } from "./parents";
 import { Taric } from "./tarics";
 import { Category } from "./categories";
+import { OrderItem } from "./order_items";
 
 @Entity()
 export class Item {
-  @PrimaryColumn()
+  @PrimaryGeneratedColumn()
   id!: number;
 
   @Column({ nullable: true })
@@ -151,8 +152,10 @@ export class Item {
   // @OneToMany(() => VariationValue, (variationValue) => variationValue.item)
   // variationValues: VariationValue[];
 
-  // @OneToMany(() => OrderItem, (orderItem) => orderItem.item)
-  // orderItems: OrderItem[];
+
+  @OneToMany(() => OrderItem, orderItem => orderItem.item)
+  orderItems: OrderItem[];
+
 
   // @OneToMany(() => ItemQuality, (itemQuality) => itemQuality.item)
   // itemQualities: ItemQuality[];

@@ -7,10 +7,13 @@ import { AppDataSource } from "../config/database";
 import { RequestedItem } from "../models/requested_items";
 import { Taric } from "../models/tarics";
 import { Item } from "../models/items";
+import { StarBusinessDetails } from "../models/star_business_details";
 import { validate } from "class-validator";
 import { plainToInstance } from "class-transformer";
+import { UserRole } from "../models/users";
+import { filterDataByRole } from "../utils/dataFilter";
+import { AuthorizedRequest } from "../middlewares/authorized";
 
-// Alternative: Simplified DTOs
 
 import { IsOptional, IsString, IsNumber, IsInt, Min } from "class-validator";
 import { Type } from "class-transformer";
@@ -87,7 +90,7 @@ export class BaseItemConversionDto {
   note?: string;
 }
 
-export class ConvertInquiryToItemDto extends BaseItemConversionDto {}
+export class ConvertInquiryToItemDto extends BaseItemConversionDto { }
 
 export class ConvertRequestToItemDto extends BaseItemConversionDto {
   @IsOptional()
@@ -258,9 +261,12 @@ export class InquiryController {
         .take(Number(limit))
         .getManyAndCount();
 
+      const user = (request as AuthorizedRequest).user;
+      const filteredData = filterDataByRole(inquiries, user?.role || UserRole.STAFF);
+
       return response.status(200).json({
         success: true,
-        data: inquiries,
+        data: filteredData,
         pagination: {
           page: Number(page),
           limit: Number(limit),
@@ -293,9 +299,12 @@ export class InquiryController {
         });
       }
 
+      const user = (request as AuthorizedRequest).user;
+      const filteredData = filterDataByRole(inquiry, user?.role || UserRole.STAFF);
+
       return response.status(200).json({
         success: true,
-        data: inquiry,
+        data: filteredData,
       });
     } catch (error) {
       console.error("Error fetching inquiry:", error);
@@ -403,18 +412,23 @@ export class InquiryController {
         handlingInstructions,
         numberOfPackages,
         packageType,
-        // Purchase price fields
         purchasePrice,
         purchasePriceCurrency,
       });
 
-      // Save inquiry first to get ID
       const savedInquiry = await this.inquiryRepository.save(inquiry);
 
-      // Create and save requests if provided
       if (requests && Array.isArray(requests) && requests.length > 0) {
+        let starBusinessDetails = customer.starBusinessDetails;
+        if (!starBusinessDetails) {
+          const starBusinessDetailsRepository = AppDataSource.getRepository(StarBusinessDetails);
+          starBusinessDetails = starBusinessDetailsRepository.create({
+            customer: customer,
+          });
+          await starBusinessDetailsRepository.save(starBusinessDetails);
+        }
+
         const requestEntities = requests.map((reqData: any) => {
-          // Calculate total weight if unit weight and quantity are provided
           let totalWeight = null;
           if (reqData.unitWeight && reqData.quantity) {
             totalWeight =
@@ -423,11 +437,10 @@ export class InquiryController {
 
           const requestItem = this.requestRepository.create({
             ...reqData,
-            businessId: customer.starBusinessDetails.id,
-            businessDetails: customer.starBusinessDetails,
+            businessId: starBusinessDetails.id,
+            business: starBusinessDetails,
             inquiry: savedInquiry,
             qty: reqData.quantity,
-            // Calculate total weight for requested item
             totalWeight: totalWeight || reqData.totalWeight,
           });
 
@@ -437,7 +450,6 @@ export class InquiryController {
         await this.requestRepository.save(requestEntities);
       }
 
-      // Fetch complete inquiry with relations
       const completeInquiry = await this.inquiryRepository.findOne({
         where: { id: savedInquiry.id },
         relations: ["customer", "contactPerson", "requests"],
@@ -475,18 +487,15 @@ export class InquiryController {
         termsConditions,
         projectLink,
         assemblyInstructions,
-        // New dimension fields
         weight,
         width,
         height,
         length,
-        // New shipping fields
         isFragile,
         requiresSpecialHandling,
         handlingInstructions,
         numberOfPackages,
         packageType,
-        // Purchase price fields
         purchasePrice,
         purchasePriceCurrency,
         requests,
@@ -523,7 +532,6 @@ export class InquiryController {
         }
       }
 
-      // Update data including all new fields
       const updateData: any = {
         ...(name && { name }),
         ...(description !== undefined && { description }),
@@ -538,12 +546,10 @@ export class InquiryController {
         ...(projectLink !== undefined && { projectLink }),
         ...(assemblyInstructions !== undefined && { assemblyInstructions }),
         ...(isEstimated !== undefined && { isEstimated }),
-        // Dimension fields
         ...(weight !== undefined && { weight }),
         ...(width !== undefined && { width }),
         ...(height !== undefined && { height }),
         ...(length !== undefined && { length }),
-        // Shipping fields
         ...(isFragile !== undefined && { isFragile }),
         ...(requiresSpecialHandling !== undefined && {
           requiresSpecialHandling,
@@ -551,7 +557,6 @@ export class InquiryController {
         ...(handlingInstructions !== undefined && { handlingInstructions }),
         ...(numberOfPackages !== undefined && { numberOfPackages }),
         ...(packageType !== undefined && { packageType }),
-        // Purchase price fields
         ...(purchasePrice !== undefined && { purchasePrice }),
         ...(purchasePriceCurrency !== undefined && { purchasePriceCurrency }),
       };
@@ -560,55 +565,54 @@ export class InquiryController {
         updateData.contactPerson = contactPerson;
       }
 
-      // Apply the update
       await this.inquiryRepository.update(id, updateData);
 
-      // Handle requests update if provided
       if (requests && Array.isArray(requests)) {
-        // First, remove existing requests
         if (existingInquiry.requests && existingInquiry.requests.length > 0) {
           await this.requestRepository.remove(existingInquiry.requests);
         }
 
-        // Then create new requests with proper business details
-        if (
-          requests.length > 0 &&
-          existingInquiry.customer?.starBusinessDetails
-        ) {
-          const requestEntities = requests.map((reqData: any) => {
-            // Calculate total weight if unit weight and quantity are provided
-            let totalWeight = null;
-            if (reqData.unitWeight && reqData.quantity) {
-              totalWeight =
-                parseFloat(reqData.unitWeight) * parseFloat(reqData.quantity);
-            }
+        if (requests.length > 0) {
+          let starBusinessDetails = existingInquiry.customer?.starBusinessDetails;
+          if (!starBusinessDetails && existingInquiry.customer) {
+            const starBusinessDetailsRepository = AppDataSource.getRepository(StarBusinessDetails);
+            starBusinessDetails = starBusinessDetailsRepository.create({
+              customer: existingInquiry.customer,
+            });
+            await starBusinessDetailsRepository.save(starBusinessDetails);
+          }
 
-            const requestItem = this.requestRepository.create({
-              ...reqData,
-              businessId: existingInquiry.customer.starBusinessDetails.id,
-              businessDetails: existingInquiry.customer.starBusinessDetails,
-              inquiry: existingInquiry,
-              qty: reqData.quantity,
-              // Calculate total weight for requested item
-              totalWeight: totalWeight || reqData.totalWeight,
+          if (starBusinessDetails) {
+            const requestEntities = requests.map((reqData: any) => {
+              let totalWeight = null;
+              if (reqData.unitWeight && reqData.quantity) {
+                totalWeight =
+                  parseFloat(reqData.unitWeight) * parseFloat(reqData.quantity);
+              }
+
+              const requestItem = this.requestRepository.create({
+                ...reqData,
+                businessId: starBusinessDetails.id,
+                business: starBusinessDetails,
+                inquiry: existingInquiry,
+                qty: reqData.quantity,
+                totalWeight: totalWeight || reqData.totalWeight,
+              });
+
+              return requestItem;
             });
 
-            return requestItem;
-          });
-
-          await this.requestRepository.save(requestEntities);
+            await this.requestRepository.save(requestEntities);
+          }
         }
       }
 
-      // Handle status synchronization logic
       if (status && status !== existingInquiry.status) {
-        // Get updated inquiry with requests
         const updatedInquiry = await this.inquiryRepository.findOne({
           where: { id },
           relations: ["requests"],
         });
 
-        // If inquiry is NOT an assembly, update all request statuses
         if (
           updatedInquiry &&
           !updatedInquiry.isAssembly &&
@@ -623,8 +627,6 @@ export class InquiryController {
             })
           );
         }
-        // If inquiry IS an assembly, don't update request statuses
-        // (they remain independent)
       }
 
       const updatedInquiry = await this.inquiryRepository.findOne({
@@ -758,7 +760,6 @@ export class InquiryController {
         });
       }
 
-      // Calculate total weight if unit weight and quantity are provided
       let totalWeight = null;
       if (requestData.unitWeight && requestData.quantity) {
         totalWeight =
@@ -774,7 +775,6 @@ export class InquiryController {
 
       const savedRequest = await this.requestRepository.save(requestItem);
 
-      // Update inquiry status based on first request if not already set
       if (inquiry.status === "Draft") {
         inquiry.status = savedRequest.status || "Draft";
         await this.inquiryRepository.save(inquiry);
@@ -821,13 +821,10 @@ export class InquiryController {
         });
       }
 
-      // Calculate total weight if unit weight and quantity are provided
       if (requestData.unitWeight && requestData.quantity) {
         requestData.totalWeight =
           parseFloat(requestData.unitWeight) * parseFloat(requestData.quantity);
       }
-
-      // Map quantity to qty if provided
       if (requestData.quantity !== undefined) {
         requestData.qty = requestData.quantity;
       }
@@ -860,7 +857,6 @@ export class InquiryController {
         request.body
       );
 
-      // Validate conversion data
       const errors = await validate(conversionData);
       if (errors.length > 0) {
         return response.status(400).json({
@@ -876,7 +872,6 @@ export class InquiryController {
       const itemRepository = AppDataSource.getRepository(Item);
       const taricRepository = AppDataSource.getRepository(Taric);
 
-      // Find the inquiry
       const inquiry = await inquiryRepository.findOne({
         where: { id: inquiryId },
         relations: ["requests"],
@@ -889,20 +884,17 @@ export class InquiryController {
         });
       }
 
-      // Generate new item ID and EAN
       const itemId = await ItemGenerator.generateItemId();
       const ean = ItemGenerator.generateEAN(itemId);
 
       let taric: Taric | null = null;
 
       if (conversionData.taricId) {
-        // Try to find existing TARIC by ID
         taric = await taricRepository.findOne({
           where: { id: conversionData.taricId },
         });
 
         if (!taric) {
-          // If TARIC ID is provided but not found, create a new one with the provided ID
           taric = taricRepository.create({
             id: conversionData.taricId,
             code: undefined,
@@ -919,11 +911,9 @@ export class InquiryController {
       }
 
       if (!taric) {
-        // Create new TARIC with auto-generated ID
         taric = await ItemGenerator.createTaricForItem(inquiry.name);
       }
 
-      // Prepare item data based on inquiry type
       let itemData: any = {
         id: itemId,
         ean: ean,
@@ -946,7 +936,6 @@ export class InquiryController {
       };
 
       if (inquiry.isAssembly) {
-        // For assembly inquiries: Use inquiry fields directly
         itemData = {
           ...itemData,
           item_name: inquiry.name,
@@ -954,23 +943,19 @@ export class InquiryController {
           photo: inquiry.image,
           remark: conversionData.remark || inquiry.description,
           note: conversionData.note || inquiry.internalNotes,
-          // Use dimension fields from inquiry or conversion data
           weight: conversionData.weight || inquiry.weight,
           width: conversionData.width || inquiry.width,
           height: conversionData.height || inquiry.height,
           length: conversionData.length || inquiry.length,
           isEstimated: inquiry.isEstimated,
-          // Parse quantity from first requested item if exists
           FOQ:
             conversionData.FOQ ||
             (inquiry.requests?.[0]?.qty
               ? parseInt(inquiry.requests[0].qty) || 0
               : 0),
-          // Use purchase price if available
           RMB_Price: conversionData.RMBPrice || inquiry.purchasePrice || 0,
         };
       } else {
-        // For non-assembly: Use inquiry fields where available, body fields for others
         itemData = {
           ...itemData,
           item_name: inquiry.name,
@@ -978,7 +963,6 @@ export class InquiryController {
           photo: inquiry.image,
           model: conversionData.model,
           supp_cat: conversionData.suppCat,
-          // Use dimension fields from inquiry or conversion data
           isEstimated: inquiry.isEstimated,
           weight: conversionData.weight || inquiry.weight,
           width: conversionData.width || inquiry.width,
@@ -996,11 +980,9 @@ export class InquiryController {
         };
       }
 
-      // Create and save the item
       const item = itemRepository.create(itemData);
       const savedItem = await itemRepository.save(item);
 
-      // Update inquiry status to "Quoted" or similar
       inquiry.status = "Quoted";
       await inquiryRepository.save(inquiry);
 
@@ -1030,7 +1012,6 @@ export class InquiryController {
         request.body
       );
 
-      // Validate conversion data
       const errors = await validate(conversionData);
       if (errors.length > 0) {
         return response.status(400).json({
@@ -1048,7 +1029,6 @@ export class InquiryController {
       const taricRepository = AppDataSource.getRepository(Taric);
       const inquiryRepository = AppDataSource.getRepository(Inquiry);
 
-      // Find the requested item
       const requestedItem = await requestedItemRepository.findOne({
         where: { id: requestId },
         relations: ["inquiry", "business"],
@@ -1088,7 +1068,6 @@ export class InquiryController {
       }
 
       if (!taric) {
-        // Create new TARIC with auto-generated ID
         taric = await ItemGenerator.createTaricForItem(requestedItem.itemName);
       }
 
@@ -1223,7 +1202,6 @@ export class InquiryController {
     }
   }
 
-  // New method to calculate total dimensions for an inquiry
   async calculateInquiryDimensions(request: Request, response: Response) {
     try {
       const { id } = request.params;
@@ -1267,7 +1245,6 @@ export class InquiryController {
         });
       }
 
-      // Update inquiry with calculated dimensions
       inquiry.weight = totalWeight > 0 ? totalWeight : inquiry.weight;
       inquiry.length = maxLength > 0 ? maxLength : inquiry.length;
       inquiry.width = maxWidth > 0 ? maxWidth : inquiry.width;

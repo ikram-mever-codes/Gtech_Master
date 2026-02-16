@@ -2846,7 +2846,9 @@ export class OfferController {
 
       if (offer.useUnitPrices) {
         doc.text(
-          `Pricing Mode: Unit Pricing (${offer.maxUnitPriceColumns || 3} columns)`,
+          `Pricing Mode: Unit Pricing (${
+            offer.maxUnitPriceColumns || 3
+          } columns)`,
         );
       }
       doc.moveDown();

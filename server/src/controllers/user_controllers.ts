@@ -6,7 +6,7 @@ import crypto from "crypto";
 import { User, UserRole } from "../models/users";
 import { Permission } from "../models/permissions";
 import ErrorHandler from "../utils/errorHandler";
-import sendEmail from "../services/emailService";
+import { sendEmailSafe } from "../services/notification.service";
 import cloudinary from "../config/cloudinary";
 import fs from "fs";
 import { AppDataSource } from "../config/database";
@@ -15,8 +15,9 @@ import { AuthorizedRequest } from "../middlewares/authorized";
 import { CustomerCreator, List, LIST_STATUS, ListItem } from "../models/list";
 import { Invoice, InvoiceItem } from "../models/invoice";
 import { StarCustomerDetails } from "../models/star_customer_details";
+import { cookieOptions } from "../utils/cookieOptions";
 
-// Create User with Permissions (Admin/Super Admin only)
+
 export const createUser = async (
   req: Request,
   res: Response,
@@ -36,7 +37,7 @@ export const createUser = async (
       country,
     } = req.body;
 
-    // Validation - Only name, email and role are required
+
     if (!name || !email || !role) {
       return next(new ErrorHandler("Name, email and role are required", 400));
     }
@@ -52,17 +53,17 @@ export const createUser = async (
       return next(new ErrorHandler("Email already exists", 400));
     }
 
-    // Generate temporary password
+
     const tempPassword = crypto.randomBytes(8).toString("hex");
     const hashedPassword = await bcrypt.hash(tempPassword, 10);
 
-    // Generate email verification code (6-digit code)
+
     const emailVerificationCode = Math.floor(
       100000 + Math.random() * 900000
     ).toString();
     const emailVerificationExp = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
-    // Create user with optional fields
+
     const user = userRepository.create({
       name,
       email,
@@ -74,6 +75,10 @@ export const createUser = async (
       gender: gender || null,
       dateOfBirth: dateOfBirth || null,
       address: address || null,
+      partnerName: req.body.partnerName || null,
+      emergencyContact: req.body.emergencyContact || null,
+      joiningDate: req.body.joiningDate || null,
+      isLoginEnabled: req.body.isLoginEnabled !== undefined ? req.body.isLoginEnabled : true,
       emailVerificationCode,
       emailVerificationExp,
       isEmailVerified: false,
@@ -81,7 +86,7 @@ export const createUser = async (
 
     await userRepository.save(user);
 
-    // Handle optional permissions
+
     if (permissions && permissions.length > 0) {
       const permissionRepository = AppDataSource.getRepository(Permission);
       const permissionEntities = permissions.map((perm: any) =>
@@ -112,7 +117,7 @@ export const createUser = async (
         <p><strong>Note:</strong> This verification code will expire in 24 hours.</p>
       `;
 
-    await sendEmail({
+    sendEmailSafe({
       to: email,
       subject: "Your Admin Account Credentials - Verify Your Email",
       html: message,
@@ -159,12 +164,10 @@ export const verifyEmail = async (
       return next(new ErrorHandler("Invalid verification code or email", 400));
     }
 
-    // Check if verification code has expired
     if (user.emailVerificationExp && user.emailVerificationExp < new Date()) {
       return next(new ErrorHandler("Verification code has expired", 400));
     }
 
-    // Update user verification status
     user.isEmailVerified = true;
     user.emailVerificationCode = undefined;
     user.emailVerificationExp = null;
@@ -192,7 +195,7 @@ export const login = async (
       return next(new ErrorHandler("Email and password are required", 400));
     }
 
-    // Initialize repository through the DataSource
+
     const userRepository = AppDataSource.getRepository(User);
 
     const user = await userRepository.findOne({
@@ -209,6 +212,7 @@ export const login = async (
     }
 
     const isMatch = await bcrypt.compare(password, user.password);
+
     if (!isMatch) {
       return next(new ErrorHandler("Invalid credentials", 401));
     }
@@ -217,12 +221,16 @@ export const login = async (
       return next(new ErrorHandler("Please verify your email first", 401));
     }
 
+    if (!user.isLoginEnabled) {
+      return next(new ErrorHandler("Your account has been disabled. Please contact support.", 403));
+    }
+
     const token = jwt.sign(
       { id: user.id, role: user.role },
       process.env.JWT_SECRET!
     );
 
-    // Filter sensitive data
+
     const userData = {
       id: user.id,
       name: user.name,
@@ -231,16 +239,16 @@ export const login = async (
       permissions: user.permissions,
       assignedResources: user.assignedResources,
       avatar: user.avatar,
+      partnerName: user.partnerName,
+      emergencyContact: user.emergencyContact,
+      joiningDate: user.joiningDate,
+      phoneNumber: user.phoneNumber,
+      isLoginEnabled: user.isLoginEnabled,
     };
 
     return res
       .status(200)
-      .cookie("token", token, {
-        httpOnly: true,
-        secure: true,
-        sameSite: "none",
-        maxAge: 24 * 60 * 60 * 1000,
-      })
+      .cookie("token", token, cookieOptions)
       .json({
         success: true,
         message: "Logged in successfully",
@@ -258,16 +266,64 @@ export const logout = async (
 ) => {
   try {
     return res
-      .clearCookie("token", {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "strict",
-      })
+      .clearCookie("token", cookieOptions)
       .status(200)
       .json({
         success: true,
         message: "Logged out successfully",
       });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const getMe = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const userId = (req as any).user.id;
+    const userRepository = AppDataSource.getRepository(User);
+    const user = await userRepository.findOne({
+      where: { id: userId },
+      relations: ["permissions"],
+    });
+
+    if (!user) {
+      return next(new ErrorHandler("User not found", 404));
+    }
+
+
+    const cleanResources = (user.assignedResources || []).map(r => r.trim()).filter(r => r.length > 0);
+    const derivedResources = user.permissions?.map(p => p.resource.trim()) || [];
+    const finalResources = Array.from(new Set([...cleanResources, ...derivedResources]));
+
+    const userData = {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      permissions: user.permissions || [],
+      assignedResources: finalResources || [],
+      avatar: user.avatar,
+      phoneNumber: user.phoneNumber,
+      gender: user.gender,
+      dateOfBirth: user.dateOfBirth,
+      address: user.address,
+      country: user.country,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+      partnerName: user.partnerName,
+      emergencyContact: user.emergencyContact,
+      joiningDate: user.joiningDate,
+      isLoginEnabled: user.isLoginEnabled,
+    };
+
+    return res.status(200).json({
+      success: true,
+      data: userData,
+    });
   } catch (error) {
     return next(error);
   }
@@ -302,7 +358,7 @@ export const refresh = async (
       process.env.JWT_SECRET!
     );
 
-    // Filter sensitive data
+
     const userData = {
       id: user.id,
       name: user.name,
@@ -311,16 +367,16 @@ export const refresh = async (
       permissions: user.permissions,
       assignedResources: user.assignedResources,
       avatar: user.avatar,
+      partnerName: user.partnerName,
+      emergencyContact: user.emergencyContact,
+      joiningDate: user.joiningDate,
+      phoneNumber: user.phoneNumber,
+      isLoginEnabled: user.isLoginEnabled,
     };
 
     return res
       .status(200)
-      .cookie("token", newToken, {
-        httpOnly: true,
-        secure: true,
-        sameSite: "none",
-        maxAge: 24 * 60 * 60 * 1000,
-      })
+      .cookie("token", newToken, cookieOptions)
       .json({
         success: true,
         data: userData,
@@ -363,14 +419,14 @@ export const changePassword = async (
     user.password = hashedPassword;
     await userRepository.save(user);
 
-    // Send email notification
+
     const message = `
         <h2>Password Changed</h2>
         <p>Your password was successfully changed.</p>
         <p>If you didn't make this change, please contact support immediately.</p>
       `;
 
-    await sendEmail({
+    sendEmailSafe({
       to: user.email,
       subject: "Password Change Notification",
       html: message,
@@ -392,7 +448,16 @@ export const editProfile = async (
 ) => {
   try {
     const userId = (req as any).user.id;
-    const { name, phoneNumber, gender, dateOfBirth, address } = req.body;
+    const {
+      name,
+      phoneNumber,
+      gender,
+      dateOfBirth,
+      address,
+      partnerName,
+      emergencyContact,
+      country
+    } = req.body;
 
     const userRepository = AppDataSource.getRepository(User);
     const user = await userRepository.findOne({ where: { id: userId } });
@@ -401,14 +466,12 @@ export const editProfile = async (
       return next(new ErrorHandler("User not found", 404));
     }
 
-    // Handle avatar upload
     if (req.file) {
       if (!fs.existsSync(req.file.path)) {
         return next(new ErrorHandler("File not found", 404));
       }
 
       try {
-        // Delete old avatar if exists
         if (user.avatar) {
           const publicId = user.avatar.split("/").pop()?.split(".")[0];
           if (publicId) {
@@ -428,7 +491,7 @@ export const editProfile = async (
       }
     }
 
-    // Update fields
+
     if (name) user.name = name;
     if (phoneNumber) {
       const existingUser = await userRepository.findOne({
@@ -442,20 +505,44 @@ export const editProfile = async (
     if (gender) user.gender = gender;
     if (dateOfBirth) user.dateOfBirth = dateOfBirth;
     if (address) user.address = address;
+    if (country) user.country = country;
+    if (partnerName !== undefined) user.partnerName = partnerName;
+    if (emergencyContact !== undefined) user.emergencyContact = emergencyContact;
 
     await userRepository.save(user);
 
-    // Filter sensitive data
+
+    const updatedUser = await userRepository.findOne({
+      where: { id: userId },
+      relations: ["permissions"],
+    });
+
+    if (!updatedUser) {
+      return next(new ErrorHandler("User not found after update", 404));
+    }
+
+    const cleanResources = (updatedUser.assignedResources || []).map(r => r.trim()).filter(r => r.length > 0);
+    const derivedResources = updatedUser.permissions?.map(p => p.resource) || [];
+    const finalResources = cleanResources.length > 0 ? cleanResources : Array.from(new Set(derivedResources));
+
+
     const userData = {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      avatar: user.avatar,
-      phoneNumber: user.phoneNumber,
-      gender: user.gender,
-      dateOfBirth: user.dateOfBirth,
-      address: user.address,
+      id: updatedUser.id,
+      name: updatedUser.name,
+      email: updatedUser.email,
+      role: updatedUser.role,
+      permissions: updatedUser.permissions || [],
+      assignedResources: finalResources || [],
+      avatar: updatedUser.avatar,
+      phoneNumber: updatedUser.phoneNumber,
+      gender: updatedUser.gender,
+      dateOfBirth: updatedUser.dateOfBirth,
+      address: updatedUser.address,
+      country: updatedUser.country,
+      partnerName: updatedUser.partnerName,
+      emergencyContact: updatedUser.emergencyContact,
+      joiningDate: updatedUser.joiningDate,
+      isLoginEnabled: updatedUser.isLoginEnabled,
     };
 
     return res.status(200).json({
@@ -506,13 +593,18 @@ export const getUserById = async (
       return next(new ErrorHandler("User not found", 404));
     }
 
+
+    const cleanResources = (user.assignedResources || []).map(r => r.trim()).filter(r => r.length > 0);
+    const derivedResources = user.permissions?.map(p => p.resource) || [];
+    const finalResources = cleanResources.length > 0 ? cleanResources : Array.from(new Set(derivedResources));
+
     const userData = {
       id: user.id,
       name: user.name,
       email: user.email,
       role: user.role,
-      permissions: user.permissions,
-      assignedResources: user.assignedResources,
+      permissions: user.permissions || [],
+      assignedResources: finalResources || [],
       avatar: user.avatar,
       phoneNumber: user.phoneNumber,
       gender: user.gender,
@@ -521,6 +613,10 @@ export const getUserById = async (
       country: user.country,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
+      partnerName: user.partnerName,
+      emergencyContact: user.emergencyContact,
+      joiningDate: user.joiningDate,
+      isLoginEnabled: user.isLoginEnabled,
     };
 
     return res.status(200).json({
@@ -553,17 +649,14 @@ export const forgetPassword = async (
       });
     }
 
-    // Generate reset token with expiration (30 minutes)
     const resetToken = jwt.sign({ id: user.id }, process.env.JWT_SECRET!, {
       expiresIn: "30m",
     });
 
-    // Save reset token to user
     user.resetPasswordToken = resetToken;
     user.resetPasswordExp = new Date(Date.now() + 1800000); // 30 minutes
     await userRepository.save(user);
 
-    // Create reset link
     const resetLink = `${process.env.MASTER}/reset-password?token=${resetToken}`;
 
     const message = `
@@ -586,7 +679,7 @@ export const forgetPassword = async (
         </div>
       `;
 
-    await sendEmail({
+    sendEmailSafe({
       to: email,
       subject: "Passwort zurücksetzen – GTech Star-Kundenportal",
       html: message,
@@ -601,7 +694,6 @@ export const forgetPassword = async (
   }
 };
 
-// Reset Password Controller
 export const resetPassword = async (
   req: Request,
   res: Response,
@@ -614,7 +706,6 @@ export const resetPassword = async (
       return next(new ErrorHandler("Token and new password are required", 400));
     }
 
-    // Verify token
     let decoded;
     try {
       decoded = jwt.verify(token, process.env.JWT_SECRET!) as { id: string };
@@ -637,21 +728,19 @@ export const resetPassword = async (
       return next(new ErrorHandler("Invalid or expired token", 401));
     }
 
-    // Update password and clear reset token
     const hashedPassword = await bcrypt.hash(newPassword, 10);
     user.password = hashedPassword;
     user.resetPasswordToken = undefined;
     user.resetPasswordExp = undefined;
     await userRepository.save(user);
 
-    // Send confirmation email
     const message = `
         <h2>Password Updated</h2>
         <p>Your password has been successfully updated.</p>
         <p>If you didn't make this change, please contact support immediately.</p>
       `;
 
-    await sendEmail({
+    sendEmailSafe({
       to: user.email,
       subject: "Password Updated",
       html: message,
@@ -685,7 +774,7 @@ export const createCompany = async (
       deliveryCountry,
     } = req.body;
 
-    // Validations
+
     if (
       !companyName ||
       !legalName ||
@@ -715,24 +804,20 @@ export const createCompany = async (
       return next(new ErrorHandler("Email already exists", 400));
     }
 
-    // Generate temporary password
     const tempPassword = crypto.randomBytes(8).toString("hex");
     const hashedPassword = await bcrypt.hash(tempPassword, 10);
 
-    // Use transaction to ensure both customer and star customer details are created together
     const result = await AppDataSource.transaction(
       async (transactionalEntityManager) => {
-        // Create customer (company)
         const customer = customerRepository.create({
           companyName,
           legalName,
           email,
           contactEmail,
           contactPhoneNumber,
-          stage: "star_customer", // Set stage to star_customer
+          stage: "star_customer",
         });
 
-        // Save customer first
         const savedCustomer = await transactionalEntityManager.save(customer);
 
         const starCustomerDetails = starCustomerDetailsRepository.create({
@@ -748,16 +833,12 @@ export const createCompany = async (
           deliveryCountry,
         });
 
-        // Save star customer details
         const savedStarCustomerDetails = await transactionalEntityManager.save(
           starCustomerDetails
         );
-
-        // Update customer with star customer details relationship
         savedCustomer.starCustomerDetails = savedStarCustomerDetails;
         await transactionalEntityManager.save(savedCustomer);
 
-        // Create default list for the customer
         const defaultList = listRepository.create({
           name: `${companyName} - Default List`,
           description: `Default list for ${companyName}`,
@@ -768,7 +849,6 @@ export const createCompany = async (
           status: LIST_STATUS.ACTIVE,
         });
 
-        // Save the default list
         const savedList = await transactionalEntityManager.save(defaultList);
 
         return {
@@ -793,22 +873,20 @@ export const createCompany = async (
         <p>A default list "${list.name}" has been created for your company.</p>
       `;
 
-    await sendEmail({
+    sendEmailSafe({
       to: email,
       subject: "Your Company Account Credentials",
       html: message,
     });
 
-    // Also send to contact email if different
     if (contactEmail !== email) {
-      await sendEmail({
+      sendEmailSafe({
         to: contactEmail,
         subject: "Your Company Account Credentials",
         html: message,
       });
     }
 
-    // Return response without sensitive data
     const customerData = {
       id: customer.id,
       companyName: customer.companyName,
@@ -870,14 +948,12 @@ export const updateCustomer = async (
       return next(new ErrorHandler("Customer not found", 404));
     }
 
-    // Handle avatar upload
     if (req.file) {
       if (!fs.existsSync(req.file.path)) {
         return next(new ErrorHandler("File not found", 404));
       }
 
       try {
-        // Delete old avatar if exists
         if (customer.avatar) {
           const publicId = customer.avatar.split("/").pop()?.split(".")[0];
           if (publicId) {
@@ -903,10 +979,8 @@ export const updateCustomer = async (
     if (contactEmail) customer.contactEmail = contactEmail;
     if (contactPhoneNumber) customer.contactPhoneNumber = contactPhoneNumber;
 
-    // Save customer updates
     await customerRepository.save(customer);
 
-    // Update star customer details if they exist
     if (customer.starCustomerDetails) {
       const starCustomerDetails = await starCustomerDetailsRepository.findOne({
         where: { id: customer.starCustomerDetails.id },
@@ -928,7 +1002,6 @@ export const updateCustomer = async (
       }
     }
 
-    // Get updated customer with relations for response
     const updatedCustomer = await customerRepository.findOne({
       where: { id: customerId },
       relations: ["starCustomerDetails"],
@@ -938,7 +1011,6 @@ export const updateCustomer = async (
       return next(new ErrorHandler("Customer not found after update", 404));
     }
 
-    // Filter sensitive data
     const customerData = {
       id: updatedCustomer.id,
       companyName: updatedCustomer.companyName,
@@ -950,19 +1022,19 @@ export const updateCustomer = async (
       stage: updatedCustomer.stage,
       starCustomerDetails: updatedCustomer.starCustomerDetails
         ? {
-            taxNumber: updatedCustomer.starCustomerDetails.taxNumber,
-            accountVerificationStatus:
-              updatedCustomer.starCustomerDetails.accountVerificationStatus,
-            deliveryAddressLine1:
-              updatedCustomer.starCustomerDetails.deliveryAddressLine1,
-            deliveryAddressLine2:
-              updatedCustomer.starCustomerDetails.deliveryAddressLine2,
-            deliveryPostalCode:
-              updatedCustomer.starCustomerDetails.deliveryPostalCode,
-            deliveryCity: updatedCustomer.starCustomerDetails.deliveryCity,
-            deliveryCountry:
-              updatedCustomer.starCustomerDetails.deliveryCountry,
-          }
+          taxNumber: updatedCustomer.starCustomerDetails.taxNumber,
+          accountVerificationStatus:
+            updatedCustomer.starCustomerDetails.accountVerificationStatus,
+          deliveryAddressLine1:
+            updatedCustomer.starCustomerDetails.deliveryAddressLine1,
+          deliveryAddressLine2:
+            updatedCustomer.starCustomerDetails.deliveryAddressLine2,
+          deliveryPostalCode:
+            updatedCustomer.starCustomerDetails.deliveryPostalCode,
+          deliveryCity: updatedCustomer.starCustomerDetails.deliveryCity,
+          deliveryCountry:
+            updatedCustomer.starCustomerDetails.deliveryCountry,
+        }
         : null,
     };
 
@@ -996,9 +1068,11 @@ export const updateUser = async (
       dateOfBirth,
       address,
       country,
+      partnerName,
+      emergencyContact,
+      joiningDate,
+      isLoginEnabled,
     } = req.body;
-
-    // Validation
     if (!id) {
       return next(new ErrorHandler("User ID is required", 400));
     }
@@ -1033,12 +1107,18 @@ export const updateUser = async (
     user.name = name;
     user.email = email;
     user.role = role;
-    user.assignedResources = assignedResources || [];
-    user.phoneNumber = phoneNumber;
-    user.gender = gender;
-    user.dateOfBirth = dateOfBirth;
-    user.address = address;
-    user.country = country;
+
+    const rawResources = Array.isArray(assignedResources) ? assignedResources : [];
+    user.assignedResources = rawResources.map((r: string) => r.trim()).filter((r: string) => r.length > 0);
+    user.phoneNumber = phoneNumber || null;
+    user.gender = gender || null;
+    user.dateOfBirth = dateOfBirth || null;
+    user.address = address || null;
+    user.country = country || null;
+    if (partnerName !== undefined) user.partnerName = partnerName || null;
+    if (emergencyContact !== undefined) user.emergencyContact = emergencyContact || null;
+    if (joiningDate !== undefined) user.joiningDate = joiningDate || null;
+    if (isLoginEnabled !== undefined) user.isLoginEnabled = isLoginEnabled;
 
     if (permissions) {
       await permissionRepository.delete({ user: { id: user.id } });
@@ -1066,12 +1146,16 @@ export const updateUser = async (
       return next(new ErrorHandler("Failed to fetch updated user", 500));
     }
 
+    const cleanResources = (updatedUser.assignedResources || []).map(r => r.trim()).filter(r => r.length > 0);
+    const derivedResources = updatedUser.permissions?.map(p => p.resource.trim()) || [];
+    const finalResources = Array.from(new Set([...cleanResources, ...derivedResources]));
+
     const userData = {
       id: updatedUser.id,
       name: updatedUser.name,
       email: updatedUser.email,
       role: updatedUser.role,
-      assignedResources: updatedUser.assignedResources,
+      assignedResources: finalResources,
       permissions: updatedUser.permissions,
       phoneNumber: updatedUser.phoneNumber,
       gender: updatedUser.gender,
@@ -1081,6 +1165,10 @@ export const updateUser = async (
       avatar: updatedUser.avatar,
       createdAt: updatedUser.createdAt,
       updatedAt: updatedUser.updatedAt,
+      partnerName: updatedUser.partnerName,
+      emergencyContact: updatedUser.emergencyContact,
+      joiningDate: updatedUser.joiningDate,
+      isLoginEnabled: updatedUser.isLoginEnabled,
     };
 
     return res.status(200).json({
@@ -1109,7 +1197,7 @@ export const deleteCustomer = async (
     const customerRepository = AppDataSource.getRepository(Customer);
     const listRepository = AppDataSource.getRepository(List);
 
-    // Check if customer exists
+
     const customer = await customerRepository.findOne({
       where: { id: customerId },
     });
@@ -1118,7 +1206,7 @@ export const deleteCustomer = async (
       return next(new ErrorHandler("Customer not found", 404));
     }
 
-    // Check for lists with items
+
     const listsWithItems = await listRepository
       .createQueryBuilder("list")
       .innerJoinAndSelect("list.items", "items")
@@ -1138,41 +1226,32 @@ export const deleteCustomer = async (
       );
     }
 
-    // Use a transaction to ensure data consistency
     await AppDataSource.transaction(async (transactionalEntityManager) => {
-      // 1. First find all lists for this customer
       const customerLists = await transactionalEntityManager.find(List, {
         where: { customer: { id: customerId } },
       });
 
-      // 2. Delete list items for each list
       for (const list of customerLists) {
         await transactionalEntityManager.delete(ListItem, {
           list: { id: list.id },
         });
       }
 
-      // 3. Delete all lists for this customer
       await transactionalEntityManager.delete(List, {
         customer: { id: customerId },
       });
-
-      // 4. Find all invoices for this customer and delete their items first
       const customerInvoices = await transactionalEntityManager.find(Invoice, {
         where: { customer: { id: customerId } },
         relations: ["items"],
       });
 
       for (const invoice of customerInvoices) {
-        // Delete invoice items first
         await transactionalEntityManager.delete(InvoiceItem, {
           invoice: { id: invoice.id },
         });
-        // Then delete the invoice
         await transactionalEntityManager.delete(Invoice, invoice.id);
       }
 
-      // 5. Finally delete the customer
       await transactionalEntityManager.delete(Customer, customerId);
     });
 
@@ -1206,7 +1285,6 @@ export const deleteUser = async (
     const userRepository = AppDataSource.getRepository(User);
     const permissionRepository = AppDataSource.getRepository(Permission);
 
-    // Check if user exists
     const user = await userRepository.findOne({
       where: { id: userId },
     });
@@ -1215,13 +1293,10 @@ export const deleteUser = async (
       return next(new ErrorHandler("User not found", 404));
     }
 
-    // Prevent self-deletion (admin cannot delete themselves)
     const currentUserId = (req as any).user?.id;
     if (currentUserId && userId === currentUserId) {
       return next(new ErrorHandler("You cannot delete your own account", 400));
     }
-
-    // Check if user is the last admin (optional safety check)
     if (user.role === UserRole.ADMIN) {
       const adminCount = await userRepository.count({
         where: { role: UserRole.ADMIN },
@@ -1236,7 +1311,6 @@ export const deleteUser = async (
 
     await userRepository.delete(user.id);
 
-    // Send notification email (optional)
     try {
       const message = `
           <h2>Account Deletion Notification</h2>
@@ -1244,14 +1318,13 @@ export const deleteUser = async (
           <p>If you believe this was a mistake, please contact support immediately.</p>
         `;
 
-      await sendEmail({
+      sendEmailSafe({
         to: user.email,
         subject: "Account Deletion Notification",
         html: message,
       });
     } catch (emailError) {
       console.error("Failed to send deletion notification email:", emailError);
-      // Continue with the response even if email fails
     }
 
     return res.status(200).json({
@@ -1282,7 +1355,6 @@ export const resendVerificationEmail = async (
     const user = await userRepository.findOne({ where: { email } });
 
     if (!user) {
-      // For security reasons, don't reveal if email exists or not
       return res.status(200).json({
         success: true,
         message: "If the email exists, a verification email has been sent",
@@ -1292,22 +1364,16 @@ export const resendVerificationEmail = async (
     if (user.isEmailVerified) {
       return next(new ErrorHandler("Email is already verified", 400));
     }
-
-    // Check if there's a recent verification attempt (prevent spam)
     const now = new Date();
 
-    // Generate new verification code
     const emailVerificationCode = Math.floor(
       100000 + Math.random() * 900000
     ).toString();
     const emailVerificationExp = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
 
-    // Update user with new verification code
     user.emailVerificationCode = emailVerificationCode;
     user.emailVerificationExp = emailVerificationExp;
     await userRepository.save(user);
-
-    // Send verification email
     const verificationLink = `https://master.gtech.de/verify?email=${encodeURIComponent(
       email
     )}&verificationCode=${emailVerificationCode}`;
@@ -1324,7 +1390,7 @@ export const resendVerificationEmail = async (
         <p>If you didn't request this verification, please ignore this email.</p>
       `;
 
-    await sendEmail({
+    sendEmailSafe({
       to: email,
       subject: "Verify Your Email Address",
       html: message,

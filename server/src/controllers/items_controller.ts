@@ -21,6 +21,9 @@ import {
 } from "typeorm";
 import ErrorHandler from "../utils/errorHandler";
 import { pool } from "../config/misDb";
+import { UserRole } from "../models/users";
+import { filterDataByRole } from "../utils/dataFilter";
+import { AuthorizedRequest } from "../middlewares/authorized";
 
 export const getItems = async (
   req: Request,
@@ -33,7 +36,7 @@ export const getItems = async (
     // Get query parameters
     const {
       page = "1",
-      limit = "30",
+      limit = "50",
       search = "",
       status = "",
       category = "",
@@ -119,9 +122,12 @@ export const getItems = async (
       updated_at: item.updated_at,
     }));
 
+    const user = (req as AuthorizedRequest).user;
+    const filteredData = filterDataByRole(formattedItems, user?.role || UserRole.STAFF);
+
     return res.status(200).json({
       success: true,
-      data: formattedItems,
+      data: filteredData,
       pagination: {
         page: pageNum,
         limit: limitNum,
@@ -281,15 +287,17 @@ export const getItemById = async (
       nprRemarks: item.npr_remark || "",
     };
 
+    const user = (req as AuthorizedRequest).user;
+    const filteredData = filterDataByRole(formattedItem, user?.role || UserRole.STAFF);
+
     return res.status(200).json({
       success: true,
-      data: formattedItem,
+      data: filteredData,
     });
   } catch (error) {
     return next(error);
   }
 };
-
 // Create new item
 export const createItem = async (
   req: Request,
@@ -838,18 +846,21 @@ export const getParents = async (
       supplier_id: parent.supplier_id,
       supplier: parent.supplier
         ? {
-            id: parent.supplier.id,
-            name: parent.supplier.name,
-          }
+          id: parent.supplier.id,
+          name: parent.supplier.name,
+        }
         : null,
       item_count: parent.items?.length || 0,
       created_at: parent.created_at,
       updated_at: parent.updated_at,
     }));
 
+    const user = (req as AuthorizedRequest).user;
+    const filteredData = filterDataByRole(formattedParents, user?.role || UserRole.STAFF);
+
     return res.status(200).json({
       success: true,
-      data: formattedParents,
+      data: filteredData,
       pagination: {
         page: pageNum,
         limit: limitNum,
@@ -914,17 +925,17 @@ export const getParentById = async (
       is_active: parent.is_active,
       taric: parent.taric
         ? {
-            id: parent.taric.id,
-            code: parent.taric.code,
-            name_de: parent.taric.name_de,
-          }
+          id: parent.taric.id,
+          code: parent.taric.code,
+          name_de: parent.taric.name_de,
+        }
         : null,
       supplier: parent.supplier
         ? {
-            id: parent.supplier.id,
-            name: parent.supplier.name,
-            contact_person: parent.supplier.contact_person,
-          }
+          id: parent.supplier.id,
+          name: parent.supplier.name,
+          contact_person: parent.supplier.contact_person,
+        }
         : null,
       variations: {
         de: [parent.var_de_1, parent.var_de_2, parent.var_de_3].filter(Boolean),
@@ -939,9 +950,12 @@ export const getParentById = async (
       updated_at: parent.updated_at,
     };
 
+    const user = (req as AuthorizedRequest).user;
+    const filteredData = filterDataByRole(formattedParent, user?.role || UserRole.STAFF);
+
     return res.status(200).json({
       success: true,
-      data: formattedParent,
+      data: filteredData,
     });
   } catch (error) {
     return next(error);
@@ -1872,7 +1886,7 @@ const syncTaricToMIS = async (
         convertUndefinedToNull(taricData.name_cn),
         convertUndefinedToNull(taricData.updated_at) || new Date(),
         convertUndefinedToNull(taricData.originalCode) ||
-          convertUndefinedToNull(taricData.code),
+        convertUndefinedToNull(taricData.code),
       ]);
     } else if (operation === "delete") {
       const query = `DELETE FROM tarics WHERE code = ?`;

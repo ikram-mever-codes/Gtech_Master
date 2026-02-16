@@ -37,6 +37,17 @@ interface DeliveryInfoPayload {
   deliveryCity?: string;
   deliveryCountry?: string;
   deliveryNotes?: string;
+  // Item delivery specific fields
+  period?: string;
+  quantity?: number;
+  status?: string;
+  remark?: string;
+  cargoStatus?: string;
+  shippedAt?: string;
+  eta?: string;
+  cargoType?: string;
+  cargoNo?: string[];
+  deliveredAt?: Date | string;
 }
 
 interface ListItemPayload {

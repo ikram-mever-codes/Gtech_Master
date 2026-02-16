@@ -23,6 +23,7 @@ import {
   InformationCircleIcon,
   ScaleIcon,
   ArrowsPointingOutIcon,
+  TrashIcon,
   PhotoIcon,
   PaperClipIcon,
 } from "@heroicons/react/24/outline";
@@ -344,24 +345,20 @@ const CombinedInquiriesPage: React.FC = () => {
     termsConditions: "",
     projectLink: "",
     assemblyInstructions: "",
-    // New dimension fields
     weight: undefined,
     width: undefined,
     height: undefined,
     length: undefined,
-    // New shipping fields
     isFragile: false,
     requiresSpecialHandling: false,
     handlingInstructions: "",
     numberOfPackages: undefined,
     packageType: "",
-    // Purchase price fields
     purchasePrice: undefined,
     purchasePriceCurrency: "RMB" as "RMB" | "HKD" | "EUR" | "USD",
     requests: [],
   });
 
-  // Form state for requested items (standalone) with dimension fields
   const [requestItemFormData, setRequestItemFormData] =
     useState<RequestedItemCreatePayload>({
       businessId: "",
@@ -392,7 +389,6 @@ const CombinedInquiriesPage: React.FC = () => {
       inquiryId: undefined,
     });
 
-  // Multiple requests for inquiry creation with dimension fields and attachments
   const [inquiryRequests, setInquiryRequests] = useState<
     Array<{
       itemName: string;
@@ -404,7 +400,6 @@ const CombinedInquiriesPage: React.FC = () => {
       material: string;
       specifications: string;
       images?: string[];
-      // New dimension fields
       weight?: number;
       width?: number;
       height?: number;
@@ -658,6 +653,7 @@ const CombinedInquiriesPage: React.FC = () => {
       if (selectedBusinessId) {
         filtered = filtered.filter(
           (item: RequestedItem) =>
+            item.businessId === selectedBusinessId ||
             item.business?.customer?.id === selectedBusinessId,
         );
       }
@@ -685,7 +681,17 @@ const CombinedInquiriesPage: React.FC = () => {
               id: businessId,
               displayName:
                 item.business.customer.companyName ||
-                item.business.customer.legalName,
+                item.business.customer.legalName ||
+                item.business.customer.name ||
+                "Unknown Business",
+            });
+          }
+        } else if (item.businessId) {
+          // Fallback for items where business details are missing or not enriched
+          if (!businessMap.has(item.businessId)) {
+            businessMap.set(item.businessId, {
+              id: item.businessId,
+              displayName: "Business " + item.businessId.substring(0, 8),
             });
           }
         }
@@ -1393,7 +1399,6 @@ const CombinedInquiriesPage: React.FC = () => {
         await deleteRequestedItem(itemId);
         fetchRequestedItems();
         fetchRequestStatistics();
-        toast.success("Request item deleted successfully");
       } catch (error) {
         console.error("Error deleting item:", error);
         toast.error("Failed to delete request item");
@@ -2090,6 +2095,18 @@ const CombinedInquiriesPage: React.FC = () => {
                                 <ArrowRightIcon className="h-3 w-3" />
                                 Convert
                               </button>
+                              {user?.role === UserRole.ADMIN && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteInquiry(inquiry.id);
+                                  }}
+                                  className="p-1 text-red-500 hover:text-red-700 transition-colors"
+                                  title="Delete Inquiry"
+                                >
+                                  <TrashIcon className="h-4 w-4" />
+                                </button>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -2351,6 +2368,21 @@ const CombinedInquiriesPage: React.FC = () => {
                                                 <ArrowRightIcon className="h-3 w-3" />
                                                 Convert
                                               </button>
+                                              {user?.role ===
+                                                UserRole.ADMIN && (
+                                                <button
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleDeleteRequestItem(
+                                                      request.id,
+                                                    );
+                                                  }}
+                                                  className="p-1 text-red-500 hover:text-red-700 transition-colors"
+                                                  title="Delete Request"
+                                                >
+                                                  <TrashIcon className="h-4 w-4" />
+                                                </button>
+                                              )}
                                             </div>
                                           </td>
                                         </tr>
@@ -2660,6 +2692,18 @@ const CombinedInquiriesPage: React.FC = () => {
                               <ArrowRightIcon className="h-3 w-3" />
                               Convert
                             </button>
+                            {user?.role === UserRole.ADMIN && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteRequestItem(item.id);
+                                }}
+                                className="p-1 text-red-500 hover:text-red-700 transition-colors"
+                                title="Delete Request"
+                              >
+                                <TrashIcon className="h-4 w-4" />
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -2795,72 +2839,12 @@ const CombinedInquiriesPage: React.FC = () => {
               )}
 
               <div className="space-y-6">
-                {/* Inquiry Information - REORDERED: Customer and Contact Person first */}
+                {/* Inquiry Information */}
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900 mb-3">
                     Inquiry Information
                   </h3>
                   <div className="grid grid-cols-2 gap-3">
-                    {/* REORDERED: Customer first */}
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Customer *
-                      </label>
-                      <select
-                        value={inquiryFormData.customerId}
-                        onChange={(e) =>
-                          setInquiryFormData({
-                            ...inquiryFormData,
-                            customerId: e.target.value,
-                          })
-                        }
-                        disabled={
-                          inquiryModalMode === "edit" && !editModeEnabled
-                        }
-                        className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                      >
-                        <option value="">Select Customer</option>
-                        {customers.map((customer) => (
-                          <option key={customer.id} value={customer.id}>
-                            {customer.companyName || customer.legalName}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* REORDERED: Contact Person second */}
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Contact Person
-                      </label>
-                      <select
-                        value={inquiryFormData.contactPersonId}
-                        onChange={(e) =>
-                          setInquiryFormData({
-                            ...inquiryFormData,
-                            contactPersonId: e.target.value,
-                          })
-                        }
-                        disabled={
-                          inquiryModalMode === "edit" && !editModeEnabled
-                        }
-                        className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                      >
-                        <option value="">Select Contact Person</option>
-                        {contactPersons
-                          .filter(
-                            (person) =>
-                              person.starBusinessDetailsId ===
-                              inquiryFormData.customerId,
-                          )
-                          .map((person) => (
-                            <option key={person.id} value={person.id}>
-                              {person.name} {person.familyName}
-                            </option>
-                          ))}
-                      </select>
-                    </div>
-
                     <div className="col-span-2">
                       <label className="block text-xs font-medium text-gray-700 mb-1">
                         Inquiry Name *
@@ -2901,6 +2885,64 @@ const CombinedInquiriesPage: React.FC = () => {
                         className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
                         placeholder="Enter inquiry description"
                       />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        Customer *
+                      </label>
+                      <select
+                        value={inquiryFormData.customerId}
+                        onChange={(e) =>
+                          setInquiryFormData({
+                            ...inquiryFormData,
+                            customerId: e.target.value,
+                          })
+                        }
+                        disabled={
+                          inquiryModalMode === "edit" && !editModeEnabled
+                        }
+                        className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                      >
+                        <option value="">Select Customer</option>
+                        {customers.map((customer) => (
+                          <option key={customer.id} value={customer.id}>
+                            {customer.companyName || customer.legalName}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        Contact Person
+                      </label>
+                      <select
+                        value={inquiryFormData.contactPersonId}
+                        onChange={(e) =>
+                          setInquiryFormData({
+                            ...inquiryFormData,
+                            contactPersonId: e.target.value,
+                          })
+                        }
+                        disabled={
+                          inquiryModalMode === "edit" && !editModeEnabled
+                        }
+                        className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                      >
+                        <option value="">Select Contact Person</option>
+                        {contactPersons
+                          .filter(
+                            (person) =>
+                              person.starBusinessDetailsId ===
+                              inquiryFormData.customerId,
+                          )
+                          .map((person) => (
+                            <option key={person.id} value={person.id}>
+                              {person.name} {person.familyName}
+                            </option>
+                          ))}
+                      </select>
                     </div>
 
                     <div>
@@ -3182,10 +3224,320 @@ const CombinedInquiriesPage: React.FC = () => {
                         {/* Request Content - Collapsible */}
                         {expandedRequestIndex === index && (
                           <div className="p-3 bg-white">
-                            {/* Conditionally render full RequestItem View if isAssembly = TRUE */}
-                            {inquiryFormData.isAssembly
-                              ? renderAssemblyRequestView(request, index)
-                              : renderStandardRequestView(request, index)}
+                            <div className="grid grid-cols-2 gap-2">
+                              <div className="col-span-2">
+                                <label className="block text-xs font-medium text-gray-700 mb-1">
+                                  Item Name *
+                                </label>
+                                <input
+                                  type="text"
+                                  value={request.itemName}
+                                  onChange={(e) =>
+                                    updateRequest(
+                                      index,
+                                      "itemName",
+                                      e.target.value,
+                                    )
+                                  }
+                                  disabled={
+                                    inquiryModalMode === "edit" &&
+                                    !editModeEnabled
+                                  }
+                                  className="w-full px-2 py-1 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                                  placeholder="Enter item name"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="block text-xs font-medium text-gray-700 mb-1">
+                                  Quantity *
+                                </label>
+                                <input
+                                  type="number"
+                                  value={request.quantity}
+                                  onChange={(e) =>
+                                    updateRequest(
+                                      index,
+                                      "quantity",
+                                      parseInt(e.target.value) || 1,
+                                    )
+                                  }
+                                  disabled={
+                                    inquiryModalMode === "edit" &&
+                                    !editModeEnabled
+                                  }
+                                  className="w-full px-2 py-1 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                                  min="1"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="block text-xs font-medium text-gray-700 mb-1">
+                                  Purchase Price
+                                </label>
+                                <input
+                                  type="number"
+                                  value={request.purchasePrice}
+                                  onChange={(e) =>
+                                    updateRequest(
+                                      index,
+                                      "purchasePrice",
+                                      parseFloat(e.target.value) || 0,
+                                    )
+                                  }
+                                  disabled={
+                                    inquiryModalMode === "edit" &&
+                                    !editModeEnabled
+                                  }
+                                  className="w-full px-2 py-1 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                                  min="0"
+                                  step="0.01"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="block text-xs font-medium text-gray-700 mb-1">
+                                  Currency
+                                </label>
+                                <select
+                                  value={request.currency}
+                                  onChange={(e) =>
+                                    updateRequest(
+                                      index,
+                                      "currency",
+                                      e.target.value,
+                                    )
+                                  }
+                                  disabled={
+                                    inquiryModalMode === "edit" &&
+                                    !editModeEnabled
+                                  }
+                                  className="w-full px-2 py-1 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                                >
+                                  {getAvailableCurrencies().map((currency) => (
+                                    <option
+                                      key={currency.value}
+                                      value={currency.value}
+                                    >
+                                      {currency.label}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+
+                              <div>
+                                <label className="block text-xs font-medium text-gray-700 mb-1">
+                                  Status
+                                </label>
+                                <select
+                                  value={request.status}
+                                  onChange={(e) =>
+                                    updateRequest(
+                                      index,
+                                      "status",
+                                      e.target.value,
+                                    )
+                                  }
+                                  disabled={
+                                    inquiryModalMode === "edit" &&
+                                    !editModeEnabled
+                                  }
+                                  className="w-full px-2 py-1 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                                >
+                                  {getRequestStatuses().map((status) => (
+                                    <option
+                                      key={status.value}
+                                      value={status.value}
+                                    >
+                                      {status.label}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+
+                              <div>
+                                <label className="block text-xs font-medium text-gray-700 mb-1">
+                                  Material
+                                </label>
+                                <input
+                                  type="text"
+                                  value={request.material}
+                                  onChange={(e) =>
+                                    updateRequest(
+                                      index,
+                                      "material",
+                                      e.target.value,
+                                    )
+                                  }
+                                  disabled={
+                                    inquiryModalMode === "edit" &&
+                                    !editModeEnabled
+                                  }
+                                  className="w-full px-2 py-1 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                                  placeholder="Enter material"
+                                />
+                              </div>
+
+                              {/* Dimension Fields for Request Items */}
+                              <div className="col-span-2 border-t pt-2 mt-2">
+                                <h5 className="text-xs font-medium text-gray-700 mb-2 flex items-center gap-1">
+                                  <ArrowsPointingOutIcon className="h-3 w-3" />
+                                  Item Dimensions
+                                </h5>
+                                <div className="grid grid-cols-4 gap-2">
+                                  <div>
+                                    <label className="block text-xs font-medium text-gray-500 mb-1">
+                                      Weight (kg)
+                                    </label>
+                                    <input
+                                      type="number"
+                                      value={request.weight || ""}
+                                      onChange={(e) =>
+                                        updateRequest(
+                                          index,
+                                          "weight",
+                                          e.target.value
+                                            ? parseFloat(e.target.value)
+                                            : undefined,
+                                        )
+                                      }
+                                      disabled={
+                                        inquiryModalMode === "edit" &&
+                                        !editModeEnabled
+                                      }
+                                      className="w-full px-2 py-1 text-xs border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                                      placeholder="0.00"
+                                      step="0.01"
+                                      min="0"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="block text-xs font-medium text-gray-500 mb-1">
+                                      Length (cm)
+                                    </label>
+                                    <input
+                                      type="number"
+                                      value={request.length || ""}
+                                      onChange={(e) =>
+                                        updateRequest(
+                                          index,
+                                          "length",
+                                          e.target.value
+                                            ? parseFloat(e.target.value)
+                                            : undefined,
+                                        )
+                                      }
+                                      disabled={
+                                        inquiryModalMode === "edit" &&
+                                        !editModeEnabled
+                                      }
+                                      className="w-full px-2 py-1 text-xs border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                                      placeholder="0.0"
+                                      step="0.1"
+                                      min="0"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="block text-xs font-medium text-gray-500 mb-1">
+                                      Width (cm)
+                                    </label>
+                                    <input
+                                      type="number"
+                                      value={request.width || ""}
+                                      onChange={(e) =>
+                                        updateRequest(
+                                          index,
+                                          "width",
+                                          e.target.value
+                                            ? parseFloat(e.target.value)
+                                            : undefined,
+                                        )
+                                      }
+                                      disabled={
+                                        inquiryModalMode === "edit" &&
+                                        !editModeEnabled
+                                      }
+                                      className="w-full px-2 py-1 text-xs border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                                      placeholder="0.0"
+                                      step="0.1"
+                                      min="0"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="block text-xs font-medium text-gray-500 mb-1">
+                                      Height (cm)
+                                    </label>
+                                    <input
+                                      type="number"
+                                      value={request.height || ""}
+                                      onChange={(e) =>
+                                        updateRequest(
+                                          index,
+                                          "height",
+                                          e.target.value
+                                            ? parseFloat(e.target.value)
+                                            : undefined,
+                                        )
+                                      }
+                                      disabled={
+                                        inquiryModalMode === "edit" &&
+                                        !editModeEnabled
+                                      }
+                                      className="w-full px-2 py-1 text-xs border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                                      placeholder="0.0"
+                                      step="0.1"
+                                      min="0"
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="col-span-2">
+                                <label className="block text-xs font-medium text-gray-700 mb-1">
+                                  Description
+                                </label>
+                                <textarea
+                                  value={request.description}
+                                  onChange={(e) =>
+                                    updateRequest(
+                                      index,
+                                      "description",
+                                      e.target.value,
+                                    )
+                                  }
+                                  disabled={
+                                    inquiryModalMode === "edit" &&
+                                    !editModeEnabled
+                                  }
+                                  rows={1}
+                                  className="w-full px-2 py-1 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                                  placeholder="Enter item description"
+                                />
+                              </div>
+
+                              <div className="col-span-2">
+                                <label className="block text-xs font-medium text-gray-700 mb-1">
+                                  Specifications
+                                </label>
+                                <textarea
+                                  value={request.specifications}
+                                  onChange={(e) =>
+                                    updateRequest(
+                                      index,
+                                      "specifications",
+                                      e.target.value,
+                                    )
+                                  }
+                                  disabled={
+                                    inquiryModalMode === "edit" &&
+                                    !editModeEnabled
+                                  }
+                                  rows={1}
+                                  className="w-full px-2 py-1 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                                  placeholder="Enter specifications"
+                                />
+                              </div>
+                            </div>
                           </div>
                         )}
                       </div>
@@ -3305,6 +3657,62 @@ const CombinedInquiriesPage: React.FC = () => {
 
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-3">
+                  {/* REORDERED: Customer first */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Customer *
+                    </label>
+                    <select
+                      value={inquiryFormData.customerId}
+                      onChange={(e) =>
+                        setInquiryFormData({
+                          ...inquiryFormData,
+                          customerId: e.target.value,
+                        })
+                      }
+                      disabled={inquiryModalMode === "edit" && !editModeEnabled}
+                      className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    >
+                      <option value="">Select Customer</option>
+                      {customers.map((customer) => (
+                        <option key={customer.id} value={customer.id}>
+                          {customer.companyName || customer.legalName}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* REORDERED: Contact Person second */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Contact Person
+                    </label>
+                    <select
+                      value={inquiryFormData.contactPersonId}
+                      onChange={(e) =>
+                        setInquiryFormData({
+                          ...inquiryFormData,
+                          contactPersonId: e.target.value,
+                        })
+                      }
+                      disabled={inquiryModalMode === "edit" && !editModeEnabled}
+                      className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    >
+                      <option value="">Select Contact Person</option>
+                      {contactPersons
+                        .filter(
+                          (person) =>
+                            person.starBusinessDetailsId ===
+                            inquiryFormData.customerId,
+                        )
+                        .map((person) => (
+                          <option key={person.id} value={person.id}>
+                            {person.name} {person.familyName}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+
                   <div className="col-span-2">
                     <label className="block text-xs font-medium text-gray-700 mb-1">
                       Business *
@@ -3324,12 +3732,11 @@ const CombinedInquiriesPage: React.FC = () => {
                     >
                       <option value="">Select Business</option>
                       {businesses.map((business) => (
-                        <option
-                          key={business.customer?.id}
-                          value={business.customer?.id}
-                        >
-                          {business.customer?.companyName ||
-                            business.customer?.legalName}
+                        <option key={business.id} value={business.id}>
+                          {business.displayName ||
+                            business.companyName ||
+                            business.legalName ||
+                            business.name}
                         </option>
                       ))}
                     </select>
@@ -3356,8 +3763,7 @@ const CombinedInquiriesPage: React.FC = () => {
                     />
                   </div>
 
-                  {/* Quantity and Interval - Displayed together */}
-                  <div>
+                  <div className="col-span-2">
                     <label className="block text-xs font-medium text-gray-700 mb-1">
                       Quantity *
                     </label>
@@ -3451,153 +3857,6 @@ const CombinedInquiriesPage: React.FC = () => {
                         </option>
                       ))}
                     </select>
-                  </div>
-
-                  {/* TARIC Field - Added */}
-                  <div className="col-span-2">
-                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                      TARIC Code
-                    </label>
-                    <select
-                      value={requestItemFormData.taric || ""}
-                      onChange={(e) =>
-                        setRequestItemFormData({
-                          ...requestItemFormData,
-                          taric: e.target.value,
-                        })
-                      }
-                      disabled={
-                        requestModalMode === "edit" && !requestEditModeEnabled
-                      }
-                      className="w-full px-2 py-1 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                    >
-                      <option value="">Select TARIC Code</option>
-                      {tarics.map((taric) => (
-                        <option key={taric.id} value={taric.code}>
-                          {formatTaricDisplay(taric)}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Quality Criteria Section */}
-                  <div className="col-span-2">
-                    <div className="flex items-center justify-between mb-2">
-                      <label className="block text-xs font-medium text-gray-700">
-                        Quality Criteria (instead of specifications)
-                      </label>
-                      <button
-                        type="button"
-                        onClick={addQualityCriterion}
-                        disabled={
-                          requestModalMode === "edit" && !requestEditModeEnabled
-                        }
-                        className="px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 transition-all flex items-center gap-1 disabled:opacity-50"
-                      >
-                        <PlusIcon className="h-3 w-3" />
-                        Add Criterion
-                      </button>
-                    </div>
-
-                    {requestQualityCriteria.map((criterion, index) => (
-                      <div
-                        key={index}
-                        className="mb-3 p-3 border border-gray-200 rounded bg-white"
-                      >
-                        <div className="flex justify-between items-start mb-2">
-                          <h5 className="text-xs font-medium text-gray-700">
-                            Criterion #{index + 1}
-                          </h5>
-                          <button
-                            type="button"
-                            onClick={() => removeQualityCriterion(index)}
-                            disabled={
-                              requestModalMode === "edit" &&
-                              !requestEditModeEnabled
-                            }
-                            className="text-red-500 hover:text-red-700 text-xs"
-                          >
-                            Remove
-                          </button>
-                        </div>
-
-                        <div className="mb-2">
-                          <label className="block text-xs font-medium text-gray-700 mb-1">
-                            Description
-                          </label>
-                          <textarea
-                            value={criterion.description}
-                            onChange={(e) =>
-                              updateQualityCriterion(
-                                index,
-                                "description",
-                                e.target.value,
-                              )
-                            }
-                            disabled={
-                              requestModalMode === "edit" &&
-                              !requestEditModeEnabled
-                            }
-                            rows={2}
-                            className="w-full px-2 py-1 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                            placeholder="Enter quality description"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">
-                            Picture
-                          </label>
-                          {criterion.pictureUrl ? (
-                            <div className="flex items-center gap-2">
-                              <img
-                                src={criterion.pictureUrl}
-                                alt="Quality criterion"
-                                className="h-16 w-16 object-cover rounded"
-                              />
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  updateQualityCriterion(
-                                    index,
-                                    "picture",
-                                    undefined,
-                                  )
-                                }
-                                className="text-red-500 hover:text-red-700 text-xs"
-                              >
-                                Remove
-                              </button>
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-2">
-                              <label className="cursor-pointer px-3 py-1 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-all">
-                                <PhotoIcon className="h-4 w-4 inline mr-1" />
-                                Upload Picture
-                                <input
-                                  type="file"
-                                  accept="image/*"
-                                  className="hidden"
-                                  onChange={(e) => {
-                                    if (e.target.files && e.target.files[0]) {
-                                      updateQualityCriterion(
-                                        index,
-                                        "picture",
-                                        e.target.files[0],
-                                      );
-                                    }
-                                  }}
-                                  disabled={
-                                    requestModalMode === "edit" &&
-                                    !requestEditModeEnabled
-                                  }
-                                />
-                              </label>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ))}
                   </div>
 
                   {/* Dimension Fields for Requested Item */}
@@ -3710,10 +3969,10 @@ const CombinedInquiriesPage: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Purchase Price Fields - DEFAULT TO RMB */}
+                  {/* Purchase Price Fields */}
                   <div className="col-span-2">
                     <h4 className="text-sm font-semibold text-gray-900 mb-2">
-                      Purchase Price (Default: RMB)
+                      Purchase Price
                     </h4>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
@@ -3770,61 +4029,6 @@ const CombinedInquiriesPage: React.FC = () => {
                         </select>
                       </div>
                     </div>
-                  </div>
-
-                  {/* Attachments Section */}
-                  <div className="col-span-2">
-                    <div className="flex items-center justify-between mb-2">
-                      <label className="block text-xs font-medium text-gray-700">
-                        Attachments
-                      </label>
-                      <label className="cursor-pointer px-3 py-1 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-all">
-                        <PaperClipIcon className="h-4 w-4 inline mr-1" />
-                        Add Attachment
-                        <input
-                          type="file"
-                          multiple
-                          className="hidden"
-                          onChange={(e) => {
-                            if (e.target.files) {
-                              handleAttachmentUpload(e.target.files);
-                            }
-                          }}
-                          disabled={
-                            requestModalMode === "edit" &&
-                            !requestEditModeEnabled
-                          }
-                        />
-                      </label>
-                    </div>
-
-                    {requestAttachments.length > 0 && (
-                      <div className="space-y-2">
-                        {requestAttachments.map((file, index) => (
-                          <div
-                            key={index}
-                            className="flex items-center justify-between p-2 bg-white border border-gray-200 rounded"
-                          >
-                            <div className="flex items-center gap-2">
-                              <PaperClipIcon className="h-4 w-4 text-gray-500" />
-                              <span className="text-xs text-gray-700 truncate">
-                                {file.name}
-                              </span>
-                              <span className="text-xs text-gray-500">
-                                ({Math.round(file.size / 1024)} KB)
-                              </span>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => removeAttachment(index)}
-                              className="text-red-500 hover:text-red-700 text-xs"
-                            >
-                              Remove
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
                   </div>
                 </div>
 
@@ -4105,7 +4309,6 @@ const CombinedInquiriesPage: React.FC = () => {
                   ))}
                 </div>
 
-                {/* Note about generated fields */}
                 <div className="mt-4 p-3 bg-blue-50 rounded-lg">
                   <div className="flex items-start gap-2">
                     <InformationCircleIcon className="h-5 w-5 text-blue-500 mt-0.5" />

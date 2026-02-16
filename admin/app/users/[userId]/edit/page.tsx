@@ -44,6 +44,7 @@ import { useRouter } from "next/navigation";
 import { getUserById, updateUserFunction as updateUserApi } from "@/api/user";
 import CustomButton from "@/components/UI/CustomButton";
 import { useParams } from "next/navigation";
+import { availableResources } from "@/utils/resources";
 
 interface Permission {
   id: string;
@@ -67,6 +68,10 @@ interface FormValues {
   role: UserRole;
   country: string;
   assignedResources: string[];
+  partnerName: string;
+  emergencyContact: string;
+  joiningDate: string;
+  isLoginEnabled: boolean;
 }
 
 const validationSchema = Yup.object({
@@ -83,54 +88,20 @@ const validationSchema = Yup.object({
   gender: Yup.string().required("Gender is required"),
   role: Yup.string().required("Role is required"),
   country: Yup.string().required("Country is required"),
+  partnerName: Yup.string(),
+  emergencyContact: Yup.string()
+    .matches(
+      /^[+]?[(]?[0-9]{3}[)]?[-\s.]?[0-9]{3}[-\s.]?[0-9]{4,6}$/,
+      "Invalid emergency contact number"
+    ),
+  joiningDate: Yup.date(),
+  isLoginEnabled: Yup.boolean(),
 });
 
-// Expanded resource configuration with descriptions
-const availableResources: ResourceConfig[] = [
-  {
-    name: "Dashboard",
-    description: "Access to main dashboard and overview data",
-    actions: ["view", "export"],
-  },
-  {
-    name: "Products",
-    description: "Manage product catalog and inventory",
-    actions: ["create", "read", "update", "delete"],
-  },
-  {
-    name: "Orders",
-    description: "Manage customer orders and processing",
-    actions: ["create", "read", "update", "cancel", "refund"],
-  },
-  {
-    name: "Users",
-    description: "Manage user accounts and permissions",
-    actions: ["create", "read", "update", "disable"],
-  },
-  {
-    name: "Analytics",
-    description: "Access to data reports and insights",
-    actions: ["read", "export"],
-  },
-  {
-    name: "Settings",
-    description: "Manage system configuration",
-    actions: ["read", "update"],
-  },
-  {
-    name: "Reports",
-    description: "Access to business reports",
-    actions: ["read", "create", "export"],
-  },
-  {
-    name: "Messages",
-    description: "Internal communication system",
-    actions: ["read", "send", "delete"],
-  },
-];
 
-// Countries list for dropdown
+
 const countries = [
+  "Afghanistan",
   "United States",
   "United Kingdom",
   "Canada",
@@ -178,7 +149,6 @@ const UserUpdatePage: React.FC = () => {
         const response = await getUserById(userId);
         const userData = response?.data;
 
-        // Set form values
         formik.setValues({
           name: userData.name,
           email: userData.email,
@@ -189,18 +159,38 @@ const UserUpdatePage: React.FC = () => {
           role: userData.role,
           country: userData.country || "",
           assignedResources: userData.assignedResources || [],
+          partnerName: userData.partnerName || "",
+          emergencyContact: userData.emergencyContact || "",
+          joiningDate: userData.joiningDate?.split("T")[0] || "",
+          isLoginEnabled: userData.isLoginEnabled !== undefined ? userData.isLoginEnabled : true,
         });
 
-        // Set permissions if they exist
-        if (userData.permissions) {
-          setPermissions(
-            userData.permissions.map((perm: any) => ({
+        const existingPermissions = userData.permissions || [];
+        const assignedResourcesList = userData.assignedResources || [];
+
+        const initialPermissions = [
+          ...existingPermissions.map((perm: any) => ({
+            id: Math.random().toString(),
+            resource: perm.resource,
+            actions: Array.isArray(perm.actions)
+              ? perm.actions
+              : typeof perm.actions === 'string' && (perm.actions as string).length > 0
+                ? (perm.actions as string).split(',')
+                : [],
+          }))
+        ];
+
+        assignedResourcesList.forEach((res: string) => {
+          if (!initialPermissions.some(p => p.resource === res)) {
+            initialPermissions.push({
               id: Math.random().toString(),
-              resource: perm.resource,
-              actions: perm.actions,
-            }))
-          );
-        }
+              resource: res,
+              actions: []
+            });
+          }
+        });
+
+        setPermissions(initialPermissions);
       } catch (error) {
         toast.error("Failed to load user data");
         router.push("/users");
@@ -225,13 +215,16 @@ const UserUpdatePage: React.FC = () => {
       role: UserRole.STAFF,
       country: "",
       assignedResources: [],
+      partnerName: "",
+      emergencyContact: "",
+      joiningDate: "",
+      isLoginEnabled: true,
     },
     validationSchema,
     onSubmit: async (values) => {
       try {
         setIsSubmitting(true);
 
-        // Prepare the payload for API
         const userData = {
           ...values,
           assignedResources: permissions.map((p) => p.resource),
@@ -255,7 +248,6 @@ const UserUpdatePage: React.FC = () => {
   });
 
   const handleAddResource = (resourceName: string): void => {
-    // Add to form's assignedResources
     if (!permissions.some((p) => p.resource === resourceName)) {
       setPermissions((prev) => [
         ...prev,
@@ -274,17 +266,16 @@ const UserUpdatePage: React.FC = () => {
       prev.map((p) =>
         p.resource === resource
           ? {
-              ...p,
-              actions: p.actions.includes(action)
-                ? p.actions.filter((a) => a !== action)
-                : [...p.actions, action],
-            }
+            ...p,
+            actions: p.actions.includes(action)
+              ? p.actions.filter((a) => a !== action)
+              : [...p.actions, action],
+          }
           : p
       )
     );
   };
 
-  // Handle alert close
   const handleAlertClose = (): void => {
     setAlertInfo({ ...alertInfo, show: false });
   };
@@ -309,7 +300,7 @@ const UserUpdatePage: React.FC = () => {
           boxShadow: "0 4px 15px rgba(0, 0, 0, 0.05)",
         }}
       >
-        {/* Header */}
+
         <Box
           sx={{
             p: 3,
@@ -358,7 +349,6 @@ const UserUpdatePage: React.FC = () => {
         </Box>
 
         <Box component="form" onSubmit={formik.handleSubmit} sx={{ p: 3 }}>
-          {/* User Information Form Fields */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 mb-8">
             <div>
               <FormInput
@@ -440,7 +430,6 @@ const UserUpdatePage: React.FC = () => {
               />
             </div>
 
-            {/* Removed password field since we shouldn't update it here */}
             <div className="md:col-span-2">
               <FormInput
                 name="address"
@@ -452,9 +441,81 @@ const UserUpdatePage: React.FC = () => {
                 rows={2}
               />
             </div>
+
+            <div>
+              <FormInput
+                name="partnerName"
+                label="Project Partner"
+                icon={<LucideUser size={20} />}
+                formik={formik}
+                placeholder="Project Partner's name (optional)"
+              />
+            </div>
+
+            <div>
+              <FormInput
+                name="emergencyContact"
+                label="Emergency Contact"
+                icon={<LucidePhone size={20} />}
+                formik={formik}
+                placeholder="+1 (555) 987-6543"
+              />
+            </div>
+
+            <div>
+              <FormInput
+                name="joiningDate"
+                label="Joining Date"
+                type="date"
+                icon={<LucideCalendar size={20} />}
+                formik={formik}
+              />
+            </div>
+
+            <div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-gray-700 block">
+                  Login Access
+                </label>
+                <div className="flex items-center gap-3 p-3 border rounded-lg bg-gray-50">
+                  <LucideLock size={20} className="text-gray-500" />
+                  <div className="flex-1">
+                    <Typography variant="body2" fontWeight={500}>
+                      {formik.values.isLoginEnabled
+                        ? "Login Enabled"
+                        : "Login Disabled"}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {formik.values.isLoginEnabled
+                        ? "User can access the system"
+                        : "User cannot login to the system"}
+                    </Typography>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      formik.setFieldValue(
+                        "isLoginEnabled",
+                        !formik.values.isLoginEnabled
+                      )
+                    }
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${formik.values.isLoginEnabled
+                      ? "bg-green-500"
+                      : "bg-gray-300"
+                      }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${formik.values.isLoginEnabled
+                        ? "translate-x-6"
+                        : "translate-x-1"
+                        }`}
+                    />
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
 
-          {/* Beautiful Divider */}
           <div className="relative py-4">
             <div className="absolute inset-0 flex items-center">
               <div className="w-full border-t border-indigo-100"></div>
@@ -466,7 +527,6 @@ const UserUpdatePage: React.FC = () => {
             </div>
           </div>
 
-          {/* Access Permissions Section */}
           <div className="mb-6">
             <div className="flex items-center gap-3 mb-4">
               <div className="text-primary-main bg-primary-50 p-2 rounded-lg">
@@ -556,11 +616,10 @@ const UserUpdatePage: React.FC = () => {
                                     action
                                   )
                                 }
-                                className={`px-3 py-1.5 rounded-md flex items-center gap-1.5 transition-all ${
-                                  isActive
-                                    ? `bg-[#8CC21B] text-white`
-                                    : "bg-white border border-gray-200 text-gray-700 hover:border-primary-light"
-                                }`}
+                                className={`px-3 py-1.5 rounded-md flex items-center gap-1.5 transition-all ${isActive
+                                  ? `bg-[#8CC21B] text-white`
+                                  : "bg-white border border-gray-200 text-gray-700 hover:border-primary-light"
+                                  }`}
                               >
                                 {isActive && <LucideCheck size={16} />}
                                 <span>
@@ -579,7 +638,6 @@ const UserUpdatePage: React.FC = () => {
             )}
           </div>
 
-          {/* Submit Button */}
           <div className="border-t border-indigo-100 pt-6 mt-6 flex justify-end">
             <CustomButton
               type="submit"
@@ -598,7 +656,7 @@ const UserUpdatePage: React.FC = () => {
           </div>
         </Box>
 
-        {/* Add Resource Dialog */}
+
         <Dialog
           open={showResourceDialog}
           onClose={() => setShowResourceDialog(false)}
@@ -629,38 +687,39 @@ const UserUpdatePage: React.FC = () => {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {availableResources.map((resource) => {
-                const isAssigned = permissions.some(
-                  (p) => p.resource === resource.name
-                );
+              {availableResources
+                .filter((resource) => !resource.adminOnly)
+                .map((resource) => {
+                  const isAssigned = permissions.some(
+                    (p) => p.resource === resource.name
+                  );
 
-                return (
-                  <div
-                    key={resource.name}
-                    onClick={() =>
-                      !isAssigned && handleAddResource(resource.name)
-                    }
-                    className={`p-3 border rounded-lg cursor-pointer transition-all ${
-                      isAssigned
+                  return (
+                    <div
+                      key={resource.name}
+                      onClick={() =>
+                        !isAssigned && handleAddResource(resource.name)
+                      }
+                      className={`p-3 border rounded-lg cursor-pointer transition-all ${isAssigned
                         ? "bg-blue-50 border-indigo-200 opacity-70 cursor-not-allowed"
                         : "hover:border-indigo-300 hover:bg-blue-50"
-                    }`}
-                  >
-                    <div className="flex justify-between items-center mb-2">
-                      <h3 className="font-medium">{resource.name}</h3>
-                      {isAssigned && (
-                        <div className="text-xs bg-indigo-500 text-white px-2 py-0.5 rounded-full flex items-center gap-1">
-                          <LucideCheck size={12} />
-                          Added
-                        </div>
-                      )}
+                        }`}
+                    >
+                      <div className="flex justify-between items-center mb-2">
+                        <h3 className="font-medium">{resource.name}</h3>
+                        {isAssigned && (
+                          <div className="text-xs bg-indigo-500 text-white px-2 py-0.5 rounded-full flex items-center gap-1">
+                            <LucideCheck size={12} />
+                            Added
+                          </div>
+                        )}
+                      </div>
+                      <p className="text-sm text-gray-600">
+                        {resource.description}
+                      </p>
                     </div>
-                    <p className="text-sm text-gray-600">
-                      {resource.description}
-                    </p>
-                  </div>
-                );
-              })}
+                  );
+                })}
             </div>
 
             <div className="flex justify-end mt-6">
@@ -682,7 +741,6 @@ const UserUpdatePage: React.FC = () => {
           </div>
         </Dialog>
 
-        {/* Alert Snackbar */}
         <Snackbar
           open={alertInfo.show}
           autoHideDuration={6000}

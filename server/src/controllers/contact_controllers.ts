@@ -15,7 +15,6 @@ import ErrorHandler from "../utils/errorHandler";
 import { In, Like, Brackets, ILike } from "typeorm";
 import { User } from "../models/users";
 
-// Constants for ContactPerson statuses and types
 export const LINKEDIN_STATES = {
   OPEN: "open",
   NO_LINKEDIN: "NoLinkedIn",
@@ -46,7 +45,6 @@ export const POSITIONS = {
   OTHERS: "Others",
 };
 
-// 1. Create Contact Person
 function isDecisionMakerContactType(contactType: ContactType): boolean {
   return [
     CONTACT_TYPES.DECISION_MAKER_TECH,
@@ -55,7 +53,6 @@ function isDecisionMakerContactType(contactType: ContactType): boolean {
   ].includes(contactType as any);
 }
 
-// Helper function to set isDecisionMaker based on contact type
 function setDecisionMakerFromContactType(contactPerson: ContactPerson): void {
   if (contactPerson.contact) {
     contactPerson.isDecisionMaker = isDecisionMakerContactType(
@@ -106,7 +103,6 @@ export const createContactPerson = async (
       isDecisionMaker,
     } = req.body;
 
-    // Validate required fields
     if (!starBusinessDetailsId || !name || !familyName) {
       return next(
         new ErrorHandler(
@@ -116,7 +112,6 @@ export const createContactPerson = async (
       );
     }
 
-    // Validate position and positionOthers relationship
     if (position === POSITIONS.OTHERS && !positionOthers) {
       return next(
         new ErrorHandler(
@@ -126,27 +121,47 @@ export const createContactPerson = async (
       );
     }
 
-    // Get repositories
     const contactPersonRepository = AppDataSource.getRepository(ContactPerson);
     const starBusinessDetailsRepository =
       AppDataSource.getRepository(StarBusinessDetails);
 
-    // Verify star business exists
-    const starBusinessDetails = await starBusinessDetailsRepository.findOne({
+    let starBusinessDetails = await starBusinessDetailsRepository.findOne({
       where: { id: starBusinessDetailsId },
       relations: ["customer"],
     });
 
     if (!starBusinessDetails) {
-      return next(new ErrorHandler("Star business not found", 404));
+      const customerRepository = AppDataSource.getRepository(Customer);
+      const customer = await customerRepository.findOne({
+        where: { id: starBusinessDetailsId },
+        relations: ["starBusinessDetails"],
+      });
+
+      if (customer) {
+        if (customer.starBusinessDetails) {
+          starBusinessDetails = customer.starBusinessDetails;
+        } else {
+          if (["star_business", "star_customer"].includes(customer.stage)) {
+            starBusinessDetails = starBusinessDetailsRepository.create({
+              customer: customer,
+            });
+            await starBusinessDetailsRepository.save(starBusinessDetails);
+          }
+        }
+      }
     }
 
-    // Check for duplicate contact person
+    if (!starBusinessDetails) {
+      return next(new ErrorHandler("Star business or customer not found", 404));
+    }
+
+    const actualStarBusinessDetailsId = starBusinessDetails.id;
+
     if (email) {
       const existingContactByEmail = await contactPersonRepository.findOne({
         where: {
           email: email.toLowerCase(),
-          starBusinessDetailsId,
+          starBusinessDetailsId: actualStarBusinessDetailsId,
         },
       });
 
@@ -160,7 +175,6 @@ export const createContactPerson = async (
       }
     }
 
-    // Create new contact person
     const contactPerson = new ContactPerson();
     contactPerson.sex = sanitizeSex(sex);
     contactPerson.starBusinessDetailsId = starBusinessDetailsId;
@@ -192,7 +206,6 @@ export const createContactPerson = async (
     contactPerson.stateLinkedIn = sanitizeLinkedInState(stateLinkedIn);
     contactPerson.contact = sanitizeContactType(contact);
 
-    // Add decisionMakerState handling
     if (decisionMakerState !== undefined) {
       contactPerson.decisionMakerState =
         sanitizeDecisionMakerState(decisionMakerState);
@@ -202,12 +215,9 @@ export const createContactPerson = async (
       contactPerson.note = note.trim();
     }
 
-    // Allow decisionMakerNote only if the contact person is a decision maker
     if (decisionMakerNote) {
-      // Set isDecisionMaker based on contact type first
       setDecisionMakerFromContactType(contactPerson);
 
-      // Only allow decisionMakerNote if the person is a decision maker
       if (contactPerson.isDecisionMaker) {
         contactPerson.decisionMakerNote = decisionMakerNote.trim();
       } else {
@@ -220,16 +230,12 @@ export const createContactPerson = async (
       }
     }
 
-    // Set isDecisionMaker based on contact type (overrides explicit setting)
-    // This is called again to ensure consistency after potential changes above
     setDecisionMakerFromContactType(contactPerson);
 
-    // Save to database
     const savedContactPerson = await contactPersonRepository.save(
       contactPerson
     );
 
-    // Fetch with relations for response
     const contactPersonWithRelations = await contactPersonRepository.findOne({
       where: { id: savedContactPerson.id },
       relations: ["starBusinessDetails", "starBusinessDetails.customer"],
@@ -246,7 +252,6 @@ export const createContactPerson = async (
   }
 };
 
-// Updated updateContactPerson function with decisionMakerState
 export const updateContactPerson = async (
   req: Request,
   res: Response,
@@ -274,7 +279,6 @@ export const updateContactPerson = async (
 
     const contactPersonRepository = AppDataSource.getRepository(ContactPerson);
 
-    // Find existing contact person
     const contactPerson = await contactPersonRepository.findOne({
       where: { id },
       relations: ["starBusinessDetails", "starBusinessDetails.customer"],
@@ -284,7 +288,6 @@ export const updateContactPerson = async (
       return next(new ErrorHandler("Contact person not found", 404));
     }
 
-    // Validate position and positionOthers relationship
     if (position === POSITIONS.OTHERS && !positionOthers) {
       return next(
         new ErrorHandler(
@@ -294,7 +297,6 @@ export const updateContactPerson = async (
       );
     }
 
-    // Check for duplicate email if email is being updated
     if (email && email !== contactPerson.email) {
       const existingContactByEmail = await contactPersonRepository.findOne({
         where: {
@@ -314,7 +316,6 @@ export const updateContactPerson = async (
       }
     }
 
-    // Handle contact type and decision maker logic first to determine if they're a decision maker
     let contactTypeChanged = false;
     if (contact !== undefined) {
       const newContactType = sanitizeContactType(contact);
@@ -322,28 +323,23 @@ export const updateContactPerson = async (
       contactPerson.contact = newContactType;
     }
 
-    // Update decisionMakerState if provided
     if (decisionMakerState !== undefined) {
       contactPerson.decisionMakerState =
         sanitizeDecisionMakerState(decisionMakerState);
     }
 
-    // Update isDecisionMaker based on contact type if contact type changed
-    // Otherwise respect the explicit isDecisionMaker value if provided
     if (contactTypeChanged) {
       setDecisionMakerFromContactType(contactPerson);
     } else if (isDecisionMaker !== undefined) {
       contactPerson.isDecisionMaker = Boolean(isDecisionMaker);
     }
 
-    // Validate decisionMakerNote - only allow if the person is a decision maker
     if (decisionMakerNote !== undefined) {
-      // Check if the person is currently a decision maker or will become one
       const willBeDecisionMaker = contactTypeChanged
         ? isDecisionMakerFromContactType(contactPerson.contact)
         : isDecisionMaker !== undefined
-        ? Boolean(isDecisionMaker)
-        : contactPerson.isDecisionMaker;
+          ? Boolean(isDecisionMaker)
+          : contactPerson.isDecisionMaker;
 
       if (decisionMakerNote && !willBeDecisionMaker) {
         return next(
@@ -354,13 +350,10 @@ export const updateContactPerson = async (
         );
       }
 
-      // If validation passes, update the decisionMakerNote
       contactPerson.decisionMakerNote = decisionMakerNote
         ? decisionMakerNote.trim()
         : null;
     }
-
-    // Update other fields
     if (sex !== undefined) {
       contactPerson.sex = sanitizeSex(sex);
     }
@@ -409,8 +402,6 @@ export const updateContactPerson = async (
     if (note !== undefined) {
       contactPerson.note = note ? note.trim() : null;
     }
-
-    // Save updates
     const updatedContactPerson = await contactPersonRepository.save(
       contactPerson
     );
@@ -425,7 +416,7 @@ export const updateContactPerson = async (
     return next(new ErrorHandler("Failed to update contact person", 500));
   }
 };
-// 8. Bulk Import Contact Persons
+
 export const bulkImportContactPersons = async (
   req: Request,
   res: Response,
@@ -433,8 +424,6 @@ export const bulkImportContactPersons = async (
 ) => {
   try {
     const { contactPersons, starBusinessDetailsId } = req.body;
-
-    // Validate input
     if (!contactPersons || !Array.isArray(contactPersons)) {
       return next(new ErrorHandler("Contact persons array is required", 400));
     }
@@ -459,7 +448,6 @@ export const bulkImportContactPersons = async (
     const starBusinessDetailsRepository =
       AppDataSource.getRepository(StarBusinessDetails);
 
-    // Verify star business exists
     const starBusinessDetails = await starBusinessDetailsRepository.findOne({
       where: { id: starBusinessDetailsId },
       relations: ["customer"],
@@ -469,7 +457,6 @@ export const bulkImportContactPersons = async (
       return next(new ErrorHandler("Star business not found", 404));
     }
 
-    // Initialize results tracking
     const results = {
       total: contactPersons.length,
       imported: 0,
@@ -487,13 +474,10 @@ export const bulkImportContactPersons = async (
       endTime: null as Date | null,
     };
 
-    // Get existing contact persons for duplicate checking
     const existingContactPersons = await contactPersonRepository.find({
       where: { starBusinessDetailsId },
       select: ["id", "name", "familyName", "email"],
     });
-
-    // Create maps for duplicate checking
     const existingByEmail = new Map<string, any>();
     const existingByName = new Map<string, any>();
 
@@ -505,7 +489,6 @@ export const bulkImportContactPersons = async (
       existingByName.set(nameKey, contact);
     });
 
-    // Process each contact person
     const contactPersonsToSave: ContactPerson[] = [];
     const seenInBatch = {
       emails: new Set<string>(),
@@ -515,7 +498,6 @@ export const bulkImportContactPersons = async (
     for (let i = 0; i < contactPersons.length; i++) {
       const contactData = contactPersons[i];
 
-      // Validate required fields
       if (!contactData.name || !contactData.familyName) {
         results.skippedInvalidData++;
         results.errorsList.push({
@@ -525,7 +507,6 @@ export const bulkImportContactPersons = async (
         continue;
       }
 
-      // Validate position and positionOthers
       if (
         contactData.position === POSITIONS.OTHERS &&
         !contactData.positionOthers
@@ -538,7 +519,6 @@ export const bulkImportContactPersons = async (
         continue;
       }
 
-      // Normalize data for duplicate checking
       const normalizedEmail = contactData.email
         ? contactData.email.trim().toLowerCase()
         : null;
@@ -546,7 +526,6 @@ export const bulkImportContactPersons = async (
         .trim()
         .toLowerCase()}_${contactData.familyName.trim().toLowerCase()}`;
 
-      // Check for duplicates in current batch
       let duplicateReason = "";
       let existingRecord = null;
 
@@ -556,7 +535,6 @@ export const bulkImportContactPersons = async (
         duplicateReason = "Duplicate name in current batch";
       }
 
-      // Check against existing database records
       if (!duplicateReason) {
         if (normalizedEmail && existingByEmail.has(normalizedEmail)) {
           duplicateReason = "Email already exists for this star business";
@@ -567,7 +545,6 @@ export const bulkImportContactPersons = async (
         }
       }
 
-      // If duplicate found, add to results and skip
       if (duplicateReason) {
         results.duplicates++;
         results.duplicateEntries.push({
@@ -584,14 +561,12 @@ export const bulkImportContactPersons = async (
         continue;
       }
 
-      // Add to seen sets
       if (normalizedEmail) {
         seenInBatch.emails.add(normalizedEmail);
       }
       seenInBatch.names.add(nameKey);
 
       try {
-        // Create new contact person entity
         const contactPerson = new ContactPerson();
         contactPerson.sex = sanitizeSex(contactData.sex);
         contactPerson.starBusinessDetailsId = starBusinessDetailsId;
@@ -635,7 +610,6 @@ export const bulkImportContactPersons = async (
           contactPerson.note = contactData.note.trim();
         }
 
-        // Set isDecisionMaker based on contact type for imported contacts
         setDecisionMakerFromContactType(contactPerson);
 
         contactPersonsToSave.push(contactPerson);
@@ -648,12 +622,11 @@ export const bulkImportContactPersons = async (
       }
     }
 
-    // Bulk save all valid contact persons
     if (contactPersonsToSave.length > 0) {
       try {
         const savedContactPersons = await contactPersonRepository.save(
           contactPersonsToSave,
-          { chunk: 100 } // Save in chunks of 100
+          { chunk: 100 }
         );
         results.imported = savedContactPersons.length;
         results.importedContactPersons = savedContactPersons.map(
@@ -692,7 +665,6 @@ export const bulkImportContactPersons = async (
   }
 };
 
-// 15. Quick Add Contact Person to Star Business
 export const quickAddContactPerson = async (
   req: Request,
   res: Response,
@@ -702,7 +674,6 @@ export const quickAddContactPerson = async (
     const { starBusinessDetailsId } = req.params;
     const { name, familyName, email, phone, position, contact } = req.body;
 
-    // Validate minimum required fields
     if (!name || !familyName) {
       return next(new ErrorHandler("Name and family name are required", 400));
     }
@@ -711,7 +682,6 @@ export const quickAddContactPerson = async (
     const starBusinessDetailsRepository =
       AppDataSource.getRepository(StarBusinessDetails);
 
-    // Verify star business exists
     const starBusinessDetails = await starBusinessDetailsRepository.findOne({
       where: { id: starBusinessDetailsId },
       relations: ["customer"],
@@ -721,7 +691,6 @@ export const quickAddContactPerson = async (
       return next(new ErrorHandler("Star business not found", 404));
     }
 
-    // Quick duplicate check by name and email
     const existingQuery = contactPersonRepository
       .createQueryBuilder("contactPerson")
       .where("contactPerson.starBusinessDetailsId = :starBusinessDetailsId", {
@@ -755,14 +724,12 @@ export const quickAddContactPerson = async (
       );
     }
 
-    // Create contact person with minimal fields
     const contactPerson = new ContactPerson();
     contactPerson.name = name.trim();
     contactPerson.familyName = familyName.trim();
     contactPerson.starBusinessDetailsId = starBusinessDetailsId;
     contactPerson.starBusinessDetails = starBusinessDetails;
 
-    // Optional fields
     if (email) {
       contactPerson.email = email.trim().toLowerCase();
     }
@@ -776,17 +743,14 @@ export const quickAddContactPerson = async (
       contactPerson.contact = sanitizeContactType(contact);
     }
 
-    // Set defaults
     contactPerson.sex = "Not Specified";
     contactPerson.stateLinkedIn = "open";
     if (!contact) {
       contactPerson.contact = "";
     }
 
-    // Set isDecisionMaker based on contact type for quick add
     setDecisionMakerFromContactType(contactPerson);
 
-    // Save to database
     const savedContactPerson = await contactPersonRepository.save(
       contactPerson
     );
@@ -814,7 +778,6 @@ export const quickAddContactPerson = async (
   }
 };
 
-// 3. Get Single Contact Person
 export const getContactPerson = async (
   req: Request,
   res: Response,
@@ -844,7 +807,6 @@ export const getContactPerson = async (
   }
 };
 
-// 4. Get All Contact Persons with Filters
 export const getAllContactPersons = async (
   req: Request,
   res: Response,
@@ -874,7 +836,6 @@ export const getAllContactPersons = async (
     const limitNum = parseInt(limit as string);
     const skip = (pageNum - 1) * limitNum;
 
-    // Get all star business customers with their contact persons
     const allCustomers = await customerRepository.find({
       where: {},
       relations: [
@@ -887,7 +848,6 @@ export const getAllContactPersons = async (
 
     console.log(`Total star business customers found: ${allCustomers.length}`);
 
-    // Extract and flatten all contact persons from all customers
     let allContactPersons = allCustomers.flatMap(
       (customer) =>
         customer.starBusinessDetails?.contactPersons?.map((contactPerson) => ({
@@ -899,7 +859,6 @@ export const getAllContactPersons = async (
 
     console.log(`Total contact persons found: ${allContactPersons.length}`);
 
-    // Apply search filter if provided
     if (search) {
       const searchTerm = search.toString().toLowerCase();
       allContactPersons = allContactPersons.filter(
@@ -914,7 +873,6 @@ export const getAllContactPersons = async (
       );
     }
 
-    // Business name filter
     if (businessName) {
       const businessTerm = businessName.toString().toLowerCase();
       allContactPersons = allContactPersons.filter((contactPerson) =>
@@ -924,43 +882,35 @@ export const getAllContactPersons = async (
       );
     }
 
-    // Star business details ID filter
     if (starBusinessDetailsId) {
       allContactPersons = allContactPersons.filter(
         (contactPerson) =>
           contactPerson.starBusinessDetails?.id === starBusinessDetailsId
       );
     }
-
-    // Position filter
     if (position) {
       allContactPersons = allContactPersons.filter(
         (contactPerson) => contactPerson.position === position
       );
     }
-
-    // Sex filter
     if (sex) {
       allContactPersons = allContactPersons.filter(
         (contactPerson) => contactPerson.sex === sex
       );
     }
 
-    // LinkedIn state filter
     if (stateLinkedIn) {
       allContactPersons = allContactPersons.filter(
         (contactPerson) => contactPerson.stateLinkedIn === stateLinkedIn
       );
     }
 
-    // Contact type filter
     if (contact) {
       allContactPersons = allContactPersons.filter(
         (contactPerson) => contactPerson.contact === contact
       );
     }
 
-    // Has email filter
     if (hasEmail === "true") {
       allContactPersons = allContactPersons.filter(
         (contactPerson) =>
@@ -972,7 +922,6 @@ export const getAllContactPersons = async (
       );
     }
 
-    // Has phone filter
     if (hasPhone === "true") {
       allContactPersons = allContactPersons.filter(
         (contactPerson) =>
@@ -984,7 +933,6 @@ export const getAllContactPersons = async (
       );
     }
 
-    // Has LinkedIn filter
     if (hasLinkedIn === "true") {
       allContactPersons = allContactPersons.filter(
         (contactPerson) =>
@@ -997,7 +945,6 @@ export const getAllContactPersons = async (
       );
     }
 
-    // Apply sorting
     const validSortFields = [
       "createdAt",
       "updatedAt",
@@ -1026,14 +973,12 @@ export const getAllContactPersons = async (
       }
     });
 
-    // Apply pagination
     const total = allContactPersons.length;
     const paginatedContactPersons = allContactPersons.slice(
       skip,
       skip + limitNum
     );
 
-    // Format response
     const formattedContactPersons = paginatedContactPersons.map(
       (contactPerson) => {
         const customer = contactPerson.customer;
@@ -1055,17 +1000,15 @@ export const getAllContactPersons = async (
           createdAt: contactPerson.createdAt,
           updatedAt: contactPerson.updatedAt,
           starBusinessDetailsId: contactPerson.starBusinessDetailsId,
-          isDecisionMaker: true,
+          isDecisionMaker: contactPerson.isDecisionMaker,
           decisionMakerState: contactPerson.decisionMakerState,
-          // Business info
+          decisionMakerNote: contactPerson.decisionMakerNote,
           businessId: customer?.id || null,
           businessName: customer?.companyName || null,
           businessLegalName: customer?.legalName,
           businessEmail: customer?.email || null,
           businessContactEmail: customer?.contactEmail || null,
           businessContactPhone: customer?.contactPhoneNumber || null,
-
-          // Business details
           website: businessDetails?.website || null,
           city: businessDetails?.city || null,
           state: businessDetails?.state || null,
@@ -1076,10 +1019,8 @@ export const getAllContactPersons = async (
           industry:
             starBusinessDetails?.industry || businessDetails?.industry || null,
 
-          // Display fields
-          fullName: `${contactPerson.name || ""} ${
-            contactPerson.familyName || ""
-          }`.trim(),
+          fullName: `${contactPerson.name || ""} ${contactPerson.familyName || ""
+            }`.trim(),
           displayPosition: contactPerson.position || "",
           note: contactPerson.note || null,
           noteContactPreference: contactPerson.noteContactPreference || null,
@@ -1106,7 +1047,6 @@ export const getAllContactPersons = async (
   }
 };
 
-// 5. Get Contact Persons by Star Business
 export const getContactPersonsByStarBusiness = async (
   req: Request,
   res: Response,
@@ -1117,7 +1057,6 @@ export const getContactPersonsByStarBusiness = async (
 
     const customerRepository = AppDataSource.getRepository(Customer);
 
-    // Find the customer that has this star business details
     const customer = await customerRepository.findOne({
       where: {
         starBusinessDetails: { id: starBusinessDetailsId },
@@ -1154,8 +1093,10 @@ export const getContactPersonsByStarBusiness = async (
         createdAt: contactPerson.createdAt,
         updatedAt: contactPerson.updatedAt,
         starBusinessDetailsId: contactPerson.starBusinessDetailsId,
+        isDecisionMaker: contactPerson.isDecisionMaker,
+        decisionMakerState: contactPerson.decisionMakerState,
+        decisionMakerNote: contactPerson.decisionMakerNote,
 
-        // Business info
         businessId: customer.id,
         businessName: customer.companyName,
         businessLegalName: customer.legalName,
@@ -1163,7 +1104,6 @@ export const getContactPersonsByStarBusiness = async (
         businessContactEmail: customer.contactEmail,
         businessContactPhone: customer.contactPhoneNumber,
 
-        // Business details
         website: businessDetails?.website || null,
         city: businessDetails?.city || null,
         state: businessDetails?.state || null,
@@ -1174,10 +1114,8 @@ export const getContactPersonsByStarBusiness = async (
         industry:
           starBusinessDetails?.industry || businessDetails?.industry || null,
 
-        // Display fields
-        fullName: `${contactPerson.name || ""} ${
-          contactPerson.familyName || ""
-        }`.trim(),
+        fullName: `${contactPerson.name || ""} ${contactPerson.familyName || ""
+          }`.trim(),
         displayPosition: contactPerson.position || "",
         note: contactPerson.note || null,
         noteContactPreference: contactPerson.noteContactPreference || null,
@@ -1197,8 +1135,6 @@ export const getContactPersonsByStarBusiness = async (
   }
 };
 
-// 6. Delete Contact Person
-// 6. Delete Contact Person
 export const deleteContactPerson = async (
   req: Request,
   res: Response,
@@ -1244,7 +1180,6 @@ export const deleteContactPerson = async (
   }
 };
 
-// 7. Bulk Delete Contact Persons
 export const bulkDeleteContactPersons = async (
   req: Request,
   res: Response,
@@ -1276,7 +1211,6 @@ export const bulkDeleteContactPersons = async (
   }
 };
 
-// 9. Update LinkedIn State in Bulk
 export const bulkUpdateLinkedInState = async (
   req: Request,
   res: Response,
@@ -1320,7 +1254,6 @@ export const bulkUpdateLinkedInState = async (
   }
 };
 
-// 10. Get Contact Person Statistics
 export const getContactPersonStatistics = async (
   req: Request,
   res: Response,
@@ -1342,24 +1275,19 @@ export const getContactPersonStatistics = async (
       );
     }
 
-    // Total count
     const totalContactPersons = await baseQuery.getCount();
-
-    // Count by position
     const positionCounts = await baseQuery
       .select("contactPerson.position, COUNT(*) as count")
       .groupBy("contactPerson.position")
       .orderBy("count", "DESC")
       .getRawMany();
 
-    // Count by LinkedIn state
     const linkedInStateCounts = await baseQuery
       .select("contactPerson.stateLinkedIn, COUNT(*) as count")
       .groupBy("contactPerson.stateLinkedIn")
       .orderBy("count", "DESC")
       .getRawMany();
 
-    // Count by contact type
     const contactTypeCounts = await baseQuery
       .select("contactPerson.contact, COUNT(*) as count")
       .where("contactPerson.contact IS NOT NULL")
@@ -1368,9 +1296,6 @@ export const getContactPersonStatistics = async (
       .orderBy("count", "DESC")
       .getRawMany();
 
-    // Count by sex
-
-    // Contact information availability
     const withEmail = await baseQuery
       .clone()
       .where("contactPerson.email IS NOT NULL")
@@ -1406,7 +1331,6 @@ export const getContactPersonStatistics = async (
   }
 };
 
-// 11. Export Contact Persons to CSV
 export const exportContactPersonsToCSV = async (
   req: Request,
   res: Response,
@@ -1433,7 +1357,6 @@ export const exportContactPersonsToCSV = async (
       )
       .leftJoinAndSelect("starBusinessDetails.customer", "customer");
 
-    // Apply filters
     if (ids && typeof ids === "string") {
       const idsArray = ids.split(",");
       query.andWhere("contactPerson.id IN (:...ids)", { ids: idsArray });
@@ -1486,7 +1409,6 @@ export const exportContactPersonsToCSV = async (
 
     const contactPersons = await query.getMany();
 
-    // Format data for CSV export
     const csvData = contactPersons.map((person) => ({
       ID: person.id,
       "Business Name": person.starBusinessDetails?.customer?.companyName || "",
@@ -1516,8 +1438,6 @@ export const exportContactPersonsToCSV = async (
     return next(new ErrorHandler("Failed to export contact persons", 500));
   }
 };
-
-// Helper Functions
 
 function sanitizeSex(value: any): Sex {
   if (!value) return "Not Specified";
@@ -1586,20 +1506,16 @@ function normalizeLinkedInUrl(url: string): string {
   if (!url) return "";
   url = url.trim();
 
-  // Add https:// if no protocol is specified
   if (!url.startsWith("http://") && !url.startsWith("https://")) {
     url = "https://" + url;
   }
 
-  // Ensure it's a LinkedIn URL
   if (!url.includes("linkedin.com")) {
-    return url; // Return as-is if not a LinkedIn URL
+    return url;
   }
 
-  // Normalize to https
   url = url.replace("http://", "https://");
 
-  // Remove trailing slashes
   url = url.replace(/\/+$/, "");
 
   return url;
@@ -1629,13 +1545,14 @@ function formatContactPersonResponse(contactPerson: any) {
     stateLinkedIn: contactPerson.stateLinkedIn,
     contact: contactPerson.contact,
     isDecisionMaker: contactPerson.isDecisionMaker,
+    decisionMakerState: contactPerson.decisionMakerState,
+    decisionMakerNote: contactPerson.decisionMakerNote,
     note: contactPerson.note,
     createdAt: contactPerson.createdAt,
     updatedAt: contactPerson.updatedAt,
   };
 }
 
-// Add missing import
 import { Not } from "typeorm";
 import { link } from "pdfkit";
 import { RequestedItem } from "../models/requested_items";
@@ -1661,7 +1578,6 @@ export const getAllStarBusinesses = async (
     const skip = (pageNum - 1) * limitNum;
     const includeContactsCount = withContactsCount === "true";
 
-    // Modified query to include both star_business and star_customer stages
     let query = customerRepository
       .createQueryBuilder("customer")
       .leftJoinAndSelect("customer.starBusinessDetails", "starBusinessDetails")
@@ -1670,7 +1586,6 @@ export const getAllStarBusinesses = async (
         stages: ["star_business", "star_customer"],
       });
 
-    // Add search filter
     if (search) {
       const searchTerm = `%${search}%`;
       query.andWhere(
@@ -1697,8 +1612,10 @@ export const getAllStarBusinesses = async (
 
     const formattedRecords = await Promise.all(
       starRecords.map(async (record) => {
+        const id = record.starBusinessDetails?.id || record.id;
+        console.log(`[DEBUG] Mapping customer ${record.companyName}: id=${id}, record.id=${record.id}, starBusinessDetails.id=${record.starBusinessDetails?.id}`);
         const baseData = {
-          id: record.starBusinessDetails?.id,
+          id: id,
           customerId: record.id,
           companyName: record.companyName,
           legalName: record.legalName,
@@ -1793,9 +1710,7 @@ export const getStarBusinessesWithoutContacts = async (
       `Total star businesses and customers found: ${starCustomers.length}`
     );
 
-    // Filter records based on their stage and contact persons
     let filteredRecords = starCustomers.filter((customer) => {
-      // For star_business: must have starBusinessDetails and no contact persons
       if (customer.stage === "star_business") {
         return (
           customer.starBusinessDetails &&
@@ -1803,8 +1718,6 @@ export const getStarBusinessesWithoutContacts = async (
             customer.starBusinessDetails.contactPersons.length === 0)
         );
       }
-
-      // For star_customer: they don't have contact persons by definition
       if (customer.stage === "star_customer") {
         return (
           customer.starBusinessDetails &&
@@ -1820,7 +1733,6 @@ export const getStarBusinessesWithoutContacts = async (
       `Star businesses and customers without contacts: ${filteredRecords.length}`
     );
 
-    // Apply search filter if provided
     if (search) {
       const searchTerm = search.toString().toLowerCase();
       filteredRecords = filteredRecords.filter(
@@ -1832,7 +1744,6 @@ export const getStarBusinessesWithoutContacts = async (
       );
     }
 
-    // Apply city filter if provided
     if (city) {
       const cityTerm = city.toString().toLowerCase();
       filteredRecords = filteredRecords.filter((customer) =>
@@ -1840,7 +1751,6 @@ export const getStarBusinessesWithoutContacts = async (
       );
     }
 
-    // Apply country filter if provided
     if (country) {
       const countryTerm = country.toString().toLowerCase();
       filteredRecords = filteredRecords.filter((customer) =>
@@ -1848,7 +1758,6 @@ export const getStarBusinessesWithoutContacts = async (
       );
     }
 
-    // Apply industry filter if provided
     if (industry) {
       const industryTerm = industry.toString().toLowerCase();
       filteredRecords = filteredRecords.filter(
@@ -1862,7 +1771,6 @@ export const getStarBusinessesWithoutContacts = async (
       );
     }
 
-    // Format the response
     const formattedRecords = filteredRecords.map((customer) => {
       const starBusiness = customer.starBusinessDetails;
       const businessDetails = customer.businessDetails;
@@ -1902,10 +1810,10 @@ export const getStarBusinessesWithoutContacts = async (
           comment: starBusiness?.comment,
           daysSinceConverted: starBusiness?.converted_timestamp
             ? Math.floor(
-                (Date.now() -
-                  new Date(starBusiness.converted_timestamp).getTime()) /
-                  (1000 * 60 * 60 * 24)
-              )
+              (Date.now() -
+                new Date(starBusiness.converted_timestamp).getTime()) /
+              (1000 * 60 * 60 * 24)
+            )
             : null,
         };
       }
@@ -1926,11 +1834,11 @@ export const getStarBusinessesWithoutContacts = async (
     const averageDaysSinceConverted =
       starBusinessesWithDays.length > 0
         ? Math.round(
-            starBusinessesWithDays.reduce(
-              (acc, b: any) => acc + (b.daysSinceConverted || 0),
-              0
-            ) / starBusinessesWithDays.length
-          )
+          starBusinessesWithDays.reduce(
+            (acc, b: any) => acc + (b.daysSinceConverted || 0),
+            0
+          ) / starBusinessesWithDays.length
+        )
         : 0;
 
     return res.status(200).json({
@@ -1938,7 +1846,7 @@ export const getStarBusinessesWithoutContacts = async (
       message:
         "Star businesses and customers without contact persons fetched successfully",
       data: {
-        starBusinesses: formattedRecords, // Keeping same response structure for compatibility
+        starBusinesses: formattedRecords,
         total: filteredRecords.length,
         summary: {
           totalStarBusinesses: starBusinesses.length,
@@ -1977,7 +1885,6 @@ export const getStarBusinessesWithContactSummary = async (
     const starBusinessDetailsRepository =
       AppDataSource.getRepository(StarBusinessDetails);
 
-    // Get all star businesses with contact person count
     const query = starBusinessDetailsRepository
       .createQueryBuilder("starBusinessDetails")
       .leftJoinAndSelect("starBusinessDetails.customer", "customer")
@@ -1990,7 +1897,6 @@ export const getStarBusinessesWithContactSummary = async (
 
     const allStarBusinesses = await query.getMany();
     console.log(allStarBusinesses);
-    // Filter by contact count
     const filteredBusinesses = allStarBusinesses.filter((business: any) => {
       const count = business.contactPersonsCount || 0;
       if (maxContactsNum !== undefined) {
@@ -1999,7 +1905,6 @@ export const getStarBusinessesWithContactSummary = async (
       return count >= minContactsNum;
     });
 
-    // Group businesses by contact count
     const groupedByContactCount: Record<number, any[]> = {};
     filteredBusinesses.forEach((business: any) => {
       const count = business.contactPersonsCount || 0;
@@ -2018,7 +1923,6 @@ export const getStarBusinessesWithContactSummary = async (
       });
     });
 
-    // Calculate statistics
     const totalStarBusinesses = allStarBusinesses.length;
     const withContacts = allStarBusinesses.filter(
       (b: any) => b.contactPersonsCount > 0
@@ -2028,9 +1932,9 @@ export const getStarBusinessesWithContactSummary = async (
     const avgContactsPerBusiness =
       withContacts > 0
         ? allStarBusinesses.reduce(
-            (sum: number, b: any) => sum + (b.contactPersonsCount || 0),
-            0
-          ) / withContacts
+          (sum: number, b: any) => sum + (b.contactPersonsCount || 0),
+          0
+        ) / withContacts
         : 0;
 
     return res.status(200).json({

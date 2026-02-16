@@ -48,10 +48,7 @@ import { useSelector } from "react-redux";
 import { UserRole } from "@/utils/interfaces";
 import Link from "next/link";
 
-// Tab type
 type TabType = "all" | "no-contacts" | "sales";
-
-// Modal mode type
 type ModalMode = "create" | "edit";
 
 interface ContactFormData {
@@ -69,14 +66,13 @@ interface ContactFormData {
   decisionMakerState: string;
   note: string;
   noteContactPreference: string;
-  decisionMakerNote: string; // NEW FIELD
+  decisionMakerNote: string;
 }
 
 const ContactPersonsPage: React.FC = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // State management
   const [activeTab, setActiveTab] = useState<TabType>("no-contacts");
   const [contactPersons, setContactPersons] = useState<ContactPersonData[]>([]);
   const [decisionMakers, setDecisionMakers] = useState<ContactPersonData[]>([]);
@@ -240,6 +236,7 @@ const ContactPersonsPage: React.FC = () => {
   const fetchAllStarBusinesses = async (search?: string) => {
     try {
       const businesses = await fetchStarBusinessesForDropdown(search);
+      console.log("[DEBUG] allStarBusinesses from API:", businesses);
       setAllStarBusinesses(businesses);
     } catch (error) {
       console.error("Error fetching star businesses:", error);
@@ -455,9 +452,8 @@ const ContactPersonsPage: React.FC = () => {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `contact_persons_${
-        new Date().toISOString().split("T")[0]
-      }.csv`;
+      a.download = `contact_persons_${new Date().toISOString().split("T")[0]
+        }.csv`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -470,14 +466,25 @@ const ContactPersonsPage: React.FC = () => {
     }
   };
 
-  // Handle create/edit contact submission
   const handleCreateContact = async () => {
+    console.log("=== CREATE CONTACT DEBUG ===");
+    console.log("selectedBusiness:", selectedBusiness);
+    console.log("createForm.starBusinessDetailsId:", createForm.starBusinessDetailsId);
+
     if (!createForm.name || !createForm.familyName || !createForm.position) {
       toast.error("Please fill in all required fields");
       return;
     }
 
-    if (!selectedBusiness?.id && !createForm.starBusinessDetailsId) {
+    const businessId = typeof selectedBusiness === 'string'
+      ? selectedBusiness
+      : selectedBusiness?.id || selectedBusiness?.value;
+
+    console.log("businessId extracted:", businessId);
+    console.log("typeof selectedBusiness:", typeof selectedBusiness);
+
+    if (!businessId && !createForm.starBusinessDetailsId) {
+      console.log("VALIDATION FAILED: No business selected");
       toast.error("Please select a business");
       return;
     }
@@ -490,34 +497,29 @@ const ContactPersonsPage: React.FC = () => {
     try {
       const payload: any = {
         ...createForm,
-        starBusinessDetailsId:
-          selectedBusiness?.id || createForm.starBusinessDetailsId,
+        starBusinessDetailsId: businessId || createForm.starBusinessDetailsId,
       };
 
+      console.log("Payload to send:", payload);
+
       if (modalMode === "edit" && editingContactId) {
-        // Update existing contact
         await updateContactPerson(editingContactId, payload);
       } else {
-        // Create new contact
         await createContactPerson(payload);
       }
 
-      // Reset form and close modal
       resetCreateForm();
       setShowCreateModal(false);
       setModalMode("create");
       setEditingContactId(null);
       setEditModeEnabled(false);
 
-      // Refresh the list
       fetchContactPersons();
 
-      // Refresh businesses without contacts if we were adding from that tab
       if (activeTab === "no-contacts") {
         fetchStarBusinessesWithoutContacts();
       }
 
-      // Refresh decision makers if we're on sales tab
       if (activeTab === "sales") {
         fetchDecisionMakers();
       }
@@ -532,7 +534,6 @@ const ContactPersonsPage: React.FC = () => {
     }
   };
 
-  // Reset form
   const resetCreateForm = () => {
     setCreateForm({
       starBusinessDetailsId: "",
@@ -554,7 +555,6 @@ const ContactPersonsPage: React.FC = () => {
     setEditModeEnabled(false);
   };
 
-  // Format date
   const formatDate = (dateString: string) => {
     if (!dateString) return "-";
     return new Date(dateString).toLocaleDateString("en-US", {
@@ -564,7 +564,6 @@ const ContactPersonsPage: React.FC = () => {
     });
   };
 
-  // LinkedIn state colors
   const getLinkedInStateColor = (state: string) => {
     const colors: Record<string, string> = {
       open: "bg-green-100 text-green-800",
@@ -575,7 +574,6 @@ const ContactPersonsPage: React.FC = () => {
     return colors[state] || "bg-gray-100 text-gray-800";
   };
 
-  // Decision Maker state colors
   const getDecisionMakerStateColor = (state: string) => {
     const colors: Record<string, string> = {
       open: "bg-blue-100 text-blue-800",
@@ -589,7 +587,6 @@ const ContactPersonsPage: React.FC = () => {
     return colors[state] || "bg-gray-100 text-gray-800";
   };
 
-  // Position label
   const getPositionLabel = (position: string, positionOthers?: string) => {
     if (position === "Others" && positionOthers) {
       return positionOthers;
@@ -640,8 +637,7 @@ const ContactPersonsPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 p-8">
-      <div className="max-w-[85vw] mx-auto">
-        {/* Header */}
+      <div className="w-full mx-auto">
 
         <div className="w-full items-center  flex justify-between">
           <div className="mb-3">
@@ -661,16 +657,14 @@ const ContactPersonsPage: React.FC = () => {
             </CustomButton>
           )}
         </div>
-        {/* Tabs */}
         <div className="border-b border-gray-200 mb-6">
           <nav className="-mb-px flex space-x-8">
             <button
               onClick={() => setActiveTab("no-contacts")}
-              className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
-                activeTab === "no-contacts"
-                  ? "border-gray-500 text-gray-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-              }`}
+              className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === "no-contacts"
+                ? "border-gray-500 text-gray-600"
+                : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                }`}
             >
               STARS Without Contacts
               {businessesWithoutContactsCount > 0 && (
@@ -681,35 +675,30 @@ const ContactPersonsPage: React.FC = () => {
             </button>
             <button
               onClick={() => setActiveTab("all")}
-              className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
-                activeTab === "all"
-                  ? "border-gray-500 text-gray-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-              }`}
+              className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === "all"
+                ? "border-gray-500 text-gray-600"
+                : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                }`}
             >
               All Contacts
             </button>
             <button
               onClick={() => setActiveTab("sales")}
-              className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
-                activeTab === "sales"
-                  ? "border-gray-500 text-gray-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-              }`}
+              className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === "sales"
+                ? "border-gray-500 text-gray-600"
+                : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                }`}
             >
               Sales View
             </button>
           </nav>
         </div>
 
-        {/* All Contacts Tab */}
         {activeTab === "all" && (
           <>
-            {/* Filters & Actions */}
             <div className="bg-white/80 backdrop-blur-sm rounded-xl shadow-lg border border-gray-100/50 mb-6">
               <div className="p-6">
                 <div className="flex flex-col lg:flex-row gap-4 items-center justify-between">
-                  {/* Search */}
                   <div className="w-full lg:w-96 relative">
                     <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
                     <input
@@ -723,7 +712,6 @@ const ContactPersonsPage: React.FC = () => {
                     />
                   </div>
 
-                  {/* Action Buttons */}
                   <div className="flex gap-3">
                     <button
                       onClick={() => setShowFilters(!showFilters)}
@@ -735,10 +723,10 @@ const ContactPersonsPage: React.FC = () => {
                         filters.stateLinkedIn ||
                         filters.contact ||
                         filters.decisionMakerState) && (
-                        <span className="bg-gray-500 text-white px-2 py-0.5 rounded-full text-xs">
-                          Active
-                        </span>
-                      )}
+                          <span className="bg-gray-500 text-white px-2 py-0.5 rounded-full text-xs">
+                            Active
+                          </span>
+                        )}
                     </button>
 
                     <button
@@ -776,7 +764,6 @@ const ContactPersonsPage: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Filter Panel */}
                 {showFilters && (
                   <div className="mt-6 pt-6 border-t border-gray-200/50">
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -897,7 +884,6 @@ const ContactPersonsPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Contacts Table */}
             <div className="bg-white/80 backdrop-blur-sm rounded-xl shadow-lg border border-gray-100/50 overflow-hidden">
               {loading ? (
                 <div className="p-12 text-center">
@@ -1123,11 +1109,10 @@ const ContactPersonsPage: React.FC = () => {
                             <button
                               key={pageNum}
                               onClick={() => setCurrentPage(pageNum)}
-                              className={`px-3 py-1 text-sm rounded-lg transition-all ${
-                                currentPage === pageNum
-                                  ? "bg-gray-600 text-white"
-                                  : "bg-white/80 backdrop-blur-sm border border-gray-300/80 hover:bg-white/60"
-                              }`}
+                              className={`px-3 py-1 text-sm rounded-lg transition-all ${currentPage === pageNum
+                                ? "bg-gray-600 text-white"
+                                : "bg-white/80 backdrop-blur-sm border border-gray-300/80 hover:bg-white/60"
+                                }`}
                             >
                               {pageNum}
                             </button>
@@ -1141,11 +1126,10 @@ const ContactPersonsPage: React.FC = () => {
                       {totalPages > 5 && (
                         <button
                           onClick={() => setCurrentPage(totalPages)}
-                          className={`px-3 py-1 text-sm rounded-lg transition-all ${
-                            currentPage === totalPages
-                              ? "bg-gray-600 text-white"
-                              : "bg-white/80 backdrop-blur-sm border border-gray-300/80 hover:bg-white/60"
-                          }`}
+                          className={`px-3 py-1 text-sm rounded-lg transition-all ${currentPage === totalPages
+                            ? "bg-gray-600 text-white"
+                            : "bg-white/80 backdrop-blur-sm border border-gray-300/80 hover:bg-white/60"
+                            }`}
                         >
                           {totalPages}
                         </button>
@@ -1200,9 +1184,8 @@ const ContactPersonsPage: React.FC = () => {
                       className="px-4 py-2 text-gray-700 bg-white/80 backdrop-blur-sm border border-gray-300/80 rounded-lg hover:bg-white/60 transition-all flex items-center gap-2 disabled:opacity-50"
                     >
                       <ArrowPathIcon
-                        className={`h-5 w-5 ${
-                          loadingDecisionMakers ? "animate-spin" : ""
-                        }`}
+                        className={`h-5 w-5 ${loadingDecisionMakers ? "animate-spin" : ""
+                          }`}
                       />
                       Refresh
                     </button>
@@ -1457,11 +1440,10 @@ const ContactPersonsPage: React.FC = () => {
                               <button
                                 key={pageNum}
                                 onClick={() => setDecisionMakersPage(pageNum)}
-                                className={`px-3 py-1 text-sm rounded-lg transition-all ${
-                                  decisionMakersPage === pageNum
-                                    ? "bg-gray-600 text-white"
-                                    : "bg-white/80 backdrop-blur-sm border border-gray-300/80 hover:bg-white/60"
-                                }`}
+                                className={`px-3 py-1 text-sm rounded-lg transition-all ${decisionMakersPage === pageNum
+                                  ? "bg-gray-600 text-white"
+                                  : "bg-white/80 backdrop-blur-sm border border-gray-300/80 hover:bg-white/60"
+                                  }`}
                               >
                                 {pageNum}
                               </button>
@@ -1478,11 +1460,10 @@ const ContactPersonsPage: React.FC = () => {
                           onClick={() =>
                             setDecisionMakersPage(decisionMakersTotalPages)
                           }
-                          className={`px-3 py-1 text-sm rounded-lg transition-all ${
-                            decisionMakersPage === decisionMakersTotalPages
-                              ? "bg-gray-600 text-white"
-                              : "bg-white/80 backdrop-blur-sm border border-gray-300/80 hover:bg-white/60"
-                          }`}
+                          className={`px-3 py-1 text-sm rounded-lg transition-all ${decisionMakersPage === decisionMakersTotalPages
+                            ? "bg-gray-600 text-white"
+                            : "bg-white/80 backdrop-blur-sm border border-gray-300/80 hover:bg-white/60"
+                            }`}
                         >
                           {decisionMakersTotalPages}
                         </button>
@@ -1659,18 +1640,16 @@ const ContactPersonsPage: React.FC = () => {
                       </span>
                       <button
                         type="button"
-                        className={`${
-                          editModeEnabled ? "bg-gray-600" : "bg-gray-200"
-                        } relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2`}
+                        className={`${editModeEnabled ? "bg-gray-600" : "bg-gray-200"
+                          } relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2`}
                         role="switch"
                         aria-checked={editModeEnabled}
                         onClick={() => setEditModeEnabled(!editModeEnabled)}
                       >
                         <span
                           aria-hidden="true"
-                          className={`${
-                            editModeEnabled ? "translate-x-5" : "translate-x-0"
-                          } pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out`}
+                          className={`${editModeEnabled ? "translate-x-5" : "translate-x-0"
+                            } pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out`}
                         />
                       </button>
                     </div>
@@ -1702,15 +1681,16 @@ const ContactPersonsPage: React.FC = () => {
                         />
                         {allStarBusinesses.length > 0 && (
                           <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto z-10">
-                            {allStarBusinesses.map((business) => (
+                            {allStarBusinesses.map((business, index) => (
                               <button
-                                key={business.id || business.value}
+                                key={business.value || business.id || `business-${index}`}
                                 onClick={() => {
+                                  console.log("[DEBUG] Selected business from dropdown:", business);
                                   setSelectedBusiness(business);
                                   setCreateForm({
                                     ...createForm,
                                     starBusinessDetailsId:
-                                      business.id || business.value,
+                                      business.value || business.id,
                                   });
                                   setBusinessSearchTerm("");
                                 }}
