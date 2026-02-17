@@ -256,7 +256,7 @@ export const updateItem = async (
   itemData: Partial<{
     item_name: string;
     item_name_cn: string;
-    ean: string;
+    ean: string | null;
     parent_id: number;
     taric_id: number;
     cat_id: number;

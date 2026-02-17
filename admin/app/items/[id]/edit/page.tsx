@@ -118,7 +118,8 @@ const EditItemPage = () => {
             setSaving(true);
             try {
                 const payload = {
-                    ...values,
+                    item_name: values.item_name,
+                    item_name_cn: values.item_name_cn,
                     isActive: values.isActive ? "Y" : "N",
                     is_qty_dividable: values.is_qty_dividable ? "Y" : "N",
                     is_npr: values.is_npr ? "Y" : "N",
@@ -135,6 +136,11 @@ const EditItemPage = () => {
                     width: Number(values.width),
                     height: Number(values.height),
                     ean: values.ean ? values.ean.toString().trim() : null,
+                    remark: values.remark,
+                    model: values.model,
+                    photo: values.photo,
+                    pix_path_eBay: values.pix_path_eBay,
+                    npr_remark: values.npr_remark,
                     ISBN: Number(values.isbn),
                     many_components: Number(values.mc),
                     effort_rating: Number(values.er),

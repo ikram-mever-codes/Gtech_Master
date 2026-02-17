@@ -47,17 +47,14 @@ export type CreateOrderPayload = {
 };
 
 export type UpdateOrderPayload = {
-  // Keep order_no optional (backend can keep existing)
   order_no?: string;
   customer_id?: string;
   category_id?: string;
   status?: number;
   comment?: string;
-  // Optional: replace item lines
   items?: CreateOrderItemLine[];
 };
 
-// Small helper for query params
 const toQueryString = (filters?: OrderSearchFilters) => {
   if (!filters) return "";
   const params = new URLSearchParams();
@@ -67,7 +64,6 @@ const toQueryString = (filters?: OrderSearchFilters) => {
   return qs ? `?${qs}` : "";
 };
 
-// -------------------- API functions --------------------
 
 export const createOrder = async (orderData: CreateOrderPayload) => {
   try {
@@ -89,7 +85,9 @@ export const createOrder = async (orderData: CreateOrderPayload) => {
 export const getOrderById = async (orderId: string | number) => {
   try {
     const res = await api.get(`/orders/${orderId}`);
-    return res;
+    const payload = res as any;
+    if (payload && typeof payload === "object" && "success" in payload) return payload;
+    return { success: true, data: payload };
   } catch (error) {
     handleApiError(error);
     throw error;
@@ -100,9 +98,12 @@ export const getAllOrders = async (filters?: OrderSearchFilters) => {
   try {
     const qs = toQueryString(filters);
     const res = await api.get(`/orders${qs}`);
-    return res;
+    const payload = res as any;
+    if (payload && typeof payload === "object" && "success" in payload) return payload;
+    return { success: true, data: payload };
   } catch (error) {
     handleApiError(error);
+    return { success: false, data: [] };
   }
 };
 
@@ -123,7 +124,7 @@ export const updateOrder = async (orderId: string | number, orderData: UpdateOrd
 export const deleteOrder = async (orderId: string | number) => {
   try {
     toast.loading("Deleting order...", loadingStyles);
-    const response = await api.delete(`/orders/${orderId}`); // ✅ fixed endpoint
+    const response = await api.delete(`/orders/${orderId}`);
     toast.dismiss();
 
     const payload = response.data as ResponseInterface | any;
