@@ -29,19 +29,20 @@ const LayoutProvider = ({ children }: { children: ReactNode }) => {
         {shouldRenderLayout ? (
           <div
             className={`w-full min-h-screen h-max bg-[${theme.palette.secondary.main}] flex`}
+            suppressHydrationWarning
           >
             <aside className="sticky top-0 h-[100vh]">
               <Sidebar />
             </aside>
 
-            <div className="flex-1 flex flex-col">
+            <div className="flex-1 flex flex-col" suppressHydrationWarning>
               {/* Header */}
               <header className="sticky top-0 z-50">
                 <Header />
               </header>
 
               <main className="flex-1 p-6 bg-gray-50">
-                <div className="w-full px-8 py-6 mb-[2rem] mx-auto">
+                <div className="w-full px-8 py-6 mb-[2rem] mx-auto" suppressHydrationWarning>
                   {children}
                 </div>
               </main>
@@ -52,7 +53,7 @@ const LayoutProvider = ({ children }: { children: ReactNode }) => {
             </div>
           </div>
         ) : (
-          <div className="w-full min-h-screen">{children}</div>
+          <div className="w-full min-h-screen" suppressHydrationWarning>{children}</div>
         )}
       </ThemeProvider>
     </Provider>

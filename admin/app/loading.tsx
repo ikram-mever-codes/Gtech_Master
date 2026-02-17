@@ -15,6 +15,7 @@ const Loading = ({ type = "full", text, sx = {} }: any) => {
   if (type === "full") {
     return (
       <Box
+        suppressHydrationWarning
         sx={{
           position: "fixed",
           top: 0,
