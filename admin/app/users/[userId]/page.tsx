@@ -251,7 +251,7 @@ const UserProfile = () => {
   };
 
   const getRoleChipColor = (role: UserRole) => {
-    const colorMap = {
+    const colorMap: any = {
       [UserRole.ADMIN]: { bg: "#ffebee", color: "#c62828", border: "#ffcdd2" },
       [UserRole.MANAGER]: {
         bg: "#e3f2fd",
@@ -855,13 +855,29 @@ const UserProfile = () => {
                         </Typography>
                         <Box sx={{ mt: 0.5 }}>
                           <Chip
-                            icon={userData.isLoginEnabled ? <CheckCircle size={14} /> : <Ban size={14} />}
-                            label={userData.isLoginEnabled ? "Active" : "Disabled"}
+                            icon={
+                              userData.isLoginEnabled ? (
+                                <CheckCircle size={14} />
+                              ) : (
+                                <Ban size={14} />
+                              )
+                            }
+                            label={
+                              userData.isLoginEnabled ? "Active" : "Disabled"
+                            }
                             sx={{
-                              backgroundColor: userData.isLoginEnabled ? "#e8f5e8" : "#ffebee",
-                              color: userData.isLoginEnabled ? "#2e7d32" : "#c62828",
+                              backgroundColor: userData.isLoginEnabled
+                                ? "#e8f5e8"
+                                : "#ffebee",
+                              color: userData.isLoginEnabled
+                                ? "#2e7d32"
+                                : "#c62828",
                               fontWeight: 600,
-                              "& .MuiChip-icon": { color: userData.isLoginEnabled ? "#2e7d32" : "#c62828" },
+                              "& .MuiChip-icon": {
+                                color: userData.isLoginEnabled
+                                  ? "#2e7d32"
+                                  : "#c62828",
+                              },
                             }}
                           />
                         </Box>
@@ -1101,7 +1117,14 @@ const UserProfile = () => {
             </Box>
 
             {userData.role === UserRole.ADMIN ? (
-              <Box sx={{ p: 6, textAlign: "center", bgcolor: alpha("#1976d2", 0.02), borderTop: "1px solid #e8eaed" }}>
+              <Box
+                sx={{
+                  p: 6,
+                  textAlign: "center",
+                  bgcolor: alpha("#1976d2", 0.02),
+                  borderTop: "1px solid #e8eaed",
+                }}
+              >
                 <Box
                   sx={{
                     width: 64,
@@ -1118,11 +1141,20 @@ const UserProfile = () => {
                 >
                   <Shield size={32} />
                 </Box>
-                <Typography variant="h5" sx={{ fontWeight: 800, color: "#1976d2", mb: 1 }}>
+                <Typography
+                  variant="h5"
+                  sx={{ fontWeight: 800, color: "#1976d2", mb: 1 }}
+                >
                   Full Administrative Access
                 </Typography>
-                <Typography variant="body1" color="text.secondary" sx={{ maxWidth: 500, mx: "auto" }}>
-                  This user has the Administrator role, which grants unrestricted access to all system resources, modules, and administrative functions.
+                <Typography
+                  variant="body1"
+                  color="text.secondary"
+                  sx={{ maxWidth: 500, mx: "auto" }}
+                >
+                  This user has the Administrator role, which grants
+                  unrestricted access to all system resources, modules, and
+                  administrative functions.
                 </Typography>
               </Box>
             ) : (
@@ -1155,15 +1187,19 @@ const UserProfile = () => {
                       const displayPermissions = [
                         ...(userData.permissions || []),
                         ...(userData.assignedResources || [])
-                          .filter(res => {
+                          .filter((res) => {
                             const trimmedRes = res.trim();
-                            return !userData.permissions?.some(p => p.resource.trim().toLowerCase() === trimmedRes.toLowerCase());
+                            return !userData.permissions?.some(
+                              (p) =>
+                                p.resource.trim().toLowerCase() ===
+                                trimmedRes.toLowerCase(),
+                            );
                           })
-                          .map(res => ({
+                          .map((res) => ({
                             id: `derived-${res.trim()}`,
                             resource: res.trim(),
-                            actions: []
-                          }))
+                            actions: [],
+                          })),
                       ];
 
                       return displayPermissions.length > 0 ? (
@@ -1182,13 +1218,23 @@ const UserProfile = () => {
                             </TableCell>
                             <TableCell sx={{ py: 3 }}>
                               <Box
-                                sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}
+                                sx={{
+                                  display: "flex",
+                                  flexWrap: "wrap",
+                                  gap: 1,
+                                }}
                               >
                                 {(() => {
-                                  const actions = Array.isArray(permission.actions)
+                                  const actions = Array.isArray(
+                                    permission.actions,
+                                  )
                                     ? permission.actions
-                                    : typeof permission.actions === 'string' && (permission.actions as string).length > 0
-                                      ? (permission.actions as string).split(',')
+                                    : typeof permission.actions === "string" &&
+                                        (permission.actions as string).length >
+                                          0
+                                      ? (permission.actions as string).split(
+                                          ",",
+                                        )
                                       : [];
 
                                   if (actions.length > 0) {
@@ -1245,7 +1291,9 @@ const UserProfile = () => {
                                           border: "#e1bee7",
                                         },
                                       };
-                                      const colors = colorMap[action.toLowerCase().trim()] || {
+                                      const colors = colorMap[
+                                        action.toLowerCase().trim()
+                                      ] || {
                                         bg: "#f5f5f5",
                                         color: "#757575",
                                         border: "#e0e0e0",
@@ -1269,7 +1317,13 @@ const UserProfile = () => {
                                   } else {
                                     // If no specific actions selected, show it clearly
                                     return (
-                                      <Typography variant="caption" sx={{ color: 'text.disabled', fontStyle: 'italic' }}>
+                                      <Typography
+                                        variant="caption"
+                                        sx={{
+                                          color: "text.disabled",
+                                          fontStyle: "italic",
+                                        }}
+                                      >
                                         Full Access (No restricted actions)
                                       </Typography>
                                     );
