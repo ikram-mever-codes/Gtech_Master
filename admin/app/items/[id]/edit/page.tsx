@@ -134,6 +134,7 @@ const EditItemPage = () => {
                     length: Number(values.length),
                     width: Number(values.width),
                     height: Number(values.height),
+                    ean: values.ean ? values.ean.toString().trim() : null,
                     ISBN: Number(values.isbn),
                     many_components: Number(values.mc),
                     effort_rating: Number(values.er),

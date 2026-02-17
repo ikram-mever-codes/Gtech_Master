@@ -69,6 +69,7 @@ const Header = () => {
 
   return (
     <Box
+      suppressHydrationWarning
       sx={{
         display: "flex",
         justifyContent: "space-between",
@@ -155,6 +156,7 @@ const Header = () => {
 
         {/* User Profile Icon with Menu */}
         <Box
+          suppressHydrationWarning
           sx={{
             display: "flex",
             alignItems: "center",
@@ -168,6 +170,7 @@ const Header = () => {
         >
           <IconButton onClick={openMenu}>
             <Avatar
+              suppressHydrationWarning
               src={user?.avatar}
               alt={user?.name}
               color={theme.palette.secondary.main}

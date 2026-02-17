@@ -215,6 +215,7 @@ const Sidebar = () => {
 
   const drawerContent = (
     <Box
+      suppressHydrationWarning
       sx={{
         width: { xs: 240, sm: isCollapsed ? 80 : 280 },
         backgroundColor: "secondary.main",
@@ -229,6 +230,7 @@ const Sidebar = () => {
       }}
     >
       <Box
+        suppressHydrationWarning
         sx={{
           px: 2,
           width: "100%",
@@ -278,6 +280,7 @@ const Sidebar = () => {
       )}
 
       <List
+        suppressHydrationWarning
         sx={{
           width: "100%",
           height: "100%",
@@ -318,6 +321,7 @@ const Sidebar = () => {
         </Fade>
 
         <Box
+          suppressHydrationWarning
           ref={menuContainerRef}
           onScroll={handleScroll}
           sx={{
@@ -332,6 +336,7 @@ const Sidebar = () => {
           }}
         >
           <Box
+            suppressHydrationWarning
             ref={menuContentRef}
             sx={{
               width: "100%",
@@ -515,6 +520,7 @@ const Sidebar = () => {
       )}
 
       <Drawer
+        suppressHydrationWarning
         variant={isMobile ? "temporary" : "permanent"}
         open={!isMobile ? true : mobileOpen}
         onClose={handleDrawerToggle}
