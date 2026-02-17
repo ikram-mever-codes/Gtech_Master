@@ -44,7 +44,7 @@ export type CreateCustomerPayload = {
 
 export const getAllCustomers = async () => {
   try {
-    const res = await api.get("/customers/all");
+    const res = await api.get("/businesses");
     return res;
   } catch (error) {
     handleApiError(error);
@@ -53,7 +53,7 @@ export const getAllCustomers = async () => {
 
 export const updateCustomerStatus = async (
   customerId: string,
-  customerStatus: any
+  customerStatus: any,
 ) => {
   try {
     toast.loading("Updating customer status...", loadingStyles);
@@ -61,7 +61,7 @@ export const updateCustomerStatus = async (
       `/customers/${customerId}/status`,
       {
         status: customerStatus,
-      }
+      },
     );
     toast.dismiss();
 
@@ -74,7 +74,7 @@ export const updateCustomerStatus = async (
 export const getSingleCustomer = async (customerId: string) => {
   try {
     const res: ResponseInterface = await api.get(
-      `/customers/single/${customerId}`
+      `/customers/single/${customerId}`,
     );
     return res;
   } catch (error) {
@@ -87,7 +87,7 @@ export const createCompany = async (payload: CreateCustomerPayload) => {
     toast.loading("Creating company...", loadingStyles);
     const res: ResponseInterface = await api.post(
       "/auth/customers/create",
-      payload
+      payload,
     );
     toast.dismiss();
     toast.success(res.message, successStyles);
@@ -102,7 +102,7 @@ export const updateCustomerProfile = async (payload: any) => {
     toast.loading("Updating company...", loadingStyles);
     const res: ResponseInterface = await api.put(
       "/auth/customers/edit",
-      payload
+      payload,
     );
     toast.dismiss();
     toast.success(res.message, successStyles);
@@ -116,7 +116,7 @@ export const deleteCustomer = async (customerId: string) => {
   try {
     toast.loading("Deleting customer...", loadingStyles);
     const res: ResponseInterface = await api.delete(
-      `/auth/customers/${customerId}`
+      `/auth/customers/${customerId}`,
     );
     toast.dismiss();
     toast.success(res.message, successStyles);

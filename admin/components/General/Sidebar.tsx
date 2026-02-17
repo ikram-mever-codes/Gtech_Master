@@ -105,30 +105,30 @@ const allMenuItems = [
     path: "/offers",
     resource: "Offers",
   },
-  {
-    icon: DollarSign,
-    text: "Invoices",
-    path: "/invoices",
-    resource: "Invoices",
-  },
-  {
-    icon: LibraryAdd,
-    text: "Library",
-    path: "/library",
-    resource: "Library",
-  },
+  // {
+  //   icon: DollarSign,
+  //   text: "Invoices",
+  //   path: "/invoices",
+  //   resource: "Invoices",
+  // },
+  // {
+  //   icon: LibraryAdd,
+  //   text: "Library",
+  //   path: "/library",
+  //   resource: "Library",
+  // },
   {
     icon: LucideFileText,
     text: "Orders",
     path: "/orders",
     resource: "Orders",
   },
-  {
-    icon: Person,
-    text: "Customers",
-    path: "/customers",
-    resource: "Customers",
-  },
+  // {
+  //   icon: Person,
+  //   text: "Customers",
+  //   path: "/customers",
+  //   resource: "Customers",
+  // },
 ];
 
 const Sidebar = () => {
@@ -140,7 +140,7 @@ const Sidebar = () => {
   const dispatch = useDispatch();
   const { user } = useSelector((state: RootState) => state.user);
   const isMobile = useMediaQuery((theme: Theme) =>
-    theme.breakpoints.down("md")
+    theme.breakpoints.down("md"),
   );
 
   const activePath = usePathname();
@@ -336,7 +336,7 @@ const Sidebar = () => {
             sx={{
               width: "100%",
               px: 1,
-              pb: 1,
+              pb: 0,
             }}
           >
             {menuItems.map((item) => (
@@ -374,7 +374,7 @@ const Sidebar = () => {
                       height: "100%",
                       width:
                         activePath === item.path ||
-                          activePath.includes(item.path)
+                        activePath.includes(item.path)
                           ? "3px"
                           : 0,
                       backgroundColor: "primary.main",
@@ -387,7 +387,7 @@ const Sidebar = () => {
                       minWidth: 40,
                       color:
                         activePath === item.path ||
-                          activePath.includes(item.path)
+                        activePath.includes(item.path)
                           ? "white"
                           : "text.secondary",
                       transition: "color 0.2s ease",
@@ -473,7 +473,10 @@ const Sidebar = () => {
         sx={{
           px: 2,
           width: "100%",
-          py: 2,
+          pb: 1,
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
           flexShrink: 0,
         }}
       >

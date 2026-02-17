@@ -78,13 +78,9 @@ import { useSelector } from "react-redux";
 import { RootState } from "@/app/Redux/store";
 import { UserRole } from "@/utils/interfaces";
 import { DownloadCloudIcon, ToggleLeft, ToggleRight } from "lucide-react";
-
-interface Customer {
-  id: string;
-  companyName: string;
-  legalName?: string;
-  email?: string;
-}
+import { formatDate, openOutlookWithOffer } from "@/utils/offers";
+import { Customer } from "../inquiry/page";
+import { errorStyles } from "@/utils/constants";
 
 const OffersPage: React.FC = () => {
   // State management
@@ -213,13 +209,26 @@ const OffersPage: React.FC = () => {
     try {
       const response = await getAllCustomers();
       if (response?.data) {
-        setCustomers(
-          Array.isArray(response.data)
-            ? response.data
-            : response.data.customers || [],
+        const customers = Array.isArray(response.data)
+          ? response.data
+          : response.data.businesses || [];
+
+        // Filter based on stage field
+        const filteredCustomers = customers.filter((customer: Customer) => {
+          return (
+            customer.stage === "star_business" ||
+            customer.stage === "star_customer"
+          );
+        });
+
+        setCustomers(filteredCustomers);
+        console.log(
+          `Found ${filteredCustomers.length} star customers/businesses`,
         );
       }
-    } catch (error) {}
+    } catch (error) {
+      console.error("Error fetching customers:", error);
+    }
   };
 
   const handleCustomerChange = (customerId: string) => {
@@ -836,16 +845,6 @@ const OffersPage: React.FC = () => {
     setFilteredInquiries(inquiries);
   };
 
-  // Format date
-  const formatDate = (dateString: string | Date) => {
-    if (!dateString) return "-";
-    return new Date(dateString).toLocaleDateString("de-DE", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
-  };
-
   // Toggle offer expansion
   const toggleOfferExpansion = (offerId: string) => {
     if (expandedOfferId === offerId) {
@@ -1178,6 +1177,7 @@ const OffersPage: React.FC = () => {
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center justify-center gap-2">
+                            {/* Existing buttons */}
                             <button
                               onClick={() => handleViewOffer(offer)}
                               className="text-blue-600 hover:text-blue-800 transition-colors p-1"
@@ -1194,6 +1194,28 @@ const OffersPage: React.FC = () => {
                               <PencilIcon className="h-4 w-4" />
                             </button>
 
+                            {/* NEW: Mail button */}
+                            <button
+                              onClick={() => openOutlookWithOffer(offer)}
+                              className="text-green-600 hover:text-green-800 transition-colors p-1"
+                              title="Send offer via email"
+                            >
+                              <svg
+                                className="h-4 w-4"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+                                />
+                              </svg>
+                            </button>
+
+                            {/* Existing PDF button */}
                             {offer.pdfGenerated ? (
                               <button
                                 onClick={() => downloadPdf(offer.id)}
@@ -2151,7 +2173,7 @@ const OffersPage: React.FC = () => {
                     <option value="">All Customers</option>
                     {customers.map((customer) => (
                       <option key={customer.id} value={customer.id}>
-                        {customer.companyName}
+                        {customer.displayName}
                       </option>
                     ))}
                   </select>
@@ -2377,12 +2399,19 @@ const OffersPage: React.FC = () => {
                               min="1"
                               max="10"
                               value={offerFormData.maxUnitPriceColumns}
-                              onChange={(e) =>
+                              onChange={(e) => {
+                                if (e.target.value >= "10") {
+                                  toast.error(
+                                    "Max unit price columns is 10",
+                                    errorStyles,
+                                  );
+                                  return;
+                                }
                                 setOfferFormData({
                                   ...offerFormData,
                                   maxUnitPriceColumns: parseInt(e.target.value),
-                                })
-                              }
+                                });
+                              }}
                               className="w-full px-2 py-1 text-xs border border-gray-300 rounded"
                             />
                           </div>

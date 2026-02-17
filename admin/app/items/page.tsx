@@ -20,7 +20,7 @@ import {
 import { useRouter } from "next/navigation";
 import CustomButton from "@/components/UI/CustomButton";
 import { EditIcon, EyeIcon, Plus, Package, LinkIcon } from "lucide-react";
-import { Delete } from "@mui/icons-material";
+import { Delete, Sync } from "@mui/icons-material";
 import { toast } from "react-hot-toast";
 
 import {
@@ -64,6 +64,7 @@ import {
   TaricDetails,
   PaginatedResponse,
   StatisticsResponse,
+  exportItemsToCSV,
 } from "@/api/items";
 import { getCategories } from "@/api/categories";
 import { loadingStyles, successStyles, errorStyles } from "@/utils/constants";
@@ -133,7 +134,7 @@ const ItemsManagementPage: React.FC = () => {
   // TARIC modal states
   const [showTaricModal, setShowTaricModal] = useState(false);
   const [taricModalMode, setTaricModalMode] = useState<"create" | "edit">(
-    "create"
+    "create",
   );
   const [editingTaricId, setEditingTaricId] = useState<number | null>(null);
   const [taricFormData, setTaricFormData] = useState({
@@ -148,7 +149,6 @@ const ItemsManagementPage: React.FC = () => {
   });
 
   const [categories, setCategories] = useState<any[]>([]);
-
 
   // Item modal states
   const [showItemModal, setShowItemModal] = useState(false);
@@ -301,7 +301,10 @@ const ItemsManagementPage: React.FC = () => {
         if (catsRes?.data) setCategories(catsRes.data);
 
         // Verification check
-        if ((!parentsRes?.data || parentsRes.data.length === 0) && activeTab === "items") {
+        if (
+          (!parentsRes?.data || parentsRes.data.length === 0) &&
+          activeTab === "items"
+        ) {
           console.warn("No parents found in database.");
         }
       } catch (error) {
@@ -311,7 +314,6 @@ const ItemsManagementPage: React.FC = () => {
 
     fetchInitialData();
   }, [activeTab]);
-
 
   // Handle item actions
   const handleViewItem = (itemId: number) => {
@@ -328,16 +330,19 @@ const ItemsManagementPage: React.FC = () => {
     try {
       await deleteItem(itemId);
       fetchData();
-    } catch (error) { }
+    } catch (error) {}
   };
 
   const handleDeleteParent = async (parentId: number) => {
-    if (!confirm("Are you sure you want to delete this parent and all its items?")) return;
+    if (
+      !confirm("Are you sure you want to delete this parent and all its items?")
+    )
+      return;
 
     try {
       await deleteParent(parentId);
       fetchData();
-    } catch (error) { }
+    } catch (error) {}
   };
 
   const handleToggleStatus = async (itemId: number, currentStatus: string) => {
@@ -346,10 +351,10 @@ const ItemsManagementPage: React.FC = () => {
       await toggleItemStatus(itemId, !isActive);
       toast.success(
         `Item ${!isActive ? "activated" : "deactivated"} successfully`,
-        successStyles
+        successStyles,
       );
       fetchData();
-    } catch (error) { }
+    } catch (error) {}
   };
 
   const handleOpenCreateItemModal = () => {
@@ -463,7 +468,7 @@ const ItemsManagementPage: React.FC = () => {
   const handleDeleteTaric = async (taricId: number) => {
     if (
       !confirm(
-        "Are you sure you want to delete this TARIC? This action cannot be undone."
+        "Are you sure you want to delete this TARIC? This action cannot be undone.",
       )
     )
       return;
@@ -520,7 +525,7 @@ const ItemsManagementPage: React.FC = () => {
       }
       setSelectedTarics(new Set());
       fetchData();
-    } catch (error) { }
+    } catch (error) {}
   };
 
   const handleBulkDelete = async () => {
@@ -540,7 +545,7 @@ const ItemsManagementPage: React.FC = () => {
       await bulkUpdateItems(ids, { isActive: "N" });
       toast.success(
         `${selectedItems.size} items deactivated successfully`,
-        successStyles
+        successStyles,
       );
       setSelectedItems(new Set());
       fetchData();
@@ -560,7 +565,7 @@ const ItemsManagementPage: React.FC = () => {
       await bulkUpdateItems(ids, { isActive: "Y" });
       toast.success(
         `${selectedItems.size} items activated successfully`,
-        successStyles
+        successStyles,
       );
       setSelectedItems(new Set());
       fetchData();
@@ -580,7 +585,7 @@ const ItemsManagementPage: React.FC = () => {
       await bulkUpdateItems(ids, { isActive: "N" });
       toast.success(
         `${selectedItems.size} items deactivated successfully`,
-        successStyles
+        successStyles,
       );
       setSelectedItems(new Set());
       fetchData();
@@ -602,7 +607,7 @@ const ItemsManagementPage: React.FC = () => {
       }
     } else {
       const newSelection = new Set(
-        currentData.map((item: any) => item.id.toString())
+        currentData.map((item: any) => item.id.toString()),
       );
       if (activeTab === "tarics") {
         setSelectedTarics(newSelection);
@@ -694,7 +699,7 @@ const ItemsManagementPage: React.FC = () => {
             value
               ?.toString()
               .toLowerCase()
-              .includes(filters.search.toLowerCase())
+              .includes(filters.search.toLowerCase()),
           );
 
         const matchesActive =
@@ -874,7 +879,7 @@ const ItemsManagementPage: React.FC = () => {
             <td className="px-4 py-3">
               <span
                 className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusBadgeColor(
-                  item.is_active
+                  item.is_active,
                 )}`}
               >
                 {item.is_active === "Y" ? "Active" : "Inactive"}
@@ -953,7 +958,7 @@ const ItemsManagementPage: React.FC = () => {
             <td className="px-4 py-3">
               <span
                 className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusBadgeColor(
-                  parent.is_active
+                  parent.is_active,
                 )}`}
               >
                 {parent.is_active === "Y" ? "Active" : "Inactive"}
@@ -1031,7 +1036,7 @@ const ItemsManagementPage: React.FC = () => {
             <td className="px-4 py-3">
               <span
                 className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusBadgeColor(
-                  warehouse.is_stock_item
+                  warehouse.is_stock_item,
                 )}`}
               >
                 {warehouse.is_stock_item === "Y" ? "Yes" : "No"}
@@ -1040,7 +1045,7 @@ const ItemsManagementPage: React.FC = () => {
             <td className="px-4 py-3">
               <span
                 className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusBadgeColor(
-                  warehouse.is_active
+                  warehouse.is_active,
                 )}`}
               >
                 {warehouse.is_active === "Y" ? "Active" : "Inactive"}
@@ -1263,10 +1268,11 @@ const ItemsManagementPage: React.FC = () => {
 
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className={`px-4 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2 ${showFilters
-                ? "bg-[#8CC21B] text-white"
-                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                }`}
+              className={`px-4 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2 ${
+                showFilters
+                  ? "bg-[#8CC21B] text-white"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+              }`}
             >
               <FunnelIcon className="w-5 h-5" />
               Filters
@@ -1287,6 +1293,15 @@ const ItemsManagementPage: React.FC = () => {
               >
                 <PlusIcon className="w-5 h-5" />
                 New Item
+              </button>
+            )}
+            {activeTab === "items" && (
+              <button
+                onClick={exportItemsToCSV}
+                className="px-4 py-2.5 bg-[#8CC21B] text-white rounded-lg font-medium hover:bg-[#8CC21B] transition-all flex items-center gap-2"
+              >
+                <Sync className="w-5 h-5" />
+                Export CSV
               </button>
             )}
 
@@ -1325,10 +1340,11 @@ const ItemsManagementPage: React.FC = () => {
                 <button
                   key={tab.key}
                   onClick={() => setActiveTab(tab.key as TabType)}
-                  className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${activeTab === tab.key
-                    ? "border-primary text-primary"
-                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                    }`}
+                  className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${
+                    activeTab === tab.key
+                      ? "border-primary text-primary"
+                      : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                  }`}
                 >
                   <tab.icon className="w-5 h-5" />
                   {tab.label}
@@ -1532,12 +1548,12 @@ const ItemsManagementPage: React.FC = () => {
                     Showing{" "}
                     {Math.min(
                       (pagination.page - 1) * pagination.limit + 1,
-                      pagination.totalRecords
+                      pagination.totalRecords,
                     )}{" "}
                     to{" "}
                     {Math.min(
                       pagination.page * pagination.limit,
-                      pagination.totalRecords
+                      pagination.totalRecords,
                     )}{" "}
                     of {pagination.totalRecords} {activeTab}
                   </p>
@@ -1832,7 +1848,6 @@ const ItemsManagementPage: React.FC = () => {
                   />
                 </div>
 
-
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Parent *
@@ -1848,11 +1863,12 @@ const ItemsManagementPage: React.FC = () => {
                     className="w-full px-3 py-2 border border-gray-300 rounded-md"
                   >
                     <option value="0">Select Parent</option>
-                    {parents && parents.map((parent) => (
-                      <option key={parent.id} value={parent.id}>
-                        {parent.name_de} ({parent.de_no})
-                      </option>
-                    ))}
+                    {parents &&
+                      parents.map((parent) => (
+                        <option key={parent.id} value={parent.id}>
+                          {parent.name_de} ({parent.de_no})
+                        </option>
+                      ))}
                   </select>
                 </div>
 
@@ -1894,11 +1910,12 @@ const ItemsManagementPage: React.FC = () => {
                     className="w-full px-3 py-2 border border-gray-300 rounded-md"
                   >
                     <option value="0">Select Category</option>
-                    {categories && categories.map((cat) => (
-                      <option key={cat.id} value={cat.id}>
-                        {cat.name}
-                      </option>
-                    ))}
+                    {categories &&
+                      categories.map((cat) => (
+                        <option key={cat.id} value={cat.id}>
+                          {cat.name}
+                        </option>
+                      ))}
                   </select>
                 </div>
 
@@ -2062,7 +2079,9 @@ const ItemsManagementPage: React.FC = () => {
                 </button>
                 <button
                   onClick={handleCreateItemSubmit}
-                  disabled={!itemFormData.item_name?.trim() || !itemFormData.parent_id}
+                  disabled={
+                    !itemFormData.item_name?.trim() || !itemFormData.parent_id
+                  }
                   className="flex-1 px-4 py-2 bg-[#8CC21B] text-white rounded-lg hover:bg-[#8CC21B] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Create Item

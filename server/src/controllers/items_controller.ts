@@ -28,7 +28,7 @@ import { AuthorizedRequest } from "../middlewares/authorized";
 export const getItems = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     const itemRepository = AppDataSource.getRepository(Item);
@@ -123,7 +123,10 @@ export const getItems = async (
     }));
 
     const user = (req as AuthorizedRequest).user;
-    const filteredData = filterDataByRole(formattedItems, user?.role || UserRole.STAFF);
+    const filteredData = filterDataByRole(
+      formattedItems,
+      user?.role || UserRole.STAFF,
+    );
 
     return res.status(200).json({
       success: true,
@@ -144,7 +147,7 @@ export const getItems = async (
 export const getItemById = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     const { id } = req.params;
@@ -288,7 +291,10 @@ export const getItemById = async (
     };
 
     const user = (req as AuthorizedRequest).user;
-    const filteredData = filterDataByRole(formattedItem, user?.role || UserRole.STAFF);
+    const filteredData = filterDataByRole(
+      formattedItem,
+      user?.role || UserRole.STAFF,
+    );
 
     return res.status(200).json({
       success: true,
@@ -302,7 +308,7 @@ export const getItemById = async (
 export const createItem = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     const itemRepository: any = AppDataSource.getRepository(Item);
@@ -333,7 +339,7 @@ export const createItem = async (
     // Validate required fields
     if (!item_name || !parent_id) {
       return next(
-        new ErrorHandler("Item name and parent ID are required", 400)
+        new ErrorHandler("Item name and parent ID are required", 400),
       );
     }
 
@@ -431,7 +437,7 @@ export const createItem = async (
 export const updateItem = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     const { id } = req.params;
@@ -505,7 +511,7 @@ export const updateItem = async (
 export const deleteItem = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     const { id } = req.params;
@@ -533,14 +539,14 @@ export const deleteItem = async (
 
     const totalStock = warehouseItems.reduce(
       (sum, wi: any) => sum + wi.stock_qty,
-      0
+      0,
     );
     if (totalStock > 0) {
       return next(
         new ErrorHandler(
           "Cannot delete item. There is stock in warehouse. Please clear stock first.",
-          400
-        )
+          400,
+        ),
       );
     }
 
@@ -571,7 +577,7 @@ export const deleteItem = async (
 export const toggleItemStatus = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     const { id } = req.params;
@@ -614,7 +620,7 @@ export const toggleItemStatus = async (
 export const bulkUpdateItems = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     const { ids, updates } = req.body;
@@ -667,7 +673,7 @@ export const bulkUpdateItems = async (
 export const getItemStatistics = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     const itemRepository = AppDataSource.getRepository(Item);
@@ -717,7 +723,7 @@ export const getItemStatistics = async (
 export const searchItems = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     const { q, limit = "10" } = req.query;
@@ -770,7 +776,7 @@ export const searchItems = async (
 export const getParents = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     const parentRepository = AppDataSource.getRepository(Parent);
@@ -846,9 +852,9 @@ export const getParents = async (
       supplier_id: parent.supplier_id,
       supplier: parent.supplier
         ? {
-          id: parent.supplier.id,
-          name: parent.supplier.name,
-        }
+            id: parent.supplier.id,
+            name: parent.supplier.name,
+          }
         : null,
       item_count: parent.items?.length || 0,
       created_at: parent.created_at,
@@ -856,7 +862,10 @@ export const getParents = async (
     }));
 
     const user = (req as AuthorizedRequest).user;
-    const filteredData = filterDataByRole(formattedParents, user?.role || UserRole.STAFF);
+    const filteredData = filterDataByRole(
+      formattedParents,
+      user?.role || UserRole.STAFF,
+    );
 
     return res.status(200).json({
       success: true,
@@ -877,7 +886,7 @@ export const getParents = async (
 export const getParentById = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     const { id } = req.params;
@@ -925,17 +934,17 @@ export const getParentById = async (
       is_active: parent.is_active,
       taric: parent.taric
         ? {
-          id: parent.taric.id,
-          code: parent.taric.code,
-          name_de: parent.taric.name_de,
-        }
+            id: parent.taric.id,
+            code: parent.taric.code,
+            name_de: parent.taric.name_de,
+          }
         : null,
       supplier: parent.supplier
         ? {
-          id: parent.supplier.id,
-          name: parent.supplier.name,
-          contact_person: parent.supplier.contact_person,
-        }
+            id: parent.supplier.id,
+            name: parent.supplier.name,
+            contact_person: parent.supplier.contact_person,
+          }
         : null,
       variations: {
         de: [parent.var_de_1, parent.var_de_2, parent.var_de_3].filter(Boolean),
@@ -951,7 +960,10 @@ export const getParentById = async (
     };
 
     const user = (req as AuthorizedRequest).user;
-    const filteredData = filterDataByRole(formattedParent, user?.role || UserRole.STAFF);
+    const filteredData = filterDataByRole(
+      formattedParent,
+      user?.role || UserRole.STAFF,
+    );
 
     return res.status(200).json({
       success: true,
@@ -966,7 +978,7 @@ export const getParentById = async (
 export const createParent = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     const parentRepository = AppDataSource.getRepository(Parent);
@@ -994,7 +1006,7 @@ export const createParent = async (
     // Validate required fields
     if (!de_no || !name_de) {
       return next(
-        new ErrorHandler("DE number and German name are required", 400)
+        new ErrorHandler("DE number and German name are required", 400),
       );
     }
 
@@ -1002,7 +1014,7 @@ export const createParent = async (
     const existingParent = await parentRepository.findOne({ where: { de_no } });
     if (existingParent) {
       return next(
-        new ErrorHandler("Parent with this DE number already exists", 400)
+        new ErrorHandler("Parent with this DE number already exists", 400),
       );
     }
 
@@ -1066,7 +1078,7 @@ export const createParent = async (
 export const updateParent = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     const { id } = req.params;
@@ -1133,7 +1145,7 @@ export const updateParent = async (
 export const deleteParent = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     const { id } = req.params;
@@ -1162,8 +1174,8 @@ export const deleteParent = async (
       return next(
         new ErrorHandler(
           "Cannot delete parent. It has child items. Please delete or reassign child items first.",
-          400
-        )
+          400,
+        ),
       );
     }
 
@@ -1182,7 +1194,7 @@ export const deleteParent = async (
 export const searchParents = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     const { q, limit = "10" } = req.query;
@@ -1229,7 +1241,7 @@ export const searchParents = async (
 export const getWarehouseItems = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     const warehouseRepository = AppDataSource.getRepository(WarehouseItem);
@@ -1323,7 +1335,7 @@ export const getWarehouseItems = async (
 export const updateWarehouseStock = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     const { id } = req.params;
@@ -1389,7 +1401,7 @@ export const updateWarehouseStock = async (
 export const getItemVariations = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     const { itemId } = req.params;
@@ -1430,7 +1442,7 @@ export const getItemVariations = async (
 export const updateItemVariations = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     const { itemId } = req.params;
@@ -1474,7 +1486,7 @@ export const updateItemVariations = async (
           value_en_3: variation.value_en_3,
           created_at: new Date(),
           updated_at: new Date(),
-        })
+        }),
       );
 
       if (newVariations.length > 0) {
@@ -1503,7 +1515,7 @@ export const updateItemVariations = async (
 export const getItemQualityCriteria = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     const { itemId } = req.params;
@@ -1531,7 +1543,7 @@ export const getItemQualityCriteria = async (
 export const createQualityCriterion = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     const { itemId } = req.params;
@@ -1582,7 +1594,7 @@ export const createQualityCriterion = async (
 export const updateQualityCriterion = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     const { id } = req.params;
@@ -1624,7 +1636,7 @@ export const updateQualityCriterion = async (
 export const deleteQualityCriterion = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     const { id } = req.params;
@@ -1656,7 +1668,7 @@ export const deleteQualityCriterion = async (
 export const getAllTarics = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     const taricRepository = AppDataSource.getRepository(Taric);
@@ -1747,7 +1759,7 @@ export const getAllTarics = async (
 export const getTaricById = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     const { id } = req.params;
@@ -1830,7 +1842,7 @@ export const getTaricById = async (
 // MIS database connection helper functions
 const syncTaricToMIS = async (
   taricData: any,
-  operation: "create" | "update" | "delete"
+  operation: "create" | "update" | "delete",
 ) => {
   let connection;
   try {
@@ -1886,7 +1898,7 @@ const syncTaricToMIS = async (
         convertUndefinedToNull(taricData.name_cn),
         convertUndefinedToNull(taricData.updated_at) || new Date(),
         convertUndefinedToNull(taricData.originalCode) ||
-        convertUndefinedToNull(taricData.code),
+          convertUndefinedToNull(taricData.code),
       ]);
     } else if (operation === "delete") {
       const query = `DELETE FROM tarics WHERE code = ?`;
@@ -1907,7 +1919,7 @@ const syncTaricToMIS = async (
 export const createTaric = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   let connection;
   try {
@@ -1976,7 +1988,7 @@ export const createTaric = async (
           created_at: newTaric.created_at,
           updated_at: newTaric.updated_at,
         },
-        "create"
+        "create",
       );
     } catch (misError: any) {
       // Rollback local creation if MIS sync fails
@@ -1984,8 +1996,8 @@ export const createTaric = async (
       return next(
         new ErrorHandler(
           `TARIC created locally but failed to sync to MIS: ${misError.message}`,
-          500
-        )
+          500,
+        ),
       );
     }
 
@@ -2009,7 +2021,7 @@ export const createTaric = async (
 export const updateTaric = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   let connection;
   try {
@@ -2059,7 +2071,7 @@ export const updateTaric = async (
           ...taric,
           originalCode, // Pass original code for the WHERE clause
         },
-        "update"
+        "update",
       );
     } catch (misError: any) {
       // Rollback local update if MIS sync fails
@@ -2070,14 +2082,14 @@ export const updateTaric = async (
           Object.entries(req.body).map(([key, value]) => [
             key,
             (taric as any)[key],
-          ])
+          ]),
         ),
       });
       return next(
         new ErrorHandler(
           `TARIC updated locally but failed to sync to MIS: ${misError.message}`,
-          500
-        )
+          500,
+        ),
       );
     }
 
@@ -2101,7 +2113,7 @@ export const updateTaric = async (
 export const deleteTaric = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   let connection;
   try {
@@ -2137,8 +2149,8 @@ export const deleteTaric = async (
       return next(
         new ErrorHandler(
           "Cannot delete TARIC. It has related items or parents. Please reassign them first.",
-          400
-        )
+          400,
+        ),
       );
     }
 
@@ -2146,7 +2158,7 @@ export const deleteTaric = async (
     const taricCode = taric.code || null;
     if (!taricCode) {
       return next(
-        new ErrorHandler("Cannot delete TARIC: code is missing", 400)
+        new ErrorHandler("Cannot delete TARIC: code is missing", 400),
       );
     }
 
@@ -2162,8 +2174,8 @@ export const deleteTaric = async (
       return next(
         new ErrorHandler(
           `TARIC deleted locally but failed to sync to MIS: ${misError.message}`,
-          500
-        )
+          500,
+        ),
       );
     }
 
@@ -2180,7 +2192,7 @@ export const deleteTaric = async (
 export const searchTarics = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     const { q, limit = "20" } = req.query;
@@ -2224,7 +2236,7 @@ export const searchTarics = async (
 export const getTaricStatistics = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     const taricRepository = AppDataSource.getRepository(Taric);
@@ -2295,7 +2307,7 @@ export const getTaricStatistics = async (
 export const bulkUpsertTarics = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     const { tarics } = req.body; // Array of taric objects
@@ -2357,6 +2369,284 @@ export const bulkUpsertTarics = async (
       data: results,
     });
   } catch (error) {
+    return next(error);
+  }
+};
+
+export const exportItemsToCSV = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const itemRepository = AppDataSource.getRepository(Item);
+    const warehouseRepository = AppDataSource.getRepository(WarehouseItem);
+    const variationRepository = AppDataSource.getRepository(VariationValue);
+
+    // Get all items with their relations
+    const items = await itemRepository.find({
+      relations: ["parent", "taric", "category"],
+      order: {
+        id: "ASC",
+      },
+    });
+
+    // Helper function to format date
+    const formatDate = (date: Date | undefined) => {
+      if (!date) return "";
+      const d = new Date(date);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}:${String(d.getSeconds()).padStart(2, "0")}`;
+    };
+
+    // Helper function to get warehouse data for an item
+    const getWarehouseData = async (itemId: number) => {
+      const warehouseItems = await warehouseRepository.find({
+        where: { item_id: itemId },
+      });
+      return warehouseItems[0] || null;
+    };
+
+    // Helper function to get variation values
+    const getVariationValues = async (itemId: number) => {
+      const variations = await variationRepository.find({
+        where: { item_id: itemId },
+      });
+      return variations[0] || null;
+    };
+
+    // Generate price columns based on quantity breaks
+    const getPriceColumns = (item: any) => {
+      // You need to get these prices from somewhere - maybe from a pricing table
+      // For now, using RMB_Price as base with some calculations
+      const basePrice = item.RMB_Price || 0;
+      const priceLevels = [1, 2, 5, 10, 25, 50, 100, 200, 500, 1000, 2000];
+
+      return priceLevels.map((level) => {
+        // Simple volume discount logic - you should replace this with actual pricing logic
+        let discount = 0;
+        if (level >= 1000)
+          discount = 0.3; // 30% discount for 1000+
+        else if (level >= 500) discount = 0.25;
+        else if (level >= 200) discount = 0.2;
+        else if (level >= 100) discount = 0.15;
+        else if (level >= 50) discount = 0.1;
+        else if (level >= 25) discount = 0.05;
+
+        const price = basePrice * (1 - discount);
+        return price.toFixed(2).replace(".", ",");
+      });
+    };
+
+    const headers = [
+      "Timestamp",
+      "EAN",
+      "Parent No DE",
+      "Item No DE",
+      "Sup_cat",
+      "Item Name DE",
+      "Variation DE 1",
+      "Value DE",
+      "Variation DE 2",
+      "Value DE 2",
+      "Variation DE 3",
+      "Value DE 3",
+      "Item Name EN",
+      "Item Name",
+      "Variation EN 1",
+      "Value EN",
+      "Variation EN 2",
+      "Value EN 2",
+      "Variation EN 3",
+      "Value EN 3",
+      "Code",
+      "ISBN",
+      "Width",
+      "Height",
+      "Length",
+      "Weight",
+      "Shipping Weight",
+      "Shipping Class",
+      "Is Qty Dividable",
+      "Is Stock Item",
+      "FOQ",
+      "FSQ",
+      "MSQ",
+      "MOQ Result",
+      "Interval",
+      "Buffer Result",
+      "Price RMB",
+      "Y/N",
+      "Many Components",
+      "Effort Rating",
+      "EK Net",
+      "Item Volume (dm³)",
+      "Freight Costs Volume",
+      "Freight Costs Weight",
+      "Freight Costs",
+      "Import Duty Charge (EUR)",
+      "SP_eBay",
+      "SP_DE_NET_1",
+      "SP_DE_NET_2",
+      "SP_DE_NET_5",
+      "SP_DE_NET_10",
+      "SP_DE_NET_25",
+      "SP_DE_NET_50",
+      "SP_DE_NET_100",
+      "SP_DE_NET_200",
+      "SP_DE_NET_500",
+      "SP_DE_NET_1000",
+      "SP_DE_NET_2000",
+      "BulkQty_2",
+      "BulkQty_5",
+      "BulkQty_10",
+      "BulkQty_25",
+      "BulkQty_50",
+      "BulkQty_100",
+      "BulkQty_200",
+      "BulkQty_500",
+      "BulkQty_1000",
+      "BulkQty_2000",
+      "USt %",
+      "Dummy-Bild01",
+      "Image Path EAN",
+      "Image Path eBay",
+      "Max Quantity",
+    ];
+
+    // Generate CSV rows
+    const csvRows = [];
+
+    // Add headers
+    csvRows.push(headers.join(";"));
+
+    // Process each item
+    for (const item of items) {
+      try {
+        const warehouseData = await getWarehouseData(item.id);
+        const variationData = await getVariationValues(item.id);
+        const priceColumns = getPriceColumns(item);
+
+        // Get variations from parent
+        const parent = item.parent;
+
+        // Calculate volume in dm³ (convert from cm³ to dm³: divide by 1000)
+        const volume =
+          ((item.length || 0) * (item.width || 0) * (item.height || 0)) / 1000;
+
+        // Bulk quantities
+        const bulkQuantities = [2, 5, 10, 25, 50, 100, 200, 500, 1000, 2000];
+
+        // Create row data matching CSV structure
+        const rowData = [
+          formatDate(item.updated_at || item.created_at || new Date()), // Timestamp
+          item.ean?.toString() || "", // EAN
+          parent?.de_no || "NONE", // Parent No DE
+          item.ItemID_DE?.toString() || item.id.toString(), // Item No DE
+          item.supp_cat || item.category?.name || "STD", // Sup_cat
+          item.item_name || parent?.name_de || "", // Item Name DE
+          parent?.var_de_1 || "", // Variation DE 1
+          variationData?.value_de || "", // Value DE
+          parent?.var_de_2 || "", // Variation DE 2
+          variationData?.value_de_2 || "", // Value DE 2
+          parent?.var_de_3 || "", // Variation DE 3
+          variationData?.value_de_3 || "", // Value DE 3
+          item.item_name_cn || parent?.name_en || "", // Item Name EN
+          item.item_name || parent?.name_en || "", // Item Name
+          parent?.var_en_1 || "", // Variation EN 1
+          variationData?.value_en || "", // Value EN
+          parent?.var_en_2 || "", // Variation EN 2
+          variationData?.value_en_2 || "", // Value EN 2
+          parent?.var_en_3 || "", // Variation EN 3
+          variationData?.value_en_3 || "", // Value EN 3
+          item.taric?.code || "", // Code
+          item.ISBN?.toString() || "0", // ISBN
+          (item.width || 0).toFixed(1).replace(".", ","), // Width
+          (item.height || 0).toFixed(1).replace(".", ","), // Height
+          (item.length || 0).toFixed(1).replace(".", ","), // Length
+          (item.weight || 0).toFixed(2).replace(".", ","), // Weight
+          (item.weight || 0).toFixed(4).replace(".", ","), // Shipping Weight (using same as weight)
+          warehouseData?.ship_class || "1", // Shipping Class
+          item.is_qty_dividable || "Y", // Is Qty Dividable
+          warehouseData?.is_stock_item || "N", // Is Stock Item
+          item.FOQ?.toString() || "0", // FOQ
+          item.FSQ?.toString() || "0", // FSQ
+          warehouseData?.msq?.toString() || "0", // MSQ
+          "0", // MOQ Result (calculate if needed)
+          "0", // Interval (calculate if needed)
+          warehouseData?.buffer?.toString() || "0", // Buffer Result
+          Number(item.RMB_Price || 0)
+            .toFixed(2)
+            .replace(".", ","), // Price RMB
+          "Y", // Y/N (active status)
+          item.many_components?.toString() || "1", // Many Components
+          item.effort_rating?.toString() || "3", // Effort Rating
+          Number(item.RMB_Price || 0)
+            .toFixed(2)
+            .replace(".", ","), // EK Net (using RMB price as base)
+          volume.toFixed(2).replace(".", ","), // Item Volume (dm³)
+          "0,00", // Freight Costs Volume
+          "0,00", // Freight Costs Weight
+          "0,00", // Freight Costs
+          "0,00", // Import Duty Charge (EUR)
+          Number(item.RMB_Price || 0)
+            .toFixed(2)
+            .replace(".", ","), // SP_eBay (placeholder)
+          ...priceColumns, // SP_DE_NET_X columns (11 columns)
+          ...bulkQuantities.map((qty) => qty.toString()), // BulkQty columns (10 columns)
+          "19", // USt % (VAT)
+          item.photo?.split("\\").pop() || "DummyPicture.jpg", // Dummy-Bild01
+          item.pix_path || "", // Image Path EAN
+          item.pix_path_eBay || "", // Image Path eBay
+          "10000", // Max Quantity
+        ];
+
+        // Ensure rowData has exactly the same number of columns as headers
+        if (rowData.length !== headers.length) {
+          console.warn(
+            `Row data length mismatch for item ${item.id}: ${rowData.length} vs ${headers.length}`,
+          );
+        }
+
+        const formattedRow = rowData.map((value) => {
+          if (value === null || value === undefined) return "";
+          const stringValue = value.toString();
+          // Wrap in quotes if contains semicolon, newline, or double quote
+          if (
+            stringValue.includes(";") ||
+            stringValue.includes("\n") ||
+            stringValue.includes('"')
+          ) {
+            return `"${stringValue.replace(/"/g, '""')}"`;
+          }
+          return stringValue;
+        });
+
+        csvRows.push(formattedRow.join(";"));
+      } catch (itemError) {
+        console.error(`Error processing item ${item.id}:`, itemError);
+        // Continue with next item
+      }
+    }
+
+    const csvContent = csvRows.join("\n");
+
+    // Set headers for file download
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader(
+      "Content-Disposition",
+      "attachment; filename=updated_Item_List.csv",
+    );
+    res.setHeader("Content-Length", Buffer.byteLength(csvContent, "utf8"));
+    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
+    res.setHeader("X-Content-Type-Options", "nosniff");
+
+    // Add BOM for UTF-8 to handle special characters
+    const bom = "\uFEFF";
+    return res.status(200).send(bom + csvContent);
+  } catch (error) {
+    console.error("Error exporting CSV:", error);
     return next(error);
   }
 };

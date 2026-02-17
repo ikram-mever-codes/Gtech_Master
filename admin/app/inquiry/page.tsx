@@ -71,11 +71,13 @@ import { RootState } from "@/app/Redux/store";
 import { UserRole } from "@/utils/interfaces";
 import { getAllTarics } from "@/api/items";
 
-interface Customer {
+export interface Customer {
   id: string;
   companyName: string;
   legalName?: string;
   email?: string;
+  stage: "business" | "star_business" | "star_customer" | "device_maker";
+  displayName: string;
 }
 
 interface ContactPerson {
@@ -524,17 +526,27 @@ const CombinedInquiriesPage: React.FC = () => {
     try {
       const response = await getAllCustomers();
       if (response?.data) {
-        setCustomers(
-          Array.isArray(response.data)
-            ? response.data
-            : response.data.customers || [],
+        const customers = Array.isArray(response.data)
+          ? response.data
+          : response.data.businesses || [];
+
+        // Filter based on stage field
+        const filteredCustomers = customers.filter((customer: Customer) => {
+          return (
+            customer.stage === "star_business" ||
+            customer.stage === "star_customer"
+          );
+        });
+
+        setCustomers(filteredCustomers);
+        console.log(
+          `Found ${filteredCustomers.length} star customers/businesses`,
         );
       }
     } catch (error) {
       console.error("Error fetching customers:", error);
     }
   };
-
   const fetchContactPersons = async () => {
     try {
       const response = await getAllContactPersons();
@@ -953,22 +965,6 @@ const CombinedInquiriesPage: React.FC = () => {
       [field]: value,
     };
     setRequestQualityCriteria(updated);
-  };
-
-  const removeQualityCriterion = (index: number) => {
-    const updated = requestQualityCriteria.filter((_, i) => i !== index);
-    setRequestQualityCriteria(updated);
-  };
-
-  // Handle attachments for request items
-  const handleAttachmentUpload = (files: FileList) => {
-    const newAttachments = Array.from(files);
-    setRequestAttachments([...requestAttachments, ...newAttachments]);
-  };
-
-  const removeAttachment = (index: number) => {
-    const updated = requestAttachments.filter((_, i) => i !== index);
-    setRequestAttachments(updated);
   };
 
   // Handle quality criteria for inquiry requests
@@ -1456,320 +1452,6 @@ const CombinedInquiriesPage: React.FC = () => {
       }
       return field;
     });
-  };
-
-  // Function to render the full RequestItem View when isAssembly = TRUE
-  const renderAssemblyRequestView = (request: any, index: number) => {
-    return (
-      <div className="border border-gray-200 rounded-lg p-4 mb-3 bg-gray-50">
-        <div className="grid grid-cols-2 gap-4">
-          {/* Quantity and Interval - Displayed together */}
-          <div className="col-span-1">
-            <label className="block text-xs font-medium text-gray-700 mb-1">
-              Quantity *
-            </label>
-            <input
-              type="number"
-              value={request.quantity}
-              onChange={(e) =>
-                updateRequest(index, "quantity", parseInt(e.target.value) || 1)
-              }
-              disabled={inquiryModalMode === "edit" && !editModeEnabled}
-              className="w-full px-2 py-1 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-              min="1"
-            />
-          </div>
-
-          <div className="col-span-1">
-            <label className="block text-xs font-medium text-gray-700 mb-1">
-              Interval
-            </label>
-            <select
-              value={request.interval || "Monatlich"}
-              onChange={(e) => updateRequest(index, "interval", e.target.value)}
-              disabled={inquiryModalMode === "edit" && !editModeEnabled}
-              className="w-full px-2 py-1 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-            >
-              {getAvailableIntervals().map((interval) => (
-                <option key={interval.value} value={interval.value}>
-                  {interval.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Price in RMB */}
-          <div className="col-span-1">
-            <label className="block text-xs font-medium text-gray-700 mb-1">
-              Price (RMB) *
-            </label>
-            <input
-              type="number"
-              value={request.priceRMB || request.purchasePrice || 0}
-              onChange={(e) =>
-                updateRequest(
-                  index,
-                  "priceRMB",
-                  parseFloat(e.target.value) || 0,
-                )
-              }
-              disabled={inquiryModalMode === "edit" && !editModeEnabled}
-              className="w-full px-2 py-1 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-              min="0"
-              step="0.01"
-            />
-          </div>
-
-          {/* TARIC */}
-          <div className="col-span-1">
-            <label className="block text-xs font-medium text-gray-700 mb-1">
-              TARIC Code
-            </label>
-            <select
-              value={request.taric || ""}
-              onChange={(e) => updateRequest(index, "taric", e.target.value)}
-              disabled={inquiryModalMode === "edit" && !editModeEnabled}
-              className="w-full px-2 py-1 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-            >
-              <option value="">Select TARIC Code</option>
-              {tarics.map((taric) => (
-                <option key={taric.id} value={taric.code}>
-                  {formatTaricDisplay(taric)}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Quality Criteria Section */}
-          <div className="col-span-2">
-            <div className="flex items-center justify-between mb-2">
-              <label className="block text-xs font-medium text-gray-700">
-                Quality Criteria
-              </label>
-              <button
-                type="button"
-                onClick={() => addRequestQualityCriterion(index)}
-                disabled={inquiryModalMode === "edit" && !editModeEnabled}
-                className="px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 transition-all flex items-center gap-1 disabled:opacity-50"
-              >
-                <PlusIcon className="h-3 w-3" />
-                Add Criterion
-              </button>
-            </div>
-
-            {request.qualityCriteria?.map(
-              (criterion: QualityCriterion, criterionIndex: number) => (
-                <div
-                  key={criterionIndex}
-                  className="mb-3 p-3 border border-gray-200 rounded bg-white"
-                >
-                  <div className="flex justify-between items-start mb-2">
-                    <h5 className="text-xs font-medium text-gray-700">
-                      Criterion #{criterionIndex + 1}
-                    </h5>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        removeRequestQualityCriterion(index, criterionIndex)
-                      }
-                      disabled={inquiryModalMode === "edit" && !editModeEnabled}
-                      className="text-red-500 hover:text-red-700 text-xs"
-                    >
-                      Remove
-                    </button>
-                  </div>
-
-                  <div className="mb-2">
-                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                      Description
-                    </label>
-                    <textarea
-                      value={criterion.description}
-                      onChange={(e) =>
-                        updateRequestQualityCriterion(
-                          index,
-                          criterionIndex,
-                          "description",
-                          e.target.value,
-                        )
-                      }
-                      disabled={inquiryModalMode === "edit" && !editModeEnabled}
-                      rows={2}
-                      className="w-full px-2 py-1 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                      placeholder="Enter quality description"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                      Picture
-                    </label>
-                    {criterion.pictureUrl ? (
-                      <div className="flex items-center gap-2">
-                        <img
-                          src={criterion.pictureUrl}
-                          alt="Quality criterion"
-                          className="h-16 w-16 object-cover rounded"
-                        />
-                        <button
-                          type="button"
-                          onClick={() =>
-                            updateRequestQualityCriterion(
-                              index,
-                              criterionIndex,
-                              "picture",
-                              undefined,
-                            )
-                          }
-                          className="text-red-500 hover:text-red-700 text-xs"
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        <label className="cursor-pointer px-3 py-1 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-all">
-                          <PhotoIcon className="h-4 w-4 inline mr-1" />
-                          Upload Picture
-                          <input
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            onChange={(e) => {
-                              if (e.target.files && e.target.files[0]) {
-                                updateRequestQualityCriterion(
-                                  index,
-                                  criterionIndex,
-                                  "picture",
-                                  e.target.files[0],
-                                );
-                              }
-                            }}
-                            disabled={
-                              inquiryModalMode === "edit" && !editModeEnabled
-                            }
-                          />
-                        </label>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ),
-            )}
-          </div>
-
-          {/* Attachments Section */}
-          <div className="col-span-2">
-            <div className="flex items-center justify-between mb-2">
-              <label className="block text-xs font-medium text-gray-700">
-                Attachments
-              </label>
-              <label className="cursor-pointer px-3 py-1 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-all">
-                <PaperClipIcon className="h-4 w-4 inline mr-1" />
-                Add Attachment
-                <input
-                  type="file"
-                  multiple
-                  className="hidden"
-                  onChange={(e) => {
-                    if (e.target.files) {
-                      handleRequestAttachmentUpload(index, e.target.files);
-                    }
-                  }}
-                  disabled={inquiryModalMode === "edit" && !editModeEnabled}
-                />
-              </label>
-            </div>
-
-            {request.attachments && request.attachments.length > 0 && (
-              <div className="space-y-2">
-                {request.attachments.map((file: File, fileIndex: number) => (
-                  <div
-                    key={fileIndex}
-                    className="flex items-center justify-between p-2 bg-white border border-gray-200 rounded"
-                  >
-                    <div className="flex items-center gap-2">
-                      <PaperClipIcon className="h-4 w-4 text-gray-500" />
-                      <span className="text-xs text-gray-700 truncate">
-                        {file.name}
-                      </span>
-                      <span className="text-xs text-gray-500">
-                        ({Math.round(file.size / 1024)} KB)
-                      </span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => removeRequestAttachment(index, fileIndex)}
-                      className="text-red-500 hover:text-red-700 text-xs"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  // Function to render standard request view when isAssembly = FALSE
-  const renderStandardRequestView = (request: any, index: number) => {
-    return (
-      <div className="grid grid-cols-2 gap-2">
-        <div className="col-span-2">
-          <label className="block text-xs font-medium text-gray-700 mb-1">
-            Item Name *
-          </label>
-          <input
-            type="text"
-            value={request.itemName}
-            onChange={(e) => updateRequest(index, "itemName", e.target.value)}
-            disabled={inquiryModalMode === "edit" && !editModeEnabled}
-            className="w-full px-2 py-1 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-            placeholder="Enter item name"
-          />
-        </div>
-
-        <div>
-          <label className="block text-xs font-medium text-gray-700 mb-1">
-            Quantity *
-          </label>
-          <input
-            type="number"
-            value={request.quantity}
-            onChange={(e) =>
-              updateRequest(index, "quantity", parseInt(e.target.value) || 1)
-            }
-            disabled={inquiryModalMode === "edit" && !editModeEnabled}
-            className="w-full px-2 py-1 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-            min="1"
-          />
-        </div>
-
-        <div>
-          <label className="block text-xs font-medium text-gray-700 mb-1">
-            Purchase Price (RMB)
-          </label>
-          <input
-            type="number"
-            value={request.purchasePrice}
-            onChange={(e) =>
-              updateRequest(
-                index,
-                "purchasePrice",
-                parseFloat(e.target.value) || 0,
-              )
-            }
-            disabled={inquiryModalMode === "edit" && !editModeEnabled}
-            className="w-full px-2 py-1 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-            min="0"
-            step="0.01"
-          />
-        </div>
-      </div>
-    );
   };
 
   return (

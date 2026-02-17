@@ -32,6 +32,7 @@ import {
   searchTarics,
   getTaricStatistics,
   bulkUpsertTarics,
+  exportItemsToCSV,
 } from "../controllers/items_controller";
 import { authenticateUser, authorize } from "../middlewares/authorized";
 import { AppDataSource } from "../config/database";
@@ -45,6 +46,8 @@ router.use(authenticateUser);
 router.use(authorize(UserRole.ADMIN, UserRole.SALES, UserRole.PURCHASING));
 
 router.get("/", getItems);
+
+router.get("/export/csv", exportItemsToCSV);
 
 router.get("/:id", getItemById);
 
@@ -72,7 +75,9 @@ router.get("/parents/simple", async (req: Request, res: Response) => {
     res.json({ success: true, data: parents });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ success: false, message: "Failed to fetch parents" });
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to fetch parents" });
   }
 });
 
@@ -87,7 +92,6 @@ router.put("/parents/:id", updateParent);
 router.delete("/parents/:id", deleteParent);
 
 router.get("/parents/search/quick-search", searchParents);
-
 
 router.get("/warehouse/items", getWarehouseItems);
 

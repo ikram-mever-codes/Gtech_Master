@@ -1,7 +1,7 @@
 // src/api/itemApi.ts
 import { toast } from "react-hot-toast";
 import { api, handleApiError } from "../utils/api";
-import { loadingStyles, successStyles } from "@/utils/constants";
+import { BASE_URL, loadingStyles, successStyles } from "@/utils/constants";
 import { ResponseInterface } from "@/utils/interfaces";
 
 export interface Item {
@@ -271,7 +271,7 @@ export const updateItem = async (
     is_npr: string;
     is_eur_special: string;
     is_rmb_special: string;
-  }>
+  }>,
 ) => {
   try {
     toast.loading("Updating item...", loadingStyles);
@@ -309,7 +309,7 @@ export const toggleItemStatus = async (id: number, isActive: boolean) => {
     toast.dismiss();
     toast.success(
       `Item ${isActive ? "activated" : "deactivated"} successfully`,
-      successStyles
+      successStyles,
     );
     return response;
   } catch (error) {
@@ -321,7 +321,7 @@ export const toggleItemStatus = async (id: number, isActive: boolean) => {
 // Bulk update items
 export const bulkUpdateItems = async (
   ids: number[],
-  updates: Record<string, any>
+  updates: Record<string, any>,
 ) => {
   try {
     toast.loading("Updating items...", loadingStyles);
@@ -342,7 +342,7 @@ export const bulkUpdateItems = async (
 export const getItemStatistics = async () => {
   try {
     const response: ResponseInterface = await api.get(
-      "/items/stats/statistics"
+      "/items/stats/statistics",
     );
     return response;
   } catch (error) {
@@ -358,7 +358,7 @@ export const searchItems = async (query: string, limit: number = 10) => {
       "/items/search/quick-search",
       {
         params: { q: query, limit },
-      }
+      },
     );
     return response;
   } catch (error) {
@@ -515,7 +515,7 @@ export const updateTaric = async (
     description_en: string;
     reguler_artikel: string;
     duty_rate: number;
-  }>
+  }>,
 ) => {
   try {
     toast.loading("Updating TARIC...", loadingStyles);
@@ -550,7 +550,7 @@ export const searchTarics = async (query: string, limit: number = 20) => {
       "/items/tarics/search/quick-search",
       {
         params: { q: query, limit },
-      }
+      },
     );
     return response;
   } catch (error) {
@@ -563,7 +563,7 @@ export const searchTarics = async (query: string, limit: number = 20) => {
 export const getTaricStatistics = async () => {
   try {
     const response: ResponseInterface = await api.get(
-      "/items/tarics/stats/statistics"
+      "/items/tarics/stats/statistics",
     );
     return response;
   } catch (error) {
@@ -583,7 +583,7 @@ export const bulkUpsertTarics = async (
     description_en?: string;
     reguler_artikel?: string;
     duty_rate?: number;
-  }>
+  }>,
 ) => {
   try {
     toast.loading("Processing TARICs...", loadingStyles);
@@ -697,7 +697,7 @@ export const updateParent = async (
     is_var_unilingual: string;
     is_active: string;
     parent_rank: number;
-  }>
+  }>,
 ) => {
   try {
     toast.loading("Updating parent...", loadingStyles);
@@ -732,7 +732,7 @@ export const searchParents = async (query: string, limit: number = 10) => {
       "/items/parents/search/quick-search",
       {
         params: { q: query, limit },
-      }
+      },
     );
     return response;
   } catch (error) {
@@ -767,7 +767,7 @@ export const updateWarehouseStock = async (
     msq?: number;
     buffer?: number;
     is_stock_item?: string;
-  }
+  },
 ) => {
   try {
     toast.loading("Updating warehouse stock...", loadingStyles);
@@ -806,7 +806,7 @@ export const updateItemVariations = async (
     value_en?: string;
     value_en_2?: string;
     value_en_3?: string;
-  }>
+  }>,
 ) => {
   try {
     toast.loading("Updating variations...", loadingStyles);
@@ -843,7 +843,7 @@ export const createQualityCriterion = async (
     picture?: string;
     description?: string;
     description_cn?: string;
-  }
+  },
 ) => {
   try {
     toast.loading("Creating quality criterion...", loadingStyles);
@@ -865,7 +865,7 @@ export const updateQualityCriterion = async (
     picture: string;
     description: string;
     description_cn: string;
-  }>
+  }>,
 ) => {
   try {
     toast.loading("Updating quality criterion...", loadingStyles);
@@ -911,5 +911,25 @@ export const downloadOrderPdf = async (id: string) => {
   } catch (error) {
     handleApiError(error, "Failed to download PDF");
     throw error;
+  }
+};
+
+export const exportItemsToCSV = async () => {
+  try {
+    const response = await fetch(`${BASE_URL}/items/export/csv`, {
+      method: "GET",
+      credentials: "include",
+    });
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "updated_Item_List.csv";
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  } catch (error) {
+    console.error("Error exporting CSV:", error);
   }
 };
