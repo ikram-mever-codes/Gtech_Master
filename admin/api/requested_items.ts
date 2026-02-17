@@ -98,6 +98,9 @@ export interface RequestedItemCreatePayload {
   businessId: string;
   contactPersonId?: string;
   itemName: string;
+  qualityCriteria: any;
+  attachments: any;
+  taric: any;
   extraNote?: string;
   material?: string;
   asanaLink?: string;
@@ -120,8 +123,7 @@ export interface RequestedItemCreatePayload {
   comment?: string;
 }
 
-export interface RequestedItemUpdatePayload
-  extends Partial<RequestedItemCreatePayload> {
+export interface RequestedItemUpdatePayload extends Partial<RequestedItemCreatePayload> {
   requestStatus?: RequestStatus;
   priority?: Priority;
 }
@@ -130,13 +132,11 @@ export interface BulkRequestedItemsOperationPayload {
   ids: string[];
 }
 
-export interface BulkStatusUpdatePayload
-  extends BulkRequestedItemsOperationPayload {
+export interface BulkStatusUpdatePayload extends BulkRequestedItemsOperationPayload {
   requestStatus: RequestStatus;
 }
 
-export interface BulkPriorityUpdatePayload
-  extends BulkRequestedItemsOperationPayload {
+export interface BulkPriorityUpdatePayload extends BulkRequestedItemsOperationPayload {
   priority: Priority;
 }
 
@@ -166,7 +166,7 @@ export interface RequestedItemsStatistics {
 }
 
 export const createRequestedItem = async (
-  itemData: RequestedItemCreatePayload
+  itemData: RequestedItemCreatePayload,
 ) => {
   try {
     toast.loading("Creating requested item...", loadingStyles);
@@ -181,7 +181,7 @@ export const createRequestedItem = async (
 };
 
 export const getAllRequestedItems = async (
-  filters: RequestedItemsSearchFilters = {}
+  filters: RequestedItemsSearchFilters = {},
 ) => {
   try {
     const params = new URLSearchParams();
@@ -212,7 +212,7 @@ export const getRequestedItemById = async (id: string) => {
 
 export const updateRequestedItem = async (
   id: string,
-  updateData: RequestedItemUpdatePayload
+  updateData: RequestedItemUpdatePayload,
 ) => {
   try {
     toast.loading("Updating requested item...", loadingStyles);
@@ -228,6 +228,10 @@ export const updateRequestedItem = async (
 
 export const deleteRequestedItem = async (id: string) => {
   try {
+    const cfs = window.confirm(
+      "Are you sure you want to delete this requested item?",
+    );
+    if (!cfs) return;
     toast.loading("Deleting requested item...", loadingStyles);
     const response = await api.delete(`/requested-items/${id}`);
     toast.dismiss();
@@ -241,7 +245,7 @@ export const deleteRequestedItem = async (id: string) => {
 
 export const getRequestedItemsByBusiness = async (
   businessId: string,
-  filters: Omit<RequestedItemsSearchFilters, "businessId"> = {}
+  filters: Omit<RequestedItemsSearchFilters, "businessId"> = {},
 ) => {
   try {
     const params = new URLSearchParams();
@@ -253,7 +257,7 @@ export const getRequestedItemsByBusiness = async (
     });
 
     const response = await api.get(
-      `/business/${businessId}/requested-items?${params.toString()}`
+      `/business/${businessId}/requested-items?${params.toString()}`,
     );
     return response.data;
   } catch (error) {
@@ -263,18 +267,18 @@ export const getRequestedItemsByBusiness = async (
 };
 
 export const bulkDeleteRequestedItems = async (
-  payload: BulkRequestedItemsOperationPayload
+  payload: BulkRequestedItemsOperationPayload,
 ) => {
   try {
     toast.loading(
       `Deleting ${payload.ids.length} requested items...`,
-      loadingStyles
+      loadingStyles,
     );
     const response = await api.post("/requested-items/bulk-delete", payload);
     toast.dismiss();
     toast.success(
       `Deleted ${payload.ids.length} requested items`,
-      successStyles
+      successStyles,
     );
     return response.data;
   } catch (error) {
@@ -284,21 +288,21 @@ export const bulkDeleteRequestedItems = async (
 };
 
 export const bulkUpdateRequestedItemsStatus = async (
-  payload: BulkStatusUpdatePayload
+  payload: BulkStatusUpdatePayload,
 ) => {
   try {
     toast.loading(
       `Updating status for ${payload.ids.length} items...`,
-      loadingStyles
+      loadingStyles,
     );
     const response = await api.post(
       "/requested-items/bulk-update-status",
-      payload
+      payload,
     );
     toast.dismiss();
     toast.success(
       `Updated status for ${payload.ids.length} items`,
-      successStyles
+      successStyles,
     );
     return response.data;
   } catch (error) {
@@ -308,21 +312,21 @@ export const bulkUpdateRequestedItemsStatus = async (
 };
 
 export const bulkUpdateRequestedItemsPriority = async (
-  payload: BulkPriorityUpdatePayload
+  payload: BulkPriorityUpdatePayload,
 ) => {
   try {
     toast.loading(
       `Updating priority for ${payload.ids.length} items...`,
-      loadingStyles
+      loadingStyles,
     );
     const response = await api.post(
       "/requested-items/bulk-update-priority",
-      payload
+      payload,
     );
     toast.dismiss();
     toast.success(
       `Updated priority for ${payload.ids.length} items`,
-      successStyles
+      successStyles,
     );
     return response.data;
   } catch (error) {
@@ -344,11 +348,11 @@ export const getRequestedItemsStatistics = async (): Promise<{
 };
 
 export const getBusinessRequestedItemsStatistics = async (
-  businessId: string
+  businessId: string,
 ) => {
   try {
     const response = await api.get(
-      `/business/${businessId}/requested-items/statistics`
+      `/business/${businessId}/requested-items/statistics`,
     );
     return response.data;
   } catch (error) {
@@ -358,7 +362,7 @@ export const getBusinessRequestedItemsStatistics = async (
 };
 
 export const validateRequestedItemData = (
-  item: RequestedItemCreatePayload
+  item: RequestedItemCreatePayload,
 ): { isValid: boolean; errors: string[] } => {
   const errors: string[] = [];
 
@@ -435,20 +439,20 @@ export const isOverdue = (item: RequestedItem): boolean => {
 
 export const filterItemsByStatus = (
   items: RequestedItem[],
-  status: string
+  status: string,
 ): RequestedItem[] => {
   return items.filter((item) => item.requestStatus === status);
 };
 
 export const filterItemsByPriority = (
   items: RequestedItem[],
-  priority: string
+  priority: string,
 ): RequestedItem[] => {
   return items.filter((item) => item.priority === priority);
 };
 
 export const sortItemsByPriorityAndDate = (
-  items: RequestedItem[]
+  items: RequestedItem[],
 ): RequestedItem[] => {
   return items.sort((a, b) => {
     if (a.priority !== b.priority) {
@@ -459,7 +463,7 @@ export const sortItemsByPriorityAndDate = (
 };
 
 export const exportRequestedItemsToCSV = async (
-  filters: RequestedItemsSearchFilters = {}
+  filters: RequestedItemsSearchFilters = {},
 ) => {
   try {
     toast.loading("Exporting requested items...", loadingStyles);
@@ -473,7 +477,7 @@ export const exportRequestedItemsToCSV = async (
     link.href = url;
     link.setAttribute(
       "download",
-      `requested-items-export-${new Date().toISOString().split("T")[0]}.csv`
+      `requested-items-export-${new Date().toISOString().split("T")[0]}.csv`,
     );
     document.body.appendChild(link);
     link.click();

@@ -13,106 +13,108 @@ router.use(authenticateUser);
 router.post(
   "/inquiry/:inquiryId",
   authorize(UserRole.SALES),
-  offerController.createOfferFromInquiry.bind(offerController)
+  offerController.createOfferFromInquiry.bind(offerController),
 );
 router.get(
   "",
   authorize(UserRole.SALES),
-  offerController.getAllOffers.bind(offerController)
+  offerController.getAllOffers.bind(offerController),
 );
 router.get(
   "/:id",
   authorize(UserRole.SALES),
-  offerController.getOfferById.bind(offerController)
+  offerController.getOfferById.bind(offerController),
 );
 router.put(
   "/:id",
   authorize(UserRole.SALES),
-  offerController.updateOffer.bind(offerController)
+  offerController.updateOffer.bind(offerController),
 );
 router.delete(
   "/:id",
   authorize(UserRole.SALES),
-  offerController.deleteOffer.bind(offerController)
+  offerController.deleteOffer.bind(offerController),
 );
 
 // Offer revisions
 router.post(
   "/:id/revisions",
-  offerController.createRevision.bind(offerController)
+  offerController.createRevision.bind(offerController),
 );
 
 // Offer PDF generation
 router.post(
   "/:id/generate-pdf",
-  offerController.generatePdf.bind(offerController)
+  offerController.generatePdf.bind(offerController),
 );
+
+// Offer PDF generation
 router.get(
   "/:id/download-pdf",
-  offerController.downloadPdf.bind(offerController)
+  offerController.generateAndDownloadPdf.bind(offerController),
 );
 
 // Line item operations
 router.put(
   "/:offerId/line-items/:lineItemId",
-  offerController.updateLineItem.bind(offerController)
+  offerController.updateLineItem.bind(offerController),
 );
 router.put(
   "/:offerId/line-items/bulk",
-  offerController.bulkUpdateLineItems.bind(offerController)
+  offerController.bulkUpdateLineItems.bind(offerController),
 );
 
 // Price management operations
 router.post(
   "/line-items/:lineItemId/quantity-prices",
-  offerController.addQuantityPrice.bind(offerController)
+  offerController.addQuantityPrice.bind(offerController),
 );
 router.post(
   "/line-items/:lineItemId/unit-prices",
-  offerController.addUnitPrice.bind(offerController)
+  offerController.addUnitPrice.bind(offerController),
 );
 
 // Unit price operations (offer level)
 router.post(
   "/:offerId/toggle-unit-prices",
-  offerController.toggleOfferUnitPrices.bind(offerController)
+  offerController.toggleOfferUnitPrices.bind(offerController),
 );
 router.put(
   "/:offerId/bulk-update-unit-prices",
-  offerController.bulkUpdateOfferUnitPrices.bind(offerController)
+  offerController.bulkUpdateOfferUnitPrices.bind(offerController),
 );
 router.post(
   "/:offerId/sync-unit-prices",
-  offerController.syncUnitPricesAcrossOffer.bind(offerController)
+  offerController.syncUnitPricesAcrossOffer.bind(offerController),
 );
 
 // Set active price for line items
 router.put(
   "/line-items/:lineItemId/active-price/:priceType/:priceIndex",
-  offerController.setActivePrice.bind(offerController)
+  offerController.setActivePrice.bind(offerController),
 );
 
 // Copy/paste operations
 router.post(
   "/:offerId/copy-paste-prices",
-  offerController.copyPastePrices.bind(offerController)
+  offerController.copyPastePrices.bind(offerController),
 );
 
 // Inquiry-specific offers
 router.get(
   "/inquiry/:inquiryId",
-  offerController.getOffersByInquiry.bind(offerController)
+  offerController.getOffersByInquiry.bind(offerController),
 );
 
 // Statistics and metadata
 router.get(
   "/statistics",
-  offerController.getOfferStatistics.bind(offerController)
+  offerController.getOfferStatistics.bind(offerController),
 );
 router.get("/statuses", offerController.getOfferStatuses.bind(offerController));
 router.get(
   "/currencies",
-  offerController.getAvailableCurrencies.bind(offerController)
+  offerController.getAvailableCurrencies.bind(offerController),
 );
 
 export default router;
