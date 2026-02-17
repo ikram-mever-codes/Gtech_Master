@@ -98,7 +98,7 @@ function ItemSelectorWithQuantity({
         label: item.item_name || item.name || "Unnamed Item",
       })),
     ],
-    [items]
+    [items],
   );
 
   const handleAdd = () => {
@@ -233,7 +233,7 @@ function OrdersTable({
               <td className="px-4 py-3">
                 <div
                   className={`text-xs px-2 py-1 rounded-full font-medium ${getOrderStatusColor(
-                    order.status
+                    order.status,
                   )}`}
                 >
                   {order.status}
@@ -294,9 +294,8 @@ function OrdersTable({
 const OrderPage = () => {
   const { user } = useSelector((state: RootState) => state.user);
 
-  const [activeTab, setActiveTab] = useState<(typeof tabs)[number]["id"]>(
-    "tab1"
-  );
+  const [activeTab, setActiveTab] =
+    useState<(typeof tabs)[number]["id"]>("tab1");
   const activeTabObj = tabs.find((t) => t.id === activeTab);
 
   const [orders, setOrders] = useState<Order[]>([]);
@@ -357,14 +356,14 @@ const OrderPage = () => {
   const getCategoryName = useCallback(
     (categoryId: string | number) =>
       categories.find((c) => String(c.id) === String(categoryId))?.name ?? "-",
-    [categories]
+    [categories],
   );
 
   const getCustomerName = useCallback(
     (customerId: any) =>
-      customers.find((c) => String(c.id) === String(customerId))
-        ?.companyName ?? "-",
-    [customers]
+      customers.find((c) => String(c.id) === String(customerId))?.companyName ??
+      "-",
+    [customers],
   );
 
   // submit rules:
@@ -376,7 +375,8 @@ const OrderPage = () => {
     const hasItems = orderItems.length > 0;
     const hasComment = !!form.comment?.trim();
     const tabOk =
-      (isTab1 ? !!form.category_id : true) && (isTab2 ? !!form.customer_id : true);
+      (isTab1 ? !!form.category_id : true) &&
+      (isTab2 ? !!form.customer_id : true);
     return hasItems && hasComment && tabOk;
   }, [
     isConvertMode,
@@ -461,7 +461,7 @@ const OrderPage = () => {
   const fetchOrders = useCallback(async () => {
     setLoadingOrders(true);
     try {
-      const response = await getAllOrders(filters);
+      const response: any = await getAllOrders(filters);
       if (response?.success) setOrders(response.data);
       else if (response?.data) setOrders(response.data);
     } catch (error) {
@@ -488,7 +488,7 @@ const OrderPage = () => {
 
   const handleCategoryChange = async (
     category_id: string,
-    resetOrderItemsFlag: boolean = true
+    resetOrderItemsFlag: boolean = true,
   ) => {
     setForm((prev) => ({ ...prev, category_id }));
     setSelectedItemId("");
@@ -512,7 +512,10 @@ const OrderPage = () => {
         next[idx] = { ...next[idx], qty: next[idx].qty + qty };
         return next;
       }
-      return [...prev, { item_id: String(item_id), itemName, qty, remark_de: "" }];
+      return [
+        ...prev,
+        { item_id: String(item_id), itemName, qty, remark_de: "" },
+      ];
     });
 
     toast.success(`Added ${qty}x ${itemName} to order`);
@@ -523,12 +526,14 @@ const OrderPage = () => {
 
   const handleUpdateOrderItemQty = (item_id: string, qty: number) => {
     if (!qty || qty <= 0) return;
-    setOrderItems((prev) => prev.map((x) => (x.item_id === item_id ? { ...x, qty } : x)));
+    setOrderItems((prev) =>
+      prev.map((x) => (x.item_id === item_id ? { ...x, qty } : x)),
+    );
   };
 
   const handleUpdateOrderItemRemark = (item_id: string, remark_de: string) => {
     setOrderItems((prev) =>
-      prev.map((x) => (x.item_id === item_id ? { ...x, remark_de } : x))
+      prev.map((x) => (x.item_id === item_id ? { ...x, remark_de } : x)),
     );
   };
 
@@ -570,7 +575,7 @@ const OrderPage = () => {
             qty: Number(l.qty ?? 1),
             remark_de: String(l.remark_de ?? ""),
           };
-        })
+        }),
       );
     } else {
       setOrderItems([]);
@@ -604,7 +609,7 @@ const OrderPage = () => {
             qty: Number(l.qty ?? 1),
             remark_de: String(l.remark_de ?? ""),
           };
-        })
+        }),
       );
     } else {
       setOrderItems([]);
@@ -636,7 +641,7 @@ const OrderPage = () => {
               qty: Number(l.qty ?? 1),
               remark_de: String(l.remark_de ?? ""),
             };
-          })
+          }),
         );
       } else {
         setViewItems([]);
@@ -656,9 +661,12 @@ const OrderPage = () => {
 
   const handleCreateOrder = async () => {
     if (!form.comment?.trim()) return toast.error("Please add a comment");
-    if (orderItems.length === 0) return toast.error("Please add at least one item");
-    if (isTab1 && !form.category_id) return toast.error("Please select a category for Orders");
-    if (isTab2 && !form.customer_id) return toast.error("Please select a customer for Customer Orders");
+    if (orderItems.length === 0)
+      return toast.error("Please add at least one item");
+    if (isTab1 && !form.category_id)
+      return toast.error("Please select a category for Orders");
+    if (isTab2 && !form.customer_id)
+      return toast.error("Please select a customer for Customer Orders");
 
     const payload = {
       customer_id: form.customer_id || null,
@@ -680,7 +688,8 @@ const OrderPage = () => {
 
   const handleUpdateOrder = async () => {
     if (!selectedOrder?.id) return;
-    if (orderItems.length === 0) return toast.error("Please add at least one item");
+    if (orderItems.length === 0)
+      return toast.error("Please add at least one item");
 
     const payload = {
       customer_id: (form.customer_id || null) as any,
@@ -712,7 +721,8 @@ const OrderPage = () => {
       const createPayload = {
         customer_id: null,
         category_id: category_id ? String(category_id) : null,
-        comment: (selectedOrder.comment ?? form.comment ?? "").slice(0, 200) || null,
+        comment:
+          (selectedOrder.comment ?? form.comment ?? "").slice(0, 200) || null,
         status: 1,
         items: orderItems.map((x) => ({
           item_id: Number(x.item_id),
@@ -723,10 +733,18 @@ const OrderPage = () => {
 
       const created: any = await createOrder(createPayload as any);
       const newOrderNo =
-        created?.data?.order_no || created?.data?.data?.order_no || created?.order_no || "";
+        created?.data?.order_no ||
+        created?.data?.data?.order_no ||
+        created?.order_no ||
+        "";
 
-      const marker = newOrderNo ? ` | Converted to ${newOrderNo}` : ` | Converted`;
-      const nextComment = ((selectedOrder.comment ?? "") + marker).slice(0, 200);
+      const marker = newOrderNo
+        ? ` | Converted to ${newOrderNo}`
+        : ` | Converted`;
+      const nextComment = ((selectedOrder.comment ?? "") + marker).slice(
+        0,
+        200,
+      );
 
       await updateOrder(originalId, {
         status: 4,
@@ -734,7 +752,9 @@ const OrderPage = () => {
       });
 
       toast.success(
-        newOrderNo ? `Converted ${originalOrderNo} → ${newOrderNo}` : `Converted ${originalOrderNo}`
+        newOrderNo
+          ? `Converted ${originalOrderNo} → ${newOrderNo}`
+          : `Converted ${originalOrderNo}`,
       );
 
       setShowModal(false);
@@ -752,8 +772,14 @@ const OrderPage = () => {
     fetchOrders();
   };
 
-  const ordersOnly = useMemo(() => orders.filter((o: any) => o.customer_id == null), [orders]);
-  const customerOrders = useMemo(() => orders.filter((o: any) => o.customer_id != null), [orders]);
+  const ordersOnly = useMemo(
+    () => orders.filter((o: any) => o.customer_id == null),
+    [orders],
+  );
+  const customerOrders = useMemo(
+    () => orders.filter((o: any) => o.customer_id != null),
+    [orders],
+  );
   const visibleOrders = activeTab === "tab2" ? customerOrders : ordersOnly;
 
   const tabActions: Record<(typeof tabs)[number]["id"], React.ReactNode> = {
@@ -764,7 +790,9 @@ const OrderPage = () => {
           disabled={loadingOrders}
           className="px-3 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-all flex items-center gap-2 disabled:opacity-50"
         >
-          <ArrowPathIcon className={`h-4 w-4 ${loadingOrders ? "animate-spin" : ""}`} />
+          <ArrowPathIcon
+            className={`h-4 w-4 ${loadingOrders ? "animate-spin" : ""}`}
+          />
           Refresh
         </button>
 
@@ -785,7 +813,9 @@ const OrderPage = () => {
           disabled={loadingOrders}
           className="px-3 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-all flex items-center gap-2 disabled:opacity-50"
         >
-          <ArrowPathIcon className={`h-4 w-4 ${loadingOrders ? "animate-spin" : ""}`} />
+          <ArrowPathIcon
+            className={`h-4 w-4 ${loadingOrders ? "animate-spin" : ""}`}
+          />
           Refresh
         </button>
 
@@ -813,7 +843,9 @@ const OrderPage = () => {
                 <h1 className="text-2xl font-bold text-gray-900 mb-2">
                   {activeTabObj?.label || "Select a tab"}
                 </h1>
-                <p className="text-gray-600 text-sm">{activeTabObj?.description || "-"}</p>
+                <p className="text-gray-600 text-sm">
+                  {activeTabObj?.description || "-"}
+                </p>
               </div>
 
               {tabActions[activeTab]}
@@ -826,10 +858,11 @@ const OrderPage = () => {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`py-3 px-1 border-b-2 font-medium text-sm ${activeTab === tab.id
-                    ? "border-gray-600 text-gray-900"
-                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                    }`}
+                  className={`py-3 px-1 border-b-2 font-medium text-sm ${
+                    activeTab === tab.id
+                      ? "border-gray-600 text-gray-900"
+                      : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                  }`}
                 >
                   {tab.label}
                 </button>
@@ -868,7 +901,10 @@ const OrderPage = () => {
                   </p>
                 </div>
 
-                <button onClick={closeView} className="text-gray-400 hover:text-gray-600 transition-colors">
+                <button
+                  onClick={closeView}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
                   <XMarkIcon className="h-5 w-5" />
                 </button>
               </div>
@@ -884,13 +920,17 @@ const OrderPage = () => {
                 <div>
                   <div className="text-gray-500">Customer</div>
                   <div className="font-medium text-gray-900">
-                    {viewOrder.customer_id != null ? getCustomerName(viewOrder.customer_id) : "-"}
+                    {viewOrder.customer_id != null
+                      ? getCustomerName(viewOrder.customer_id)
+                      : "-"}
                   </div>
                 </div>
 
                 <div className="col-span-2">
                   <div className="text-gray-500">Comment</div>
-                  <div className="font-medium text-gray-900">{viewOrder.comment ?? "-"}</div>
+                  <div className="font-medium text-gray-900">
+                    {viewOrder.comment ?? "-"}
+                  </div>
                 </div>
               </div>
 
@@ -916,9 +956,15 @@ const OrderPage = () => {
                   <tbody>
                     {viewItems.map((row) => (
                       <tr key={row.item_id} className="hover:bg-gray-50">
-                        <td className="px-4 py-2 text-sm text-gray-700 border-b">{row.item_id}</td>
-                        <td className="px-4 py-2 text-sm text-gray-700 border-b">{row.itemName}</td>
-                        <td className="px-4 py-2 text-sm text-gray-700 border-b">{row.qty}</td>
+                        <td className="px-4 py-2 text-sm text-gray-700 border-b">
+                          {row.item_id}
+                        </td>
+                        <td className="px-4 py-2 text-sm text-gray-700 border-b">
+                          {row.itemName}
+                        </td>
+                        <td className="px-4 py-2 text-sm text-gray-700 border-b">
+                          {row.qty}
+                        </td>
                         <td className="px-4 py-2 text-sm text-gray-700 border-b">
                           {row.remark_de || "-"}
                         </td>
@@ -927,7 +973,10 @@ const OrderPage = () => {
 
                     {viewItems.length === 0 && (
                       <tr>
-                        <td colSpan={4} className="px-4 py-6 text-center text-sm text-gray-500">
+                        <td
+                          colSpan={4}
+                          className="px-4 py-6 text-center text-sm text-gray-500"
+                        >
                           No items found
                         </td>
                       </tr>
@@ -974,7 +1023,8 @@ const OrderPage = () => {
 
               {isConvertMode && (
                 <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-                  <b>Note</b>. All other fields are locked. Only <b>QTY</b> and <b>Item remark</b>  is editable.
+                  <b>Note</b>. All other fields are locked. Only <b>QTY</b> and{" "}
+                  <b>Item remark</b> is editable.
                 </div>
               )}
 
@@ -1033,10 +1083,14 @@ const OrderPage = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Comment:</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Comment:
+                  </label>
                   <textarea
                     value={form.comment}
-                    onChange={(e) => setForm((prev) => ({ ...prev, comment: e.target.value }))}
+                    onChange={(e) =>
+                      setForm((prev) => ({ ...prev, comment: e.target.value }))
+                    }
                     disabled={lockAllExceptQty}
                     className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:bg-gray-50"
                     placeholder="Enter order comment..."
@@ -1070,8 +1124,12 @@ const OrderPage = () => {
                       <tbody>
                         {orderItems.map((row) => (
                           <tr key={row.item_id} className="hover:bg-gray-50">
-                            <td className="px-4 py-2 text-sm text-gray-700 border-b">{row.item_id}</td>
-                            <td className="px-4 py-2 text-sm text-gray-700 border-b">{row.itemName}</td>
+                            <td className="px-4 py-2 text-sm text-gray-700 border-b">
+                              {row.item_id}
+                            </td>
+                            <td className="px-4 py-2 text-sm text-gray-700 border-b">
+                              {row.itemName}
+                            </td>
 
                             <td className="px-4 py-2 text-sm text-gray-700 border-b">
                               <input
@@ -1079,7 +1137,10 @@ const OrderPage = () => {
                                 min={1}
                                 value={row.qty}
                                 onChange={(e) =>
-                                  handleUpdateOrderItemQty(row.item_id, Number(e.target.value))
+                                  handleUpdateOrderItemQty(
+                                    row.item_id,
+                                    Number(e.target.value),
+                                  )
                                 }
                                 className="w-20 px-2 py-1 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-gray-500 focus:border-transparent"
                               />
@@ -1091,9 +1152,11 @@ const OrderPage = () => {
                                 value={row.remark_de}
                                 // disabled={!allowRemarkEdit}
                                 onChange={(e) =>
-                                  handleUpdateOrderItemRemark(row.item_id, String(e.target.value))
+                                  handleUpdateOrderItemRemark(
+                                    row.item_id,
+                                    String(e.target.value),
+                                  )
                                 }
-
                                 className="w-64 px-2 py-1 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:bg-gray-50"
                               />
                             </td>
@@ -1101,7 +1164,9 @@ const OrderPage = () => {
                             <td className="px-4 py-2 text-sm text-gray-700 border-b text-center">
                               <button
                                 type="button"
-                                onClick={() => handleRemoveOrderItem(row.item_id)}
+                                onClick={() =>
+                                  handleRemoveOrderItem(row.item_id)
+                                }
                                 disabled={lockAllExceptQty}
                                 className="inline-flex items-center gap-1 px-3 py-1.5 text-sm bg-red-600 text-white rounded-lg hover:bg-red-500 disabled:opacity-50"
                               >
