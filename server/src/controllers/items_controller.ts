@@ -455,11 +455,16 @@ export const updateItem = async (
     ];
 
     updatableFields.forEach((field) => {
-      if (req.body[field] !== undefined) {
-        if (field === "ean" && req.body[field]) {
-          (item as any)[field] = BigInt(req.body[field]);
+      const value = req.body[field];
+      if (value !== undefined) {
+        if (field === "ean") {
+          if (value && value.toString().trim() !== "") {
+            (item as any)[field] = BigInt(value);
+          } else {
+            (item as any)[field] = null;
+          }
         } else {
-          (item as any)[field] = req.body[field];
+          (item as any)[field] = value;
         }
       }
     });
