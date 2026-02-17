@@ -29,7 +29,7 @@ export type Order = {
 
 export type OrderSearchFilters = {
   search?: string;
-  status?: number;
+  status?: any;
 };
 
 export type CreateOrderItemLine = {
@@ -77,7 +77,8 @@ export const createOrder = async (orderData: CreateOrderPayload) => {
     toast.success("Order created successfully !", successStyles);
 
     const payload = response.data;
-    if (payload && typeof payload === "object" && "success" in payload) return payload;
+    if (payload && typeof payload === "object" && "success" in payload)
+      return payload;
     return { success: true, data: payload };
   } catch (error) {
     toast.dismiss();
@@ -106,7 +107,10 @@ export const getAllOrders = async (filters?: OrderSearchFilters) => {
   }
 };
 
-export const updateOrder = async (orderId: string | number, orderData: UpdateOrderPayload) => {
+export const updateOrder = async (
+  orderId: string | number,
+  orderData: UpdateOrderPayload,
+) => {
   try {
     toast.loading("Updating order...", loadingStyles);
     const response = await api.put(`/orders/${orderId}`, orderData);
@@ -129,7 +133,8 @@ export const deleteOrder = async (orderId: string | number) => {
     const payload = response.data as ResponseInterface | any;
     toast.success(payload?.message || "Order deleted", successStyles);
 
-    if (payload && typeof payload === "object" && "success" in payload) return payload;
+    if (payload && typeof payload === "object" && "success" in payload)
+      return payload;
     return { success: true, message: payload?.message || "Order deleted" };
   } catch (error) {
     toast.dismiss();
@@ -139,7 +144,9 @@ export const deleteOrder = async (orderId: string | number) => {
 };
 
 export const getOrderStatusColor = (status: string | number) => {
-  const statusObj = getOrderStatuses().find((s) => String(s.value) === String(status));
+  const statusObj = getOrderStatuses().find(
+    (s) => String(s.value) === String(status),
+  );
   return statusObj?.color || "bg-gray-100 text-gray-800";
 };
 
