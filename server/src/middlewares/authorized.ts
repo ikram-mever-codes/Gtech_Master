@@ -73,7 +73,7 @@ export const isAdmin: RequestHandler = async (
     }
 
     if (authReq.user.role !== UserRole.ADMIN) {
-      return next(new ErrorHandler("Admin access required", 403));
+      return next(new ErrorHandler("Access Denied", 403));
     }
 
     next();
@@ -83,10 +83,6 @@ export const isAdmin: RequestHandler = async (
   }
 };
 
-/**
- * Middleware to restrict access based on user roles.
- * Admins always bypass this check.
- */
 export const authorize = (...roles: UserRole[]): RequestHandler => {
   return (req, res, next) => {
     const authReq = req as AuthorizedRequest;
@@ -102,7 +98,7 @@ export const authorize = (...roles: UserRole[]): RequestHandler => {
     if (roles.length && !roles.includes(authReq.user.role)) {
       return next(
         new ErrorHandler(
-          `Forbidden: ${authReq.user.role} role does not have access to this resource`,
+          `Access Denied`,
           403
         )
       );
