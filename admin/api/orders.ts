@@ -19,6 +19,7 @@ export type Order = {
   order_no: string;
   category_id?: string | null;
   customer_id?: string | null;
+  supplier_id?: string | null;
   status?: number | null;
   comment?: string | null;
 
@@ -39,8 +40,9 @@ export type CreateOrderItemLine = {
 };
 
 export type CreateOrderPayload = {
-  customer_id: string;
-  category_id: string;
+  customer_id?: string;
+  category_id?: string;
+  supplier_id?: string;
   comment: string;
   items: CreateOrderItemLine[];
   status?: number;
@@ -50,6 +52,7 @@ export type UpdateOrderPayload = {
   order_no?: string;
   customer_id?: string;
   category_id?: string;
+  supplier_id?: string;
   status?: number;
   comment?: string;
   items?: CreateOrderItemLine[];
