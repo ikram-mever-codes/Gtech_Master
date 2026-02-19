@@ -15,6 +15,7 @@ import {
   DocumentTextIcon,
   PencilIcon,
   TrashIcon,
+  TruckIcon,
   EyeIcon as EyeIconOutline,
 } from "@heroicons/react/24/outline";
 import { useRouter } from "next/navigation";
@@ -66,10 +67,11 @@ import {
   PaginatedResponse,
   StatisticsResponse,
 } from "@/api/items";
+import { getAllSuppliers, SupplierType } from "@/api/suppliers";
 import { getCategories } from "@/api/categories";
 import { loadingStyles, successStyles, errorStyles } from "@/utils/constants";
 
-type TabType = "items" | "parents" | "warehouse" | "tarics";
+type TabType = "items" | "parents" | "warehouse" | "tarics" | "suppliers";
 
 interface FilterState {
   search: string;
@@ -98,6 +100,7 @@ const ItemsManagementPage: React.FC = () => {
   const [parents, setParents] = useState<Parent[]>([]);
   const [warehouseItems, setWarehouseItems] = useState<WarehouseItem[]>([]);
   const [tarics, setTarics] = useState<Taric[]>([]);
+  const [suppliers, setSuppliers] = useState<SupplierType[]>([]);
 
   const [loading, setLoading] = useState(false);
   const [pagination, setPagination] = useState<PaginationState>({
@@ -259,6 +262,18 @@ const ItemsManagementPage: React.FC = () => {
           });
           setTarics(taricsResponse.data);
           setPagination(taricsResponse.pagination);
+          break;
+
+        case "suppliers":
+          const suppliersResponse: any = await getAllSuppliers({
+            page: pagination.page,
+            limit: pagination.limit,
+            search: filters.search,
+          });
+          setSuppliers(suppliersResponse.data);
+          if (suppliersResponse.pagination) {
+            setPagination(suppliersResponse.pagination);
+          }
           break;
       }
     } catch (error) {
@@ -637,6 +652,8 @@ const ItemsManagementPage: React.FC = () => {
         return warehouseItems;
       case "tarics":
         return tarics;
+      case "suppliers":
+        return suppliers;
       default:
         return [];
     }
@@ -1272,6 +1289,15 @@ const ItemsManagementPage: React.FC = () => {
                 New TARIC
               </button>
             )}
+            {activeTab === "suppliers" && (
+              <button
+                onClick={() => router.push("/suppliers")}
+                className="px-4 py-2.5 bg-[#8CC21B] text-white rounded-lg font-medium hover:bg-[#7ab318] transition-all flex items-center gap-2"
+              >
+                <PlusIcon className="w-5 h-5" />
+                Manage Suppliers
+              </button>
+            )}
           </div>
         </div>
 
@@ -1283,6 +1309,7 @@ const ItemsManagementPage: React.FC = () => {
                 { key: "parents", label: "Parents", icon: BuildingOfficeIcon },
                 { key: "warehouse", label: "Warehouse", icon: ArchiveBoxIcon },
                 { key: "tarics", label: "TARICs", icon: DocumentTextIcon },
+                { key: "suppliers", label: "Suppliers", icon: TruckIcon },
               ].map((tab) => (
                 <button
                   key={tab.key}
