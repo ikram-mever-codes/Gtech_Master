@@ -22,7 +22,7 @@ import {
     createSupplier,
     updateSupplier,
     deleteSupplier,
-    SupplierType,
+    Supplier,
 } from "@/api/suppliers";
 import { loadingStyles, successStyles, errorStyles } from "@/utils/constants";
 
@@ -33,7 +33,7 @@ interface PaginationState {
     totalPages: number;
 }
 
-const initialFormData: Partial<SupplierType> = {
+const initialFormData: Partial<Supplier> = {
     name: "",
     name_cn: "",
     company_name: "",
@@ -65,7 +65,7 @@ const initialFormData: Partial<SupplierType> = {
 
 const SuppliersPage: React.FC = () => {
     const router = useRouter();
-    const [suppliers, setSuppliers] = useState<SupplierType[]>([]);
+    const [suppliers, setSuppliers] = useState<Supplier[]>([]);
     const [loading, setLoading] = useState(false);
     const [search, setSearch] = useState("");
     const [pagination, setPagination] = useState<PaginationState>({
@@ -75,11 +75,10 @@ const SuppliersPage: React.FC = () => {
         totalPages: 1,
     });
 
-    // Modal state
     const [showModal, setShowModal] = useState(false);
     const [modalMode, setModalMode] = useState<"create" | "edit">("create");
     const [editingId, setEditingId] = useState<number | null>(null);
-    const [formData, setFormData] = useState<Partial<SupplierType>>(initialFormData);
+    const [formData, setFormData] = useState<Partial<Supplier>>(initialFormData);
     const [isEditEnabled, setIsEditEnabled] = useState(false);
     const [activeSection, setActiveSection] = useState<"general" | "address" | "contact" | "banking" | "financial">("general");
 
@@ -240,7 +239,6 @@ const SuppliersPage: React.FC = () => {
                     </div>
                 </div>
 
-                {/* Search */}
                 <div className="mb-6">
                     <div className="relative">
                         <MagnifyingGlassIcon className="w-6 h-6 absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" />
@@ -262,7 +260,6 @@ const SuppliersPage: React.FC = () => {
                     </div>
                 </div>
 
-                {/* Table */}
                 <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                     {loading ? (
                         <div className="p-20 flex justify-center items-center">
@@ -404,7 +401,6 @@ const SuppliersPage: React.FC = () => {
                                 </table>
                             </div>
 
-                            {/* Pagination */}
                             <div className="p-4 border-t border-gray-100 bg-gray-50 flex items-center justify-between">
                                 <p className="text-sm text-gray-600">
                                     Showing{" "}
@@ -446,11 +442,9 @@ const SuppliersPage: React.FC = () => {
                 </div>
             </div>
 
-            {/* Create / Edit Modal */}
             {showModal && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
                     <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[92vh] flex flex-col overflow-hidden">
-                        {/* Modal Header */}
                         <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white flex items-center justify-between flex-shrink-0">
                             <div className="flex items-center gap-3">
                                 <div className="w-10 h-10 rounded-xl bg-[#8CC21B]/10 flex items-center justify-center">
@@ -468,7 +462,6 @@ const SuppliersPage: React.FC = () => {
                                 </div>
                             </div>
                             <div className="flex items-center gap-3">
-                                {/* Enable Edit Toggle */}
                                 {modalMode === "edit" && (
                                     <div className="flex items-center gap-2">
                                         <span className="text-sm font-medium text-gray-600">
@@ -495,7 +488,6 @@ const SuppliersPage: React.FC = () => {
                             </div>
                         </div>
 
-                        {/* Section Tabs */}
                         <div className="px-6 py-2 border-b border-gray-200 bg-gray-50/50 flex-shrink-0">
                             <nav className="flex space-x-1">
                                 {sectionTabs.map((tab) => (
@@ -514,9 +506,7 @@ const SuppliersPage: React.FC = () => {
                             </nav>
                         </div>
 
-                        {/* Modal Content */}
                         <div className="flex-1 overflow-y-auto p-6">
-                            {/* General Section */}
                             {activeSection === "general" && (
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                                     <div className="md:col-span-2">
@@ -654,7 +644,6 @@ const SuppliersPage: React.FC = () => {
                                 </div>
                             )}
 
-                            {/* Address Section */}
                             {activeSection === "address" && (
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                                     <div>
@@ -715,7 +704,6 @@ const SuppliersPage: React.FC = () => {
                                 </div>
                             )}
 
-                            {/* Contact Section */}
                             {activeSection === "contact" && (
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                                     <div className="md:col-span-2">
@@ -790,7 +778,6 @@ const SuppliersPage: React.FC = () => {
                                 </div>
                             )}
 
-                            {/* Banking Section */}
                             {activeSection === "banking" && (
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                                     <div className="md:col-span-2">
@@ -837,7 +824,6 @@ const SuppliersPage: React.FC = () => {
                                 </div>
                             )}
 
-                            {/* Financial Section */}
                             {activeSection === "financial" && (
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                                     <div>
@@ -930,7 +916,6 @@ const SuppliersPage: React.FC = () => {
                             )}
                         </div>
 
-                        {/* Modal Footer */}
                         <div className="px-6 py-4 border-t border-gray-200 bg-gray-50/80 flex-shrink-0">
                             <div className="flex gap-3 justify-end">
                                 <button

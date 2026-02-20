@@ -67,7 +67,7 @@ import {
   PaginatedResponse,
   StatisticsResponse,
 } from "@/api/items";
-import { getAllSuppliers, SupplierType } from "@/api/suppliers";
+import { getAllSuppliers, Supplier } from "@/api/suppliers";
 import { getCategories } from "@/api/categories";
 import { loadingStyles, successStyles, errorStyles } from "@/utils/constants";
 
@@ -100,7 +100,7 @@ const ItemsManagementPage: React.FC = () => {
   const [parents, setParents] = useState<Parent[]>([]);
   const [warehouseItems, setWarehouseItems] = useState<WarehouseItem[]>([]);
   const [tarics, setTarics] = useState<Taric[]>([]);
-  const [suppliers, setSuppliers] = useState<SupplierType[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
 
   const [loading, setLoading] = useState(false);
   const [pagination, setPagination] = useState<PaginationState>({

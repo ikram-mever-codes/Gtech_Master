@@ -30,7 +30,9 @@ export type Order = {
 
 export type OrderSearchFilters = {
   search?: string;
-  status?: number;
+  status?: number | string;
+  page?: number;
+  limit?: number;
 };
 
 export type CreateOrderItemLine = {
@@ -62,7 +64,9 @@ const toQueryString = (filters?: OrderSearchFilters) => {
   if (!filters) return "";
   const params = new URLSearchParams();
   if (filters.search) params.set("search", filters.search);
-  if (filters.status) params.set("status", String(filters.status));
+  if (filters.status !== undefined && filters.status !== "") params.set("status", String(filters.status));
+  if (filters.page) params.set("page", String(filters.page));
+  if (filters.limit) params.set("limit", String(filters.limit));
   const qs = params.toString();
   return qs ? `?${qs}` : "";
 };

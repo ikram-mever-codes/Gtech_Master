@@ -41,16 +41,35 @@ import {
     type OrderSearchFilters,
 
     getOrderStatusColor,
+    getOrderStatuses,
 } from "@/api/orders";
 
-import { getAllCustomers } from "@/api/customers";
-import { getItems } from "@/api/items";
-import { getItemByCategory } from "@/api/items";
+import { downloadOrderPdf } from "@/api/items";
+
+
+import { getAllCustomers, type CustomerData as Customer } from "@/api/customers";
+import { getItems, getItemByCategory, type Item } from "@/api/items";
+
+
 import CustomButton from "@/components/UI/CustomButton";
 import { useSelector } from "react-redux";
 import { RootState } from "@/app/Redux/store";
 import { UserRole } from "@/utils/interfaces";
 import { DownloadCloudIcon, ToggleLeft, ToggleRight } from "lucide-react";
+
+
+interface Option {
+    value: string | number;
+    label: string;
+}
+
+interface Props {
+    items: Item[];
+    selectedItemId: string;
+    onItemChange: (itemId: string) => void;
+    onAdd: (itemId: string, qty: number) => void;
+}
+
 
 
 function ItemSelectorWithQuantity({
@@ -64,10 +83,11 @@ function ItemSelectorWithQuantity({
     const options: Option[] = [
         { value: '', label: 'All Items / Clear' },
         ...items.map(item => ({
-            value: item.id,
+            value: item.id.toString(),
             label: item.item_name || 'Unnamed Item'
         }))
     ];
+
 
     const handleAdd = () => {
         if (!selectedItemId || !quantity.trim()) return;
@@ -79,7 +99,6 @@ function ItemSelectorWithQuantity({
         }
 
         onAdd(selectedItemId, qty);
-        // Clear quantity for next entry, but keep item selected for visual feedback
         setQuantity('');
     };
 
@@ -93,7 +112,7 @@ function ItemSelectorWithQuantity({
                     }}
                     options={options}
                     value={options.find(opt => opt.value === selectedItemId)}
-                    onChange={(newValue) => onItemChange(newValue?.value ?? "")}
+                    onChange={(newValue) => onItemChange(newValue?.value?.toString() ?? "")}
                     placeholder="Search or select item..."
                     isSearchable
                     isClearable
@@ -120,40 +139,34 @@ function ItemSelectorWithQuantity({
 
 const OrderPage = () => {
 
-    // State management
     const [Orders, setOrders] = useState<Order[]>([]);
     const [loading, setLoading] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
     const [totalRecords, setTotalRecords] = useState(0);
 
-    // Modal states
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [showViewModal, setShowViewModal] = useState(false);
     const [showEditModal, setShowEditModal] = useState(false);
 
-    // Selected Orders
     const [selectedOrder, setSelectedOrder] = useState<any>(null);
     const [selectedOrderType, setSelectedOrderType] = useState<string>("");
 
-    // Data lists
     const [customers, setCustomers] = useState<Customer[]>([]);
     const [items, setItems] = useState<Item[]>([]);
     const [categories, setCategories] = useState<string[]>([]);
 
     const { user } = useSelector((state: RootState) => state.user);
 
-    //  Form state with required fields for order creation
     const [OrderFormData, setOrderFormData] = useState({
         comment: "",
         orderNo: "",
         customerId: "",
-        categoryId:"",
+        categoryId: "",
         itemId: "",
         qty: "",
     });
 
-    // Filters
     const [filters, setFilters] = useState<OrderSearchFilters>({
         search: "",
         status: "",
@@ -161,17 +174,53 @@ const OrderPage = () => {
         limit: 20,
     });
 
+    const resetCreateForm = () => {
+        setOrderFormData({
+            comment: "",
+            orderNo: "DE00125",
+            customerId: "",
+            categoryId: "",
+            itemId: "",
+            qty: "",
+        });
+        setSelectedOrderType("");
+    };
 
-    //  Check if all required fields have values
-    const isCreateOrderEnabled = 
+    const handleViewOrder = (order: any) => {
+        setSelectedOrder(order);
+        setShowViewModal(true);
+    };
+
+    const handleEditOrder = (order: any) => {
+        setSelectedOrder(order);
+        setShowEditModal(true);
+    };
+
+    const handleGeneratePdf = async (orderId: string | number) => {
+        toast.error("Generate PDF not implemented for Orders yet");
+    };
+
+    const handleDeleteOrder = async (orderId: string | number) => {
+        if (!window.confirm("Are you sure you want to delete this order?")) return;
+        try {
+            await deleteOrder(orderId);
+            fetchOrders();
+            toast.success("Order deleted successfully");
+        } catch (error) {
+            console.error("Error deleting order:", error);
+            toast.error("Failed to delete order");
+        }
+    };
+
+
+    const isCreateOrderEnabled =
         OrderFormData.comment &&
-        OrderFormData.categoryId &&
+        (selectedOrderType === "InternalOrder" ? OrderFormData.categoryId : OrderFormData.customerId) &&
         OrderFormData.itemId &&
         OrderFormData.qty;
-        OrderFormData.orderNo ="DE00125";
+    OrderFormData.orderNo = "DE00125";
 
-    
-    //temporary category array until i fetch from db
+
     const tmpCategories = [
         { id: 1, catName: 'STD' }, { id: 2, catName: 'PRO' }, { id: 3, catName: 'TBD' },
     ];
@@ -192,6 +241,7 @@ const OrderPage = () => {
         setOrderFormData(prev => ({ ...prev, categoryId }));
     };
 
+
     const handleItemChange = (itemId: string) => {
         setOrderFormData(prev => ({ ...prev, itemId }));
     };
@@ -202,21 +252,21 @@ const OrderPage = () => {
             itemId: itemId,
             qty: qty.toString()
         }));
-        const item = items.find(i => i.id === itemId);
+        const item = items.find(i => i.id.toString() === itemId);
         toast.success(`Added ${qty}x ${item?.item_name || 'item'} to order`);
     };
-    // Handle Order creation
     const handleCreateOrder = async () => {
         try {
-            //  Prepare payload with all required fields
-            const payload = {
-                ...OrderFormData,
-                qty: parseInt(OrderFormData.qty, 10),
-                orderType: selectedOrderType,
-                // Add any additional fields required by your API
-                title: OrderFormData.comment.substring(0, 50), // Generate title from comment
-                currency: "EUR",
-                validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+            const payload: CreateOrderPayload = {
+                customer_id: OrderFormData.customerId,
+                category_id: OrderFormData.categoryId,
+                comment: OrderFormData.comment,
+                items: [
+                    {
+                        item_id: parseInt(OrderFormData.itemId, 10),
+                        qty: parseInt(OrderFormData.qty, 10),
+                    }
+                ]
             };
 
             const response = await createOrder(payload);
@@ -232,65 +282,72 @@ const OrderPage = () => {
         }
     };
 
-const fetchItems = async () => {
-    const itemId = parseInt(id as string);
-    try {
-      const response = await getItemByCategory(itemId);
-      if (response?.data) {
-        setItems(
-          Array.isArray(response.data)
-            ? response.data
-            : response.data.items || []
-        );
-      }
-    } catch (error) {
-      console.error("Error while fetching items", error);
-      toast.error("Failed to fetch items");
-    }
-  };
+    const fetchItems = async () => {
+        if (!OrderFormData.categoryId) return;
+        const catId = parseInt(OrderFormData.categoryId as string);
+        try {
+            const response = await getItemByCategory(catId);
 
-  const fetchCustomers = async () => {
-      try {
-        const response = await getAllCustomers();
-        if (response?.data) {
-          setCustomers(
-            Array.isArray(response.data)
-              ? response.data
-              : response.data.customers || []
-          );
+            if (response?.data) {
+                setItems(
+                    Array.isArray(response.data)
+                        ? response.data
+                        : response.data.items || []
+                );
+            }
+        } catch (error) {
+            console.error("Error while fetching items", error);
+            toast.error("Failed to fetch items");
         }
-      } catch (error) {
-        console.error("Error fetching customers:", error);
-        toast.error("Failed to fetch customers");
-      }
+    };
+
+    const fetchCustomers = async () => {
+        try {
+            const response = await getAllCustomers();
+            if (response?.data) {
+                setCustomers(
+                    Array.isArray(response.data)
+                        ? response.data
+                        : response.data.customers || []
+                );
+            }
+        } catch (error) {
+            console.error("Error fetching customers:", error);
+            toast.error("Failed to fetch customers");
+        }
     };
     const fetchOrders = useCallback(async () => {
-      setLoading(true);
-      try {
-        const response = await getAllOrders(filters);
-        if (response.success) {
-          setOrders(response.data);
-          setTotalRecords(response.pagination?.total || response.data.length);
-          setTotalPages(response.pagination?.pages || 1);
+        setLoading(true);
+        try {
+            const response = await getAllOrders(filters);
+            if (response.success) {
+                setOrders(response.data);
+                setTotalRecords(response.pagination?.total || response.data.length);
+                setTotalPages(response.pagination?.pages || 1);
+            }
+        } catch (error) {
+            console.error("Error fetching Orders:", error);
+            toast.error("Failed to fetch orders");
+        } finally {
+            setLoading(false);
         }
-      } catch (error) {
-        console.error("Error fetching Orders:", error);
-        toast.error("Failed to fetch orders");
-      } finally {
-        setLoading(false);
-      }
     }, [filters]);
-    // Fetch data on mount
     useEffect(() => {
         fetchOrders();
-         fetchItems();
-         fetchCustomers();
-    }, [filters]);
+    }, [filters, fetchOrders]);
+
+    useEffect(() => {
+        fetchItems();
+    }, [OrderFormData.categoryId]);
+
+    useEffect(() => {
+        fetchCustomers();
+    }, []);
+
 
     return (
         <div className="min-h-screen bg-white shadow-xl rounded-lg p-6">
             <div className="max-w-7xl mx-auto">
-                {/* Header */}
                 <div className="mb-6">
                     <div className="flex justify-between items-center mb-4">
                         <div>
@@ -304,25 +361,25 @@ const fetchItems = async () => {
                                 <input
                                     type="text"
                                     placeholder="Search Orders..."
-                                    //   value={filters.search || ""}
-                                    //   onChange={(e) =>
-                                    //     setFilters({ ...filters, search: e.target.value, page: 1 })
-                                    //  }
+                                    value={filters.search || ""}
+                                    onChange={(e) =>
+                                        setFilters({ ...filters, search: e.target.value, page: 1 })
+                                    }
                                     className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent"
                                 />
                                 <select
-                                    //   value={filters.status || ""}
-                                    //   onChange={(e) =>
-                                    //     setFilters({ ...filters, status: e.target.value, page: 1 })
-                                    //   }
+                                    value={filters.status || ""}
+                                    onChange={(e) =>
+                                        setFilters({ ...filters, status: e.target.value, page: 1 })
+                                    }
                                     className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent"
                                 >
                                     <option value="">All Status</option>
-                                    {/* {getOrderStatuses().map((status) => (
-                    <option key={status.value} value={status.value}>
-                      {status.label}
-                    </option>
-                  ))} */}
+                                    {getOrderStatuses().map((status) => (
+                                        <option key={status.value} value={status.value}>
+                                            {status.label}
+                                        </option>
+                                    ))}
                                 </select>
                             </div>
 
@@ -349,7 +406,6 @@ const fetchItems = async () => {
                     </div>
                 </div>
 
-                {/* Orders Table */}
                 <div className="bg-white rounded-md shadow-lg border border-gray-200 overflow-hidden">
                     {loading ? (
                         <div className="p-8 text-center">
@@ -495,7 +551,6 @@ const fetchItems = async () => {
                             </div>
 
                             <div className="space-y-4">
-                                {/* Order Type Selection */}
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-2">
                                         Select Order Type:
@@ -511,7 +566,6 @@ const fetchItems = async () => {
                                     </select>
                                 </div>
 
-                                {/* Customer Selection (for Internal Orders) */}
                                 {selectedOrderType === "InternalOrder" && (
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -531,7 +585,6 @@ const fetchItems = async () => {
                                         </select>
                                     </div>
                                 )}
-                                {/* Customer Selection (for External Orders) */}
                                 {selectedOrderType === "ExternalOrder" && (
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -551,7 +604,6 @@ const fetchItems = async () => {
                                         </select>
                                     </div>
                                 )}
-                                {/*  Comment Input */}
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-2">
                                         Comment:
@@ -564,7 +616,6 @@ const fetchItems = async () => {
                                         rows={3}
                                     />
                                 </div>
-                                {/*  Item Selector with integrated qty */}
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-2">
                                         Select Item & qty:
@@ -577,12 +628,11 @@ const fetchItems = async () => {
                                     />
                                 </div>
 
-                                {/* Display selected item summary */}
                                 {OrderFormData.itemId && OrderFormData.qty && (
                                     <div className="p-3 bg-gray-50 rounded-lg">
                                         <p className="text-sm text-gray-700">
-                                            <span className="font-medium">Selected Item:</span> 
-                                            {items.find(i => i.id === OrderFormData.itemId)?.item_name}
+                                            <span className="font-medium">Selected Item:</span>
+                                            {items.find(i => i.id.toString() === OrderFormData.itemId)?.item_name}
                                         </p>
                                         <p className="text-sm text-gray-700 mt-1">
                                             <span className="font-medium">qty:</span> {OrderFormData.qty}
@@ -600,7 +650,6 @@ const fetchItems = async () => {
                                     >
                                         Cancel
                                     </button>
-                                    {/*  Button disabled until all fields have values */}
                                     <CustomButton
                                         gradient={true}
                                         onClick={handleCreateOrder}

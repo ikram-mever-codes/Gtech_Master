@@ -1,7 +1,7 @@
 
 import { api, handleApiError } from "../utils/api";
 
-export type SupplierType = {
+export type Supplier = {
     id: number;
     order_type_id?: number;
     name?: string;
@@ -62,7 +62,7 @@ export const getSupplierById = async (id: number) => {
     }
 };
 
-export const createSupplier = async (supplierData: Partial<SupplierType>) => {
+export const createSupplier = async (supplierData: Partial<Supplier>) => {
     try {
         const res = await api.post("/suppliers", supplierData);
         const payload = res as any;
@@ -74,7 +74,7 @@ export const createSupplier = async (supplierData: Partial<SupplierType>) => {
     }
 };
 
-export const updateSupplier = async (id: number, supplierData: Partial<SupplierType>) => {
+export const updateSupplier = async (id: number, supplierData: Partial<Supplier>) => {
     try {
         const res = await api.put(`/suppliers/${id}`, supplierData);
         const payload = res as any;

@@ -34,10 +34,23 @@ import { ShoppingCart } from "lucide-react";
 import { useSelector } from "react-redux";
 import { RootState } from "@/app/Redux/store";
 import { UserRole } from "@/utils/interfaces";
+import CargosTab from "@/components/cargos/CargosTab";
 
-// -------------------- Types --------------------
 type Item = { id: string | number; item_name?: string; name?: string };
-type Customer = { id: string | number; companyName: string };
+type Customer = {
+  id: string | number;
+  companyName: string;
+  addressLine1?: string;
+  city?: string;
+  country?: string;
+  deliveryAddressLine1?: string;
+  deliveryCity?: string;
+  deliveryCountry?: string;
+  contactEmail?: string;
+  email?: string;
+  legalName?: string;
+  contactPhoneNumber?: string;
+};
 type Category = { id: string | number; name: string };
 
 type Option = { value: string; label: string };
@@ -70,7 +83,6 @@ type OrdersTableProps = {
   onDelete: (id: string | number) => void;
   canDelete: boolean;
 
-  // convert button only in tab2
   showConvert: boolean;
   onConvert: (o: any) => void;
 };
@@ -82,9 +94,13 @@ const tabs = [
     label: "Customer Orders",
     description: "Create and manage customer orders",
   },
+  {
+    id: "tab3",
+    label: "Cargos",
+    description: "Manage Cargos and Shipments",
+  },
 ] as const;
 
-// -------------------- Components --------------------
 function ItemSelectorWithQuantity({
   items,
   selectedItemId,
@@ -297,7 +313,6 @@ function OrdersTable({
   );
 }
 
-// -------------------- Page --------------------
 const OrderPage = () => {
   const { user } = useSelector((state: RootState) => state.user);
 
@@ -330,7 +345,6 @@ const OrderPage = () => {
 
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
 
-  // ✅ View modal state
   const [showViewModal, setShowViewModal] = useState(false);
   const [viewOrder, setViewOrder] = useState<any>(null);
   const [viewItems, setViewItems] = useState<OrderItemRow[]>([]);
@@ -389,9 +403,6 @@ const OrderPage = () => {
     [suppliers]
   );
 
-  // submit rules:
-  // - convert: only needs items
-  // - normal:  previous rules
   const canSubmit = useMemo(() => {
     if (isConvertMode) return orderItems.length > 0;
 
@@ -421,7 +432,6 @@ const OrderPage = () => {
     setMode("create");
   }, []);
 
-  // -------------------- Fetchers --------------------
   const fetchCategories = useCallback(async () => {
     try {
       const response = await getCategories();
@@ -595,7 +605,6 @@ const OrderPage = () => {
     );
   };
 
-  // -------------------- Modal open flows --------------------
   const openCreate = () => {
     resetForm();
     setMode("create");
@@ -653,6 +662,7 @@ const OrderPage = () => {
     setForm({
       category_id: String(order.category_id ?? "1"),
       customer_id: String((order as any).customer_id ?? ""),
+      supplier_id: String(order.supplier_id ?? ""),
       comment: order.comment ?? "",
       status: String(order.status ?? ""),
     });
@@ -869,6 +879,7 @@ const OrderPage = () => {
         </CustomButton>
       </div>
     ),
+    tab3: null,
   };
 
   const lockAllExceptQty = isConvertMode;
@@ -905,18 +916,22 @@ const OrderPage = () => {
           </div>
 
           <div className="bg-white rounded-md shadow-lg border border-gray-200 overflow-hidden">
-            <OrdersTable
-              orders={visibleOrders}
-              loading={loadingOrders}
-              getCategoryName={getCategoryName}
-              getOrderStatusColor={getOrderStatusColor}
-              onView={openView}
-              onEdit={openEdit}
-              onDelete={handleDeleteOrder}
-              canDelete={user?.role === UserRole.ADMIN}
-              showConvert={activeTab === "tab2"}
-              onConvert={openConvert}
-            />
+            {activeTab === "tab3" ? (
+              <CargosTab customers={customers} />
+            ) : (
+              <OrdersTable
+                orders={visibleOrders}
+                loading={loadingOrders}
+                getCategoryName={getCategoryName}
+                getOrderStatusColor={getOrderStatusColor}
+                onView={openView}
+                onEdit={openEdit}
+                onDelete={handleDeleteOrder}
+                canDelete={user?.role === UserRole.ADMIN}
+                showConvert={activeTab === "tab2"}
+                onConvert={openConvert}
+              />
+            )}
           </div>
         </div>
       </div>
