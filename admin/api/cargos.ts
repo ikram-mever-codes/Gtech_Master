@@ -19,6 +19,33 @@ export type CargoType = {
     updated_at?: Date;
     orders?: any[];
     orderItems?: any[];
+
+    customer_type?: string;
+
+    bill_to_company_name?: string;
+    bill_to_display_name?: string;
+    bill_to_phone_no?: string;
+    bill_to_tax_no?: string;
+    bill_to_email?: string;
+    bill_to_website?: string;
+    bill_to_contact_person?: string;
+    bill_to_contact_phone?: string;
+    bill_to_contact_mobile?: string;
+    bill_to_contact_email?: string;
+    bill_to_country?: string;
+    bill_to_city?: string;
+    bill_to_postal_code?: string;
+    bill_to_full_address?: string;
+
+    ship_to_company_name?: string;
+    ship_to_display_name?: string;
+    ship_to_contact_person?: string;
+    ship_to_contact_phone?: string;
+    ship_to_country?: string;
+    ship_to_city?: string;
+    ship_to_postal_code?: string;
+    ship_to_full_address?: string;
+    ship_to_remarks?: string;
 };
 
 export const getAllCargos = async (params?: {

@@ -110,7 +110,7 @@ const Header = () => {
       >
         {getPageTitle()}
       </Typography> */}
-      <form className="w-[35vw]  flex gap-4 px-3 justify-start items-center h-[95%] rounded-lg bg-[#EDEDED] hover:bg-[#d0cfcf] transition-[300ms ease-in-out]">
+      <form className="lg:w-[35vw] md:w-[45vw] w-full max-w-[500px] flex gap-4 px-3 justify-start items-center h-[95%] rounded-lg bg-[#EDEDED] hover:bg-[#d0cfcf] transition-[300ms ease-in-out]">
         <button className="hover-icon">
           <Search />
         </button>

@@ -8,7 +8,6 @@ import theme from "@/styles/theme";
 import { Provider } from "react-redux";
 import { usePathname } from "next/navigation";
 import store from "@/app/Redux/store";
-import { Toaster } from "react-hot-toast";
 
 const LayoutProvider = ({ children }: { children: ReactNode }) => {
   const pathname = usePathname();
@@ -35,8 +34,7 @@ const LayoutProvider = ({ children }: { children: ReactNode }) => {
               <Sidebar />
             </aside>
 
-            <div className="flex-1 flex flex-col" suppressHydrationWarning>
-              {/* Header */}
+            <div className="flex-1 flex flex-col min-w-0" suppressHydrationWarning>
               <header className="sticky top-0 z-50">
                 <Header />
               </header>

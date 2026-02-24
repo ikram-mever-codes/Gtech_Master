@@ -30,6 +30,8 @@ import {
 import { getAllOrders, type Order } from "@/api/orders";
 import { getAllCustomers } from "@/api/customers";
 import { errorStyles, successStyles } from "@/utils/constants";
+import BillToShipToForm, { BillToShipToData } from "../General/BillToShipToForm";
+
 
 type Customer = {
     id: string | number;
@@ -96,6 +98,30 @@ const CargosTab: React.FC<CargosTabProps> = ({ customers: externalCustomers }) =
         remark: "",
         cargo_status: "Open",
         shipped_at: "",
+        customer_type: "Other Customer",
+        bill_to_company_name: "",
+        bill_to_display_name: "",
+        bill_to_phone_no: "",
+        bill_to_tax_no: "",
+        bill_to_email: "",
+        bill_to_website: "",
+        bill_to_contact_person: "",
+        bill_to_contact_phone: "",
+        bill_to_contact_mobile: "",
+        bill_to_contact_email: "",
+        bill_to_country: "",
+        bill_to_city: "",
+        bill_to_postal_code: "",
+        bill_to_full_address: "",
+        ship_to_company_name: "",
+        ship_to_display_name: "",
+        ship_to_contact_person: "",
+        ship_to_contact_phone: "",
+        ship_to_country: "",
+        ship_to_city: "",
+        ship_to_postal_code: "",
+        ship_to_full_address: "",
+        ship_to_remarks: "",
     });
 
     const [assignedOrderIds, setAssignedOrderIds] = useState<number[]>([]);
@@ -213,6 +239,30 @@ const CargosTab: React.FC<CargosTabProps> = ({ customers: externalCustomers }) =
             remark: "",
             cargo_status: "Open",
             shipped_at: "",
+            customer_type: "Other Customer",
+            bill_to_company_name: "",
+            bill_to_display_name: "",
+            bill_to_phone_no: "",
+            bill_to_tax_no: "",
+            bill_to_email: "",
+            bill_to_website: "",
+            bill_to_contact_person: "",
+            bill_to_contact_phone: "",
+            bill_to_contact_mobile: "",
+            bill_to_contact_email: "",
+            bill_to_country: "",
+            bill_to_city: "",
+            bill_to_postal_code: "",
+            bill_to_full_address: "",
+            ship_to_company_name: "",
+            ship_to_display_name: "",
+            ship_to_contact_person: "",
+            ship_to_contact_phone: "",
+            ship_to_country: "",
+            ship_to_city: "",
+            ship_to_postal_code: "",
+            ship_to_full_address: "",
+            ship_to_remarks: "",
         });
         setAssignedOrderIds([]);
         setCargoOrderItems([]);
@@ -246,6 +296,30 @@ const CargosTab: React.FC<CargosTabProps> = ({ customers: externalCustomers }) =
                     remark: cargo.remark || "",
                     cargo_status: cargo.cargo_status || "Open",
                     shipped_at: formatDateInput(cargo.shipped_at),
+                    customer_type: cargo.customer_type || "Other Customer",
+                    bill_to_company_name: cargo.bill_to_company_name || "",
+                    bill_to_display_name: cargo.bill_to_display_name || "",
+                    bill_to_phone_no: cargo.bill_to_phone_no || "",
+                    bill_to_tax_no: cargo.bill_to_tax_no || "",
+                    bill_to_email: cargo.bill_to_email || "",
+                    bill_to_website: cargo.bill_to_website || "",
+                    bill_to_contact_person: cargo.bill_to_contact_person || "",
+                    bill_to_contact_phone: cargo.bill_to_contact_phone || "",
+                    bill_to_contact_mobile: cargo.bill_to_contact_mobile || "",
+                    bill_to_contact_email: cargo.bill_to_contact_email || "",
+                    bill_to_country: cargo.bill_to_country || "",
+                    bill_to_city: cargo.bill_to_city || "",
+                    bill_to_postal_code: cargo.bill_to_postal_code || "",
+                    bill_to_full_address: cargo.bill_to_full_address || "",
+                    ship_to_company_name: cargo.ship_to_company_name || "",
+                    ship_to_display_name: cargo.ship_to_display_name || "",
+                    ship_to_contact_person: cargo.ship_to_contact_person || "",
+                    ship_to_contact_phone: cargo.ship_to_contact_phone || "",
+                    ship_to_country: cargo.ship_to_country || "",
+                    ship_to_city: cargo.ship_to_city || "",
+                    ship_to_postal_code: cargo.ship_to_postal_code || "",
+                    ship_to_full_address: cargo.ship_to_full_address || "",
+                    ship_to_remarks: cargo.ship_to_remarks || "",
                 });
                 setAssignedOrderIds((cargo.orders || []).map((o: any) => o.id));
                 setCargoOrders(cargo.orders || []);
@@ -331,9 +405,13 @@ const CargosTab: React.FC<CargosTabProps> = ({ customers: externalCustomers }) =
 
     const sectionTabs = [
         { key: "details" as const, label: "Cargo Details", icon: "📦" },
-        { key: "billto_shipto" as const, label: "Bill To / Ship To", icon: "🏠" },
+        { key: "billto_shipto" as const, label: "Bill To / Ship To", icon: "📄" },
         { key: "orders" as const, label: "Assigned Orders", icon: "📋" },
     ];
+
+    const handleBatchChange = (updates: Partial<BillToShipToData>) => {
+        setFormData(prev => ({ ...prev, ...updates }));
+    };
 
     return (
         <div>
@@ -345,7 +423,7 @@ const CargosTab: React.FC<CargosTabProps> = ({ customers: externalCustomers }) =
                         placeholder="Search cargos..."
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-gray-500 transition-all text-sm"
+                        className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-[4px] focus:ring-2 focus:ring-gray-500 focus:border-gray-500 transition-all text-sm"
                     />
                     {search && (
                         <button
@@ -360,14 +438,14 @@ const CargosTab: React.FC<CargosTabProps> = ({ customers: externalCustomers }) =
                     <button
                         onClick={fetchCargos}
                         disabled={loading}
-                        className="px-3 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-all flex items-center gap-2 disabled:opacity-50"
+                        className="px-3 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-[4px] hover:bg-gray-50 transition-all flex items-center gap-2 disabled:opacity-50"
                     >
                         <ArrowPathIcon className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
                         Refresh
                     </button>
                     <button
                         onClick={handleOpenCreate}
-                        className="px-3 py-2 text-sm bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-all flex items-center gap-2"
+                        className="px-3 py-2 text-sm bg-gray-600 text-white rounded-[4px] hover:bg-gray-700 transition-all flex items-center gap-2"
                     >
                         <PlusIcon className="h-4 w-4" />
                         New Cargo
@@ -444,7 +522,7 @@ const CargosTab: React.FC<CargosTabProps> = ({ customers: externalCustomers }) =
                                     </td>
                                     <td className="px-4 py-3 text-center">
                                         <span
-                                            className={`text-xs px-2 py-1 rounded-full font-medium ${getCargoStatusColor(
+                                            className={`text-xs px-2 py-1 rounded-[4px] font-medium ${getCargoStatusColor(
                                                 cargo.cargo_status
                                             )}`}
                                         >
@@ -514,7 +592,7 @@ const CargosTab: React.FC<CargosTabProps> = ({ customers: externalCustomers }) =
                         <button
                             onClick={() => handlePageChange(pagination.page - 1)}
                             disabled={pagination.page === 1}
-                            className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 transition-all flex items-center gap-1"
+                            className="px-3 py-1.5 text-sm border border-gray-300 rounded-[4px] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 transition-all flex items-center gap-1"
                         >
                             <ChevronLeftIcon className="w-4 h-4" />
                             Previous
@@ -525,7 +603,7 @@ const CargosTab: React.FC<CargosTabProps> = ({ customers: externalCustomers }) =
                         <button
                             onClick={() => handlePageChange(pagination.page + 1)}
                             disabled={pagination.page === pagination.totalPages}
-                            className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 transition-all flex items-center gap-1"
+                            className="px-3 py-1.5 text-sm border border-gray-300 rounded-[4px] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 transition-all flex items-center gap-1"
                         >
                             Next
                             <ChevronRightIcon className="w-4 h-4" />
@@ -536,10 +614,10 @@ const CargosTab: React.FC<CargosTabProps> = ({ customers: externalCustomers }) =
 
             {showModal && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-                    <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[92vh] flex flex-col overflow-hidden">
+                    <div className="bg-white rounded-[4px] shadow-2xl max-w-4xl w-full max-h-[92vh] flex flex-col overflow-hidden">
                         <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white flex items-center justify-between flex-shrink-0">
                             <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center">
+                                <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center">
                                     <TruckIcon className="w-5 h-5 text-gray-600" />
                                 </div>
                                 <div>
@@ -550,13 +628,6 @@ const CargosTab: React.FC<CargosTabProps> = ({ customers: externalCustomers }) =
                                                 ? "Edit Cargo"
                                                 : "Create New Cargo"}
                                     </h2>
-                                    <p className="text-sm text-gray-500">
-                                        {modalMode === "edit"
-                                            ? "Toggle edit mode to modify cargo details"
-                                            : modalMode === "view"
-                                                ? "View cargo details and assigned orders"
-                                                : "Fill in the details to create a new cargo"}
-                                    </p>
                                 </div>
                             </div>
                             <div className="flex items-center gap-3">
@@ -567,11 +638,11 @@ const CargosTab: React.FC<CargosTabProps> = ({ customers: externalCustomers }) =
                                         </span>
                                         <button
                                             onClick={() => setIsEditEnabled(!isEditEnabled)}
-                                            className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${isEditEnabled ? "bg-gray-600" : "bg-gray-300"
+                                            className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-[4px] border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${isEditEnabled ? "bg-gray-600" : "bg-gray-300"
                                                 }`}
                                         >
                                             <span
-                                                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${isEditEnabled ? "translate-x-5" : "translate-x-0"
+                                                className={`pointer-events-none inline-block h-5 w-5 transform rounded-[4px] bg-white shadow ring-0 transition duration-200 ease-in-out ${isEditEnabled ? "translate-x-5" : "translate-x-0"
                                                     }`}
                                             />
                                         </button>
@@ -579,7 +650,7 @@ const CargosTab: React.FC<CargosTabProps> = ({ customers: externalCustomers }) =
                                 )}
                                 <button
                                     onClick={() => setShowModal(false)}
-                                    className="text-gray-400 hover:text-gray-600 transition-colors p-1.5 rounded-lg hover:bg-gray-100"
+                                    className="text-gray-400 hover:text-gray-600 transition-colors p-1.5 rounded-[4px] hover:bg-gray-100"
                                 >
                                     <XMarkIcon className="h-5 w-5" />
                                 </button>
@@ -592,7 +663,7 @@ const CargosTab: React.FC<CargosTabProps> = ({ customers: externalCustomers }) =
                                     <button
                                         key={tab.key}
                                         onClick={() => setActiveSection(tab.key)}
-                                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${activeSection === tab.key
+                                        className={`px-4 py-2 rounded-[4px] text-sm font-medium transition-all flex items-center gap-2 ${activeSection === tab.key
                                             ? "bg-white text-gray-900 shadow-sm border border-gray-200"
                                             : "text-gray-500 hover:text-gray-700 hover:bg-white/50"
                                             }`}
@@ -616,7 +687,7 @@ const CargosTab: React.FC<CargosTabProps> = ({ customers: externalCustomers }) =
                                             value={formData.cargo_no || ""}
                                             onChange={(e) => updateField("cargo_no", e.target.value)}
                                             disabled={!isEditEnabled}
-                                            className="w-full px-3.5 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-gray-500 transition-all disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
+                                            className="w-full px-3.5 py-2.5 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500/50 focus:border-gray-500 transition-all disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
                                             placeholder="Enter cargo number"
                                         />
                                     </div>
@@ -630,7 +701,7 @@ const CargosTab: React.FC<CargosTabProps> = ({ customers: externalCustomers }) =
                                             value={formData.cargo_type_id || ""}
                                             onChange={(e) => updateField("cargo_type_id", e.target.value ? Number(e.target.value) : undefined)}
                                             disabled={!isEditEnabled}
-                                            className="w-full px-3.5 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-gray-500 transition-all disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
+                                            className="w-full px-3.5 py-2.5 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500/50 focus:border-gray-500 transition-all disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
                                             placeholder="Enter cargo type ID"
                                         />
                                     </div>
@@ -641,7 +712,7 @@ const CargosTab: React.FC<CargosTabProps> = ({ customers: externalCustomers }) =
                                             value={formData.cargo_status || "Open"}
                                             onChange={(e) => updateField("cargo_status", e.target.value)}
                                             disabled={!isEditEnabled}
-                                            className="w-full px-3.5 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-gray-500 transition-all disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
+                                            className="w-full px-3.5 py-2.5 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500/50 focus:border-gray-500 transition-all disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
                                         >
                                             {CARGO_STATUSES.map((s) => (
                                                 <option key={s.value} value={s.value}>
@@ -659,7 +730,7 @@ const CargosTab: React.FC<CargosTabProps> = ({ customers: externalCustomers }) =
                                             className="text-sm"
                                             classNames={{
                                                 control: () =>
-                                                    "border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500",
+                                                    "border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500",
                                             }}
                                             options={customerOptions}
                                             value={customerOptions.find((opt) => opt.value === String(formData.customer_id)) || null}
@@ -680,7 +751,7 @@ const CargosTab: React.FC<CargosTabProps> = ({ customers: externalCustomers }) =
                                             value={formatDateInput(formData.pickup_date)}
                                             onChange={(e) => updateField("pickup_date", e.target.value || null)}
                                             disabled={!isEditEnabled}
-                                            className="w-full px-3.5 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-gray-500 transition-all disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
+                                            className="w-full px-3.5 py-2.5 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500/50 focus:border-gray-500 transition-all disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
                                         />
                                     </div>
 
@@ -693,7 +764,7 @@ const CargosTab: React.FC<CargosTabProps> = ({ customers: externalCustomers }) =
                                             value={formatDateInput(formData.dep_date)}
                                             onChange={(e) => updateField("dep_date", e.target.value || null)}
                                             disabled={!isEditEnabled}
-                                            className="w-full px-3.5 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-gray-500 transition-all disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
+                                            className="w-full px-3.5 py-2.5 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500/50 focus:border-gray-500 transition-all disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
                                         />
                                     </div>
 
@@ -706,7 +777,7 @@ const CargosTab: React.FC<CargosTabProps> = ({ customers: externalCustomers }) =
                                             value={formatDateInput(formData.eta)}
                                             onChange={(e) => updateField("eta", e.target.value || null)}
                                             disabled={!isEditEnabled}
-                                            className="w-full px-3.5 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-gray-500 transition-all disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
+                                            className="w-full px-3.5 py-2.5 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500/50 focus:border-gray-500 transition-all disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
                                         />
                                     </div>
 
@@ -719,7 +790,7 @@ const CargosTab: React.FC<CargosTabProps> = ({ customers: externalCustomers }) =
                                             value={formatDateInput(formData.shipped_at)}
                                             onChange={(e) => updateField("shipped_at", e.target.value || null)}
                                             disabled={!isEditEnabled}
-                                            className="w-full px-3.5 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-gray-500 transition-all disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
+                                            className="w-full px-3.5 py-2.5 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500/50 focus:border-gray-500 transition-all disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
                                         />
                                     </div>
 
@@ -730,7 +801,7 @@ const CargosTab: React.FC<CargosTabProps> = ({ customers: externalCustomers }) =
                                             value={formData.note || ""}
                                             onChange={(e) => updateField("note", e.target.value)}
                                             disabled={!isEditEnabled}
-                                            className="w-full px-3.5 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-gray-500 transition-all disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
+                                            className="w-full px-3.5 py-2.5 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500/50 focus:border-gray-500 transition-all disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
                                             placeholder="Enter note"
                                         />
                                     </div>
@@ -744,7 +815,7 @@ const CargosTab: React.FC<CargosTabProps> = ({ customers: externalCustomers }) =
                                             value={formData.online_track || ""}
                                             onChange={(e) => updateField("online_track", e.target.value)}
                                             disabled={!isEditEnabled}
-                                            className="w-full px-3.5 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-gray-500 transition-all disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
+                                            className="w-full px-3.5 py-2.5 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500/50 focus:border-gray-500 transition-all disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
                                             placeholder="Enter tracking URL or ID"
                                         />
                                     </div>
@@ -756,7 +827,7 @@ const CargosTab: React.FC<CargosTabProps> = ({ customers: externalCustomers }) =
                                             onChange={(e) => updateField("remark", e.target.value)}
                                             disabled={!isEditEnabled}
                                             rows={2}
-                                            className="w-full px-3.5 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-gray-500 transition-all disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed resize-none"
+                                            className="w-full px-3.5 py-2.5 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500/50 focus:border-gray-500 transition-all disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed resize-none"
                                             placeholder="Enter remark"
                                         />
                                     </div>
@@ -764,116 +835,13 @@ const CargosTab: React.FC<CargosTabProps> = ({ customers: externalCustomers }) =
                             )}
 
                             {activeSection === "billto_shipto" && (
-                                <div className="space-y-6">
-                                    <div className="bg-blue-50 border border-blue-200 rounded-xl p-5">
-                                        <h3 className="text-base font-semibold text-blue-900 mb-3 flex items-center gap-2">
-                                            📄 Bill To
-                                        </h3>
-                                        {selectedCustomer ? (
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                <div>
-                                                    <p className="text-sm text-gray-500 mb-0.5">Company Name</p>
-                                                    <p className="text-sm font-medium text-gray-900">
-                                                        {selectedCustomer.companyName || "-"}
-                                                    </p>
-                                                </div>
-                                                <div>
-                                                    <p className="text-sm text-gray-500 mb-0.5">Contact Email</p>
-                                                    <p className="text-sm font-medium text-gray-900">
-                                                        {selectedCustomer.contactEmail || selectedCustomer.email || "-"}
-                                                    </p>
-                                                </div>
-                                                <div className="md:col-span-2">
-                                                    <p className="text-sm text-gray-500 mb-0.5">Billing Address</p>
-                                                    <p className="text-sm font-medium text-gray-900 leading-relaxed">
-                                                        {selectedCustomer.addressLine1 || "-"}<br />
-                                                        {selectedCustomer.city || "-"}, {selectedCustomer.country || "-"}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        ) : (
-                                            <p className="text-sm text-gray-500 italic">
-                                                No customer selected. Select a customer in the Cargo Details tab to see
-                                                billing information.
-                                            </p>
-                                        )}
-                                    </div>
-
-                                    <div className="bg-green-50 border border-green-200 rounded-xl p-5">
-                                        <h3 className="text-base font-semibold text-green-900 mb-3 flex items-center gap-2">
-                                            📦 Ship To
-                                        </h3>
-                                        {selectedCustomer ? (
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                <div>
-                                                    <p className="text-sm text-gray-500 mb-0.5">Consignee</p>
-                                                    <p className="text-sm font-medium text-gray-900">
-                                                        {selectedCustomer.legalName || selectedCustomer.companyName || "-"}
-                                                    </p>
-                                                </div>
-                                                <div>
-                                                    <p className="text-sm text-gray-500 mb-0.5">Phone</p>
-                                                    <p className="text-sm font-medium text-gray-900">
-                                                        {selectedCustomer.contactPhoneNumber || "-"}
-                                                    </p>
-                                                </div>
-                                                <div className="md:col-span-2">
-                                                    <p className="text-sm text-gray-500 mb-0.5">Shipping Address</p>
-                                                    <p className="text-sm font-medium text-gray-900 leading-relaxed">
-                                                        {selectedCustomer.deliveryAddressLine1 || selectedCustomer.addressLine1 || "-"}<br />
-                                                        {selectedCustomer.deliveryCity || selectedCustomer.city || "-"}, {selectedCustomer.deliveryCountry || selectedCustomer.country || "-"}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        ) : (
-                                            <p className="text-sm text-gray-500 italic">
-                                                No customer selected. Select a customer in the Cargo Details tab to see
-                                                shipping information.
-                                            </p>
-                                        )}
-
-                                        {formData.online_track && (
-                                            <div className="mt-3 pt-3 border-t border-green-200">
-                                                <p className="text-sm text-gray-500 mb-0.5">Tracking</p>
-                                                <p className="text-sm font-medium text-green-800">
-                                                    {formData.online_track}
-                                                </p>
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    <div className="bg-gray-50 border border-gray-200 rounded-xl p-5">
-                                        <h3 className="text-base font-semibold text-gray-900 mb-3">
-                                            📅 Shipping Timeline
-                                        </h3>
-                                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                                            <div>
-                                                <p className="text-sm text-gray-500 mb-0.5">Pickup</p>
-                                                <p className="text-sm font-medium text-gray-900">
-                                                    {formatDate(formData.pickup_date)}
-                                                </p>
-                                            </div>
-                                            <div>
-                                                <p className="text-sm text-gray-500 mb-0.5">Departure</p>
-                                                <p className="text-sm font-medium text-gray-900">
-                                                    {formatDate(formData.dep_date)}
-                                                </p>
-                                            </div>
-                                            <div>
-                                                <p className="text-sm text-gray-500 mb-0.5">ETA</p>
-                                                <p className="text-sm font-medium text-gray-900">
-                                                    {formatDate(formData.eta)}
-                                                </p>
-                                            </div>
-                                            <div>
-                                                <p className="text-sm text-gray-500 mb-0.5">Shipped</p>
-                                                <p className="text-sm font-medium text-gray-900">
-                                                    {formatDate(formData.shipped_at)}
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
+                                <BillToShipToForm
+                                    data={formData}
+                                    onChange={updateField as any}
+                                    onBatchChange={handleBatchChange}
+                                    isEditEnabled={isEditEnabled}
+                                    selectedCustomer={selectedCustomer}
+                                />
                             )}
 
                             {activeSection === "orders" && (
@@ -889,7 +857,7 @@ const CargosTab: React.FC<CargosTabProps> = ({ customers: externalCustomers }) =
                                                         className="text-sm"
                                                         classNames={{
                                                             control: () =>
-                                                                "border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500",
+                                                                "border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500",
                                                         }}
                                                         options={orderOptions}
                                                         onChange={(newValue) => {
@@ -906,7 +874,7 @@ const CargosTab: React.FC<CargosTabProps> = ({ customers: externalCustomers }) =
                                     )}
 
                                     {cargoOrders.length > 0 ? (
-                                        <div className="border border-gray-200 rounded-xl overflow-hidden">
+                                        <div className="border border-gray-200 rounded-[4px] overflow-hidden">
                                             <table className="w-full">
                                                 <thead className="bg-gray-50 border-b border-gray-200">
                                                     <tr>
@@ -974,7 +942,7 @@ const CargosTab: React.FC<CargosTabProps> = ({ customers: externalCustomers }) =
                                             <h4 className="text-sm font-semibold text-gray-700 mb-2">
                                                 Order Items ({cargoOrderItems.length})
                                             </h4>
-                                            <div className="border border-gray-200 rounded-xl overflow-hidden">
+                                            <div className="border border-gray-200 rounded-[4px] overflow-hidden">
                                                 <table className="w-full">
                                                     <thead className="bg-gray-50 border-b border-gray-200">
                                                         <tr>
@@ -1024,7 +992,7 @@ const CargosTab: React.FC<CargosTabProps> = ({ customers: externalCustomers }) =
                             <div className="flex gap-3 justify-end">
                                 <button
                                     onClick={() => setShowModal(false)}
-                                    className="px-5 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-all"
+                                    className="px-5 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-[4px] hover:bg-gray-50 transition-all"
                                 >
                                     {isEditEnabled ? "Cancel" : "Close"}
                                 </button>
@@ -1032,7 +1000,7 @@ const CargosTab: React.FC<CargosTabProps> = ({ customers: externalCustomers }) =
                                     <button
                                         onClick={handleSubmit}
                                         disabled={loading}
-                                        className="px-5 py-2.5 text-sm font-medium bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm flex items-center gap-2"
+                                        className="px-5 py-2.5 text-sm font-medium bg-gray-600 text-white rounded-[4px] hover:bg-gray-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm flex items-center gap-2"
                                     >
                                         {loading && (
                                             <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -1043,7 +1011,7 @@ const CargosTab: React.FC<CargosTabProps> = ({ customers: externalCustomers }) =
                                 {modalMode === "edit" && !isEditEnabled && (
                                     <button
                                         onClick={() => handleDelete(editingId!)}
-                                        className="px-5 py-2.5 text-sm font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all flex items-center gap-2"
+                                        className="px-5 py-2.5 text-sm font-medium bg-red-600 text-white rounded-[4px] hover:bg-red-700 transition-all flex items-center gap-2"
                                     >
                                         <TrashIcon className="w-4 h-4" />
                                         Delete Cargo

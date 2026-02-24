@@ -52,7 +52,7 @@ interface FilterState {
   maxRating: string;
   verified: string;
   source: string;
-  stage: string; // Add stage filter
+  stage: string;
 }
 const formatDateTime = (dateString: string | undefined) => {
   if (!dateString) return "-";
@@ -91,17 +91,16 @@ const BusinessSearchPage: React.FC = () => {
     maxRating: "",
     verified: "",
     source: "",
-    stage: "", // Add stage filter
+    stage: "",
   });
 
   const [categories, setCategories] = useState<string[]>([]);
   const [cities, setCities] = useState<string[]>([]);
   const [countries, setCountries] = useState<string[]>([]);
   const [sources, setSources] = useState<string[]>([]);
-  const [stages, setStages] = useState<string[]>([]); // Add stages state
+  const [stages, setStages] = useState<string[]>([]);
   const router = useRouter();
 
-  // Format date function
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString("en-US", {
@@ -111,7 +110,6 @@ const BusinessSearchPage: React.FC = () => {
     });
   };
 
-  // Get source badge color
   const getSourceBadgeColor = (source: string) => {
     switch (source) {
       case "Shop":
@@ -131,7 +129,6 @@ const BusinessSearchPage: React.FC = () => {
     }
   };
 
-  // Get stage badge color
   const getStageBadgeColor = (stage: string) => {
     switch (stage) {
       case "star_business":
@@ -144,7 +141,6 @@ const BusinessSearchPage: React.FC = () => {
     }
   };
 
-  // Get stage display name
   const getStageDisplayName = (stage: string) => {
     switch (stage) {
       case "star_business":
@@ -157,7 +153,6 @@ const BusinessSearchPage: React.FC = () => {
     }
   };
 
-  // Debounced search function
   const debouncedSearch = useCallback((searchFilters: SearchFilters) => {
     fetchBusinesses(searchFilters);
   }, []);
@@ -170,11 +165,10 @@ const BusinessSearchPage: React.FC = () => {
     return [...businesses].sort((a, b) => {
       const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
       const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-      return dateB - dateA; // Descending order (newest first)
+      return dateB - dateA;
     });
   }, [businesses]);
 
-  // Also update the API call to ensure createdAt is included in the response
   const fetchBusinesses = async (customFilters?: SearchFilters) => {
     setLoading(true);
     try {
@@ -200,7 +194,7 @@ const BusinessSearchPage: React.FC = () => {
         maxRating: filters.maxRating
           ? parseFloat(filters.maxRating)
           : undefined,
-        stage: filters.stage || undefined, // Add stage filter
+        stage: filters.stage || undefined,
         sortBy: "createdAt",
         sortOrder: "desc",
       };
@@ -208,10 +202,8 @@ const BusinessSearchPage: React.FC = () => {
       const response = await getAllBusinesses(searchFilters);
 
       if (response && response.data) {
-        // The API might already sort it, but we'll sort client-side as well for consistency
         const businessesData = response.data.businesses || [];
 
-        // Sort by createdAt descending (newest first)
         const sortedBusinesses = businessesData.sort(
           (a: Business, b: Business) => {
             const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
@@ -223,8 +215,6 @@ const BusinessSearchPage: React.FC = () => {
         setBusinesses(sortedBusinesses);
         setTotalPages(response.data.pagination.pages || 1);
         setTotalRecords(response.data.pagination.total || 0);
-
-        // ... rest of the existing code for extracting unique values
         if (sortedBusinesses) {
           const uniqueCategories: any = [
             ...new Set(
@@ -286,7 +276,7 @@ const BusinessSearchPage: React.FC = () => {
       source: filters.source || undefined,
       minRating: filters.minRating ? parseFloat(filters.minRating) : undefined,
       maxRating: filters.maxRating ? parseFloat(filters.maxRating) : undefined,
-      stage: filters.stage || undefined, // Add stage filter
+      stage: filters.stage || undefined,
     };
 
     setCurrentPage(1);
@@ -349,7 +339,7 @@ const BusinessSearchPage: React.FC = () => {
       maxRating: "",
       verified: "",
       source: "",
-      stage: "", // Reset stage filter
+      stage: "",
     });
   };
 
@@ -378,7 +368,7 @@ const BusinessSearchPage: React.FC = () => {
   };
 
   return (
-    <div className="w-full mx-auto">
+    <div className="w-full max-w-full mx-auto overflow-hidden">
       <div
         className="bg-white rounded-lg shadow-sm pb-8 p-6"
         style={{
@@ -386,7 +376,6 @@ const BusinessSearchPage: React.FC = () => {
           background: "linear-gradient(to bottom, #ffffff, #f9f9f9)",
         }}
       >
-        {/* Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
           <div>
             <PageHeader title="Business Directory" icon={Building2} />
@@ -430,7 +419,6 @@ const BusinessSearchPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Search Bar */}
         <div className="mb-6">
           <div className="relative">
             <MagnifyingGlassIcon className="w-6 h-6 absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" />
@@ -454,7 +442,6 @@ const BusinessSearchPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Advanced Filters */}
         {showFilters && (
           <div className="bg-gradient-to-r from-gray-50 to-white rounded-xl p-6 mb-6 border border-gray-100">
             <div className="flex items-center justify-between mb-4">
@@ -470,8 +457,7 @@ const BusinessSearchPage: React.FC = () => {
               </button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {/* Location Filters */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">
                   Postal Code
@@ -529,7 +515,6 @@ const BusinessSearchPage: React.FC = () => {
                 </select>
               </div>
 
-              {/* Business Filters */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">
                   Category
@@ -585,7 +570,6 @@ const BusinessSearchPage: React.FC = () => {
                 </select>
               </div>
 
-              {/* Add Stage Filter */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">
                   Stage
@@ -666,7 +650,6 @@ const BusinessSearchPage: React.FC = () => {
               </div> */}
             </div>
 
-            {/* Active Filters Display */}
             {Object.entries(filters).some(([key, value]) => value) && (
               <div className="mt-4 flex flex-wrap gap-2">
                 {Object.entries(filters).map(([key, value]) => {
@@ -691,8 +674,7 @@ const BusinessSearchPage: React.FC = () => {
           </div>
         )}
 
-        {/* Statistics Cards - Add Stage Statistics */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           <div className="bg-gradient-to-br from-blue-50 to-white rounded-xl p-5 border border-blue-100">
             <div className="flex items-center justify-between">
               <div>
@@ -735,7 +717,6 @@ const BusinessSearchPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Add Stage Statistics Card */}
           <div className="bg-gradient-to-br from-amber-50 to-white rounded-xl p-5 border border-amber-100">
             <div className="flex items-center justify-between">
               <div>
@@ -751,7 +732,6 @@ const BusinessSearchPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Data Table */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
           {loading ? (
             <div className="p-20 flex justify-center items-center">
@@ -763,7 +743,7 @@ const BusinessSearchPage: React.FC = () => {
           ) : (
             <>
               <div className="overflow-x-auto w-full">
-                <table className="w-max">
+                <table className="min-w-full w-max border-collapse">
                   <thead className="bg-gray-50 border-b border-gray-200">
                     <tr>
                       <th className="p-4">
@@ -795,7 +775,6 @@ const BusinessSearchPage: React.FC = () => {
                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                         Stage
                       </th>
-                      {/* Add Stage Column */}
                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                         Tags
                       </th>
@@ -807,11 +786,11 @@ const BusinessSearchPage: React.FC = () => {
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y w-max divide-gray-100">
+                  <tbody className="divide-y divide-gray-100">
                     {businesses.map((business: any) => (
                       <tr
                         key={business.id}
-                        className="hover:bg-gray-50 w-max transition-colors"
+                        className="hover:bg-gray-50 transition-colors"
                       >
                         <td className="p-4">
                           <input
@@ -973,7 +952,6 @@ const BusinessSearchPage: React.FC = () => {
                 </table>
               </div>
 
-              {/* Pagination */}
               <div className="p-4 border-t border-gray-100 bg-gray-50 flex items-center justify-between">
                 <div className="flex items-center gap-4">
                   <p className="text-sm text-gray-600">
@@ -1041,8 +1019,8 @@ const BusinessSearchPage: React.FC = () => {
             </>
           )}
         </div>
-      </div>
-    </div>
+      </div >
+    </div >
   );
 };
 
