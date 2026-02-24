@@ -116,7 +116,6 @@ export class RequestedItem {
   @Column({ type: "text", nullable: true })
   asanaLink!: string;
 
-  // Purchase price and currency fields
   @Column({
     type: "decimal",
     precision: 12,
@@ -136,6 +135,15 @@ export class RequestedItem {
 
   @Column({ type: "boolean", default: false })
   isEstimated!: boolean;
+
+  @Column({ type: "json", nullable: true })
+  qualityCriteria?: any[];
+
+  @Column({ type: "json", nullable: true })
+  attachments?: any[];
+
+  @Column({ type: "varchar", length: 100, nullable: true })
+  taric?: string;
 
   @ManyToOne(() => Inquiry, (inquiry) => inquiry.requests, {
     nullable: true,

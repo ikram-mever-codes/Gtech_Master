@@ -157,7 +157,6 @@ export class RequestedItemController {
         });
       }
 
-      // Get customer information for the business
       const customerRepository = AppDataSource.getRepository(Customer);
       const customer = await customerRepository.findOne({
         where: { starBusinessDetails: { id: item.businessId } },
@@ -219,21 +218,20 @@ export class RequestedItemController {
         priority,
         requestStatus,
         comment,
-        // New dimension fields
         weight,
         width,
         height,
         length,
-        // Purchase price fields
         purchasePrice,
         currency,
-        // Inquiry reference
         inquiryId,
+        qualityCriteria,
+        attachments,
+        taric,
       } = request.body;
 
-      console.log("Received contactPersonId:", contactPersonId); // Debug log
+      console.log("Received contactPersonId:", contactPersonId);
 
-      // Basic validation
       if (!businessId || !itemName || !qty) {
         return response.status(400).json({
           success: false,
@@ -300,14 +298,15 @@ export class RequestedItemController {
         priority: priority || "Normal",
         requestStatus: requestStatus || "Open",
         comment,
-        // Dimension fields
         weight,
         width,
         height,
         length,
-        // Purchase price fields
         purchasePrice,
         currency: currency || "RMB",
+        qualityCriteria,
+        attachments,
+        taric,
       });
 
       const savedItem: any = await this.requestedItemRepository.save(
@@ -352,16 +351,16 @@ export class RequestedItemController {
         priority,
         requestStatus,
         comment,
-        // New dimension fields
         weight,
         width,
         height,
         length,
-        // Purchase price fields
         purchasePrice,
         currency,
-        // Inquiry reference
         inquiryId,
+        qualityCriteria,
+        attachments,
+        taric,
       } = request.body;
 
       const existingItem = await this.requestedItemRepository.findOne({
@@ -390,7 +389,6 @@ export class RequestedItemController {
             });
           }
         } else {
-          // If contactPersonId is explicitly set to null/empty, clear the relation
           contactPerson = null;
         }
       }
@@ -409,7 +407,6 @@ export class RequestedItemController {
             });
           }
         } else {
-          // If inquiryId is explicitly set to null/empty, clear the relation
           inquiry = null;
         }
       }
@@ -429,14 +426,15 @@ export class RequestedItemController {
         ...(priority && { priority }),
         ...(requestStatus && { requestStatus }),
         ...(comment !== undefined && { comment }),
-        // Dimension fields
         ...(weight !== undefined && { weight }),
         ...(width !== undefined && { width }),
         ...(height !== undefined && { height }),
         ...(length !== undefined && { length }),
-        // Purchase price fields
         ...(purchasePrice !== undefined && { purchasePrice }),
         ...(currency && { currency }),
+        ...(qualityCriteria !== undefined && { qualityCriteria }),
+        ...(attachments !== undefined && { attachments }),
+        ...(taric !== undefined && { taric }),
       };
 
       if (contactPerson !== undefined) {
@@ -703,7 +701,6 @@ export class RequestedItemController {
     }
   }
 
-  // New method: Update multiple requested items with dimensions
   async bulkUpdateDimensions(request: Request, response: Response) {
     try {
       const { items } = request.body;
@@ -778,7 +775,6 @@ export class RequestedItemController {
     }
   }
 
-  // New method: Get items with missing dimensions
   async getItemsWithMissingDimensions(request: Request, response: Response) {
     try {
       const { page = 1, limit = 10, businessId } = request.query;

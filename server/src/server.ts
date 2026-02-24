@@ -22,7 +22,6 @@ const PORT = process.env.PORT || 1000;
   }
 })();
 
-// Function to fetch item data from MIS DB
 export async function fetchItemData(itemId: number) {
   const connection = await getConnection();
 

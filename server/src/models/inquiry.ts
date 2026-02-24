@@ -205,6 +205,9 @@ export class Inquiry {
   @Column({ type: "varchar", length: 500, nullable: true })
   projectLink?: string;
 
+  @Column({ type: "varchar", length: 500, nullable: true })
+  asanaLink?: string;
+
   @CreateDateColumn()
   createdAt!: Date;
 

@@ -332,25 +332,22 @@ export class InquiryController {
         internalNotes,
         termsConditions,
         projectLink,
+        asanaLink,
         assemblyInstructions,
-        // New dimension fields
         weight,
         width,
         height,
         length,
-        // New shipping fields
         isFragile,
         requiresSpecialHandling,
         handlingInstructions,
         numberOfPackages,
         packageType,
-        // Purchase price fields
         purchasePrice,
         purchasePriceCurrency,
         requests,
       } = request.body;
 
-      // Basic validation
       if (!name || !customerId) {
         return response.status(400).json({
           success: false,
@@ -384,7 +381,6 @@ export class InquiryController {
         }
       }
 
-      // Create inquiry with all fields including dimensions
       const inquiry = this.inquiryRepository.create({
         name,
         description,
@@ -399,14 +395,13 @@ export class InquiryController {
         internalNotes,
         termsConditions,
         projectLink,
+        asanaLink,
         assemblyInstructions,
-        // Dimension fields
         weight,
         width,
         height,
         length,
         isEstimated,
-        // Shipping fields
         isFragile: isFragile || false,
         requiresSpecialHandling: requiresSpecialHandling || false,
         handlingInstructions,
@@ -486,6 +481,7 @@ export class InquiryController {
         internalNotes,
         termsConditions,
         projectLink,
+        asanaLink,
         assemblyInstructions,
         weight,
         width,
@@ -544,6 +540,7 @@ export class InquiryController {
         ...(internalNotes !== undefined && { internalNotes }),
         ...(termsConditions !== undefined && { termsConditions }),
         ...(projectLink !== undefined && { projectLink }),
+        ...(asanaLink !== undefined && { asanaLink }),
         ...(assemblyInstructions !== undefined && { assemblyInstructions }),
         ...(isEstimated !== undefined && { isEstimated }),
         ...(weight !== undefined && { weight }),
