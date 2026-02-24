@@ -297,9 +297,10 @@ const CombinedInquiriesPageContent: React.FC = () => {
     number | null
   >(0);
 
-  const [expandedInquiryId, setExpandedInquiryId] = useState<string | null>(
-    null,
+  const [expandedInquiryIds, setExpandedInquiryIds] = useState<Set<string>>(
+    new Set(),
   );
+  const [allRequestsExpanded, setAllRequestsExpanded] = useState(true);
 
   const [inquiryImageFile, setInquiryImageFile] = useState<File | null>(null);
   const [inquiryImagePreview, setInquiryImagePreview] = useState<string>("");
@@ -526,10 +527,26 @@ const CombinedInquiriesPageContent: React.FC = () => {
   };
 
   const toggleInquiryRequests = (inquiryId: string) => {
-    if (expandedInquiryId === inquiryId) {
-      setExpandedInquiryId(null);
+    setExpandedInquiryIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(inquiryId)) {
+        next.delete(inquiryId);
+      } else {
+        next.add(inquiryId);
+      }
+      return next;
+    });
+  };
+
+  const toggleAllInquiryRequests = (inquiries: any[]) => {
+    if (allRequestsExpanded) {
+      setExpandedInquiryIds(new Set());
+      setAllRequestsExpanded(false);
     } else {
-      setExpandedInquiryId(inquiryId);
+      setExpandedInquiryIds(
+        new Set(inquiries.filter((i) => i.requests?.length > 0).map((i) => i.id))
+      );
+      setAllRequestsExpanded(true);
     }
   };
 
@@ -598,6 +615,10 @@ const CombinedInquiriesPageContent: React.FC = () => {
         const endIndex = startIndex + itemsPerPage;
         const paginatedItems = inquiryData.slice(startIndex, endIndex);
         setInquiries(paginatedItems);
+
+        const withRequests = inquiryData.filter((i: any) => i.requests?.length > 0);
+        setExpandedInquiryIds(new Set(withRequests.map((i: any) => i.id)));
+        setAllRequestsExpanded(true);
       }
     } catch (error) {
       console.error("Error fetching inquiries:", error);
@@ -1660,7 +1681,6 @@ const CombinedInquiriesPageContent: React.FC = () => {
             )}
           </div>
 
-          {/* Attachments Section */}
           <div className="col-span-2">
             <div className="flex items-center justify-between mb-2">
               <label className="block text-xs font-medium text-gray-700">
@@ -1716,7 +1736,6 @@ const CombinedInquiriesPageContent: React.FC = () => {
     );
   };
 
-  // Function to render standard request view when isAssembly = FALSE
   const renderStandardRequestView = (request: any, index: number) => {
     return (
       <div className="grid grid-cols-2 gap-2">
@@ -1788,21 +1807,35 @@ const CombinedInquiriesPageContent: React.FC = () => {
             </div>
             <div className="flex gap-2">
               {activeTab === "inquiries" ? (
-                <select
-                  value={selectedCustomerId}
-                  onChange={(e) => {
-                    setSelectedCustomerId(e.target.value);
-                    setInquiryCurrentPage(1);
-                  }}
-                  className="px-3 py-2 text-sm text-gray-700 bg-white/80 backdrop-blur-sm border border-gray-300/80 rounded-lg hover:bg-white/60 transition-all"
-                >
-                  <option value="">All Customers</option>
-                  {customers.map((customer) => (
-                    <option key={customer.id} value={customer.id}>
-                      {customer.companyName || customer.legalName}
-                    </option>
-                  ))}
-                </select>
+                <>
+                  <select
+                    value={selectedCustomerId}
+                    onChange={(e) => {
+                      setSelectedCustomerId(e.target.value);
+                      setInquiryCurrentPage(1);
+                    }}
+                    className="px-3 py-2 text-sm text-gray-700 bg-white/80 backdrop-blur-sm border border-gray-300/80 rounded-lg hover:bg-white/60 transition-all"
+                  >
+                    <option value="">All Customers</option>
+                    {customers.map((customer) => (
+                      <option key={customer.id} value={customer.id}>
+                        {customer.companyName || customer.legalName}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={() => toggleAllInquiryRequests(allInquiries)}
+                    className="px-3 py-2 text-sm text-gray-700 bg-white/80 backdrop-blur-sm border border-gray-300/80 rounded-lg hover:bg-white/60 transition-all flex items-center gap-2"
+                    title={allRequestsExpanded ? "Fold all requests" : "Unfold all requests"}
+                  >
+                    {allRequestsExpanded ? (
+                      <EyeSlashIcon className="h-4 w-4" />
+                    ) : (
+                      <EyeIcon className="h-4 w-4" />
+                    )}
+                    {allRequestsExpanded ? "Fold All" : "Unfold All"}
+                  </button>
+                </>
               ) : (
                 <>
                   <select
@@ -2087,12 +2120,12 @@ const CombinedInquiriesPageContent: React.FC = () => {
                                   e.stopPropagation();
                                   toggleInquiryRequests(inquiry.id);
                                 }}
-                                className={`px-2 py-1 text-xs rounded-lg transition-all flex items-center gap-1 ${expandedInquiryId === inquiry.id
+                                className={`px-2 py-1 text-xs rounded-lg transition-all flex items-center gap-1 ${expandedInquiryIds.has(inquiry.id)
                                   ? "bg-blue-100 text-blue-800"
                                   : "bg-blue-500 text-white hover:bg-blue-600"
                                   }`}
                               >
-                                {expandedInquiryId === inquiry.id ? (
+                                {expandedInquiryIds.has(inquiry.id) ? (
                                   <EyeSlashIcon className="h-3 w-3" />
                                 ) : (
                                   <EyeIcon className="h-3 w-3" />
@@ -2138,7 +2171,7 @@ const CombinedInquiriesPageContent: React.FC = () => {
                           </td>
                         </tr>
 
-                        {expandedInquiryId === inquiry.id &&
+                        {expandedInquiryIds.has(inquiry.id) &&
                           inquiry.requests &&
                           inquiry.requests.length > 0 && (
                             <tr className="bg-gray-50/30">
@@ -2656,10 +2689,9 @@ const CombinedInquiriesPageContent: React.FC = () => {
         )}
       </div>
 
-      {/* Inquiry Create/Edit Modal with Multiple Requests */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+          <div className={`backdrop-blur-md rounded-2xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto transition-colors duration-300 ${inquiryFormData.isAssembly ? "bg-red-50/95 border border-red-200" : "bg-white/95"}`}>
             <div className="p-6">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-xl font-bold text-gray-900">
@@ -3023,7 +3055,7 @@ const CombinedInquiriesPageContent: React.FC = () => {
 
                     {/* isAssembly Checkbox */}
                     <div className="col-span-2">
-                      <div className="flex items-center gap-2 p-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg">
+                      <div className={`flex items-center gap-2 p-2 border rounded-lg transition-colors duration-200 ${inquiryFormData.isAssembly ? "border-red-300 bg-red-100" : "border-gray-300/80 bg-white/70 backdrop-blur-sm"}`}>
                         <input
                           type="checkbox"
                           id="isAssembly"
@@ -3048,7 +3080,6 @@ const CombinedInquiriesPageContent: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Assembly Instructions (conditional) */}
                     {inquiryFormData.isAssembly && (
                       <div className="col-span-2">
                         <label className="block text-xs font-medium text-gray-700 mb-1">
@@ -3098,15 +3129,14 @@ const CombinedInquiriesPageContent: React.FC = () => {
                     {inquiryRequests.map((request, index) => (
                       <div
                         key={index}
-                        className="border border-gray-200 rounded-lg overflow-hidden"
+                        className={`border rounded-lg overflow-hidden transition-colors duration-300 ${inquiryFormData.isAssembly ? "border-red-200" : "border-gray-200"}`}
                       >
-                        {/* Request Header - Clickable to expand/collapse */}
                         <button
                           type="button"
                           onClick={() => toggleRequestExpansion(index)}
                           className={`w-full px-3 py-2 flex items-center justify-between text-left transition-colors ${expandedRequestIndex === index
-                            ? "bg-gray-100"
-                            : "bg-gray-50 hover:bg-gray-100"
+                            ? inquiryFormData.isAssembly ? "bg-red-100" : "bg-gray-100"
+                            : inquiryFormData.isAssembly ? "bg-red-50 hover:bg-red-100" : "bg-gray-50 hover:bg-gray-100"
                             }`}
                         >
                           <div className="flex items-center gap-2">
@@ -3140,9 +3170,8 @@ const CombinedInquiriesPageContent: React.FC = () => {
                           </div>
                         </button>
 
-                        {/* Request Content - Collapsible */}
                         {expandedRequestIndex === index && (
-                          <div className="p-3 bg-white">
+                          <div className={`p-3 transition-colors duration-300 ${inquiryFormData.isAssembly ? "bg-red-50/60" : "bg-white"}`}>
                             <div className="grid grid-cols-2 gap-2">
                               <div className="col-span-2">
                                 <label className="block text-xs font-medium text-gray-700 mb-1">
@@ -3546,7 +3575,7 @@ const CombinedInquiriesPageContent: React.FC = () => {
 
       {showRequestCreateModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="bg-rose-50/95 backdrop-blur-md rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-rose-200">
             <div className="p-6">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-xl font-bold text-gray-900">
