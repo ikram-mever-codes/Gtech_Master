@@ -19,28 +19,32 @@ export interface Request {
   itemName: string;
   description?: string;
   images?: string[];
-  dimensions?: {
-    length?: number;
-    width?: number;
-    height?: number;
-    unit?: string;
-    [key: string]: any;
-  };
-
+  weight?: number;
+  width?: number;
+  height?: number;
+  length?: number;
   isEstimated?: boolean;
-  quantity: number;
+  qty: string;
   purchasePrice: any;
   currency: "RMB" | "HKD" | "EUR" | "USD";
   notes?: string;
-  specifications?: string;
+  specification?: string;
   material?: string;
   color?: string;
   finish?: string;
   hasSample?: boolean;
   sampleQuantity?: number;
   expectedDeliveryDate?: string;
-  status: "Draft" | "Pending" | "Quoted" | "Ordered" | "Cancelled";
+  status: string;
   asanaLink?: string;
+  itemNo?: string;
+  urgency1?: string;
+  urgency2?: string;
+  painPoints?: string[];
+  qualityCriteria?: any[];
+  attachments?: any[];
+  taric?: string;
+  priceRMB?: number;
 }
 
 export interface Inquiry {
@@ -83,6 +87,10 @@ export interface Inquiry {
   termsConditions?: string;
   projectLink?: string;
   asanaLink?: string;
+  itemNo?: string;
+  urgency1?: string;
+  urgency2?: string;
+  painPoints?: string[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -114,6 +122,10 @@ export interface CreateInquiryPayload {
   termsConditions?: string;
   projectLink?: string;
   asanaLink?: string;
+  itemNo?: string;
+  urgency1?: string;
+  urgency2?: string;
+  painPoints?: string[];
   assemblyInstructions?: string;
   deliveryAddress?: Omit<DeliveryAddress, "id">;
   requests?: Omit<Request, "id" | "inquiryId" | "inquiry">[];

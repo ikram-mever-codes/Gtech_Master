@@ -67,6 +67,7 @@ export interface RequestedItem {
   businessId: string;
   contactPersonId?: string;
   itemName: string;
+  itemNo?: string;
   material?: string;
   specification?: string;
   extraItems: "YES" | "NO";
@@ -80,6 +81,9 @@ export interface RequestedItem {
   width?: number;
   extraNote?: string;
   asanaLink?: string;
+  urgency1?: string;
+  urgency2?: string;
+  painPoints?: string[];
   extraItemsDescriptions?: string;
   qty: string;
   interval: Interval;
@@ -101,12 +105,16 @@ export interface RequestedItemCreatePayload {
   businessId: string;
   contactPersonId?: string;
   itemName: string;
+  itemNo?: string;
   qualityCriteria: any;
   attachments: any;
   taric: any;
   extraNote?: string;
   material?: string;
   asanaLink?: string;
+  urgency1?: string;
+  urgency2?: string;
+  painPoints?: string[];
   weight?: number;
   height?: number;
   width?: number;
