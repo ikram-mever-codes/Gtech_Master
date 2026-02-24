@@ -469,7 +469,6 @@ export class InquiryController {
       });
     } catch (error) {
       console.error("Error creating inquiry:", error);
-      // Log more details about the error if possible
       if (error instanceof Error) {
         console.error("Stack trace:", error.stack);
       }
