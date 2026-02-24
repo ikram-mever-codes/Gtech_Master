@@ -338,6 +338,10 @@ export class InquiryController {
         width,
         height,
         length,
+        itemNo,
+        urgency1,
+        urgency2,
+        painPoints,
         isFragile,
         requiresSpecialHandling,
         handlingInstructions,
@@ -401,6 +405,10 @@ export class InquiryController {
         width,
         height,
         length,
+        itemNo,
+        urgency1,
+        urgency2,
+        painPoints,
         isEstimated,
         isFragile: isFragile || false,
         requiresSpecialHandling: requiresSpecialHandling || false,
@@ -450,16 +458,24 @@ export class InquiryController {
         relations: ["customer", "contactPerson", "requests"],
       });
 
+      const user = (request as AuthorizedRequest).user;
+      const filteredData = filterDataByRole(completeInquiry, user?.role || UserRole.STAFF);
+
       return response.status(201).json({
         success: true,
         message: "Inquiry created successfully",
-        data: completeInquiry,
+        data: filteredData,
       });
     } catch (error) {
       console.error("Error creating inquiry:", error);
+      // Log more details about the error if possible
+      if (error instanceof Error) {
+        console.error("Stack trace:", error.stack);
+      }
       return response.status(500).json({
         success: false,
         message: "Internal server error",
+        error: error instanceof Error ? error.message : "Unknown error"
       });
     }
   }
@@ -487,6 +503,10 @@ export class InquiryController {
         width,
         height,
         length,
+        itemNo,
+        urgency1,
+        urgency2,
+        painPoints,
         isFragile,
         requiresSpecialHandling,
         handlingInstructions,
@@ -547,6 +567,10 @@ export class InquiryController {
         ...(width !== undefined && { width }),
         ...(height !== undefined && { height }),
         ...(length !== undefined && { length }),
+        ...(itemNo !== undefined && { itemNo }),
+        ...(urgency1 !== undefined && { urgency1 }),
+        ...(urgency2 !== undefined && { urgency2 }),
+        ...(painPoints !== undefined && { painPoints }),
         ...(isFragile !== undefined && { isFragile }),
         ...(requiresSpecialHandling !== undefined && {
           requiresSpecialHandling,
