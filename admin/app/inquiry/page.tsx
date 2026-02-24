@@ -575,17 +575,18 @@ const CombinedInquiriesPageContent: React.FC = () => {
   const fetchInquiries = useCallback(async () => {
     setInquiryLoading(true);
     try {
-      let response;
-      if (selectedCustomerId) {
-        response = await getInquiriesByCustomer(selectedCustomerId);
-      } else {
-        response = await getAllInquiries(inquiryFilters);
-      }
+      const filters: any = {
+        ...inquiryFilters,
+        page: 1,
+        limit: 10000,
+        ...(selectedCustomerId ? { customerId: selectedCustomerId } : {}),
+      };
+      const response = await getAllInquiries(filters);
 
       if (response?.data) {
         const inquiryData = Array.isArray(response.data)
           ? response.data
-          : response.data.inquiries || [];
+          : response.data.data || response.data.inquiries || [];
         setAllInquiries(inquiryData);
 
         const totalFiltered = inquiryData.length;
@@ -1804,7 +1805,6 @@ const CombinedInquiriesPageContent: React.FC = () => {
                 </select>
               ) : (
                 <>
-                  {/* Dimension filters for requested items */}
                   <select
                     value={requestFilters.hasDimensions || ""}
                     onChange={(e) => {
@@ -1947,6 +1947,9 @@ const CombinedInquiriesPageContent: React.FC = () => {
                         Status
                       </th>
                       <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Asana
+                      </th>
+                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Actions
                       </th>
                     </tr>
@@ -2051,6 +2054,33 @@ const CombinedInquiriesPageContent: React.FC = () => {
                             </div>
                           </td>
                           <td className="px-4 py-3">
+                            <div className="flex items-center justify-center">
+                              {inquiry.asanaLink ? (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    window.open(inquiry.asanaLink, "_blank");
+                                  }}
+                                  className="text-purple-500 hover:text-purple-700 transition-colors p-1"
+                                  title="Open Asana task"
+                                >
+                                  <svg
+                                    className="h-5 w-5"
+                                    viewBox="0 0 24 24"
+                                    fill="currentColor"
+                                  >
+                                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z" />
+                                    <circle cx="12" cy="8.5" r="1.5" />
+                                    <circle cx="8.5" cy="14.5" r="1.5" />
+                                    <circle cx="15.5" cy="14.5" r="1.5" />
+                                  </svg>
+                                </button>
+                              ) : (
+                                <span className="text-gray-300 text-xs">—</span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
                             <div className="flex items-center justify-center gap-2">
                               <button
                                 onClick={(e) => {
@@ -2069,27 +2099,6 @@ const CombinedInquiriesPageContent: React.FC = () => {
                                 )}
                                 Requests ({inquiry.requests?.length || 0})
                               </button>
-                              {inquiry.asanaLink && (
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    window.open(inquiry.asanaLink, "_blank");
-                                  }}
-                                  className="text-purple-500 hover:text-purple-700 transition-colors p-1"
-                                  title="Open Asana task"
-                                >
-                                  <svg
-                                    className="h-4 w-4"
-                                    viewBox="0 0 24 24"
-                                    fill="currentColor"
-                                  >
-                                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z" />
-                                    <circle cx="12" cy="8.5" r="1.5" />
-                                    <circle cx="8.5" cy="14.5" r="1.5" />
-                                    <circle cx="15.5" cy="14.5" r="1.5" />
-                                  </svg>
-                                </button>
-                              )}
                               {inquiry.projectLink && (
                                 <button
                                   onClick={(e) => {
@@ -2133,7 +2142,7 @@ const CombinedInquiriesPageContent: React.FC = () => {
                           inquiry.requests &&
                           inquiry.requests.length > 0 && (
                             <tr className="bg-gray-50/30">
-                              <td colSpan={6} className="px-4 py-3">
+                              <td colSpan={7} className="px-4 py-3">
                                 <div className="overflow-x-auto">
                                   <table className="w-full text-sm border border-gray-200 rounded-lg">
                                     <thead className="bg-gray-200/50 border-b border-gray-200/50">
