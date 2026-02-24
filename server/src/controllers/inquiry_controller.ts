@@ -433,9 +433,10 @@ export class InquiryController {
 
         const requestEntities = requests.map((reqData: any) => {
           let totalWeight = null;
-          if (reqData.unitWeight && reqData.quantity) {
+          const currentQty = reqData.qty || reqData.quantity;
+          if (reqData.unitWeight && currentQty) {
             totalWeight =
-              parseFloat(reqData.unitWeight) * parseFloat(reqData.quantity);
+              parseFloat(reqData.unitWeight) * parseFloat(currentQty);
           }
 
           const requestItem = this.requestRepository.create({
@@ -443,7 +444,7 @@ export class InquiryController {
             businessId: starBusinessDetails.id,
             business: starBusinessDetails,
             inquiry: savedInquiry,
-            qty: reqData.quantity,
+            qty: currentQty,
             totalWeight: totalWeight || reqData.totalWeight,
           });
 
@@ -606,9 +607,10 @@ export class InquiryController {
           if (starBusinessDetails) {
             const requestEntities = requests.map((reqData: any) => {
               let totalWeight = null;
-              if (reqData.unitWeight && reqData.quantity) {
+              const currentQty = reqData.qty || reqData.quantity;
+              if (reqData.unitWeight && currentQty) {
                 totalWeight =
-                  parseFloat(reqData.unitWeight) * parseFloat(reqData.quantity);
+                  parseFloat(reqData.unitWeight) * parseFloat(currentQty);
               }
 
               const requestItem = this.requestRepository.create({
@@ -616,7 +618,7 @@ export class InquiryController {
                 businessId: starBusinessDetails.id,
                 business: starBusinessDetails,
                 inquiry: existingInquiry,
-                qty: reqData.quantity,
+                qty: currentQty,
                 totalWeight: totalWeight || reqData.totalWeight,
               });
 
@@ -782,15 +784,16 @@ export class InquiryController {
       }
 
       let totalWeight = null;
-      if (requestData.unitWeight && requestData.quantity) {
+      const currentQty = requestData.qty || requestData.quantity;
+      if (requestData.unitWeight && currentQty) {
         totalWeight =
-          parseFloat(requestData.unitWeight) * parseFloat(requestData.quantity);
+          parseFloat(requestData.unitWeight) * parseFloat(currentQty);
       }
 
       const requestItem = this.requestRepository.create({
         ...requestData,
         inquiry,
-        qty: requestData.quantity,
+        qty: currentQty,
         totalWeight: totalWeight || requestData.totalWeight,
       });
 
