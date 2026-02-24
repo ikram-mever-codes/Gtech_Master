@@ -120,7 +120,7 @@
 import React from "react";
 
 const Footer = () => {
-  return <div></div>;
+  return <div suppressHydrationWarning></div>;
 };
 
 export default Footer;

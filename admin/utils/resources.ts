@@ -100,40 +100,7 @@ export const availableResources: ResourceConfig[] = [
         description: "Manage supplier data - PURCHASING ONLY (hidden from SALES)",
         actions: ["create", "read", "update", "delete"],
         adminOnly: false,
-        purchasingRestricted: false, // PURCHASING has full access, SALES cannot see
+        purchasingRestricted: false,
     },
 ];
 
-/**
- * Role-Based Access Rules:
- * 
- * ADMIN:
- * - Full access to all resources
- * - Can manage users and permissions
- * - Bypasses all restrictions
- * 
- * SALES / Customer Team (DE & CY):
- * - Customers and billing addresses ✅
- * - Inquiries and Requests ✅
- * - Purchase prices (for offer calculation) ✅
- * - Sales prices ✅
- * - Offers, Customer Orders and Invoices ✅
- * - All commercial documents (PDFs) ✅
- * - CANNOT access: Supplier data (names, contacts, contracts) ❌
- * 
- * PURCHASING / Supply Chain (CN):
- * - Requests (technical data only) ✅
- * - Quantities, drawings, specifications ✅
- * - Purchase prices ✅
- * - Supplier data ✅
- * - CANNOT access:
- *   - Customer data (names, addresses, VAT IDs) ❌
- *   - Sales prices ❌
- *   - Offers, Orders, Invoices ❌
- * 
- * Key Implementation Notes:
- * - Purchase prices are visible to both SALES and PURCHASING
- * - Supplier identity is restricted from SALES
- * - Customer data and sales prices are restricted from PURCHASING
- * - Access control MUST be enforced on backend/API level, not only in UI
- */

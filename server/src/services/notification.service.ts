@@ -15,6 +15,5 @@ export async function sendEmailSafe(payload: EmailPayload) {
             subject: payload.subject,
             error,
         });
-        // ❗ intentionally not throwing error
     }
 }

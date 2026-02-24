@@ -1104,39 +1104,51 @@ export const updateUser = async (
       }
     }
 
-    user.name = name;
-    user.email = email;
-    user.role = role;
+    await AppDataSource.transaction(async (manager) => {
+      const tUserRepo = manager.getRepository(User);
+      const tPermRepo = manager.getRepository(Permission);
 
-    const rawResources = Array.isArray(assignedResources) ? assignedResources : [];
-    user.assignedResources = rawResources.map((r: string) => r.trim()).filter((r: string) => r.length > 0);
-    user.phoneNumber = phoneNumber || null;
-    user.gender = gender || null;
-    user.dateOfBirth = dateOfBirth || null;
-    user.address = address || null;
-    user.country = country || null;
-    if (partnerName !== undefined) user.partnerName = partnerName || null;
-    if (emergencyContact !== undefined) user.emergencyContact = emergencyContact || null;
-    if (joiningDate !== undefined) user.joiningDate = joiningDate || null;
-    if (isLoginEnabled !== undefined) user.isLoginEnabled = isLoginEnabled;
+      user.name = name;
+      user.email = email;
+      user.role = role;
 
-    if (permissions) {
-      await permissionRepository.delete({ user: { id: user.id } });
+      const rawResources = Array.isArray(assignedResources) ? assignedResources : [];
+      user.assignedResources = rawResources.map((r: string) => r.trim()).filter((r: string) => r.length > 0);
+      user.phoneNumber = phoneNumber || null;
+      user.gender = gender || null;
+      user.dateOfBirth = dateOfBirth || null;
+      user.address = address || null;
+      user.country = country || null;
+      if (partnerName !== undefined) user.partnerName = partnerName || null;
+      if (emergencyContact !== undefined) user.emergencyContact = emergencyContact || null;
+      if (joiningDate !== undefined) user.joiningDate = joiningDate || null;
+      if (isLoginEnabled !== undefined) user.isLoginEnabled = isLoginEnabled;
 
-      if (permissions.length > 0) {
-        const permissionEntities = permissions.map((perm: any) =>
-          permissionRepository.create({
-            resource: perm.resource,
-            actions: perm.actions,
-            user,
-          })
-        );
-        await permissionRepository.save(permissionEntities);
+      // Save user first
+      await tUserRepo.save(user);
+
+      // Handle Permissions if provided
+      if (permissions) {
+        // Delete existing for this user
+        await tPermRepo.delete({ user: { id: user.id } });
+
+        // Save new ones if any
+        if (permissions.length > 0) {
+          const permissionEntities = permissions.map((perm: any) =>
+            tPermRepo.create({
+              resource: String(perm.resource).trim(),
+              actions: Array.isArray(perm.actions)
+                ? perm.actions.map((a: any) => String(a).trim())
+                : [],
+              user,
+            })
+          );
+          await tPermRepo.save(permissionEntities);
+        }
       }
-    }
+    });
 
-    await userRepository.save(user);
-
+    // Fetch the update state to confirm and return
     const updatedUser = await userRepository.findOne({
       where: { id: user.id },
       relations: ["permissions"],

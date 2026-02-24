@@ -3,6 +3,8 @@ import { Customer } from "../models/customers";
 import { Item } from "../models/items";
 import { Parent } from "../models/parents";
 import { BusinessDetails } from "../models/business_details";
+import { Supplier } from "../models/suppliers";
+import { Category } from "../models/categories";
 
 export const seedDatabase = async () => {
     try {
@@ -12,84 +14,193 @@ export const seedDatabase = async () => {
         const itemRepository = AppDataSource.getRepository(Item);
         const parentRepository = AppDataSource.getRepository(Parent);
         const businessDetailsRepository = AppDataSource.getRepository(BusinessDetails);
+        const supplierRepository = AppDataSource.getRepository(Supplier);
+        const categoryRepository = AppDataSource.getRepository(Category);
 
-        // Check if data already exists
+        const existingSuppliers = await supplierRepository.count();
+        if (existingSuppliers === 0) {
+            console.log("📦 Seeding suppliers...");
+            const suppliers = [
+                {
+                    name: "ElectroWorld",
+                    company_name: "ElectroWorld Inc.",
+                    name_cn: "电子世界",
+                    email: "contact@electroworld.com",
+                    order_type_id: 1,
+                },
+                {
+                    name: "GlobalMech",
+                    company_name: "Global Mechanics Ltd.",
+                    name_cn: "全球机械",
+                    email: "sales@globalmech.com",
+                    order_type_id: 1,
+                },
+            ];
+            for (const s of suppliers) {
+                await supplierRepository.save(supplierRepository.create(s));
+            }
+        }
+
+        const existingCategories = await categoryRepository.count();
+        if (existingCategories === 0) {
+            console.log("📦 Seeding categories...");
+            const categories = [
+                { name: "Electronics", de_cat: "ELEC", is_ignored_value: "N" },
+                { name: "Mechanical", de_cat: "MECH", is_ignored_value: "N" },
+                { name: "Office", de_cat: "OFFIC", is_ignored_value: "N" },
+            ];
+            for (const c of categories) {
+                await categoryRepository.save(categoryRepository.create(c));
+            }
+        }
+
         const existingCustomers = await customerRepository.count();
         const existingItems = await itemRepository.count();
 
         if (existingCustomers > 0 && existingItems > 0) {
-            console.log("✅ Database already has data. Skipping seed.");
+            console.log("✅ Database already has customers/items. Skipping main seed.");
             return;
         }
 
-        // Seed Customers
-        console.log("📦 Seeding customers...");
-        const customers = [
-            {
-                companyName: "TechCorp",
-                legalName: "TechCorp GmbH",
-                email: "contact@techcorp.de",
-                contactEmail: "contact@techcorp.de",
-                contactPhoneNumber: "+49 30 12345678",
-                stage: "business" as const,
-            },
-            {
-                companyName: "InnovateLtd",
-                legalName: "Innovate Ltd.",
-                email: "info@innovate.com",
-                contactEmail: "info@innovate.com",
-                contactPhoneNumber: "+49 89 87654321",
-                stage: "business" as const,
-            },
-            {
-                companyName: "GlobalTrade",
-                legalName: "Global Trade International",
-                email: "sales@globaltrade.com",
-                contactEmail: "sales@globaltrade.com",
-                contactPhoneNumber: "+49 40 11223344",
-                stage: "star_business" as const,
-            },
-            {
-                companyName: "SmartDevices",
-                legalName: "Smart Devices AG",
-                email: "contact@smartdevices.de",
-                contactEmail: "contact@smartdevices.de",
-                contactPhoneNumber: "+49 69 99887766",
-                stage: "star_customer" as const,
-            },
-            {
-                companyName: "EuroSupply",
-                legalName: "Euro Supply Chain GmbH",
-                email: "info@eurosupply.eu",
-                contactEmail: "info@eurosupply.eu",
-                contactPhoneNumber: "+49 221 55667788",
-                stage: "business" as const,
-            },
-        ];
+        let savedSuppliers: any[] = [];
+        if (existingSuppliers === 0) {
+            console.log("📦 Seeding suppliers...");
+            const suppliers = [
+                {
+                    name: "ElectroWorld",
+                    company_name: "ElectroWorld Inc.",
+                    name_cn: "电子世界",
+                    email: "contact@electroworld.com",
+                    order_type_id: 1,
+                },
+                {
+                    name: "GlobalMech",
+                    company_name: "Global Mechanics Ltd.",
+                    name_cn: "全球机械",
+                    email: "sales@globalmech.com",
+                    order_type_id: 1,
+                },
+                {
+                    name: "OfficeDepot",
+                    company_name: "Office Depot GmbH",
+                    name_cn: "办公仓库",
+                    email: "info@officedepot.de",
+                    order_type_id: 1,
+                },
+            ];
 
-        const savedCustomers = [];
-        for (const customerData of customers) {
-            const customer = customerRepository.create(customerData);
-
-            // Create business details for each customer
-            const businessDetails = businessDetailsRepository.create({
-                businessSource: "Manual",
-                address: `${customerData.companyName} Street 123`,
-                city: "Berlin",
-                country: "Germany",
-                postalCode: "10115",
-                website: `https://www.${customerData.companyName.toLowerCase()}.com`,
-                isDeviceMaker: "Unsure",
-                customer: customer,
-            });
-
-            customer.businessDetails = businessDetails;
-            const saved = await customerRepository.save(customer);
-            savedCustomers.push(saved);
-            console.log(`  ✓ Created customer: ${saved.companyName}`);
+            for (const suppData of suppliers) {
+                const supp = supplierRepository.create(suppData);
+                const saved = await supplierRepository.save(supp);
+                savedSuppliers.push(saved);
+                console.log(`  ✓ Created supplier: ${saved.company_name}`);
+            }
         }
 
-        // Seed Parent Items
+        let savedCategories: any[] = [];
+        if (existingCategories === 0) {
+            console.log("📦 Seeding categories...");
+            const categories = [
+                {
+                    name: "Electronics",
+                    de_cat: "ELEC",
+                    is_ignored_value: "N",
+                },
+                {
+                    name: "Mechanical",
+                    de_cat: "MECH",
+                    is_ignored_value: "N",
+                },
+                {
+                    name: "Office",
+                    de_cat: "OFFIC",
+                    is_ignored_value: "N",
+                },
+                {
+                    name: "Raw Materials",
+                    de_cat: "MAT",
+                    is_ignored_value: "N",
+                },
+            ];
+
+            for (const catData of categories) {
+                const cat = categoryRepository.create(catData);
+                const saved = await categoryRepository.save(cat);
+                savedCategories.push(saved);
+                console.log(`  ✓ Created category: ${saved.name}`);
+            }
+        }
+
+        if (existingCustomers === 0) {
+            console.log("📦 Seeding customers...");
+            const customers = [
+                {
+                    companyName: "TechCorp",
+                    legalName: "TechCorp GmbH",
+                    email: "contact@techcorp.de",
+                    contactEmail: "contact@techcorp.de",
+                    contactPhoneNumber: "+49 30 12345678",
+                    stage: "business" as const,
+                },
+                {
+                    companyName: "InnovateLtd",
+                    legalName: "Innovate Ltd.",
+                    email: "info@innovate.com",
+                    contactEmail: "info@innovate.com",
+                    contactPhoneNumber: "+49 89 87654321",
+                    stage: "business" as const,
+                },
+                {
+                    companyName: "GlobalTrade",
+                    legalName: "Global Trade International",
+                    email: "sales@globaltrade.com",
+                    contactEmail: "sales@globaltrade.com",
+                    contactPhoneNumber: "+49 40 11223344",
+                    stage: "star_business" as const,
+                },
+                {
+                    companyName: "SmartDevices",
+                    legalName: "Smart Devices AG",
+                    email: "contact@smartdevices.de",
+                    contactEmail: "contact@smartdevices.de",
+                    contactPhoneNumber: "+49 69 99887766",
+                    stage: "star_customer" as const,
+                },
+                {
+                    companyName: "EuroSupply",
+                    legalName: "Euro Supply Chain GmbH",
+                    email: "info@eurosupply.eu",
+                    contactEmail: "info@eurosupply.eu",
+                    contactPhoneNumber: "+49 221 55667788",
+                    stage: "business" as const,
+                },
+            ];
+
+            const savedCustomers = [];
+            for (const customerData of customers) {
+                const customer = customerRepository.create(customerData);
+
+                const businessDetails = businessDetailsRepository.create({
+                    businessSource: "Manual",
+                    address: `${customerData.companyName} Street 123`,
+                    city: "Berlin",
+                    country: "Germany",
+                    postalCode: "10115",
+                    website: `https://www.${customerData.companyName.toLowerCase()}.com`,
+                    isDeviceMaker: "Unsure",
+                    customer: customer,
+                });
+
+                customer.businessDetails = businessDetails;
+                const saved = await customerRepository.save(customer);
+                console.log(`  ✓ Created customer: ${saved.companyName}`);
+            }
+        }
+
+        if (existingItems === 0) {
+            console.log("📦 Seeding parent items...");
+        }
+
         console.log("📦 Seeding parent items...");
         const parents = [
             {
@@ -281,9 +392,6 @@ export const seedDatabase = async () => {
         }
 
         console.log("✅ Database seeding completed successfully!");
-        console.log(`   - ${savedCustomers.length} customers created`);
-        console.log(`   - ${savedParents.length} parent items created`);
-        console.log(`   - ${items.length} items created`);
     } catch (error) {
         console.error("❌ Error seeding database:", error);
         throw error;

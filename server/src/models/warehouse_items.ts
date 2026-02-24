@@ -27,7 +27,7 @@ export class WarehouseItem {
   category_id!: number;
 
   @Column({ type: "varchar", length: 13, nullable: true })
-  ean?: string; // Changed from bigint to varchar, no foreign key
+  ean?: string;
 
   @Column({ type: "varchar", length: 100, nullable: true })
   item_no_de?: string;

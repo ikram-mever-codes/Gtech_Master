@@ -41,6 +41,8 @@ import {
 } from "@/api/bussiness";
 import { getCustomerLists, deleteList } from "@/api/list";
 import CustomButton from "@/components/UI/CustomButton";
+import { Eye, Pencil, Building2 } from "lucide-react";
+import PageHeader from "@/components/UI/PageHeader";
 import theme from "@/styles/theme";
 
 interface FormErrors {
@@ -270,21 +272,21 @@ const AddEditBusinessManual: React.FC = () => {
         },
         socialMedia: businessData.businessDetails?.socialLinks ||
           businessData.socialMedia || {
-            facebook: "",
-            instagram: "",
-            linkedin: "",
-            twitter: "",
-          },
+          facebook: "",
+          instagram: "",
+          linkedin: "",
+          twitter: "",
+        },
         businessHours: businessData.businessDetails?.businessHours ||
           businessData.businessHours || {
-            monday: "",
-            tuesday: "",
-            wednesday: "",
-            thursday: "",
-            friday: "",
-            saturday: "",
-            sunday: "",
-          },
+          monday: "",
+          tuesday: "",
+          wednesday: "",
+          thursday: "",
+          friday: "",
+          saturday: "",
+          sunday: "",
+        },
       });
 
       // Auto-open sections if there's data (for edit mode)
@@ -759,9 +761,8 @@ const AddEditBusinessManual: React.FC = () => {
             {label}
           </label>
           <div
-            className={`w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg ${
-              icon ? "flex items-center gap-3" : ""
-            }`}
+            className={`w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg ${icon ? "flex items-center gap-3" : ""
+              }`}
           >
             {icon && <span className="text-gray-400">{icon}</span>}
             <span className="text-gray-700">{displayValue}</span>
@@ -789,9 +790,8 @@ const AddEditBusinessManual: React.FC = () => {
             name={fieldName}
             value={value || ""}
             onChange={(e) => onChangeHandler(fieldName, e.target.value)}
-            className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all ${
-              formErrors[fieldName] ? "border-red-500" : "border-gray-200"
-            }`}
+            className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all ${formErrors[fieldName] ? "border-red-500" : "border-gray-200"
+              }`}
             disabled={isViewMode}
           >
             <option value="">
@@ -799,17 +799,17 @@ const AddEditBusinessManual: React.FC = () => {
             </option>
             {isStringArray
               ? (selectOptions as string[]).map((opt) => (
-                  <option key={opt} value={opt}>
-                    {opt}
-                  </option>
-                ))
+                <option key={opt} value={opt}>
+                  {opt}
+                </option>
+              ))
               : (selectOptions as { value: string; label: string }[]).map(
-                  (opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  )
-                )}
+                (opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                )
+              )}
           </select>
           {formErrors[fieldName] && (
             <p className="mt-1 text-sm text-red-500">{formErrors[fieldName]}</p>
@@ -837,11 +837,9 @@ const AddEditBusinessManual: React.FC = () => {
               const handler = customOnChange || handleInputChange;
               handler(fieldName, e.target.value);
             }}
-            className={`w-full ${
-              icon ? "pl-10" : "px-4"
-            } pr-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all ${
-              formErrors[fieldName] ? "border-red-500" : "border-gray-200"
-            } ${isViewMode ? "bg-gray-50 cursor-not-allowed" : ""}`}
+            className={`w-full ${icon ? "pl-10" : "px-4"
+              } pr-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all ${formErrors[fieldName] ? "border-red-500" : "border-gray-200"
+              } ${isViewMode ? "bg-gray-50 cursor-not-allowed" : ""}`}
             placeholder={placeholder || ""}
             disabled={isViewMode}
           />
@@ -885,32 +883,17 @@ const AddEditBusinessManual: React.FC = () => {
                   <ArrowLeftIcon className="w-5 h-5 text-gray-600" />
                 </button>
               )}
-              <h1 className="text-3xl font-semibold text-secondary flex items-center gap-3">
-                {isViewMode ? (
-                  <>
-                    <EyeIcon className="w-8 h-8 text-primary" />
-                    Business Details
-                  </>
-                ) : isEditMode ? (
-                  <>
-                    <PencilIcon className="w-8 h-8 text-primary" />
-                    Edit Business
-                  </>
-                ) : (
-                  <>
-                    <BuildingStorefrontIcon className="w-8 h-8 text-primary" />
-                    Add New Business
-                  </>
-                )}
-              </h1>
+              <PageHeader
+                title={
+                  isViewMode
+                    ? "Business Details"
+                    : isEditMode
+                      ? "Edit Business"
+                      : "Add New Business"
+                }
+                icon={isViewMode ? Eye : isEditMode ? Pencil : Building2}
+              />
             </div>
-            <p className="mt-2 text-text-secondary">
-              {isViewMode
-                ? `Viewing details for ${formData.name || "this business"}`
-                : isEditMode
-                ? `Update information for ${formData.name || "this business"}`
-                : "Enter business information with all details"}
-            </p>
           </div>
           <div className="flex items-center gap-4">
             {/* Edit Button in View Mode */}
@@ -1084,10 +1067,10 @@ const AddEditBusinessManual: React.FC = () => {
 
           {/* Star Business Details Section */}
           {(isEditMode && formData.starBusinessDetails) ||
-          (!isEditMode && !isViewMode && formData.isDeviceMaker === "Yes") ||
-          (isViewMode &&
-            formData.starBusinessDetails &&
-            Object.values(formData.starBusinessDetails).some((v) => v)) ? (
+            (!isEditMode && !isViewMode && formData.isDeviceMaker === "Yes") ||
+            (isViewMode &&
+              formData.starBusinessDetails &&
+              Object.values(formData.starBusinessDetails).some((v) => v)) ? (
             <div className="bg-gradient-to-br from-gray-50 to-white rounded-xl border border-gray-200">
               {!isViewMode ? (
                 <button
@@ -1104,8 +1087,8 @@ const AddEditBusinessManual: React.FC = () => {
                       {formData.isDeviceMaker === "Yes"
                         ? "(Device Maker)"
                         : formData.isDeviceMaker === "No"
-                        ? "(Not Device Maker)"
-                        : "(Unsure)"}
+                          ? "(Not Device Maker)"
+                          : "(Unsure)"}
                     </span>
                   </div>
                   {isStarBusinessOpen ? (
@@ -1125,24 +1108,22 @@ const AddEditBusinessManual: React.FC = () => {
                       {formData.isDeviceMaker === "Yes"
                         ? "(Device Maker)"
                         : formData.isDeviceMaker === "No"
-                        ? "(Not Device Maker)"
-                        : "(Unsure)"}
+                          ? "(Not Device Maker)"
+                          : "(Unsure)"}
                     </span>
                   </div>
                 </div>
               )}
 
               <div
-                className={`overflow-hidden transition-all duration-300 ${
-                  isStarBusinessOpen || isViewMode
+                className={`overflow-hidden transition-all duration-300 ${isStarBusinessOpen || isViewMode
                     ? "max-h-[1500px]"
                     : "max-h-0"
-                }`}
+                  }`}
               >
                 <div
-                  className={`${
-                    isViewMode ? "px-6 pb-6" : "p-8 pt-0"
-                  } space-y-6`}
+                  className={`${isViewMode ? "px-6 pb-6" : "p-8 pt-0"
+                    } space-y-6`}
                 >
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {renderField(
@@ -1194,11 +1175,10 @@ const AddEditBusinessManual: React.FC = () => {
                           onChange={(e) =>
                             handleStarBusinessChange("device", e.target.value)
                           }
-                          className={`w-full pl-10 pr-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all ${
-                            formErrors["starBusinessDetails.device"]
+                          className={`w-full pl-10 pr-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all ${formErrors["starBusinessDetails.device"]
                               ? "border-red-500"
                               : "border-gray-200"
-                          }`}
+                            }`}
                           placeholder="Enter device information"
                           disabled={isViewMode}
                         />
@@ -1343,40 +1323,38 @@ const AddEditBusinessManual: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => setIsStarCustomer(!isStarCustomer)}
-                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                          isStarCustomer ? "bg-yellow-600" : "bg-gray-300"
-                        }`}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${isStarCustomer ? "bg-yellow-600" : "bg-gray-300"
+                          }`}
                       >
                         <span
-                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                            isStarCustomer ? "translate-x-6" : "translate-x-1"
-                          }`}
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${isStarCustomer ? "translate-x-6" : "translate-x-1"
+                            }`}
                         />
                       </button>
                     </div>
                   )}
                   {(isStarCustomer ||
                     (isViewMode && formData.starCustomerEmail)) && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {renderField(
-                        "Customer Email",
-                        formData.starCustomerEmail,
-                        "starCustomerEmail",
-                        true,
-                        "email",
-                        "customer@example.com",
-                        <EnvelopeIcon className="w-5 h-5" />
-                      )}
-                      {renderField(
-                        "Display Name",
-                        formData.displayName,
-                        "displayName",
-                        false,
-                        "text",
-                        "Display name (what customers see)"
-                      )}
-                    </div>
-                  )}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {renderField(
+                          "Customer Email",
+                          formData.starCustomerEmail,
+                          "starCustomerEmail",
+                          true,
+                          "email",
+                          "customer@example.com",
+                          <EnvelopeIcon className="w-5 h-5" />
+                        )}
+                        {renderField(
+                          "Display Name",
+                          formData.displayName,
+                          "displayName",
+                          false,
+                          "text",
+                          "Display name (what customers see)"
+                        )}
+                      </div>
+                    )}
                 </div>
               </div>
             </div>
@@ -1423,16 +1401,14 @@ const AddEditBusinessManual: React.FC = () => {
               )}
 
               <div
-                className={`overflow-hidden transition-all duration-300 ${
-                  isListsSectionOpen || isViewMode
+                className={`overflow-hidden transition-all duration-300 ${isListsSectionOpen || isViewMode
                     ? "max-h-[2000px]"
                     : "max-h-0"
-                }`}
+                  }`}
               >
                 <div
-                  className={`${
-                    isViewMode ? "px-6 pb-6" : "p-8 pt-0"
-                  } space-y-4`}
+                  className={`${isViewMode ? "px-6 pb-6" : "p-8 pt-0"
+                    } space-y-4`}
                 >
                   {loadingLists ? (
                     <div className="flex items-center justify-center py-8">
@@ -1521,13 +1497,12 @@ const AddEditBusinessManual: React.FC = () => {
                                     Status
                                   </p>
                                   <span
-                                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                      list.status === "active"
+                                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${list.status === "active"
                                         ? "bg-green-100 text-green-800"
                                         : list.status === "disabled"
-                                        ? "bg-red-100 text-red-800"
-                                        : "bg-gray-100 text-gray-800"
-                                    }`}
+                                          ? "bg-red-100 text-red-800"
+                                          : "bg-gray-100 text-gray-800"
+                                      }`}
                                   >
                                     {list.status}
                                   </span>
@@ -1629,9 +1604,8 @@ const AddEditBusinessManual: React.FC = () => {
             )}
 
             <div
-              className={`overflow-hidden transition-all duration-300 ${
-                isExtraInfoOpen || isViewMode ? "max-h-[3000px]" : "max-h-0"
-              }`}
+              className={`overflow-hidden transition-all duration-300 ${isExtraInfoOpen || isViewMode ? "max-h-[3000px]" : "max-h-0"
+                }`}
             >
               <div
                 className={`${isViewMode ? "px-6 pb-6" : "p-8 pt-0"} space-y-6`}

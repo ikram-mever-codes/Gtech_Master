@@ -41,6 +41,8 @@ import {
 import theme from "@/styles/theme";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import PageHeader from "@/components/UI/PageHeader";
+import { PlusCircle, Pencil } from "lucide-react";
 import {
   createOrder,
   // createNewOrder,
@@ -183,8 +185,152 @@ const OrderCreatePage: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="w-full h-screen flex items-center justify-center">
-        <CircularProgress />
+      <div className="w-full mx-auto">
+        <Paper
+          elevation={0}
+          sx={{
+            borderRadius: 2,
+            overflow: "hidden",
+            mx: "auto",
+            maxWidth: 1200,
+            boxShadow: "0 4px 15px rgba(0, 0, 0, 0.05)",
+          }}
+        >
+          {/* Header */}
+          <Box
+            sx={{
+              p: 3,
+              borderBottom: "1px solid",
+              borderColor: "divider",
+              display: "flex",
+              alignItems: "center",
+              gap: 2,
+              bgcolor: "background.paper",
+            }}
+          >
+            <Link
+              href="/orders"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                color: theme.palette.primary.main,
+              }}
+            >
+              <IconButton
+                sx={{
+                  color: "primary.main",
+                  bgcolor: alpha(muiTheme.palette.primary.main, 0.08),
+                  "&:hover": {
+                    bgcolor: alpha(muiTheme.palette.primary.main, 0.15),
+                  },
+                }}
+              >
+                <LucideArrowLeft size={20} />
+              </IconButton>
+            </Link>
+
+            <PageHeader
+              title={isEditMode ? "Edit Order" : "Create New Order"}
+              icon={isEditMode ? Pencil : PlusCircle}
+            />
+          </Box>
+
+          {/* Form */}
+          <Box component="form" onSubmit={formik.handleSubmit} sx={{ p: 3 }}>
+            {/* Order Details Section */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 mb-8">
+              <div className="md:col-span-2">
+                <Typography
+                  variant="h6"
+                  sx={{
+                    fontWeight: 600,
+                    color: "secondary.main",
+                    mb: 2,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 1,
+                  }}
+                >
+                  <LucideFileText size={20} />
+                  Order Details
+                </Typography>
+              </div>
+
+              {/* Order Number */}
+              <div>
+                <FormInput
+                  name="order_no"
+                  label="Order Number"
+                  icon={<LucideFileText size={20} />}
+                  formik={formik}
+                  placeholder="DE3068"
+                />
+              </div>
+
+              {/* Category ID */}
+              <div>
+                <FormInput
+                  name="category_id"
+                  label="Category ID"
+                  icon={<LucidePlus size={20} />}
+                  formik={formik}
+                  placeholder="26"
+                />
+              </div>
+
+              {/* Status */}
+              <div>
+                <FormSelect
+                  name="status"
+                  label="Status"
+                  icon={<LucideChartBar size={20} />}
+                  formik={formik}
+                  options={[
+                    { value: 20, label: "Completed" },
+                    { value: 10, label: "Processing" },
+                    { value: 5, label: "Pending" },
+                    { value: 0, label: "Cancelled" },
+                  ]}
+                />
+              </div>
+
+              {/* Comment */}
+              <div className="md:col-span-2">
+                <FormInput
+                  name="comment"
+                  label="Comment"
+                  icon={<LucideMessageCircle size={20} />}
+                  formik={formik}
+                  placeholder="Optional comment..."
+                />
+              </div>
+            </div>
+
+            {/* Submit Button */}
+            <div className="border-t border-indigo-100 pt-6 mt-6 flex justify-end">
+              <CustomButton
+                type="submit"
+                disabled={isSubmitting}
+                gradient={true}
+                startIcon={
+                  isSubmitting ? (
+                    <CircularProgress size={16} />
+                  ) : (
+                    <LucideSave size={16} />
+                  )
+                }
+              >
+                {isSubmitting
+                  ? isEditMode
+                    ? "Updating..."
+                    : "Creating..."
+                  : isEditMode
+                    ? "Update Order"
+                    : "Create Order"}
+              </CustomButton>
+            </div>
+          </Box>
+        </Paper>
       </div>
     );
   }

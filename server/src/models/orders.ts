@@ -12,6 +12,7 @@ import {
 } from "typeorm";
 import { OrderItem } from "./order_items";
 import { Category } from "./categories";
+import { Supplier } from "./suppliers";
 
 @Entity()
 export class Order {
@@ -42,15 +43,21 @@ export class Order {
   // @Column({ type: "varchar", length: 50, nullable: true })
   // category_id?: string;
   @Column({ type: "int", nullable: true })
-category_id?: number;
+  category_id?: number;
 
   // @ManyToOne(() => Category, (category) => category.orders)
   // @JoinColumn({ name: "category_id", referencedColumnName: "de_cat" })
   // category!: Category;
   @ManyToOne(() => Category, (category) => category.orders)
   @JoinColumn({ name: "category_id", referencedColumnName: "id" })
-
   category!: Category;
+
+  @Column({ type: "int", nullable: true })
+  supplier_id?: number;
+
+  @ManyToOne(() => Supplier)
+  @JoinColumn({ name: "supplier_id" })
+  supplier?: Supplier;
 
 
   @OneToMany(() => OrderItem, (orderItem) => orderItem.order)

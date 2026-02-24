@@ -24,6 +24,7 @@ import { createNewInvoice } from "@/api/invoice";
 import { getAllCustomers } from "@/api/customers";
 import CustomButton from "@/components/UI/CustomButton";
 import { useRouter } from "next/navigation";
+import PageHeader from "@/components/UI/PageHeader";
 
 // Types based on your code
 interface CustomerData {
@@ -286,26 +287,8 @@ const InvoiceGenerator: React.FC = () => {
       style={{ backgroundColor: "#F8F9FA" }}
     >
       <div className="w-full mx-auto p-0">
-        {/* Enhanced Header with Gradient */}
-        <div
-          className="rounded-md p-8 mb-8 shadow-lg"
-          style={{
-            background: "linear-gradient(135deg, #8CC21B 0%, #7AB017 100%)",
-          }}
-        >
-          <div className="flex items-center gap-4 mb-3">
-            <div className="bg-white/20 p-3 rounded-lg backdrop-blur-sm">
-              <FileText className="w-8 h-8 text-white" />
-            </div>
-            <div>
-              <h1 className="text-3xl poppins-font  font-bold text-white">
-                Create New Invoice
-              </h1>
-              <p className="text-white/90 text-md font-roboto">
-                Generate professional invoices for your customers with ease
-              </p>
-            </div>
-          </div>
+        <div className="mb-8">
+          <PageHeader title="Create New Invoice" icon={FileText} />
         </div>
 
         <div className="space-y-8">

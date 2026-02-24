@@ -1,9 +1,10 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import { getCategories } from "@/api/categories";
-import { EyeIcon, PencilIcon, TrashIcon } from "lucide-react";
+import { EyeIcon, PencilIcon, TrashIcon, Layers } from "lucide-react";
 import { UserRole } from "@/utils/interfaces";
 import { useSelector } from "react-redux";
+import PageHeader from "@/components/UI/PageHeader";
 import { RootState } from "../Redux/store";
 
 const CategoryPage = () => {

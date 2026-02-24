@@ -33,6 +33,8 @@ import { ItemQuality } from "../models/item_qualities";
 import { LibraryFile } from "../models/library";
 import { DeliveryAddress, Inquiry } from "../models/inquiry";
 import { Offer, OfferLineItem } from "../models/offer";
+import { Cargo } from "../models/cargos";
+import { CargoOrder } from "../models/cargo_orders";
 
 dotenv.config();
 
@@ -80,6 +82,8 @@ export const AppDataSource = new DataSource({
     Taric,
     ItemQuality,
     Category,
+    Cargo,
+    CargoOrder,
   ],
   extra: {
     ssl:

@@ -69,6 +69,7 @@ const Header = () => {
 
   return (
     <Box
+      suppressHydrationWarning
       sx={{
         display: "flex",
         justifyContent: "space-between",
@@ -109,7 +110,7 @@ const Header = () => {
       >
         {getPageTitle()}
       </Typography> */}
-      <form className="w-[35vw]  flex gap-4 px-3 justify-start items-center h-[95%] rounded-lg bg-[#EDEDED] hover:bg-[#d0cfcf] transition-[300ms ease-in-out]">
+      <form className="lg:w-[35vw] md:w-[45vw] w-full max-w-[500px] flex gap-4 px-3 justify-start items-center h-[95%] rounded-lg bg-[#EDEDED] hover:bg-[#d0cfcf] transition-[300ms ease-in-out]">
         <button className="hover-icon">
           <Search />
         </button>
@@ -155,6 +156,7 @@ const Header = () => {
 
         {/* User Profile Icon with Menu */}
         <Box
+          suppressHydrationWarning
           sx={{
             display: "flex",
             alignItems: "center",
@@ -168,6 +170,7 @@ const Header = () => {
         >
           <IconButton onClick={openMenu}>
             <Avatar
+              suppressHydrationWarning
               src={user?.avatar}
               alt={user?.name}
               color={theme.palette.secondary.main}

@@ -38,6 +38,8 @@ import {
 import theme from "@/styles/theme";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import PageHeader from "@/components/UI/PageHeader";
+import { PlusCircle, Pencil } from "lucide-react";
 import {
   createCompany,
   updateCustomerProfile,
@@ -177,12 +179,12 @@ const CustomerCreatePage: React.FC = () => {
           // Clear delivery address if same as billing
           ...(values.sameAsBilling
             ? {
-                deliveryAddressLine1: values.addressLine1,
-                deliveryAddressLine2: values.addressLine2,
-                deliveryPostalCode: values.postalCode,
-                deliveryCity: values.city,
-                deliveryCountry: values.country,
-              }
+              deliveryAddressLine1: values.addressLine1,
+              deliveryAddressLine2: values.addressLine2,
+              deliveryPostalCode: values.postalCode,
+              deliveryCity: values.city,
+              deliveryCountry: values.country,
+            }
             : {}),
         };
 
@@ -330,31 +332,18 @@ const CustomerCreatePage: React.FC = () => {
             <IconButton
               sx={{
                 color: "primary.main",
-                bgcolor: alpha(theme.palette.primary.main, 0.08),
-                "&:hover": { bgcolor: alpha(theme.palette.primary.main, 0.15) },
+                bgcolor: alpha(muiTheme.palette.primary.main, 0.08),
+                "&:hover": { bgcolor: alpha(muiTheme.palette.primary.main, 0.15) },
               }}
             >
               <LucideArrowLeft size={20} />
             </IconButton>
           </Link>
 
-          <Box>
-            <Typography
-              variant="h4"
-              sx={{
-                color: "secondary.main",
-                fontSize: { xs: "1.5rem", md: "1.75rem" },
-                fontWeight: 600,
-              }}
-            >
-              {isEditMode ? "Edit Company" : "Create New Company"}
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              {isEditMode
-                ? "Update company account information"
-                : "Add a new company account with billing and delivery information"}
-            </Typography>
-          </Box>
+          <PageHeader
+            title={isEditMode ? "Edit Company" : "Create New Company"}
+            icon={isEditMode ? Pencil : PlusCircle}
+          />
         </Box>
 
         <Box component="form" onSubmit={formik.handleSubmit} sx={{ p: 3 }}>
@@ -617,8 +606,8 @@ const CustomerCreatePage: React.FC = () => {
                   ? "Updating..."
                   : "Creating..."
                 : isEditMode
-                ? "Update Company"
-                : "Create Company"}
+                  ? "Update Company"
+                  : "Create Company"}
             </CustomButton>
           </div>
         </Box>

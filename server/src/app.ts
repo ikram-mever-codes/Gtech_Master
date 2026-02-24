@@ -19,6 +19,8 @@ import inquiryRoutes from "./routes/inquiry_routes";
 import offerRoutes from "./routes/offer_routes";
 import orderRoutes from "./routes/orderRoutes";
 import qtyRoutes from "./routes/qtyRoutes";
+import supplierRoutes from "./routes/supplier_routes";
+import cargoRoutes from "./routes/cargo_routes";
 
 
 const app: any = express();
@@ -55,6 +57,8 @@ app.use("/api/v1/inquiries", inquiryRoutes);
 app.use("/api/v1/offers", offerRoutes);
 app.use("/api/v1/orders", orderRoutes);
 app.use("/api/v1/categories", qtyRoutes);
+app.use("/api/v1/suppliers", supplierRoutes);
+app.use("/api/v1/cargos", cargoRoutes);
 
 const __uploads_dirname = path.resolve();
 app.use("/uploads", express.static(path.join(__uploads_dirname, "/uploads")));

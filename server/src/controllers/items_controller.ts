@@ -32,8 +32,6 @@ export const getItems = async (
 ) => {
   try {
     const itemRepository = AppDataSource.getRepository(Item);
-
-    // Get query parameters
     const {
       page = "1",
       limit = "50",
@@ -52,41 +50,30 @@ export const getItems = async (
     const limitNum = parseInt(limit as string);
     const skip = (pageNum - 1) * limitNum;
 
-    // Build where conditions
     const whereConditions: FindOptionsWhere<Item> = {};
 
-    // Search across multiple fields
     if (search) {
       whereConditions.item_name = ILike(`%${search}%`);
     }
 
-    // Filter by status/active
     if (isActive) {
       whereConditions.isActive = isActive as string;
     }
-
-    // Filter by category
     if (category) {
       whereConditions.cat_id = parseInt(category as string);
     }
 
-    // Filter by parent
     if (parentId) {
       whereConditions.parent_id = parseInt(parentId as string);
     }
-
-    // Filter by taric
     if (taricId) {
       whereConditions.taric_id = parseInt(taricId as string);
     }
 
-    // Build relations
     const relations = ["parent", "taric", "category"];
 
-    // Get total count
     const totalRecords = await itemRepository.count({ where: whereConditions });
 
-    // Get paginated items
     const items = await itemRepository.find({
       where: whereConditions,
       relations,
@@ -97,7 +84,6 @@ export const getItems = async (
       take: limitNum,
     });
 
-    // Format response
     const formattedItems = items.map((item) => ({
       id: item.id,
       de_no: item.parent?.de_no || null,
@@ -143,7 +129,6 @@ export const getItems = async (
   }
 };
 
-// Get item by ID
 export const getItemById = async (
   req: Request,
   res: Response,
@@ -162,7 +147,6 @@ export const getItemById = async (
     const qualityRepository = AppDataSource.getRepository(ItemQuality);
     const orderItemRepository = AppDataSource.getRepository(OrderItem);
 
-    // Get item with relations
     const item = await itemRepository.findOne({
       where: { id: parseInt(id) },
       relations: ["parent", "taric", "category"],
@@ -172,7 +156,6 @@ export const getItemById = async (
       return next(new ErrorHandler("Item not found", 404));
     }
 
-    // Get related data
     const warehouseItems = await warehouseRepository.find({
       where: { item_id: parseInt(id) },
     });
@@ -190,7 +173,6 @@ export const getItemById = async (
     //   relations: ["order"],
     // });
 
-    // Format response based on your frontend structure
     const formattedItem = {
       id: item.id,
       itemNo: `${item.id} / ${item.parent?.de_no || ""}`,
@@ -202,20 +184,18 @@ export const getItemById = async (
       remark: item.remark || "",
       isActive: item.isActive === "Y",
 
-      // Parent details
       parent: {
         noDE: item.parent?.de_no || "NONE",
         nameDE: item.parent?.name_de || "NONE",
         nameEN: item.parent?.name_en || "NONE",
         isActive: item.parent?.is_active === "Y",
         isSpecialItem: item.parent?.is_NwV === "Y",
-        priceEUR: 0, // You'll need to add this to your model
-        priceRMB: 0, // You'll need to add this to your model
+        priceEUR: 0,
+        priceRMB: 0,
         isEURSpecial: item.is_eur_special === "Y",
         isRMBSpecial: item.is_rmb_special === "Y",
       },
 
-      // Dimensions
       dimensions: {
         isbn: item.ISBN?.toString() || "1",
         weight: item.weight?.toString() || "0",
@@ -224,7 +204,6 @@ export const getItemById = async (
         height: item.height?.toString() || "0",
       },
 
-      // Variations
       variationsDE: {
         variations: [
           item.parent?.var_de_1,
@@ -242,7 +221,6 @@ export const getItemById = async (
         values: variationValues.map((v) => v.value_en).filter(Boolean),
       },
 
-      // Others
       others: {
         taricCode: item.taric?.code || "",
         isQTYdiv: item.is_qty_dividable === "Y",
@@ -263,12 +241,16 @@ export const getItemById = async (
           .reduce((sum, wi: any) => sum + wi.stock_qty, 0)
           .toString(),
         msq: warehouseItems[0]?.msq?.toString() || "0",
-        isNAO: false,
+        isNAO: warehouseItems[0]?.is_no_auto_order === "Y",
         buffer: warehouseItems[0]?.buffer?.toString() || "0",
-        isSnSI: false,
+        isSnSI: warehouseItems[0]?.is_SnSI === "Y",
+        foq: item.FOQ?.toString() || "0",
+        fsq: item.FSQ?.toString() || "0",
+        rmbPrice: item.RMB_Price?.toString() || "0",
+        isDimensionSpecial: item.is_dimension_special === "Y",
+        suppCat: item.supp_cat || "",
       },
 
-      // Quality criteria
       qualityCriteria: qualityCriteria.map((qc: any) => ({
         id: qc.id,
         name: qc.name || "",
@@ -277,16 +259,13 @@ export const getItemById = async (
         descriptionCN: qc.description_cn || "",
       })),
 
-      // Attachments
       attachments: [],
 
-      // Pictures
       pictures: {
         shopPicture: item.photo || "",
         ebayPictures: item.pix_path_eBay || "",
       },
 
-      // NPR Remarks
       nprRemarks: item.npr_remark || "",
     };
 
@@ -304,7 +283,7 @@ export const getItemById = async (
     return next(error);
   }
 };
-// Create new item
+
 export const createItem = async (
   req: Request,
   res: Response,
@@ -336,20 +315,17 @@ export const createItem = async (
       is_rmb_special = "N",
     } = req.body;
 
-    // Validate required fields
     if (!item_name || !parent_id) {
       return next(
         new ErrorHandler("Item name and parent ID are required", 400),
       );
     }
 
-    // Check if parent exists
     const parent = await parentRepository.findOne({ where: { id: parent_id } });
     if (!parent) {
       return next(new ErrorHandler("Parent not found", 404));
     }
 
-    // Check if taric exists
     if (taric_id) {
       const taric = await taricRepository.findOne({ where: { id: taric_id } });
       if (!taric) {
@@ -357,7 +333,6 @@ export const createItem = async (
       }
     }
 
-    // Check if category exists
     if (cat_id) {
       const category = await categoryRepository.findOne({
         where: { id: cat_id },
@@ -367,7 +342,6 @@ export const createItem = async (
       }
     }
 
-    // Check if EAN already exists
     if (ean) {
       const existingItem = await itemRepository.findOne({ where: { ean } });
       if (existingItem) {
@@ -375,7 +349,6 @@ export const createItem = async (
       }
     }
 
-    // Create new item
     const newItem = itemRepository.create({
       item_name,
       item_name_cn,
@@ -400,7 +373,6 @@ export const createItem = async (
 
     await itemRepository.save(newItem);
 
-    // Create warehouse entry for the item
     const warehouseRepository = AppDataSource.getRepository(WarehouseItem);
     const warehouseItem = warehouseRepository.create({
       item_id: newItem.id,
@@ -433,7 +405,6 @@ export const createItem = async (
   }
 };
 
-// Update item
 export const updateItem = async (
   req: Request,
   res: Response,
@@ -452,7 +423,6 @@ export const updateItem = async (
       return next(new ErrorHandler("Item not found", 404));
     }
 
-    // Update fields
     const updatableFields = [
       "item_name",
       "item_name_cn",
@@ -476,14 +446,31 @@ export const updateItem = async (
       "pix_path",
       "pix_path_eBay",
       "npr_remark",
+      "is_dimension_special",
+      "FOQ",
+      "FSQ",
+      "ISBN",
+      "RMB_Price",
+      "many_components",
+      "effort_rating",
+      "is_pu_item",
+      "is_meter_item",
+      "is_new",
+      "supp_cat",
+      "ItemID_DE",
     ];
 
     updatableFields.forEach((field) => {
-      if (req.body[field] !== undefined) {
-        if (field === "ean" && req.body[field]) {
-          (item as any)[field] = BigInt(req.body[field]);
+      const value = req.body[field];
+      if (value !== undefined) {
+        if (field === "ean") {
+          if (value && value.toString().trim() !== "") {
+            (item as any)[field] = BigInt(value);
+          } else {
+            (item as any)[field] = null;
+          }
         } else {
-          (item as any)[field] = req.body[field];
+          (item as any)[field] = value;
         }
       }
     });
@@ -507,7 +494,6 @@ export const updateItem = async (
   }
 };
 
-// Delete item
 export const deleteItem = async (
   req: Request,
   res: Response,
@@ -526,13 +512,11 @@ export const deleteItem = async (
     const qualityRepository = AppDataSource.getRepository(ItemQuality);
     const orderItemRepository = AppDataSource.getRepository(OrderItem);
 
-    // Check if item exists
     const item = await itemRepository.findOne({ where: { id: parseInt(id) } });
     if (!item) {
       return next(new ErrorHandler("Item not found", 404));
     }
 
-    // Check if there's stock in warehouse
     const warehouseItems = await warehouseRepository.find({
       where: { item_id: parseInt(id) },
     });
@@ -550,7 +534,6 @@ export const deleteItem = async (
       );
     }
 
-    // Use transaction to delete all related data
     await AppDataSource.transaction(async (transactionalEntityManager) => {
       await transactionalEntityManager.delete(WarehouseItem, {
         item_id: parseInt(id),
@@ -573,7 +556,6 @@ export const deleteItem = async (
   }
 };
 
-// Toggle item status
 export const toggleItemStatus = async (
   req: Request,
   res: Response,
@@ -616,7 +598,6 @@ export const toggleItemStatus = async (
   }
 };
 
-// Bulk update items
 export const bulkUpdateItems = async (
   req: Request,
   res: Response,
@@ -669,7 +650,6 @@ export const bulkUpdateItems = async (
   }
 };
 
-// Get item statistics
 export const getItemStatistics = async (
   req: Request,
   res: Response,
@@ -679,22 +659,18 @@ export const getItemStatistics = async (
     const itemRepository = AppDataSource.getRepository(Item);
     const warehouseRepository = AppDataSource.getRepository(WarehouseItem);
 
-    // Total items count
     const totalItems = await itemRepository.count();
 
-    // Active items count
     const activeItems = await itemRepository.count({
       where: { isActive: "Y" },
     });
 
-    // Items with stock
     const itemsWithStock = await warehouseRepository
       .createQueryBuilder("warehouse")
       .select("COUNT(DISTINCT warehouse.item_id)", "count")
       .where("warehouse.stock_qty > 0")
       .getRawOne();
 
-    // Items by category
     const itemsByCategory = await itemRepository
       .createQueryBuilder("item")
       .leftJoin("item.category", "category")
@@ -719,7 +695,6 @@ export const getItemStatistics = async (
   }
 };
 
-// Search items by name or EAN
 export const searchItems = async (
   req: Request,
   res: Response,
@@ -768,11 +743,6 @@ export const searchItems = async (
   }
 };
 
-// ============================================
-// PARENTS CONTROLLERS
-// ============================================
-
-// Get all parents with pagination and filters
 export const getParents = async (
   req: Request,
   res: Response,
@@ -781,7 +751,6 @@ export const getParents = async (
   try {
     const parentRepository = AppDataSource.getRepository(Parent);
 
-    // Get query parameters
     const {
       page = "1",
       limit = "30",
@@ -798,38 +767,28 @@ export const getParents = async (
     const limitNum = parseInt(limit as string);
     const skip = (pageNum - 1) * limitNum;
 
-    // Build where conditions
     const whereConditions: FindOptionsWhere<Parent> = {};
 
-    // Search across multiple fields
     if (search) {
       whereConditions.name_de = ILike(`%${search}%`);
     }
 
-    // Filter by status/active
     if (isActive) {
       whereConditions.is_active = isActive as string;
     }
-
-    // Filter by supplier
     if (supplierId) {
       whereConditions.supplier_id = parseInt(supplierId as string);
     }
 
-    // Filter by taric
     if (taricId) {
       whereConditions.taric_id = parseInt(taricId as string);
     }
-
-    // Build relations
     const relations = ["taric", "supplier", "items"];
 
-    // Get total count
     const totalRecords = await parentRepository.count({
       where: whereConditions,
     });
 
-    // Get paginated parents
     const parents = await parentRepository.find({
       where: whereConditions,
       relations,
@@ -840,7 +799,6 @@ export const getParents = async (
       take: limitNum,
     });
 
-    // Format response
     const formattedParents = parents.map((parent) => ({
       id: parent.id,
       de_no: parent.de_no,
@@ -882,7 +840,6 @@ export const getParents = async (
   }
 };
 
-// Get parent by ID
 export const getParentById = async (
   req: Request,
   res: Response,
@@ -898,7 +855,6 @@ export const getParentById = async (
     const parentRepository = AppDataSource.getRepository(Parent);
     const itemRepository = AppDataSource.getRepository(Item);
 
-    // Get parent with relations
     const parent = await parentRepository.findOne({
       where: { id: parseInt(id) },
       relations: ["taric", "supplier"],
@@ -908,7 +864,6 @@ export const getParentById = async (
       return next(new ErrorHandler("Parent not found", 404));
     }
 
-    // Get child items
     const items = await itemRepository.find({
       where: { parent_id: parseInt(id) },
       relations: ["category"],
@@ -924,7 +879,6 @@ export const getParentById = async (
       created_at: item.created_at,
     }));
 
-    // Format response
     const formattedParent = {
       id: parent.id,
       de_no: parent.de_no,
@@ -974,7 +928,6 @@ export const getParentById = async (
   }
 };
 
-// Create new parent
 export const createParent = async (
   req: Request,
   res: Response,
@@ -1003,22 +956,17 @@ export const createParent = async (
       is_active = "Y",
     } = req.body;
 
-    // Validate required fields
     if (!de_no || !name_de) {
       return next(
         new ErrorHandler("DE number and German name are required", 400),
       );
     }
-
-    // Check if DE number already exists
     const existingParent = await parentRepository.findOne({ where: { de_no } });
     if (existingParent) {
       return next(
         new ErrorHandler("Parent with this DE number already exists", 400),
       );
     }
-
-    // Check if taric exists
     if (taric_id) {
       const taric = await taricRepository.findOne({ where: { id: taric_id } });
       if (!taric) {
@@ -1026,7 +974,6 @@ export const createParent = async (
       }
     }
 
-    // Check if supplier exists
     if (supplier_id) {
       const supplier = await supplierRepository.findOne({
         where: { id: supplier_id },
@@ -1036,7 +983,6 @@ export const createParent = async (
       }
     }
 
-    // Create new parent
     const newParent = parentRepository.create({
       de_no,
       name_de,
@@ -1074,7 +1020,6 @@ export const createParent = async (
   }
 };
 
-// Update parent
 export const updateParent = async (
   req: Request,
   res: Response,
@@ -1095,7 +1040,6 @@ export const updateParent = async (
       return next(new ErrorHandler("Parent not found", 404));
     }
 
-    // Update fields
     const updatableFields = [
       "de_no",
       "name_de",
@@ -1141,7 +1085,6 @@ export const updateParent = async (
   }
 };
 
-// Delete parent
 export const deleteParent = async (
   req: Request,
   res: Response,
@@ -1157,7 +1100,6 @@ export const deleteParent = async (
     const parentRepository = AppDataSource.getRepository(Parent);
     const itemRepository = AppDataSource.getRepository(Item);
 
-    // Check if parent exists
     const parent = await parentRepository.findOne({
       where: { id: parseInt(id) },
     });
@@ -1165,7 +1107,6 @@ export const deleteParent = async (
       return next(new ErrorHandler("Parent not found", 404));
     }
 
-    // Check if parent has child items
     const childItems = await itemRepository.find({
       where: { parent_id: parseInt(id) },
     });
@@ -1190,7 +1131,6 @@ export const deleteParent = async (
   }
 };
 
-// Search parents by name or DE number
 export const searchParents = async (
   req: Request,
   res: Response,
@@ -1221,7 +1161,7 @@ export const searchParents = async (
       name_de: parent.name_de,
       name_en: parent.name_en,
       is_active: parent.is_active,
-      item_count: 0, // You might want to fetch this separately
+      item_count: 0,
     }));
 
     return res.status(200).json({
@@ -1233,11 +1173,6 @@ export const searchParents = async (
   }
 };
 
-// ============================================
-// WAREHOUSE ITEMS CONTROLLERS
-// ============================================
-
-// Get warehouse items
 export const getWarehouseItems = async (
   req: Request,
   res: Response,
@@ -1247,7 +1182,6 @@ export const getWarehouseItems = async (
     const warehouseRepository = AppDataSource.getRepository(WarehouseItem);
     const itemRepository = AppDataSource.getRepository(Item);
 
-    // Get query parameters
     const {
       page = "1",
       limit = "30",
@@ -1262,10 +1196,8 @@ export const getWarehouseItems = async (
     const limitNum = parseInt(limit as string);
     const skip = (pageNum - 1) * limitNum;
 
-    // Build query
     const query = warehouseRepository.createQueryBuilder("warehouse");
 
-    // Apply filters
     if (search) {
       query
         .where("warehouse.item_name_de ILIKE :search", {
@@ -1289,17 +1221,14 @@ export const getWarehouseItems = async (
       query.andWhere("warehouse.is_stock_item = :isStockItem", { isStockItem });
     }
 
-    // Get total count
     const totalRecords = await query.getCount();
 
-    // Apply pagination and sorting
     const warehouseItems = await query
       .orderBy(`warehouse.${sortBy}`, sortOrder === "DESC" ? "DESC" : "ASC")
       .skip(skip)
       .take(limitNum)
       .getMany();
 
-    // Format response
     const formattedItems = warehouseItems.map((warehouse) => ({
       id: warehouse.id,
       item_id: warehouse.item_id,
@@ -1331,7 +1260,6 @@ export const getWarehouseItems = async (
   }
 };
 
-// Update warehouse item stock
 export const updateWarehouseStock = async (
   req: Request,
   res: Response,
@@ -1354,7 +1282,6 @@ export const updateWarehouseStock = async (
       return next(new ErrorHandler("Warehouse item not found", 404));
     }
 
-    // Update fields
     if (stock_qty !== undefined) {
       if (stock_qty < 0) {
         return next(new ErrorHandler("Stock quantity cannot be negative", 400));
@@ -1393,11 +1320,6 @@ export const updateWarehouseStock = async (
   }
 };
 
-// ============================================
-// VARIATION VALUES CONTROLLERS
-// ============================================
-
-// Get variation values for an item
 export const getItemVariations = async (
   req: Request,
   res: Response,
@@ -1438,7 +1360,6 @@ export const getItemVariations = async (
   }
 };
 
-// Create or update variation values
 export const updateItemVariations = async (
   req: Request,
   res: Response,
@@ -1446,7 +1367,7 @@ export const updateItemVariations = async (
 ) => {
   try {
     const { itemId } = req.params;
-    const variations = req.body; // Array of variation objects
+    const variations = req.body;
 
     if (!itemId) {
       return next(new ErrorHandler("Item ID is required", 400));
@@ -1459,7 +1380,6 @@ export const updateItemVariations = async (
     const variationRepository = AppDataSource.getRepository(VariationValue);
     const itemRepository = AppDataSource.getRepository(Item);
 
-    // Check if item exists
     const item = await itemRepository.findOne({
       where: { id: parseInt(itemId) },
     });
@@ -1467,14 +1387,10 @@ export const updateItemVariations = async (
       return next(new ErrorHandler("Item not found", 404));
     }
 
-    // Use transaction for batch operations
     await AppDataSource.transaction(async (transactionalEntityManager) => {
-      // Delete existing variations for this item
       await transactionalEntityManager.delete(VariationValue, {
         item_id: parseInt(itemId),
       });
-
-      // Create new variations
       const newVariations = variations.map((variation) =>
         variationRepository.create({
           item_id: parseInt(itemId),
@@ -1507,11 +1423,6 @@ export const updateItemVariations = async (
   }
 };
 
-// ============================================
-// QUALITY CRITERIA CONTROLLERS
-// ============================================
-
-// Get quality criteria for an item
 export const getItemQualityCriteria = async (
   req: Request,
   res: Response,
@@ -1539,7 +1450,6 @@ export const getItemQualityCriteria = async (
   }
 };
 
-// Create quality criteria
 export const createQualityCriterion = async (
   req: Request,
   res: Response,
@@ -1560,7 +1470,6 @@ export const createQualityCriterion = async (
     const qualityRepository: any = AppDataSource.getRepository(ItemQuality);
     const itemRepository = AppDataSource.getRepository(Item);
 
-    // Check if item exists
     const item = await itemRepository.findOne({
       where: { id: parseInt(itemId) },
     });
@@ -1590,7 +1499,6 @@ export const createQualityCriterion = async (
   }
 };
 
-// Update quality criterion
 export const updateQualityCriterion = async (
   req: Request,
   res: Response,
@@ -1613,7 +1521,6 @@ export const updateQualityCriterion = async (
       return next(new ErrorHandler("Quality criterion not found", 404));
     }
 
-    // Update fields
     if (name !== undefined) criterion.name = name;
     if (picture !== undefined) criterion.picture = picture;
     if (description !== undefined) criterion.description = description;
@@ -1632,7 +1539,6 @@ export const updateQualityCriterion = async (
   }
 };
 
-// Delete quality criterion
 export const deleteQualityCriterion = async (
   req: Request,
   res: Response,
@@ -1673,7 +1579,6 @@ export const getAllTarics = async (
   try {
     const taricRepository = AppDataSource.getRepository(Taric);
 
-    // Get query parameters
     const {
       page = "1",
       limit = "30",
@@ -1688,10 +1593,8 @@ export const getAllTarics = async (
     const limitNum = parseInt(limit as string);
     const skip = (pageNum - 1) * limitNum;
 
-    // Build where conditions
     const whereConditions: FindOptionsWhere<Taric> = {};
 
-    // Search across multiple fields
     if (search) {
       whereConditions.code = ILike(`%${search}%`);
       whereConditions.name_de = ILike(`%${search}%`);
@@ -1699,7 +1602,6 @@ export const getAllTarics = async (
       whereConditions.name_cn = ILike(`%${search}%`);
     }
 
-    // Filter by specific fields
     if (code) {
       whereConditions.code = ILike(`%${code}%`);
     }
@@ -1708,12 +1610,9 @@ export const getAllTarics = async (
       whereConditions.name_de = ILike(`%${name}%`);
     }
 
-    // Get total count
     const totalRecords = await taricRepository.count({
       where: whereConditions,
     });
-
-    // Get paginated tarics
     const tarics = await taricRepository.find({
       where: whereConditions,
       order: {
@@ -1723,7 +1622,6 @@ export const getAllTarics = async (
       take: limitNum,
     });
 
-    // Format response
     const formattedTarics = tarics.map((taric) => ({
       id: taric.id,
       code: taric.code,
@@ -1755,7 +1653,6 @@ export const getAllTarics = async (
   }
 };
 
-// Get taric by ID with relationships
 export const getTaricById = async (
   req: Request,
   res: Response,
@@ -1772,7 +1669,6 @@ export const getTaricById = async (
     const itemRepository = AppDataSource.getRepository(Item);
     const parentRepository = AppDataSource.getRepository(Parent);
 
-    // Get taric with relations
     const taric = await taricRepository.findOne({
       where: { id: parseInt(id) },
     });
@@ -1781,20 +1677,16 @@ export const getTaricById = async (
       return next(new ErrorHandler("TARIC not found", 404));
     }
 
-    // Get related items
     const items = await itemRepository.find({
       where: { taric_id: parseInt(id) },
       relations: ["parent", "category"],
-      take: 10, // Limit to 10 items for preview
+      take: 10,
     });
 
-    // Get related parents
     const parents = await parentRepository.find({
       where: { taric_id: parseInt(id) },
-      take: 10, // Limit to 10 parents for preview
+      take: 10,
     });
-
-    // Format response
     const formattedTaric = {
       id: taric.id,
       code: taric.code,
@@ -1839,7 +1731,7 @@ export const getTaricById = async (
     return next(error);
   }
 };
-// MIS database connection helper functions
+
 const syncTaricToMIS = async (
   taricData: any,
   operation: "create" | "update" | "delete",
@@ -1848,7 +1740,6 @@ const syncTaricToMIS = async (
   try {
     connection = await pool.getConnection();
 
-    // Helper function to convert undefined to null
     const convertUndefinedToNull = (value: any) => {
       return value === undefined ? null : value;
     };
@@ -1914,8 +1805,6 @@ const syncTaricToMIS = async (
   }
 };
 
-// Create TARIC with MIS sync
-// Create TARIC with MIS sync and ID generation
 export const createTaric = async (
   req: Request,
   res: Response,
@@ -1936,18 +1825,14 @@ export const createTaric = async (
       duty_rate = 0,
     } = req.body;
 
-    // Validate required fields
     if (!code) {
       return next(new ErrorHandler("TARIC code is required", 400));
     }
-
-    // Check if code already exists
     const existingTaric = await taricRepository.findOne({ where: { code } });
     if (existingTaric) {
       return next(new ErrorHandler("TARIC with this code already exists", 400));
     }
 
-    // Find the highest ID to generate the next ID
     const maxIdResult = await taricRepository
       .createQueryBuilder("taric")
       .select("MAX(taric.id)", "max")
@@ -1955,9 +1840,8 @@ export const createTaric = async (
 
     const nextId = (maxIdResult?.max || 0) + 1;
 
-    // Create new taric in local database
     const newTaric = taricRepository.create({
-      id: nextId, // Set the generated ID
+      id: nextId,
       code,
       name_de,
       name_en,
@@ -1972,7 +1856,6 @@ export const createTaric = async (
 
     await taricRepository.save(newTaric);
 
-    // Sync to MIS database (MIS has AUTO_INCREMENT for id, so we don't need to pass id)
     try {
       await syncTaricToMIS(
         {
@@ -1991,7 +1874,6 @@ export const createTaric = async (
         "create",
       );
     } catch (misError: any) {
-      // Rollback local creation if MIS sync fails
       await taricRepository.delete(newTaric.id);
       return next(
         new ErrorHandler(
@@ -2017,7 +1899,6 @@ export const createTaric = async (
   }
 };
 
-// Update TARIC with MIS sync
 export const updateTaric = async (
   req: Request,
   res: Response,
@@ -2039,10 +1920,8 @@ export const updateTaric = async (
       return next(new ErrorHandler("TARIC not found", 404));
     }
 
-    // Store original code for MIS update
     const originalCode = taric.code;
 
-    // Update fields
     const updatableFields = [
       "code",
       "name_de",
@@ -2064,17 +1943,15 @@ export const updateTaric = async (
 
     await taricRepository.save(taric);
 
-    // Sync to MIS database
     try {
       await syncTaricToMIS(
         {
           ...taric,
-          originalCode, // Pass original code for the WHERE clause
+          originalCode,
         },
         "update",
       );
     } catch (misError: any) {
-      // Rollback local update if MIS sync fails
       await taricRepository.save({
         ...taric,
         code: originalCode,
@@ -2108,8 +1985,6 @@ export const updateTaric = async (
   }
 };
 
-// Delete TARIC with MIS sync
-// Delete TARIC with MIS sync
 export const deleteTaric = async (
   req: Request,
   res: Response,
@@ -2127,7 +2002,6 @@ export const deleteTaric = async (
     const itemRepository = AppDataSource.getRepository(Item);
     const parentRepository = AppDataSource.getRepository(Parent);
 
-    // Check if taric exists
     const taric = await taricRepository.findOne({
       where: { id: parseInt(id) },
     });
@@ -2135,12 +2009,9 @@ export const deleteTaric = async (
       return next(new ErrorHandler("TARIC not found", 404));
     }
 
-    // Check if taric has related items
     const relatedItems = await itemRepository.count({
       where: { taric_id: parseInt(id) },
     });
-
-    // Check if taric has related parents
     const relatedParents = await parentRepository.count({
       where: { taric_id: parseInt(id) },
     });
@@ -2154,7 +2025,6 @@ export const deleteTaric = async (
       );
     }
 
-    // Store code for MIS deletion - ensure it's not undefined
     const taricCode = taric.code || null;
     if (!taricCode) {
       return next(
@@ -2162,14 +2032,11 @@ export const deleteTaric = async (
       );
     }
 
-    // Delete from local database first
     await taricRepository.delete(parseInt(id));
 
-    // Sync to MIS database
     try {
       await syncTaricToMIS({ code: taricCode }, "delete");
     } catch (misError: any) {
-      // If MIS deletion fails, restore local record
       await taricRepository.save(taric);
       return next(
         new ErrorHandler(
@@ -2188,7 +2055,6 @@ export const deleteTaric = async (
   }
 };
 
-// Search tarics by code or name
 export const searchTarics = async (
   req: Request,
   res: Response,
@@ -2232,7 +2098,6 @@ export const searchTarics = async (
   }
 };
 
-// Get taric statistics
 export const getTaricStatistics = async (
   req: Request,
   res: Response,
@@ -2243,24 +2108,20 @@ export const getTaricStatistics = async (
     const itemRepository = AppDataSource.getRepository(Item);
     const parentRepository = AppDataSource.getRepository(Parent);
 
-    // Total tarics count
     const totalTarics = await taricRepository.count();
 
-    // Tarics with items count
     const taricsWithItems = await itemRepository
       .createQueryBuilder("item")
       .select("COUNT(DISTINCT item.taric_id)", "count")
       .where("item.taric_id IS NOT NULL")
       .getRawOne();
 
-    // Tarics with parents count
     const taricsWithParents = await parentRepository
       .createQueryBuilder("parent")
       .select("COUNT(DISTINCT parent.taric_id)", "count")
       .where("parent.taric_id IS NOT NULL")
       .getRawOne();
 
-    // Top tarics by item count
     const topTaricsByItems = await taricRepository
       .createQueryBuilder("taric")
       .leftJoin("taric.items", "item")
@@ -2273,7 +2134,6 @@ export const getTaricStatistics = async (
       .take(10)
       .getRawMany();
 
-    // Top tarics by parent count
     const topTaricsByParents = await taricRepository
       .createQueryBuilder("taric")
       .leftJoin("taric.parents", "parent")
@@ -2303,14 +2163,13 @@ export const getTaricStatistics = async (
   }
 };
 
-// Bulk create/update tarics
 export const bulkUpsertTarics = async (
   req: Request,
   res: Response,
   next: NextFunction,
 ) => {
   try {
-    const { tarics } = req.body; // Array of taric objects
+    const { tarics } = req.body;
 
     if (!tarics || !Array.isArray(tarics) || tarics.length === 0) {
       return next(new ErrorHandler("TARICS array is required", 400));
@@ -2324,7 +2183,6 @@ export const bulkUpsertTarics = async (
       errors: [] as any[],
     };
 
-    // Process each taric
     for (const taricData of tarics) {
       try {
         if (!taricData.code) {
@@ -2333,18 +2191,15 @@ export const bulkUpsertTarics = async (
           continue;
         }
 
-        // Check if taric exists by code
         let taric: any = await taricRepository.findOne({
           where: { code: taricData.code },
         });
 
         if (taric) {
-          // Update existing taric
           Object.assign(taric, taricData);
           taric.updated_at = new Date();
           results.updated++;
         } else {
-          // Create new taric
           taric = taricRepository.create({
             ...taricData,
             created_at: new Date(),

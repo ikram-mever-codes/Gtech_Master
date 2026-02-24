@@ -22,7 +22,14 @@ import { toast } from "react-hot-toast";
 export const handleApiError = (error: unknown, defaultMessage?: string) => {
   toast.dismiss();
   if (axios.isAxiosError(error)) {
-    toast.error(error.response?.data?.message || error.message, errorStyles);
+    const status = error.response?.status;
+    const message = error.response?.data?.message;
+
+    if (status === 403 && (message === "Access Denied" || message?.startsWith("Forbidden"))) {
+      console.warn("Forbidden access:", message);
+      return;
+    }
+    toast.error(message || error.message, errorStyles);
   } else if (error instanceof Error) {
     toast.error(error.message, errorStyles);
   } else {

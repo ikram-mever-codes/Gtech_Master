@@ -23,7 +23,9 @@ import {
   LucideSearch,
   PlusIcon,
   RefreshCw,
+  Users,
 } from "lucide-react";
+import PageHeader from "@/components/UI/PageHeader";
 import { UserRole, UserStatus } from "@/utils/interfaces";
 import theme from "@/styles/theme";
 import CustomButton from "@/components/UI/CustomButton";
@@ -211,12 +213,7 @@ const UsersPage = () => {
         {/* Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <div>
-            <Typography
-              variant="h4"
-              sx={{ color: "secondary.main", fontSize: "30px" }}
-            >
-              Users Management
-            </Typography>
+            <PageHeader title="Users Management" icon={Users} />
           </div>
 
           <div className="flex gap-4 w-full md:w-auto">

@@ -50,6 +50,10 @@ export class SupplierItem {
   @Column({ type: "varchar", length: 25, nullable: true })
   updated_by?: string;
 
+  @ManyToOne(() => Item)
+  @JoinColumn({ name: "item_id" })
+  item!: Item;
+
   @ManyToOne(() => Supplier, (supplier) => supplier.supplierItems)
   @JoinColumn({ name: "supplier_id" })
   supplier!: Supplier;

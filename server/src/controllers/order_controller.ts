@@ -25,6 +25,7 @@ export const createOrder = async (req: Request, res: Response, next: NextFunctio
     const {
       category_id,
       customer_id,
+      supplier_id,
       status,
       comment,
       items,
@@ -56,6 +57,7 @@ export const createOrder = async (req: Request, res: Response, next: NextFunctio
       order_no: generatedorder_no,
       category_id: category_id || null,
       customer_id: customer_id || null,
+      supplier_id: supplier_id || null,
       status: status ?? 1,
       comment: comment || null,
       created_at: new Date(),
@@ -97,6 +99,7 @@ export const createOrder = async (req: Request, res: Response, next: NextFunctio
         order_no: order.order_no,
         category_id: order.category_id,
         customer_id: order.customer_id,
+        supplier_id: order.supplier_id,
         status: order.status,
         comment: order.comment,
         created_at: order.created_at,
@@ -127,7 +130,7 @@ export const updateOrder = async (req: Request, res: Response, next: NextFunctio
 
   try {
     const { orderId } = req.params;
-    const { order_no, category_id, customer_id, status, comment, items } = req.body;
+    const { order_no, category_id, customer_id, supplier_id, status, comment, items } = req.body;
 
     if (!orderId) return next(new ErrorHandler("Order ID is required", 400));
 
@@ -148,6 +151,7 @@ export const updateOrder = async (req: Request, res: Response, next: NextFunctio
 
     if (category_id !== undefined) order.category_id = category_id || null;
     if (customer_id !== undefined) (order as any).customer_id = customer_id || null;
+    if (supplier_id !== undefined) order.supplier_id = supplier_id || null;
     if (status !== undefined) order.status = status ?? order.status;
     if (comment !== undefined) order.comment = comment ?? order.comment;
     order.updated_at = new Date();
@@ -197,6 +201,7 @@ export const updateOrder = async (req: Request, res: Response, next: NextFunctio
         order_no: freshOrder!.order_no,
         category_id: freshOrder!.category_id,
         customer_id: (freshOrder as any).customer_id,
+        supplier_id: freshOrder!.supplier_id,
         status: freshOrder!.status,
         comment: freshOrder!.comment,
         created_at: freshOrder!.created_at,
@@ -234,6 +239,7 @@ export const getAllOrders = async (req: Request, res: Response, next: NextFuncti
         "o.order_no",
         "o.category_id",
         "o.customer_id",
+        "o.supplier_id",
         "o.status",
         "o.comment",
         "o.created_at",
@@ -273,6 +279,7 @@ export const getOrderById = async (req: Request, res: Response, next: NextFuncti
         order_no: order.order_no,
         category_id: order.category_id,
         customer_id: (order as any).customer_id,
+        supplier_id: order.supplier_id,
         status: order.status,
         comment: order.comment,
         created_at: order.created_at,

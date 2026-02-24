@@ -15,7 +15,7 @@ import { Parent } from "./parents";
 
 @Entity()
 export class Supplier {
-  @PrimaryColumn()
+  @PrimaryGeneratedColumn()
   id!: number;
 
   @Column({ type: "int", default: 1 })

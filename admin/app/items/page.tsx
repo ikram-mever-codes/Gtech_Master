@@ -15,10 +15,12 @@ import {
   DocumentTextIcon,
   PencilIcon,
   TrashIcon,
+  TruckIcon,
   EyeIcon as EyeIconOutline,
 } from "@heroicons/react/24/outline";
 import { useRouter } from "next/navigation";
 import CustomButton from "@/components/UI/CustomButton";
+import PageHeader from "@/components/UI/PageHeader";
 import { EditIcon, EyeIcon, Plus, Package, LinkIcon } from "lucide-react";
 import { Delete, Sync } from "@mui/icons-material";
 import { toast } from "react-hot-toast";
@@ -66,10 +68,11 @@ import {
   StatisticsResponse,
   exportItemsToCSV,
 } from "@/api/items";
+import { getAllSuppliers, Supplier } from "@/api/suppliers";
 import { getCategories } from "@/api/categories";
 import { loadingStyles, successStyles, errorStyles } from "@/utils/constants";
 
-type TabType = "items" | "parents" | "warehouse" | "tarics";
+type TabType = "items" | "parents" | "warehouse" | "tarics" | "suppliers";
 
 interface FilterState {
   search: string;
@@ -98,6 +101,7 @@ const ItemsManagementPage: React.FC = () => {
   const [parents, setParents] = useState<Parent[]>([]);
   const [warehouseItems, setWarehouseItems] = useState<WarehouseItem[]>([]);
   const [tarics, setTarics] = useState<Taric[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
 
   const [loading, setLoading] = useState(false);
   const [pagination, setPagination] = useState<PaginationState>({
@@ -131,7 +135,6 @@ const ItemsManagementPage: React.FC = () => {
     name: "",
   });
 
-  // TARIC modal states
   const [showTaricModal, setShowTaricModal] = useState(false);
   const [taricModalMode, setTaricModalMode] = useState<"create" | "edit">(
     "create",
@@ -150,7 +153,6 @@ const ItemsManagementPage: React.FC = () => {
 
   const [categories, setCategories] = useState<any[]>([]);
 
-  // Item modal states
   const [showItemModal, setShowItemModal] = useState(false);
   const [itemFormData, setItemFormData] = useState({
     item_name: "",
@@ -194,7 +196,6 @@ const ItemsManagementPage: React.FC = () => {
     });
   };
 
-  // Get status badge color
   const getStatusBadgeColor = (status: string) => {
     switch (status?.toLowerCase()) {
       case "active":
@@ -212,7 +213,6 @@ const ItemsManagementPage: React.FC = () => {
     }
   };
 
-  // Fetch data based on active tab
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
@@ -263,6 +263,18 @@ const ItemsManagementPage: React.FC = () => {
           setTarics(taricsResponse.data);
           setPagination(taricsResponse.pagination);
           break;
+
+        case "suppliers":
+          const suppliersResponse: any = await getAllSuppliers({
+            page: pagination.page,
+            limit: pagination.limit,
+            search: filters.search,
+          });
+          setSuppliers(suppliersResponse.data);
+          if (suppliersResponse.pagination) {
+            setPagination(suppliersResponse.pagination);
+          }
+          break;
       }
     } catch (error) {
       console.error("Error fetching data:", error);
@@ -300,7 +312,6 @@ const ItemsManagementPage: React.FC = () => {
         if (taricsRes?.data) setTarics(taricsRes.data);
         if (catsRes?.data) setCategories(catsRes.data);
 
-        // Verification check
         if (
           (!parentsRes?.data || parentsRes.data.length === 0) &&
           activeTab === "items"
@@ -315,7 +326,6 @@ const ItemsManagementPage: React.FC = () => {
     fetchInitialData();
   }, [activeTab]);
 
-  // Handle item actions
   const handleViewItem = (itemId: number) => {
     router.push(`/items/${itemId}`);
   };
@@ -647,6 +657,8 @@ const ItemsManagementPage: React.FC = () => {
         return warehouseItems;
       case "tarics":
         return tarics;
+      case "suppliers":
+        return suppliers;
       default:
         return [];
     }
@@ -692,7 +704,6 @@ const ItemsManagementPage: React.FC = () => {
 
         return matchesSearch && matchesCode && matchesName;
       } else {
-        // For other tabs
         const matchesSearch =
           !filters.search ||
           Object.values(item).some((value: any) =>
@@ -712,7 +723,6 @@ const ItemsManagementPage: React.FC = () => {
 
   const filteredData = getFilteredData();
 
-  // Render different columns based on active tab
   const renderTableHeaders = () => {
     switch (activeTab) {
       case "items":
@@ -1171,7 +1181,6 @@ const ItemsManagementPage: React.FC = () => {
     }
   };
 
-  // Handle page change
   const handlePageChange = (newPage: number) => {
     if (newPage < 1 || newPage > pagination.totalPages) return;
     setPagination({ ...pagination, page: newPage });
@@ -1208,27 +1217,9 @@ const ItemsManagementPage: React.FC = () => {
           background: "linear-gradient(to bottom, #ffffff, #f9f9f9)",
         }}
       >
-        {/* Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
           <div>
-            <h1 className="text-3xl font-semibold text-secondary flex items-center gap-3">
-              <Package className="w-8 h-8 text-primary" />
-              Items Management
-            </h1>
-
-            {activeTab === "items" && (
-              <div className="flex gap-4 mt-2">
-                <span className="text-sm text-green-600">
-                  {statistics.activeItems} Active
-                </span>
-                <span className="text-sm text-red-600">
-                  {statistics.inactiveItems} Inactive
-                </span>
-                <span className="text-sm text-blue-600">
-                  {statistics.itemsWithStock} With Stock
-                </span>
-              </div>
-            )}
+            <PageHeader title="Items Management" icon={Package} />
           </div>
 
           <div className="flex gap-3">
@@ -1295,26 +1286,6 @@ const ItemsManagementPage: React.FC = () => {
                 New Item
               </button>
             )}
-            {activeTab === "items" && (
-              <button
-                onClick={exportItemsToCSV}
-                className="px-4 py-2.5 bg-[#8CC21B] text-white rounded-lg font-medium hover:bg-[#8CC21B] transition-all flex items-center gap-2"
-              >
-                <Sync className="w-5 h-5" />
-                Export CSV
-              </button>
-            )}
-
-            {/* {activeTab === "parents" && (
-                <button
-                  onClick={handleCreateParent}
-                  className="px-4 py-2.5 bg-[#8CC21B] text-white rounded-lg font-medium hover:bg-[#8CC21B] transition-all flex items-center gap-2"
-                >
-                  <PlusIcon className="w-5 h-5" />
-                  New Parent
-                </button>
-              )} */}
-
             {activeTab === "tarics" && (
               <button
                 onClick={handleCreateTaric}
@@ -1324,10 +1295,18 @@ const ItemsManagementPage: React.FC = () => {
                 New TARIC
               </button>
             )}
+            {activeTab === "suppliers" && (
+              <button
+                onClick={() => router.push("/suppliers")}
+                className="px-4 py-2.5 bg-[#8CC21B] text-white rounded-lg font-medium hover:bg-[#7ab318] transition-all flex items-center gap-2"
+              >
+                <PlusIcon className="w-5 h-5" />
+                Manage Suppliers
+              </button>
+            )}
           </div>
         </div>
 
-        {/* Tabs */}
         <div className="mb-6">
           <div className="border-b border-gray-200">
             <nav className="-mb-px flex space-x-8">
@@ -1336,6 +1315,7 @@ const ItemsManagementPage: React.FC = () => {
                 { key: "parents", label: "Parents", icon: BuildingOfficeIcon },
                 { key: "warehouse", label: "Warehouse", icon: ArchiveBoxIcon },
                 { key: "tarics", label: "TARICs", icon: DocumentTextIcon },
+                { key: "suppliers", label: "Suppliers", icon: TruckIcon },
               ].map((tab) => (
                 <button
                   key={tab.key}
@@ -1354,7 +1334,6 @@ const ItemsManagementPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Filters - Different for TARICs */}
         {showFilters && (
           <div className="mb-6 bg-gray-50 p-4 rounded-lg">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -1450,7 +1429,6 @@ const ItemsManagementPage: React.FC = () => {
                       className="w-full px-3 py-2 border border-gray-300 rounded-md"
                     >
                       <option value="">All Categories</option>
-                      {/* Categories will be loaded dynamically */}
                     </select>
                   </div>
                   <div className="md:col-span-2 flex items-end">
@@ -1467,7 +1445,6 @@ const ItemsManagementPage: React.FC = () => {
           </div>
         )}
 
-        {/* Search Bar */}
         {activeTab !== "tarics" && (
           <div className="mb-6">
             <div className="relative">
@@ -1493,7 +1470,6 @@ const ItemsManagementPage: React.FC = () => {
           </div>
         )}
 
-        {/* Data Table */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
           {loading ? (
             <div className="p-20 flex justify-center items-center">
@@ -1541,7 +1517,6 @@ const ItemsManagementPage: React.FC = () => {
                 </table>
               </div>
 
-              {/* Pagination */}
               <div className="p-4 border-t border-gray-100 bg-gray-50 flex items-center justify-between">
                 <div className="flex items-center gap-4">
                   <p className="text-sm text-gray-600">
@@ -1589,7 +1564,6 @@ const ItemsManagementPage: React.FC = () => {
         </div>
       </div>
 
-      {/* TARIC Modal */}
       {showTaricModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl max-w-md w-full">
@@ -1776,7 +1750,6 @@ const ItemsManagementPage: React.FC = () => {
         </div>
       )}
 
-      {/* Item Creation Modal */}
       {showItemModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">

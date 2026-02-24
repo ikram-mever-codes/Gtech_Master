@@ -25,16 +25,36 @@ import {
 } from "@/api/orders";
 
 import { getAllCustomers } from "@/api/customers";
+import {
+  getAllSuppliers,
+  getSupplierItems,
+  type Supplier,
+} from "@/api/suppliers";
 import { getItems } from "@/api/items";
 import { getCategories } from "@/api/categories";
 import CustomButton from "@/components/UI/CustomButton";
+import PageHeader from "@/components/UI/PageHeader";
+import { ShoppingCart } from "lucide-react";
 import { useSelector } from "react-redux";
 import { RootState } from "@/app/Redux/store";
 import { UserRole } from "@/utils/interfaces";
+import CargosTab from "@/components/cargos/CargosTab";
 
-// -------------------- Types --------------------
 type Item = { id: string | number; item_name?: string; name?: string };
-type Customer = { id: string | number; companyName: string };
+type Customer = {
+  id: string | number;
+  companyName: string;
+  addressLine1?: string;
+  city?: string;
+  country?: string;
+  deliveryAddressLine1?: string;
+  deliveryCity?: string;
+  deliveryCountry?: string;
+  contactEmail?: string;
+  email?: string;
+  legalName?: string;
+  contactPhoneNumber?: string;
+};
 type Category = { id: string | number; name: string };
 
 type Option = { value: string; label: string };
@@ -60,13 +80,13 @@ type OrdersTableProps = {
   orders: Order[];
   loading: boolean;
   getCategoryName: (id: any) => string;
+  getSupplierName?: (id: any) => string;
   getOrderStatusColor: (status: any) => string;
   onView: (o: any) => void;
   onEdit: (o: any) => void;
   onDelete: (id: string | number) => void;
   canDelete: boolean;
 
-  // convert button only in tab2
   showConvert: boolean;
   onConvert: (o: any) => void;
 };
@@ -78,9 +98,13 @@ const tabs = [
     label: "Customer Orders",
     description: "Create and manage customer orders",
   },
+  {
+    id: "tab3",
+    label: "Cargos",
+    description: "Manage Cargos and Shipments",
+  },
 ] as const;
 
-// -------------------- Components --------------------
 function ItemSelectorWithQuantity({
   items,
   selectedItemId,
@@ -161,6 +185,7 @@ function OrdersTable({
   orders,
   loading,
   getCategoryName,
+  getSupplierName,
   getOrderStatusColor,
   onView,
   onEdit,
@@ -201,7 +226,7 @@ function OrdersTable({
               Order #
             </th>
             <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Category
+              Supplier / Category
             </th>
             <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
               Status
@@ -227,7 +252,9 @@ function OrdersTable({
               <td className="px-4 py-3">{order.order_no}</td>
 
               <td className="px-4 py-3 text-center">
-                {getCategoryName(order.category_id)}
+                {order.supplier_id
+                  ? getSupplierName?.(order.supplier_id)
+                  : getCategoryName(order.category_id)}
               </td>
 
               <td className="px-4 py-3">
@@ -290,7 +317,6 @@ function OrdersTable({
   );
 }
 
-// -------------------- Page --------------------
 const OrderPage = () => {
   const { user } = useSelector((state: RootState) => state.user);
 
@@ -303,11 +329,14 @@ const OrderPage = () => {
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
 
   const [itemsAll, setItemsAll] = useState<Item[]>([]);
   const [itemsByCategory, setItemsByCategory] = useState<Item[]>([]);
+  const [itemsBySupplier, setItemsBySupplier] = useState<Item[]>([]);
   const [loadingItemsAll, setLoadingItemsAll] = useState(false);
   const [loadingItemsByCategory, setLoadingItemsByCategory] = useState(false);
+  const [loadingItemsBySupplier, setLoadingItemsBySupplier] = useState(false);
 
   const [filters, setFilters] = useState<OrderSearchFilters>({
     search: "",
@@ -319,7 +348,6 @@ const OrderPage = () => {
 
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
 
-  // ✅ View modal state
   const [showViewModal, setShowViewModal] = useState(false);
   const [viewOrder, setViewOrder] = useState<any>(null);
   const [viewItems, setViewItems] = useState<OrderItemRow[]>([]);
@@ -328,6 +356,7 @@ const OrderPage = () => {
     comment: "",
     customer_id: "",
     category_id: "",
+    supplier_id: "",
     status: "",
   });
 
@@ -339,19 +368,29 @@ const OrderPage = () => {
   const isConvertMode = mode === "convert";
 
   const effectiveItems: Item[] = useMemo(() => {
+    if (form.supplier_id) return itemsBySupplier;
     if (form.category_id) return itemsByCategory;
     return itemsAll;
-  }, [form.category_id, itemsByCategory, itemsAll]);
+  }, [
+    form.supplier_id,
+    itemsBySupplier,
+    form.category_id,
+    itemsByCategory,
+    itemsAll,
+  ]);
 
   const loadingItems =
-    loadingItemsAll || (isTab1 && !!form.category_id && loadingItemsByCategory);
+    loadingItemsAll ||
+    (isTab1 && !!form.supplier_id && loadingItemsBySupplier) ||
+    (isTab1 && !!form.category_id && loadingItemsByCategory);
 
   const itemById = useMemo(() => {
     const map = new Map<string, Item>();
     for (const it of itemsAll) map.set(String(it.id), it);
     for (const it of itemsByCategory) map.set(String(it.id), it);
+    for (const it of itemsBySupplier) map.set(String(it.id), it);
     return map;
-  }, [itemsAll, itemsByCategory]);
+  }, [itemsAll, itemsByCategory, itemsBySupplier]);
 
   const getCategoryName = useCallback(
     (categoryId: string | number) =>
@@ -366,16 +405,20 @@ const OrderPage = () => {
     [customers],
   );
 
-  // submit rules:
-  // - convert: only needs items
-  // - normal:  previous rules
+  const getSupplierName = useCallback(
+    (supplierId: any) =>
+      suppliers.find((c) => String(c.id) === String(supplierId))
+        ?.company_name ?? "-",
+    [suppliers],
+  );
+
   const canSubmit = useMemo(() => {
     if (isConvertMode) return orderItems.length > 0;
 
     const hasItems = orderItems.length > 0;
     const hasComment = !!form.comment?.trim();
     const tabOk =
-      (isTab1 ? !!form.category_id : true) &&
+      (isTab1 ? !!form.category_id || !!form.supplier_id : true) &&
       (isTab2 ? !!form.customer_id : true);
     return hasItems && hasComment && tabOk;
   }, [
@@ -383,21 +426,28 @@ const OrderPage = () => {
     orderItems.length,
     form.comment,
     form.category_id,
+    form.supplier_id,
     form.customer_id,
     isTab1,
     isTab2,
   ]);
 
   const resetForm = useCallback(() => {
-    setForm({ comment: "", customer_id: "", category_id: "", status: "" });
+    setForm({
+      comment: "",
+      customer_id: "",
+      category_id: "",
+      supplier_id: "",
+      status: "",
+    });
     setSelectedItemId("");
     setOrderItems([]);
     setItemsByCategory([]);
+    setItemsBySupplier([]);
     setSelectedOrder(null);
     setMode("create");
   }, []);
 
-  // -------------------- Fetchers --------------------
   const fetchCategories = useCallback(async () => {
     try {
       const response = await getCategories();
@@ -419,6 +469,18 @@ const OrderPage = () => {
     } catch (error) {
       console.error("Error fetching customers:", error);
       toast.error("Failed to fetch customers");
+    }
+  }, []);
+
+  const fetchSuppliers = useCallback(async () => {
+    try {
+      const response = await getAllSuppliers();
+      const data = response?.data ?? response;
+      const arr = Array.isArray(data) ? data : data?.suppliers || [];
+      setSuppliers(arr);
+    } catch (error) {
+      console.error("Error fetching suppliers:", error);
+      toast.error("Failed to fetch suppliers");
     }
   }, []);
 
@@ -479,10 +541,10 @@ const OrderPage = () => {
   useEffect(() => {
     fetchCustomers();
     fetchCategories();
+    fetchSuppliers();
     fetchAllItems();
-  }, [fetchCustomers, fetchCategories, fetchAllItems]);
+  }, [fetchCustomers, fetchCategories, fetchSuppliers, fetchAllItems]);
 
-  // -------------------- Form handlers --------------------
   const handleCustomerChange = (customer_id: string) =>
     setForm((prev) => ({ ...prev, customer_id }));
 
@@ -499,6 +561,33 @@ const OrderPage = () => {
       return;
     }
     setItemsByCategory([]);
+  };
+
+  const handleSupplierChange = async (
+    supplier_id: string,
+    resetOrderItemsFlag: boolean = true,
+  ) => {
+    setForm((prev) => ({ ...prev, supplier_id }));
+    setSelectedItemId("");
+    if (resetOrderItemsFlag) setOrderItems([]);
+
+    if (supplier_id) {
+      setLoadingItemsBySupplier(true);
+      try {
+        const response: any = await getSupplierItems(supplier_id);
+        const data = response?.data ?? response;
+        const arr = Array.isArray(data) ? data : [];
+        setItemsBySupplier(arr);
+      } catch (e) {
+        console.error(e);
+        toast.error("Failed to fetch supplier items");
+        setItemsBySupplier([]);
+      } finally {
+        setLoadingItemsBySupplier(false);
+      }
+      return;
+    }
+    setItemsBySupplier([]);
   };
 
   const handleAddItemToOrder = (item_id: string, qty: number) => {
@@ -537,7 +626,6 @@ const OrderPage = () => {
     );
   };
 
-  // -------------------- Modal open flows --------------------
   const openCreate = () => {
     resetForm();
     setMode("create");
@@ -552,6 +640,7 @@ const OrderPage = () => {
     setForm({
       category_id: String(order.category_id ?? ""),
       customer_id: String((order as any).customer_id ?? ""),
+      supplier_id: String(order.supplier_id ?? ""),
       comment: order.comment ?? "",
       status: String(order.status ?? ""),
     });
@@ -559,6 +648,10 @@ const OrderPage = () => {
     const category_id = String(order.category_id ?? "");
     if (isTab1 && category_id) await fetchItemsByCategory(category_id);
     else setItemsByCategory([]);
+
+    const supplier_id = String(order.supplier_id ?? "");
+    if (isTab1 && supplier_id) await handleSupplierChange(supplier_id, false);
+    else setItemsBySupplier([]);
 
     const detailRes: any = await getOrderById(order.id);
     const detail = detailRes?.data ?? detailRes;
@@ -590,6 +683,7 @@ const OrderPage = () => {
     setForm({
       category_id: String(order.category_id ?? "1"),
       customer_id: String((order as any).customer_id ?? ""),
+      supplier_id: String(order.supplier_id ?? ""),
       comment: order.comment ?? "",
       status: String(order.status ?? ""),
     });
@@ -663,14 +757,15 @@ const OrderPage = () => {
     if (!form.comment?.trim()) return toast.error("Please add a comment");
     if (orderItems.length === 0)
       return toast.error("Please add at least one item");
-    if (isTab1 && !form.category_id)
-      return toast.error("Please select a category for Orders");
+    if (isTab1 && !form.category_id && !form.supplier_id)
+      return toast.error("Please select a category or supplier for Orders");
     if (isTab2 && !form.customer_id)
       return toast.error("Please select a customer for Customer Orders");
 
     const payload = {
       customer_id: form.customer_id || null,
       category_id: form.category_id || null,
+      supplier_id: form.supplier_id || null,
       comment: form.comment?.slice(0, 200) || null,
       status: 1,
       items: orderItems.map((x) => ({
@@ -694,6 +789,7 @@ const OrderPage = () => {
     const payload = {
       customer_id: (form.customer_id || null) as any,
       category_id: (form.category_id || null) as any,
+      supplier_id: (form.supplier_id || null) as any,
       comment: (form.comment || "").slice(0, 200),
       status: Number(form.status || selectedOrder.status || 1),
       items: orderItems.map((x) => ({
@@ -829,6 +925,7 @@ const OrderPage = () => {
         </CustomButton>
       </div>
     ),
+    tab3: null,
   };
 
   const lockAllExceptQty = isConvertMode;
@@ -840,12 +937,10 @@ const OrderPage = () => {
           <div className="mb-6">
             <div className="flex justify-between items-center mb-4">
               <div>
-                <h1 className="text-2xl font-bold text-gray-900 mb-2">
-                  {activeTabObj?.label || "Select a tab"}
-                </h1>
-                <p className="text-gray-600 text-sm">
-                  {activeTabObj?.description || "-"}
-                </p>
+                <PageHeader
+                  title={activeTabObj?.label || "Orders"}
+                  icon={ShoppingCart}
+                />
               </div>
 
               {tabActions[activeTab]}
@@ -871,18 +966,22 @@ const OrderPage = () => {
           </div>
 
           <div className="bg-white rounded-md shadow-lg border border-gray-200 overflow-hidden">
-            <OrdersTable
-              orders={visibleOrders}
-              loading={loadingOrders}
-              getCategoryName={getCategoryName}
-              getOrderStatusColor={getOrderStatusColor}
-              onView={openView}
-              onEdit={openEdit}
-              onDelete={handleDeleteOrder}
-              canDelete={user?.role === UserRole.ADMIN}
-              showConvert={activeTab === "tab2"}
-              onConvert={openConvert}
-            />
+            {activeTab === "tab3" ? (
+              <CargosTab customers={customers} />
+            ) : (
+              <OrdersTable
+                orders={visibleOrders}
+                loading={loadingOrders}
+                getCategoryName={getCategoryName}
+                getOrderStatusColor={getOrderStatusColor}
+                onView={openView}
+                onEdit={openEdit}
+                onDelete={handleDeleteOrder}
+                canDelete={user?.role === UserRole.ADMIN}
+                showConvert={activeTab === "tab2"}
+                onConvert={openConvert}
+              />
+            )}
           </div>
         </div>
       </div>
@@ -1051,21 +1150,37 @@ const OrderPage = () => {
 
                   <div className="flex-1">
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Select Customer:
+                      {isTab1 ? "Select Supplier:" : "Select Customer:"}
                     </label>
-                    <select
-                      value={form.customer_id}
-                      onChange={(e) => handleCustomerChange(e.target.value)}
-                      disabled={lockAllExceptQty}
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:bg-gray-50"
-                    >
-                      <option value="">Select Customer</option>
-                      {customers.map((customer) => (
-                        <option key={customer.id} value={String(customer.id)}>
-                          {customer.companyName}
-                        </option>
-                      ))}
-                    </select>
+                    {isTab1 ? (
+                      <select
+                        value={form.supplier_id}
+                        onChange={(e) => handleSupplierChange(e.target.value)}
+                        disabled={lockAllExceptQty}
+                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:bg-gray-50"
+                      >
+                        <option value="">Select Supplier</option>
+                        {suppliers.map((s) => (
+                          <option key={s.id} value={String(s.id)}>
+                            {s.company_name || s.name || "Unnamed Supplier"}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <select
+                        value={form.customer_id}
+                        onChange={(e) => handleCustomerChange(e.target.value)}
+                        disabled={lockAllExceptQty}
+                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:bg-gray-50"
+                      >
+                        <option value="">Select Customer</option>
+                        {customers.map((customer) => (
+                          <option key={customer.id} value={String(customer.id)}>
+                            {customer.companyName}
+                          </option>
+                        ))}
+                      </select>
+                    )}
                   </div>
                 </div>
 
