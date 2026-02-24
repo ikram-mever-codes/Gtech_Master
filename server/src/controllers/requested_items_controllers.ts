@@ -228,6 +228,10 @@ export class RequestedItemController {
         qualityCriteria,
         attachments,
         taric,
+        itemNo,
+        urgency1,
+        urgency2,
+        painPoints,
       } = request.body;
 
       console.log("Received contactPersonId:", contactPersonId);
@@ -307,6 +311,10 @@ export class RequestedItemController {
         qualityCriteria,
         attachments,
         taric,
+        itemNo,
+        urgency1,
+        urgency2,
+        painPoints,
       });
 
       const savedItem: any = await this.requestedItemRepository.save(
@@ -361,6 +369,10 @@ export class RequestedItemController {
         qualityCriteria,
         attachments,
         taric,
+        itemNo,
+        urgency1,
+        urgency2,
+        painPoints,
       } = request.body;
 
       const existingItem = await this.requestedItemRepository.findOne({
@@ -435,6 +447,10 @@ export class RequestedItemController {
         ...(qualityCriteria !== undefined && { qualityCriteria }),
         ...(attachments !== undefined && { attachments }),
         ...(taric !== undefined && { taric }),
+        ...(itemNo !== undefined && { itemNo }),
+        ...(urgency1 !== undefined && { urgency1 }),
+        ...(urgency2 !== undefined && { urgency2 }),
+        ...(painPoints !== undefined && { painPoints }),
       };
 
       if (contactPerson !== undefined) {
@@ -649,7 +665,6 @@ export class RequestedItemController {
     }
   }
 
-  // New method: Calculate volume for a requested item
   async calculateItemVolume(request: Request, response: Response) {
     try {
       const { id } = request.params;

@@ -66,6 +66,9 @@ export class Inquiry {
   @Column({ type: "varchar", length: 255 })
   name!: string;
 
+  @Column({ type: "varchar", length: 255, nullable: true })
+  itemNo?: string;
+
   @Column({ type: "text", nullable: true })
   image?: string;
 
@@ -207,6 +210,15 @@ export class Inquiry {
 
   @Column({ type: "varchar", length: 500, nullable: true })
   asanaLink?: string;
+
+  @Column({ type: "text", nullable: true })
+  urgency1?: string;
+
+  @Column({ type: "text", nullable: true })
+  urgency2?: string;
+
+  @Column({ type: "json", nullable: true })
+  painPoints?: string[];
 
   @CreateDateColumn()
   createdAt!: Date;

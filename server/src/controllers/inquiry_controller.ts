@@ -338,6 +338,10 @@ export class InquiryController {
         width,
         height,
         length,
+        itemNo,
+        urgency1,
+        urgency2,
+        painPoints,
         isFragile,
         requiresSpecialHandling,
         handlingInstructions,
@@ -401,6 +405,10 @@ export class InquiryController {
         width,
         height,
         length,
+        itemNo,
+        urgency1,
+        urgency2,
+        painPoints,
         isEstimated,
         isFragile: isFragile || false,
         requiresSpecialHandling: requiresSpecialHandling || false,
@@ -425,9 +433,10 @@ export class InquiryController {
 
         const requestEntities = requests.map((reqData: any) => {
           let totalWeight = null;
-          if (reqData.unitWeight && reqData.quantity) {
+          const currentQty = reqData.qty || reqData.quantity;
+          if (reqData.unitWeight && currentQty) {
             totalWeight =
-              parseFloat(reqData.unitWeight) * parseFloat(reqData.quantity);
+              parseFloat(reqData.unitWeight) * parseFloat(currentQty);
           }
 
           const requestItem = this.requestRepository.create({
@@ -435,7 +444,7 @@ export class InquiryController {
             businessId: starBusinessDetails.id,
             business: starBusinessDetails,
             inquiry: savedInquiry,
-            qty: reqData.quantity,
+            qty: currentQty,
             totalWeight: totalWeight || reqData.totalWeight,
           });
 
@@ -450,16 +459,23 @@ export class InquiryController {
         relations: ["customer", "contactPerson", "requests"],
       });
 
+      const user = (request as AuthorizedRequest).user;
+      const filteredData = filterDataByRole(completeInquiry, user?.role || UserRole.STAFF);
+
       return response.status(201).json({
         success: true,
         message: "Inquiry created successfully",
-        data: completeInquiry,
+        data: filteredData,
       });
     } catch (error) {
       console.error("Error creating inquiry:", error);
+      if (error instanceof Error) {
+        console.error("Stack trace:", error.stack);
+      }
       return response.status(500).json({
         success: false,
         message: "Internal server error",
+        error: error instanceof Error ? error.message : "Unknown error"
       });
     }
   }
@@ -487,6 +503,10 @@ export class InquiryController {
         width,
         height,
         length,
+        itemNo,
+        urgency1,
+        urgency2,
+        painPoints,
         isFragile,
         requiresSpecialHandling,
         handlingInstructions,
@@ -547,6 +567,10 @@ export class InquiryController {
         ...(width !== undefined && { width }),
         ...(height !== undefined && { height }),
         ...(length !== undefined && { length }),
+        ...(itemNo !== undefined && { itemNo }),
+        ...(urgency1 !== undefined && { urgency1 }),
+        ...(urgency2 !== undefined && { urgency2 }),
+        ...(painPoints !== undefined && { painPoints }),
         ...(isFragile !== undefined && { isFragile }),
         ...(requiresSpecialHandling !== undefined && {
           requiresSpecialHandling,
@@ -582,9 +606,10 @@ export class InquiryController {
           if (starBusinessDetails) {
             const requestEntities = requests.map((reqData: any) => {
               let totalWeight = null;
-              if (reqData.unitWeight && reqData.quantity) {
+              const currentQty = reqData.qty || reqData.quantity;
+              if (reqData.unitWeight && currentQty) {
                 totalWeight =
-                  parseFloat(reqData.unitWeight) * parseFloat(reqData.quantity);
+                  parseFloat(reqData.unitWeight) * parseFloat(currentQty);
               }
 
               const requestItem = this.requestRepository.create({
@@ -592,7 +617,7 @@ export class InquiryController {
                 businessId: starBusinessDetails.id,
                 business: starBusinessDetails,
                 inquiry: existingInquiry,
-                qty: reqData.quantity,
+                qty: currentQty,
                 totalWeight: totalWeight || reqData.totalWeight,
               });
 
@@ -758,15 +783,16 @@ export class InquiryController {
       }
 
       let totalWeight = null;
-      if (requestData.unitWeight && requestData.quantity) {
+      const currentQty = requestData.qty || requestData.quantity;
+      if (requestData.unitWeight && currentQty) {
         totalWeight =
-          parseFloat(requestData.unitWeight) * parseFloat(requestData.quantity);
+          parseFloat(requestData.unitWeight) * parseFloat(currentQty);
       }
 
       const requestItem = this.requestRepository.create({
         ...requestData,
         inquiry,
-        qty: requestData.quantity,
+        qty: currentQty,
         totalWeight: totalWeight || requestData.totalWeight,
       });
 

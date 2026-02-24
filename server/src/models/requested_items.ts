@@ -43,6 +43,9 @@ export class RequestedItem {
   itemName!: string;
 
   @Column({ type: "varchar", length: 255, nullable: true })
+  itemNo!: string;
+
+  @Column({ type: "varchar", length: 255, nullable: true })
   material!: string;
 
   @Column({ type: "text", nullable: true })
@@ -144,6 +147,15 @@ export class RequestedItem {
 
   @Column({ type: "varchar", length: 100, nullable: true })
   taric?: string;
+
+  @Column({ type: "text", nullable: true })
+  urgency1?: string;
+
+  @Column({ type: "text", nullable: true })
+  urgency2?: string;
+
+  @Column({ type: "json", nullable: true })
+  painPoints?: string[];
 
   @ManyToOne(() => Inquiry, (inquiry) => inquiry.requests, {
     nullable: true,
