@@ -2,7 +2,6 @@ import { api, handleApiError } from "@/utils/api";
 import { toast } from "react-hot-toast";
 import { loadingStyles, successStyles } from "@/utils/constants";
 
-// Types
 export interface DeliveryAddress {
   id?: string;
   street?: string;
@@ -41,6 +40,7 @@ export interface Request {
   sampleQuantity?: number;
   expectedDeliveryDate?: string;
   status: "Draft" | "Pending" | "Quoted" | "Ordered" | "Cancelled";
+  asanaLink?: string;
 }
 
 export interface Inquiry {
@@ -67,14 +67,14 @@ export interface Inquiry {
   deliveryAddress?: DeliveryAddress;
   requests: Request[];
   status:
-    | "Draft"
-    | "Submitted"
-    | "In Review"
-    | "Quoted"
-    | "Negotiation"
-    | "Accepted"
-    | "Rejected"
-    | "Cancelled";
+  | "Draft"
+  | "Submitted"
+  | "In Review"
+  | "Quoted"
+  | "Negotiation"
+  | "Accepted"
+  | "Rejected"
+  | "Cancelled";
   totalEstimatedCost?: number;
   priority: "Low" | "Medium" | "High" | "Urgent";
   referenceNumber?: string;
@@ -82,6 +82,7 @@ export interface Inquiry {
   internalNotes?: string;
   termsConditions?: string;
   projectLink?: string;
+  asanaLink?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -102,7 +103,6 @@ export interface CreateInquiryPayload {
   handlingInstructions: any;
   numberOfPackages: any;
   packageType: any;
-  // Purchase price fields
   purchasePrice: any;
   purchasePriceCurrency: any;
   contactPersonId?: string;
@@ -113,6 +113,7 @@ export interface CreateInquiryPayload {
   internalNotes?: string;
   termsConditions?: string;
   projectLink?: string;
+  asanaLink?: string;
   assemblyInstructions?: string;
   deliveryAddress?: Omit<DeliveryAddress, "id">;
   requests?: Omit<Request, "id" | "inquiryId" | "inquiry">[];
@@ -148,15 +149,12 @@ export interface InquiryStatistics {
   assemblyCount: number;
 }
 
-// Currency options
 export const getAvailableCurrencies = () => [
   { value: "USD", label: "USD" },
   { value: "EUR", label: "EUR" },
   { value: "RMB", label: "RMB" },
   { value: "HKD", label: "HKD" },
 ];
-
-// Status options for inquiries
 export const getInquiryStatuses = () => [
   { value: "Draft", label: "Draft", color: "bg-gray-100 text-gray-800" },
   {
@@ -188,7 +186,6 @@ export const getInquiryStatuses = () => [
   },
 ];
 
-// Status options for requests
 export const getRequestStatuses = () => [
   { value: "Draft", label: "Draft", color: "bg-gray-100 text-gray-800" },
   { value: "Pending", label: "Pending", color: "bg-blue-100 text-blue-800" },
@@ -197,7 +194,6 @@ export const getRequestStatuses = () => [
   { value: "Cancelled", label: "Cancelled", color: "bg-red-100 text-red-800" },
 ];
 
-// Priority options
 export const getPriorityOptions = () => [
   { value: "Low", label: "Low", color: "bg-green-100 text-green-800" },
   { value: "Medium", label: "Medium", color: "bg-yellow-100 text-yellow-800" },
@@ -205,7 +201,6 @@ export const getPriorityOptions = () => [
   { value: "Urgent", label: "Urgent", color: "bg-red-100 text-red-800" },
 ];
 
-// Main API functions
 export const getAllInquiries = async (filters?: InquirySearchFilters) => {
   try {
     const response = await api.get("/inquiries", { params: filters });
@@ -349,7 +344,6 @@ export const exportInquiriesToCSV = async (filters?: InquirySearchFilters) => {
     toast.dismiss();
     toast.success("Export completed", successStyles);
 
-    // Create blob URL for download
     const url = window.URL.createObjectURL(new Blob([response.data]));
     const link = document.createElement("a");
     link.href = url;
@@ -423,7 +417,6 @@ export const convertInquiryToItem = async (
   }
 };
 
-// Convert Requested Item to Item API
 export const convertRequestToItem = async (
   requestId: string,
   conversionData: any

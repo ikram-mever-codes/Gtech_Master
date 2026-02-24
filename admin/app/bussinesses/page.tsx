@@ -612,42 +612,6 @@ const BusinessSearchPage: React.FC = () => {
                   ))}
                 </select>
               </div>
-
-              {/* <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                  Min Rating
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  max="5"
-                  step="0.5"
-                  placeholder="0"
-                  value={filters.minRating}
-                  onChange={(e) =>
-                    setFilters({ ...filters, minRating: e.target.value })
-                  }
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                  Max Rating
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  max="5"
-                  step="0.5"
-                  placeholder="5"
-                  value={filters.maxRating}
-                  onChange={(e) =>
-                    setFilters({ ...filters, maxRating: e.target.value })
-                  }
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
-                />
-              </div> */}
             </div>
 
             {Object.entries(filters).some(([key, value]) => value) && (

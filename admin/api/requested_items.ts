@@ -92,6 +92,9 @@ export interface RequestedItem {
   updatedAt: string;
   business?: any;
   contactPerson?: any;
+  qualityCriteria?: any[];
+  attachments?: any[];
+  taric?: string;
 }
 
 export interface RequestedItemCreatePayload {

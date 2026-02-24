@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   MagnifyingGlassIcon,
   ArrowPathIcon,
@@ -33,6 +34,7 @@ import {
   createInquiry,
   updateInquiry,
   deleteInquiry,
+  getInquiryById,
   getInquiryStatistics,
   getInquiriesByCustomer,
   updateInquiryStatus,
@@ -53,6 +55,7 @@ import {
   createRequestedItem,
   updateRequestedItem,
   deleteRequestedItem,
+  getRequestedItemById,
   getRequestedItemsStatistics,
   getAvailableIntervals,
   getAvailablePriorities as getAvailableRequestPriorities,
@@ -95,8 +98,8 @@ interface ContactPerson {
 
 interface QualityCriterion {
   description: string;
-  picture?: File | string; // Can be File object or URL string
-  pictureUrl?: string; // For displaying existing images
+  picture?: File | string;
+  pictureUrl?: string;
 }
 
 const getConversionFormFields = (hasExistingDimensions?: any) => {
@@ -248,13 +251,11 @@ const getConversionFormFields = (hasExistingDimensions?: any) => {
   return baseFields;
 };
 
-const CombinedInquiriesPage: React.FC = () => {
-  // State for active tab
+const CombinedInquiriesPageContent: React.FC = () => {
   const [activeTab, setActiveTab] = useState<"inquiries" | "requests">(
     "inquiries",
   );
 
-  // State management for inquiries
   const [inquiries, setInquiries] = useState<Inquiry[]>([]);
   const [allInquiries, setAllInquiries] = useState<Inquiry[]>([]);
   const [inquiryLoading, setInquiryLoading] = useState(false);
@@ -281,7 +282,6 @@ const CombinedInquiriesPage: React.FC = () => {
     length?: boolean;
   }>({});
 
-  // Add these states to your component
   const [showConversionModal, setShowConversionModal] = useState(false);
   const [conversionType, setConversionType] = useState<"inquiry" | "request">(
     "inquiry",
@@ -293,12 +293,10 @@ const CombinedInquiriesPage: React.FC = () => {
   const [conversionRequestData, setConversionRequestData] =
     useState<RequestedItem | null>(null);
 
-  // Collapsible state for inquiry requests in modal
   const [expandedRequestIndex, setExpandedRequestIndex] = useState<
     number | null
-  >(0); // First one expanded by default
+  >(0);
 
-  // Collapsible state for inquiry table requests
   const [expandedInquiryId, setExpandedInquiryId] = useState<string | null>(
     null,
   );
@@ -306,7 +304,6 @@ const CombinedInquiriesPage: React.FC = () => {
   const [inquiryImageFile, setInquiryImageFile] = useState<File | null>(null);
   const [inquiryImagePreview, setInquiryImagePreview] = useState<string>("");
 
-  // State management for requested items
   const [requestedItems, setRequestedItems] = useState<RequestedItem[]>([]);
   const [allRequestedItems, setAllRequestedItems] = useState<RequestedItem[]>(
     [],
@@ -330,13 +327,11 @@ const CombinedInquiriesPage: React.FC = () => {
   >(null);
   const [requestEditModeEnabled, setRequestEditModeEnabled] = useState(false);
 
-  // Form state for inquiries with dimension fields - REORDERED: Customer first
   const [inquiryFormData, setInquiryFormData] = useState<CreateInquiryPayload>({
     name: "",
     description: "",
     image: "",
     isAssembly: false,
-    // REORDERED: Customer and Contact Person first
     customerId: "",
     contactPersonId: "",
     status: "Draft",
@@ -346,6 +341,7 @@ const CombinedInquiriesPage: React.FC = () => {
     internalNotes: "",
     termsConditions: "",
     projectLink: "",
+    asanaLink: "",
     assemblyInstructions: "",
     weight: undefined,
     width: undefined,
@@ -406,13 +402,10 @@ const CombinedInquiriesPage: React.FC = () => {
       width?: number;
       height?: number;
       length?: number;
-      // Quality criteria
       qualityCriteria?: QualityCriterion[];
-      // Attachments
       attachments?: File[];
-      // TARIC field
       taric?: string;
-      // Price in RMB
+      asanaLink?: string;
       priceRMB?: number;
     }>
   >([
@@ -421,7 +414,7 @@ const CombinedInquiriesPage: React.FC = () => {
       description: "",
       quantity: 1,
       purchasePrice: 0,
-      currency: "RMB", // Default to RMB
+      currency: "RMB",
       status: "Draft",
       material: "",
       specifications: "",
@@ -433,19 +426,17 @@ const CombinedInquiriesPage: React.FC = () => {
       qualityCriteria: [],
       attachments: [],
       taric: "",
+      asanaLink: "",
       priceRMB: 0,
     },
   ]);
 
-  // Quality criteria for request items
   const [requestQualityCriteria, setRequestQualityCriteria] = useState<
     QualityCriterion[]
   >([]);
 
-  // Attachments for request items
   const [requestAttachments, setRequestAttachments] = useState<File[]>([]);
 
-  // Filters state
   const [inquiryFilters, setInquiryFilters] = useState<InquirySearchFilters>({
     search: "",
     status: "",
@@ -475,7 +466,6 @@ const CombinedInquiriesPage: React.FC = () => {
 
   const itemsPerPage = 20;
 
-  // Fetch data on component mount
   useEffect(() => {
     fetchCustomers();
     fetchContactPersons();
@@ -505,6 +495,27 @@ const CombinedInquiriesPage: React.FC = () => {
     selectedCustomerId,
     selectedBusinessId,
   ]);
+
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    const inquiryId = searchParams.get("inquiryId");
+    const requestId = searchParams.get("requestId");
+
+    if (inquiryId && allInquiries.length > 0) {
+      const inquiry = allInquiries.find((i) => i.id === inquiryId);
+      if (inquiry) {
+        handleInquiryClick(inquiry);
+        setActiveTab("inquiries");
+      }
+    } else if (requestId && allRequestedItems.length > 0) {
+      const request = allRequestedItems.find((r) => r.id === requestId);
+      if (request) {
+        handleRequestItemClick(request);
+        setActiveTab("requests");
+      }
+    }
+  }, [searchParams, allInquiries, allRequestedItems]);
 
   const toggleRequestExpansion = (index: number) => {
     if (expandedRequestIndex === index) {
@@ -650,7 +661,6 @@ const CombinedInquiriesPage: React.FC = () => {
       const items = response || [];
       setAllRequestedItems(items);
 
-      // Filter by business if selected
       let filtered = items;
       if (selectedBusinessId) {
         filtered = filtered.filter(
@@ -660,20 +670,17 @@ const CombinedInquiriesPage: React.FC = () => {
         );
       }
 
-      // Calculate pagination
       const totalFiltered = filtered.length;
       const totalPagesCalc = Math.ceil(totalFiltered / itemsPerPage);
       setRequestTotalPages(totalPagesCalc);
       setRequestTotalRecords(totalFiltered);
 
-      // Apply pagination
       const startIndex = (requestCurrentPage - 1) * itemsPerPage;
       const endIndex = startIndex + itemsPerPage;
       const paginatedItems = filtered.slice(startIndex, endIndex);
 
       setRequestedItems(paginatedItems);
 
-      // Update businesses with requests
       const businessMap = new Map();
       items.forEach((item: RequestedItem) => {
         if (item.business?.customer) {
@@ -689,7 +696,6 @@ const CombinedInquiriesPage: React.FC = () => {
             });
           }
         } else if (item.businessId) {
-          // Fallback for items where business details are missing or not enriched
           if (!businessMap.has(item.businessId)) {
             businessMap.set(item.businessId, {
               id: item.businessId,
@@ -706,7 +712,6 @@ const CombinedInquiriesPage: React.FC = () => {
     }
   }, [requestFilters, selectedBusinessId, requestCurrentPage]);
 
-  // Handle inquiry click
   const handleInquiryClick = (inquiry: Inquiry) => {
     setInquiryModalMode("edit");
     setEditingInquiryId(inquiry.id);
@@ -727,26 +732,23 @@ const CombinedInquiriesPage: React.FC = () => {
       internalNotes: inquiry.internalNotes || "",
       termsConditions: inquiry.termsConditions || "",
       projectLink: inquiry.projectLink || "",
+      asanaLink: inquiry.asanaLink || "",
       assemblyInstructions: inquiry.assemblyInstructions || "",
-      // New dimension fields
       weight: inquiry.weight,
       width: inquiry.width,
       height: inquiry.height,
       length: inquiry.length,
-      // New shipping fields
       isFragile: inquiry.isFragile || false,
       requiresSpecialHandling: inquiry.requiresSpecialHandling || false,
       handlingInstructions: inquiry.handlingInstructions || "",
       numberOfPackages: inquiry.numberOfPackages,
       packageType: inquiry.packageType || "",
-      // Purchase price fields
       purchasePrice: inquiry.purchasePrice,
       purchasePriceCurrency: inquiry.purchasePriceCurrency || "RMB",
       requests: inquiry.requests || [],
     });
     setInquiryImagePreview(inquiry.image || "");
 
-    // Set the requests data for the modal with dimension fields
     if (inquiry.requests && inquiry.requests.length > 0) {
       setInquiryRequests(
         inquiry.requests.map((req: any) => ({
@@ -754,23 +756,19 @@ const CombinedInquiriesPage: React.FC = () => {
           description: req.description || "",
           quantity: req.quantity || 1,
           purchasePrice: req.purchasePrice || 0,
-          currency: req.currency || "RMB", // Default to RMB
+          currency: req.currency || "RMB",
           status: req.status || "Draft",
           material: req.material || "",
           specifications: req.specifications || "",
           images: req.images || [],
-          // New dimension fields
           weight: req.weight,
           width: req.width,
           height: req.height,
           length: req.length,
-          // Quality criteria
           qualityCriteria: req.qualityCriteria || [],
-          // Attachments
           attachments: req.attachments || [],
-          // TARIC
           taric: req.taric || "",
-          // Price in RMB
+          asanaLink: req.asanaLink || "",
           priceRMB: req.priceRMB || req.purchasePrice || 0,
         })),
       );
@@ -780,14 +778,47 @@ const CombinedInquiriesPage: React.FC = () => {
     setShowCreateModal(true);
   };
 
-  // Handle inquiry create/edit submission with multiple requests
+  const handleRequestItemClick = (item: RequestedItem) => {
+    setRequestModalMode("edit");
+    setEditingRequestItemId(item.id);
+    setRequestEditModeEnabled(false);
+    setRequestItemFormData({
+      businessId: item.businessId,
+      contactPersonId: item.contactPersonId || "",
+      itemName: item.itemName,
+      material: item.material || "",
+      specification: item.specification || "",
+      extraItems: item.extraItems || "NO",
+      extraItemsDescriptions: item.extraItemsDescriptions || "",
+      qty: item.qty,
+      interval: item.interval,
+      sampleQty: item.sampleQty || "",
+      expectedDelivery: item.expectedDelivery || "",
+      priority: item.priority,
+      requestStatus: item.requestStatus,
+      comment: item.comment || "",
+      extraNote: item.extraNote || "",
+      asanaLink: item.asanaLink || "",
+      weight: item.weight,
+      width: item.width,
+      height: item.height,
+      length: item.length,
+      purchasePrice: item.purchasePrice,
+      currency: item.currency || "RMB",
+      inquiryId: item.inquiry?.id,
+      qualityCriteria: item.qualityCriteria || [],
+      attachments: item.attachments || [],
+      taric: item.taric || "",
+    });
+    setShowRequestCreateModal(true);
+  };
+
   const handleInquirySubmit = async () => {
     if (!inquiryFormData.name || !inquiryFormData.customerId) {
       toast.error("Please fill in all required fields");
       return;
     }
 
-    // Validate at least one request
     const hasValidRequest = inquiryRequests.some(
       (req) => req.itemName && req.quantity >= 1,
     );
@@ -797,7 +828,6 @@ const CombinedInquiriesPage: React.FC = () => {
     }
 
     try {
-      // Prepare request data with dimension fields
       const requestsData = inquiryRequests.map((req) => ({
         itemName: req.itemName,
         description: req.description,
@@ -808,18 +838,14 @@ const CombinedInquiriesPage: React.FC = () => {
         material: req.material,
         specifications: req.specifications,
         images: req.images || [],
-        // New dimension fields
         weight: req.weight,
         width: req.width,
         height: req.height,
         length: req.length,
-        // Quality criteria
         qualityCriteria: req.qualityCriteria || [],
-        // Attachments
         attachments: req.attachments || [],
-        // TARIC
         taric: req.taric,
-        // Price in RMB
+        asanaLink: req.asanaLink,
         priceRMB: req.priceRMB || req.purchasePrice,
       }));
 
@@ -842,15 +868,13 @@ const CombinedInquiriesPage: React.FC = () => {
       fetchInquiries();
     } catch (error) {
       console.error(
-        `Error ${
-          inquiryModalMode === "edit" ? "updating" : "creating"
+        `Error ${inquiryModalMode === "edit" ? "updating" : "creating"
         } inquiry:`,
         error,
       );
     }
   };
 
-  // Handle request item create/edit submission
   const handleRequestItemSubmit = async () => {
     if (
       !requestItemFormData.businessId ||
@@ -862,7 +886,6 @@ const CombinedInquiriesPage: React.FC = () => {
     }
 
     try {
-      // Prepare form data with quality criteria and attachments
       const formDataWithQuality = {
         ...requestItemFormData,
         qualityCriteria: requestQualityCriteria,
@@ -883,8 +906,7 @@ const CombinedInquiriesPage: React.FC = () => {
       fetchRequestedItems();
     } catch (error) {
       console.error(
-        `Error ${
-          requestModalMode === "edit" ? "updating" : "creating"
+        `Error ${requestModalMode === "edit" ? "updating" : "creating"
         } request item:`,
         error,
       );
@@ -899,7 +921,7 @@ const CombinedInquiriesPage: React.FC = () => {
         description: "",
         quantity: 1,
         purchasePrice: 0,
-        currency: "RMB", // Default to RMB
+        currency: "RMB",
         status: "Draft",
         material: "",
         specifications: "",
@@ -911,10 +933,10 @@ const CombinedInquiriesPage: React.FC = () => {
         qualityCriteria: [],
         attachments: [],
         taric: "",
+        asanaLink: "",
         priceRMB: 0,
       },
     ]);
-    // Expand the newly added request
     setExpandedRequestIndex(inquiryRequests.length);
   };
 
@@ -930,7 +952,6 @@ const CombinedInquiriesPage: React.FC = () => {
     }
   };
 
-  // Update a specific request
   const updateRequest = (index: number, field: string, value: any) => {
     const updatedRequests = [...inquiryRequests];
     updatedRequests[index] = {
@@ -940,7 +961,6 @@ const CombinedInquiriesPage: React.FC = () => {
     setInquiryRequests(updatedRequests);
   };
 
-  // Handle quality criteria for request items
   const addQualityCriterion = () => {
     setRequestQualityCriteria([
       ...requestQualityCriteria,
@@ -962,7 +982,6 @@ const CombinedInquiriesPage: React.FC = () => {
     setRequestQualityCriteria(updated);
   };
 
-  // Handle attachments for request items
   const handleAttachmentUpload = (files: FileList) => {
     const newAttachments = Array.from(files);
     setRequestAttachments([...requestAttachments, ...newAttachments]);
@@ -973,7 +992,6 @@ const CombinedInquiriesPage: React.FC = () => {
     setRequestAttachments(updated);
   };
 
-  // Handle quality criteria for inquiry requests
   const addRequestQualityCriterion = (requestIndex: number) => {
     const updatedRequests = [...inquiryRequests];
     if (!updatedRequests[requestIndex].qualityCriteria) {
@@ -1015,7 +1033,6 @@ const CombinedInquiriesPage: React.FC = () => {
     }
   };
 
-  // Handle attachments for inquiry requests
   const handleRequestAttachmentUpload = (
     requestIndex: number,
     files: FileList,
@@ -1042,7 +1059,6 @@ const CombinedInquiriesPage: React.FC = () => {
     }
   };
 
-  // Reset forms
   const resetInquiryForm = () => {
     setInquiryFormData({
       name: "",
@@ -1058,6 +1074,7 @@ const CombinedInquiriesPage: React.FC = () => {
       internalNotes: "",
       termsConditions: "",
       projectLink: "",
+      asanaLink: "",
       assemblyInstructions: "",
       weight: undefined,
       width: undefined,
@@ -1090,6 +1107,7 @@ const CombinedInquiriesPage: React.FC = () => {
         qualityCriteria: [],
         attachments: [],
         taric: "",
+        asanaLink: "",
         priceRMB: 0,
       },
     ]);
@@ -1106,7 +1124,6 @@ const CombinedInquiriesPage: React.FC = () => {
       const updatedRequests = inquiryRequests.filter((_, i) => i !== index);
       setInquiryRequests(updatedRequests);
 
-      // Adjust expanded index if needed
       if (expandedRequestIndex === index) {
         setExpandedRequestIndex(Math.max(0, index - 1));
       } else if (expandedRequestIndex && expandedRequestIndex > index) {
@@ -1173,7 +1190,6 @@ const CombinedInquiriesPage: React.FC = () => {
     if (type === "inquiry" && inquiryData) {
       setConversionInquiryData(inquiryData);
 
-      // Check which dimension fields exist in inquiry
       existingDims = {
         weight: !!inquiryData.weight,
         width: !!inquiryData.width,
@@ -1181,7 +1197,6 @@ const CombinedInquiriesPage: React.FC = () => {
         length: !!inquiryData.length,
       };
 
-      // Auto-populate dimension fields if they exist
       if (inquiryData.isAssembly) {
         initialFormData = {
           itemNameCN: inquiryData.description,
@@ -1210,7 +1225,6 @@ const CombinedInquiriesPage: React.FC = () => {
     } else if (type === "request" && requestData) {
       setConversionRequestData(requestData);
 
-      // Check which dimension fields exist in request
       existingDims = {
         weight: !!requestData.weight,
         width: !!requestData.width,
@@ -1218,7 +1232,6 @@ const CombinedInquiriesPage: React.FC = () => {
         length: !!requestData.length,
       };
 
-      // Auto-populate dimension fields if they exist
       initialFormData = {
         itemNameCN: requestData.specification,
         FOQ: requestData.qty ? parseInt(requestData.qty) || 0 : 0,
@@ -1228,7 +1241,6 @@ const CombinedInquiriesPage: React.FC = () => {
         note: requestData.extraNote,
         material: requestData.material,
         specification: requestData.specification,
-        // Include dimension fields
         weight: requestData.weight || "",
         width: requestData.width || "",
         height: requestData.height || "",
@@ -1242,7 +1254,6 @@ const CombinedInquiriesPage: React.FC = () => {
   };
 
   const handleConvertInquiryToItem = async () => {
-    // Check if required dimension fields are filled
     const validationErrors = validateConversionForm(
       conversionFormData,
       existingDimensionFields,
@@ -1267,7 +1278,6 @@ const CombinedInquiriesPage: React.FC = () => {
   };
 
   const handleConvertRequestToItem = async () => {
-    // Check if required dimension fields are filled
     const validationErrors = validateConversionForm(
       conversionFormData,
       existingDimensionFields,
@@ -1327,7 +1337,6 @@ const CombinedInquiriesPage: React.FC = () => {
     handleOpenConversionModal("request", request.id, undefined, request);
   };
 
-  // Get status and priority colors
   const getInquiryStatusColor = (status: string) => {
     const statusObj = getInquiryStatuses().find((s) => s.value === status);
     return statusObj?.color || "bg-gray-100 text-gray-800";
@@ -1367,7 +1376,6 @@ const CombinedInquiriesPage: React.FC = () => {
     return colors[priority] || "bg-gray-100 text-gray-800";
   };
 
-  // Format functions
   const formatDate = (dateString: string | Date) => {
     if (!dateString) return "-";
     return new Date(dateString).toLocaleDateString("de-DE", {
@@ -1408,7 +1416,6 @@ const CombinedInquiriesPage: React.FC = () => {
     }
   };
 
-  // Helper function to display dimension info
   const renderDimensionInfo = (item: any) => {
     const hasDimensions =
       item.weight || item.width || item.height || item.length;
@@ -1435,15 +1442,12 @@ const CombinedInquiriesPage: React.FC = () => {
     );
   };
 
-  // Helper function to format TARIC display
   const formatTaricDisplay = (taric: any) => {
     if (!taric) return "";
-    return `${taric.id} - ${taric.code || "No code"} - ${
-      taric.name_de || taric.name_en || taric.name_cn || "No name"
-    }`;
+    return `${taric.id} - ${taric.code || "No code"} - ${taric.name_de || taric.name_en || taric.name_cn || "No name"
+      }`;
   };
 
-  // Get conversion form fields with populated TARIC options
   const getConversionFormFieldsWithOptions = () => {
     const fields = getConversionFormFields(existingDimensionFields);
     return fields.map((field) => {
@@ -1460,12 +1464,10 @@ const CombinedInquiriesPage: React.FC = () => {
     });
   };
 
-  // Function to render the full RequestItem View when isAssembly = TRUE
   const renderAssemblyRequestView = (request: any, index: number) => {
     return (
       <div className="border border-gray-200 rounded-lg p-4 mb-3 bg-gray-50">
         <div className="grid grid-cols-2 gap-4">
-          {/* Quantity and Interval - Displayed together */}
           <div className="col-span-1">
             <label className="block text-xs font-medium text-gray-700 mb-1">
               Quantity *
@@ -1500,7 +1502,6 @@ const CombinedInquiriesPage: React.FC = () => {
             </select>
           </div>
 
-          {/* Price in RMB */}
           <div className="col-span-1">
             <label className="block text-xs font-medium text-gray-700 mb-1">
               Price (RMB) *
@@ -1522,7 +1523,6 @@ const CombinedInquiriesPage: React.FC = () => {
             />
           </div>
 
-          {/* TARIC */}
           <div className="col-span-1">
             <label className="block text-xs font-medium text-gray-700 mb-1">
               TARIC Code
@@ -1542,7 +1542,6 @@ const CombinedInquiriesPage: React.FC = () => {
             </select>
           </div>
 
-          {/* Quality Criteria Section */}
           <div className="col-span-2">
             <div className="flex items-center justify-between mb-2">
               <label className="block text-xs font-medium text-gray-700">
@@ -1854,13 +1853,12 @@ const CombinedInquiriesPage: React.FC = () => {
                 className="px-3 py-2 text-sm text-gray-700 bg-white/80 backdrop-blur-sm border border-gray-300/80 rounded-lg hover:bg-white/60 transition-all flex items-center gap-2 disabled:opacity-50"
               >
                 <ArrowPathIcon
-                  className={`h-4 w-4 ${
-                    activeTab === "inquiries"
-                      ? inquiryLoading
-                      : requestLoading
-                        ? "animate-spin"
-                        : ""
-                  }`}
+                  className={`h-4 w-4 ${activeTab === "inquiries"
+                    ? inquiryLoading
+                    : requestLoading
+                      ? "animate-spin"
+                      : ""
+                    }`}
                 />
                 Refresh
               </button>
@@ -1889,21 +1887,19 @@ const CombinedInquiriesPage: React.FC = () => {
             <nav className="-mb-px flex space-x-8">
               <button
                 onClick={() => setActiveTab("inquiries")}
-                className={`py-3 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === "inquiries"
-                    ? "border-gray-600 text-gray-900"
-                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                }`}
+                className={`py-3 px-1 border-b-2 font-medium text-sm ${activeTab === "inquiries"
+                  ? "border-gray-600 text-gray-900"
+                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                  }`}
               >
                 Inquiries
               </button>
               <button
                 onClick={() => setActiveTab("requests")}
-                className={`py-3 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === "requests"
-                    ? "border-gray-600 text-gray-900"
-                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                }`}
+                className={`py-3 px-1 border-b-2 font-medium text-sm ${activeTab === "requests"
+                  ? "border-gray-600 text-gray-900"
+                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                  }`}
               >
                 Request Items
               </button>
@@ -2061,11 +2057,10 @@ const CombinedInquiriesPage: React.FC = () => {
                                   e.stopPropagation();
                                   toggleInquiryRequests(inquiry.id);
                                 }}
-                                className={`px-2 py-1 text-xs rounded-lg transition-all flex items-center gap-1 ${
-                                  expandedInquiryId === inquiry.id
-                                    ? "bg-blue-100 text-blue-800"
-                                    : "bg-blue-500 text-white hover:bg-blue-600"
-                                }`}
+                                className={`px-2 py-1 text-xs rounded-lg transition-all flex items-center gap-1 ${expandedInquiryId === inquiry.id
+                                  ? "bg-blue-100 text-blue-800"
+                                  : "bg-blue-500 text-white hover:bg-blue-600"
+                                  }`}
                               >
                                 {expandedInquiryId === inquiry.id ? (
                                   <EyeSlashIcon className="h-3 w-3" />
@@ -2074,13 +2069,34 @@ const CombinedInquiriesPage: React.FC = () => {
                                 )}
                                 Requests ({inquiry.requests?.length || 0})
                               </button>
+                              {inquiry.asanaLink && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    window.open(inquiry.asanaLink, "_blank");
+                                  }}
+                                  className="text-purple-500 hover:text-purple-700 transition-colors p-1"
+                                  title="Open Asana task"
+                                >
+                                  <svg
+                                    className="h-4 w-4"
+                                    viewBox="0 0 24 24"
+                                    fill="currentColor"
+                                  >
+                                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z" />
+                                    <circle cx="12" cy="8.5" r="1.5" />
+                                    <circle cx="8.5" cy="14.5" r="1.5" />
+                                    <circle cx="15.5" cy="14.5" r="1.5" />
+                                  </svg>
+                                </button>
+                              )}
                               {inquiry.projectLink && (
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     window.open(inquiry.projectLink, "_blank");
                                   }}
-                                  className="text-purple-500 hover:text-purple-700 transition-colors p-1"
+                                  className="text-blue-500 hover:text-blue-700 transition-colors p-1"
                                   title="Open project link"
                                 >
                                   <LinkIcon className="h-4 w-4" />
@@ -2113,7 +2129,6 @@ const CombinedInquiriesPage: React.FC = () => {
                           </td>
                         </tr>
 
-                        {/* Requests sub-table - only shown when expanded */}
                         {expandedInquiryId === inquiry.id &&
                           inquiry.requests &&
                           inquiry.requests.length > 0 && (
@@ -2150,66 +2165,14 @@ const CombinedInquiriesPage: React.FC = () => {
                                       {inquiry.requests.map((request: any) => (
                                         <tr
                                           key={request.id}
-                                          className={`hover:bg-gray-50/50 transition-colors ${
-                                            request.priority === "High"
-                                              ? "bg-red-50/50"
-                                              : ""
-                                          }`}
+                                          className={`hover:bg-gray-50/50 transition-colors ${request.priority === "High"
+                                            ? "bg-red-50/50"
+                                            : ""
+                                            }`}
                                         >
                                           <td
                                             className="px-4 py-3 cursor-pointer"
-                                            onClick={() => {
-                                              setRequestModalMode("edit");
-                                              setEditingRequestItemId(
-                                                request.id,
-                                              );
-                                              setRequestEditModeEnabled(false);
-                                              setRequestItemFormData({
-                                                businessId: request.businessId,
-                                                contactPersonId:
-                                                  request.contactPersonId || "",
-                                                itemName: request.itemName,
-                                                material:
-                                                  request.material || "",
-                                                specification:
-                                                  request.specification || "",
-                                                extraItems:
-                                                  request.extraItems || "NO",
-                                                extraItemsDescriptions:
-                                                  request.extraItemsDescriptions ||
-                                                  "",
-                                                qty: request.qty,
-                                                interval: request.interval,
-                                                sampleQty:
-                                                  request.sampleQty || "",
-                                                expectedDelivery:
-                                                  request.expectedDelivery ||
-                                                  "",
-                                                priority: request.priority,
-                                                requestStatus:
-                                                  request.requestStatus,
-                                                comment: request.comment || "",
-                                                extraNote:
-                                                  request.extraNote || "",
-                                                asanaLink:
-                                                  request.asanaLink || "",
-                                                weight: request.weight,
-                                                width: request.width,
-                                                height: request.height,
-                                                length: request.length,
-                                                purchasePrice:
-                                                  request.purchasePrice,
-                                                currency:
-                                                  request.currency || "RMB",
-                                                inquiryId: request.inquiry?.id,
-                                                qualityCriteria:
-                                                  request.qualityCriteria || [],
-                                                attachments:
-                                                  request.attachments || [],
-                                                taric: request.taric || "",
-                                              });
-                                              setShowRequestCreateModal(true);
-                                            }}
+                                            onClick={() => handleRequestItemClick(request)}
                                           >
                                             <div className="w-[8rem]">
                                               <div className="text-sm font-medium text-gray-900">
@@ -2225,58 +2188,7 @@ const CombinedInquiriesPage: React.FC = () => {
                                           </td>
                                           <td
                                             className="px-4 py-3 cursor-pointer"
-                                            onClick={() => {
-                                              setRequestModalMode("edit");
-                                              setEditingRequestItemId(
-                                                request.id,
-                                              );
-                                              setRequestEditModeEnabled(false);
-                                              setRequestItemFormData({
-                                                businessId: request.businessId,
-                                                contactPersonId:
-                                                  request.contactPersonId || "",
-                                                itemName: request.itemName,
-                                                material:
-                                                  request.material || "",
-                                                specification:
-                                                  request.specification || "",
-                                                extraItems:
-                                                  request.extraItems || "NO",
-                                                extraItemsDescriptions:
-                                                  request.extraItemsDescriptions ||
-                                                  "",
-                                                qty: request.qty,
-                                                interval: request.interval,
-                                                sampleQty:
-                                                  request.sampleQty || "",
-                                                expectedDelivery:
-                                                  request.expectedDelivery ||
-                                                  "",
-                                                priority: request.priority,
-                                                requestStatus:
-                                                  request.requestStatus,
-                                                comment: request.comment || "",
-                                                extraNote:
-                                                  request.extraNote || "",
-                                                asanaLink:
-                                                  request.asanaLink || "",
-                                                weight: request.weight,
-                                                width: request.width,
-                                                height: request.height,
-                                                length: request.length,
-                                                purchasePrice:
-                                                  request.purchasePrice,
-                                                currency:
-                                                  request.currency || "RMB",
-                                                inquiryId: request.inquiry?.id,
-                                                taric: request.taric || "",
-                                                attachments:
-                                                  request.attachments || [],
-                                                qualityCriteria:
-                                                  request.qualityCriteria || [],
-                                              });
-                                              setShowRequestCreateModal(true);
-                                            }}
+                                            onClick={() => handleRequestItemClick(request)}
                                           >
                                             <div className="w-[8rem]">
                                               <a
@@ -2354,7 +2266,16 @@ const CombinedInquiriesPage: React.FC = () => {
                                                   className="text-purple-500 hover:text-purple-700 transition-colors p-1"
                                                   title="Open Asana link"
                                                 >
-                                                  <LinkIcon className="h-4 w-4" />
+                                                  <svg
+                                                    className="h-4 w-4"
+                                                    viewBox="0 0 24 24"
+                                                    fill="currentColor"
+                                                  >
+                                                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8+3.59 8 8-3.59 8-8 8z" />
+                                                    <circle cx="12" cy="8.5" r="1.5" />
+                                                    <circle cx="8.5" cy="14.5" r="1.5" />
+                                                    <circle cx="15.5" cy="14.5" r="1.5" />
+                                                  </svg>
                                                 </button>
                                               )}
                                               <button
@@ -2372,19 +2293,19 @@ const CombinedInquiriesPage: React.FC = () => {
                                               </button>
                                               {user?.role ===
                                                 UserRole.ADMIN && (
-                                                <button
-                                                  onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    handleDeleteRequestItem(
-                                                      request.id,
-                                                    );
-                                                  }}
-                                                  className="p-1 text-red-500 hover:text-red-700 transition-colors"
-                                                  title="Delete Request"
-                                                >
-                                                  <TrashIcon className="h-4 w-4" />
-                                                </button>
-                                              )}
+                                                  <button
+                                                    onClick={(e) => {
+                                                      e.stopPropagation();
+                                                      handleDeleteRequestItem(
+                                                        request.id,
+                                                      );
+                                                    }}
+                                                    className="p-1 text-red-500 hover:text-red-700 transition-colors"
+                                                    title="Delete Request"
+                                                  >
+                                                    <TrashIcon className="h-4 w-4" />
+                                                  </button>
+                                                )}
                                             </div>
                                           </td>
                                         </tr>
@@ -2431,11 +2352,10 @@ const CombinedInquiriesPage: React.FC = () => {
                         <button
                           key={pageNum}
                           onClick={() => setInquiryCurrentPage(pageNum)}
-                          className={`px-2 py-1 text-sm rounded-lg transition-all ${
-                            inquiryCurrentPage === pageNum
-                              ? "bg-gray-600 text-white"
-                              : "bg-white/80 backdrop-blur-sm border border-gray-300/80 hover:bg-white/60"
-                          }`}
+                          className={`px-2 py-1 text-sm rounded-lg transition-all ${inquiryCurrentPage === pageNum
+                            ? "bg-gray-600 text-white"
+                            : "bg-white/80 backdrop-blur-sm border border-gray-300/80 hover:bg-white/60"
+                            }`}
                         >
                           {pageNum}
                         </button>
@@ -2448,11 +2368,10 @@ const CombinedInquiriesPage: React.FC = () => {
                           onClick={() =>
                             setInquiryCurrentPage(inquiryTotalPages)
                           }
-                          className={`px-2 py-1 text-sm rounded-lg transition-all ${
-                            inquiryCurrentPage === inquiryTotalPages
-                              ? "bg-gray-600 text-white"
-                              : "bg-white/80 backdrop-blur-sm border border-gray-300/80 hover:bg-white/60"
-                          }`}
+                          className={`px-2 py-1 text-sm rounded-lg transition-all ${inquiryCurrentPage === inquiryTotalPages
+                            ? "bg-gray-600 text-white"
+                            : "bg-white/80 backdrop-blur-sm border border-gray-300/80 hover:bg-white/60"
+                            }`}
                         >
                           {inquiryTotalPages}
                         </button>
@@ -2527,47 +2446,12 @@ const CombinedInquiriesPage: React.FC = () => {
                     {requestedItems.map((item: any) => (
                       <tr
                         key={item.id}
-                        className={`hover:bg-gray-50/50 transition-colors ${
-                          item.priority === "High" ? "bg-red-50/50" : ""
-                        }`}
+                        className={`hover:bg-gray-50/50 transition-colors ${item.priority === "High" ? "bg-red-50/50" : ""
+                          }`}
                       >
                         <td
                           className="px-4 py-3 cursor-pointer"
-                          onClick={() => {
-                            setRequestModalMode("edit");
-                            setEditingRequestItemId(item.id);
-                            setRequestEditModeEnabled(false);
-                            setRequestItemFormData({
-                              qualityCriteria: item.qualityCriteria || [],
-                              attachments: item.attachments || [],
-                              businessId: item.businessId,
-                              contactPersonId: item.contactPersonId || "",
-                              itemName: item.itemName,
-                              material: item.material || "",
-                              specification: item.specification || "",
-                              extraItems: item.extraItems || "NO",
-                              extraItemsDescriptions:
-                                item.extraItemsDescriptions || "",
-                              qty: item.qty,
-                              interval: item.interval,
-                              taric: item.taric || "",
-                              sampleQty: item.sampleQty || "",
-                              expectedDelivery: item.expectedDelivery || "",
-                              priority: item.priority,
-                              requestStatus: item.requestStatus,
-                              comment: item.comment || "",
-                              extraNote: item.extraNote || "",
-                              asanaLink: item.asanaLink || "",
-                              weight: item.weight,
-                              width: item.width,
-                              height: item.height,
-                              length: item.length,
-                              purchasePrice: item.purchasePrice,
-                              currency: item.currency || "RMB",
-                              inquiryId: item.inquiry?.id,
-                            });
-                            setShowRequestCreateModal(true);
-                          }}
+                          onClick={() => handleRequestItemClick(item)}
                         >
                           <div className="w-[8rem]">
                             <div className="text-sm font-medium text-gray-900">
@@ -2583,41 +2467,7 @@ const CombinedInquiriesPage: React.FC = () => {
                         </td>
                         <td
                           className="px-4 py-3 cursor-pointer"
-                          onClick={() => {
-                            setRequestModalMode("edit");
-                            setEditingRequestItemId(item.id);
-                            setRequestEditModeEnabled(false);
-                            setRequestItemFormData({
-                              businessId: item.businessId,
-                              contactPersonId: item.contactPersonId || "",
-                              itemName: item.itemName,
-                              material: item.material || "",
-                              specification: item.specification || "",
-                              extraItems: item.extraItems || "NO",
-                              extraItemsDescriptions:
-                                item.extraItemsDescriptions || "",
-                              qty: item.qty,
-                              interval: item.interval,
-                              sampleQty: item.sampleQty || "",
-                              expectedDelivery: item.expectedDelivery || "",
-                              priority: item.priority,
-                              requestStatus: item.requestStatus,
-                              comment: item.comment || "",
-                              extraNote: item.extraNote || "",
-                              asanaLink: item.asanaLink || "",
-                              weight: item.weight,
-                              width: item.width,
-                              height: item.height,
-                              length: item.length,
-                              purchasePrice: item.purchasePrice,
-                              currency: item.currency || "RMB",
-                              inquiryId: item.inquiry?.id,
-                              qualityCriteria: item.qualityCriteria || [],
-                              attachments: item.attachments || [],
-                              taric: item.taric || "",
-                            });
-                            setShowRequestCreateModal(true);
-                          }}
+                          onClick={() => handleRequestItemClick(item)}
                         >
                           <div className="w-[8rem]">
                             <a
@@ -2680,7 +2530,16 @@ const CombinedInquiriesPage: React.FC = () => {
                                 className="text-purple-500 hover:text-purple-700 transition-colors p-1"
                                 title="Open Asana link"
                               >
-                                <LinkIcon className="h-4 w-4" />
+                                <svg
+                                  className="h-4 w-4"
+                                  viewBox="0 0 24 24"
+                                  fill="currentColor"
+                                >
+                                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8+3.59 8 8-3.59 8-8 8z" />
+                                  <circle cx="12" cy="8.5" r="1.5" />
+                                  <circle cx="8.5" cy="14.5" r="1.5" />
+                                  <circle cx="15.5" cy="14.5" r="1.5" />
+                                </svg>
                               </button>
                             )}
                             <button
@@ -2715,7 +2574,6 @@ const CombinedInquiriesPage: React.FC = () => {
               </div>
             )}
 
-            {/* Pagination */}
             {requestTotalPages > 1 && (
               <div className="px-4 py-3 bg-gray-50/50 border-t border-gray-200/50 flex items-center justify-between">
                 <div className="text-sm text-gray-700">
@@ -2744,11 +2602,10 @@ const CombinedInquiriesPage: React.FC = () => {
                         <button
                           key={pageNum}
                           onClick={() => setRequestCurrentPage(pageNum)}
-                          className={`px-2 py-1 text-sm rounded-lg transition-all ${
-                            requestCurrentPage === pageNum
-                              ? "bg-gray-600 text-white"
-                              : "bg-white/80 backdrop-blur-sm border border-gray-300/80 hover:bg-white/60"
-                          }`}
+                          className={`px-2 py-1 text-sm rounded-lg transition-all ${requestCurrentPage === pageNum
+                            ? "bg-gray-600 text-white"
+                            : "bg-white/80 backdrop-blur-sm border border-gray-300/80 hover:bg-white/60"
+                            }`}
                         >
                           {pageNum}
                         </button>
@@ -2761,11 +2618,10 @@ const CombinedInquiriesPage: React.FC = () => {
                           onClick={() =>
                             setRequestCurrentPage(requestTotalPages)
                           }
-                          className={`px-2 py-1 text-sm rounded-lg transition-all ${
-                            requestCurrentPage === requestTotalPages
-                              ? "bg-gray-600 text-white"
-                              : "bg-white/80 backdrop-blur-sm border border-gray-300/80 hover:bg-white/60"
-                          }`}
+                          className={`px-2 py-1 text-sm rounded-lg transition-all ${requestCurrentPage === requestTotalPages
+                            ? "bg-gray-600 text-white"
+                            : "bg-white/80 backdrop-blur-sm border border-gray-300/80 hover:bg-white/60"
+                            }`}
                         >
                           {requestTotalPages}
                         </button>
@@ -2825,15 +2681,13 @@ const CombinedInquiriesPage: React.FC = () => {
                     </span>
                     <button
                       type="button"
-                      className={`${
-                        editModeEnabled ? "bg-gray-600" : "bg-gray-200"
-                      } relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2`}
+                      className={`${editModeEnabled ? "bg-gray-600" : "bg-gray-200"
+                        } relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2`}
                       onClick={() => setEditModeEnabled(!editModeEnabled)}
                     >
                       <span
-                        className={`${
-                          editModeEnabled ? "translate-x-4" : "translate-x-0"
-                        } pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out`}
+                        className={`${editModeEnabled ? "translate-x-4" : "translate-x-0"
+                          } pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out`}
                       />
                     </button>
                   </div>
@@ -2997,7 +2851,62 @@ const CombinedInquiriesPage: React.FC = () => {
                       </select>
                     </div>
 
-                    {/* Dimension Fields Section */}
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        Project Link
+                      </label>
+                      <input
+                        type="text"
+                        value={inquiryFormData.projectLink || ""}
+                        onChange={(e) =>
+                          setInquiryFormData({
+                            ...inquiryFormData,
+                            projectLink: e.target.value,
+                          })
+                        }
+                        disabled={
+                          inquiryModalMode === "edit" && !editModeEnabled
+                        }
+                        className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                        placeholder="https://..."
+                      />
+                    </div>
+
+                    <div className="col-span-2">
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        Asana Link
+                      </label>
+                      <div className="relative">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                          <svg
+                            className="h-4 w-4 text-gray-400"
+                            viewBox="0 0 24 24"
+                            fill="currentColor"
+                          >
+                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z" />
+                            <circle cx="12" cy="8.5" r="1.5" />
+                            <circle cx="8.5" cy="14.5" r="1.5" />
+                            <circle cx="15.5" cy="14.5" r="1.5" />
+                          </svg>
+                        </div>
+                        <input
+                          type="text"
+                          value={inquiryFormData.asanaLink || ""}
+                          onChange={(e) =>
+                            setInquiryFormData({
+                              ...inquiryFormData,
+                              asanaLink: e.target.value,
+                            })
+                          }
+                          disabled={
+                            inquiryModalMode === "edit" && !editModeEnabled
+                          }
+                          className="w-full pl-10 pr-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                          placeholder="https://app.asana.com/..."
+                        />
+                      </div>
+                    </div>
+
                     <div className="col-span-2 border-t pt-4 mt-2">
                       <h4 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
                         <ArrowsPointingOutIcon className="h-4 w-4" />
@@ -3186,11 +3095,10 @@ const CombinedInquiriesPage: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => toggleRequestExpansion(index)}
-                          className={`w-full px-3 py-2 flex items-center justify-between text-left transition-colors ${
-                            expandedRequestIndex === index
-                              ? "bg-gray-100"
-                              : "bg-gray-50 hover:bg-gray-100"
-                          }`}
+                          className={`w-full px-3 py-2 flex items-center justify-between text-left transition-colors ${expandedRequestIndex === index
+                            ? "bg-gray-100"
+                            : "bg-gray-50 hover:bg-gray-100"
+                            }`}
                         >
                           <div className="flex items-center gap-2">
                             {expandedRequestIndex === index ? (
@@ -3539,6 +3447,29 @@ const CombinedInquiriesPage: React.FC = () => {
                                   placeholder="Enter specifications"
                                 />
                               </div>
+
+                              <div className="col-span-2">
+                                <label className="block text-xs font-medium text-gray-700 mb-1">
+                                  Asana Link
+                                </label>
+                                <input
+                                  type="text"
+                                  value={request.asanaLink || ""}
+                                  onChange={(e) =>
+                                    updateRequest(
+                                      index,
+                                      "asanaLink",
+                                      e.target.value,
+                                    )
+                                  }
+                                  disabled={
+                                    inquiryModalMode === "edit" &&
+                                    !editModeEnabled
+                                  }
+                                  className="w-full px-2 py-1 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                                  placeholder="https://app.asana.com/..."
+                                />
+                              </div>
                             </div>
                           </div>
                         )}
@@ -3579,23 +3510,23 @@ const CombinedInquiriesPage: React.FC = () => {
                     </button>
                     {(inquiryModalMode === "create" ||
                       (inquiryModalMode === "edit" && editModeEnabled)) && (
-                      <CustomButton
-                        gradient={true}
-                        onClick={handleInquirySubmit}
-                        disabled={
-                          !inquiryFormData.name ||
-                          !inquiryFormData.customerId ||
-                          !inquiryRequests.some(
-                            (req) => req.itemName && req.quantity >= 1,
-                          )
-                        }
-                        className="px-3 py-2 text-xs bg-gray-600/90 backdrop-blur-sm text-white rounded hover:bg-gray-700/90 transition-all disabled:opacity-50"
-                      >
-                        {inquiryModalMode === "edit"
-                          ? "Update Inquiry"
-                          : "Create Inquiry"}
-                      </CustomButton>
-                    )}
+                        <CustomButton
+                          gradient={true}
+                          onClick={handleInquirySubmit}
+                          disabled={
+                            !inquiryFormData.name ||
+                            !inquiryFormData.customerId ||
+                            !inquiryRequests.some(
+                              (req) => req.itemName && req.quantity >= 1,
+                            )
+                          }
+                          className="px-3 py-2 text-xs bg-gray-600/90 backdrop-blur-sm text-white rounded hover:bg-gray-700/90 transition-all disabled:opacity-50"
+                        >
+                          {inquiryModalMode === "edit"
+                            ? "Update Inquiry"
+                            : "Create Inquiry"}
+                        </CustomButton>
+                      )}
                   </div>
                 </div>
               </div>
@@ -3604,7 +3535,6 @@ const CombinedInquiriesPage: React.FC = () => {
         </div>
       )}
 
-      {/* Request Item Create/Edit Modal (for standalone requests) */}
       {showRequestCreateModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
@@ -3626,7 +3556,6 @@ const CombinedInquiriesPage: React.FC = () => {
                 </button>
               </div>
 
-              {/* Edit Mode Switch */}
               {requestModalMode === "edit" && (
                 <div className="mb-4 flex items-center justify-between bg-gray-50 rounded-lg p-3">
                   <span className="text-sm font-medium text-gray-700">
@@ -3638,19 +3567,17 @@ const CombinedInquiriesPage: React.FC = () => {
                     </span>
                     <button
                       type="button"
-                      className={`${
-                        requestEditModeEnabled ? "bg-gray-600" : "bg-gray-200"
-                      } relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2`}
+                      className={`${requestEditModeEnabled ? "bg-gray-600" : "bg-gray-200"
+                        } relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2`}
                       onClick={() =>
                         setRequestEditModeEnabled(!requestEditModeEnabled)
                       }
                     >
                       <span
-                        className={`${
-                          requestEditModeEnabled
-                            ? "translate-x-4"
-                            : "translate-x-0"
-                        } pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out`}
+                        className={`${requestEditModeEnabled
+                          ? "translate-x-4"
+                          : "translate-x-0"
+                          } pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out`}
                       />
                     </button>
                   </div>
@@ -3659,7 +3586,6 @@ const CombinedInquiriesPage: React.FC = () => {
 
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-3">
-                  {/* REORDERED: Customer first */}
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">
                       Customer *
@@ -3684,7 +3610,6 @@ const CombinedInquiriesPage: React.FC = () => {
                     </select>
                   </div>
 
-                  {/* REORDERED: Contact Person second */}
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">
                       Contact Person
@@ -3861,7 +3786,27 @@ const CombinedInquiriesPage: React.FC = () => {
                     </select>
                   </div>
 
-                  {/* Dimension Fields for Requested Item */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Asana Link
+                    </label>
+                    <input
+                      type="text"
+                      value={requestItemFormData.asanaLink || ""}
+                      onChange={(e) =>
+                        setRequestItemFormData({
+                          ...requestItemFormData,
+                          asanaLink: e.target.value,
+                        })
+                      }
+                      disabled={
+                        requestModalMode === "edit" && !requestEditModeEnabled
+                      }
+                      className="w-full px-2 py-1 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                      placeholder="https://app.asana.com/..."
+                    />
+                  </div>
+
                   <div className="col-span-2 border-t pt-4 mt-2">
                     <h4 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
                       <ArrowsPointingOutIcon className="h-4 w-4" />
@@ -4067,21 +4012,21 @@ const CombinedInquiriesPage: React.FC = () => {
                     {(requestModalMode === "create" ||
                       (requestModalMode === "edit" &&
                         requestEditModeEnabled)) && (
-                      <CustomButton
-                        gradient={true}
-                        onClick={handleRequestItemSubmit}
-                        disabled={
-                          !requestItemFormData.businessId ||
-                          !requestItemFormData.itemName ||
-                          !requestItemFormData.qty
-                        }
-                        className="px-3 py-2 text-xs bg-gray-600/90 backdrop-blur-sm text-white rounded hover:bg-gray-700/90 transition-all"
-                      >
-                        {requestModalMode === "edit"
-                          ? "Update Request"
-                          : "Add Request"}
-                      </CustomButton>
-                    )}
+                        <CustomButton
+                          gradient={true}
+                          onClick={handleRequestItemSubmit}
+                          disabled={
+                            !requestItemFormData.businessId ||
+                            !requestItemFormData.itemName ||
+                            !requestItemFormData.qty
+                          }
+                          className="px-3 py-2 text-xs bg-gray-600/90 backdrop-blur-sm text-white rounded hover:bg-gray-700/90 transition-all"
+                        >
+                          {requestModalMode === "edit"
+                            ? "Update Request"
+                            : "Add Request"}
+                        </CustomButton>
+                      )}
                   </div>
                 </div>
               </div>
@@ -4117,7 +4062,6 @@ const CombinedInquiriesPage: React.FC = () => {
                 </button>
               </div>
 
-              {/* Source Information */}
               <div className="mb-6 p-3 bg-gray-50 rounded-lg">
                 <h3 className="font-medium text-gray-900 mb-2">
                   Source Information
@@ -4148,21 +4092,21 @@ const CombinedInquiriesPage: React.FC = () => {
                       conversionInquiryData.width ||
                       conversionInquiryData.height ||
                       conversionInquiryData.length) && (
-                      <div className="col-span-2">
-                        <span className="text-gray-600">Dimensions:</span>
-                        <span className="ml-2">
-                          {conversionInquiryData.weight &&
-                            `${conversionInquiryData.weight}kg `}
-                          {conversionInquiryData.length &&
-                            `${conversionInquiryData.length}×`}
-                          {conversionInquiryData.width &&
-                            `${conversionInquiryData.width}×`}
-                          {conversionInquiryData.height &&
-                            `${conversionInquiryData.height}`}
-                          cm
-                        </span>
-                      </div>
-                    )}
+                        <div className="col-span-2">
+                          <span className="text-gray-600">Dimensions:</span>
+                          <span className="ml-2">
+                            {conversionInquiryData.weight &&
+                              `${conversionInquiryData.weight}kg `}
+                            {conversionInquiryData.length &&
+                              `${conversionInquiryData.length}×`}
+                            {conversionInquiryData.width &&
+                              `${conversionInquiryData.width}×`}
+                            {conversionInquiryData.height &&
+                              `${conversionInquiryData.height}`}
+                            cm
+                          </span>
+                        </div>
+                      )}
                   </div>
                 )}
                 {conversionType === "request" && conversionRequestData && (
@@ -4195,29 +4139,27 @@ const CombinedInquiriesPage: React.FC = () => {
                       conversionRequestData.width ||
                       conversionRequestData.height ||
                       conversionRequestData.length) && (
-                      <div className="col-span-2">
-                        <span className="text-gray-600">Dimensions:</span>
-                        <span className="ml-2">
-                          {conversionRequestData.weight &&
-                            `${conversionRequestData.weight}kg `}
-                          {conversionRequestData.length &&
-                            `${conversionRequestData.length}×`}
-                          {conversionRequestData.width &&
-                            `${conversionRequestData.width}×`}
-                          {conversionRequestData.height &&
-                            `${conversionRequestData.height}`}
-                          cm
-                        </span>
-                      </div>
-                    )}
+                        <div className="col-span-2">
+                          <span className="text-gray-600">Dimensions:</span>
+                          <span className="ml-2">
+                            {conversionRequestData.weight &&
+                              `${conversionRequestData.weight}kg `}
+                            {conversionRequestData.length &&
+                              `${conversionRequestData.length}×`}
+                            {conversionRequestData.width &&
+                              `${conversionRequestData.width}×`}
+                            {conversionRequestData.height &&
+                              `${conversionRequestData.height}`}
+                            cm
+                          </span>
+                        </div>
+                      )}
                   </div>
                 )}
               </div>
 
-              {/* Show dimension status */}
               {renderDimensionStatus()}
 
-              {/* Conversion Form */}
               <div className="space-y-4">
                 <h3 className="font-medium text-gray-900">Item Details</h3>
                 <div className="grid grid-cols-2 gap-3">
@@ -4287,11 +4229,10 @@ const CombinedInquiriesPage: React.FC = () => {
                                   : e.target.value,
                             })
                           }
-                          className={`w-full px-3 py-2 text-sm border ${
-                            field.required && !conversionFormData[field.name]
-                              ? "border-red-300"
-                              : "border-gray-300/80"
-                          } bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all`}
+                          className={`w-full px-3 py-2 text-sm border ${field.required && !conversionFormData[field.name]
+                            ? "border-red-300"
+                            : "border-gray-300/80"
+                            } bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all`}
                           placeholder={field.placeholder}
                           min={field.min}
                           step={field.step}
@@ -4300,9 +4241,8 @@ const CombinedInquiriesPage: React.FC = () => {
                       )}
                       {field.description && (
                         <p
-                          className={`text-xs mt-1 ${
-                            field.required ? "text-red-600" : "text-gray-500"
-                          }`}
+                          className={`text-xs mt-1 ${field.required ? "text-red-600" : "text-gray-500"
+                            }`}
                         >
                           {field.description}
                         </p>
@@ -4341,7 +4281,6 @@ const CombinedInquiriesPage: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Action Buttons */}
                 <div className="mt-6 flex justify-end gap-2">
                   <button
                     onClick={() => {
@@ -4371,6 +4310,18 @@ const CombinedInquiriesPage: React.FC = () => {
         </div>
       )}
     </div>
+  );
+};
+
+const CombinedInquiriesPage = () => {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+      </div>
+    }>
+      <CombinedInquiriesPageContent />
+    </Suspense>
   );
 };
 
