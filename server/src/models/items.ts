@@ -120,6 +120,9 @@ export class Item {
   @Column({ type: "char", length: 1, default: "Y" })
   isActive!: string;
 
+  @Column({ type: "json", nullable: true })
+  painPoints?: string[];
+
   @Column({ type: "varchar", length: 200, nullable: true })
   note?: string;
 
@@ -132,7 +135,6 @@ export class Item {
   @UpdateDateColumn()
   updated_at!: Date;
 
-  // Relationships
   @ManyToOne(() => Parent, (parent) => parent.items, { nullable: true })
   @JoinColumn({ name: "parent_id" })
   parent: Parent | null;
@@ -145,18 +147,7 @@ export class Item {
   @JoinColumn({ name: "cat_id" })
   category: Category | null;
 
-  // Remove these OneToMany relationships if you don't need them for migration
-  // @OneToMany(() => WarehouseItem, (warehouseItem) => warehouseItem.item)
-  // warehouseItems: WarehouseItem[];
-
-  // @OneToMany(() => VariationValue, (variationValue) => variationValue.item)
-  // variationValues: VariationValue[];
-
-
   @OneToMany(() => OrderItem, orderItem => orderItem.item)
   orderItems: OrderItem[];
 
-
-  // @OneToMany(() => ItemQuality, (itemQuality) => itemQuality.item)
-  // itemQualities: ItemQuality[];
 }

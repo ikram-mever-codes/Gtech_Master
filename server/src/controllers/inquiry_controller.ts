@@ -86,6 +86,10 @@ export class BaseItemConversionDto {
   RMBPrice?: number;
 
   @IsOptional()
+  @IsString({ each: true })
+  painPoints?: string[];
+
+  @IsOptional()
   @IsString()
   note?: string;
 }
@@ -205,11 +209,7 @@ export class InquiryController {
         .leftJoinAndSelect("inquiry.contactPerson", "contactPerson")
         .leftJoinAndSelect("inquiry.requests", "requests")
         .leftJoinAndSelect("requests.business", "business")
-        .leftJoinAndSelect(
-          "business.customer",
-          "businessCustomer",
-          "businessCustomer.id = business.customerId"
-        )
+        .leftJoinAndSelect("business.customer", "businessCustomer")
         .leftJoinAndSelect("requests.contactPerson", "requestContactPerson")
         .select([
           "inquiry",
@@ -438,9 +438,9 @@ export class InquiryController {
             totalWeight =
               parseFloat(reqData.unitWeight) * parseFloat(currentQty);
           }
-
+          const { id: _ignored, ...reqDataWithoutId } = reqData;
           const requestItem = this.requestRepository.create({
-            ...reqData,
+            ...reqDataWithoutId,
             businessId: starBusinessDetails.id,
             business: starBusinessDetails,
             inquiry: savedInquiry,
@@ -612,8 +612,11 @@ export class InquiryController {
                   parseFloat(reqData.unitWeight) * parseFloat(currentQty);
               }
 
+              // Strip `id` so TypeORM always INSERTs a fresh row.
+              const { id: _ignored, ...reqDataWithoutId } = reqData;
+
               const requestItem = this.requestRepository.create({
-                ...reqData,
+                ...reqDataWithoutId,
                 businessId: starBusinessDetails.id,
                 business: starBusinessDetails,
                 inquiry: existingInquiry,
@@ -977,6 +980,7 @@ export class InquiryController {
               ? parseInt(inquiry.requests[0].qty) || 0
               : 0),
           RMB_Price: conversionData.RMBPrice || inquiry.purchasePrice || 0,
+          painPoints: conversionData.painPoints || inquiry.painPoints || [],
         };
       } else {
         itemData = {
@@ -1000,6 +1004,7 @@ export class InquiryController {
           remark: conversionData.remark || inquiry.description,
           note: conversionData.note || inquiry.internalNotes,
           RMB_Price: conversionData.RMBPrice || inquiry.purchasePrice || 0,
+          painPoints: conversionData.painPoints || inquiry.painPoints || [],
         };
       }
 
@@ -1124,6 +1129,7 @@ export class InquiryController {
         remark: conversionData.remark || requestedItem.comment,
         note: conversionData.note || requestedItem.extraNote,
         RMB_Price: conversionData.RMBPrice || requestedItem.purchasePrice || 0,
+        painPoints: conversionData.painPoints || requestedItem.painPoints || [],
         cat_id: conversionData.catId || null,
         is_dimension_special: "N",
         is_qty_dividable: "Y",

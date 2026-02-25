@@ -60,7 +60,6 @@ export class StarBusinessDetails {
   comment?: string;
 
   @OneToOne(() => Customer, (customer) => customer.starBusinessDetails)
-  @JoinColumn()
   customer!: Customer;
 
   @OneToMany(
