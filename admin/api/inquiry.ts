@@ -431,12 +431,13 @@ export const convertInquiryToItem = async (
 
 export const convertRequestToItem = async (
   requestId: string,
-  conversionData: any
+  conversionData: any,
+  inquiryId: string = "all"
 ) => {
   try {
     toast.loading("Converting request to item...", loadingStyles);
     const response = await api.post(
-      `/requested-items/${requestId}/convert-to-item`,
+      `/inquiries/${inquiryId}/requests/${requestId}/convert-to-item`,
       conversionData
     );
     toast.dismiss();

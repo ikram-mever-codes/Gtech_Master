@@ -34,9 +34,6 @@ import {
   createInquiry,
   updateInquiry,
   deleteInquiry,
-  getInquiryById,
-  getInquiryStatistics,
-  getInquiriesByCustomer,
   updateInquiryStatus,
   type Inquiry,
   type CreateInquiryPayload,
@@ -47,27 +44,18 @@ import {
   getPriorityOptions,
   getAvailableCurrencies,
   getRequestStatuses,
-  convertRequestToItem,
   convertInquiryToItem,
+  convertRequestToItem,
+  removeRequestFromInquiry,
 } from "@/api/inquiry";
 import {
-  getAllRequestedItems,
-  createRequestedItem,
-  updateRequestedItem,
-  deleteRequestedItem,
-  getRequestedItemById,
-  getRequestedItemsStatistics,
   getAvailableIntervals,
   getAvailablePriorities as getAvailableRequestPriorities,
   getAvailableStatuses as getAvailableRequestStatuses,
-  type RequestedItem,
-  type RequestedItemCreatePayload,
-  type RequestedItemUpdatePayload,
-  type RequestedItemsSearchFilters,
+  updateRequestedItem,
 } from "@/api/requested_items";
 import { getAllCustomers } from "@/api/customers";
 import { getAllContactPersons } from "@/api/contacts";
-import { getAllBusinesses } from "@/api/bussiness";
 import CustomButton from "@/components/UI/CustomButton";
 import { useSelector } from "react-redux";
 import { RootState } from "@/app/Redux/store";
@@ -240,6 +228,13 @@ const getConversionFormFields = (hasExistingDimensions?: any) => {
       required: false,
     },
     {
+      name: "painPoints",
+      label: "Pain Points",
+      type: "tags",
+      placeholder: "Add tag...",
+      required: false,
+    },
+    {
       name: "photo",
       label: "Photo URL",
       type: "text",
@@ -252,9 +247,6 @@ const getConversionFormFields = (hasExistingDimensions?: any) => {
 };
 
 const CombinedInquiriesPageContent = () => {
-  const [activeTab, setActiveTab] = useState<"inquiries" | "requests">(
-    "inquiries",
-  );
 
   const [inquiries, setInquiries] = useState<Inquiry[]>([]);
   const [allInquiries, setAllInquiries] = useState<Inquiry[]>([]);
@@ -269,7 +261,6 @@ const CombinedInquiriesPageContent = () => {
   const [tarics, setTarics] = useState<any[]>([]);
 
   const [editingInquiryId, setEditingInquiryId] = useState<string | null>(null);
-  const [inquiryStatistics, setInquiryStatistics] = useState<any>(null);
   const { user } = useSelector((state: RootState) => state.user);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [contactPersons, setContactPersons] = useState<ContactPerson[]>([]);
@@ -287,11 +278,12 @@ const CombinedInquiriesPageContent = () => {
     "inquiry",
   );
   const [convertingItemId, setConvertingItemId] = useState<string>("");
+  const [convertingInquiryId, setConvertingInquiryId] = useState<string>("");
   const [conversionFormData, setConversionFormData] = useState<any>({});
   const [conversionInquiryData, setConversionInquiryData] =
     useState<Inquiry | null>(null);
   const [conversionRequestData, setConversionRequestData] =
-    useState<RequestedItem | null>(null);
+    useState<Request | null>(null);
 
   const [expandedRequestIndex, setExpandedRequestIndex] = useState<
     number | null
@@ -304,29 +296,6 @@ const CombinedInquiriesPageContent = () => {
 
   const [inquiryImageFile, setInquiryImageFile] = useState<File | null>(null);
   const [inquiryImagePreview, setInquiryImagePreview] = useState<string>("");
-
-  const [requestedItems, setRequestedItems] = useState<RequestedItem[]>([]);
-  const [allRequestedItems, setAllRequestedItems] = useState<RequestedItem[]>(
-    [],
-  );
-  const [requestLoading, setRequestLoading] = useState(false);
-  const [requestCurrentPage, setRequestCurrentPage] = useState(1);
-  const [requestTotalPages, setRequestTotalPages] = useState(1);
-  const [requestTotalRecords, setRequestTotalRecords] = useState(0);
-  const [requestStatistics, setRequestStatistics] = useState<any>(null);
-  const [businesses, setBusinesses] = useState<any[]>([]);
-  const [selectedBusinessId, setSelectedBusinessId] = useState<string>("");
-  const [businessesWithRequests, setBusinessesWithRequests] = useState<any[]>(
-    [],
-  );
-  const [showRequestCreateModal, setShowRequestCreateModal] = useState(false);
-  const [requestModalMode, setRequestModalMode] = useState<"create" | "edit">(
-    "create",
-  );
-  const [editingRequestItemId, setEditingRequestItemId] = useState<
-    string | null
-  >(null);
-  const [requestEditModeEnabled, setRequestEditModeEnabled] = useState(false);
 
   const [inquiryFormData, setInquiryFormData] = useState<CreateInquiryPayload>({
     name: "",
@@ -362,39 +331,50 @@ const CombinedInquiriesPageContent = () => {
     requests: [],
   });
 
-  const [requestItemFormData, setRequestItemFormData] =
-    useState<RequestedItemCreatePayload>({
-      businessId: "",
-      contactPersonId: "",
-      itemName: "",
-      extraNote: "",
-      material: "",
-      specification: "",
-      extraItems: "NO",
-      extraItemsDescriptions: "",
-      qty: "",
-      interval: "Monatlich",
-      sampleQty: "",
-      expectedDelivery: "",
-      priority: "Normal",
-      requestStatus: "Open",
-      comment: "",
-      asanaLink: "",
-      weight: undefined,
-      width: undefined,
-      height: undefined,
-      length: undefined,
-      purchasePrice: undefined,
-      currency: "RMB" as "RMB" | "HKD" | "EUR" | "USD",
-      qualityCriteria: [],
-      attachments: [],
-      taric: "",
-      itemNo: "",
-      urgency1: "",
-      urgency2: "",
-      painPoints: [],
-      inquiryId: undefined,
-    });
+
+  const [inquiryTagInput, setInquiryTagInput] = useState("");
+  const [requestLoopTagInputs, setRequestLoopTagInputs] = useState<Record<number, string>>({});
+
+  const handleAddInquiryPainPoint = () => {
+    const value = inquiryTagInput.trim();
+    if (value && !inquiryFormData.painPoints?.includes(value)) {
+      setInquiryFormData({
+        ...inquiryFormData,
+        painPoints: [...(inquiryFormData.painPoints || []), value],
+      });
+      setInquiryTagInput("");
+    }
+  };
+
+
+  const handleAddRequestLoopPainPoint = (index: number) => {
+    const value = (requestLoopTagInputs[index] || "").trim();
+    if (value && !inquiryRequests[index].painPoints?.includes(value)) {
+      const updatedRequests = [...inquiryRequests];
+      updatedRequests[index] = {
+        ...updatedRequests[index],
+        painPoints: [...(updatedRequests[index].painPoints || []), value],
+      };
+      setInquiryRequests(updatedRequests);
+      setRequestLoopTagInputs({
+        ...requestLoopTagInputs,
+        [index]: "",
+      });
+    }
+  };
+
+  const [conversionTagInput, setConversionTagInput] = useState("");
+
+  const handleAddConversionPainPoint = () => {
+    const value = conversionTagInput.trim();
+    if (value && !conversionFormData.painPoints?.includes(value)) {
+      setConversionFormData({
+        ...conversionFormData,
+        painPoints: [...(conversionFormData.painPoints || []), value],
+      });
+      setConversionTagInput("");
+    }
+  };
 
   const [inquiryRequests, setInquiryRequests] = useState<
     Array<{
@@ -448,11 +428,6 @@ const CombinedInquiriesPageContent = () => {
     },
   ]);
 
-  const [requestQualityCriteria, setRequestQualityCriteria] = useState<
-    QualityCriterion[]
-  >([]);
-
-  const [requestAttachments, setRequestAttachments] = useState<File[]>([]);
 
   const [inquiryFilters, setInquiryFilters] = useState<InquirySearchFilters>({
     search: "",
@@ -465,28 +440,12 @@ const CombinedInquiriesPageContent = () => {
     sortOrder: "DESC",
   });
 
-  const [requestFilters, setRequestFilters] =
-    useState<RequestedItemsSearchFilters>({
-      search: "",
-      requestStatus: "",
-      priority: "",
-      interval: "",
-      extraItems: "" as any,
-      sortBy: "",
-      sortOrder: "DESC",
-      page: 1,
-      limit: 20,
-      minWeight: undefined,
-      maxWeight: undefined,
-      hasDimensions: undefined,
-    });
 
   const itemsPerPage = 20;
 
   useEffect(() => {
     fetchCustomers();
     fetchContactPersons();
-    fetchBusinesses();
     fetchTarics();
   }, []);
 
@@ -500,39 +459,24 @@ const CombinedInquiriesPageContent = () => {
   };
 
   useEffect(() => {
-    if (activeTab === "inquiries") {
-      fetchInquiries();
-    } else {
-      fetchRequestedItems();
-    }
+    fetchInquiries();
   }, [
-    activeTab,
     inquiryFilters,
-    requestFilters,
     selectedCustomerId,
-    selectedBusinessId,
   ]);
 
   const searchParams = useSearchParams();
 
   useEffect(() => {
     const inquiryId = searchParams.get("inquiryId");
-    const requestId = searchParams.get("requestId");
 
     if (inquiryId && allInquiries.length > 0) {
       const inquiry = allInquiries.find((i) => i.id === inquiryId);
       if (inquiry) {
         handleInquiryClick(inquiry);
-        setActiveTab("inquiries");
-      }
-    } else if (requestId && allRequestedItems.length > 0) {
-      const request = allRequestedItems.find((r) => r.id === requestId);
-      if (request) {
-        handleRequestItemClick(request);
-        setActiveTab("requests");
       }
     }
-  }, [searchParams, allInquiries, allRequestedItems]);
+  }, [searchParams, allInquiries]);
 
   const toggleRequestExpansion = (index: number) => {
     if (expandedRequestIndex === index) {
@@ -592,18 +536,6 @@ const CombinedInquiriesPageContent = () => {
     }
   };
 
-  const fetchBusinesses = async () => {
-    try {
-      const response: any = await getAllBusinesses();
-      if (response?.data?.businesses) {
-        setBusinesses(response.data.businesses);
-      } else if (Array.isArray(response?.data)) {
-        setBusinesses(response.data);
-      }
-    } catch (error) {
-      console.error("Error fetching businesses:", error);
-    }
-  };
 
   const fetchInquiries = useCallback(async () => {
     setInquiryLoading(true);
@@ -641,7 +573,7 @@ const CombinedInquiriesPageContent = () => {
     } finally {
       setInquiryLoading(false);
     }
-  }, [inquiryFilters, selectedCustomerId, inquiryCurrentPage]);
+  }, [inquiryFilters, inquiryCurrentPage, itemsPerPage, selectedCustomerId]);
 
   const renderDimensionStatus = () => {
     if (!Object.values(existingDimensionFields).some((v) => v)) {
@@ -686,69 +618,6 @@ const CombinedInquiriesPageContent = () => {
     );
   };
 
-  const fetchRequestedItems = useCallback(async () => {
-    setRequestLoading(true);
-    try {
-      const filterParams: any = {
-        ...requestFilters,
-        page: 1,
-        limit: 10000,
-      };
-
-      const response = await getAllRequestedItems(filterParams);
-      const items = response || [];
-      setAllRequestedItems(items);
-
-      let filtered = items;
-      if (selectedBusinessId) {
-        filtered = filtered.filter(
-          (item: RequestedItem) =>
-            item.businessId === selectedBusinessId ||
-            item.business?.customer?.id === selectedBusinessId,
-        );
-      }
-
-      const totalFiltered = filtered.length;
-      const totalPagesCalc = Math.ceil(totalFiltered / itemsPerPage);
-      setRequestTotalPages(totalPagesCalc);
-      setRequestTotalRecords(totalFiltered);
-
-      const startIndex = (requestCurrentPage - 1) * itemsPerPage;
-      const endIndex = startIndex + itemsPerPage;
-      const paginatedItems = filtered.slice(startIndex, endIndex);
-
-      setRequestedItems(paginatedItems);
-
-      const businessMap = new Map();
-      items.forEach((item: RequestedItem) => {
-        if (item.business?.customer) {
-          const businessId = item.business.customer.id;
-          if (!businessMap.has(businessId)) {
-            businessMap.set(businessId, {
-              id: businessId,
-              displayName:
-                item.business.customer.companyName ||
-                item.business.customer.legalName ||
-                item.business.customer.name ||
-                "Unknown Business",
-            });
-          }
-        } else if (item.businessId) {
-          if (!businessMap.has(item.businessId)) {
-            businessMap.set(item.businessId, {
-              id: item.businessId,
-              displayName: "Business " + item.businessId.substring(0, 8),
-            });
-          }
-        }
-      });
-      setBusinessesWithRequests(Array.from(businessMap.values()));
-    } catch (error) {
-      console.error("Error fetching requested items:", error);
-    } finally {
-      setRequestLoading(false);
-    }
-  }, [requestFilters, selectedBusinessId, requestCurrentPage]);
 
   const handleInquiryClick = (inquiry: Inquiry) => {
     setInquiryModalMode("edit");
@@ -824,44 +693,6 @@ const CombinedInquiriesPageContent = () => {
     setShowCreateModal(true);
   };
 
-  const handleRequestItemClick = (item: RequestedItem) => {
-    setRequestModalMode("edit");
-    setEditingRequestItemId(item.id);
-    setRequestEditModeEnabled(false);
-    setRequestItemFormData({
-      businessId: item.businessId,
-      contactPersonId: item.contactPersonId || "",
-      itemName: item.itemName,
-      material: item.material || "",
-      specification: item.specification || "",
-      extraItems: item.extraItems || "NO",
-      extraItemsDescriptions: item.extraItemsDescriptions || "",
-      qty: item.qty,
-      interval: item.interval,
-      sampleQty: item.sampleQty || "",
-      expectedDelivery: item.expectedDelivery || "",
-      priority: item.priority,
-      requestStatus: item.requestStatus,
-      comment: item.comment || "",
-      extraNote: item.extraNote || "",
-      asanaLink: item.asanaLink || "",
-      weight: item.weight,
-      width: item.width,
-      height: item.height,
-      length: item.length,
-      purchasePrice: item.purchasePrice,
-      currency: item.currency || "RMB",
-      inquiryId: item.inquiry?.id,
-      qualityCriteria: item.qualityCriteria || [],
-      attachments: item.attachments || [],
-      taric: item.taric || "",
-      itemNo: item.itemNo || "",
-      urgency1: item.urgency1 || "",
-      urgency2: item.urgency2 || "",
-      painPoints: item.painPoints || [],
-    });
-    setShowRequestCreateModal(true);
-  };
 
   const handleInquirySubmit = async () => {
     if (!inquiryFormData.name || !inquiryFormData.customerId) {
@@ -909,43 +740,6 @@ const CombinedInquiriesPageContent = () => {
     }
   };
 
-  const handleRequestItemSubmit = async () => {
-    if (
-      !requestItemFormData.businessId ||
-      !requestItemFormData.itemName ||
-      !requestItemFormData.qty
-    ) {
-      toast.error("Please fill in all required fields");
-      return;
-    }
-
-    try {
-      const formDataWithQuality = {
-        ...requestItemFormData,
-        qualityCriteria: requestQualityCriteria,
-        attachments: requestAttachments,
-      };
-
-      if (requestModalMode === "edit" && editingRequestItemId) {
-        await updateRequestedItem(
-          editingRequestItemId,
-          formDataWithQuality as RequestedItemUpdatePayload,
-        );
-      } else {
-        await createRequestedItem(formDataWithQuality);
-      }
-
-      resetRequestItemForm();
-      setShowRequestCreateModal(false);
-      fetchRequestedItems();
-    } catch (error) {
-      console.error(
-        `Error ${requestModalMode === "edit" ? "updating" : "creating"
-        } request item:`,
-        error,
-      );
-    }
-  };
 
   const addNewRequest = () => {
     setInquiryRequests([
@@ -999,36 +793,7 @@ const CombinedInquiriesPageContent = () => {
     setInquiryRequests(updatedRequests);
   };
 
-  const addQualityCriterion = () => {
-    setRequestQualityCriteria([
-      ...requestQualityCriteria,
-      { description: "", picture: undefined },
-    ]);
-  };
 
-  const updateQualityCriterion = (index: number, field: string, value: any) => {
-    const updated = [...requestQualityCriteria];
-    updated[index] = {
-      ...updated[index],
-      [field]: value,
-    };
-    setRequestQualityCriteria(updated);
-  };
-
-  const removeQualityCriterion = (index: number) => {
-    const updated = requestQualityCriteria.filter((_, i) => i !== index);
-    setRequestQualityCriteria(updated);
-  };
-
-  const handleAttachmentUpload = (files: FileList) => {
-    const newAttachments = Array.from(files);
-    setRequestAttachments([...requestAttachments, ...newAttachments]);
-  };
-
-  const removeAttachment = (index: number) => {
-    const updated = requestAttachments.filter((_, i) => i !== index);
-    setRequestAttachments(updated);
-  };
 
   const addRequestQualityCriterion = (requestIndex: number) => {
     const updatedRequests = [...inquiryRequests];
@@ -1180,54 +945,17 @@ const CombinedInquiriesPageContent = () => {
     }
   };
 
-  const resetRequestItemForm = () => {
-    setRequestItemFormData({
-      businessId: "",
-      contactPersonId: "",
-      itemName: "",
-      extraNote: "",
-      material: "",
-      specification: "",
-      extraItems: "NO",
-      extraItemsDescriptions: "",
-      qty: "",
-      interval: "Monatlich",
-      sampleQty: "",
-      expectedDelivery: "",
-      priority: "Normal",
-      requestStatus: "Open",
-      comment: "",
-      asanaLink: "",
-      weight: undefined,
-      width: undefined,
-      height: undefined,
-      length: undefined,
-      purchasePrice: undefined,
-      currency: "RMB",
-      qualityCriteria: [],
-      attachments: [],
-      inquiryId: undefined,
-      taric: "",
-      itemNo: "",
-      urgency1: "",
-      urgency2: "",
-      painPoints: [],
-    });
-    setRequestQualityCriteria([]);
-    setRequestAttachments([]);
-    setRequestEditModeEnabled(false);
-    setEditingRequestItemId(null);
-    setRequestModalMode("create");
-  };
 
   const handleOpenConversionModal = async (
     type: "inquiry" | "request",
     itemId: string,
     inquiryData?: any,
     requestData?: any,
+    inquiryId?: string,
   ) => {
     setConversionType(type);
     setConvertingItemId(itemId);
+    if (inquiryId) setConvertingInquiryId(inquiryId);
 
     let existingDims = {
       weight: false,
@@ -1319,7 +1047,6 @@ const CombinedInquiriesPageContent = () => {
       await convertInquiryToItem(convertingItemId, conversionFormData);
       setShowConversionModal(false);
       fetchInquiries();
-      fetchRequestedItems();
       resetConversionForm();
     } catch (error: any) {
       console.error("Error converting inquiry to item:", error);
@@ -1340,9 +1067,12 @@ const CombinedInquiriesPageContent = () => {
     }
 
     try {
-      await convertRequestToItem(convertingItemId, conversionFormData);
+      await convertRequestToItem(
+        convertingItemId,
+        conversionFormData,
+        convertingInquiryId,
+      );
       setShowConversionModal(false);
-      fetchRequestedItems();
       resetConversionForm();
     } catch (error: any) {
       console.error("Error converting request to item:", error);
@@ -1376,6 +1106,7 @@ const CombinedInquiriesPageContent = () => {
     setConversionInquiryData(null);
     setConversionRequestData(null);
     setConvertingItemId("");
+    setConvertingInquiryId("");
     setExistingDimensionFields({});
   };
 
@@ -1383,8 +1114,14 @@ const CombinedInquiriesPageContent = () => {
     handleOpenConversionModal("inquiry", inquiry.id, inquiry);
   };
 
-  const handleConvertRequestClick = (request: RequestedItem) => {
-    handleOpenConversionModal("request", request.id, undefined, request);
+  const handleConvertRequestClick = (request: Request, inquiryId?: string) => {
+    handleOpenConversionModal(
+      "request",
+      request.id!,
+      undefined,
+      request,
+      inquiryId,
+    );
   };
 
   const getInquiryStatusColor = (status: string) => {
@@ -1442,29 +1179,6 @@ const CombinedInquiriesPageContent = () => {
     }).format(amount);
   };
 
-  const fetchRequestStatistics = async () => {
-    try {
-      const response = await getRequestedItemsStatistics();
-      if (response?.data) {
-        setRequestStatistics(response.data);
-      }
-    } catch (error) {
-      console.error("Error fetching request statistics:", error);
-    }
-  };
-
-  const handleDeleteRequestItem = async (itemId: string) => {
-    if (window.confirm("Are you sure you want to delete this item?")) {
-      try {
-        await deleteRequestedItem(itemId);
-        fetchRequestedItems();
-        fetchRequestStatistics();
-      } catch (error) {
-        console.error("Error deleting item:", error);
-        toast.error("Failed to delete request item");
-      }
-    }
-  };
 
   const renderDimensionInfo = (item: any) => {
     const hasDimensions =
@@ -1829,97 +1543,46 @@ const CombinedInquiriesPageContent = () => {
             <div className="flex justify-between items-center mb-4">
               <div>
                 <PageHeader
-                  title={activeTab === "inquiries" ? "Inquiries" : "Requested Items"}
-                  icon={activeTab === "inquiries" ? MessagesSquare : ClipboardList}
+                  title="Inquiries"
+                  icon={MessagesSquare}
                 />
               </div>
               <div className="flex gap-2">
-                {activeTab === "inquiries" ? (
-                  <>
-                    <select
-                      value={selectedCustomerId}
-                      onChange={(e) => {
-                        setSelectedCustomerId(e.target.value);
-                        setInquiryCurrentPage(1);
-                      }}
-                      className="px-3 py-2 text-sm text-gray-700 bg-white/80 backdrop-blur-sm border border-gray-300/80 rounded-lg hover:bg-white/60 transition-all"
-                    >
-                      <option value="">All Customers</option>
-                      {customers.map((customer) => (
-                        <option key={customer.id} value={customer.id}>
-                          {customer.companyName || customer.legalName}
-                        </option>
-                      ))}
-                    </select>
-                    <button
-                      onClick={() => toggleAllInquiryRequests(allInquiries)}
-                      className="px-3 py-2 text-sm text-gray-700 bg-white/80 backdrop-blur-sm border border-gray-300/80 rounded-lg hover:bg-white/60 transition-all flex items-center gap-2"
-                      title={allRequestsExpanded ? "Fold all requests" : "Unfold all requests"}
-                    >
-                      {allRequestsExpanded ? (
-                        <EyeSlashIcon className="h-4 w-4" />
-                      ) : (
-                        <EyeIcon className="h-4 w-4" />
-                      )}
-                      {allRequestsExpanded ? "Fold All" : "Unfold All"}
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <select
-                      value={requestFilters.hasDimensions || ""}
-                      onChange={(e) => {
-                        setRequestFilters({
-                          ...requestFilters,
-                          hasDimensions: e.target.value
-                            ? (e.target.value as "true" | "false")
-                            : undefined,
-                          page: 1,
-                        });
-                      }}
-                      className="px-3 py-2 text-sm text-gray-700 bg-white/80 backdrop-blur-sm border border-gray-300/80 rounded-lg hover:bg-white/60 transition-all"
-                    >
-                      <option value="">All Dimensions</option>
-                      <option value="true">With Dimensions</option>
-                      <option value="false">Without Dimensions</option>
-                    </select>
-
-                    <select
-                      value={selectedBusinessId}
-                      onChange={(e) => {
-                        setSelectedBusinessId(e.target.value);
-                        setRequestCurrentPage(1);
-                      }}
-                      className="px-3 py-2 text-sm text-gray-700 bg-white/80 backdrop-blur-sm border border-gray-300/80 rounded-lg hover:bg-white/60 transition-all"
-                    >
-                      <option value="">All Businesses with Requests</option>
-                      {businessesWithRequests.map((business) => (
-                        <option key={business.id} value={business.id}>
-                          {business.displayName}
-                        </option>
-                      ))}
-                    </select>
-                  </>
-                )}
+                <select
+                  value={selectedCustomerId}
+                  onChange={(e) => {
+                    setSelectedCustomerId(e.target.value);
+                    setInquiryCurrentPage(1);
+                  }}
+                  className="px-3 py-2 text-sm text-gray-700 bg-white/80 backdrop-blur-sm border border-gray-300/80 rounded-lg hover:bg-white/60 transition-all"
+                >
+                  <option value="">All Customers</option>
+                  {customers.map((customer) => (
+                    <option key={customer.id} value={customer.id}>
+                      {customer.companyName || customer.legalName}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  onClick={() => toggleAllInquiryRequests(allInquiries)}
+                  className="px-3 py-2 text-sm text-gray-700 bg-white/80 backdrop-blur-sm border border-gray-300/80 rounded-lg hover:bg-white/60 transition-all flex items-center gap-2"
+                  title={allRequestsExpanded ? "Fold all requests" : "Unfold all requests"}
+                >
+                  {allRequestsExpanded ? (
+                    <EyeSlashIcon className="h-4 w-4" />
+                  ) : (
+                    <EyeIcon className="h-4 w-4" />
+                  )}
+                  {allRequestsExpanded ? "Fold All" : "Unfold All"}
+                </button>
 
                 <button
-                  onClick={
-                    activeTab === "inquiries"
-                      ? fetchInquiries
-                      : fetchRequestedItems
-                  }
-                  disabled={
-                    activeTab === "inquiries" ? inquiryLoading : requestLoading
-                  }
+                  onClick={fetchInquiries}
+                  disabled={inquiryLoading}
                   className="px-3 py-2 text-sm text-gray-700 bg-white/80 backdrop-blur-sm border border-gray-300/80 rounded-lg hover:bg-white/60 transition-all flex items-center gap-2 disabled:opacity-50"
                 >
                   <ArrowPathIcon
-                    className={`h-4 w-4 ${activeTab === "inquiries"
-                      ? inquiryLoading
-                      : requestLoading
-                        ? "animate-spin"
-                        : ""
-                      }`}
+                    className={`h-4 w-4 ${inquiryLoading ? "animate-spin" : ""}`}
                   />
                   Refresh
                 </button>
@@ -1927,654 +1590,218 @@ const CombinedInquiriesPageContent = () => {
                 <CustomButton
                   gradient={true}
                   onClick={() => {
-                    if (activeTab === "inquiries") {
-                      resetInquiryForm();
-                      setShowCreateModal(true);
-                    } else {
-                      resetRequestItemForm();
-                      setShowRequestCreateModal(true);
-                    }
+                    resetInquiryForm();
+                    setShowCreateModal(true);
                   }}
                   className="px-3 py-2 text-sm bg-gray-600/90 backdrop-blur-sm text-white rounded-lg hover:bg-gray-700/90 transition-all flex items-center gap-2"
                 >
                   <PlusIcon className="h-4 w-4" />
-                  {activeTab === "inquiries" ? "New Inquiry" : "Add Request"}
+                  New Inquiry
                 </CustomButton>
               </div>
             </div>
 
-            {/* Tabs */}
-            <div className="border-b border-gray-200">
-              <nav className="-mb-px flex space-x-8">
-                <button
-                  onClick={() => setActiveTab("inquiries")}
-                  className={`py-3 px-1 border-b-2 font-medium text-sm ${activeTab === "inquiries"
-                    ? "border-gray-600 text-gray-900"
-                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                    }`}
-                >
-                  Inquiries
-                </button>
-                <button
-                  onClick={() => setActiveTab("requests")}
-                  className={`py-3 px-1 border-b-2 font-medium text-sm ${activeTab === "requests"
-                    ? "border-gray-600 text-gray-900"
-                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                    }`}
-                >
-                  Request Items
-                </button>
-              </nav>
-            </div>
           </div>
 
-          {activeTab === "inquiries" ? (
-            <div className="bg-white/80 backdrop-blur-sm rounded-md shadow-lg border border-gray-100/50 overflow-hidden">
-              {inquiryLoading ? (
-                <div className="p-8 text-center">
-                  <div className="inline-flex items-center gap-3">
-                    <ArrowPathIcon className="h-5 w-5 animate-spin text-gray-500" />
-                    <span className="text-gray-600">Loading inquiries...</span>
-                  </div>
+          <div className="bg-white/80 backdrop-blur-sm rounded-md shadow-lg border border-gray-100/50 overflow-hidden">
+            {inquiryLoading ? (
+              <div className="p-8 text-center">
+                <div className="inline-flex items-center gap-3">
+                  <ArrowPathIcon className="h-5 w-5 animate-spin text-gray-500" />
+                  <span className="text-gray-600">Loading inquiries...</span>
                 </div>
-              ) : inquiries.length === 0 ? (
-                <div className="p-8 text-center">
-                  <ExclamationTriangleIcon className="h-10 w-10 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-600">No inquiries found</p>
-                  <p className="text-gray-500 text-sm mt-2">
-                    Try adjusting your filters or create a new inquiry
-                  </p>
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="bg-gray-200/50 border-b border-gray-200/50">
-                      <tr>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Inquiry Details
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Customer & Contact
-                        </th>
-                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Items & Value
-                        </th>
-                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Status
-                        </th>
-                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Asana
-                        </th>
-                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Actions
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200/50">
-                      {inquiries.map((inquiry) => (
-                        <React.Fragment key={inquiry.id}>
-                          <tr className="hover:bg-gray-50/50 transition-colors">
-                            <td
-                              className="px-4 py-3 cursor-pointer"
-                              onClick={() => handleInquiryClick(inquiry)}
-                            >
-                              <div className="w-[12rem]">
-                                <div className="text-sm font-medium text-gray-900 flex items-center gap-2">
-                                  {inquiry.name}
-                                  {inquiry.isAssembly && (
-                                    <CubeIcon
-                                      className="h-4 w-4 text-blue-500"
-                                      title="Assembly Item"
-                                    />
-                                  )}
-                                </div>
-                                {inquiry.description && (
-                                  <div className="text-xs text-gray-500 truncate">
-                                    {inquiry.description}
-                                  </div>
-                                )}
-                                <div className="text-xs text-gray-400 mt-1">
-                                  Created: {formatDate(inquiry.createdAt)}
-                                </div>
-                              </div>
-                            </td>
-                            <td
-                              className="px-4 py-3 cursor-pointer"
-                              onClick={() => handleInquiryClick(inquiry)}
-                            >
-                              <div className="w-[10rem]">
-                                <a
-                                  href={`/customers/${inquiry.customer.id}`}
-                                  className="text-sm text-blue-600 hover:text-blue-800 block"
-                                  onClick={(e) => e.stopPropagation()}
-                                >
-                                  {inquiry.customer?.companyName || "-"}
-                                </a>
-                                {inquiry.contactPerson && (
-                                  <div className="text-sm text-gray-600 truncate">
-                                    {inquiry.contactPerson?.name}{" "}
-                                    {inquiry.contactPerson?.familyName}
-                                  </div>
-                                )}
-                              </div>
-                            </td>
-
-                            <td className="px-4 py-3 text-center">
-                              <div className="space-y-1">
-                                <div className="text-sm font-medium text-gray-900">
-                                  {inquiry.requests?.length || 0} items
-                                </div>
-                                {inquiry.totalEstimatedCost && (
-                                  <div className="text-xs text-gray-500">
-                                    {formatCurrency(
-                                      inquiry.totalEstimatedCost,
-                                      "USD",
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-                            </td>
-                            <td className="px-4 py-3">
-                              <div className="flex flex-col gap-1 items-center">
-                                <select
-                                  value={inquiry.status}
-                                  onChange={(e: any) =>
-                                    updateInquiryStatus(
-                                      inquiry.id,
-                                      e.target.value,
-                                    )
-                                  }
-                                  className={`text-xs w-[7rem] px-2 py-1 rounded-full font-medium border-0 cursor-pointer ${getInquiryStatusColor(
-                                    inquiry.status,
-                                  )}`}
-                                >
-                                  {getInquiryStatuses().map((status) => (
-                                    <option
-                                      key={status.value}
-                                      value={status.value}
-                                    >
-                                      {status.label}
-                                    </option>
-                                  ))}
-                                </select>
-                                <span
-                                  className={`text-xs px-2 py-1 rounded-full font-medium ${getInquiryPriorityColor(
-                                    inquiry.priority,
-                                  )}`}
-                                >
-                                  {inquiry.priority}
-                                </span>
-                              </div>
-                            </td>
-                            <td className="px-4 py-3">
-                              <div className="flex items-center justify-center">
-                                {inquiry.asanaLink ? (
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      window.open(inquiry.asanaLink, "_blank");
-                                    }}
-                                    className="text-purple-500 hover:text-purple-700 transition-colors p-1"
-                                    title="Open Asana task"
-                                  >
-                                    <svg
-                                      className="h-5 w-5"
-                                      viewBox="0 0 24 24"
-                                      fill="currentColor"
-                                    >
-                                      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z" />
-                                      <circle cx="12" cy="8.5" r="1.5" />
-                                      <circle cx="8.5" cy="14.5" r="1.5" />
-                                      <circle cx="15.5" cy="14.5" r="1.5" />
-                                    </svg>
-                                  </button>
-                                ) : (
-                                  <span className="text-red-500 font-bold text-lg animate-pulse" title="Missing Asana Link">!</span>
-                                )}
-                              </div>
-                            </td>
-                            <td className="px-4 py-3">
-                              <div className="flex items-center justify-center gap-2">
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    toggleInquiryRequests(inquiry.id);
-                                  }}
-                                  className={`px-2 py-1 text-xs rounded-lg transition-all flex items-center gap-1 ${expandedInquiryIds.has(inquiry.id)
-                                    ? "bg-blue-100 text-blue-800"
-                                    : "bg-blue-500 text-white hover:bg-blue-600"
-                                    }`}
-                                >
-                                  {expandedInquiryIds.has(inquiry.id) ? (
-                                    <EyeSlashIcon className="h-3 w-3" />
-                                  ) : (
-                                    <EyeIcon className="h-3 w-3" />
-                                  )}
-                                  Requests ({inquiry.requests?.length || 0})
-                                </button>
-                                {inquiry.projectLink && (
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      window.open(inquiry.projectLink, "_blank");
-                                    }}
-                                    className="text-blue-500 hover:text-blue-700 transition-colors p-1"
-                                    title="Open project link"
-                                  >
-                                    <LinkIcon className="h-4 w-4" />
-                                  </button>
-                                )}
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleConvertInquiryClick(inquiry);
-                                  }}
-                                  className="px-2 py-1 text-xs bg-green-500 text-white rounded hover:bg-green-600 transition-all flex items-center gap-1"
-                                  title="Convert to item"
-                                >
-                                  <ArrowRightIcon className="h-3 w-3" />
-                                  Convert
-                                </button>
-                                {user?.role === UserRole.ADMIN && (
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleDeleteInquiry(inquiry.id);
-                                    }}
-                                    className="p-1 text-red-500 hover:text-red-700 transition-colors"
-                                    title="Delete Inquiry"
-                                  >
-                                    <TrashIcon className="h-4 w-4" />
-                                  </button>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-
-                          {expandedInquiryIds.has(inquiry.id) &&
-                            inquiry.requests &&
-                            inquiry.requests.length > 0 && (
-                              <tr className="bg-gray-50/30">
-                                <td colSpan={6} className="px-4 py-3">
-                                  <div className="overflow-x-auto">
-                                    <table className="w-full text-sm border border-gray-200 rounded-lg">
-                                      <thead className="bg-gray-200/50 border-b border-gray-200/50">
-                                        <tr>
-                                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Item Name
-                                          </th>
-                                          <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Dimensions
-                                          </th>
-                                          <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Quantity & Interval
-                                          </th>
-                                          <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Status
-                                          </th>
-                                          <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Priority
-                                          </th>
-                                          <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Asana
-                                          </th>
-                                          <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Actions
-                                          </th>
-                                        </tr>
-                                      </thead>
-                                      <tbody className="divide-y divide-gray-200">
-                                        {inquiry.requests.map((request: any) => (
-                                          <tr
-                                            key={request.id}
-                                            className={`hover:bg-gray-50/50 transition-colors ${request.priority === "High"
-                                              ? "bg-red-50/50"
-                                              : ""
-                                              }`}
-                                          >
-                                            <td
-                                              className="px-4 py-3 cursor-pointer"
-                                              onClick={() => handleRequestItemClick(request)}
-                                            >
-                                              <div className="w-[8rem]">
-                                                <div className="text-sm font-medium text-gray-900">
-                                                  {request.itemName}
-                                                </div>
-                                                {request.material && (
-                                                  <div className="text-xs text-gray-500">
-                                                    {request.material}
-                                                  </div>
-                                                )}
-                                              </div>
-                                            </td>
-
-                                            <td className="px-4 py-3 text-center">
-                                              {renderDimensionInfo(request)}
-                                            </td>
-                                            <td className="px-4 py-3 text-center">
-                                              <div className="text-sm font-medium text-gray-900">
-                                                {request.qty} / {request.interval}
-                                              </div>
-                                            </td>
-                                            <td className="px-4 py-3 text-center">
-                                              <select
-                                                value={request.requestStatus}
-                                                onChange={(e: any) => {
-                                                  updateRequestedItem(
-                                                    request.id,
-                                                    {
-                                                      requestStatus:
-                                                        e.target.value,
-                                                    },
-                                                  );
-                                                }}
-                                                className={`text-xs px-2 py-1 rounded-full font-medium border-0 cursor-pointer ${getRequestStatusColor(
-                                                  request.requestStatus,
-                                                )}`}
-                                              >
-                                                {getAvailableRequestStatuses().map(
-                                                  (status) => (
-                                                    <option
-                                                      key={status.value}
-                                                      value={status.value}
-                                                    >
-                                                      {status.label}
-                                                    </option>
-                                                  ),
-                                                )}
-                                              </select>
-                                            </td>
-                                            <td className="px-4 py-3 text-center">
-                                              <span
-                                                className={`text-xs px-2 py-1 rounded-full font-medium ${getRequestPriorityColor(
-                                                  request.priority,
-                                                )}`}
-                                              >
-                                                {request.priority}
-                                              </span>
-                                            </td>
-                                            <td className="px-4 py-3 text-center">
-                                              {request.asanaLink ? (
-                                                <button
-                                                  onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    window.open(
-                                                      request.asanaLink,
-                                                      "_blank",
-                                                    );
-                                                  }}
-                                                  className="text-purple-500 hover:text-purple-700 transition-colors p-1"
-                                                  title="Open Asana link"
-                                                >
-                                                  <svg
-                                                    className="h-4 w-4"
-                                                    viewBox="0 0 24 24"
-                                                    fill="currentColor"
-                                                  >
-                                                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z" />
-                                                    <circle cx="12" cy="8.5" r="1.5" />
-                                                    <circle cx="8.5" cy="14.5" r="1.5" />
-                                                    <circle cx="15.5" cy="14.5" r="1.5" />
-                                                  </svg>
-                                                </button>
-                                              ) : (
-                                                <span className="text-red-500 font-bold text-lg animate-pulse" title="Missing Asana Link">!</span>
-                                              )}
-                                            </td>
-                                            <td className="px-4 py-3">
-                                              <div className="flex items-center justify-center gap-2">
-                                                <button
-                                                  onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    handleConvertRequestClick(
-                                                      request,
-                                                    );
-                                                  }}
-                                                  className="px-2 py-1 text-xs bg-green-500 text-white rounded hover:bg-green-600 transition-all flex items-center gap-1"
-                                                  title="Convert to item"
-                                                >
-                                                  <ArrowRightIcon className="h-3 w-3" />
-                                                  Convert
-                                                </button>
-                                                {user?.role ===
-                                                  UserRole.ADMIN && (
-                                                    <button
-                                                      onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        handleDeleteRequestItem(
-                                                          request.id,
-                                                        );
-                                                      }}
-                                                      className="p-1 text-red-500 hover:text-red-700 transition-colors"
-                                                      title="Delete Request"
-                                                    >
-                                                      <TrashIcon className="h-4 w-4" />
-                                                    </button>
-                                                  )}
-                                              </div>
-                                            </td>
-                                          </tr>
-                                        ))}
-                                      </tbody>
-                                    </table>
-                                  </div>
-                                </td>
-                              </tr>
-                            )}
-                        </React.Fragment>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-
-              {inquiryTotalPages > 1 && (
-                <div className="px-4 py-3 bg-gray-50/50 border-t border-gray-200/50 flex items-center justify-between">
-                  <div className="text-sm text-gray-700">
-                    Showing {(inquiryCurrentPage - 1) * itemsPerPage + 1} to{" "}
-                    {Math.min(
-                      inquiryCurrentPage * itemsPerPage,
-                      inquiryTotalRecords,
-                    )}{" "}
-                    of {inquiryTotalRecords} results
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() =>
-                        setInquiryCurrentPage(Math.max(1, inquiryCurrentPage - 1))
-                      }
-                      disabled={inquiryCurrentPage === 1}
-                      className="px-2 py-1 text-sm bg-white/80 backdrop-blur-sm border border-gray-300/80 rounded-lg hover:bg-white/60 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-1"
-                    >
-                      <ChevronLeftIcon className="h-3 w-3" />
-                      Prev
-                    </button>
-                    <div className="flex items-center gap-1">
-                      {[...Array(Math.min(5, inquiryTotalPages))].map((_, i) => {
-                        const pageNum = i + 1;
-                        return (
-                          <button
-                            key={pageNum}
-                            onClick={() => setInquiryCurrentPage(pageNum)}
-                            className={`px-2 py-1 text-sm rounded-lg transition-all ${inquiryCurrentPage === pageNum
-                              ? "bg-gray-600 text-white"
-                              : "bg-white/80 backdrop-blur-sm border border-gray-300/80 hover:bg-white/60"
-                              }`}
-                          >
-                            {pageNum}
-                          </button>
-                        );
-                      })}
-                      {inquiryTotalPages > 5 && (
-                        <>
-                          <span className="px-1 text-gray-500">...</span>
-                          <button
-                            onClick={() =>
-                              setInquiryCurrentPage(inquiryTotalPages)
-                            }
-                            className={`px-2 py-1 text-sm rounded-lg transition-all ${inquiryCurrentPage === inquiryTotalPages
-                              ? "bg-gray-600 text-white"
-                              : "bg-white/80 backdrop-blur-sm border border-gray-300/80 hover:bg-white/60"
-                              }`}
-                          >
-                            {inquiryTotalPages}
-                          </button>
-                        </>
-                      )}
-                    </div>
-                    <button
-                      onClick={() =>
-                        setInquiryCurrentPage(
-                          Math.min(inquiryTotalPages, inquiryCurrentPage + 1),
-                        )
-                      }
-                      disabled={inquiryCurrentPage === inquiryTotalPages}
-                      className="px-2 py-1 text-sm bg-white/80 backdrop-blur-sm border border-gray-300/80 rounded-lg hover:bg-white/60 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-1"
-                    >
-                      Next
-                      <ChevronRightIcon className="h-3 w-3" />
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="bg-white/80 backdrop-blur-sm rounded-md shadow-lg border border-gray-100/50 overflow-hidden">
-              {requestLoading ? (
-                <div className="p-8 text-center">
-                  <div className="inline-flex items-center gap-3">
-                    <ArrowPathIcon className="h-5 w-5 animate-spin text-gray-500" />
-                    <span className="text-gray-600">
-                      Loading requested items...
-                    </span>
-                  </div>
-                </div>
-              ) : requestedItems.length === 0 ? (
-                <div className="p-8 text-center">
-                  <ExclamationTriangleIcon className="h-10 w-10 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-600">No requested items found</p>
-                  <p className="text-gray-500 text-sm mt-2">
-                    Try adjusting your filters or add a new request item
-                  </p>
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="bg-gray-200/50 border-b border-gray-200/50">
-                      <tr>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Item Name
-                        </th>
-                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Dimensions
-                        </th>
-                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Quantity & Interval
-                        </th>
-                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Status
-                        </th>
-                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Priority
-                        </th>
-                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Asana
-                        </th>
-                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Actions
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200/50">
-                      {requestedItems.map((item: any) => (
-                        <tr
-                          key={item.id}
-                          className={`hover:bg-gray-50/50 transition-colors ${item.priority === "High" ? "bg-red-50/50" : ""
-                            }`}
-                        >
+              </div>
+            ) : inquiries.length === 0 ? (
+              <div className="p-8 text-center">
+                <ExclamationTriangleIcon className="h-10 w-10 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-600">No inquiries found</p>
+                <p className="text-gray-500 text-sm mt-2">
+                  Try adjusting your filters or create a new inquiry
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-200/50 border-b border-gray-200/50">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Inquiry Details
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Customer & Contact
+                      </th>
+                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Items & Value
+                      </th>
+                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Status
+                      </th>
+                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Asana
+                      </th>
+                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200/50">
+                    {inquiries.map((inquiry) => (
+                      <React.Fragment key={inquiry.id}>
+                        <tr className="hover:bg-gray-50/50 transition-colors">
                           <td
                             className="px-4 py-3 cursor-pointer"
-                            onClick={() => handleRequestItemClick(item)}
+                            onClick={() => handleInquiryClick(inquiry)}
                           >
-                            <div className="w-[8rem]">
-                              <div className="text-sm font-medium text-gray-900">
-                                {item.itemName}
+                            <div className="w-[12rem]">
+                              <div className="text-sm font-medium text-gray-900 flex items-center gap-2">
+                                {inquiry.name}
+                                {inquiry.isAssembly && (
+                                  <CubeIcon
+                                    className="h-4 w-4 text-blue-500"
+                                    title="Assembly Item"
+                                  />
+                                )}
                               </div>
-                              {item.material && (
-                                <div className="text-xs text-gray-500">
-                                  {item.material}
+                              {inquiry.description && (
+                                <div className="text-xs text-gray-500 truncate">
+                                  {inquiry.description}
+                                </div>
+                              )}
+                              <div className="text-xs text-gray-400 mt-1">
+                                Created: {formatDate(inquiry.createdAt)}
+                              </div>
+                            </div>
+                          </td>
+                          <td
+                            className="px-4 py-3 cursor-pointer"
+                            onClick={() => handleInquiryClick(inquiry)}
+                          >
+                            <div className="w-[10rem]">
+                              <a
+                                href={`/customers/${inquiry.customer.id}`}
+                                className="text-sm text-blue-600 hover:text-blue-800 block"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                {inquiry.customer?.companyName || "-"}
+                              </a>
+                              {inquiry.contactPerson && (
+                                <div className="text-sm text-gray-600 truncate">
+                                  {inquiry.contactPerson?.name}{" "}
+                                  {inquiry.contactPerson?.familyName}
                                 </div>
                               )}
                             </div>
                           </td>
 
                           <td className="px-4 py-3 text-center">
-                            {renderDimensionInfo(item)}
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                            <div className="text-sm font-medium text-gray-900">
-                              {item.qty} / {item.interval}
+                            <div className="space-y-1">
+                              <div className="text-sm font-medium text-gray-900">
+                                {inquiry.requests?.length || 0} items
+                              </div>
+                              {inquiry.totalEstimatedCost && (
+                                <div className="text-xs text-gray-500">
+                                  {formatCurrency(
+                                    inquiry.totalEstimatedCost,
+                                    "USD",
+                                  )}
+                                </div>
+                              )}
                             </div>
                           </td>
-                          <td className="px-4 py-3 text-center">
-                            <select
-                              value={item.requestStatus}
-                              onChange={(e) => {
-                                updateRequestedItem(item.id, {
-                                  requestStatus: e.target.value as any,
-                                });
-                              }}
-                              className={`text-xs px-2 py-1 rounded-full font-medium border-0 cursor-pointer ${getRequestStatusColor(
-                                item.requestStatus,
-                              )}`}
-                            >
-                              {getAvailableRequestStatuses().map((status) => (
-                                <option key={status.value} value={status.value}>
-                                  {status.label}
-                                </option>
-                              ))}
-                            </select>
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                            <span
-                              className={`text-xs px-2 py-1 rounded-full font-medium ${getRequestPriorityColor(
-                                item.priority,
-                              )}`}
-                            >
-                              {item.priority}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                            {item.asanaLink ? (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  window.open(item.asanaLink, "_blank");
-                                }}
-                                className="text-purple-500 hover:text-purple-700 transition-colors p-1"
-                                title="Open Asana link"
+                          <td className="px-4 py-3">
+                            <div className="flex flex-col gap-1 items-center">
+                              <select
+                                value={inquiry.status}
+                                onChange={(e: any) =>
+                                  updateInquiryStatus(
+                                    inquiry.id,
+                                    e.target.value,
+                                  )
+                                }
+                                className={`text-xs w-[7rem] px-2 py-1 rounded-full font-medium border-0 cursor-pointer ${getInquiryStatusColor(
+                                  inquiry.status,
+                                )}`}
                               >
-                                <svg
-                                  className="h-4 w-4"
-                                  viewBox="0 0 24 24"
-                                  fill="currentColor"
+                                {getInquiryStatuses().map((status) => (
+                                  <option
+                                    key={status.value}
+                                    value={status.value}
+                                  >
+                                    {status.label}
+                                  </option>
+                                ))}
+                              </select>
+                              <span
+                                className={`text-xs px-2 py-1 rounded-full font-medium ${getInquiryPriorityColor(
+                                  inquiry.priority,
+                                )}`}
+                              >
+                                {inquiry.priority}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center justify-center">
+                              {inquiry.asanaLink ? (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    window.open(inquiry.asanaLink, "_blank");
+                                  }}
+                                  className="text-purple-500 hover:text-purple-700 transition-colors p-1"
+                                  title="Open Asana task"
                                 >
-                                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8+3.59 8 8-3.59 8-8 8z" />
-                                  <circle cx="12" cy="8.5" r="1.5" />
-                                  <circle cx="8.5" cy="14.5" r="1.5" />
-                                  <circle cx="15.5" cy="14.5" r="1.5" />
-                                </svg>
-                              </button>
-                            ) : (
-                              <span className="text-red-500 font-bold text-lg animate-pulse" title="Missing Asana Link">!</span>
-                            )}
+                                  <svg
+                                    className="h-5 w-5"
+                                    viewBox="0 0 24 24"
+                                    fill="currentColor"
+                                  >
+                                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z" />
+                                    <circle cx="12" cy="8.5" r="1.5" />
+                                    <circle cx="8.5" cy="14.5" r="1.5" />
+                                    <circle cx="15.5" cy="14.5" r="1.5" />
+                                  </svg>
+                                </button>
+                              ) : (
+                                <span className="text-red-500 font-bold text-lg animate-pulse" title="Missing Asana Link">!</span>
+                              )}
+                            </div>
                           </td>
                           <td className="px-4 py-3">
                             <div className="flex items-center justify-center gap-2">
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  handleConvertRequestClick(item);
+                                  toggleInquiryRequests(inquiry.id);
+                                }}
+                                className={`px-2 py-1 text-xs rounded-lg transition-all flex items-center gap-1 ${expandedInquiryIds.has(inquiry.id)
+                                  ? "bg-blue-100 text-blue-800"
+                                  : "bg-blue-500 text-white hover:bg-blue-600"
+                                  }`}
+                              >
+                                {expandedInquiryIds.has(inquiry.id) ? (
+                                  <EyeSlashIcon className="h-3 w-3" />
+                                ) : (
+                                  <EyeIcon className="h-3 w-3" />
+                                )}
+                                Requests ({inquiry.requests?.length || 0})
+                              </button>
+                              {inquiry.projectLink && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    window.open(inquiry.projectLink, "_blank");
+                                  }}
+                                  className="text-blue-500 hover:text-blue-700 transition-colors p-1"
+                                  title="Open project link"
+                                >
+                                  <LinkIcon className="h-4 w-4" />
+                                </button>
+                              )}
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleConvertInquiryClick(inquiry);
                                 }}
                                 className="px-2 py-1 text-xs bg-green-500 text-white rounded hover:bg-green-600 transition-all flex items-center gap-1"
                                 title="Convert to item"
@@ -2586,10 +1813,10 @@ const CombinedInquiriesPageContent = () => {
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    handleDeleteRequestItem(item.id);
+                                    handleDeleteInquiry(inquiry.id);
                                   }}
                                   className="p-1 text-red-500 hover:text-red-700 transition-colors"
-                                  title="Delete Request"
+                                  title="Delete Inquiry"
                                 >
                                   <TrashIcon className="h-4 w-4" />
                                 </button>
@@ -2597,83 +1824,250 @@ const CombinedInquiriesPageContent = () => {
                             </div>
                           </td>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
 
-              {requestTotalPages > 1 && (
-                <div className="px-4 py-3 bg-gray-50/50 border-t border-gray-200/50 flex items-center justify-between">
-                  <div className="text-sm text-gray-700">
-                    Showing {(requestCurrentPage - 1) * itemsPerPage + 1} to{" "}
-                    {Math.min(
-                      requestCurrentPage * itemsPerPage,
-                      requestTotalRecords,
-                    )}{" "}
-                    of {requestTotalRecords} results
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() =>
-                        setRequestCurrentPage(Math.max(1, requestCurrentPage - 1))
-                      }
-                      disabled={requestCurrentPage === 1}
-                      className="px-2 py-1 text-sm bg-white/80 backdrop-blur-sm border border-gray-300/80 rounded-lg hover:bg-white/60 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-1"
-                    >
-                      <ChevronLeftIcon className="h-3 w-3" />
-                      Prev
-                    </button>
-                    <div className="flex items-center gap-1">
-                      {[...Array(Math.min(5, requestTotalPages))].map((_, i) => {
-                        const pageNum = i + 1;
-                        return (
-                          <button
-                            key={pageNum}
-                            onClick={() => setRequestCurrentPage(pageNum)}
-                            className={`px-2 py-1 text-sm rounded-lg transition-all ${requestCurrentPage === pageNum
-                              ? "bg-gray-600 text-white"
-                              : "bg-white/80 backdrop-blur-sm border border-gray-300/80 hover:bg-white/60"
-                              }`}
-                          >
-                            {pageNum}
-                          </button>
-                        );
-                      })}
-                      {requestTotalPages > 5 && (
-                        <>
-                          <span className="px-1 text-gray-500">...</span>
-                          <button
-                            onClick={() =>
-                              setRequestCurrentPage(requestTotalPages)
-                            }
-                            className={`px-2 py-1 text-sm rounded-lg transition-all ${requestCurrentPage === requestTotalPages
-                              ? "bg-gray-600 text-white"
-                              : "bg-white/80 backdrop-blur-sm border border-gray-300/80 hover:bg-white/60"
-                              }`}
-                          >
-                            {requestTotalPages}
-                          </button>
-                        </>
-                      )}
-                    </div>
-                    <button
-                      onClick={() =>
-                        setRequestCurrentPage(
-                          Math.min(requestTotalPages, requestCurrentPage + 1),
-                        )
-                      }
-                      disabled={requestCurrentPage === requestTotalPages}
-                      className="px-2 py-1 text-sm bg-white/80 backdrop-blur-sm border border-gray-300/80 rounded-lg hover:bg-white/60 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-1"
-                    >
-                      Next
-                      <ChevronRightIcon className="h-3 w-3" />
-                    </button>
-                  </div>
+                        {expandedInquiryIds.has(inquiry.id) &&
+                          inquiry.requests &&
+                          inquiry.requests.length > 0 && (
+                            <tr className="bg-gray-50/30">
+                              <td colSpan={6} className="px-4 py-3">
+                                <div className="overflow-x-auto">
+                                  <table className="w-full text-sm border border-gray-200 rounded-lg">
+                                    <thead className="bg-gray-200/50 border-b border-gray-200/50">
+                                      <tr>
+                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                          Item Name
+                                        </th>
+                                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                          Dimensions
+                                        </th>
+                                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                          Quantity & Interval
+                                        </th>
+                                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                          Status
+                                        </th>
+                                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                          Priority
+                                        </th>
+                                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                          Asana
+                                        </th>
+                                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                          Actions
+                                        </th>
+                                      </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-200">
+                                      {inquiry.requests.map((request: any) => (
+                                        <tr
+                                          key={request.id}
+                                          className={`hover:bg-gray-50/50 transition-colors ${request.priority === "High"
+                                            ? "bg-red-50/50"
+                                            : ""
+                                            }`}
+                                        >
+                                          <td className="px-4 py-3">
+                                            <div className="w-[8rem]">
+                                              <div className="text-sm font-medium text-gray-900">
+                                                {request.itemName}
+                                              </div>
+                                              {request.material && (
+                                                <div className="text-xs text-gray-500">
+                                                  {request.material}
+                                                </div>
+                                              )}
+                                            </div>
+                                          </td>
+
+                                          <td className="px-4 py-3 text-center">
+                                            {renderDimensionInfo(request)}
+                                          </td>
+                                          <td className="px-4 py-3 text-center">
+                                            <div className="text-sm font-medium text-gray-900">
+                                              {request.qty} / {request.interval}
+                                            </div>
+                                          </td>
+                                          <td className="px-4 py-3 text-center">
+                                            <select
+                                              value={request.requestStatus}
+                                              onChange={(e: any) => {
+                                                updateRequestedItem(
+                                                  request.id,
+                                                  {
+                                                    requestStatus:
+                                                      e.target.value,
+                                                  },
+                                                );
+                                              }}
+                                              className={`text-xs px-2 py-1 rounded-full font-medium border-0 cursor-pointer ${getRequestStatusColor(
+                                                request.requestStatus,
+                                              )}`}
+                                            >
+                                              {getAvailableRequestStatuses().map(
+                                                (status) => (
+                                                  <option
+                                                    key={status.value}
+                                                    value={status.value}
+                                                  >
+                                                    {status.label}
+                                                  </option>
+                                                ),
+                                              )}
+                                            </select>
+                                          </td>
+                                          <td className="px-4 py-3 text-center">
+                                            <span
+                                              className={`text-xs px-2 py-1 rounded-full font-medium ${getRequestPriorityColor(
+                                                request.priority,
+                                              )}`}
+                                            >
+                                              {request.priority}
+                                            </span>
+                                          </td>
+                                          <td className="px-4 py-3 text-center">
+                                            {request.asanaLink ? (
+                                              <button
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  window.open(
+                                                    request.asanaLink,
+                                                    "_blank",
+                                                  );
+                                                }}
+                                                className="text-purple-500 hover:text-purple-700 transition-colors p-1"
+                                                title="Open Asana link"
+                                              >
+                                                <svg
+                                                  className="h-4 w-4"
+                                                  viewBox="0 0 24 24"
+                                                  fill="currentColor"
+                                                >
+                                                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z" />
+                                                  <circle cx="12" cy="8.5" r="1.5" />
+                                                  <circle cx="8.5" cy="14.5" r="1.5" />
+                                                  <circle cx="15.5" cy="14.5" r="1.5" />
+                                                </svg>
+                                              </button>
+                                            ) : (
+                                              <span className="text-red-500 font-bold text-lg animate-pulse" title="Missing Asana Link">!</span>
+                                            )}
+                                          </td>
+                                          <td className="px-4 py-3">
+                                            <div className="flex items-center justify-center gap-2">
+                                              <button
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  handleConvertRequestClick(
+                                                    request,
+                                                    inquiry.id,
+                                                  );
+                                                }}
+                                                className="px-2 py-1 text-xs bg-green-500 text-white rounded hover:bg-green-600 transition-all flex items-center gap-1"
+                                                title="Convert to item"
+                                              >
+                                                <ArrowRightIcon className="h-3 w-3" />
+                                                Convert
+                                              </button>
+                                              <button
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  if (window.confirm("Are you sure you want to delete this request?")) {
+                                                    removeRequestFromInquiry(inquiry.id, request.id);
+                                                    fetchInquiries();
+                                                  }
+                                                }}
+                                                className="p-1 text-red-500 hover:text-red-700 transition-colors"
+                                                title="Delete Request"
+                                              >
+                                                <TrashIcon className="h-4 w-4" />
+                                              </button>
+                                            </div>
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                      </React.Fragment>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {inquiryTotalPages > 1 && (
+              <div className="px-4 py-3 bg-gray-50/50 border-t border-gray-200/50 flex items-center justify-between">
+                <div className="text-sm text-gray-700">
+                  Showing {(inquiryCurrentPage - 1) * itemsPerPage + 1} to{" "}
+                  {Math.min(
+                    inquiryCurrentPage * itemsPerPage,
+                    inquiryTotalRecords,
+                  )}{" "}
+                  of {inquiryTotalRecords} results
                 </div>
-              )}
-            </div>
-          )}
+                <div className="flex gap-2">
+                  <button
+                    onClick={() =>
+                      setInquiryCurrentPage(Math.max(1, inquiryCurrentPage - 1))
+                    }
+                    disabled={inquiryCurrentPage === 1}
+                    className="px-2 py-1 text-sm bg-white/80 backdrop-blur-sm border border-gray-300/80 rounded-lg hover:bg-white/60 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-1"
+                  >
+                    <ChevronLeftIcon className="h-3 w-3" />
+                    Prev
+                  </button>
+                  <div className="flex items-center gap-1">
+                    {[...Array(Math.min(5, inquiryTotalPages))].map((_, i) => {
+                      const pageNum = i + 1;
+                      return (
+                        <button
+                          key={pageNum}
+                          onClick={() => setInquiryCurrentPage(pageNum)}
+                          className={`px-2 py-1 text-sm rounded-lg transition-all ${inquiryCurrentPage === pageNum
+                            ? "bg-gray-600 text-white"
+                            : "bg-white/80 backdrop-blur-sm border border-gray-300/80 hover:bg-white/60"
+                            }`}
+                        >
+                          {pageNum}
+                        </button>
+                      );
+                    })}
+                    {inquiryTotalPages > 5 && (
+                      <>
+                        <span className="px-1 text-gray-500">...</span>
+                        <button
+                          onClick={() =>
+                            setInquiryCurrentPage(inquiryTotalPages)
+                          }
+                          className={`px-2 py-1 text-sm rounded-lg transition-all ${inquiryCurrentPage === inquiryTotalPages
+                            ? "bg-gray-600 text-white"
+                            : "bg-white/80 backdrop-blur-sm border border-gray-300/80 hover:bg-white/60"
+                            }`}
+                        >
+                          {inquiryTotalPages}
+                        </button>
+                      </>
+                    )}
+                  </div>
+                  <button
+                    onClick={() =>
+                      setInquiryCurrentPage(
+                        Math.min(inquiryTotalPages, inquiryCurrentPage + 1),
+                      )
+                    }
+                    disabled={inquiryCurrentPage === inquiryTotalPages}
+                    className="px-2 py-1 text-sm bg-white/80 backdrop-blur-sm border border-gray-300/80 rounded-lg hover:bg-white/60 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-1"
+                  >
+                    Next
+                    <ChevronRightIcon className="h-3 w-3" />
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         {showCreateModal && (
@@ -3065,25 +2459,30 @@ const CombinedInquiriesPageContent = () => {
                                 </span>
                               ))}
                             </div>
-                            <input
-                              type="text"
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter' || e.key === ',') {
-                                  e.preventDefault();
-                                  const value = (e.target as HTMLInputElement).value.trim();
-                                  if (value && !inquiryFormData.painPoints?.includes(value)) {
-                                    setInquiryFormData({
-                                      ...inquiryFormData,
-                                      painPoints: [...(inquiryFormData.painPoints || []), value]
-                                    });
-                                    (e.target as HTMLInputElement).value = '';
+                            <div className="flex items-center gap-1">
+                              <input
+                                type="text"
+                                value={inquiryTagInput}
+                                onChange={(e) => setInquiryTagInput(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter' || e.key === ',') {
+                                    e.preventDefault();
+                                    handleAddInquiryPainPoint();
                                   }
-                                }
-                              }}
-                              disabled={inquiryModalMode === "edit" && !editModeEnabled}
-                              placeholder="Type and press Enter..."
-                              className="w-full text-sm bg-transparent outline-none border-none p-0 focus:ring-0"
-                            />
+                                }}
+                                disabled={inquiryModalMode === "edit" && !editModeEnabled}
+                                placeholder="Type tag..."
+                                className="flex-1 text-sm bg-transparent outline-none border-none p-0 focus:ring-0"
+                              />
+                              <button
+                                type="button"
+                                onClick={handleAddInquiryPainPoint}
+                                disabled={(inquiryModalMode === "edit" && !editModeEnabled) || !inquiryTagInput.trim()}
+                                className="p-1 text-blue-500 hover:text-blue-700 transition-colors disabled:text-gray-300"
+                              >
+                                <PlusIcon className="h-5 w-5" />
+                              </button>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -3520,22 +2919,33 @@ const CombinedInquiriesPageContent = () => {
                                           </span>
                                         ))}
                                       </div>
-                                      <input
-                                        type="text"
-                                        onKeyDown={(e) => {
-                                          if (e.key === 'Enter' || e.key === ',') {
-                                            e.preventDefault();
-                                            const value = (e.target as HTMLInputElement).value.trim();
-                                            if (value && !request.painPoints?.includes(value)) {
-                                              updateRequest(index, "painPoints", [...(request.painPoints || []), value]);
-                                              (e.target as HTMLInputElement).value = '';
+                                      <div className="flex items-center gap-1">
+                                        <input
+                                          type="text"
+                                          value={requestLoopTagInputs[index] || ""}
+                                          onChange={(e) => setRequestLoopTagInputs({
+                                            ...requestLoopTagInputs,
+                                            [index]: e.target.value
+                                          })}
+                                          onKeyDown={(e) => {
+                                            if (e.key === 'Enter' || e.key === ',') {
+                                              e.preventDefault();
+                                              handleAddRequestLoopPainPoint(index);
                                             }
-                                          }
-                                        }}
-                                        disabled={inquiryModalMode === "edit" && !editModeEnabled}
-                                        placeholder="Add tag..."
-                                        className="w-full text-xs bg-transparent outline-none border-none p-0 focus:ring-0"
-                                      />
+                                          }}
+                                          disabled={inquiryModalMode === "edit" && !editModeEnabled}
+                                          placeholder="Add..."
+                                          className="flex-1 text-xs bg-transparent outline-none border-none p-0 focus:ring-0"
+                                        />
+                                        <button
+                                          type="button"
+                                          onClick={() => handleAddRequestLoopPainPoint(index)}
+                                          disabled={(inquiryModalMode === "edit" && !editModeEnabled) || !(requestLoopTagInputs[index] || "").trim()}
+                                          className="p-0.5 text-blue-500 hover:text-blue-700 transition-colors disabled:text-gray-300"
+                                        >
+                                          <PlusIcon className="h-4 w-4" />
+                                        </button>
+                                      </div>
                                     </div>
                                   </div>
                                 </div>
@@ -3650,571 +3060,6 @@ const CombinedInquiriesPageContent = () => {
           </div>
         )}
 
-        {showRequestCreateModal && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <div className="bg-rose-50/95 backdrop-blur-md rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-rose-200">
-              <div className="p-6">
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-xl font-bold text-gray-900">
-                    {requestModalMode === "edit"
-                      ? "Request Details"
-                      : "Add New Requested Item"}
-                  </h2>
-                  <button
-                    onClick={() => {
-                      setShowRequestCreateModal(false);
-                      resetRequestItemForm();
-                    }}
-                    className="text-gray-400 hover:text-gray-600 transition-colors"
-                  >
-                    <XMarkIcon className="h-5 w-5" />
-                  </button>
-                </div>
-
-                {requestModalMode === "edit" && (
-                  <div className="mb-4 flex items-center justify-between bg-gray-50 rounded-lg p-3">
-                    <span className="text-sm font-medium text-gray-700">
-                      Edit Mode
-                    </span>
-                    <div className="flex items-center">
-                      <span className="text-xs text-gray-500 mr-2">
-                        {requestEditModeEnabled ? "Enabled" : "Disabled"}
-                      </span>
-                      <button
-                        type="button"
-                        className={`${requestEditModeEnabled ? "bg-gray-600" : "bg-gray-200"
-                          } relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2`}
-                        onClick={() =>
-                          setRequestEditModeEnabled(!requestEditModeEnabled)
-                        }
-                      >
-                        <span
-                          className={`${requestEditModeEnabled
-                            ? "translate-x-4"
-                            : "translate-x-0"
-                            } pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out`}
-                        />
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-3">
-
-
-                    <div className="flex gap-3">
-                      <div className="flex-1">
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                          Item Name *
-                        </label>
-                        <input
-                          type="text"
-                          value={requestItemFormData.itemName}
-                          onChange={(e) =>
-                            setRequestItemFormData({
-                              ...requestItemFormData,
-                              itemName: e.target.value,
-                            })
-                          }
-                          disabled={
-                            requestModalMode === "edit" && !requestEditModeEnabled
-                          }
-                          className="w-full px-2 py-1 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                          placeholder="Enter item name"
-                        />
-                      </div>
-                      <div className="w-1/3">
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                          Item No
-                        </label>
-                        <input
-                          type="text"
-                          value={requestItemFormData.itemNo || ""}
-                          onChange={(e) =>
-                            setRequestItemFormData({
-                              ...requestItemFormData,
-                              itemNo: e.target.value,
-                            })
-                          }
-                          disabled={
-                            requestModalMode === "edit" && !requestEditModeEnabled
-                          }
-                          className="w-full px-2 py-1 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                          placeholder="Item number"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="col-span-2 grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                          Material
-                        </label>
-                        <input
-                          type="text"
-                          value={requestItemFormData.material || ""}
-                          onChange={(e) =>
-                            setRequestItemFormData({
-                              ...requestItemFormData,
-                              material: e.target.value,
-                            })
-                          }
-                          disabled={
-                            requestModalMode === "edit" && !requestEditModeEnabled
-                          }
-                          className="w-full px-2 py-1 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                          placeholder="Enter material"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                          Specification
-                        </label>
-                        <input
-                          type="text"
-                          value={requestItemFormData.specification || ""}
-                          onChange={(e) =>
-                            setRequestItemFormData({
-                              ...requestItemFormData,
-                              specification: e.target.value,
-                            })
-                          }
-                          disabled={
-                            requestModalMode === "edit" && !requestEditModeEnabled
-                          }
-                          className="w-full px-2 py-1 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                          placeholder="Enter specifications"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="col-span-2">
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Quantity *
-                      </label>
-                      <input
-                        type="text"
-                        value={requestItemFormData.qty}
-                        onChange={(e) =>
-                          setRequestItemFormData({
-                            ...requestItemFormData,
-                            qty: e.target.value,
-                          })
-                        }
-                        disabled={
-                          requestModalMode === "edit" && !requestEditModeEnabled
-                        }
-                        className="w-full px-2 py-1 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                        placeholder="e.g., 100 Stk"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Interval
-                      </label>
-                      <select
-                        value={requestItemFormData.interval}
-                        onChange={(e) =>
-                          setRequestItemFormData({
-                            ...requestItemFormData,
-                            interval: e.target.value as any,
-                          })
-                        }
-                        disabled={
-                          requestModalMode === "edit" && !requestEditModeEnabled
-                        }
-                        className="w-full px-2 py-1 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                      >
-                        {getAvailableIntervals().map((interval) => (
-                          <option key={interval.value} value={interval.value}>
-                            {interval.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Priority
-                      </label>
-                      <select
-                        value={requestItemFormData.priority}
-                        onChange={(e) =>
-                          setRequestItemFormData({
-                            ...requestItemFormData,
-                            priority: e.target.value as any,
-                          })
-                        }
-                        disabled={
-                          requestModalMode === "edit" && !requestEditModeEnabled
-                        }
-                        className="w-full px-2 py-1 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                      >
-                        {getAvailableRequestPriorities().map((priority) => (
-                          <option key={priority.value} value={priority.value}>
-                            {priority.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Status
-                      </label>
-                      <select
-                        value={requestItemFormData.requestStatus}
-                        onChange={(e) =>
-                          setRequestItemFormData({
-                            ...requestItemFormData,
-                            requestStatus: e.target.value as any,
-                          })
-                        }
-                        disabled={
-                          requestModalMode === "edit" && !requestEditModeEnabled
-                        }
-                        className="w-full px-2 py-1 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                      >
-                        {getAvailableRequestStatuses().map((status) => (
-                          <option key={status.value} value={status.value}>
-                            {status.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Asana Link
-                      </label>
-                      <input
-                        type="text"
-                        value={requestItemFormData.asanaLink || ""}
-                        onChange={(e) =>
-                          setRequestItemFormData({
-                            ...requestItemFormData,
-                            asanaLink: e.target.value,
-                          })
-                        }
-                        disabled={
-                          requestModalMode === "edit" && !requestEditModeEnabled
-                        }
-                        className="w-full px-2 py-1 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                        placeholder="https://app.asana.com/..."
-                      />
-                    </div>
-
-                    <div className="col-span-2 border-t pt-4 mt-2">
-                      <h4 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                        <ArrowsPointingOutIcon className="h-4 w-4" />
-                        Item Dimensions
-                      </h4>
-                      <div className="grid grid-cols-4 gap-3">
-                        <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">
-                            Weight (kg)
-                          </label>
-                          <input
-                            type="number"
-                            value={requestItemFormData.weight || ""}
-                            onChange={(e) =>
-                              setRequestItemFormData({
-                                ...requestItemFormData,
-                                weight: e.target.value
-                                  ? parseFloat(e.target.value)
-                                  : undefined,
-                              })
-                            }
-                            disabled={
-                              requestModalMode === "edit" &&
-                              !requestEditModeEnabled
-                            }
-                            className="w-full px-2 py-1 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                            placeholder="0.00"
-                            step="0.01"
-                            min="0"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">
-                            Length (cm)
-                          </label>
-                          <input
-                            type="number"
-                            value={requestItemFormData.length || ""}
-                            onChange={(e) =>
-                              setRequestItemFormData({
-                                ...requestItemFormData,
-                                length: e.target.value
-                                  ? parseFloat(e.target.value)
-                                  : undefined,
-                              })
-                            }
-                            disabled={
-                              requestModalMode === "edit" &&
-                              !requestEditModeEnabled
-                            }
-                            className="w-full px-2 py-1 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                            placeholder="0.0"
-                            step="0.1"
-                            min="0"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">
-                            Width (cm)
-                          </label>
-                          <input
-                            type="number"
-                            value={requestItemFormData.width || ""}
-                            onChange={(e) =>
-                              setRequestItemFormData({
-                                ...requestItemFormData,
-                                width: e.target.value
-                                  ? parseFloat(e.target.value)
-                                  : undefined,
-                              })
-                            }
-                            disabled={
-                              requestModalMode === "edit" &&
-                              !requestEditModeEnabled
-                            }
-                            className="w-full px-2 py-1 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                            placeholder="0.0"
-                            step="0.1"
-                            min="0"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">
-                            Height (cm)
-                          </label>
-                          <input
-                            type="number"
-                            value={requestItemFormData.height || ""}
-                            onChange={(e) =>
-                              setRequestItemFormData({
-                                ...requestItemFormData,
-                                height: e.target.value
-                                  ? parseFloat(e.target.value)
-                                  : undefined,
-                              })
-                            }
-                            disabled={
-                              requestModalMode === "edit" &&
-                              !requestEditModeEnabled
-                            }
-                            className="w-full px-2 py-1 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                            placeholder="0.0"
-                            step="0.1"
-                            min="0"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="col-span-2 grid grid-cols-3 gap-3 border-t pt-3 mt-1">
-                        <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">
-                            Urgency 1
-                          </label>
-                          <textarea
-                            value={requestItemFormData.urgency1 || ""}
-                            onChange={(e) =>
-                              setRequestItemFormData({
-                                ...requestItemFormData,
-                                urgency1: e.target.value,
-                              })
-                            }
-                            disabled={requestModalMode === "edit" && !requestEditModeEnabled}
-                            rows={3}
-                            className="w-full px-2 py-1 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                            placeholder="Urgency details..."
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">
-                            Urgency 2
-                          </label>
-                          <textarea
-                            value={requestItemFormData.urgency2 || ""}
-                            onChange={(e) =>
-                              setRequestItemFormData({
-                                ...requestItemFormData,
-                                urgency2: e.target.value,
-                              })
-                            }
-                            disabled={requestModalMode === "edit" && !requestEditModeEnabled}
-                            rows={3}
-                            className="w-full px-2 py-1 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                            placeholder="Additional urgency..."
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">
-                            Pain Points
-                          </label>
-                          <div className="min-h-[80px] p-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded focus-within:ring-2 focus-within:ring-gray-500/50 transition-all">
-                            <div className="flex flex-wrap gap-1 mb-2">
-                              {requestItemFormData.painPoints?.map((tag, i) => (
-                                <span key={i} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 border border-gray-200">
-                                  {tag}
-                                  <button
-                                    type="button"
-                                    onClick={() => setRequestItemFormData({
-                                      ...requestItemFormData,
-                                      painPoints: requestItemFormData.painPoints?.filter((_, idx) => idx !== i)
-                                    })}
-                                    disabled={requestModalMode === "edit" && !requestEditModeEnabled}
-                                    className="ml-1 text-gray-400 hover:text-gray-600 focus:outline-none"
-                                  >
-                                    <XMarkIcon className="h-3 w-3" />
-                                  </button>
-                                </span>
-                              ))}
-                            </div>
-                            <input
-                              type="text"
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter' || e.key === ',') {
-                                  e.preventDefault();
-                                  const value = (e.target as HTMLInputElement).value.trim();
-                                  if (value && !requestItemFormData.painPoints?.includes(value)) {
-                                    setRequestItemFormData({
-                                      ...requestItemFormData,
-                                      painPoints: [...(requestItemFormData.painPoints || []), value]
-                                    });
-                                    (e.target as HTMLInputElement).value = '';
-                                  }
-                                }
-                              }}
-                              disabled={requestModalMode === "edit" && !requestEditModeEnabled}
-                              placeholder="Add tag..."
-                              className="w-full text-sm bg-transparent outline-none border-none p-0 focus:ring-0"
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="col-span-2">
-                      <h4 className="text-sm font-semibold text-gray-900 mb-2">
-                        Purchase Price
-                      </h4>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">
-                            Purchase Price
-                          </label>
-                          <input
-                            type="number"
-                            value={requestItemFormData.purchasePrice || ""}
-                            onChange={(e) =>
-                              setRequestItemFormData({
-                                ...requestItemFormData,
-                                purchasePrice: e.target.value
-                                  ? parseFloat(e.target.value)
-                                  : undefined,
-                              })
-                            }
-                            disabled={
-                              requestModalMode === "edit" &&
-                              !requestEditModeEnabled
-                            }
-                            className="w-full px-2 py-1 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                            placeholder="0.00"
-                            step="0.01"
-                            min="0"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">
-                            Currency
-                          </label>
-                          <select
-                            value={requestItemFormData.currency}
-                            onChange={(e) =>
-                              setRequestItemFormData({
-                                ...requestItemFormData,
-                                currency: e.target.value as
-                                  | "RMB"
-                                  | "HKD"
-                                  | "EUR"
-                                  | "USD",
-                              })
-                            }
-                            disabled={
-                              requestModalMode === "edit" &&
-                              !requestEditModeEnabled
-                            }
-                            className="w-full px-2 py-1 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                          >
-                            <option value="RMB">RMB</option>
-                            <option value="HKD">HKD</option>
-                            <option value="EUR">EUR</option>
-                            <option value="USD">USD</option>
-                          </select>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mt-4 flex justify-between gap-2">
-                    <div>
-                      {requestModalMode === "edit" &&
-                        requestEditModeEnabled &&
-                        user?.role === UserRole.ADMIN && (
-                          <button
-                            onClick={() => {
-                              if (editingRequestItemId) {
-                                handleDeleteRequestItem(editingRequestItemId);
-                                setShowRequestCreateModal(false);
-                              }
-                            }}
-                            className="px-3 py-2 text-xs text-red-700 bg-white/80 backdrop-blur-sm border border-red-300/80 rounded hover:bg-red-50/60 transition-all"
-                          >
-                            Delete
-                          </button>
-                        )}
-                    </div>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => {
-                          setShowRequestCreateModal(false);
-                          resetRequestItemForm();
-                        }}
-                        className="px-3 py-2 text-xs text-gray-700 bg-white/80 backdrop-blur-sm border border-gray-300/80 rounded hover:bg-white/60 transition-all"
-                      >
-                        {requestModalMode === "edit" && !requestEditModeEnabled
-                          ? "Close"
-                          : "Cancel"}
-                      </button>
-                      {(requestModalMode === "create" ||
-                        (requestModalMode === "edit" &&
-                          requestEditModeEnabled)) && (
-                          <CustomButton
-                            gradient={true}
-                            onClick={handleRequestItemSubmit}
-                            disabled={
-                              !requestItemFormData.businessId ||
-                              !requestItemFormData.itemName ||
-                              !requestItemFormData.qty
-                            }
-                            className="px-3 py-2 text-xs bg-gray-600/90 backdrop-blur-sm text-white rounded hover:bg-gray-700/90 transition-all"
-                          >
-                            {requestModalMode === "edit"
-                              ? "Update Request"
-                              : "Add Request"}
-                          </CustomButton>
-                        )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
 
         {showConversionModal && (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
@@ -4300,7 +3145,7 @@ const CombinedInquiriesPageContent = () => {
                       <div>
                         <span className="text-gray-600">Business:</span>
                         <span className="ml-2 font-medium">
-                          {conversionRequestData.business?.customer?.companyName}
+                          {(conversionRequestData as any).business?.customer?.companyName || (conversionRequestData as any).business?.companyName || "N/A"}
                         </span>
                       </div>
                       <div>
@@ -4394,6 +3239,49 @@ const CombinedInquiriesPageContent = () => {
                               </option>
                             ))}
                           </select>
+                        ) : field.type === "tags" ? (
+                          <div className="min-h-[80px] p-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus-within:ring-2 focus-within:ring-gray-500/50 transition-all">
+                            <div className="flex flex-wrap gap-1 mb-2">
+                              {conversionFormData[field.name]?.map((tag: string, i: number) => (
+                                <span key={i} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 border border-gray-200">
+                                  {tag}
+                                  <button
+                                    type="button"
+                                    onClick={() => setConversionFormData({
+                                      ...conversionFormData,
+                                      [field.name]: conversionFormData[field.name].filter((_: any, idx: number) => idx !== i)
+                                    })}
+                                    className="ml-1 text-gray-400 hover:text-gray-600 focus:outline-none"
+                                  >
+                                    <XMarkIcon className="h-3 w-3" />
+                                  </button>
+                                </span>
+                              ))}
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <input
+                                type="text"
+                                value={conversionTagInput}
+                                onChange={(e) => setConversionTagInput(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter' || e.key === ',') {
+                                    e.preventDefault();
+                                    handleAddConversionPainPoint();
+                                  }
+                                }}
+                                placeholder="Type tag..."
+                                className="flex-1 text-sm bg-transparent outline-none border-none p-0 focus:ring-0"
+                              />
+                              <button
+                                type="button"
+                                onClick={handleAddConversionPainPoint}
+                                disabled={!conversionTagInput.trim()}
+                                className="p-1 text-blue-500 hover:text-blue-700 transition-colors disabled:text-gray-300"
+                              >
+                                <PlusIcon className="h-5 w-5" />
+                              </button>
+                            </div>
+                          </div>
                         ) : (
                           <input
                             type={field.type}
