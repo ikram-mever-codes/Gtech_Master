@@ -598,6 +598,7 @@ const CombinedInquiriesPageContent = () => {
   const fetchContactPersons = async () => {
     try {
       const response = await getAllContactPersons();
+      console.log(response);
       if (response?.data?.contactPersons) {
         setContactPersons(response.data.contactPersons);
       }
@@ -2921,8 +2922,8 @@ const CombinedInquiriesPageContent = () => {
                           <option value="">Select Contact Person</option>
                           {contactPersons
                             .filter(
-                              (person) =>
-                                person.starBusinessDetailsId ===
+                              (person: any) =>
+                                person.businessId ===
                                 inquiryFormData.customerId,
                             )
                             .map((person) => (
