@@ -45,6 +45,8 @@ export interface Request {
   attachments?: any[];
   taric?: string;
   priceRMB?: number;
+  priority?: string;
+  interval?: string;
 }
 
 export interface Inquiry {
@@ -88,6 +90,10 @@ export interface Inquiry {
   projectLink?: string;
   asanaLink?: string;
   itemNo?: string;
+  qty?: string | number;
+  interval?: string;
+  taric?: string;
+  requestStatus?: string;
   urgency1?: string;
   urgency2?: string;
   painPoints?: string[];
@@ -113,6 +119,10 @@ export interface CreateInquiryPayload {
   packageType: any;
   purchasePrice: any;
   purchasePriceCurrency: any;
+  qty?: string | number;
+  interval?: string;
+  taric?: string;
+  requestStatus?: string;
   contactPersonId?: string;
   status?: Inquiry["status"];
   priority?: Inquiry["priority"];
