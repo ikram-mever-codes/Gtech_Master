@@ -44,17 +44,25 @@ import { useRouter, useSearchParams } from "next/navigation";
 import PageHeader from "@/components/UI/PageHeader";
 import { PlusCircle, Pencil } from "lucide-react";
 import {
-    createNewOrder,
-    updateOrderFunction,
+    createOrder,
+    updateOrder,
     getOrderById,
 } from "@/api/orders";
 import CustomButton from "@/components/UI/CustomButton";
+
 export interface Order {
-    id: number;                // Order ID
-    order_no: string;          // Order number
-    category_id: number | string; // Category ID (your API returns string sometimes)
-    status: number | string;            // Numeric status code (20, 10, etc.)
-    comment: string;           // Comment text
+    id: number;
+    order_no: string;
+    category_id: number | string;
+    status: number | string;
+    comment: string;
+}
+
+interface FormValues {
+    order_no: string;
+    category_id: string | number;
+    status: string | number;
+    comment: string;
 }
 
 const validationSchema = Yup.object({
@@ -115,11 +123,9 @@ const OrderCreatePage: React.FC = () => {
                 let data;
 
                 if (isEditMode && OrderId) {
-                    // Update existing order
-                    data = await updateOrderFunction({ ...payload, id: OrderId });
+                    data = await updateOrder(OrderId, payload as any);
                 } else {
-                    // Create new order
-                    data = await createNewOrder(payload);
+                    data = await createOrder(payload as any);
                 }
 
                 if (data?.success) {
@@ -145,10 +151,8 @@ const OrderCreatePage: React.FC = () => {
                 setIsSubmitting(false);
             }
         },
-
     });
 
-    // Fetch Order data if in edit mode
     useEffect(() => {
         const fetchOrderData = async () => {
             if (isEditMode && OrderId) {
@@ -160,7 +164,6 @@ const OrderCreatePage: React.FC = () => {
                     if (data?.success) {
                         const order = data.data;
 
-                        // Pre-fill form with order data
                         formik.setValues({
                             order_no: order.order_no || "",
                             category_id: order.category_id || "",
@@ -183,7 +186,6 @@ const OrderCreatePage: React.FC = () => {
         fetchOrderData();
     }, [isEditMode, OrderId]);
 
-
     if (isLoading) {
         return (
             <div className="w-full h-screen flex items-center justify-center">
@@ -204,7 +206,6 @@ const OrderCreatePage: React.FC = () => {
                     boxShadow: "0 4px 15px rgba(0, 0, 0, 0.05)",
                 }}
             >
-                {/* Header */}
                 <Box
                     sx={{
                         p: 3,
@@ -241,9 +242,7 @@ const OrderCreatePage: React.FC = () => {
                     />
                 </Box>
 
-                {/* Form */}
                 <Box component="form" onSubmit={formik.handleSubmit} sx={{ p: 3 }}>
-                    {/* Order Details Section */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 mb-8">
                         <div className="md:col-span-2">
                             <Typography
@@ -262,7 +261,6 @@ const OrderCreatePage: React.FC = () => {
                             </Typography>
                         </div>
 
-                        {/* Order Number */}
                         <div>
                             <FormInput
                                 name="order_no"
@@ -273,7 +271,6 @@ const OrderCreatePage: React.FC = () => {
                             />
                         </div>
 
-                        {/* Category ID */}
                         <div>
                             <FormInput
                                 name="category_id"
@@ -284,7 +281,6 @@ const OrderCreatePage: React.FC = () => {
                             />
                         </div>
 
-                        {/* Status */}
                         <div>
                             <FormSelect
                                 name="status"
@@ -300,7 +296,6 @@ const OrderCreatePage: React.FC = () => {
                             />
                         </div>
 
-                        {/* Comment */}
                         <div className="md:col-span-2">
                             <FormInput
                                 name="comment"
@@ -312,7 +307,6 @@ const OrderCreatePage: React.FC = () => {
                         </div>
                     </div>
 
-                    {/* Submit Button */}
                     <div className="border-t border-indigo-100 pt-6 mt-6 flex justify-end">
                         <CustomButton
                             type="submit"
@@ -337,7 +331,6 @@ const OrderCreatePage: React.FC = () => {
                     </div>
                 </Box>
             </Paper>
-
         </div>
     );
 };
@@ -419,7 +412,7 @@ const FormInput: React.FC<FormInputProps> = ({
 interface FormSelectProps {
     name: string;
     label: string;
-    options: Array<{ value: string; label: string }>;
+    options: Array<{ value: string | number; label: string }>;
     formik: any;
     icon: React.ReactNode;
     helperText?: string;
