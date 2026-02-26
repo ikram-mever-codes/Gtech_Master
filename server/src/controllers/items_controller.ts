@@ -104,6 +104,7 @@ export const getItems = async (
       height: item.height,
       remark: item.remark,
       model: item.model,
+      painPoints: item.painPoints || [],
       created_at: item.created_at,
       updated_at: item.updated_at,
     }));
@@ -182,6 +183,7 @@ export const getItemById = async (
       category: item.category?.name || "STD",
       model: item.model || "",
       remark: item.remark || "",
+      painPoints: item.painPoints || [],
       isActive: item.isActive === "Y",
 
       parent: {
@@ -313,6 +315,7 @@ export const createItem = async (
       is_npr = "N",
       is_eur_special = "N",
       is_rmb_special = "N",
+      painPoints = [],
     } = req.body;
 
     if (!item_name || !parent_id) {
@@ -367,6 +370,7 @@ export const createItem = async (
       is_npr,
       is_eur_special,
       is_rmb_special,
+      painPoints,
       created_at: new Date(),
       updated_at: new Date(),
     });
@@ -458,6 +462,7 @@ export const updateItem = async (
       "is_new",
       "supp_cat",
       "ItemID_DE",
+      "painPoints",
     ];
 
     updatableFields.forEach((field) => {
