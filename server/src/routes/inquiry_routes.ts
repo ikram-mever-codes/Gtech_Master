@@ -44,7 +44,6 @@ router.delete(
   inquiryController.deleteInquiry.bind(inquiryController)
 );
 
-// Conversion routes
 router.post(
   "/:id/convert-to-item",
   authorize(UserRole.SALES, UserRole.PURCHASING),
@@ -57,7 +56,6 @@ router.post(
   inquiryController.convertRequestToItem.bind(inquiryController)
 );
 
-// Request (sub-resource) routes
 router.post(
   "/:id/requests",
   authorize(UserRole.SALES, UserRole.PURCHASING),
