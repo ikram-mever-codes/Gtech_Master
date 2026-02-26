@@ -2072,7 +2072,7 @@ const CombinedInquiriesPageContent = () => {
 
         {showCreateModal && (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <div className={`backdrop-blur-md rounded-2xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto transition-colors duration-300 ${inquiryFormData.isAssembly ? "bg-red-50/95 border border-red-200" : "bg-white/95"}`}>
+            <div className="backdrop-blur-md rounded-2xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto bg-white/95">
               <div className="p-6">
                 <div className="flex items-center justify-between mb-6">
                   <h2 className="text-xl font-bold text-gray-900">
@@ -2115,274 +2115,67 @@ const CombinedInquiriesPageContent = () => {
                 )}
 
                 <div className="space-y-6">
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-3">
-                      Inquiry Information
-                    </h3>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                          Inquiry Name *
-                        </label>
-                        <input
-                          type="text"
-                          value={inquiryFormData.name}
-                          onChange={(e) =>
-                            setInquiryFormData({
-                              ...inquiryFormData,
-                              name: e.target.value,
-                            })
-                          }
-                          disabled={
-                            inquiryModalMode === "edit" && !editModeEnabled
-                          }
-                          className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                          placeholder="Enter inquiry name"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                          Item No
-                        </label>
-                        <input
-                          type="text"
-                          value={inquiryFormData.itemNo || ""}
-                          onChange={(e) =>
-                            setInquiryFormData({
-                              ...inquiryFormData,
-                              itemNo: e.target.value,
-                            })
-                          }
-                          disabled={
-                            inquiryModalMode === "edit" && !editModeEnabled
-                          }
-                          className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                          placeholder="Enter item number"
-                        />
-                      </div>
-
-                      <div className="col-span-2">
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                          Description
-                        </label>
-                        <textarea
-                          value={inquiryFormData.description}
-                          onChange={(e) =>
-                            setInquiryFormData({
-                              ...inquiryFormData,
-                              description: e.target.value,
-                            })
-                          }
-                          disabled={
-                            inquiryModalMode === "edit" && !editModeEnabled
-                          }
-                          rows={2}
-                          className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                          placeholder="Enter inquiry description"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                          Customer *
-                        </label>
-                        <select
-                          value={inquiryFormData.customerId}
-                          onChange={(e) =>
-                            setInquiryFormData({
-                              ...inquiryFormData,
-                              customerId: e.target.value,
-                            })
-                          }
-                          disabled={
-                            inquiryModalMode === "edit" && !editModeEnabled
-                          }
-                          className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                        >
-                          <option value="">Select Customer</option>
-                          {customers.map((customer) => (
-                            <option key={customer.id} value={customer.id}>
-                              {customer.companyName || customer.legalName}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                          Contact Person
-                        </label>
-                        <select
-                          value={inquiryFormData.contactPersonId}
-                          onChange={(e) =>
-                            setInquiryFormData({
-                              ...inquiryFormData,
-                              contactPersonId: e.target.value,
-                            })
-                          }
-                          disabled={
-                            inquiryModalMode === "edit" && !editModeEnabled
-                          }
-                          className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                        >
-                          <option value="">Select Contact Person</option>
-                          {contactPersons
-                            .filter(
-                              (person) =>
-                                person.starBusinessDetailsId ===
-                                inquiryFormData.customerId,
-                            )
-                            .map((person) => (
-                              <option key={person.id} value={person.id}>
-                                {person.name} {person.familyName}
-                              </option>
-                            ))}
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                          Status
-                        </label>
-                        <select
-                          value={inquiryFormData.status}
-                          onChange={(e) =>
-                            setInquiryFormData({
-                              ...inquiryFormData,
-                              status: e.target.value as any,
-                            })
-                          }
-                          disabled={
-                            inquiryModalMode === "edit" && !editModeEnabled
-                          }
-                          className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                        >
-                          {getInquiryStatuses().map((status) => (
-                            <option key={status.value} value={status.value}>
-                              {status.label}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                          Priority
-                        </label>
-                        <select
-                          value={inquiryFormData.priority}
-                          onChange={(e) =>
-                            setInquiryFormData({
-                              ...inquiryFormData,
-                              priority: e.target.value as any,
-                            })
-                          }
-                          disabled={
-                            inquiryModalMode === "edit" && !editModeEnabled
-                          }
-                          className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                        >
-                          {getPriorityOptions().map((priority) => (
-                            <option key={priority.value} value={priority.value}>
-                              {priority.label}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                          Project Link
-                        </label>
-                        <input
-                          type="text"
-                          value={inquiryFormData.projectLink || ""}
-                          onChange={(e) =>
-                            setInquiryFormData({
-                              ...inquiryFormData,
-                              projectLink: e.target.value,
-                            })
-                          }
-                          disabled={
-                            inquiryModalMode === "edit" && !editModeEnabled
-                          }
-                          className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                          placeholder="https://..."
-                        />
-                      </div>
-
-                      <div className="col-span-2">
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                          Asana Link
-                        </label>
-                        <div className="relative">
-                          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                            <svg
-                              className="h-4 w-4 text-gray-400"
-                              viewBox="0 0 24 24"
-                              fill="currentColor"
-                            >
-                              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z" />
-                              <circle cx="12" cy="8.5" r="1.5" />
-                              <circle cx="8.5" cy="14.5" r="1.5" />
-                              <circle cx="15.5" cy="14.5" r="1.5" />
-                            </svg>
-                          </div>
+                  <div className={`rounded-xl p-4 -mx-4 transition-colors duration-300 ${inquiryFormData.isAssembly
+                    ? "bg-red-50 border border-red-200/70"
+                    : "bg-transparent"
+                    }`}>
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-3">
+                        Inquiry Information
+                      </h3>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            Inquiry Name *
+                          </label>
                           <input
                             type="text"
-                            value={inquiryFormData.asanaLink || ""}
+                            value={inquiryFormData.name}
                             onChange={(e) =>
                               setInquiryFormData({
                                 ...inquiryFormData,
-                                asanaLink: e.target.value,
+                                name: e.target.value,
                               })
                             }
                             disabled={
                               inquiryModalMode === "edit" && !editModeEnabled
                             }
-                            className="w-full pl-10 pr-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                            placeholder="https://app.asana.com/..."
+                            className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                            placeholder="Enter inquiry name"
                           />
                         </div>
-                      </div>
-                      <div className="col-span-2">
-                        <div className={`flex items-center gap-2 p-2 border rounded-lg transition-colors duration-200 ${inquiryFormData.isAssembly ? "border-red-300 bg-red-100" : "border-gray-300/80 bg-white/70 backdrop-blur-sm"}`}>
-                          <input
-                            type="checkbox"
-                            id="isAssembly"
-                            checked={inquiryFormData.isAssembly}
-                            onChange={(e) =>
-                              setInquiryFormData({
-                                ...inquiryFormData,
-                                isAssembly: e.target.checked,
-                              })
-                            }
-                            disabled={
-                              inquiryModalMode === "edit" && !editModeEnabled
-                            }
-                            className="h-4 w-4 text-gray-600 rounded focus:ring-gray-500"
-                          />
-                          <label
-                            htmlFor="isAssembly"
-                            className="text-xs font-medium text-gray-700"
-                          >
-                            This is an assembly item
-                          </label>
-                        </div>
-                      </div>
 
-                      {inquiryFormData.isAssembly && (
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            Item No
+                          </label>
+                          <input
+                            type="text"
+                            value={inquiryFormData.itemNo || ""}
+                            onChange={(e) =>
+                              setInquiryFormData({
+                                ...inquiryFormData,
+                                itemNo: e.target.value,
+                              })
+                            }
+                            disabled={
+                              inquiryModalMode === "edit" && !editModeEnabled
+                            }
+                            className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                            placeholder="Enter item number"
+                          />
+                        </div>
+
                         <div className="col-span-2">
                           <label className="block text-xs font-medium text-gray-700 mb-1">
-                            Assembly Instructions
+                            Description
                           </label>
                           <textarea
-                            value={inquiryFormData.assemblyInstructions}
+                            value={inquiryFormData.description}
                             onChange={(e) =>
                               setInquiryFormData({
                                 ...inquiryFormData,
-                                assemblyInstructions: e.target.value,
+                                description: e.target.value,
                               })
                             }
                             disabled={
@@ -2390,105 +2183,322 @@ const CombinedInquiriesPageContent = () => {
                             }
                             rows={2}
                             className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                            placeholder="Enter assembly instructions..."
+                            placeholder="Enter inquiry description"
                           />
                         </div>
-                      )}
 
-                      <div className="col-span-2 grid grid-cols-3 gap-3 border-t pt-3 mt-1">
                         <div>
                           <label className="block text-xs font-medium text-gray-700 mb-1">
-                            Urgency (text field)
+                            Customer *
                           </label>
-                          <textarea
-                            value={inquiryFormData.urgency1 || ""}
+                          <select
+                            value={inquiryFormData.customerId}
                             onChange={(e) =>
                               setInquiryFormData({
                                 ...inquiryFormData,
-                                urgency1: e.target.value,
+                                customerId: e.target.value,
                               })
                             }
                             disabled={
                               inquiryModalMode === "edit" && !editModeEnabled
                             }
-                            rows={3}
-                            className="w-full px-2 py-1 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                            placeholder="Enter urgency details..."
-                          />
+                            className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                          >
+                            <option value="">Select Customer</option>
+                            {customers.map((customer) => (
+                              <option key={customer.id} value={customer.id}>
+                                {customer.companyName || customer.legalName}
+                              </option>
+                            ))}
+                          </select>
                         </div>
+
                         <div>
                           <label className="block text-xs font-medium text-gray-700 mb-1">
-                            Urgency (text field)
+                            Contact Person
                           </label>
-                          <textarea
-                            value={inquiryFormData.urgency2 || ""}
+                          <select
+                            value={inquiryFormData.contactPersonId}
                             onChange={(e) =>
                               setInquiryFormData({
                                 ...inquiryFormData,
-                                urgency2: e.target.value,
+                                contactPersonId: e.target.value,
                               })
                             }
                             disabled={
                               inquiryModalMode === "edit" && !editModeEnabled
                             }
-                            rows={3}
-                            className="w-full px-2 py-1 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                            placeholder="Enter additional urgency details..."
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">
-                            Pain Points (tags)
-                          </label>
-                          <div className="min-h-[80px] p-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded focus-within:ring-2 focus-within:ring-gray-500/50 transition-all">
-                            <div className="flex flex-wrap gap-1 mb-2">
-                              {inquiryFormData.painPoints?.map((tag, i) => (
-                                <span key={i} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 border border-gray-200">
-                                  {tag}
-                                  <button
-                                    type="button"
-                                    onClick={() => setInquiryFormData({
-                                      ...inquiryFormData,
-                                      painPoints: inquiryFormData.painPoints?.filter((_, idx) => idx !== i)
-                                    })}
-                                    disabled={inquiryModalMode === "edit" && !editModeEnabled}
-                                    className="ml-1 text-gray-400 hover:text-gray-600 focus:outline-none"
-                                  >
-                                    <XMarkIcon className="h-3 w-3" />
-                                  </button>
-                                </span>
+                            className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                          >
+                            <option value="">Select Contact Person</option>
+                            {contactPersons
+                              .filter(
+                                (person) =>
+                                  person.starBusinessDetailsId ===
+                                  inquiryFormData.customerId,
+                              )
+                              .map((person) => (
+                                <option key={person.id} value={person.id}>
+                                  {person.name} {person.familyName}
+                                </option>
                               ))}
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <input
-                                type="text"
-                                value={inquiryTagInput}
-                                onChange={(e) => setInquiryTagInput(e.target.value)}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter' || e.key === ',') {
-                                    e.preventDefault();
-                                    handleAddInquiryPainPoint();
-                                  }
-                                }}
-                                disabled={inquiryModalMode === "edit" && !editModeEnabled}
-                                placeholder="Type tag..."
-                                className="flex-1 text-sm bg-transparent outline-none border-none p-0 focus:ring-0"
-                              />
-                              <button
-                                type="button"
-                                onClick={handleAddInquiryPainPoint}
-                                disabled={(inquiryModalMode === "edit" && !editModeEnabled) || !inquiryTagInput.trim()}
-                                className="p-1 text-blue-500 hover:text-blue-700 transition-colors disabled:text-gray-300"
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            Status
+                          </label>
+                          <select
+                            value={inquiryFormData.status}
+                            onChange={(e) =>
+                              setInquiryFormData({
+                                ...inquiryFormData,
+                                status: e.target.value as any,
+                              })
+                            }
+                            disabled={
+                              inquiryModalMode === "edit" && !editModeEnabled
+                            }
+                            className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                          >
+                            {getInquiryStatuses().map((status) => (
+                              <option key={status.value} value={status.value}>
+                                {status.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            Priority
+                          </label>
+                          <select
+                            value={inquiryFormData.priority}
+                            onChange={(e) =>
+                              setInquiryFormData({
+                                ...inquiryFormData,
+                                priority: e.target.value as any,
+                              })
+                            }
+                            disabled={
+                              inquiryModalMode === "edit" && !editModeEnabled
+                            }
+                            className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                          >
+                            {getPriorityOptions().map((priority) => (
+                              <option key={priority.value} value={priority.value}>
+                                {priority.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            Project Link
+                          </label>
+                          <input
+                            type="text"
+                            value={inquiryFormData.projectLink || ""}
+                            onChange={(e) =>
+                              setInquiryFormData({
+                                ...inquiryFormData,
+                                projectLink: e.target.value,
+                              })
+                            }
+                            disabled={
+                              inquiryModalMode === "edit" && !editModeEnabled
+                            }
+                            className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                            placeholder="https://..."
+                          />
+                        </div>
+
+                        <div className="col-span-2">
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            Asana Link
+                          </label>
+                          <div className="relative">
+                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                              <svg
+                                className="h-4 w-4 text-gray-400"
+                                viewBox="0 0 24 24"
+                                fill="currentColor"
                               >
-                                <PlusIcon className="h-5 w-5" />
-                              </button>
+                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z" />
+                                <circle cx="12" cy="8.5" r="1.5" />
+                                <circle cx="8.5" cy="14.5" r="1.5" />
+                                <circle cx="15.5" cy="14.5" r="1.5" />
+                              </svg>
+                            </div>
+                            <input
+                              type="text"
+                              value={inquiryFormData.asanaLink || ""}
+                              onChange={(e) =>
+                                setInquiryFormData({
+                                  ...inquiryFormData,
+                                  asanaLink: e.target.value,
+                                })
+                              }
+                              disabled={
+                                inquiryModalMode === "edit" && !editModeEnabled
+                              }
+                              className="w-full pl-10 pr-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                              placeholder="https://app.asana.com/..."
+                            />
+                          </div>
+                        </div>
+                        <div className="col-span-2">
+                          <div className={`flex items-center gap-2 p-2 border rounded-lg transition-colors duration-200 ${inquiryFormData.isAssembly ? "border-red-300 bg-red-100" : "border-gray-300/80 bg-white/70 backdrop-blur-sm"}`}>
+                            <input
+                              type="checkbox"
+                              id="isAssembly"
+                              checked={inquiryFormData.isAssembly}
+                              onChange={(e) =>
+                                setInquiryFormData({
+                                  ...inquiryFormData,
+                                  isAssembly: e.target.checked,
+                                })
+                              }
+                              disabled={
+                                inquiryModalMode === "edit" && !editModeEnabled
+                              }
+                              className="h-4 w-4 text-gray-600 rounded focus:ring-gray-500"
+                            />
+                            <label
+                              htmlFor="isAssembly"
+                              className="text-xs font-medium text-gray-700"
+                            >
+                              This is an assembly item
+                            </label>
+                          </div>
+                        </div>
+
+                        {inquiryFormData.isAssembly && (
+                          <div className="col-span-2">
+                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                              Assembly Instructions
+                            </label>
+                            <textarea
+                              value={inquiryFormData.assemblyInstructions}
+                              onChange={(e) =>
+                                setInquiryFormData({
+                                  ...inquiryFormData,
+                                  assemblyInstructions: e.target.value,
+                                })
+                              }
+                              disabled={
+                                inquiryModalMode === "edit" && !editModeEnabled
+                              }
+                              rows={2}
+                              className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                              placeholder="Enter assembly instructions..."
+                            />
+                          </div>
+                        )}
+
+                        <div className="col-span-2 grid grid-cols-3 gap-3 border-t pt-3 mt-1">
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                              Urgency (text field)
+                            </label>
+                            <textarea
+                              value={inquiryFormData.urgency1 || ""}
+                              onChange={(e) =>
+                                setInquiryFormData({
+                                  ...inquiryFormData,
+                                  urgency1: e.target.value,
+                                })
+                              }
+                              disabled={
+                                inquiryModalMode === "edit" && !editModeEnabled
+                              }
+                              rows={3}
+                              className="w-full px-2 py-1 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                              placeholder="Enter urgency details..."
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                              Urgency (text field)
+                            </label>
+                            <textarea
+                              value={inquiryFormData.urgency2 || ""}
+                              onChange={(e) =>
+                                setInquiryFormData({
+                                  ...inquiryFormData,
+                                  urgency2: e.target.value,
+                                })
+                              }
+                              disabled={
+                                inquiryModalMode === "edit" && !editModeEnabled
+                              }
+                              rows={3}
+                              className="w-full px-2 py-1 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                              placeholder="Enter additional urgency details..."
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                              Pain Points (tags)
+                            </label>
+                            <div className="min-h-[80px] p-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded focus-within:ring-2 focus-within:ring-gray-500/50 transition-all">
+                              <div className="flex flex-wrap gap-1 mb-2">
+                                {inquiryFormData.painPoints?.map((tag, i) => (
+                                  <span key={i} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 border border-gray-200">
+                                    {tag}
+                                    <button
+                                      type="button"
+                                      onClick={() => setInquiryFormData({
+                                        ...inquiryFormData,
+                                        painPoints: inquiryFormData.painPoints?.filter((_, idx) => idx !== i)
+                                      })}
+                                      disabled={inquiryModalMode === "edit" && !editModeEnabled}
+                                      className="ml-1 text-gray-400 hover:text-gray-600 focus:outline-none"
+                                    >
+                                      <XMarkIcon className="h-3 w-3" />
+                                    </button>
+                                  </span>
+                                ))}
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <input
+                                  type="text"
+                                  value={inquiryTagInput}
+                                  onChange={(e) => setInquiryTagInput(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter' || e.key === ',') {
+                                      e.preventDefault();
+                                      handleAddInquiryPainPoint();
+                                    }
+                                  }}
+                                  disabled={inquiryModalMode === "edit" && !editModeEnabled}
+                                  placeholder="Type tag..."
+                                  className="flex-1 text-sm bg-transparent outline-none border-none p-0 focus:ring-0"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={handleAddInquiryPainPoint}
+                                  disabled={(inquiryModalMode === "edit" && !editModeEnabled) || !inquiryTagInput.trim()}
+                                  className="p-1 text-blue-500 hover:text-blue-700 transition-colors disabled:text-gray-300"
+                                >
+                                  <PlusIcon className="h-5 w-5" />
+                                </button>
+                              </div>
                             </div>
                           </div>
                         </div>
                       </div>
                     </div>
                   </div>
+                </div>
 
+                <div className={`rounded-xl p-4 -mx-4 transition-colors duration-300 ${inquiryFormData.isAssembly
+                  ? "bg-green-50 border border-green-200/70 mt-2"
+                  : "bg-transparent"
+                  }`}>
                   <div>
                     <div className="flex items-center justify-between mb-3">
                       <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
@@ -2512,14 +2522,14 @@ const CombinedInquiriesPageContent = () => {
                       {inquiryRequests.map((request, index) => (
                         <div
                           key={index}
-                          className={`border rounded-lg overflow-hidden transition-colors duration-300 ${inquiryFormData.isAssembly ? "border-red-200" : "border-gray-200"}`}
+                          className={`border rounded-lg overflow-hidden transition-colors duration-300 ${inquiryFormData.isAssembly ? "border-green-200" : "border-gray-200"}`}
                         >
                           <button
                             type="button"
                             onClick={() => toggleRequestExpansion(index)}
                             className={`w-full px-3 py-2 flex items-center justify-between text-left transition-colors ${expandedRequestIndex === index
-                              ? inquiryFormData.isAssembly ? "bg-red-100" : "bg-gray-100"
-                              : inquiryFormData.isAssembly ? "bg-red-50 hover:bg-red-100" : "bg-gray-50 hover:bg-gray-100"
+                              ? inquiryFormData.isAssembly ? "bg-green-100" : "bg-gray-100"
+                              : inquiryFormData.isAssembly ? "bg-green-50 hover:bg-green-100" : "bg-gray-50 hover:bg-gray-100"
                               }`}
                           >
                             <div className="flex items-center gap-2">
@@ -2554,7 +2564,7 @@ const CombinedInquiriesPageContent = () => {
                           </button>
 
                           {expandedRequestIndex === index && (
-                            <div className={`p-3 transition-colors duration-300 ${inquiryFormData.isAssembly ? "bg-red-50/60" : "bg-white"}`}>
+                            <div className={`p-3 transition-colors duration-300 ${inquiryFormData.isAssembly ? "bg-green-50/60" : "bg-white"}`}>
                               <div className="grid grid-cols-2 gap-2">
                                 <div className="flex gap-2">
                                   <div className="flex-1">
