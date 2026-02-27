@@ -30,13 +30,20 @@ import { getItems } from "@/api/items";
 import { getCategories } from "@/api/categories";
 import CustomButton from "@/components/UI/CustomButton";
 import PageHeader from "@/components/UI/PageHeader";
+import { DataTable, ColumnDef } from "@/components/UI/DataTable";
 import { ShoppingCart } from "lucide-react";
 import { useSelector } from "react-redux";
 import { RootState } from "@/app/Redux/store";
 import { UserRole } from "@/utils/interfaces";
 import CargosTab from "@/components/cargos/CargosTab";
 
-type Item = { id: string | number; item_name?: string; name?: string };
+type Item = {
+  id: string | number;
+  item_name?: string;
+  name?: string;
+  ean?: number | string;
+  rmb_special_price?: number;
+};
 type Customer = {
   id: string | number;
   companyName: string;
@@ -85,20 +92,16 @@ type OrdersTableProps = {
 
   showConvert: boolean;
   onConvert: (o: any) => void;
+  activeTab: string;
+  itemById: Map<string, Item>;
 };
 
 const tabs = [
-  { id: "tab1", label: "Orders", description: "Create and manage Orders" },
-  {
-    id: "tab2",
-    label: "Customer Orders",
-    description: "Create and manage customer orders",
-  },
-  {
-    id: "tab3",
-    label: "Cargos",
-    description: "Manage Cargos and Shipments",
-  },
+  { id: "orders", label: "Orders List", description: "View all orders" },
+  { id: "order_items", label: "Order Items", description: "View all order items" },
+  { id: "cargos", label: "Cargos", description: "Manage Cargos and Shipments" },
+  { id: "nso", label: "NSO (No Supplier Orders)", description: "Orders with no supplier" },
+  { id: "supplier_orders", label: "Supplier Orders", description: "Orders with suppliers" },
 ] as const;
 
 function ItemSelectorWithQuantity({
@@ -189,127 +192,82 @@ function OrdersTable({
   canDelete,
   showConvert,
   onConvert,
+  activeTab,
+  itemById,
 }: OrdersTableProps) {
-  if (loading) {
-    return (
-      <div className="p-8 text-center">
-        <div className="inline-flex items-center gap-3">
-          <ArrowPathIcon className="h-5 w-5 animate-spin text-gray-500" />
-          <span className="text-gray-600">Loading Orders...</span>
-        </div>
-      </div>
-    );
-  }
+  const isOrderItems = activeTab === "order_items";
 
-  if (orders.length === 0) {
-    return (
-      <div className="p-8 text-center">
-        <DocumentTextIcon className="h-10 w-10 text-gray-400 mx-auto mb-4" />
-        <p className="text-gray-600">No Orders Found</p>
-      </div>
-    );
-  }
+  const itemColumns: ColumnDef<any>[] = [
+    { header: "S. No", render: (_, i) => i + 1, align: "center" },
+    { header: "EAN", render: (row) => itemById.get(String(row.item_id))?.ean || "-" },
+    { header: "Item name", render: (row) => itemById.get(String(row.item_id))?.item_name || itemById.get(String(row.item_id))?.name || "Unknown" },
+    { header: "Price", render: (row) => row.rmb_special_price ?? "-" },
+    { header: "QTY", render: (row) => row.qty, align: "center" },
+    { header: "Total", render: (row) => (row.rmb_special_price ? (row.rmb_special_price * row.qty).toFixed(2) : "-"), align: "center" },
+    { header: "Supplier", render: (row) => row.supplier_id ? getSupplierName?.(row.supplier_id) : getCategoryName(row.category_id) },
+    { header: "Order No.", render: (row) => row.order_no },
+    { header: "Remarks", render: (row) => row.remarks_cn || row.remark_de || "-" },
+    { header: "Status", render: (row) => row.item_status || "-", align: "center" },
+    { header: "Cargo", render: (row) => row.cargo_id || "-", align: "center" },
+    { header: "SOID", render: (row) => row.supplier_order_id || "-", align: "center" },
+    {
+      header: "Actions", align: "center", render: (row) => (
+        <div className="flex items-center justify-center gap-2">
+          <button className="px-3 py-1 text-xs font-semibold bg-amber-600 text-white rounded hover:bg-amber-700 transition">
+            &lt; Split
+          </button>
+          <button className="px-3 py-1 text-xs font-semibold bg-gray-600 text-white rounded hover:bg-gray-700 transition">
+            &#8617; ReAssign
+          </button>
+        </div>
+      )
+    },
+  ];
+
+  const getCount = (items: any[] | undefined, ...statuses: string[]) => {
+    return items?.filter((i) => statuses.includes(i.status || "NSO")).length || 0;
+  };
+
+  const CountCell = ({ count }: { count: number }) => (
+    <span className={count > 0 ? "text-blue-600 font-semibold" : "text-gray-800"}>{count}</span>
+  );
+
+  const orderColumns: ColumnDef<any>[] = [
+    { header: "No", render: (_, i) => i + 1, align: "center", renderTotal: () => <span className="text-transparent">Total</span> },
+    {
+      header: "Re Assign", align: "center", render: () => (
+        <button className="px-3 py-1 text-xs font-semibold bg-gray-600 text-white rounded hover:bg-gray-700 transition whitespace-nowrap">
+          &#8617; ReAssign
+        </button>
+      )
+    },
+    { header: "Order No.", render: (row) => <button onClick={() => onView(row)} className="text-blue-600 hover:underline font-semibold whitespace-nowrap">{row.order_no}</button>, align: "center" },
+    { header: "Catgy", render: (row) => getCategoryName(row.category_id), align: "center" },
+    { header: "Cargo", render: (row) => row.cargo_id ?? "-", align: "center" },
+    { header: "Comment", render: (row) => row.comment || "-", align: "left" },
+    { header: "Created", render: (row) => row.date_created || (row.created_at ? new Date(row.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit' }) : "-"), align: "center" },
+    { header: "Emailed", render: (row) => row.date_emailed || "-", align: "center" },
+    { header: "Delivery", render: (row) => row.date_delivery || "-", align: "center" },
+    { header: "Total", render: (row) => <span className="font-semibold">{row.items?.length || 0}</span>, align: "center", renderTotal: (data) => <CountCell count={data.reduce((acc, row) => acc + (row.items?.length || 0), 0)} /> },
+    { header: "NSO", render: (row) => <CountCell count={getCount(row.items, "NSO")} />, align: "center", renderTotal: (data) => <CountCell count={data.reduce((acc, row) => acc + getCount(row.items, "NSO"), 0)} /> },
+    { header: "SO", render: (row) => <CountCell count={getCount(row.items, "SO")} />, align: "center", renderTotal: (data) => <CountCell count={data.reduce((acc, row) => acc + getCount(row.items, "SO"), 0)} /> },
+    { header: "Problem", render: (row) => <CountCell count={getCount(row.items, "Problem", "problem")} />, align: "center", renderTotal: (data) => <CountCell count={data.reduce((acc, row) => acc + getCount(row.items, "Problem", "problem"), 0)} /> },
+    { header: "Purchase", render: (row) => <CountCell count={getCount(row.items, "Purchase", "Purchased", "purchase", "purchased")} />, align: "center", renderTotal: (data) => <CountCell count={data.reduce((acc, row) => acc + getCount(row.items, "Purchase", "Purchased", "purchase", "purchased"), 0)} /> },
+    { header: "Paid", render: (row) => <CountCell count={getCount(row.items, "Paid", "paid")} />, align: "center", renderTotal: (data) => <CountCell count={data.reduce((acc, row) => acc + getCount(row.items, "Paid", "paid"), 0)} /> },
+    { header: "Checked", render: (row) => <CountCell count={getCount(row.items, "Checked", "checked")} />, align: "center", renderTotal: (data) => <CountCell count={data.reduce((acc, row) => acc + getCount(row.items, "Checked", "checked"), 0)} /> },
+    { header: "Printed", render: (row) => <CountCell count={getCount(row.items, "Printed", "printed")} />, align: "center", renderTotal: (data) => <CountCell count={data.reduce((acc, row) => acc + getCount(row.items, "Printed", "printed"), 0)} /> },
+    { header: "Invoiced", render: (row) => <CountCell count={getCount(row.items, "Invoiced", "invoiced")} />, align: "center", renderTotal: (data) => <CountCell count={data.reduce((acc, row) => acc + getCount(row.items, "Invoiced", "invoiced"), 0)} /> },
+    { header: "Shipped", render: (row) => <CountCell count={getCount(row.items, "Shipped", "shipped")} />, align: "center", renderTotal: (data) => <CountCell count={data.reduce((acc, row) => acc + getCount(row.items, "Shipped", "shipped"), 0)} /> },
+  ];
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full">
-        <thead className="bg-gray-50 border-b border-gray-200">
-          <tr>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Order ID
-            </th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Order #
-            </th>
-            <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Supplier / Category
-            </th>
-            <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Status
-            </th>
-            <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Comment
-            </th>
-            <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Actions
-            </th>
-          </tr>
-        </thead>
-
-        <tbody className="divide-y divide-gray-200">
-          {orders.map((order: any) => (
-            <tr key={order.id} className="hover:bg-gray-50 transition-colors">
-              <td className="px-4 py-3 whitespace-nowrap">
-                <div className="text-sm font-medium text-gray-900">
-                  {order.id}
-                </div>
-              </td>
-
-              <td className="px-4 py-3">{order.order_no}</td>
-
-              <td className="px-4 py-3 text-center">
-                {order.supplier_id
-                  ? getSupplierName?.(order.supplier_id)
-                  : getCategoryName(order.category_id)}
-              </td>
-
-              <td className="px-4 py-3">
-                <div
-                  className={`text-xs px-2 py-1 rounded-full font-medium ${getOrderStatusColor(
-                    order.status
-                  )}`}
-                >
-                  {order.status}
-                </div>
-              </td>
-
-              <td className="px-4 py-3 text-center">{order.comment}</td>
-
-              <td className="px-4 py-3">
-                <div className="flex items-center justify-center gap-2">
-                  <button
-                    onClick={() => onView(order)}
-                    className="text-blue-600 hover:text-blue-800 transition-colors p-1"
-                    title="View"
-                  >
-                    <EyeIcon className="h-4 w-4" />
-                  </button>
-
-                  <button
-                    onClick={() => onEdit(order)}
-                    className="text-gray-600 hover:text-gray-800 transition-colors p-1"
-                    title="Edit"
-                  >
-                    <PencilIcon className="h-4 w-4" />
-                  </button>
-
-                  {/* ✅ Convert button only on tab2 */}
-                  {showConvert && (
-                    <button
-                      onClick={() => onConvert(order)}
-                      className="text-amber-700 hover:text-amber-900 transition-colors p-1"
-                      title="Convert"
-                    >
-                      <ArrowUturnRightIcon className="h-4 w-4" />
-                    </button>
-                  )}
-
-                  {canDelete && (
-                    <button
-                      onClick={() => onDelete(order.id)}
-                      className="text-red-600 hover:text-red-800 transition-colors p-1"
-                      title="Delete"
-                    >
-                      <TrashIcon className="h-4 w-4" />
-                    </button>
-                  )}
-                </div>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <DataTable
+      data={orders}
+      columns={isOrderItems ? itemColumns : orderColumns}
+      loading={loading}
+      emptyMessage={isOrderItems ? "No Order Items Found" : "No Orders Found"}
+      showTotals={!isOrderItems}
+    />
   );
 }
 
@@ -317,7 +275,7 @@ const OrderPage = () => {
   const { user } = useSelector((state: RootState) => state.user);
 
   const [activeTab, setActiveTab] = useState<(typeof tabs)[number]["id"]>(
-    "tab1"
+    "orders"
   );
   const activeTabObj = tabs.find((t) => t.id === activeTab);
 
@@ -360,8 +318,8 @@ const OrderPage = () => {
   const [selectedItemId, setSelectedItemId] = useState<string>("");
   const [orderItems, setOrderItems] = useState<OrderItemRow[]>([]);
 
-  const isTab1 = activeTab === "tab1";
-  const isTab2 = activeTab === "tab2";
+  const isTab1 = activeTab !== "cargos" && activeTab !== "order_items";
+  const isTab2 = false;
   const isConvertMode = mode === "convert";
 
   const effectiveItems: Item[] = useMemo(() => {
@@ -832,54 +790,46 @@ const OrderPage = () => {
     fetchOrders();
   };
 
-  const ordersOnly = useMemo(() => orders.filter((o: any) => o.customer_id == null), [orders]);
-  const customerOrders = useMemo(() => orders.filter((o: any) => o.customer_id != null), [orders]);
-  const visibleOrders = activeTab === "tab2" ? customerOrders : ordersOnly;
+  const nsoOrders = useMemo(() => orders.filter((o: any) => !o.supplier_id), [orders]);
+  const supplierOrders = useMemo(() => orders.filter((o: any) => !!o.supplier_id), [orders]);
+  const orderItemsFlat = useMemo(() => orders.flatMap((o: any) =>
+    (o.items || []).map((i: any) => ({ ...i, order_no: o.order_no, order_status: o.status, item_status: i.status || "NSO", supplier_id: o.supplier_id, category_id: o.category_id }))
+  ), [orders]);
+
+  const visibleOrders = activeTab === "orders" ? orders
+    : activeTab === "nso" ? nsoOrders
+      : activeTab === "supplier_orders" ? supplierOrders
+        : activeTab === "order_items" ? orderItemsFlat
+          : [];
+
+  const defaultAction = (
+    <div className="flex gap-2">
+      <button
+        onClick={fetchOrders}
+        disabled={loadingOrders}
+        className="px-3 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-all flex items-center gap-2 disabled:opacity-50"
+      >
+        <ArrowPathIcon className={`h-4 w-4 ${loadingOrders ? "animate-spin" : ""}`} />
+        Refresh
+      </button>
+
+      <CustomButton
+        gradient={true}
+        onClick={openCreate}
+        className="px-3 py-2 text-sm bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-all flex items-center gap-2"
+      >
+        <PlusIcon className="h-4 w-4" />
+        New Order
+      </CustomButton>
+    </div>
+  );
 
   const tabActions: Record<(typeof tabs)[number]["id"], React.ReactNode> = {
-    tab1: (
-      <div className="flex gap-2">
-        <button
-          onClick={fetchOrders}
-          disabled={loadingOrders}
-          className="px-3 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-all flex items-center gap-2 disabled:opacity-50"
-        >
-          <ArrowPathIcon className={`h-4 w-4 ${loadingOrders ? "animate-spin" : ""}`} />
-          Refresh
-        </button>
-
-        <CustomButton
-          gradient={true}
-          onClick={openCreate}
-          className="px-3 py-2 text-sm bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-all flex items-center gap-2"
-        >
-          <PlusIcon className="h-4 w-4" />
-          New Order
-        </CustomButton>
-      </div>
-    ),
-    tab2: (
-      <div className="flex gap-2">
-        <button
-          onClick={fetchOrders}
-          disabled={loadingOrders}
-          className="px-3 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-all flex items-center gap-2 disabled:opacity-50"
-        >
-          <ArrowPathIcon className={`h-4 w-4 ${loadingOrders ? "animate-spin" : ""}`} />
-          Refresh
-        </button>
-
-        <CustomButton
-          gradient={true}
-          onClick={openCreate}
-          className="px-3 py-2 text-sm bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-all flex items-center gap-2"
-        >
-          <PlusIcon className="h-4 w-4" />
-          New Customer Order
-        </CustomButton>
-      </div>
-    ),
-    tab3: null,
+    orders: defaultAction,
+    order_items: defaultAction,
+    cargos: null,
+    nso: defaultAction,
+    supplier_orders: defaultAction,
   };
 
   const lockAllExceptQty = isConvertMode;
@@ -916,20 +866,23 @@ const OrderPage = () => {
           </div>
 
           <div className="bg-white rounded-md shadow-lg border border-gray-200 overflow-hidden">
-            {activeTab === "tab3" ? (
+            {activeTab === "cargos" ? (
               <CargosTab customers={customers} />
             ) : (
               <OrdersTable
                 orders={visibleOrders}
                 loading={loadingOrders}
                 getCategoryName={getCategoryName}
+                getSupplierName={getSupplierName}
                 getOrderStatusColor={getOrderStatusColor}
                 onView={openView}
                 onEdit={openEdit}
                 onDelete={handleDeleteOrder}
                 canDelete={user?.role === UserRole.ADMIN}
-                showConvert={activeTab === "tab2"}
+                showConvert={false}
                 onConvert={openConvert}
+                activeTab={activeTab}
+                itemById={itemById}
               />
             )}
           </div>
@@ -1187,7 +1140,6 @@ const OrderPage = () => {
                               <input
                                 type="text"
                                 value={row.remark_de}
-                                // disabled={!allowRemarkEdit}
                                 onChange={(e) =>
                                   handleUpdateOrderItemRemark(row.item_id, String(e.target.value))
                                 }
