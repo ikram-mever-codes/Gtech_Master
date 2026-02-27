@@ -21,7 +21,7 @@ import orderRoutes from "./routes/orderRoutes";
 import qtyRoutes from "./routes/qtyRoutes";
 import supplierRoutes from "./routes/supplier_routes";
 import cargoRoutes from "./routes/cargo_routes";
-
+import cargoTypeRoutes from "./routes/cargo_type_routes";
 
 const app: any = express();
 
@@ -59,6 +59,7 @@ app.use("/api/v1/orders", orderRoutes);
 app.use("/api/v1/categories", qtyRoutes);
 app.use("/api/v1/suppliers", supplierRoutes);
 app.use("/api/v1/cargos", cargoRoutes);
+app.use("/api/v1/cargo-types", cargoTypeRoutes);
 
 const __uploads_dirname = path.resolve();
 app.use("/uploads", express.static(path.join(__uploads_dirname, "/uploads")));
@@ -85,8 +86,6 @@ AppDataSource.initialize()
     initializeCronJobs();
   })
   .catch((error) => console.log("Database connection error:", error));
-
-// 404 Not Found handler
 
 app.use((req: Request, res: Response, next: NextFunction) => {
   res.status(404).json({ message: "Resource Not Found!" });

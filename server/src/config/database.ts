@@ -35,6 +35,7 @@ import { DeliveryAddress, Inquiry } from "../models/inquiry";
 import { Offer, OfferLineItem } from "../models/offer";
 import { Cargo } from "../models/cargos";
 import { CargoOrder } from "../models/cargo_orders";
+import { CargoType } from "../models/cargo_types";
 
 dotenv.config();
 
@@ -84,6 +85,7 @@ export const AppDataSource = new DataSource({
     Category,
     Cargo,
     CargoOrder,
+    CargoType,
   ],
   extra: {
     ssl:
