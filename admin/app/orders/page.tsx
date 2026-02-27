@@ -36,6 +36,7 @@ import { useSelector } from "react-redux";
 import { RootState } from "@/app/Redux/store";
 import { UserRole } from "@/utils/interfaces";
 import CargosTab from "@/components/cargos/CargosTab";
+import CargoTypesTab from "@/components/cargos/CargoTypesTab";
 
 type Item = {
   id: string | number;
@@ -100,6 +101,7 @@ const tabs = [
   { id: "orders", label: "Orders List", description: "View all orders" },
   { id: "order_items", label: "Order Items", description: "View all order items" },
   { id: "cargos", label: "Cargos", description: "Manage Cargos and Shipments" },
+  { id: "cargo_type", label: "Cargos type", description: "Manage Cargo Types" },
   { id: "nso", label: "NSO (No Supplier Orders)", description: "Orders with no supplier" },
   { id: "supplier_orders", label: "Supplier Orders", description: "Orders with suppliers" },
 ] as const;
@@ -318,7 +320,7 @@ const OrderPage = () => {
   const [selectedItemId, setSelectedItemId] = useState<string>("");
   const [orderItems, setOrderItems] = useState<OrderItemRow[]>([]);
 
-  const isTab1 = activeTab !== "cargos" && activeTab !== "order_items";
+  const isTab1 = activeTab !== "cargos" && activeTab !== "cargo_type" && activeTab !== "order_items";
   const isTab2 = false;
   const isConvertMode = mode === "convert";
 
@@ -828,6 +830,7 @@ const OrderPage = () => {
     orders: defaultAction,
     order_items: defaultAction,
     cargos: null,
+    cargo_type: null,
     nso: defaultAction,
     supplier_orders: defaultAction,
   };
@@ -868,6 +871,8 @@ const OrderPage = () => {
           <div className="bg-white rounded-md shadow-lg border border-gray-200 overflow-hidden">
             {activeTab === "cargos" ? (
               <CargosTab customers={customers} />
+            ) : activeTab === "cargo_type" ? (
+              <CargoTypesTab />
             ) : (
               <OrdersTable
                 orders={visibleOrders}

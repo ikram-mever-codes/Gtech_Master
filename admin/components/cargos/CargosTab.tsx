@@ -31,6 +31,7 @@ import { getAllOrders, type Order } from "@/api/orders";
 import { getAllCustomers } from "@/api/customers";
 import { errorStyles, successStyles } from "@/utils/constants";
 import BillToShipToForm, { BillToShipToData } from "../General/BillToShipToForm";
+import { getAllCargoTypes, CargoTypeObj } from "@/api/cargo_types";
 
 
 type Customer = {
@@ -130,6 +131,7 @@ const CargosTab: React.FC<CargosTabProps> = ({ customers: externalCustomers }) =
 
     const [allOrders, setAllOrders] = useState<Order[]>([]);
     const [customers, setCustomers] = useState<Customer[]>([]);
+    const [cargoTypes, setCargoTypes] = useState<CargoTypeObj[]>([]);
     const [loadingOrders, setLoadingOrders] = useState(false);
 
     useEffect(() => {
@@ -172,6 +174,16 @@ const CargosTab: React.FC<CargosTabProps> = ({ customers: externalCustomers }) =
         }
     }, []);
 
+    const fetchCargoTypesData = useCallback(async () => {
+        try {
+            const response: any = await getAllCargoTypes();
+            const data = response?.data?.data || response?.data || response;
+            setCargoTypes(Array.isArray(data) ? data : []);
+        } catch (e) {
+            console.error("Error fetching cargo types:", e);
+        }
+    }, []);
+
     const fetchCustomersIfNeeded = useCallback(async () => {
         if (externalCustomers && externalCustomers.length > 0) return;
         try {
@@ -191,7 +203,8 @@ const CargosTab: React.FC<CargosTabProps> = ({ customers: externalCustomers }) =
     useEffect(() => {
         fetchOrders();
         fetchCustomersIfNeeded();
-    }, [fetchOrders, fetchCustomersIfNeeded]);
+        fetchCargoTypesData();
+    }, [fetchOrders, fetchCustomersIfNeeded, fetchCargoTypesData]);
 
     const handlePageChange = (newPage: number) => {
         if (newPage < 1 || newPage > pagination.totalPages) return;
@@ -215,6 +228,15 @@ const CargosTab: React.FC<CargosTabProps> = ({ customers: externalCustomers }) =
                 label: `${o.order_no} (ID: ${o.id})`,
             })),
         [availableOrders]
+    );
+
+    const cargoTypeOptions = useMemo(
+        () =>
+            cargoTypes.map((ct) => ({
+                value: String(ct.id),
+                label: `${ct.type} (${ct.duration || 0} days)`,
+            })),
+        [cargoTypes]
     );
 
     const customerOptions = useMemo(
@@ -694,15 +716,21 @@ const CargosTab: React.FC<CargosTabProps> = ({ customers: externalCustomers }) =
 
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                                            Cargo Type ID
+                                            Cargo Type
                                         </label>
-                                        <input
-                                            type="number"
-                                            value={formData.cargo_type_id || ""}
-                                            onChange={(e) => updateField("cargo_type_id", e.target.value ? Number(e.target.value) : undefined)}
-                                            disabled={!isEditEnabled}
-                                            className="w-full px-3.5 py-2.5 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500/50 focus:border-gray-500 transition-all disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
-                                            placeholder="Enter cargo type ID"
+                                        <Select
+                                            className="text-sm"
+                                            classNames={{
+                                                control: () =>
+                                                    "border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500",
+                                            }}
+                                            options={cargoTypeOptions}
+                                            value={cargoTypeOptions.find((opt) => opt.value === String(formData.cargo_type_id)) || null}
+                                            onChange={(newValue) => updateField("cargo_type_id", newValue?.value ? Number(newValue.value) : undefined)}
+                                            placeholder="Select cargo type..."
+                                            isSearchable
+                                            isClearable
+                                            isDisabled={!isEditEnabled}
                                         />
                                     </div>
 
