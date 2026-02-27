@@ -221,6 +221,12 @@ const CargosTab: React.FC<CargosTabProps> = ({ customers: externalCustomers }) =
         return allOrders.filter((o) => !assignedOrderIds.includes(o.id));
     }, [allOrders, assignedOrderIds]);
 
+    const getCargoTypeName = useCallback(
+        (id: any) =>
+            cargoTypes.find((ct) => String(ct.id) === String(id))?.type ?? "-",
+        [cargoTypes]
+    );
+
     const orderOptions = useMemo(
         () =>
             availableOrders.map((o) => ({
@@ -500,6 +506,9 @@ const CargosTab: React.FC<CargosTabProps> = ({ customers: externalCustomers }) =
                                     Cargo No
                                 </th>
                                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Cargo Type
+                                </th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     Customer
                                 </th>
                                 <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -535,6 +544,11 @@ const CargosTab: React.FC<CargosTabProps> = ({ customers: externalCustomers }) =
                                     <td className="px-4 py-3">
                                         <div className="text-sm text-gray-900 font-medium">
                                             {cargo.cargo_no || "-"}
+                                        </div>
+                                    </td>
+                                    <td className="px-4 py-3">
+                                        <div className="text-sm text-gray-900">
+                                            {cargo.cargo_type_id ? getCargoTypeName(cargo.cargo_type_id) : "-"}
                                         </div>
                                     </td>
                                     <td className="px-4 py-3">

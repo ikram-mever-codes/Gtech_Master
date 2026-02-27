@@ -139,6 +139,7 @@ const Sidebar = () => {
   const [hasOverflow, setHasOverflow] = useState(false);
   const dispatch = useDispatch();
   const { user } = useSelector((state: RootState) => state.user);
+  const [isMounted, setIsMounted] = useState(false);
   const isMobile = useMediaQuery((theme: Theme) =>
     theme.breakpoints.down("md")
   );
@@ -195,6 +196,11 @@ const Sidebar = () => {
   };
 
   useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isMounted) return;
     updateScrollButtons();
     const handleResize = () => {
       setTimeout(updateScrollButtons, 100);
@@ -205,12 +211,13 @@ const Sidebar = () => {
   }, [updateScrollButtons, menuItems, isCollapsed]);
 
   useEffect(() => {
+    if (!isMounted) return;
     const timer = setTimeout(updateScrollButtons, 150);
     return () => clearTimeout(timer);
-  }, [isCollapsed, updateScrollButtons]);
+  }, [isCollapsed, updateScrollButtons, isMounted]);
 
   const handleScroll = () => {
-    updateScrollButtons();
+    if (isMounted) updateScrollButtons();
   };
 
   const drawerContent = (
@@ -293,7 +300,7 @@ const Sidebar = () => {
         <Divider sx={{ borderColor: "divider", mb: 2 }} />
 
         {/* Scroll Up Button - Only shows when needed */}
-        <Fade in={hasOverflow && showScrollUp}>
+        <Fade in={isMounted && hasOverflow && showScrollUp}>
           <Box
             sx={{
               display: "flex",
@@ -417,7 +424,7 @@ const Sidebar = () => {
             ))}
           </Box>
         </Box>
-        <Fade in={hasOverflow && showScrollDown}>
+        <Fade in={isMounted && hasOverflow && showScrollDown}>
           <Box
             sx={{
               display: "flex",
