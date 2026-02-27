@@ -24,6 +24,8 @@ export interface Item {
   height: number | null;
   remark: string | null;
   model: string | null;
+  supplier_id: number | null;
+  supplier_name: string | null;
   created_at: Date;
   updated_at: Date;
 }
@@ -89,6 +91,8 @@ export interface ItemDetails {
   category: string;
   model: string;
   remark: string;
+  supplier_id: number | null;
+  supplier_name: string | null;
   isActive: boolean;
   parent: {
     noDE: string;
@@ -236,6 +240,7 @@ export const createItem = async (itemData: {
   height?: number;
   remark?: string;
   model?: string;
+  supplier_id?: number;
   isActive?: string;
 }) => {
   try {
@@ -266,6 +271,7 @@ export const updateItem = async (
     height: number;
     remark: string;
     model: string;
+    supplier_id: number;
     isActive: string;
     is_qty_dividable: string;
     is_npr: string;

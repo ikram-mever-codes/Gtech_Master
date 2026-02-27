@@ -253,11 +253,12 @@ const Sidebar = () => {
             alt="Gtech"
             src="/logo.png"
             width={isCollapsed ? 80 : 170}
-            height={isCollapsed ? 80 : 780}
+            height={isCollapsed ? 80 : 80}
             priority
             style={{
               transition: "all 0.3s ease",
               objectFit: "contain",
+              height: "auto",
             }}
           />
         </Link>
@@ -302,6 +303,7 @@ const Sidebar = () => {
         {/* Scroll Up Button - Only shows when needed */}
         <Fade in={isMounted && hasOverflow && showScrollUp}>
           <Box
+            suppressHydrationWarning
             sx={{
               display: "flex",
               justifyContent: "center",
@@ -426,6 +428,7 @@ const Sidebar = () => {
         </Box>
         <Fade in={isMounted && hasOverflow && showScrollDown}>
           <Box
+            suppressHydrationWarning
             sx={{
               display: "flex",
               justifyContent: "center",
@@ -508,7 +511,7 @@ const Sidebar = () => {
 
   return (
     <>
-      {isMobile && (
+      {isMounted && isMobile && (
         <IconButton
           color="inherit"
           onClick={handleDrawerToggle}
@@ -528,8 +531,8 @@ const Sidebar = () => {
 
       <Drawer
         suppressHydrationWarning
-        variant={isMobile ? "temporary" : "permanent"}
-        open={!isMobile ? true : mobileOpen}
+        variant={isMounted && isMobile ? "temporary" : "permanent"}
+        open={!(isMounted && isMobile) ? true : mobileOpen}
         onClose={handleDrawerToggle}
         ModalProps={{ keepMounted: true }}
         sx={{

@@ -48,6 +48,7 @@ import {
     getAllTarics,
 } from "@/api/items";
 import { getCategories } from "@/api/categories";
+import { getAllSuppliers } from "@/api/suppliers";
 import CustomButton from "@/components/UI/CustomButton";
 
 const validationSchema = Yup.object({
@@ -58,6 +59,7 @@ const validationSchema = Yup.object({
     length: Yup.number().min(0, "Must be positive").nullable(),
     width: Yup.number().min(0, "Must be positive").nullable(),
     height: Yup.number().min(0, "Must be positive").nullable(),
+    supplier_id: Yup.number().required("Supplier is required").min(1, "Please select a supplier"),
 });
 
 const EditItemPage = () => {
@@ -71,6 +73,7 @@ const EditItemPage = () => {
     const [parents, setParents] = useState<any[]>([]);
     const [tarics, setTarics] = useState<any[]>([]);
     const [categories, setCategories] = useState<any[]>([]);
+    const [suppliers, setSuppliers] = useState<any[]>([]);
 
     const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
         setActiveTab(newValue);
@@ -112,6 +115,7 @@ const EditItemPage = () => {
             is_nao: false,
             is_snsi: false,
             rmb_price: "0",
+            supplier_id: 0,
         },
         validationSchema,
         onSubmit: async (values) => {
@@ -147,6 +151,7 @@ const EditItemPage = () => {
                     FOQ: Number(values.foq),
                     ItemID_DE: Number(values.id_de),
                     RMB_Price: Number(values.rmb_price),
+                    supplier_id: Number(values.supplier_id),
                 };
 
                 const response: any = await updateItem(Number(id), payload);
@@ -165,11 +170,12 @@ const EditItemPage = () => {
     useEffect(() => {
         const fetchInitialData = async () => {
             try {
-                const [itemRes, parentsRes, taricsRes, catsRes]: any = await Promise.all([
+                const [itemRes, parentsRes, taricsRes, catsRes, suppliersRes]: any = await Promise.all([
                     getItemById(Number(id)),
                     getParents({ limit: 1000, isActive: "Y" }),
                     getAllTarics({ limit: 1000 }),
                     getCategories(),
+                    getAllSuppliers({ limit: 1000 }),
                 ]);
 
                 if (itemRes.success) {
@@ -177,6 +183,7 @@ const EditItemPage = () => {
                     const parentId = item.parent_id || (parentsRes.data?.find((p: any) => p.de_no === item.parent?.noDE)?.id || 0);
                     const taricId = item.taric_id || (taricsRes.data?.find((t: any) => t.code === item.others?.taricCode)?.id || 0);
                     const catId = item.cat_id || (catsRes.data?.find((c: any) => c.name === item.category)?.id || 0);
+                    const supplierId = item.supplier_id || 0;
 
                     formik.setValues({
                         item_name: item.name || "",
@@ -185,6 +192,7 @@ const EditItemPage = () => {
                         parent_id: parentId,
                         taric_id: taricId,
                         cat_id: catId,
+                        supplier_id: supplierId,
                         weight: Number(item.dimensions?.weight) || 0,
                         length: Number(item.dimensions?.length) || 0,
                         width: Number(item.dimensions?.width) || 0,
@@ -218,6 +226,7 @@ const EditItemPage = () => {
                 if (parentsRes.success) setParents(parentsRes.data);
                 if (taricsRes.success) setTarics(taricsRes.data);
                 if (catsRes.success) setCategories(catsRes.data);
+                if (suppliersRes.success) setSuppliers(suppliersRes.data);
 
             } catch (err: any) {
                 setError(err.message || "Failed to load data");
@@ -351,6 +360,15 @@ const EditItemPage = () => {
                                     <Select {...formik.getFieldProps('parent_id')}>
                                         <MenuItem value={0}>Select Parent</MenuItem>
                                         {parents.map((parent) => <MenuItem key={parent.id} value={parent.id}>{parent.de_no} - {parent.name_de}</MenuItem>)}
+                                    </Select>
+                                </FormControl>
+                            </Grid>
+                            <Grid size={{ xs: 12, md: 6 }}>
+                                <FormControl fullWidth>
+                                    <Typography variant="caption" sx={{ mb: 0.5, fontWeight: 600, color: "text.secondary" }}>Supplier</Typography>
+                                    <Select {...formik.getFieldProps('supplier_id')} error={formik.touched.supplier_id && Boolean(formik.errors.supplier_id)}>
+                                        <MenuItem value={0}>Select Supplier</MenuItem>
+                                        {suppliers.map((supplier) => <MenuItem key={supplier.id} value={supplier.id}>{supplier.name}</MenuItem>)}
                                     </Select>
                                 </FormControl>
                             </Grid>

@@ -15,7 +15,7 @@ import {
 } from "@heroicons/react/24/outline";
 import Image from "next/image";
 import CustomButton from "@/components/UI/CustomButton";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
 import {
   getItemById,
@@ -30,6 +30,7 @@ import PageHeader from "@/components/UI/PageHeader";
 
 const ItemDetailsPage = () => {
   const { id } = useParams();
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState("item");
   const [editMode, setEditMode] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -48,8 +49,6 @@ const ItemDetailsPage = () => {
     { id: "attachments", label: "Attachments" },
     { id: "pictures", label: "Item Pictures" },
   ];
-
-  // Fetch item data
   useEffect(() => {
     const fetchItemData = async () => {
       if (!id) return;
@@ -78,7 +77,6 @@ const ItemDetailsPage = () => {
     fetchItemData();
   }, [id]);
 
-  // Handle update item
   const handleUpdateItem = async (updatedData: any) => {
     if (!itemData || !id) return;
 
@@ -92,8 +90,6 @@ const ItemDetailsPage = () => {
       toast.error("Failed to update item", errorStyles);
     }
   };
-
-  // Status indicator component
   const StatusIndicator = ({
     value,
     label = "",
@@ -113,8 +109,6 @@ const ItemDetailsPage = () => {
       {label || (value ? "Yes" : "No")}
     </span>
   );
-
-  // Editable Info row component
   const EditableInfoRow = ({
     label,
     value,
@@ -153,8 +147,6 @@ const ItemDetailsPage = () => {
       </div>
     </div>
   );
-
-  // Info row component for consistent styling
   const InfoRow = ({
     label,
     value,
@@ -171,8 +163,6 @@ const ItemDetailsPage = () => {
       </div>
     </div>
   );
-
-  // Section header component
   const SectionHeader = ({
     title,
     icon,
@@ -224,7 +214,6 @@ const ItemDetailsPage = () => {
   return (
     <div className="min-h-screen bg-white shadow-xl rounded-lg p-6">
       <div className="max-w-7xl mx-auto">
-        {/* Header */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-4">
             <div>
@@ -254,8 +243,6 @@ const ItemDetailsPage = () => {
               )}
             </div>
           </div>
-
-          {/* Status bar */}
           <div className="flex flex-wrap gap-3 mb-6">
             <StatusIndicator value={itemData.isActive} label="Active" />
             <StatusIndicator
@@ -266,8 +253,6 @@ const ItemDetailsPage = () => {
             <StatusIndicator value={itemData.others.isNew} label="New" />
           </div>
         </div>
-
-        {/* Tabs Navigation */}
         <div className="border-b border-gray-200 mb-6">
           <nav className="flex space-x-2 overflow-x-auto">
             {tabs.map((tab) => (
@@ -284,10 +269,7 @@ const ItemDetailsPage = () => {
             ))}
           </nav>
         </div>
-
-        {/* Tab Content */}
         <div className="bg-white/80 backdrop-blur-sm rounded-xl shadow-lg border border-gray-100/50 p-6">
-          {/* Item Details Tab */}
           {activeTab === "item" && (
             <div>
               <SectionHeader title="Item Information" />
@@ -325,8 +307,6 @@ const ItemDetailsPage = () => {
               </div>
             </div>
           )}
-
-          {/* Parent Details Tab */}
           {activeTab === "parent" && (
             <div>
               <SectionHeader title="Parent Details" />
@@ -372,14 +352,11 @@ const ItemDetailsPage = () => {
               </div>
             </div>
           )}
-
-          {/* Variations Tab */}
           {activeTab === "variations" && (
             <div>
               <SectionHeader title="Variations & Values" />
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                {/* German Variations */}
                 <div>
                   <h4 className="text-md font-semibold text-gray-900 mb-4 pb-2 border-b border-gray-200">
                     German (DE)
@@ -431,8 +408,6 @@ const ItemDetailsPage = () => {
                     </div>
                   </div>
                 </div>
-
-                {/* English Variations */}
                 <div>
                   <h4 className="text-md font-semibold text-gray-900 mb-4 pb-2 border-b border-gray-200">
                     English (EN)
@@ -487,8 +462,6 @@ const ItemDetailsPage = () => {
               </div>
             </div>
           )}
-
-          {/* Dimensions Tab */}
           {activeTab === "dimensions" && (
             <div>
               <SectionHeader title="Dimensions & Specifications" />
@@ -521,8 +494,6 @@ const ItemDetailsPage = () => {
                     field="dimensions.height"
                   />
                 </div>
-
-                {/* Visual dimension representation */}
                 <div className="bg-gray-50 rounded-lg p-6 flex items-center justify-center">
                   <div className="relative">
                     <div className="w-48 h-24 border-2 border-gray-300 rounded flex items-center justify-center">
@@ -545,8 +516,6 @@ const ItemDetailsPage = () => {
               </div>
             </div>
           )}
-
-          {/* Others Tab */}
           {activeTab === "others" && (
             <div>
               <SectionHeader title="Other Details" />
@@ -637,21 +606,28 @@ const ItemDetailsPage = () => {
               </div>
             </div>
           )}
-
-          {/* Supplier Tab */}
           {activeTab === "supplier" && (
             <div>
               <SectionHeader title="Supplier Information" />
-              {/* Note: Supplier data would need its own API endpoint */}
-              <div className="text-center py-12">
-                <p className="text-gray-500">
-                  Supplier information integration coming soon
-                </p>
+              <div className="space-y-4">
+                <InfoRow label="Supplier Name" value={itemData.supplier_name || "No supplier assigned"} />
+                {itemData.supplier_id && (
+                  <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+                    <p className="text-sm text-gray-600 mb-2">
+                      Supplier ID: {itemData.supplier_id}
+                    </p>
+                    <button
+                      onClick={() => router.push("/suppliers")}
+                      className="text-[#8CC21B] hover:text-[#7ab318] text-sm font-medium flex items-center gap-1"
+                    >
+                      View All Suppliers
+                      <ChevronRightIcon className="h-4 w-4" />
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           )}
-
-          {/* Quality Criteria Tab */}
           {activeTab === "quality" && (
             <div>
               <SectionHeader
@@ -722,15 +698,12 @@ const ItemDetailsPage = () => {
               )}
             </div>
           )}
-
-          {/* Attachments Tab */}
           {activeTab === "attachments" && (
             <div>
               <SectionHeader
                 title="Attachments"
                 icon={<DocumentIcon className="h-5 w-5 text-gray-500" />}
               />
-
               {itemData.attachments.length > 0 ? (
                 <div className="overflow-x-auto">
                   <table className="w-full">
@@ -786,17 +759,13 @@ const ItemDetailsPage = () => {
               )}
             </div>
           )}
-
-          {/* Pictures Tab */}
           {activeTab === "pictures" && (
             <div>
               <SectionHeader
                 title="Item Pictures"
                 icon={<PhotoIcon className="h-5 w-5 text-blue-500" />}
               />
-
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                {/* Shop Picture */}
                 <div>
                   <h4 className="text-md font-semibold text-gray-900 mb-4">
                     Shop Picture
@@ -825,8 +794,6 @@ const ItemDetailsPage = () => {
                     </div>
                   </div>
                 </div>
-
-                {/* eBay Pictures */}
                 <div>
                   <h4 className="text-md font-semibold text-gray-900 mb-4">
                     eBay Pictures
@@ -856,8 +823,6 @@ const ItemDetailsPage = () => {
                   </div>
                 </div>
               </div>
-
-              {/* NPR Remarks */}
               <div className="mt-8">
                 <h4 className="text-md font-semibold text-gray-900 mb-4">
                   NPR Remarks
@@ -875,8 +840,6 @@ const ItemDetailsPage = () => {
             </div>
           )}
         </div>
-
-        {/* Quick Actions Bar */}
         <div className="mt-8 flex flex-wrap gap-3 justify-between items-center">
           <div className="flex gap-3">
             <button className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2">

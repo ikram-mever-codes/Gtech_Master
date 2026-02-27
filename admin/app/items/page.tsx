@@ -161,6 +161,7 @@ const ItemsManagementPage: React.FC = () => {
     parent_id: 0,
     taric_id: 0,
     cat_id: 0,
+    supplier_id: 0,
     weight: 0,
     length: 0,
     width: 0,
@@ -302,15 +303,17 @@ const ItemsManagementPage: React.FC = () => {
   useEffect(() => {
     const fetchInitialData = async () => {
       try {
-        const [parentsRes, taricsRes, catsRes]: any = await Promise.all([
+        const [parentsRes, taricsRes, catsRes, suppliersRes]: any = await Promise.all([
           getParents({ limit: 1000, isActive: "Y" }),
           getAllTarics({ limit: 1000 }),
           getCategories(),
+          getAllSuppliers({ limit: 1000 }),
         ]);
 
         if (parentsRes?.data) setParents(parentsRes.data);
         if (taricsRes?.data) setTarics(taricsRes.data);
         if (catsRes?.data) setCategories(catsRes.data);
+        if (suppliersRes?.data) setSuppliers(suppliersRes.data);
 
         if ((!parentsRes?.data || parentsRes.data.length === 0) && activeTab === "items") {
           console.warn("No parents found in database.");
@@ -370,6 +373,7 @@ const ItemsManagementPage: React.FC = () => {
       parent_id: 0,
       taric_id: 0,
       cat_id: 0,
+      supplier_id: 0,
       weight: 0,
       length: 0,
       width: 0,
@@ -395,6 +399,11 @@ const ItemsManagementPage: React.FC = () => {
       toast.error("Parent is required");
       return;
     }
+
+    if (!itemFormData.supplier_id) {
+      toast.error("Supplier is required");
+      return;
+    }
     try {
       setLoading(true);
       await createItem({
@@ -404,6 +413,7 @@ const ItemsManagementPage: React.FC = () => {
         parent_id: itemFormData.parent_id,
         taric_id: itemFormData.taric_id || undefined,
         cat_id: itemFormData.cat_id || undefined,
+        supplier_id: itemFormData.supplier_id || undefined,
         weight: itemFormData.weight || undefined,
         length: itemFormData.length || undefined,
         width: itemFormData.width || undefined,
@@ -736,6 +746,9 @@ const ItemsManagementPage: React.FC = () => {
               Category
             </th>
             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+              Supplier
+            </th>
+            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
               Status
             </th>
             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
@@ -834,6 +847,27 @@ const ItemsManagementPage: React.FC = () => {
           </>
         );
 
+      case "suppliers":
+        return (
+          <>
+            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+              Name
+            </th>
+            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+              Company
+            </th>
+            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+              Contact
+            </th>
+            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+              Email
+            </th>
+            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+              Actions
+            </th>
+          </>
+        );
+
       default:
         return null;
     }
@@ -879,6 +913,16 @@ const ItemsManagementPage: React.FC = () => {
             <td className="px-4 py-3">
               <div className="text-sm text-gray-900">
                 {item.category || "-"}
+              </div>
+            </td>
+            <td className="px-4 py-3">
+              <div className="text-sm text-gray-900">
+                {item.supplier_name || "-"}
+              </div>
+            </td>
+            <td className="px-4 py-3">
+              <div className="text-sm text-gray-900">
+                {item.supplier_name || "-"}
               </div>
             </td>
             <td className="px-4 py-3">
@@ -1084,6 +1128,39 @@ const ItemsManagementPage: React.FC = () => {
                     : "Add Stock"}
                 </button>
               </div>
+            </td>
+          </tr>
+        ));
+
+      case "suppliers":
+        return data.map((supplier: any) => (
+          <tr
+            key={supplier.id}
+            className="hover:bg-gray-50 cursor-pointer transition-colors"
+            onClick={() => router.push("/suppliers")}
+          >
+            <td className="p-4">
+              <input
+                type="checkbox"
+                checked={selectedItems.has(supplier.id.toString())}
+                onChange={() => handleSelectItem(supplier.id.toString())}
+                className="w-4 h-4 text-primary focus:ring-primary border-gray-300 rounded"
+              />
+            </td>
+            <td className="px-4 py-3 font-medium">{supplier.name}</td>
+            <td className="px-4 py-3">{supplier.company_name}</td>
+            <td className="px-4 py-3">{supplier.contact_person}</td>
+            <td className="px-4 py-3">{supplier.email}</td>
+            <td className="px-4 py-3 text-right">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  router.push("/suppliers");
+                }}
+                className="text-primary hover:underline hover:text-primary/80"
+              >
+                Manage
+              </button>
             </td>
           </tr>
         ));
@@ -1879,6 +1956,29 @@ const ItemsManagementPage: React.FC = () => {
                     {categories && categories.map((cat) => (
                       <option key={cat.id} value={cat.id}>
                         {cat.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Supplier *
+                  </label>
+                  <select
+                    value={itemFormData.supplier_id}
+                    onChange={(e) =>
+                      setItemFormData({
+                        ...itemFormData,
+                        supplier_id: Number(e.target.value),
+                      })
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  >
+                    <option value="0">Select Supplier</option>
+                    {suppliers && suppliers.map((supplier) => (
+                      <option key={supplier.id} value={supplier.id}>
+                        {supplier.name}
                       </option>
                     ))}
                   </select>

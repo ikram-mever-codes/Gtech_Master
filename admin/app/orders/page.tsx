@@ -98,7 +98,7 @@ type OrdersTableProps = {
 };
 
 const tabs = [
-  { id: "orders", label: "Orders List", description: "View all orders" },
+  { id: "orders", label: "List Order Items", description: "View all orders" },
   { id: "order_items", label: "Order Items", description: "View all order items" },
   { id: "cargos", label: "Cargos", description: "Manage Cargos and Shipments" },
   { id: "cargo_type", label: "Cargos type", description: "Manage Cargo Types" },
@@ -200,26 +200,26 @@ function OrdersTable({
   const isOrderItems = activeTab === "order_items";
 
   const itemColumns: ColumnDef<any>[] = [
-    { header: "S. No", render: (_, i) => i + 1, align: "center" },
-    { header: "EAN", render: (row) => itemById.get(String(row.item_id))?.ean || "-" },
-    { header: "Item name", render: (row) => itemById.get(String(row.item_id))?.item_name || itemById.get(String(row.item_id))?.name || "Unknown" },
-    { header: "Price", render: (row) => row.rmb_special_price ?? "-" },
-    { header: "QTY", render: (row) => row.qty, align: "center" },
-    { header: "Total", render: (row) => (row.rmb_special_price ? (row.rmb_special_price * row.qty).toFixed(2) : "-"), align: "center" },
-    { header: "Supplier", render: (row) => row.supplier_id ? getSupplierName?.(row.supplier_id) : getCategoryName(row.category_id) },
-    { header: "Order No.", render: (row) => row.order_no },
-    { header: "Remarks", render: (row) => row.remarks_cn || row.remark_de || "-" },
-    { header: "Status", render: (row) => row.item_status || "-", align: "center" },
-    { header: "Cargo", render: (row) => row.cargo_id || "-", align: "center" },
-    { header: "SOID", render: (row) => row.supplier_order_id || "-", align: "center" },
+    { header: "S. No", width: "30px", render: (_, i) => i + 1, align: "center" },
+    { header: "EAN", width: "80px", render: (row) => itemById.get(String(row.item_id))?.ean || "-" },
+    { header: "Item name", width: "150px", render: (row) => <div className="truncate" title={itemById.get(String(row.item_id))?.item_name || itemById.get(String(row.item_id))?.name}>{itemById.get(String(row.item_id))?.item_name || itemById.get(String(row.item_id))?.name || "Unknown"}</div> },
+    { header: "Price", width: "60px", render: (row) => row.rmb_special_price ?? "-" },
+    { header: "QTY", width: "40px", render: (row) => row.qty, align: "center" },
+    { header: "Total", width: "60px", render: (row) => (row.rmb_special_price ? (row.rmb_special_price * row.qty).toFixed(2) : "-"), align: "center" },
+    { header: "Supplier", width: "100px", render: (row) => <div className="truncate">{row.supplier_id ? getSupplierName?.(row.supplier_id) : getCategoryName(row.category_id)}</div> },
+    { header: "Order No.", width: "80px", render: (row) => row.order_no },
+    { header: "Remarks", width: "150px", render: (row) => <div className="line-clamp-2" title={row.remarks_cn || row.remark_de}>{row.remarks_cn || row.remark_de || "-"}</div> },
+    { header: "Status", width: "60px", render: (row) => row.item_status || "-", align: "center" },
+    { header: "Cargo", width: "40px", render: (row) => row.cargo_id || "-", align: "center" },
+    { header: "SOID", width: "40px", render: (row) => row.supplier_order_id || "-", align: "center" },
     {
-      header: "Actions", align: "center", render: (row) => (
-        <div className="flex items-center justify-center gap-2">
-          <button className="px-3 py-1 text-xs font-semibold bg-amber-600 text-white rounded hover:bg-amber-700 transition">
-            &lt; Split
+      header: "Actions", width: "130px", align: "center", render: (row) => (
+        <div className="flex items-center justify-center gap-1">
+          <button className="px-1.5 py-0.5 text-[10px] font-semibold bg-amber-600 text-white rounded hover:bg-amber-700 transition">
+            Split
           </button>
-          <button className="px-3 py-1 text-xs font-semibold bg-gray-600 text-white rounded hover:bg-gray-700 transition">
-            &#8617; ReAssign
+          <button className="px-1.5 py-0.5 text-[10px] font-semibold bg-gray-600 text-white rounded hover:bg-gray-700 transition">
+            ReAssign
           </button>
         </div>
       )
@@ -235,31 +235,31 @@ function OrdersTable({
   );
 
   const orderColumns: ColumnDef<any>[] = [
-    { header: "No", render: (_, i) => i + 1, align: "center", renderTotal: () => <span className="text-transparent">Total</span> },
+    { header: "No", width: "30px", render: (_, i) => i + 1, align: "center", renderTotal: () => <span className="text-transparent">Total</span> },
     {
-      header: "Re Assign", align: "center", render: () => (
-        <button className="px-3 py-1 text-xs font-semibold bg-gray-600 text-white rounded hover:bg-gray-700 transition whitespace-nowrap">
+      header: "Re Assign", width: "85px", align: "center", render: () => (
+        <button className="px-2 py-0.5 text-[10px] font-semibold bg-gray-600 text-white rounded hover:bg-gray-700 transition whitespace-nowrap">
           &#8617; ReAssign
         </button>
       )
     },
-    { header: "Order No.", render: (row) => <button onClick={() => onView(row)} className="text-blue-600 hover:underline font-semibold whitespace-nowrap">{row.order_no}</button>, align: "center" },
-    { header: "Catgy", render: (row) => getCategoryName(row.category_id), align: "center" },
-    { header: "Cargo", render: (row) => row.cargo_id ?? "-", align: "center" },
-    { header: "Comment", render: (row) => row.comment || "-", align: "left" },
-    { header: "Created", render: (row) => row.date_created || (row.created_at ? new Date(row.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit' }) : "-"), align: "center" },
-    { header: "Emailed", render: (row) => row.date_emailed || "-", align: "center" },
-    { header: "Delivery", render: (row) => row.date_delivery || "-", align: "center" },
-    { header: "Total", render: (row) => <span className="font-semibold">{row.items?.length || 0}</span>, align: "center", renderTotal: (data) => <CountCell count={data.reduce((acc, row) => acc + (row.items?.length || 0), 0)} /> },
-    { header: "NSO", render: (row) => <CountCell count={getCount(row.items, "NSO")} />, align: "center", renderTotal: (data) => <CountCell count={data.reduce((acc, row) => acc + getCount(row.items, "NSO"), 0)} /> },
-    { header: "SO", render: (row) => <CountCell count={getCount(row.items, "SO")} />, align: "center", renderTotal: (data) => <CountCell count={data.reduce((acc, row) => acc + getCount(row.items, "SO"), 0)} /> },
-    { header: "Problem", render: (row) => <CountCell count={getCount(row.items, "Problem", "problem")} />, align: "center", renderTotal: (data) => <CountCell count={data.reduce((acc, row) => acc + getCount(row.items, "Problem", "problem"), 0)} /> },
-    { header: "Purchase", render: (row) => <CountCell count={getCount(row.items, "Purchase", "Purchased", "purchase", "purchased")} />, align: "center", renderTotal: (data) => <CountCell count={data.reduce((acc, row) => acc + getCount(row.items, "Purchase", "Purchased", "purchase", "purchased"), 0)} /> },
-    { header: "Paid", render: (row) => <CountCell count={getCount(row.items, "Paid", "paid")} />, align: "center", renderTotal: (data) => <CountCell count={data.reduce((acc, row) => acc + getCount(row.items, "Paid", "paid"), 0)} /> },
-    { header: "Checked", render: (row) => <CountCell count={getCount(row.items, "Checked", "checked")} />, align: "center", renderTotal: (data) => <CountCell count={data.reduce((acc, row) => acc + getCount(row.items, "Checked", "checked"), 0)} /> },
-    { header: "Printed", render: (row) => <CountCell count={getCount(row.items, "Printed", "printed")} />, align: "center", renderTotal: (data) => <CountCell count={data.reduce((acc, row) => acc + getCount(row.items, "Printed", "printed"), 0)} /> },
-    { header: "Invoiced", render: (row) => <CountCell count={getCount(row.items, "Invoiced", "invoiced")} />, align: "center", renderTotal: (data) => <CountCell count={data.reduce((acc, row) => acc + getCount(row.items, "Invoiced", "invoiced"), 0)} /> },
-    { header: "Shipped", render: (row) => <CountCell count={getCount(row.items, "Shipped", "shipped")} />, align: "center", renderTotal: (data) => <CountCell count={data.reduce((acc, row) => acc + getCount(row.items, "Shipped", "shipped"), 0)} /> },
+    { header: "Order No.", width: "90px", render: (row) => <button onClick={() => onView(row)} className="text-blue-600 hover:underline font-semibold whitespace-nowrap">{row.order_no}</button>, align: "center" },
+    { header: "Catgy", width: "65px", render: (row) => getCategoryName(row.category_id), align: "center" },
+    { header: "Cargo", width: "55px", render: (row) => row.cargo_id ?? "-", align: "center" },
+    { header: "Comment", width: "250px", render: (row) => <div className="line-clamp-2 leading-tight" title={row.comment}>{row.comment || "-"}</div>, align: "left" },
+    { header: "Created", width: "65px", render: (row) => row.date_created || (row.created_at ? new Date(row.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit' }) : "-"), align: "center" },
+    { header: "Emailed", width: "65px", render: (row) => row.date_emailed || "-", align: "center" },
+    { header: "Delivery", width: "65px", render: (row) => row.date_delivery || "-", align: "center" },
+    { header: "Total", width: "35px", render: (row) => <span className="font-semibold">{row.items?.length || 0}</span>, align: "center", renderTotal: (data) => <CountCell count={data.reduce((acc, row) => acc + (row.items?.length || 0), 0)} /> },
+    { header: "NSO", width: "35px", render: (row) => <CountCell count={getCount(row.items, "NSO")} />, align: "center", renderTotal: (data) => <CountCell count={data.reduce((acc, row) => acc + getCount(row.items, "NSO"), 0)} /> },
+    { header: "SO", width: "35px", render: (row) => <CountCell count={getCount(row.items, "SO")} />, align: "center", renderTotal: (data) => <CountCell count={data.reduce((acc, row) => acc + getCount(row.items, "SO"), 0)} /> },
+    { header: "Problem", width: "35px", render: (row) => <CountCell count={getCount(row.items, "Problem", "problem")} />, align: "center", renderTotal: (data) => <CountCell count={data.reduce((acc, row) => acc + getCount(row.items, "Problem", "problem"), 0)} /> },
+    { header: "Purchase", width: "35px", render: (row) => <CountCell count={getCount(row.items, "Purchase", "Purchased", "purchase", "purchased")} />, align: "center", renderTotal: (data) => <CountCell count={data.reduce((acc, row) => acc + getCount(row.items, "Purchase", "Purchased", "purchase", "purchased"), 0)} /> },
+    { header: "Paid", width: "35px", render: (row) => <CountCell count={getCount(row.items, "Paid", "paid")} />, align: "center", renderTotal: (data) => <CountCell count={data.reduce((acc, row) => acc + getCount(row.items, "Paid", "paid"), 0)} /> },
+    { header: "Checked", width: "35px", render: (row) => <CountCell count={getCount(row.items, "Checked", "checked")} />, align: "center", renderTotal: (data) => <CountCell count={data.reduce((acc, row) => acc + getCount(row.items, "Checked", "checked"), 0)} /> },
+    { header: "Printed", width: "35px", render: (row) => <CountCell count={getCount(row.items, "Printed", "printed")} />, align: "center", renderTotal: (data) => <CountCell count={data.reduce((acc, row) => acc + getCount(row.items, "Printed", "printed"), 0)} /> },
+    { header: "Invoiced", width: "35px", render: (row) => <CountCell count={getCount(row.items, "Invoiced", "invoiced")} />, align: "center", renderTotal: (data) => <CountCell count={data.reduce((acc, row) => acc + getCount(row.items, "Invoiced", "invoiced"), 0)} /> },
+    { header: "Shipped", width: "35px", render: (row) => <CountCell count={getCount(row.items, "Shipped", "shipped")} />, align: "center", renderTotal: (data) => <CountCell count={data.reduce((acc, row) => acc + getCount(row.items, "Shipped", "shipped"), 0)} /> },
   ];
 
   return (
@@ -839,8 +839,8 @@ const OrderPage = () => {
 
   return (
     <>
-      <div className="min-h-screen bg-white shadow-xl rounded-lg p-6">
-        <div className="max-w-7xl mx-auto">
+      <div className="min-h-screen bg-white shadow-xl rounded-lg p-2 md:p-4">
+        <div className="max-w-full mx-auto">
           <div className="mb-6">
             <div className="flex justify-between items-center mb-4">
               <div>

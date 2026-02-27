@@ -6,6 +6,7 @@ export type ColumnDef<T> = {
     render: (row: T, index: number) => React.ReactNode;
     align?: "left" | "center" | "right";
     renderTotal?: (data: T[]) => React.ReactNode;
+    width?: string | number;
 };
 
 export type DataTableProps<T> = {
@@ -43,7 +44,11 @@ export function DataTable<T>({ data, columns, loading, emptyMessage = "No Data F
                 <thead className="bg-gray-50 border-b border-gray-200">
                     <tr>
                         {columns.map((c, i) => (
-                            <th key={i} className={`px-4 py-3 text-${c.align || "left"} text-xs font-semibold text-gray-600 uppercase tracking-wider border border-gray-200`}>
+                            <th
+                                key={i}
+                                className={`px-2 py-2 text-${c.align || "left"} text-[10px] font-bold text-gray-600 uppercase tracking-tight border border-gray-200`}
+                                style={c.width ? { width: c.width, minWidth: c.width } : {}}
+                            >
                                 {c.header}
                             </th>
                         ))}
@@ -51,9 +56,13 @@ export function DataTable<T>({ data, columns, loading, emptyMessage = "No Data F
                 </thead>
                 <tbody className="bg-white">
                     {showTotals && data.length > 0 && (
-                        <tr className="bg-gray-100 font-semibold text-gray-800 border-b border-gray-200">
+                        <tr className="bg-gray-100 font-bold text-gray-800 border-b border-gray-200">
                             {columns.map((c, i) => (
-                                <td key={`total-${i}`} className={`px-4 py-3 text-${c.align || "left"} border border-gray-200 text-sm`}>
+                                <td
+                                    key={`total-${i}`}
+                                    className={`px-2 py-1.5 text-${c.align || "left"} border border-gray-200 text-[11px]`}
+                                    style={c.width ? { width: c.width, minWidth: c.width } : {}}
+                                >
                                     {c.renderTotal ? c.renderTotal(data) : null}
                                 </td>
                             ))}
@@ -62,7 +71,11 @@ export function DataTable<T>({ data, columns, loading, emptyMessage = "No Data F
                     {data.map((row, idx) => (
                         <tr key={(row as any).id || idx} className="hover:bg-gray-50 transition-colors">
                             {columns.map((c, i) => (
-                                <td key={i} className={`px-4 py-3 text-${c.align || "left"} border border-gray-200 text-sm`}>
+                                <td
+                                    key={i}
+                                    className={`px-2 py-1.5 text-${c.align || "left"} border border-gray-200 text-[11px] leading-tight`}
+                                    style={c.width ? { width: c.width, minWidth: c.width } : {}}
+                                >
                                     {c.render(row, idx)}
                                 </td>
                             ))}
