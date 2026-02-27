@@ -234,26 +234,55 @@ export const getAllOrders = async (req: Request, res: Response, next: NextFuncti
 
     const qb = orderRepo
       .createQueryBuilder("o")
+      .leftJoinAndSelect("o.orderItems", "items")
       .select([
         "o.id",
         "o.order_no",
         "o.category_id",
         "o.customer_id",
         "o.supplier_id",
+        "o.cargo_id",
         "o.status",
         "o.comment",
         "o.created_at",
         "o.updated_at",
+        "items.id",
+        "items.order_id",
+        "items.item_id",
+        "items.qty",
+        "items.remark_de",
+        "items.qty_delivered",
+        "items.category_id",
+        "items.rmb_special_price",
+        "items.eur_special_price",
+        "items.taric_id",
+        "items.set_taric_code",
+        "items.status",
+        "items.remarks_cn",
+        "items.problems",
+        "items.qty_label",
+        "items.qty_split",
+        "items.supplier_order_id",
+        "items.ref_no",
+        "items.cargo_id",
+        "items.printed",
+        "items.cargo_date",
       ]);
 
     if (status) qb.andWhere("o.status = :status", { status });
     if (search) qb.andWhere("(o.order_no LIKE :q OR o.comment LIKE :q)", { q: `%${search}%` });
 
-    const orders = await qb.orderBy("o.id", "DESC").getMany();
+    const orders = await qb.orderBy("o.id", "DESC").addOrderBy("items.id", "ASC").getMany();
+
+    const mappedOrders = orders.map((order: any) => ({
+      ...order,
+      items: order.orderItems || [],
+      orderItems: undefined,
+    }));
 
     return res.status(200).json({
       success: true,
-      data: orders,
+      data: mappedOrders,
     });
   } catch (error) {
     return next(error);

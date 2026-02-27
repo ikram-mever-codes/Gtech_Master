@@ -13,6 +13,7 @@ import {
 import { OrderItem } from "./order_items";
 import { Category } from "./categories";
 import { Supplier } from "./suppliers";
+import { Cargo } from "./cargos";
 
 @Entity()
 export class Order {
@@ -59,6 +60,12 @@ export class Order {
   @JoinColumn({ name: "supplier_id" })
   supplier?: Supplier;
 
+  @Column({ type: "int", nullable: true })
+  cargo_id?: number;
+
+  @ManyToOne(() => Cargo)
+  @JoinColumn({ name: "cargo_id" })
+  cargo?: Cargo;
 
   @OneToMany(() => OrderItem, (orderItem) => orderItem.order)
   orderItems!: OrderItem[];
