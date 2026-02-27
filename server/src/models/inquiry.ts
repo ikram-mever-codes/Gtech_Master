@@ -11,7 +11,7 @@ import {
 } from "typeorm";
 import { Customer } from "./customers";
 import { ContactPerson } from "./contact_person";
-import { RequestedItem } from "./requested_items";
+import { RequestedItem, Interval } from "./requested_items";
 import { Offer } from "./offer";
 
 export type Currency = "RMB" | "HKD" | "EUR" | "USD";
@@ -98,6 +98,22 @@ export class Inquiry {
     nullable: true,
   })
   purchasePriceCurrency?: Currency;
+
+  @Column({ type: "varchar", length: 100, nullable: true })
+  qty?: string;
+
+  @Column({
+    type: "enum",
+    enum: ["Monatlich", "2 monatlich", "Quartal", "halbjährlich", "jährlich"],
+    nullable: true,
+  })
+  interval?: Interval;
+
+  @Column({ type: "varchar", length: 100, nullable: true })
+  taric?: string;
+
+  @Column({ type: "varchar", length: 255, nullable: true, default: "Open" })
+  requestStatus?: string;
 
   @ManyToOne(() => Customer, (customer) => customer.inquiries, {
     nullable: false,

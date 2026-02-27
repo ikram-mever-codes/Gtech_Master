@@ -6,70 +6,54 @@ import {
   LucideArrowLeft,
   LucideSave,
   LucidePlus,
-  LucideTrash2,
-  LucideCheck,
-  LucideMail,
-  LucideX,
-  LucidePhone,
-  LucideMapPin,
-  LucideBuilding,
   LucideFileText,
-  LucideTruck,
-  LucideChartArea,
   LucideChartBar,
   LucideMessageCircle,
 } from "lucide-react";
 import {
-  Dialog,
   Typography,
   MenuItem,
   FormControl,
   Select,
-  Button,
   Box,
   Paper,
   TextField,
   CircularProgress,
-  Alert,
   IconButton,
   alpha,
   useTheme,
-  Snackbar,
-  Switch,
-  FormControlLabel,
 } from "@mui/material";
 import theme from "@/styles/theme";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import PageHeader from "@/components/UI/PageHeader";
 import { PlusCircle, Pencil } from "lucide-react";
-import {
-  createOrder,
-  // createNewOrder,
-  // updateOrderFunction,
-  getOrderById,
-  updateOrder,
-} from "@/api/orders";
+import { createOrder, getOrderById, updateOrder } from "@/api/orders";
 import CustomButton from "@/components/UI/CustomButton";
+
 export interface Order {
-  id: number; // Order ID
-  order_no: string; // Order number
-  category_id: number | string; // Category ID (your API returns string sometimes)
-  status: number | string; // Numeric status code (20, 10, etc.)
-  comment: string; // Comment text
+  id: number;
+  order_no: string;
+  category_id: number | string;
+  status: number | string;
+  comment: string;
+}
+
+interface FormValues {
+  order_no: string;
+  category_id: string | number;
+  status: string | number;
+  comment: string;
 }
 
 const validationSchema = Yup.object({
   order_no: Yup.string().required("Order number is required"),
-
   category_id: Yup.number()
     .typeError("Category ID must be a number")
     .required("Category ID is required"),
-
   status: Yup.number()
     .oneOf([0, 5, 10, 20], "Invalid status code")
     .required("Status is required"),
-
   comment: Yup.string()
     .max(255, "Comment cannot exceed 255 characters")
     .nullable(),
@@ -94,7 +78,7 @@ const OrderCreatePage: React.FC = () => {
     severity: "info",
   });
 
-  const formik = useFormik<FormikValues>({
+  const formik = useFormik<FormValues>({
     initialValues: {
       order_no: "",
       category_id: "",
@@ -106,7 +90,7 @@ const OrderCreatePage: React.FC = () => {
       try {
         setIsSubmitting(true);
 
-        const payload: any = {
+        const payload = {
           order_no: values.order_no,
           category_id: Number(values.category_id),
           status: Number(values.status),
@@ -114,13 +98,10 @@ const OrderCreatePage: React.FC = () => {
         };
 
         let data;
-
         if (isEditMode && OrderId) {
-          // Update existing order
-          data = await updateOrder(OrderId, { ...payload });
+          data = await updateOrder(OrderId, payload as any);
         } else {
-          // Create new order
-          data = await createOrder(payload);
+          data = await createOrder(payload as any);
         }
 
         if (data?.success) {
@@ -131,7 +112,6 @@ const OrderCreatePage: React.FC = () => {
               : "Order created successfully!",
             severity: "success",
           });
-
           router.push("/orders");
         }
       } catch (error) {
@@ -154,13 +134,10 @@ const OrderCreatePage: React.FC = () => {
       if (isEditMode && OrderId) {
         try {
           setIsLoading(true);
-
           const data: any = await getOrderById(OrderId);
 
           if (data?.success) {
             const order = data.data;
-
-            // Pre-fill form with order data
             formik.setValues({
               order_no: order.order_no || "",
               category_id: order.category_id || "",
@@ -185,152 +162,8 @@ const OrderCreatePage: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="w-full mx-auto">
-        <Paper
-          elevation={0}
-          sx={{
-            borderRadius: 2,
-            overflow: "hidden",
-            mx: "auto",
-            maxWidth: 1200,
-            boxShadow: "0 4px 15px rgba(0, 0, 0, 0.05)",
-          }}
-        >
-          {/* Header */}
-          <Box
-            sx={{
-              p: 3,
-              borderBottom: "1px solid",
-              borderColor: "divider",
-              display: "flex",
-              alignItems: "center",
-              gap: 2,
-              bgcolor: "background.paper",
-            }}
-          >
-            <Link
-              href="/orders"
-              style={{
-                display: "flex",
-                alignItems: "center",
-                color: theme.palette.primary.main,
-              }}
-            >
-              <IconButton
-                sx={{
-                  color: "primary.main",
-                  bgcolor: alpha(muiTheme.palette.primary.main, 0.08),
-                  "&:hover": {
-                    bgcolor: alpha(muiTheme.palette.primary.main, 0.15),
-                  },
-                }}
-              >
-                <LucideArrowLeft size={20} />
-              </IconButton>
-            </Link>
-
-            <PageHeader
-              title={isEditMode ? "Edit Order" : "Create New Order"}
-              icon={isEditMode ? Pencil : PlusCircle}
-            />
-          </Box>
-
-          {/* Form */}
-          <Box component="form" onSubmit={formik.handleSubmit} sx={{ p: 3 }}>
-            {/* Order Details Section */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 mb-8">
-              <div className="md:col-span-2">
-                <Typography
-                  variant="h6"
-                  sx={{
-                    fontWeight: 600,
-                    color: "secondary.main",
-                    mb: 2,
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 1,
-                  }}
-                >
-                  <LucideFileText size={20} />
-                  Order Details
-                </Typography>
-              </div>
-
-              {/* Order Number */}
-              <div>
-                <FormInput
-                  name="order_no"
-                  label="Order Number"
-                  icon={<LucideFileText size={20} />}
-                  formik={formik}
-                  placeholder="DE3068"
-                />
-              </div>
-
-              {/* Category ID */}
-              <div>
-                <FormInput
-                  name="category_id"
-                  label="Category ID"
-                  icon={<LucidePlus size={20} />}
-                  formik={formik}
-                  placeholder="26"
-                />
-              </div>
-
-              {/* Status */}
-              <div>
-                <FormSelect
-                  name="status"
-                  label="Status"
-                  icon={<LucideChartBar size={20} />}
-                  formik={formik}
-                  options={[
-                    { value: 20, label: "Completed" },
-                    { value: 10, label: "Processing" },
-                    { value: 5, label: "Pending" },
-                    { value: 0, label: "Cancelled" },
-                  ]}
-                />
-              </div>
-
-              {/* Comment */}
-              <div className="md:col-span-2">
-                <FormInput
-                  name="comment"
-                  label="Comment"
-                  icon={<LucideMessageCircle size={20} />}
-                  formik={formik}
-                  placeholder="Optional comment..."
-                />
-              </div>
-            </div>
-
-            {/* Submit Button */}
-            <div className="border-t border-indigo-100 pt-6 mt-6 flex justify-end">
-              <CustomButton
-                type="submit"
-                disabled={isSubmitting}
-                gradient={true}
-                startIcon={
-                  isSubmitting ? (
-                    <CircularProgress size={16} />
-                  ) : (
-                    <LucideSave size={16} />
-                  )
-                }
-              >
-                {isSubmitting
-                  ? isEditMode
-                    ? "Updating..."
-                    : "Creating..."
-                  : isEditMode
-                    ? "Update Order"
-                    : "Create Order"}
-              </CustomButton>
-            </div>
-          </Box>
-        </Paper>
+      <div className="w-full h-screen flex items-center justify-center">
+        <CircularProgress />
       </div>
     );
   }
@@ -370,34 +203,24 @@ const OrderCreatePage: React.FC = () => {
             <IconButton
               sx={{
                 color: "primary.main",
-                bgcolor: alpha(theme.palette.primary.main, 0.08),
-                "&:hover": { bgcolor: alpha(theme.palette.primary.main, 0.15) },
+                bgcolor: alpha(muiTheme.palette.primary.main, 0.08),
+                "&:hover": {
+                  bgcolor: alpha(muiTheme.palette.primary.main, 0.15),
+                },
               }}
             >
               <LucideArrowLeft size={20} />
             </IconButton>
           </Link>
 
-          <Box>
-            <Typography
-              variant="h4"
-              sx={{
-                color: "secondary.main",
-                fontSize: { xs: "1.5rem", md: "1.75rem" },
-                fontWeight: 600,
-              }}
-            >
-              {isEditMode ? "Edit Order" : "Create New Order"}
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              {isEditMode ? "Update order information" : "Add a new order"}
-            </Typography>
-          </Box>
+          <PageHeader
+            title={isEditMode ? "Edit Order" : "Create New Order"}
+            icon={isEditMode ? Pencil : PlusCircle}
+          />
         </Box>
 
         {/* Form */}
         <Box component="form" onSubmit={formik.handleSubmit} sx={{ p: 3 }}>
-          {/* Order Details Section */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 mb-8">
             <div className="md:col-span-2">
               <Typography
@@ -527,7 +350,7 @@ const FormInput: React.FC<FormInputProps> = ({
       {label}
     </label>
     <div className="relative">
-      <div className="absolute left-3 top-3 text-gray-500">{icon}</div>
+      <div className="absolute left-3 top-3 text-gray-500 z-10">{icon}</div>
       <TextField
         fullWidth
         id={name}
@@ -552,15 +375,9 @@ const FormInput: React.FC<FormInputProps> = ({
         sx={{
           fontFamily: "Roboto, sans-serif",
           "& .MuiOutlinedInput-root": {
-            "& fieldset": {
-              borderColor: "rgba(0, 0, 0, 0.15)",
-            },
-            "&:hover fieldset": {
-              borderColor: "rgba(0, 0, 0, 0.3)",
-            },
-            "&.Mui-focused fieldset": {
-              borderColor: "#4f46e5",
-            },
+            "& fieldset": { borderColor: "rgba(0, 0, 0, 0.15)" },
+            "&:hover fieldset": { borderColor: "rgba(0, 0, 0, 0.3)" },
+            "&.Mui-focused fieldset": { borderColor: "#4f46e5" },
           },
         }}
         {...props}
@@ -572,7 +389,7 @@ const FormInput: React.FC<FormInputProps> = ({
 interface FormSelectProps {
   name: string;
   label: string;
-  options: Array<{ value: any; label: string }>;
+  options: Array<{ value: string | number; label: string }>;
   formik: any;
   icon: React.ReactNode;
   helperText?: string;
@@ -604,9 +421,7 @@ const FormSelect: React.FC<FormSelectProps> = ({
           onBlur={formik.handleBlur}
           displayEmpty
           sx={{
-            "& .MuiSelect-select": {
-              paddingLeft: "38px",
-            },
+            "& .MuiSelect-select": { paddingLeft: "38px" },
             "& .MuiOutlinedInput-notchedOutline": {
               borderColor: "rgba(0, 0, 0, 0.15)",
             },
@@ -618,7 +433,7 @@ const FormSelect: React.FC<FormSelectProps> = ({
             },
           }}
           renderValue={(selected) => {
-            if (selected === "") {
+            if (selected === "" || selected === undefined) {
               return <span className="text-gray-400">Select {label}</span>;
             }
             const selectedOption = options.find(
