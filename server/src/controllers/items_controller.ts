@@ -70,7 +70,7 @@ export const getItems = async (
       whereConditions.taric_id = parseInt(taricId as string);
     }
 
-    const relations = ["parent", "taric", "category"];
+    const relations = ["parent", "taric", "category", "supplier"];
 
     const totalRecords = await itemRepository.count({ where: whereConditions });
 
@@ -98,6 +98,8 @@ export const getItems = async (
       taric_id: item.taric_id,
       category_id: item.cat_id,
       category: item.category?.name || null,
+      supplier_id: item.supplier_id,
+      supplier_name: item.supplier?.name || null,
       weight: item.weight,
       length: item.length,
       width: item.width,
@@ -147,7 +149,7 @@ export const getItemById = async (
 
     const item = await itemRepository.findOne({
       where: { id: parseInt(id) },
-      relations: ["parent", "taric", "category"],
+      relations: ["parent", "taric", "category", "supplier"],
     });
 
     if (!item) {
@@ -180,6 +182,8 @@ export const getItemById = async (
       category: item.category?.name || "STD",
       model: item.model || "",
       remark: item.remark || "",
+      supplier_id: item.supplier_id,
+      supplier_name: item.supplier?.name || "",
       painPoints: item.painPoints || [],
       isActive: item.isActive === "Y",
 
@@ -302,6 +306,7 @@ export const createItem = async (
       length,
       width,
       height,
+      supplier_id,
       remark,
       model,
       isActive = "Y",
@@ -316,6 +321,14 @@ export const createItem = async (
       return next(
         new ErrorHandler("Item name and parent ID are required", 400)
       );
+    }
+
+    if (supplier_id) {
+      const supplierRepo = AppDataSource.getRepository(Supplier);
+      const supplier = await supplierRepo.findOne({ where: { id: supplier_id } });
+      if (!supplier) {
+        return next(new ErrorHandler("Supplier not found", 404));
+      }
     }
 
     const parent = await parentRepository.findOne({ where: { id: parent_id } });
@@ -353,6 +366,7 @@ export const createItem = async (
       parent_id,
       taric_id,
       cat_id,
+      supplier_id,
       weight: weight ? parseFloat(weight) : null,
       length: length ? parseFloat(length) : 0,
       width: width ? parseFloat(width) : null,
@@ -395,6 +409,7 @@ export const createItem = async (
         item_name: newItem.item_name,
         ean: newItem.ean,
         parent_id: newItem.parent_id,
+        supplier_id: newItem.supplier_id,
         isActive: newItem.isActive,
       },
     });
@@ -428,6 +443,7 @@ export const updateItem = async (
       "parent_id",
       "taric_id",
       "cat_id",
+      "supplier_id",
       "weight",
       "length",
       "width",
