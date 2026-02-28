@@ -12,6 +12,7 @@ import { Parent } from "./parents";
 import { Taric } from "./tarics";
 import { Category } from "./categories";
 import { OrderItem } from "./order_items";
+import { Supplier } from "./suppliers";
 
 @Entity()
 export class Item {
@@ -126,6 +127,9 @@ export class Item {
   @Column({ type: "varchar", length: 200, nullable: true })
   note?: string;
 
+  @Column({ nullable: true })
+  supplier_id?: number;
+
   @CreateDateColumn()
   synced_at!: Date;
 
@@ -146,6 +150,10 @@ export class Item {
   @ManyToOne(() => Category, (category) => category.items, { nullable: true })
   @JoinColumn({ name: "cat_id" })
   category: Category | null;
+
+  @ManyToOne(() => Supplier, { nullable: true })
+  @JoinColumn({ name: "supplier_id" })
+  supplier: Supplier | null;
 
   @OneToMany(() => OrderItem, orderItem => orderItem.item)
   orderItems: OrderItem[];

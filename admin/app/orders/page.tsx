@@ -11,6 +11,9 @@ import {
   DocumentTextIcon,
   XMarkIcon,
   ArrowUturnRightIcon,
+  MagnifyingGlassIcon,
+  ArrowRightIcon,
+  PlusCircleIcon,
 } from "@heroicons/react/24/outline";
 import { toast } from "react-hot-toast";
 import {
@@ -23,6 +26,11 @@ import {
   type OrderSearchFilters,
   getOrderStatusColor,
 } from "@/api/orders";
+import {
+  getAllCargos,
+  assignOrdersToCargo,
+  type CargoType,
+} from "@/api/cargos";
 
 import { getAllCustomers } from "@/api/customers";
 import {
@@ -48,6 +56,7 @@ type Item = {
   name?: string;
   ean?: number | string;
   rmb_special_price?: number;
+  supplier_id?: string | number;
 };
 type Customer = {
   id: string | number;
@@ -97,15 +106,16 @@ type OrdersTableProps = {
 
   showConvert: boolean;
   onConvert: (o: any) => void;
+  onReassign: (o: any) => void;
   activeTab: string;
   itemById: Map<string, Item>;
 };
 
 const tabs = [
-  { id: "orders", label: "Orders List", description: "View all orders" },
+  { id: "orders", label: "List Orders", description: "View all orders" },
   {
     id: "order_items",
-    label: "Order Items",
+    label: "List Order Items",
     description: "View all order items",
   },
   { id: "cargos", label: "Cargos", description: "Manage Cargos and Shipments" },
@@ -208,30 +218,51 @@ function OrdersTable({
   onEdit,
   onDelete,
   canDelete,
-  showConvert,
   onConvert,
+  onReassign,
   activeTab,
   itemById,
 }: OrdersTableProps) {
   const isOrderItems = activeTab === "order_items";
 
   const itemColumns: ColumnDef<any>[] = [
-    { header: "S. No", render: (_, i) => i + 1, align: "center" },
+    {
+      header: "S. No",
+      width: "30px",
+      render: (_, i) => i + 1,
+      align: "center",
+    },
     {
       header: "EAN",
+      width: "80px",
       render: (row) => itemById.get(String(row.item_id))?.ean || "-",
     },
     {
       header: "Item name",
-      render: (row) =>
-        itemById.get(String(row.item_id))?.item_name ||
-        itemById.get(String(row.item_id))?.name ||
-        "Unknown",
+      width: "150px",
+      render: (row) => (
+        <div
+          className="truncate"
+          title={
+            itemById.get(String(row.item_id))?.item_name ||
+            itemById.get(String(row.item_id))?.name
+          }
+        >
+          {itemById.get(String(row.item_id))?.item_name ||
+            itemById.get(String(row.item_id))?.name ||
+            "Unknown"}
+        </div>
+      ),
     },
-    { header: "Price", render: (row) => row.rmb_special_price ?? "-" },
-    { header: "QTY", render: (row) => row.qty, align: "center" },
+    {
+      header: "Price",
+      width: "60px",
+      render: (row) => row.rmb_special_price ?? "-",
+    },
+    { header: "QTY", width: "40px", render: (row) => row.qty, align: "center" },
     {
       header: "Total",
+      width: "60px",
       render: (row) =>
         row.rmb_special_price
           ? (row.rmb_special_price * row.qty).toFixed(2)
@@ -240,37 +271,54 @@ function OrdersTable({
     },
     {
       header: "Supplier",
-      render: (row) =>
-        row.supplier_id
-          ? getSupplierName?.(row.supplier_id)
-          : getCategoryName(row.category_id),
+      width: "100px",
+      render: (row) => (
+        <div className="truncate">
+          {row.supplier_id
+            ? getSupplierName?.(row.supplier_id)
+            : getCategoryName(row.category_id)}
+        </div>
+      ),
     },
-    { header: "Order No.", render: (row) => row.order_no },
+    { header: "Order No.", width: "80px", render: (row) => row.order_no },
     {
       header: "Remarks",
-      render: (row) => row.remarks_cn || row.remark_de || "-",
+      width: "150px",
+      render: (row) => (
+        <div className="line-clamp-2" title={row.remarks_cn || row.remark_de}>
+          {row.remarks_cn || row.remark_de || "-"}
+        </div>
+      ),
     },
     {
       header: "Status",
+      width: "60px",
       render: (row) => row.item_status || "-",
       align: "center",
     },
-    { header: "Cargo", render: (row) => row.cargo_id || "-", align: "center" },
+    {
+      header: "Cargo",
+      width: "40px",
+      render: (row) => row.cargo_id || "-",
+      align: "center",
+    },
     {
       header: "SOID",
+      width: "40px",
       render: (row) => row.supplier_order_id || "-",
       align: "center",
     },
     {
       header: "Actions",
+      width: "130px",
       align: "center",
       render: (row) => (
-        <div className="flex items-center justify-center gap-2">
-          <button className="px-3 py-1 text-xs font-semibold bg-amber-600 text-white rounded hover:bg-amber-700 transition">
-            &lt; Split
+        <div className="flex items-center justify-center gap-1">
+          <button className="px-1.5 py-0.5 text-[10px] font-semibold bg-amber-600 text-white rounded hover:bg-amber-700 transition">
+            Split
           </button>
-          <button className="px-3 py-1 text-xs font-semibold bg-gray-600 text-white rounded hover:bg-gray-700 transition">
-            &#8617; ReAssign
+          <button className="px-1.5 py-0.5 text-[10px] font-semibold bg-gray-600 text-white rounded hover:bg-gray-700 transition">
+            ReAssign
           </button>
         </div>
       ),
@@ -294,15 +342,20 @@ function OrdersTable({
   const orderColumns: ColumnDef<any>[] = [
     {
       header: "No",
+      width: "30px",
       render: (_, i) => i + 1,
       align: "center",
       renderTotal: () => <span className="text-transparent">Total</span>,
     },
     {
       header: "Re Assign",
+      width: "85px",
       align: "center",
-      render: () => (
-        <button className="px-3 py-1 text-xs font-semibold bg-gray-600 text-white rounded hover:bg-gray-700 transition whitespace-nowrap">
+      render: (row) => (
+        <button
+          onClick={() => onReassign(row)}
+          className="px-2 py-0.5 text-[10px] font-semibold bg-gray-600 text-white rounded hover:bg-gray-700 transition whitespace-nowrap"
+        >
           &#8617; ReAssign
         </button>
       ),
@@ -324,10 +377,44 @@ function OrdersTable({
       render: (row) => getCategoryName(row.category_id),
       align: "center",
     },
-    { header: "Cargo", render: (row) => row.cargo_id ?? "-", align: "center" },
-    { header: "Comment", render: (row) => row.comment || "-", align: "left" },
+    {
+      header: "Order No.",
+      width: "90px",
+      render: (row) => (
+        <button
+          onClick={() => onView(row)}
+          className="text-blue-600 hover:underline font-semibold whitespace-nowrap"
+        >
+          {row.order_no}
+        </button>
+      ),
+      align: "center",
+    },
+    {
+      header: "Catgy",
+      width: "65px",
+      render: (row) => getCategoryName(row.category_id),
+      align: "center",
+    },
+    {
+      header: "Cargo",
+      width: "55px",
+      render: (row) => row.cargo_id ?? "-",
+      align: "center",
+    },
+    {
+      header: "Comment",
+      width: "250px",
+      render: (row) => (
+        <div className="line-clamp-2 leading-tight" title={row.comment}>
+          {row.comment || "-"}
+        </div>
+      ),
+      align: "left",
+    },
     {
       header: "Created",
+      width: "65px",
       render: (row) =>
         row.date_created ||
         (row.created_at
@@ -340,16 +427,19 @@ function OrdersTable({
     },
     {
       header: "Emailed",
+      width: "65px",
       render: (row) => row.date_emailed || "-",
       align: "center",
     },
     {
       header: "Delivery",
+      width: "65px",
       render: (row) => row.date_delivery || "-",
       align: "center",
     },
     {
       header: "Total",
+      width: "35px",
       render: (row) => (
         <span className="font-semibold">{row.items?.length || 0}</span>
       ),
@@ -362,6 +452,7 @@ function OrdersTable({
     },
     {
       header: "NSO",
+      width: "35px",
       render: (row) => <CountCell count={getCount(row.items, "NSO")} />,
       align: "center",
       renderTotal: (data) => (
@@ -372,6 +463,7 @@ function OrdersTable({
     },
     {
       header: "SO",
+      width: "35px",
       render: (row) => <CountCell count={getCount(row.items, "SO")} />,
       align: "center",
       renderTotal: (data) => (
@@ -382,6 +474,7 @@ function OrdersTable({
     },
     {
       header: "Problem",
+      width: "35px",
       render: (row) => (
         <CountCell count={getCount(row.items, "Problem", "problem")} />
       ),
@@ -397,6 +490,7 @@ function OrdersTable({
     },
     {
       header: "Purchase",
+      width: "35px",
       render: (row) => (
         <CountCell
           count={getCount(
@@ -428,6 +522,7 @@ function OrdersTable({
     },
     {
       header: "Paid",
+      width: "35px",
       render: (row) => (
         <CountCell count={getCount(row.items, "Paid", "paid")} />
       ),
@@ -443,6 +538,7 @@ function OrdersTable({
     },
     {
       header: "Checked",
+      width: "35px",
       render: (row) => (
         <CountCell count={getCount(row.items, "Checked", "checked")} />
       ),
@@ -458,6 +554,7 @@ function OrdersTable({
     },
     {
       header: "Printed",
+      width: "35px",
       render: (row) => (
         <CountCell count={getCount(row.items, "Printed", "printed")} />
       ),
@@ -473,6 +570,7 @@ function OrdersTable({
     },
     {
       header: "Invoiced",
+      width: "35px",
       render: (row) => (
         <CountCell count={getCount(row.items, "Invoiced", "invoiced")} />
       ),
@@ -488,6 +586,7 @@ function OrdersTable({
     },
     {
       header: "Shipped",
+      width: "35px",
       render: (row) => (
         <CountCell count={getCount(row.items, "Shipped", "shipped")} />
       ),
@@ -510,6 +609,10 @@ function OrdersTable({
       loading={loading}
       emptyMessage={isOrderItems ? "No Order Items Found" : "No Orders Found"}
       showTotals={!isOrderItems}
+      getRowClassName={(row) => {
+        const isExpress = (row.comment || "").toLowerCase().includes("express");
+        return isExpress ? "bg-red-50" : "";
+      }}
     />
   );
 }
@@ -527,6 +630,7 @@ const OrderPage = () => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [cargos, setCargos] = useState<CargoType[]>([]);
 
   const [itemsAll, setItemsAll] = useState<Item[]>([]);
   const [itemsByCategory, setItemsByCategory] = useState<Item[]>([]);
@@ -549,6 +653,9 @@ const OrderPage = () => {
   const [viewOrder, setViewOrder] = useState<any>(null);
   const [viewItems, setViewItems] = useState<OrderItemRow[]>([]);
 
+  const [showReassignModal, setShowReassignModal] = useState(false);
+  const [reassignOrder, setReassignOrder] = useState<any>(null);
+
   const [form, setForm] = useState({
     comment: "",
     customer_id: "",
@@ -559,30 +666,7 @@ const OrderPage = () => {
 
   const [selectedItemId, setSelectedItemId] = useState<string>("");
   const [orderItems, setOrderItems] = useState<OrderItemRow[]>([]);
-
-  const isTab1 =
-    activeTab !== "cargos" &&
-    activeTab !== "cargo_type" &&
-    activeTab !== "order_items";
-  const isTab2 = false;
-  const isConvertMode = mode === "convert";
-
-  const effectiveItems: Item[] = useMemo(() => {
-    if (form.supplier_id) return itemsBySupplier;
-    if (form.category_id) return itemsByCategory;
-    return itemsAll;
-  }, [
-    form.supplier_id,
-    itemsBySupplier,
-    form.category_id,
-    itemsByCategory,
-    itemsAll,
-  ]);
-
-  const loadingItems =
-    loadingItemsAll ||
-    (isTab1 && !!form.supplier_id && loadingItemsBySupplier) ||
-    (isTab1 && !!form.category_id && loadingItemsByCategory);
+  const [nsoSearch, setNsoSearch] = useState("");
 
   const itemById = useMemo(() => {
     const map = new Map<string, Item>();
@@ -611,6 +695,79 @@ const OrderPage = () => {
         ?.company_name ?? "-",
     [suppliers],
   );
+
+  const nsoGroups = useMemo(() => {
+    const groups = {
+      express: new Map<number, any>(),
+      normal: new Map<number, any>(),
+    };
+
+    orders.forEach((o: any) => {
+      const isExpress = (o.comment || "").toLowerCase().includes("express");
+      const targetMap = isExpress ? groups.express : groups.normal;
+
+      (o.items || []).forEach((item: any) => {
+        if (item.supplier_order_id) return;
+        const itemDetails = itemById.get(String(item.item_id));
+        const sId = o.supplier_id || itemDetails?.supplier_id;
+        if (!sId) return;
+
+        const sid = Number(sId);
+        if (!targetMap.has(sid)) {
+          targetMap.set(sid, {
+            supplier_id: sid,
+            supplier_name: getSupplierName(sid),
+            order_type: getCategoryName(o.category_id) || "Taobao",
+            count: 0,
+            qty: 0,
+          });
+        }
+
+        const g = targetMap.get(sid);
+        g.count += 1;
+        g.qty += Number(item.qty || 0);
+      });
+    });
+
+    const filterBySearch = (arr: any[]) => {
+      if (!nsoSearch) return arr;
+      const s = nsoSearch.toLowerCase();
+      return arr.filter(
+        (g) =>
+          String(g.supplier_id).includes(s) ||
+          g.supplier_name.toLowerCase().includes(s),
+      );
+    };
+
+    return {
+      express: filterBySearch(Array.from(groups.express.values())),
+      normal: filterBySearch(Array.from(groups.normal.values())),
+    };
+  }, [orders, itemById, getSupplierName, getCategoryName, nsoSearch]);
+
+  const isTab1 =
+    activeTab !== "cargos" &&
+    activeTab !== "cargo_type" &&
+    activeTab !== "order_items";
+  const isTab2 = false;
+  const isConvertMode = mode === "convert";
+
+  const effectiveItems: Item[] = useMemo(() => {
+    if (form.supplier_id) return itemsBySupplier;
+    if (form.category_id) return itemsByCategory;
+    return itemsAll;
+  }, [
+    form.supplier_id,
+    itemsBySupplier,
+    form.category_id,
+    itemsByCategory,
+    itemsAll,
+  ]);
+
+  const loadingItems =
+    loadingItemsAll ||
+    (isTab1 && !!form.supplier_id && loadingItemsBySupplier) ||
+    (isTab1 && !!form.category_id && loadingItemsByCategory);
 
   const canSubmit = useMemo(() => {
     if (isConvertMode) return orderItems.length > 0;
@@ -743,7 +900,18 @@ const OrderPage = () => {
     fetchCategories();
     fetchSuppliers();
     fetchAllItems();
+    fetchCargos();
   }, [fetchCustomers, fetchCategories, fetchSuppliers, fetchAllItems]);
+
+  const fetchCargos = useCallback(async () => {
+    try {
+      const res = await getAllCargos();
+      const data = res?.data ?? res;
+      setCargos(Array.isArray(data) ? data : data?.cargos || []);
+    } catch (e) {
+      console.error(e);
+    }
+  }, []);
 
   const handleCustomerChange = (customer_id: string) =>
     setForm((prev) => ({ ...prev, customer_id }));
@@ -1139,8 +1307,8 @@ const OrderPage = () => {
 
   return (
     <>
-      <div className="min-h-screen bg-white shadow-xl rounded-lg p-6">
-        <div className="max-w-7xl mx-auto">
+      <div className="min-h-screen bg-white shadow-xl rounded-lg p-2 md:p-4">
+        <div className="max-w-full mx-auto">
           <div className="mb-6">
             <div className="flex justify-between items-center mb-4">
               <div>
@@ -1177,6 +1345,149 @@ const OrderPage = () => {
               <CargosTab customers={customers} />
             ) : activeTab === "cargo_type" ? (
               <CargoTypesTab />
+            ) : activeTab === "nso" ? (
+              <div className="p-4 bg-gray-50/30 min-h-[600px]">
+                <div className="flex items-center justify-between mb-8 px-4">
+                  <button
+                    onClick={() => setActiveTab("orders")}
+                    className="bg-[#1e40af] text-white rounded px-6 py-2 flex items-center gap-2 font-bold text-sm shadow-md hover:bg-blue-800 transition"
+                  >
+                    <XMarkIcon className="h-4 w-4 bg-white text-[#1e40af] rounded-full p-0.5" />
+                    Back
+                  </button>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
+                      <MagnifyingGlassIcon className="h-5 w-5 text-gray-400" />
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="Search NSOs"
+                      value={nsoSearch}
+                      onChange={(e) => setNsoSearch(e.target.value)}
+                      className="pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 w-80 shadow-sm text-sm"
+                    />
+                  </div>
+                </div>
+                <div className="mb-10">
+                  <h2 className="text-lg font-bold text-gray-800 mb-4 px-2">
+                    Express Orders
+                  </h2>
+                  <DataTable
+                    data={nsoGroups.express}
+                    columns={[
+                      {
+                        header: "SupplierID",
+                        width: "120px",
+                        align: "center",
+                        render: (row) => (
+                          <div className="flex items-center justify-center gap-1 group cursor-pointer">
+                            <div className="bg-[#475569] text-white rounded px-3 py-1.5 flex items-center gap-4 text-xs font-bold w-20 justify-between shadow-sm">
+                              {row.supplier_id}
+                              <div className="bg-white rounded-full p-0.5">
+                                <ArrowRightIcon className="h-2 w-2 text-[#475569]" />
+                              </div>
+                            </div>
+                          </div>
+                        ),
+                      },
+                      {
+                        header: "Supplier name",
+                        render: (row) => row.supplier_name,
+                        align: "center",
+                      },
+                      {
+                        header: "Order Type",
+                        render: (row) => row.order_type,
+                        align: "center",
+                      },
+                      {
+                        header: "Count",
+                        render: (row) => row.count,
+                        align: "center",
+                      },
+                      {
+                        header: "QTY",
+                        render: (row) => row.qty,
+                        align: "center",
+                      },
+                      {
+                        header: "Actions",
+                        align: "center",
+                        render: (row) => (
+                          <div className="flex justify-center">
+                            <button className="bg-[#059669] text-white px-4 py-2 rounded-lg flex items-center gap-2 text-xs font-bold hover:bg-green-700 transition shadow-sm">
+                              <PlusCircleIcon className="h-5 w-5" />
+                              Supplier order
+                            </button>
+                          </div>
+                        ),
+                      },
+                    ]}
+                    loading={loadingOrders}
+                    emptyMessage="No Express NSOs found"
+                    getRowClassName={() => "bg-red-50"}
+                  />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-gray-800 mb-4 px-2">
+                    Normal Orders
+                  </h2>
+                  <DataTable
+                    data={nsoGroups.normal}
+                    columns={[
+                      {
+                        header: "SupplierID",
+                        width: "120px",
+                        align: "center",
+                        render: (row) => (
+                          <div className="flex items-center justify-center gap-1 group cursor-pointer">
+                            <div className="bg-[#475569] text-white rounded px-3 py-1.5 flex items-center gap-4 text-xs font-bold w-20 justify-between shadow-sm">
+                              {row.supplier_id}
+                              <div className="bg-white rounded-full p-0.5">
+                                <ArrowRightIcon className="h-2 w-2 text-[#475569]" />
+                              </div>
+                            </div>
+                          </div>
+                        ),
+                      },
+                      {
+                        header: "Supplier",
+                        render: (row) => row.supplier_name,
+                        align: "center",
+                      },
+                      {
+                        header: "Order Type",
+                        render: (row) => row.order_type,
+                        align: "center",
+                      },
+                      {
+                        header: "Count",
+                        render: (row) => row.count,
+                        align: "center",
+                      },
+                      {
+                        header: "QTY",
+                        render: (row) => row.qty,
+                        align: "center",
+                      },
+                      {
+                        header: "Actions",
+                        align: "center",
+                        render: (row) => (
+                          <div className="flex justify-center">
+                            <button className="bg-[#059669] text-white px-4 py-2 rounded-lg flex items-center gap-2 text-xs font-bold hover:bg-green-700 transition shadow-sm">
+                              <PlusCircleIcon className="h-5 w-5" />
+                              Supplier order
+                            </button>
+                          </div>
+                        ),
+                      },
+                    ]}
+                    loading={loadingOrders}
+                    emptyMessage="No Normal NSOs found"
+                  />
+                </div>
+              </div>
             ) : (
               <OrdersTable
                 orders={visibleOrders}
@@ -1190,6 +1501,10 @@ const OrderPage = () => {
                 canDelete={user?.role === UserRole.ADMIN}
                 showConvert={false}
                 onConvert={openConvert}
+                onReassign={(o) => {
+                  setReassignOrder(o);
+                  setShowReassignModal(true);
+                }}
                 activeTab={activeTab}
                 itemById={itemById}
               />
@@ -1197,6 +1512,62 @@ const OrderPage = () => {
           </div>
         </div>
       </div>
+
+      {showReassignModal && reassignOrder && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-[60]">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-gray-900">
+                Reassign Order to Cargo
+              </h3>
+              <button onClick={() => setShowReassignModal(false)}>
+                <XMarkIcon className="h-5 w-5 text-gray-500" />
+              </button>
+            </div>
+            <p className="text-sm text-gray-600 mb-4">
+              Order No:{" "}
+              <span className="font-semibold">{reassignOrder.order_no}</span>
+            </p>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Select Cargo
+                </label>
+                <select
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                  onChange={async (e) => {
+                    const cargoId = Number(e.target.value);
+                    if (!cargoId) return;
+                    try {
+                      await assignOrdersToCargo(cargoId, [reassignOrder.id]);
+                      toast.success(`Order reassigned to Cargo ${cargoId}`);
+                      setShowReassignModal(false);
+                      fetchOrders();
+                    } catch (err) {
+                      console.error(err);
+                    }
+                  }}
+                >
+                  <option value="">Select Cargo...</option>
+                  {cargos.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.cargo_no} ({c.cargo_status || "Open"})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="mt-6 flex justify-end">
+              <button
+                onClick={() => setShowReassignModal(false)}
+                className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showViewModal && viewOrder && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">

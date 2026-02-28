@@ -139,6 +139,7 @@ const Sidebar = () => {
   const [hasOverflow, setHasOverflow] = useState(false);
   const dispatch = useDispatch();
   const { user } = useSelector((state: RootState) => state.user);
+  const [isMounted, setIsMounted] = useState(false);
   const isMobile = useMediaQuery((theme: Theme) =>
     theme.breakpoints.down("md"),
   );
@@ -195,6 +196,11 @@ const Sidebar = () => {
   };
 
   useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isMounted) return;
     updateScrollButtons();
     const handleResize = () => {
       setTimeout(updateScrollButtons, 100);
@@ -205,12 +211,13 @@ const Sidebar = () => {
   }, [updateScrollButtons, menuItems, isCollapsed]);
 
   useEffect(() => {
+    if (!isMounted) return;
     const timer = setTimeout(updateScrollButtons, 150);
     return () => clearTimeout(timer);
-  }, [isCollapsed, updateScrollButtons]);
+  }, [isCollapsed, updateScrollButtons, isMounted]);
 
   const handleScroll = () => {
-    updateScrollButtons();
+    if (isMounted) updateScrollButtons();
   };
 
   const drawerContent = (
@@ -246,11 +253,12 @@ const Sidebar = () => {
             alt="Gtech"
             src="/logo.png"
             width={isCollapsed ? 80 : 170}
-            height={isCollapsed ? 80 : 780}
+            height={isCollapsed ? 80 : 80}
             priority
             style={{
               transition: "all 0.3s ease",
               objectFit: "contain",
+              height: "auto",
             }}
           />
         </Link>
@@ -293,8 +301,9 @@ const Sidebar = () => {
         <Divider sx={{ borderColor: "divider", mb: 2 }} />
 
         {/* Scroll Up Button - Only shows when needed */}
-        <Fade in={hasOverflow && showScrollUp}>
+        <Fade in={isMounted && hasOverflow && showScrollUp}>
           <Box
+            suppressHydrationWarning
             sx={{
               display: "flex",
               justifyContent: "center",
@@ -417,8 +426,9 @@ const Sidebar = () => {
             ))}
           </Box>
         </Box>
-        <Fade in={hasOverflow && showScrollDown}>
+        <Fade in={isMounted && hasOverflow && showScrollDown}>
           <Box
+            suppressHydrationWarning
             sx={{
               display: "flex",
               justifyContent: "center",
@@ -504,7 +514,7 @@ const Sidebar = () => {
 
   return (
     <>
-      {isMobile && (
+      {isMounted && isMobile && (
         <IconButton
           color="inherit"
           onClick={handleDrawerToggle}
@@ -524,8 +534,8 @@ const Sidebar = () => {
 
       <Drawer
         suppressHydrationWarning
-        variant={isMobile ? "temporary" : "permanent"}
-        open={!isMobile ? true : mobileOpen}
+        variant={isMounted && isMobile ? "temporary" : "permanent"}
+        open={!(isMounted && isMobile) ? true : mobileOpen}
         onClose={handleDrawerToggle}
         ModalProps={{ keepMounted: true }}
         sx={{
