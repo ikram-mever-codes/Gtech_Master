@@ -15,9 +15,17 @@ export type DataTableProps<T> = {
     loading: boolean;
     emptyMessage?: string;
     showTotals?: boolean;
+    getRowClassName?: (row: T, index: number) => string;
 };
 
-export function DataTable<T>({ data, columns, loading, emptyMessage = "No Data Found", showTotals = false }: DataTableProps<T>) {
+export function DataTable<T>({
+    data,
+    columns,
+    loading,
+    emptyMessage = "No Data Found",
+    showTotals = false,
+    getRowClassName
+}: DataTableProps<T>) {
     if (loading) {
         return (
             <div className="p-8 text-center">
@@ -69,7 +77,10 @@ export function DataTable<T>({ data, columns, loading, emptyMessage = "No Data F
                         </tr>
                     )}
                     {data.map((row, idx) => (
-                        <tr key={(row as any).id || idx} className="hover:bg-gray-50 transition-colors">
+                        <tr
+                            key={(row as any).id || idx}
+                            className={`hover:bg-gray-50 transition-colors ${getRowClassName ? getRowClassName(row, idx) : ""}`}
+                        >
                             {columns.map((c, i) => (
                                 <td
                                     key={i}
