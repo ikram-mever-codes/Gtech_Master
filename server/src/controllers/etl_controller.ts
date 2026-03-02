@@ -673,14 +673,14 @@ export class EtlController {
 
       fs.createReadStream(filePath)
         .pipe(parser)
-        .on("data", (data) => records.push(data))
+        .on("data", (data: any) => records.push(data))
         .on("end", () => {
           console.log(`CSV loaded: ${path.basename(filePath)}`, {
             rows: records.length,
           });
           resolve(records);
         })
-        .on("error", (err) => {
+        .on("error", (err: any) => {
           console.error(`Error reading CSV: ${path.basename(filePath)}`, err);
           reject(err);
         });
