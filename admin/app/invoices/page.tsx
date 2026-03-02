@@ -28,7 +28,6 @@ import {
   SortDesc,
 } from "lucide-react";
 
-// Import your API functions
 import {
   getAllInvoices,
   generateInvoicePdf,
@@ -39,8 +38,9 @@ import {
 import { useRouter } from "next/navigation";
 import PageHeader from "@/components/UI/PageHeader";
 import Link from "next/link";
+import CargosTab from "@/components/cargos/CargosTab";
+import CargoTypesTab from "@/components/cargos/CargoTypesTab";
 
-// Types
 interface Invoice {
   id: string;
   invoiceNumber: string;
@@ -92,10 +92,17 @@ interface FilterOptions {
   maxAmount: string;
 }
 
+const invoiceTabs = [
+  { id: "invoices", label: "Invoices" },
+  { id: "cargos", label: "Cargos" },
+  { id: "cargo_type", label: "Cargo Types" },
+] as const;
+
 const InvoiceListPage: React.FC = () => {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [filteredInvoices, setFilteredInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeInvTab, setActiveInvTab] = useState<"invoices" | "cargos" | "cargo_type">("invoices");
   const [searchTerm, setSearchTerm] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const [sortField, setSortField] = useState<keyof Invoice>("createdAt");
@@ -117,7 +124,6 @@ const InvoiceListPage: React.FC = () => {
     maxAmount: "",
   });
 
-  // Load invoices
   useEffect(() => {
     loadInvoices();
   }, []);
@@ -125,7 +131,6 @@ const InvoiceListPage: React.FC = () => {
   useEffect(() => {
     let filtered = invoices || [];
 
-    // Search filter
     if (searchTerm) {
       const searchLower = searchTerm.toLowerCase();
       filtered = filtered.filter(
@@ -139,14 +144,12 @@ const InvoiceListPage: React.FC = () => {
       );
     }
 
-    // Status filter
     if (filters.status) {
       filtered = filtered.filter(
         (invoice) => invoice.status === filters.status
       );
     }
 
-    // Date range filter
     if (filters.dateFrom) {
       filtered = filtered.filter(
         (invoice) => new Date(invoice.invoiceDate) >= new Date(filters.dateFrom)
@@ -158,7 +161,6 @@ const InvoiceListPage: React.FC = () => {
       );
     }
 
-    // Customer filter
     if (filters.customer) {
       const customerLower = filters.customer.toLowerCase();
       filtered = filtered.filter(
@@ -171,7 +173,6 @@ const InvoiceListPage: React.FC = () => {
       );
     }
 
-    // Amount range filter
     if (filters.minAmount) {
       filtered = filtered.filter(
         (invoice) => invoice.grossTotal >= parseFloat(filters.minAmount)
@@ -183,7 +184,6 @@ const InvoiceListPage: React.FC = () => {
       );
     }
 
-    // Sort
     filtered.sort((a, b) => {
       let aValue = a[sortField];
       let bValue = b[sortField];
@@ -193,7 +193,6 @@ const InvoiceListPage: React.FC = () => {
         bValue = b.customer?.companyName || "";
       }
 
-      // Handle null/undefined values
       if (aValue == null && bValue == null) return 0;
       if (aValue == null) return sortDirection === "asc" ? 1 : -1;
       if (bValue == null) return sortDirection === "asc" ? -1 : 1;
@@ -245,7 +244,6 @@ const InvoiceListPage: React.FC = () => {
     try {
       setActionLoading((prev) => ({ ...prev, [`paid-${invoiceId}`]: true }));
       await markInvoiceAsPaid(invoiceId);
-      // Refresh the invoices list
       await loadInvoices();
     } catch (error) {
       console.error("Failed to mark as paid:", error);
@@ -258,7 +256,6 @@ const InvoiceListPage: React.FC = () => {
     try {
       setActionLoading((prev) => ({ ...prev, [`cancel-${invoiceId}`]: true }));
       await cancelInvoice(invoiceId);
-      // Refresh the invoices list
       await loadInvoices();
     } catch (error) {
       console.error("Failed to cancel invoice:", error);
@@ -279,7 +276,6 @@ const InvoiceListPage: React.FC = () => {
           [`delete-${invoiceId}`]: true,
         }));
         await deleteInvoice(invoiceId);
-        // Refresh the invoices list
         await loadInvoices();
       } catch (error) {
         console.error("Failed to delete invoice:", error);
@@ -322,13 +318,11 @@ const InvoiceListPage: React.FC = () => {
     }
   };
 
-  // Pagination
   const totalPages = Math.ceil(filteredInvoices.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
   const currentInvoices = filteredInvoices.slice(startIndex, endIndex);
 
-  // Summary stats - with safe calculations
   const totalAmount = filteredInvoices.reduce(
     (sum, inv) => sum + (Number(inv.grossTotal) || 0),
     0
@@ -348,7 +342,6 @@ const InvoiceListPage: React.FC = () => {
       style={{ backgroundColor: "#F8F9FA", color: "#212529" }}
     >
       <div className="w-full mx-auto p-0">
-        {/* Header */}
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
           <div>
             <PageHeader title="Invoice Management" icon={FileText} />
@@ -379,7 +372,6 @@ const InvoiceListPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Stats Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 mb-6">
           <div
             className="bg-white rounded-md p-4 lg:p-6 border border-[#E9ECEF]"
@@ -470,14 +462,12 @@ const InvoiceListPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Search and Filters */}
         <div
           className="bg-white rounded-md border border-[#E9ECEF] mb-6"
           style={{ boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)" }}
         >
           <div className="p-4 lg:p-6">
             <div className="flex flex-col lg:flex-row gap-4">
-              {/* Search */}
               <div className="flex-1 relative">
                 <Search
                   className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4"
@@ -502,7 +492,6 @@ const InvoiceListPage: React.FC = () => {
                 />
               </div>
 
-              {/* Filter Toggle */}
               <button
                 onClick={() => setShowFilters(!showFilters)}
                 className="flex items-center gap-2 px-4 py-2 lg:py-3 border rounded-lg transition-colors"
@@ -517,7 +506,6 @@ const InvoiceListPage: React.FC = () => {
               </button>
             </div>
 
-            {/* Expanded Filters */}
             {showFilters && (
               <div className="mt-4 pt-4 border-t border-[#E9ECEF]">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
@@ -662,7 +650,6 @@ const InvoiceListPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Table */}
         <div
           className="bg-white rounded-md border border-[#E9ECEF] overflow-hidden"
           style={{ boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)" }}

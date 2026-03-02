@@ -11,6 +11,7 @@ import {
 import { Item } from "./items";
 import { Order } from "./orders";
 import { Cargo } from "./cargos";
+import { SupplierOrder } from "./supplier_orders";
 
 @Entity()
 export class OrderItem {
@@ -90,6 +91,10 @@ export class OrderItem {
   @ManyToOne(() => Order, (order) => order.orderItems)
   @JoinColumn({ name: "order_id" })
   order!: Order;
+
+  @ManyToOne(() => SupplierOrder, (so) => so.items, { nullable: true })
+  @JoinColumn({ name: "supplier_order_id" })
+  supplier_order?: SupplierOrder;
 
   @ManyToOne(() => Cargo, { nullable: true })
   @JoinColumn({ name: "cargo_id" })

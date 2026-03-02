@@ -78,7 +78,6 @@ __decorate([
 ], StarBusinessDetails.prototype, "comment", void 0);
 __decorate([
     (0, typeorm_1.OneToOne)(() => customers_1.Customer, (customer) => customer.starBusinessDetails),
-    (0, typeorm_1.JoinColumn)(),
     __metadata("design:type", customers_1.Customer)
 ], StarBusinessDetails.prototype, "customer", void 0);
 __decorate([

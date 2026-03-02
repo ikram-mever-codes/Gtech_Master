@@ -26,6 +26,8 @@ const orderRoutes_1 = __importDefault(require("./routes/orderRoutes"));
 const qtyRoutes_1 = __importDefault(require("./routes/qtyRoutes"));
 const supplier_routes_1 = __importDefault(require("./routes/supplier_routes"));
 const cargo_routes_1 = __importDefault(require("./routes/cargo_routes"));
+const cargo_type_routes_1 = __importDefault(require("./routes/cargo_type_routes"));
+const supplier_order_routes_1 = __importDefault(require("./routes/supplier_order_routes"));
 const app = (0, express_1.default)();
 const corsOptions = {
     origin: [
@@ -59,6 +61,8 @@ app.use("/api/v1/orders", orderRoutes_1.default);
 app.use("/api/v1/categories", qtyRoutes_1.default);
 app.use("/api/v1/suppliers", supplier_routes_1.default);
 app.use("/api/v1/cargos", cargo_routes_1.default);
+app.use("/api/v1/cargo-types", cargo_type_routes_1.default);
+app.use("/api/v1/supplier-orders", supplier_order_routes_1.default);
 const __uploads_dirname = path_1.default.resolve();
 app.use("/uploads", express_1.default.static(path_1.default.join(__uploads_dirname, "/uploads")));
 app.use(errorMiddleware_1.default);
@@ -79,7 +83,6 @@ database_1.AppDataSource.initialize()
     initializeCronJobs();
 })
     .catch((error) => console.log("Database connection error:", error));
-// 404 Not Found handler
 app.use((req, res, next) => {
     res.status(404).json({ message: "Resource Not Found!" });
 });

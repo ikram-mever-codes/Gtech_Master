@@ -88,6 +88,10 @@ __decorate([
     __metadata("design:type", String)
 ], Inquiry.prototype, "name", void 0);
 __decorate([
+    (0, typeorm_1.Column)({ type: "varchar", length: 255, nullable: true }),
+    __metadata("design:type", String)
+], Inquiry.prototype, "itemNo", void 0);
+__decorate([
     (0, typeorm_1.Column)({ type: "text", nullable: true }),
     __metadata("design:type", String)
 ], Inquiry.prototype, "image", void 0);
@@ -123,6 +127,26 @@ __decorate([
     }),
     __metadata("design:type", String)
 ], Inquiry.prototype, "purchasePriceCurrency", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "varchar", length: 100, nullable: true }),
+    __metadata("design:type", String)
+], Inquiry.prototype, "qty", void 0);
+__decorate([
+    (0, typeorm_1.Column)({
+        type: "enum",
+        enum: ["Monatlich", "2 monatlich", "Quartal", "halbjährlich", "jährlich"],
+        nullable: true,
+    }),
+    __metadata("design:type", String)
+], Inquiry.prototype, "interval", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "varchar", length: 100, nullable: true }),
+    __metadata("design:type", String)
+], Inquiry.prototype, "taric", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "varchar", length: 255, nullable: true, default: "Open" }),
+    __metadata("design:type", String)
+], Inquiry.prototype, "requestStatus", void 0);
 __decorate([
     (0, typeorm_1.ManyToOne)(() => customers_1.Customer, (customer) => customer.inquiries, {
         nullable: false,
@@ -248,6 +272,22 @@ __decorate([
     (0, typeorm_1.Column)({ type: "varchar", length: 500, nullable: true }),
     __metadata("design:type", String)
 ], Inquiry.prototype, "projectLink", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "varchar", length: 500, nullable: true }),
+    __metadata("design:type", String)
+], Inquiry.prototype, "asanaLink", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "text", nullable: true }),
+    __metadata("design:type", String)
+], Inquiry.prototype, "urgency1", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "text", nullable: true }),
+    __metadata("design:type", String)
+], Inquiry.prototype, "urgency2", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "json", nullable: true }),
+    __metadata("design:type", Array)
+], Inquiry.prototype, "painPoints", void 0);
 __decorate([
     (0, typeorm_1.CreateDateColumn)(),
     __metadata("design:type", Date)

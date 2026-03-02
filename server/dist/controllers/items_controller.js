@@ -51,7 +51,7 @@ const getItems = (req, res, next) => __awaiter(void 0, void 0, void 0, function*
         if (taricId) {
             whereConditions.taric_id = parseInt(taricId);
         }
-        const relations = ["parent", "taric", "category"];
+        const relations = ["parent", "taric", "category", "supplier"];
         const totalRecords = yield itemRepository.count({ where: whereConditions });
         const items = yield itemRepository.find({
             where: whereConditions,
@@ -63,7 +63,7 @@ const getItems = (req, res, next) => __awaiter(void 0, void 0, void 0, function*
             take: limitNum,
         });
         const formattedItems = items.map((item) => {
-            var _a, _b, _c, _d, _e;
+            var _a, _b, _c, _d, _e, _f;
             return ({
                 id: item.id,
                 de_no: ((_a = item.parent) === null || _a === void 0 ? void 0 : _a.de_no) || null,
@@ -78,12 +78,15 @@ const getItems = (req, res, next) => __awaiter(void 0, void 0, void 0, function*
                 taric_id: item.taric_id,
                 category_id: item.cat_id,
                 category: ((_e = item.category) === null || _e === void 0 ? void 0 : _e.name) || null,
+                supplier_id: item.supplier_id,
+                supplier_name: ((_f = item.supplier) === null || _f === void 0 ? void 0 : _f.name) || null,
                 weight: item.weight,
                 length: item.length,
                 width: item.width,
                 height: item.height,
                 remark: item.remark,
                 model: item.model,
+                painPoints: item.painPoints || [],
                 created_at: item.created_at,
                 updated_at: item.updated_at,
             });
@@ -107,7 +110,7 @@ const getItems = (req, res, next) => __awaiter(void 0, void 0, void 0, function*
 });
 exports.getItems = getItems;
 const getItemById = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12;
     try {
         const { id } = req.params;
         if (!id) {
@@ -120,7 +123,7 @@ const getItemById = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
         const orderItemRepository = database_1.AppDataSource.getRepository(order_items_1.OrderItem);
         const item = yield itemRepository.findOne({
             where: { id: parseInt(id) },
-            relations: ["parent", "taric", "category"],
+            relations: ["parent", "taric", "category", "supplier"],
         });
         if (!item) {
             return next(new errorHandler_1.default("Item not found", 404));
@@ -147,67 +150,70 @@ const getItemById = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
             category: ((_c = item.category) === null || _c === void 0 ? void 0 : _c.name) || "STD",
             model: item.model || "",
             remark: item.remark || "",
+            supplier_id: item.supplier_id,
+            supplier_name: ((_d = item.supplier) === null || _d === void 0 ? void 0 : _d.name) || "",
+            painPoints: item.painPoints || [],
             isActive: item.isActive === "Y",
             parent: {
-                noDE: ((_d = item.parent) === null || _d === void 0 ? void 0 : _d.de_no) || "NONE",
-                nameDE: ((_e = item.parent) === null || _e === void 0 ? void 0 : _e.name_de) || "NONE",
-                nameEN: ((_f = item.parent) === null || _f === void 0 ? void 0 : _f.name_en) || "NONE",
-                isActive: ((_g = item.parent) === null || _g === void 0 ? void 0 : _g.is_active) === "Y",
-                isSpecialItem: ((_h = item.parent) === null || _h === void 0 ? void 0 : _h.is_NwV) === "Y",
+                noDE: ((_e = item.parent) === null || _e === void 0 ? void 0 : _e.de_no) || "NONE",
+                nameDE: ((_f = item.parent) === null || _f === void 0 ? void 0 : _f.name_de) || "NONE",
+                nameEN: ((_g = item.parent) === null || _g === void 0 ? void 0 : _g.name_en) || "NONE",
+                isActive: ((_h = item.parent) === null || _h === void 0 ? void 0 : _h.is_active) === "Y",
+                isSpecialItem: ((_j = item.parent) === null || _j === void 0 ? void 0 : _j.is_NwV) === "Y",
                 priceEUR: 0,
                 priceRMB: 0,
                 isEURSpecial: item.is_eur_special === "Y",
                 isRMBSpecial: item.is_rmb_special === "Y",
             },
             dimensions: {
-                isbn: ((_j = item.ISBN) === null || _j === void 0 ? void 0 : _j.toString()) || "1",
-                weight: ((_k = item.weight) === null || _k === void 0 ? void 0 : _k.toString()) || "0",
-                length: ((_l = item.length) === null || _l === void 0 ? void 0 : _l.toString()) || "0",
-                width: ((_m = item.width) === null || _m === void 0 ? void 0 : _m.toString()) || "0",
-                height: ((_o = item.height) === null || _o === void 0 ? void 0 : _o.toString()) || "0",
+                isbn: ((_k = item.ISBN) === null || _k === void 0 ? void 0 : _k.toString()) || "1",
+                weight: ((_l = item.weight) === null || _l === void 0 ? void 0 : _l.toString()) || "0",
+                length: ((_m = item.length) === null || _m === void 0 ? void 0 : _m.toString()) || "0",
+                width: ((_o = item.width) === null || _o === void 0 ? void 0 : _o.toString()) || "0",
+                height: ((_p = item.height) === null || _p === void 0 ? void 0 : _p.toString()) || "0",
             },
             variationsDE: {
                 variations: [
-                    (_p = item.parent) === null || _p === void 0 ? void 0 : _p.var_de_1,
-                    (_q = item.parent) === null || _q === void 0 ? void 0 : _q.var_de_2,
-                    (_r = item.parent) === null || _r === void 0 ? void 0 : _r.var_de_3,
+                    (_q = item.parent) === null || _q === void 0 ? void 0 : _q.var_de_1,
+                    (_r = item.parent) === null || _r === void 0 ? void 0 : _r.var_de_2,
+                    (_s = item.parent) === null || _s === void 0 ? void 0 : _s.var_de_3,
                 ].filter(Boolean),
                 values: variationValues.map((v) => v.value_de).filter(Boolean),
             },
             variationsEN: {
                 variations: [
-                    (_s = item.parent) === null || _s === void 0 ? void 0 : _s.var_en_1,
-                    (_t = item.parent) === null || _t === void 0 ? void 0 : _t.var_en_2,
-                    (_u = item.parent) === null || _u === void 0 ? void 0 : _u.var_en_3,
+                    (_t = item.parent) === null || _t === void 0 ? void 0 : _t.var_en_1,
+                    (_u = item.parent) === null || _u === void 0 ? void 0 : _u.var_en_2,
+                    (_v = item.parent) === null || _v === void 0 ? void 0 : _v.var_en_3,
                 ].filter(Boolean),
                 values: variationValues.map((v) => v.value_en).filter(Boolean),
             },
             others: {
-                taricCode: ((_v = item.taric) === null || _v === void 0 ? void 0 : _v.code) || "",
+                taricCode: ((_w = item.taric) === null || _w === void 0 ? void 0 : _w.code) || "",
                 isQTYdiv: item.is_qty_dividable === "Y",
-                mc: ((_w = item.many_components) === null || _w === void 0 ? void 0 : _w.toString()) || "0",
-                er: ((_x = item.effort_rating) === null || _x === void 0 ? void 0 : _x.toString()) || "0",
+                mc: ((_x = item.many_components) === null || _x === void 0 ? void 0 : _x.toString()) || "0",
+                er: ((_y = item.effort_rating) === null || _y === void 0 ? void 0 : _y.toString()) || "0",
                 isMeter: item.is_meter_item === 1,
                 isPU: item.is_pu_item === 1,
                 isNPR: item.is_npr === "Y",
                 isNew: item.is_new === "Y",
-                warehouseItem: ((_z = (_y = warehouseItems[0]) === null || _y === void 0 ? void 0 : _y.id) === null || _z === void 0 ? void 0 : _z.toString()) || "",
-                idDE: ((_0 = item.ItemID_DE) === null || _0 === void 0 ? void 0 : _0.toString()) || "",
+                warehouseItem: ((_0 = (_z = warehouseItems[0]) === null || _z === void 0 ? void 0 : _z.id) === null || _0 === void 0 ? void 0 : _0.toString()) || "",
+                idDE: ((_1 = item.ItemID_DE) === null || _1 === void 0 ? void 0 : _1.toString()) || "",
                 noDE: item.parent_no_de || "",
-                nameDE: ((_1 = item.parent) === null || _1 === void 0 ? void 0 : _1.name_de) || "",
-                nameEN: ((_2 = item.parent) === null || _2 === void 0 ? void 0 : _2.name_en) || "",
+                nameDE: ((_2 = item.parent) === null || _2 === void 0 ? void 0 : _2.name_de) || "",
+                nameEN: ((_3 = item.parent) === null || _3 === void 0 ? void 0 : _3.name_en) || "",
                 isActive: item.isActive === "Y",
                 isStock: warehouseItems.some((wi) => wi.stock_qty > 0),
                 qty: warehouseItems
                     .reduce((sum, wi) => sum + wi.stock_qty, 0)
                     .toString(),
-                msq: ((_4 = (_3 = warehouseItems[0]) === null || _3 === void 0 ? void 0 : _3.msq) === null || _4 === void 0 ? void 0 : _4.toString()) || "0",
-                isNAO: ((_5 = warehouseItems[0]) === null || _5 === void 0 ? void 0 : _5.is_no_auto_order) === "Y",
-                buffer: ((_7 = (_6 = warehouseItems[0]) === null || _6 === void 0 ? void 0 : _6.buffer) === null || _7 === void 0 ? void 0 : _7.toString()) || "0",
-                isSnSI: ((_8 = warehouseItems[0]) === null || _8 === void 0 ? void 0 : _8.is_SnSI) === "Y",
-                foq: ((_9 = item.FOQ) === null || _9 === void 0 ? void 0 : _9.toString()) || "0",
-                fsq: ((_10 = item.FSQ) === null || _10 === void 0 ? void 0 : _10.toString()) || "0",
-                rmbPrice: ((_11 = item.RMB_Price) === null || _11 === void 0 ? void 0 : _11.toString()) || "0",
+                msq: ((_5 = (_4 = warehouseItems[0]) === null || _4 === void 0 ? void 0 : _4.msq) === null || _5 === void 0 ? void 0 : _5.toString()) || "0",
+                isNAO: ((_6 = warehouseItems[0]) === null || _6 === void 0 ? void 0 : _6.is_no_auto_order) === "Y",
+                buffer: ((_8 = (_7 = warehouseItems[0]) === null || _7 === void 0 ? void 0 : _7.buffer) === null || _8 === void 0 ? void 0 : _8.toString()) || "0",
+                isSnSI: ((_9 = warehouseItems[0]) === null || _9 === void 0 ? void 0 : _9.is_SnSI) === "Y",
+                foq: ((_10 = item.FOQ) === null || _10 === void 0 ? void 0 : _10.toString()) || "0",
+                fsq: ((_11 = item.FSQ) === null || _11 === void 0 ? void 0 : _11.toString()) || "0",
+                rmbPrice: ((_12 = item.RMB_Price) === null || _12 === void 0 ? void 0 : _12.toString()) || "0",
                 isDimensionSpecial: item.is_dimension_special === "Y",
                 suppCat: item.supp_cat || "",
             },
@@ -243,9 +249,16 @@ const createItem = (req, res, next) => __awaiter(void 0, void 0, void 0, functio
         const parentRepository = database_1.AppDataSource.getRepository(parents_1.Parent);
         const taricRepository = database_1.AppDataSource.getRepository(tarics_1.Taric);
         const categoryRepository = database_1.AppDataSource.getRepository(categories_1.Category);
-        const { item_name, item_name_cn, ean, parent_id, taric_id, cat_id, weight, length, width, height, remark, model, isActive = "Y", is_qty_dividable = "Y", is_npr = "N", is_eur_special = "N", is_rmb_special = "N", } = req.body;
+        const { item_name, item_name_cn, ean, parent_id, taric_id, cat_id, weight, length, width, height, supplier_id, remark, model, isActive = "Y", is_qty_dividable = "Y", is_npr = "N", is_eur_special = "N", is_rmb_special = "N", painPoints = [], } = req.body;
         if (!item_name || !parent_id) {
             return next(new errorHandler_1.default("Item name and parent ID are required", 400));
+        }
+        if (supplier_id) {
+            const supplierRepo = database_1.AppDataSource.getRepository(suppliers_1.Supplier);
+            const supplier = yield supplierRepo.findOne({ where: { id: supplier_id } });
+            if (!supplier) {
+                return next(new errorHandler_1.default("Supplier not found", 404));
+            }
         }
         const parent = yield parentRepository.findOne({ where: { id: parent_id } });
         if (!parent) {
@@ -278,6 +291,7 @@ const createItem = (req, res, next) => __awaiter(void 0, void 0, void 0, functio
             parent_id,
             taric_id,
             cat_id,
+            supplier_id,
             weight: weight ? parseFloat(weight) : null,
             length: length ? parseFloat(length) : 0,
             width: width ? parseFloat(width) : null,
@@ -289,6 +303,7 @@ const createItem = (req, res, next) => __awaiter(void 0, void 0, void 0, functio
             is_npr,
             is_eur_special,
             is_rmb_special,
+            painPoints,
             created_at: new Date(),
             updated_at: new Date(),
         });
@@ -315,6 +330,7 @@ const createItem = (req, res, next) => __awaiter(void 0, void 0, void 0, functio
                 item_name: newItem.item_name,
                 ean: newItem.ean,
                 parent_id: newItem.parent_id,
+                supplier_id: newItem.supplier_id,
                 isActive: newItem.isActive,
             },
         });
@@ -342,6 +358,7 @@ const updateItem = (req, res, next) => __awaiter(void 0, void 0, void 0, functio
             "parent_id",
             "taric_id",
             "cat_id",
+            "supplier_id",
             "weight",
             "length",
             "width",
@@ -370,6 +387,7 @@ const updateItem = (req, res, next) => __awaiter(void 0, void 0, void 0, functio
             "is_new",
             "supp_cat",
             "ItemID_DE",
+            "painPoints",
         ];
         updatableFields.forEach((field) => {
             const value = req.body[field];

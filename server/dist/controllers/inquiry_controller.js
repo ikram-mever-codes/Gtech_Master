@@ -17,6 +17,17 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
+var __rest = (this && this.__rest) || function (s, e) {
+    var t = {};
+    for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p) && e.indexOf(p) < 0)
+        t[p] = s[p];
+    if (s != null && typeof Object.getOwnPropertySymbols === "function")
+        for (var i = 0, p = Object.getOwnPropertySymbols(s); i < p.length; i++) {
+            if (e.indexOf(p[i]) < 0 && Object.prototype.propertyIsEnumerable.call(s, p[i]))
+                t[p[i]] = s[p[i]];
+        }
+    return t;
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.InquiryController = exports.ItemGenerator = exports.ConvertRequestToItemDto = exports.ConvertInquiryToItemDto = exports.BaseItemConversionDto = void 0;
 const inquiry_1 = require("../models/inquiry");
@@ -115,6 +126,11 @@ __decorate([
     (0, class_transformer_2.Type)(() => Number),
     __metadata("design:type", Number)
 ], BaseItemConversionDto.prototype, "RMBPrice", void 0);
+__decorate([
+    (0, class_validator_2.IsOptional)(),
+    (0, class_validator_2.IsString)({ each: true }),
+    __metadata("design:type", Array)
+], BaseItemConversionDto.prototype, "painPoints", void 0);
 __decorate([
     (0, class_validator_2.IsOptional)(),
     (0, class_validator_2.IsString)(),
@@ -220,7 +236,7 @@ class InquiryController {
                     .leftJoinAndSelect("inquiry.contactPerson", "contactPerson")
                     .leftJoinAndSelect("inquiry.requests", "requests")
                     .leftJoinAndSelect("requests.business", "business")
-                    .leftJoinAndSelect("business.customer", "businessCustomer", "businessCustomer.id = business.customerId")
+                    .leftJoinAndSelect("business.customer", "businessCustomer")
                     .leftJoinAndSelect("requests.contactPerson", "requestContactPerson")
                     .select([
                     "inquiry",
@@ -320,14 +336,7 @@ class InquiryController {
     createInquiry(request, response) {
         return __awaiter(this, void 0, void 0, function* () {
             try {
-                const { name, description, image, isAssembly, customerId, isEstimated, contactPersonId, status, priority, referenceNumber, requiredByDate, internalNotes, termsConditions, projectLink, assemblyInstructions, 
-                // New dimension fields
-                weight, width, height, length, 
-                // New shipping fields
-                isFragile, requiresSpecialHandling, handlingInstructions, numberOfPackages, packageType, 
-                // Purchase price fields
-                purchasePrice, purchasePriceCurrency, requests, } = request.body;
-                // Basic validation
+                const { name, description, image, isAssembly, customerId, isEstimated, contactPersonId, status, priority, referenceNumber, requiredByDate, internalNotes, termsConditions, projectLink, asanaLink, assemblyInstructions, weight, width, height, length, itemNo, urgency1, urgency2, painPoints, isFragile, requiresSpecialHandling, handlingInstructions, numberOfPackages, packageType, purchasePrice, purchasePriceCurrency, requests, } = request.body;
                 if (!name || !customerId) {
                     return response.status(400).json({
                         success: false,
@@ -356,7 +365,6 @@ class InquiryController {
                         });
                     }
                 }
-                // Create inquiry with all fields including dimensions
                 const inquiry = this.inquiryRepository.create({
                     name,
                     description,
@@ -371,14 +379,17 @@ class InquiryController {
                     internalNotes,
                     termsConditions,
                     projectLink,
+                    asanaLink,
                     assemblyInstructions,
-                    // Dimension fields
                     weight,
                     width,
                     height,
                     length,
+                    itemNo,
+                    urgency1,
+                    urgency2,
+                    painPoints,
                     isEstimated,
-                    // Shipping fields
                     isFragile: isFragile || false,
                     requiresSpecialHandling: requiresSpecialHandling || false,
                     handlingInstructions,
@@ -399,11 +410,13 @@ class InquiryController {
                     }
                     const requestEntities = requests.map((reqData) => {
                         let totalWeight = null;
-                        if (reqData.unitWeight && reqData.quantity) {
+                        const currentQty = reqData.qty || reqData.quantity;
+                        if (reqData.unitWeight && currentQty) {
                             totalWeight =
-                                parseFloat(reqData.unitWeight) * parseFloat(reqData.quantity);
+                                parseFloat(reqData.unitWeight) * parseFloat(currentQty);
                         }
-                        const requestItem = this.requestRepository.create(Object.assign(Object.assign({}, reqData), { businessId: starBusinessDetails.id, business: starBusinessDetails, inquiry: savedInquiry, qty: reqData.quantity, totalWeight: totalWeight || reqData.totalWeight }));
+                        const { id: _ignored } = reqData, reqDataWithoutId = __rest(reqData, ["id"]);
+                        const requestItem = this.requestRepository.create(Object.assign(Object.assign({}, reqDataWithoutId), { businessId: starBusinessDetails.id, business: starBusinessDetails, inquiry: savedInquiry, qty: currentQty, totalWeight: totalWeight || reqData.totalWeight }));
                         return requestItem;
                     });
                     yield this.requestRepository.save(requestEntities);
@@ -412,17 +425,23 @@ class InquiryController {
                     where: { id: savedInquiry.id },
                     relations: ["customer", "contactPerson", "requests"],
                 });
+                const user = request.user;
+                const filteredData = (0, dataFilter_1.filterDataByRole)(completeInquiry, (user === null || user === void 0 ? void 0 : user.role) || users_1.UserRole.STAFF);
                 return response.status(201).json({
                     success: true,
                     message: "Inquiry created successfully",
-                    data: completeInquiry,
+                    data: filteredData,
                 });
             }
             catch (error) {
                 console.error("Error creating inquiry:", error);
+                if (error instanceof Error) {
+                    console.error("Stack trace:", error.stack);
+                }
                 return response.status(500).json({
                     success: false,
                     message: "Internal server error",
+                    error: error instanceof Error ? error.message : "Unknown error"
                 });
             }
         });
@@ -432,7 +451,7 @@ class InquiryController {
             var _a;
             try {
                 const { id } = request.params;
-                const { name, description, image, isAssembly, contactPersonId, status, priority, referenceNumber, isEstimated, requiredByDate, internalNotes, termsConditions, projectLink, assemblyInstructions, weight, width, height, length, isFragile, requiresSpecialHandling, handlingInstructions, numberOfPackages, packageType, purchasePrice, purchasePriceCurrency, requests, } = request.body;
+                const { name, description, image, isAssembly, contactPersonId, status, priority, referenceNumber, isEstimated, requiredByDate, internalNotes, termsConditions, projectLink, asanaLink, assemblyInstructions, weight, width, height, length, itemNo, urgency1, urgency2, painPoints, isFragile, requiresSpecialHandling, handlingInstructions, numberOfPackages, packageType, purchasePrice, purchasePriceCurrency, requests, } = request.body;
                 const existingInquiry = yield this.inquiryRepository.findOne({
                     where: { id },
                     relations: [
@@ -460,7 +479,7 @@ class InquiryController {
                         });
                     }
                 }
-                const updateData = Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign({}, (name && { name })), (description !== undefined && { description })), (image !== undefined && { image })), (isAssembly !== undefined && { isAssembly })), (status !== undefined && { status })), (priority !== undefined && { priority })), (referenceNumber !== undefined && { referenceNumber })), (requiredByDate !== undefined && { requiredByDate })), (internalNotes !== undefined && { internalNotes })), (termsConditions !== undefined && { termsConditions })), (projectLink !== undefined && { projectLink })), (assemblyInstructions !== undefined && { assemblyInstructions })), (isEstimated !== undefined && { isEstimated })), (weight !== undefined && { weight })), (width !== undefined && { width })), (height !== undefined && { height })), (length !== undefined && { length })), (isFragile !== undefined && { isFragile })), (requiresSpecialHandling !== undefined && {
+                const updateData = Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign({}, (name && { name })), (description !== undefined && { description })), (image !== undefined && { image })), (isAssembly !== undefined && { isAssembly })), (status !== undefined && { status })), (priority !== undefined && { priority })), (referenceNumber !== undefined && { referenceNumber })), (requiredByDate !== undefined && { requiredByDate })), (internalNotes !== undefined && { internalNotes })), (termsConditions !== undefined && { termsConditions })), (projectLink !== undefined && { projectLink })), (asanaLink !== undefined && { asanaLink })), (assemblyInstructions !== undefined && { assemblyInstructions })), (isEstimated !== undefined && { isEstimated })), (weight !== undefined && { weight })), (width !== undefined && { width })), (height !== undefined && { height })), (length !== undefined && { length })), (itemNo !== undefined && { itemNo })), (urgency1 !== undefined && { urgency1 })), (urgency2 !== undefined && { urgency2 })), (painPoints !== undefined && { painPoints })), (isFragile !== undefined && { isFragile })), (requiresSpecialHandling !== undefined && {
                     requiresSpecialHandling,
                 })), (handlingInstructions !== undefined && { handlingInstructions })), (numberOfPackages !== undefined && { numberOfPackages })), (packageType !== undefined && { packageType })), (purchasePrice !== undefined && { purchasePrice })), (purchasePriceCurrency !== undefined && { purchasePriceCurrency }));
                 if (contactPerson !== undefined) {
@@ -483,11 +502,14 @@ class InquiryController {
                         if (starBusinessDetails) {
                             const requestEntities = requests.map((reqData) => {
                                 let totalWeight = null;
-                                if (reqData.unitWeight && reqData.quantity) {
+                                const currentQty = reqData.qty || reqData.quantity;
+                                if (reqData.unitWeight && currentQty) {
                                     totalWeight =
-                                        parseFloat(reqData.unitWeight) * parseFloat(reqData.quantity);
+                                        parseFloat(reqData.unitWeight) * parseFloat(currentQty);
                                 }
-                                const requestItem = this.requestRepository.create(Object.assign(Object.assign({}, reqData), { businessId: starBusinessDetails.id, business: starBusinessDetails, inquiry: existingInquiry, qty: reqData.quantity, totalWeight: totalWeight || reqData.totalWeight }));
+                                // Strip `id` so TypeORM always INSERTs a fresh row.
+                                const { id: _ignored } = reqData, reqDataWithoutId = __rest(reqData, ["id"]);
+                                const requestItem = this.requestRepository.create(Object.assign(Object.assign({}, reqDataWithoutId), { businessId: starBusinessDetails.id, business: starBusinessDetails, inquiry: existingInquiry, qty: currentQty, totalWeight: totalWeight || reqData.totalWeight }));
                                 return requestItem;
                             });
                             yield this.requestRepository.save(requestEntities);
@@ -633,11 +655,12 @@ class InquiryController {
                     });
                 }
                 let totalWeight = null;
-                if (requestData.unitWeight && requestData.quantity) {
+                const currentQty = requestData.qty || requestData.quantity;
+                if (requestData.unitWeight && currentQty) {
                     totalWeight =
-                        parseFloat(requestData.unitWeight) * parseFloat(requestData.quantity);
+                        parseFloat(requestData.unitWeight) * parseFloat(currentQty);
                 }
-                const requestItem = this.requestRepository.create(Object.assign(Object.assign({}, requestData), { inquiry, qty: requestData.quantity, totalWeight: totalWeight || requestData.totalWeight }));
+                const requestItem = this.requestRepository.create(Object.assign(Object.assign({}, requestData), { inquiry, qty: currentQty, totalWeight: totalWeight || requestData.totalWeight }));
                 const savedRequest = yield this.requestRepository.save(requestItem);
                 if (inquiry.status === "Draft") {
                     inquiry.status = savedRequest.status || "Draft";
@@ -785,13 +808,13 @@ class InquiryController {
                     itemData = Object.assign(Object.assign({}, itemData), { item_name: inquiry.name, item_name_cn: conversionData.itemNameCN || inquiry.description, photo: inquiry.image, remark: conversionData.remark || inquiry.description, note: conversionData.note || inquiry.internalNotes, weight: conversionData.weight || inquiry.weight, width: conversionData.width || inquiry.width, height: conversionData.height || inquiry.height, length: conversionData.length || inquiry.length, isEstimated: inquiry.isEstimated, FOQ: conversionData.FOQ ||
                             (((_b = (_a = inquiry.requests) === null || _a === void 0 ? void 0 : _a[0]) === null || _b === void 0 ? void 0 : _b.qty)
                                 ? parseInt(inquiry.requests[0].qty) || 0
-                                : 0), RMB_Price: conversionData.RMBPrice || inquiry.purchasePrice || 0 });
+                                : 0), RMB_Price: conversionData.RMBPrice || inquiry.purchasePrice || 0, painPoints: conversionData.painPoints || inquiry.painPoints || [] });
                 }
                 else {
                     itemData = Object.assign(Object.assign({}, itemData), { item_name: inquiry.name, item_name_cn: conversionData.itemNameCN || inquiry.description, photo: inquiry.image, model: conversionData.model, supp_cat: conversionData.suppCat, isEstimated: inquiry.isEstimated, weight: conversionData.weight || inquiry.weight, width: conversionData.width || inquiry.width, height: conversionData.height || inquiry.height, length: conversionData.length || inquiry.length, FOQ: conversionData.FOQ ||
                             (((_d = (_c = inquiry.requests) === null || _c === void 0 ? void 0 : _c[0]) === null || _d === void 0 ? void 0 : _d.qty)
                                 ? parseInt(inquiry.requests[0].qty) || 0
-                                : 0), FSQ: conversionData.FSQ, remark: conversionData.remark || inquiry.description, note: conversionData.note || inquiry.internalNotes, RMB_Price: conversionData.RMBPrice || inquiry.purchasePrice || 0 });
+                                : 0), FSQ: conversionData.FSQ, remark: conversionData.remark || inquiry.description, note: conversionData.note || inquiry.internalNotes, RMB_Price: conversionData.RMBPrice || inquiry.purchasePrice || 0, painPoints: conversionData.painPoints || inquiry.painPoints || [] });
                 }
                 const item = itemRepository.create(itemData);
                 const savedItem = yield itemRepository.save(item);
@@ -898,6 +921,7 @@ class InquiryController {
                     remark: conversionData.remark || requestedItem.comment,
                     note: conversionData.note || requestedItem.extraNote,
                     RMB_Price: conversionData.RMBPrice || requestedItem.purchasePrice || 0,
+                    painPoints: conversionData.painPoints || requestedItem.painPoints || [],
                     cat_id: conversionData.catId || null,
                     is_dimension_special: "N",
                     is_qty_dividable: "Y",

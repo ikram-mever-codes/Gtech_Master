@@ -31,6 +31,12 @@ import {
   assignOrdersToCargo,
   type CargoType,
 } from "@/api/cargos";
+import {
+  createSupplierOrder,
+  getAllSupplierOrders,
+  deleteSupplierOrder,
+  type SupplierOrder,
+} from "@/api/supplier_orders";
 
 import { getAllCustomers } from "@/api/customers";
 import {
@@ -118,8 +124,6 @@ const tabs = [
     label: "List Order Items",
     description: "View all order items",
   },
-  { id: "cargos", label: "Cargos", description: "Manage Cargos and Shipments" },
-  { id: "cargo_type", label: "Cargos type", description: "Manage Cargo Types" },
   {
     id: "nso",
     label: "NSO (No Supplier Orders)",
@@ -127,7 +131,7 @@ const tabs = [
   },
   {
     id: "supplier_orders",
-    label: "Supplier Orders",
+    label: "Suppliers Order",
     description: "Orders with suppliers",
   },
 ] as const;
@@ -631,6 +635,11 @@ const OrderPage = () => {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [cargos, setCargos] = useState<CargoType[]>([]);
+  const [supplierOrdersList, setSupplierOrdersList] = useState<SupplierOrder[]>(
+    [],
+  );
+  const [loadingSupplierOrders, setLoadingSupplierOrders] = useState(false);
+  const [supplierOrderSearch, setSupplierOrderSearch] = useState("");
 
   const [itemsAll, setItemsAll] = useState<Item[]>([]);
   const [itemsByCategory, setItemsByCategory] = useState<Item[]>([]);
@@ -655,6 +664,8 @@ const OrderPage = () => {
 
   const [showReassignModal, setShowReassignModal] = useState(false);
   const [reassignOrder, setReassignOrder] = useState<any>(null);
+  const [showSupplierConfirm, setShowSupplierConfirm] = useState(false);
+  const [pendingNsoGroup, setPendingNsoGroup] = useState<any>(null);
 
   const [form, setForm] = useState({
     comment: "",
@@ -709,23 +720,25 @@ const OrderPage = () => {
       (o.items || []).forEach((item: any) => {
         if (item.supplier_order_id) return;
         const itemDetails = itemById.get(String(item.item_id));
-        const sId = o.supplier_id || itemDetails?.supplier_id;
-        if (!sId) return;
+        const sId = o.supplier_id || itemDetails?.supplier_id || 0;
 
         const sid = Number(sId);
         if (!targetMap.has(sid)) {
           targetMap.set(sid, {
             supplier_id: sid,
-            supplier_name: getSupplierName(sid),
+            supplier_name: sid === 0 ? "Unassigned" : getSupplierName(sid),
             order_type: getCategoryName(o.category_id) || "Taobao",
+            category_id: o.category_id,
             count: 0,
             qty: 0,
+            items: [],
           });
         }
 
         const g = targetMap.get(sid);
         g.count += 1;
         g.qty += Number(item.qty || 0);
+        g.items.push(item);
       });
     });
 
@@ -745,10 +758,7 @@ const OrderPage = () => {
     };
   }, [orders, itemById, getSupplierName, getCategoryName, nsoSearch]);
 
-  const isTab1 =
-    activeTab !== "cargos" &&
-    activeTab !== "cargo_type" &&
-    activeTab !== "order_items";
+  const isTab1 = activeTab !== "order_items";
   const isTab2 = false;
   const isConvertMode = mode === "convert";
 
@@ -912,6 +922,51 @@ const OrderPage = () => {
       console.error(e);
     }
   }, []);
+
+  const fetchSupplierOrders = useCallback(async () => {
+    try {
+      setLoadingSupplierOrders(true);
+      const res: any = await getAllSupplierOrders({
+        search: supplierOrderSearch,
+      });
+      if (res.success) setSupplierOrdersList(res.data);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoadingSupplierOrders(false);
+    }
+  }, [supplierOrderSearch]);
+
+  const handleCreateSupplierOrderFromNSO = (group: any) => {
+    if (group.supplier_id === 0) {
+      toast.error("Please assign a supplier to these items first");
+      return;
+    }
+    setPendingNsoGroup(group);
+    setShowSupplierConfirm(true);
+  };
+
+  const confirmCreateSupplierOrder = async () => {
+    if (!pendingNsoGroup) return;
+    setShowSupplierConfirm(false);
+    try {
+      await createSupplierOrder({
+        supplier_id: pendingNsoGroup.supplier_id,
+        order_type_id: pendingNsoGroup.category_id,
+        item_ids: pendingNsoGroup.items.map((i: any) => i.id),
+      });
+      await fetchOrders();
+      await fetchSupplierOrders();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setPendingNsoGroup(null);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === "supplier_orders") fetchSupplierOrders();
+  }, [activeTab, fetchSupplierOrders]);
 
   const handleCustomerChange = (customer_id: string) =>
     setForm((prev) => ({ ...prev, customer_id }));
@@ -1297,8 +1352,6 @@ const OrderPage = () => {
   const tabActions: Record<(typeof tabs)[number]["id"], React.ReactNode> = {
     orders: defaultAction,
     order_items: defaultAction,
-    cargos: null,
-    cargo_type: null,
     nso: defaultAction,
     supplier_orders: defaultAction,
   };
@@ -1341,11 +1394,7 @@ const OrderPage = () => {
           </div>
 
           <div className="bg-white rounded-md shadow-lg border border-gray-200 overflow-hidden">
-            {activeTab === "cargos" ? (
-              <CargosTab customers={customers} />
-            ) : activeTab === "cargo_type" ? (
-              <CargoTypesTab />
-            ) : activeTab === "nso" ? (
+            {activeTab === "nso" ? (
               <div className="p-4 bg-gray-50/30 min-h-[600px]">
                 <div className="flex items-center justify-between mb-8 px-4">
                   <button
@@ -1415,7 +1464,12 @@ const OrderPage = () => {
                         align: "center",
                         render: (row) => (
                           <div className="flex justify-center">
-                            <button className="bg-[#059669] text-white px-4 py-2 rounded-lg flex items-center gap-2 text-xs font-bold hover:bg-green-700 transition shadow-sm">
+                            <button
+                              onClick={() =>
+                                handleCreateSupplierOrderFromNSO(row)
+                              }
+                              className="bg-[#059669] text-white px-4 py-2 rounded-lg flex items-center gap-2 text-xs font-bold hover:bg-green-700 transition shadow-sm"
+                            >
                               <PlusCircleIcon className="h-5 w-5" />
                               Supplier order
                             </button>
@@ -1475,7 +1529,12 @@ const OrderPage = () => {
                         align: "center",
                         render: (row) => (
                           <div className="flex justify-center">
-                            <button className="bg-[#059669] text-white px-4 py-2 rounded-lg flex items-center gap-2 text-xs font-bold hover:bg-green-700 transition shadow-sm">
+                            <button
+                              onClick={() =>
+                                handleCreateSupplierOrderFromNSO(row)
+                              }
+                              className="bg-[#059669] text-white px-4 py-2 rounded-lg flex items-center gap-2 text-xs font-bold hover:bg-green-700 transition shadow-sm"
+                            >
                               <PlusCircleIcon className="h-5 w-5" />
                               Supplier order
                             </button>
@@ -1487,6 +1546,101 @@ const OrderPage = () => {
                     emptyMessage="No Normal NSOs found"
                   />
                 </div>
+              </div>
+            ) : activeTab === "supplier_orders" ? (
+              <div className="p-4 bg-gray-50/30 min-h-[600px]">
+                <div className="flex justify-between items-center mb-6 gap-4">
+                  <div className="flex gap-2 items-center">
+                    <button
+                      onClick={() => setActiveTab("orders")}
+                      className="bg-blue-600 text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-blue-700 transition shadow-sm"
+                    >
+                      Back
+                    </button>
+                    <div className="relative">
+                      <MagnifyingGlassIcon className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                      <input
+                        type="text"
+                        placeholder="Search Supplier Orders..."
+                        className="pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-xs w-64 focus:ring-2 focus:ring-blue-500 transition"
+                        value={supplierOrderSearch}
+                        onChange={(e) => setSupplierOrderSearch(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <div className="text-blue-600 font-bold text-lg">
+                    Supplier Orders
+                  </div>
+                </div>
+                <DataTable
+                  data={supplierOrdersList}
+                  columns={[
+                    {
+                      header: "#",
+                      width: "40px",
+                      render: (_, i) => i + 1,
+                      align: "center",
+                    },
+                    {
+                      header: "SOID",
+                      width: "100px",
+                      align: "center",
+                      render: (row) => (
+                        <div className="flex items-center justify-center gap-1 group cursor-pointer">
+                          <div className="bg-[#475569] text-white rounded px-3 py-1.5 flex items-center gap-4 text-xs font-bold w-20 justify-between shadow-sm">
+                            {row.id}
+                            <div className="bg-white rounded-full p-0.5">
+                              <ArrowRightIcon className="h-2 w-2 text-[#475569]" />
+                            </div>
+                          </div>
+                        </div>
+                      ),
+                    },
+                    {
+                      header: "Supplier - ID",
+                      render: (row) =>
+                        `${row.supplier?.company_name || "-"} - ${row.supplier_id || ""}`,
+                      align: "center",
+                    },
+                    {
+                      header: "Order Type",
+                      render: (row) => row.order_type?.name || "Taobao",
+                      align: "center",
+                    },
+                    {
+                      header: "Ref No.",
+                      render: (row) => row.ref_no || "-",
+                      align: "center",
+                    },
+                    {
+                      header: "Remark",
+                      render: (row) => row.remark || "-",
+                      align: "center",
+                    },
+                    {
+                      header: "Date created",
+                      render: (row) =>
+                        new Date(row.created_at).toLocaleDateString(undefined, {
+                          day: "2-digit",
+                          month: "2-digit",
+                        }),
+                      align: "center",
+                    },
+                    {
+                      header: "Actions",
+                      width: "100px",
+                      align: "center",
+                      render: (row) => (
+                        <button className="px-4 py-1.5 bg-blue-600 text-white text-xs font-bold rounded-lg hover:bg-blue-700 transition flex items-center gap-2">
+                          <PencilIcon className="h-4 w-4" />
+                          Edit
+                        </button>
+                      ),
+                    },
+                  ]}
+                  loading={loadingSupplierOrders}
+                  emptyMessage="No Supplier Orders Found"
+                />
               </div>
             ) : (
               <OrdersTable
@@ -1563,6 +1717,66 @@ const OrderPage = () => {
                 className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition"
               >
                 Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showSupplierConfirm && pendingNsoGroup && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70]">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 border border-gray-100">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="bg-green-100 rounded-full p-2">
+                <PlusCircleIcon className="h-6 w-6 text-green-600" />
+              </div>
+              <h3 className="text-lg font-bold text-gray-900">
+                Create Supplier Order
+              </h3>
+            </div>
+            <p className="text-sm text-gray-600 mb-2">
+              You are about to create a supplier order for:
+            </p>
+            <div className="bg-gray-50 rounded-xl p-3 mb-5 space-y-1 text-sm">
+              <div className="flex justify-between">
+                <span className="text-gray-500">Supplier</span>
+                <span className="font-semibold text-gray-800">
+                  {pendingNsoGroup.supplier_name}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Items</span>
+                <span className="font-semibold text-gray-800">
+                  {pendingNsoGroup.count} item(s)
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Total Qty</span>
+                <span className="font-semibold text-gray-800">
+                  {pendingNsoGroup.qty}
+                </span>
+              </div>
+            </div>
+            <p className="text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-2 mb-5">
+              ⚠ These items will be moved out of NSO and linked to the new
+              supplier order.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => {
+                  setShowSupplierConfirm(false);
+                  setPendingNsoGroup(null);
+                }}
+                className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmCreateSupplierOrder}
+                className="px-5 py-2 text-sm bg-[#059669] text-white rounded-lg hover:bg-green-700 transition font-bold flex items-center gap-2"
+              >
+                <PlusCircleIcon className="h-4 w-4" />
+                Confirm
               </button>
             </div>
           </div>

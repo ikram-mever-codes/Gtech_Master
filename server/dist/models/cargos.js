@@ -11,6 +11,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Cargo = void 0;
 const typeorm_1 = require("typeorm");
+const customers_1 = require("./customers");
 let Cargo = class Cargo {
 };
 exports.Cargo = Cargo;
@@ -19,15 +20,20 @@ __decorate([
     __metadata("design:type", Number)
 ], Cargo.prototype, "id", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ type: "int", nullable: true }),
-    __metadata("design:type", Number)
+    (0, typeorm_1.Column)({ nullable: true }),
+    __metadata("design:type", String)
 ], Cargo.prototype, "customer_id", void 0);
+__decorate([
+    (0, typeorm_1.ManyToOne)(() => customers_1.Customer, { nullable: true, onDelete: "SET NULL" }),
+    (0, typeorm_1.JoinColumn)({ name: "customer_id" }),
+    __metadata("design:type", customers_1.Customer)
+], Cargo.prototype, "customer", void 0);
 __decorate([
     (0, typeorm_1.Column)({ type: "int", nullable: true }),
     __metadata("design:type", Number)
 ], Cargo.prototype, "cargo_type_id", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ type: "varchar", length: 50, nullable: true }),
+    (0, typeorm_1.Column)({ type: "varchar", length: 150, nullable: true }),
     __metadata("design:type", String)
 ], Cargo.prototype, "cargo_no", void 0);
 __decorate([
@@ -43,7 +49,7 @@ __decorate([
     __metadata("design:type", Date)
 ], Cargo.prototype, "eta", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ type: "varchar", length: 50, nullable: true }),
+    (0, typeorm_1.Column)({ type: "varchar", length: 255, nullable: true }),
     __metadata("design:type", String)
 ], Cargo.prototype, "note", void 0);
 __decorate([
@@ -55,13 +61,109 @@ __decorate([
     __metadata("design:type", String)
 ], Cargo.prototype, "remark", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ type: "varchar", length: 10, default: "Open" }),
+    (0, typeorm_1.Column)({ type: "varchar", length: 50, default: "Open" }),
     __metadata("design:type", String)
 ], Cargo.prototype, "cargo_status", void 0);
 __decorate([
     (0, typeorm_1.Column)({ type: "date", nullable: true }),
     __metadata("design:type", Date)
 ], Cargo.prototype, "shipped_at", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "varchar", length: 50, default: "Other Customer" }),
+    __metadata("design:type", String)
+], Cargo.prototype, "customer_type", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "varchar", nullable: true }),
+    __metadata("design:type", String)
+], Cargo.prototype, "bill_to_company_name", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "varchar", nullable: true }),
+    __metadata("design:type", String)
+], Cargo.prototype, "bill_to_display_name", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "varchar", nullable: true }),
+    __metadata("design:type", String)
+], Cargo.prototype, "bill_to_phone_no", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "varchar", nullable: true }),
+    __metadata("design:type", String)
+], Cargo.prototype, "bill_to_tax_no", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "varchar", nullable: true }),
+    __metadata("design:type", String)
+], Cargo.prototype, "bill_to_email", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "varchar", nullable: true }),
+    __metadata("design:type", String)
+], Cargo.prototype, "bill_to_website", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "varchar", nullable: true }),
+    __metadata("design:type", String)
+], Cargo.prototype, "bill_to_contact_person", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "varchar", nullable: true }),
+    __metadata("design:type", String)
+], Cargo.prototype, "bill_to_contact_phone", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "varchar", nullable: true }),
+    __metadata("design:type", String)
+], Cargo.prototype, "bill_to_contact_mobile", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "varchar", nullable: true }),
+    __metadata("design:type", String)
+], Cargo.prototype, "bill_to_contact_email", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "varchar", nullable: true }),
+    __metadata("design:type", String)
+], Cargo.prototype, "bill_to_country", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "varchar", nullable: true }),
+    __metadata("design:type", String)
+], Cargo.prototype, "bill_to_city", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "varchar", nullable: true }),
+    __metadata("design:type", String)
+], Cargo.prototype, "bill_to_postal_code", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "text", nullable: true }),
+    __metadata("design:type", String)
+], Cargo.prototype, "bill_to_full_address", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "varchar", nullable: true }),
+    __metadata("design:type", String)
+], Cargo.prototype, "ship_to_company_name", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "varchar", nullable: true }),
+    __metadata("design:type", String)
+], Cargo.prototype, "ship_to_display_name", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "varchar", nullable: true }),
+    __metadata("design:type", String)
+], Cargo.prototype, "ship_to_contact_person", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "varchar", nullable: true }),
+    __metadata("design:type", String)
+], Cargo.prototype, "ship_to_contact_phone", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "varchar", nullable: true }),
+    __metadata("design:type", String)
+], Cargo.prototype, "ship_to_country", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "varchar", nullable: true }),
+    __metadata("design:type", String)
+], Cargo.prototype, "ship_to_city", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "varchar", nullable: true }),
+    __metadata("design:type", String)
+], Cargo.prototype, "ship_to_postal_code", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "text", nullable: true }),
+    __metadata("design:type", String)
+], Cargo.prototype, "ship_to_full_address", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "text", nullable: true }),
+    __metadata("design:type", String)
+], Cargo.prototype, "ship_to_remarks", void 0);
 __decorate([
     (0, typeorm_1.CreateDateColumn)(),
     __metadata("design:type", Date)

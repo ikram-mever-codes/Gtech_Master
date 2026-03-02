@@ -15,6 +15,7 @@ const typeorm_1 = require("typeorm");
 const order_items_1 = require("./order_items");
 const categories_1 = require("./categories");
 const suppliers_1 = require("./suppliers");
+const cargos_1 = require("./cargos");
 let Order = class Order {
 };
 exports.Order = Order;
@@ -68,6 +69,15 @@ __decorate([
     (0, typeorm_1.JoinColumn)({ name: "supplier_id" }),
     __metadata("design:type", suppliers_1.Supplier)
 ], Order.prototype, "supplier", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "int", nullable: true }),
+    __metadata("design:type", Number)
+], Order.prototype, "cargo_id", void 0);
+__decorate([
+    (0, typeorm_1.ManyToOne)(() => cargos_1.Cargo),
+    (0, typeorm_1.JoinColumn)({ name: "cargo_id" }),
+    __metadata("design:type", cargos_1.Cargo)
+], Order.prototype, "cargo", void 0);
 __decorate([
     (0, typeorm_1.OneToMany)(() => order_items_1.OrderItem, (orderItem) => orderItem.order),
     __metadata("design:type", Array)

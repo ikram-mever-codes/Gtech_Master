@@ -101,7 +101,6 @@ const EditItemPage = () => {
             is_npr: false,
             is_eur_special: false,
             is_rmb_special: false,
-            // New fields
             isbn: "",
             mc: "0",
             er: "0",

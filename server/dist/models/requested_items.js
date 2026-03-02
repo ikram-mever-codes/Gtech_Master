@@ -49,6 +49,10 @@ __decorate([
 __decorate([
     (0, typeorm_1.Column)({ type: "varchar", length: 255, nullable: true }),
     __metadata("design:type", String)
+], RequestedItem.prototype, "itemNo", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "varchar", length: 255, nullable: true }),
+    __metadata("design:type", String)
 ], RequestedItem.prototype, "material", void 0);
 __decorate([
     (0, typeorm_1.Column)({ type: "text", nullable: true }),
@@ -157,6 +161,30 @@ __decorate([
     (0, typeorm_1.Column)({ type: "boolean", default: false }),
     __metadata("design:type", Boolean)
 ], RequestedItem.prototype, "isEstimated", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "json", nullable: true }),
+    __metadata("design:type", Array)
+], RequestedItem.prototype, "qualityCriteria", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "json", nullable: true }),
+    __metadata("design:type", Array)
+], RequestedItem.prototype, "attachments", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "varchar", length: 100, nullable: true }),
+    __metadata("design:type", String)
+], RequestedItem.prototype, "taric", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "text", nullable: true }),
+    __metadata("design:type", String)
+], RequestedItem.prototype, "urgency1", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "text", nullable: true }),
+    __metadata("design:type", String)
+], RequestedItem.prototype, "urgency2", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "json", nullable: true }),
+    __metadata("design:type", Array)
+], RequestedItem.prototype, "painPoints", void 0);
 __decorate([
     (0, typeorm_1.ManyToOne)(() => inquiry_1.Inquiry, (inquiry) => inquiry.requests, {
         nullable: true,

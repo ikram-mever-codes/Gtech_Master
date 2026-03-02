@@ -15,6 +15,7 @@ const parents_1 = require("./parents");
 const tarics_1 = require("./tarics");
 const categories_1 = require("./categories");
 const order_items_1 = require("./order_items");
+const suppliers_1 = require("./suppliers");
 let Item = class Item {
 };
 exports.Item = Item;
@@ -159,9 +160,17 @@ __decorate([
     __metadata("design:type", String)
 ], Item.prototype, "isActive", void 0);
 __decorate([
+    (0, typeorm_1.Column)({ type: "json", nullable: true }),
+    __metadata("design:type", Array)
+], Item.prototype, "painPoints", void 0);
+__decorate([
     (0, typeorm_1.Column)({ type: "varchar", length: 200, nullable: true }),
     __metadata("design:type", String)
 ], Item.prototype, "note", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ nullable: true }),
+    __metadata("design:type", Number)
+], Item.prototype, "supplier_id", void 0);
 __decorate([
     (0, typeorm_1.CreateDateColumn)(),
     __metadata("design:type", Date)
@@ -189,6 +198,11 @@ __decorate([
     (0, typeorm_1.JoinColumn)({ name: "cat_id" }),
     __metadata("design:type", Object)
 ], Item.prototype, "category", void 0);
+__decorate([
+    (0, typeorm_1.ManyToOne)(() => suppliers_1.Supplier, { nullable: true }),
+    (0, typeorm_1.JoinColumn)({ name: "supplier_id" }),
+    __metadata("design:type", Object)
+], Item.prototype, "supplier", void 0);
 __decorate([
     (0, typeorm_1.OneToMany)(() => order_items_1.OrderItem, orderItem => orderItem.item),
     __metadata("design:type", Array)
