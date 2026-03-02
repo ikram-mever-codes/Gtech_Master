@@ -4,6 +4,7 @@ import { AppDataSource } from "../config/database";
 import { Supplier } from "../models/suppliers";
 import { SupplierItem } from "../models/supplier_items";
 import { Like, ILike } from "typeorm";
+import { Item } from "../models/items";
 
 export const getAllSuppliers = async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -165,16 +166,38 @@ export const deleteSupplier = async (req: Request, res: Response, next: NextFunc
 export const getSupplierItems = async (req: Request, res: Response, next: NextFunction) => {
     try {
         const { id } = req.params;
-        const supplierItemRepo = AppDataSource.getRepository(SupplierItem);
+        const supplierId = Number(id);
 
+        const supplierItemRepo = AppDataSource.getRepository(SupplierItem);
+        const itemRepo = AppDataSource.getRepository(Item);
+
+        // Fetch items from the junction table
         const supplierItems = await supplierItemRepo.find({
-            where: { supplier_id: Number(id) },
+            where: { supplier_id: supplierId },
             relations: ["item"]
         });
 
-        const items = supplierItems
-            .filter((si) => si.item)
-            .map((si) => si.item);
+        // Fetch items from the main Item table where supplier_id matches
+        const itemsFromMainTable = await itemRepo.find({
+            where: { supplier_id: supplierId }
+        });
+
+        // Use a Map to deduplicate items by their ID
+        const itemMap = new Map<number, any>();
+
+        // Add items from the junction table
+        supplierItems.forEach(si => {
+            if (si.item) {
+                itemMap.set(si.item.id, si.item);
+            }
+        });
+
+        // Add items from the main Item table (overwriting if already present)
+        itemsFromMainTable.forEach(item => {
+            itemMap.set(item.id, item);
+        });
+
+        const items = Array.from(itemMap.values());
 
         res.status(200).json({
             success: true,

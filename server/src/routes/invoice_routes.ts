@@ -6,8 +6,6 @@ import { UserRole } from "../models/users";
 const router: any = Router();
 
 router.use(authenticateUser);
-
-// Invoice Routes - Restricted to Admin and Sales
 router.post("/", authorize(UserRole.SALES), InvoiceController.createInvoice);
 router.put("/:id", authorize(UserRole.SALES), InvoiceController.updateInvoice);
 router.delete("/:id", authorize(UserRole.SALES), InvoiceController.deleteInvoice);

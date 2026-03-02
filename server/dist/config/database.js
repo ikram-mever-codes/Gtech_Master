@@ -76,6 +76,8 @@ const inquiry_1 = require("../models/inquiry");
 const offer_1 = require("../models/offer");
 const cargos_1 = require("../models/cargos");
 const cargo_orders_1 = require("../models/cargo_orders");
+const cargo_types_1 = require("../models/cargo_types");
+const supplier_orders_1 = require("../models/supplier_orders");
 dotenv_1.default.config();
 exports.AppDataSource = new typeorm_1.DataSource({
     type: "postgres",
@@ -122,6 +124,8 @@ exports.AppDataSource = new typeorm_1.DataSource({
         categories_1.Category,
         cargos_1.Cargo,
         cargo_orders_1.CargoOrder,
+        cargo_types_1.CargoType,
+        supplier_orders_1.SupplierOrder,
     ],
     extra: {
         ssl: process.env.DB_SSL === "true"

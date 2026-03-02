@@ -33,7 +33,6 @@ const PORT = process.env.PORT || 1000;
         process.exit(1);
     }
 }))();
-// Function to fetch item data from MIS DB
 function fetchItemData(itemId) {
     return __awaiter(this, void 0, void 0, function* () {
         const connection = yield (0, misDb_1.getConnection)();

@@ -132,7 +132,6 @@ class RequestedItemController {
                         message: "Requested item not found",
                     });
                 }
-                // Get customer information for the business
                 const customerRepository = database_1.AppDataSource.getRepository(customers_1.Customer);
                 const customer = yield customerRepository.findOne({
                     where: { starBusinessDetails: { id: item.businessId } },
@@ -170,15 +169,8 @@ class RequestedItemController {
     createRequestedItem(request, response) {
         return __awaiter(this, void 0, void 0, function* () {
             try {
-                const { businessId, contactPersonId, extraNote, itemName, material, specification, extraItems, extraItemsDescriptions, qty, asanaLink, interval, sampleQty, expectedDelivery, priority, requestStatus, comment, 
-                // New dimension fields
-                weight, width, height, length, 
-                // Purchase price fields
-                purchasePrice, currency, 
-                // Inquiry reference
-                inquiryId, } = request.body;
-                console.log("Received contactPersonId:", contactPersonId); // Debug log
-                // Basic validation
+                const { businessId, contactPersonId, extraNote, itemName, material, specification, extraItems, extraItemsDescriptions, qty, asanaLink, interval, sampleQty, expectedDelivery, priority, requestStatus, comment, weight, width, height, length, purchasePrice, currency, inquiryId, qualityCriteria, attachments, taric, itemNo, urgency1, urgency2, painPoints, } = request.body;
+                console.log("Received contactPersonId:", contactPersonId);
                 if (!businessId || !itemName || !qty) {
                     return response.status(400).json({
                         success: false,
@@ -237,14 +229,19 @@ class RequestedItemController {
                     priority: priority || "Normal",
                     requestStatus: requestStatus || "Open",
                     comment,
-                    // Dimension fields
                     weight,
                     width,
                     height,
                     length,
-                    // Purchase price fields
                     purchasePrice,
                     currency: currency || "RMB",
+                    qualityCriteria,
+                    attachments,
+                    taric,
+                    itemNo,
+                    urgency1,
+                    urgency2,
+                    painPoints,
                 });
                 const savedItem = yield this.requestedItemRepository.save(requestedItem);
                 const itemWithRelations = yield this.requestedItemRepository.findOne({
@@ -270,13 +267,7 @@ class RequestedItemController {
         return __awaiter(this, void 0, void 0, function* () {
             try {
                 const { id } = request.params;
-                const { contactPersonId, itemName, material, specification, extraItems, extraNote, extraItemsDescriptions, qty, asanaLink, interval, sampleQty, expectedDelivery, priority, requestStatus, comment, 
-                // New dimension fields
-                weight, width, height, length, 
-                // Purchase price fields
-                purchasePrice, currency, 
-                // Inquiry reference
-                inquiryId, } = request.body;
+                const { contactPersonId, itemName, material, specification, extraItems, extraNote, extraItemsDescriptions, qty, asanaLink, interval, sampleQty, expectedDelivery, priority, requestStatus, comment, weight, width, height, length, purchasePrice, currency, inquiryId, qualityCriteria, attachments, taric, itemNo, urgency1, urgency2, painPoints, } = request.body;
                 const existingItem = yield this.requestedItemRepository.findOne({
                     where: { id },
                     relations: ["business", "contactPerson", "inquiry"],
@@ -301,7 +292,6 @@ class RequestedItemController {
                         }
                     }
                     else {
-                        // If contactPersonId is explicitly set to null/empty, clear the relation
                         contactPerson = null;
                     }
                 }
@@ -319,11 +309,10 @@ class RequestedItemController {
                         }
                     }
                     else {
-                        // If inquiryId is explicitly set to null/empty, clear the relation
                         inquiry = null;
                     }
                 }
-                const updateData = Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign({}, (itemName && { itemName })), (extraNote !== undefined && { extraNote })), (asanaLink !== undefined && { asanaLink })), (material !== undefined && { material })), (specification !== undefined && { specification })), (extraItems && { extraItems })), (extraItemsDescriptions !== undefined && { extraItemsDescriptions })), (qty && { qty })), (interval && { interval })), (sampleQty !== undefined && { sampleQty })), (expectedDelivery !== undefined && { expectedDelivery })), (priority && { priority })), (requestStatus && { requestStatus })), (comment !== undefined && { comment })), (weight !== undefined && { weight })), (width !== undefined && { width })), (height !== undefined && { height })), (length !== undefined && { length })), (purchasePrice !== undefined && { purchasePrice })), (currency && { currency }));
+                const updateData = Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign({}, (itemName && { itemName })), (extraNote !== undefined && { extraNote })), (asanaLink !== undefined && { asanaLink })), (material !== undefined && { material })), (specification !== undefined && { specification })), (extraItems && { extraItems })), (extraItemsDescriptions !== undefined && { extraItemsDescriptions })), (qty && { qty })), (interval && { interval })), (sampleQty !== undefined && { sampleQty })), (expectedDelivery !== undefined && { expectedDelivery })), (priority && { priority })), (requestStatus && { requestStatus })), (comment !== undefined && { comment })), (weight !== undefined && { weight })), (width !== undefined && { width })), (height !== undefined && { height })), (length !== undefined && { length })), (purchasePrice !== undefined && { purchasePrice })), (currency && { currency })), (qualityCriteria !== undefined && { qualityCriteria })), (attachments !== undefined && { attachments })), (taric !== undefined && { taric })), (itemNo !== undefined && { itemNo })), (urgency1 !== undefined && { urgency1 })), (urgency2 !== undefined && { urgency2 })), (painPoints !== undefined && { painPoints }));
                 if (contactPerson !== undefined) {
                     updateData.contactPerson = contactPerson;
                     updateData.contactPersonId = contactPerson ? contactPerson.id : null;
@@ -507,7 +496,6 @@ class RequestedItemController {
             }
         });
     }
-    // New method: Calculate volume for a requested item
     calculateItemVolume(request, response) {
         return __awaiter(this, void 0, void 0, function* () {
             try {
@@ -557,7 +545,6 @@ class RequestedItemController {
             }
         });
     }
-    // New method: Update multiple requested items with dimensions
     bulkUpdateDimensions(request, response) {
         return __awaiter(this, void 0, void 0, function* () {
             try {
@@ -628,7 +615,6 @@ class RequestedItemController {
             }
         });
     }
-    // New method: Get items with missing dimensions
     getItemsWithMissingDimensions(request, response) {
         return __awaiter(this, void 0, void 0, function* () {
             try {

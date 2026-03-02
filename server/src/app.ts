@@ -22,6 +22,7 @@ import qtyRoutes from "./routes/qtyRoutes";
 import supplierRoutes from "./routes/supplier_routes";
 import cargoRoutes from "./routes/cargo_routes";
 import cargoTypeRoutes from "./routes/cargo_type_routes";
+import supplierOrderRoutes from "./routes/supplier_order_routes";
 
 const app: any = express();
 
@@ -60,6 +61,7 @@ app.use("/api/v1/categories", qtyRoutes);
 app.use("/api/v1/suppliers", supplierRoutes);
 app.use("/api/v1/cargos", cargoRoutes);
 app.use("/api/v1/cargo-types", cargoTypeRoutes);
+app.use("/api/v1/supplier-orders", supplierOrderRoutes);
 
 const __uploads_dirname = path.resolve();
 app.use("/uploads", express.static(path.join(__uploads_dirname, "/uploads")));

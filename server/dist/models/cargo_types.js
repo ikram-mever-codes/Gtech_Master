@@ -9,43 +9,31 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.CargoOrder = void 0;
+exports.CargoType = void 0;
 const typeorm_1 = require("typeorm");
-const cargos_1 = require("./cargos");
-const orders_1 = require("./orders");
-let CargoOrder = class CargoOrder {
+let CargoType = class CargoType {
 };
-exports.CargoOrder = CargoOrder;
+exports.CargoType = CargoType;
 __decorate([
     (0, typeorm_1.PrimaryGeneratedColumn)(),
     __metadata("design:type", Number)
-], CargoOrder.prototype, "id", void 0);
+], CargoType.prototype, "id", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ type: "int" }),
+    (0, typeorm_1.Column)({ type: "varchar", length: 150 }),
+    __metadata("design:type", String)
+], CargoType.prototype, "type", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "int", nullable: true }),
     __metadata("design:type", Number)
-], CargoOrder.prototype, "cargo_id", void 0);
-__decorate([
-    (0, typeorm_1.Column)({ type: "int" }),
-    __metadata("design:type", Number)
-], CargoOrder.prototype, "order_id", void 0);
-__decorate([
-    (0, typeorm_1.ManyToOne)(() => cargos_1.Cargo, { onDelete: "CASCADE" }),
-    (0, typeorm_1.JoinColumn)({ name: "cargo_id", referencedColumnName: "id" }),
-    __metadata("design:type", cargos_1.Cargo)
-], CargoOrder.prototype, "cargo", void 0);
-__decorate([
-    (0, typeorm_1.ManyToOne)(() => orders_1.Order, { onDelete: "CASCADE" }),
-    (0, typeorm_1.JoinColumn)({ name: "order_id", referencedColumnName: "id" }),
-    __metadata("design:type", orders_1.Order)
-], CargoOrder.prototype, "order", void 0);
+], CargoType.prototype, "duration", void 0);
 __decorate([
     (0, typeorm_1.CreateDateColumn)(),
     __metadata("design:type", Date)
-], CargoOrder.prototype, "created_at", void 0);
+], CargoType.prototype, "created_at", void 0);
 __decorate([
     (0, typeorm_1.UpdateDateColumn)(),
     __metadata("design:type", Date)
-], CargoOrder.prototype, "updated_at", void 0);
-exports.CargoOrder = CargoOrder = __decorate([
+], CargoType.prototype, "updated_at", void 0);
+exports.CargoType = CargoType = __decorate([
     (0, typeorm_1.Entity)()
-], CargoOrder);
+], CargoType);
