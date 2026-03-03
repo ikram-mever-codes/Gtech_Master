@@ -153,7 +153,7 @@ function ItemSelectorWithQuantity({
           className="text-sm"
           classNames={{
             control: () =>
-              "border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500",
+              "border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500",
           }}
           options={options}
           value={options.find((opt) => opt.value === selectedItemId) || null}
@@ -170,7 +170,7 @@ function ItemSelectorWithQuantity({
         value={quantity}
         onChange={(e) => setQuantity(e.target.value)}
         placeholder="Qty"
-        className="w-24 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:bg-gray-50"
+        className="w-24 px-3 py-2 text-sm border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:bg-gray-50"
         min="1"
         disabled={disabled}
       />
@@ -179,7 +179,7 @@ function ItemSelectorWithQuantity({
         type="button"
         onClick={handleAdd}
         disabled={disabled || !selectedItemId || !quantity}
-        className="px-4 py-2 text-sm bg-green-700 text-white rounded-lg hover:bg-green-600 disabled:opacity-50"
+        className="px-4 py-2 text-sm bg-green-700 text-white rounded-[4px] hover:bg-green-600 disabled:opacity-50"
       >
         +
       </button>
@@ -218,13 +218,20 @@ function OrdersTable({
     { header: "Cargo", width: "40px", render: (row) => row.cargo_id || "-", align: "center" },
     { header: "SOID", width: "40px", render: (row) => row.supplier_order_id || "-", align: "center" },
     {
-      header: "Actions", width: "130px", align: "center", render: (row) => (
-        <div className="flex items-center justify-center gap-1">
-          <button className="px-1.5 py-0.5 text-[10px] font-semibold bg-amber-600 text-white rounded hover:bg-amber-700 transition">
-            Split
+      header: "Actions", width: "135px", align: "center", render: (row) => (
+        <div className="flex items-center justify-center gap-1.5">
+          <button
+            onClick={() => onReassign(row)}
+            title="Re-assign to Cargo"
+            className="px-2 py-1 text-[10px] font-bold bg-[#8CC21B] text-white rounded-[4px] hover:bg-green-700 transition shadow-md flex items-center gap-1"
+          >
+            <span>&#8617;</span> ReAssign
           </button>
-          <button className="px-1.5 py-0.5 text-[10px] font-semibold bg-gray-600 text-white rounded hover:bg-gray-700 transition">
-            ReAssign
+          <button
+            title="Split Order Item"
+            className="px-2 py-1 text-[10px] font-bold bg-amber-600 text-white rounded-[4px] hover:bg-amber-700 transition shadow-md"
+          >
+            Split
           </button>
         </div>
       )
@@ -236,22 +243,34 @@ function OrdersTable({
   };
 
   const CountCell = ({ count }: { count: number }) => (
-    <span className={count > 0 ? "text-blue-600 font-semibold" : "text-gray-800"}>{count}</span>
+    <span className={count > 0 ? "text-green-600 font-semibold" : "text-gray-800"}>{count}</span>
+  );
+
+  const ActionCell = ({ row }: { row: any }) => (
+    <div className="flex items-center justify-center gap-1.5">
+      <button
+        onClick={() => onReassign(row)}
+        title="Re-assign to Cargo"
+        className="px-2 py-1 text-[10px] font-bold bg-[#8CC21B] text-white rounded-[4px] hover:bg-green-700 transition shadow-md flex items-center gap-1"
+      >
+        <span>&#8617;</span> ReAssign
+      </button>
+      <button
+        onClick={() => onEdit(row)}
+        title="Edit Order"
+        className="px-2 py-1 text-[10px] font-bold bg-[#059669] text-white rounded-[4px] hover:bg-green-700 transition shadow-md"
+      >
+        Edit
+      </button>
+    </div>
   );
 
   const orderColumns: ColumnDef<any>[] = [
-    { header: "No", width: "30px", render: (_, i) => i + 1, align: "center", renderTotal: () => <span className="text-transparent">Total</span> },
+    { header: "No", width: "40px", render: (_, i) => i + 1, align: "center", renderTotal: () => <span className="text-transparent">Total</span> },
     {
-      header: "Re Assign", width: "85px", align: "center", render: (row) => (
-        <button
-          onClick={() => onReassign(row)}
-          className="px-2 py-0.5 text-[10px] font-semibold bg-gray-600 text-white rounded hover:bg-gray-700 transition whitespace-nowrap"
-        >
-          &#8617; ReAssign
-        </button>
-      )
+      header: "Actions", width: "150px", align: "center", render: (row) => <ActionCell row={row} />
     },
-    { header: "Order No.", width: "90px", render: (row) => <button onClick={() => onView(row)} className="text-blue-600 hover:underline font-semibold whitespace-nowrap">{row.order_no}</button>, align: "center" },
+    { header: "Order No.", width: "90px", render: (row) => <button onClick={() => onView(row)} className="text-green-600 hover:underline font-semibold whitespace-nowrap">{row.order_no}</button>, align: "center" },
     { header: "Catgy", width: "65px", render: (row) => getCategoryName(row.category_id), align: "center" },
     { header: "Cargo", width: "55px", render: (row) => row.cargo_id ?? "-", align: "center" },
     { header: "Comment", width: "250px", render: (row) => <div className="line-clamp-2 leading-tight" title={row.comment}>{row.comment || "-"}</div>, align: "left" },
@@ -646,7 +665,7 @@ const OrderPage = () => {
       try {
         const response: any = await getSupplierItems(supplier_id);
         const data = response?.data ?? response;
-        const arr = Array.isArray(data) ? data : [];
+        const arr = Array.isArray(data) ? data : (data?.items || []);
         setItemsBySupplier(arr);
       } catch (e) {
         console.error(e);
@@ -935,7 +954,7 @@ const OrderPage = () => {
       <button
         onClick={fetchOrders}
         disabled={loadingOrders}
-        className="px-3 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-all flex items-center gap-2 disabled:opacity-50"
+        className="px-3 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-[4px] hover:bg-gray-50 transition-all flex items-center gap-2 disabled:opacity-50"
       >
         <ArrowPathIcon className={`h-4 w-4 ${loadingOrders ? "animate-spin" : ""}`} />
         Refresh
@@ -944,7 +963,7 @@ const OrderPage = () => {
       <CustomButton
         gradient={true}
         onClick={openCreate}
-        className="px-3 py-2 text-sm bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-all flex items-center gap-2"
+        className="px-4 py-2 text-sm bg-[#059669] text-white rounded-[4px] hover:bg-green-700 transition-all shadow-md font-bold flex items-center gap-2"
       >
         <PlusIcon className="h-4 w-4" />
         New Order
@@ -963,7 +982,7 @@ const OrderPage = () => {
 
   return (
     <>
-      <div className="min-h-screen bg-white shadow-xl rounded-lg p-2 md:p-4">
+      <div className="min-h-screen bg-white shadow-xl rounded-[4px] p-2 md:p-4">
         <div className="max-w-full mx-auto">
           <div className="mb-6">
             <div className="flex justify-between items-center mb-4">
@@ -992,15 +1011,15 @@ const OrderPage = () => {
             </nav>
           </div>
 
-          <div className="bg-white rounded-md shadow-lg border border-gray-200 overflow-hidden">
+          <div className="bg-white rounded-[4px] shadow-lg border border-gray-200 overflow-hidden">
             {activeTab === "nso" ? (
               <div className="p-4 bg-gray-50/30 min-h-[600px]">
                 <div className="flex items-center justify-between mb-8 px-4">
                   <button
                     onClick={() => setActiveTab("orders")}
-                    className="bg-[#1e40af] text-white rounded px-6 py-2 flex items-center gap-2 font-bold text-sm shadow-md hover:bg-blue-800 transition"
+                    className="bg-[#059669] text-white rounded-[4px] px-6 py-2 flex items-center gap-2 font-bold text-sm shadow-md hover:bg-green-700 transition"
                   >
-                    <XMarkIcon className="h-4 w-4 bg-white text-[#1e40af] rounded-full p-0.5" />
+                    <XMarkIcon className="h-4 w-4 bg-white text-[#059669] rounded-full p-0.5" />
                     Back
                   </button>
                   <div className="relative">
@@ -1012,7 +1031,7 @@ const OrderPage = () => {
                       placeholder="Search NSOs"
                       value={nsoSearch}
                       onChange={(e) => setNsoSearch(e.target.value)}
-                      className="pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 w-80 shadow-sm text-sm"
+                      className="pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 w-80 shadow-md text-sm"
                     />
                   </div>
                 </div>
@@ -1027,7 +1046,7 @@ const OrderPage = () => {
                         align: "center",
                         render: (row) => (
                           <div className="flex items-center justify-center gap-1 group cursor-pointer">
-                            <div className="bg-[#475569] text-white rounded px-3 py-1.5 flex items-center gap-4 text-xs font-bold w-20 justify-between shadow-sm">
+                            <div className="bg-[#475569] text-white rounded px-3 py-1.5 flex items-center gap-4 text-xs font-bold w-20 justify-between shadow-md">
                               {row.supplier_id}
                               <div className="bg-white rounded-full p-0.5">
                                 <ArrowRightIcon className="h-2 w-2 text-[#475569]" />
@@ -1047,7 +1066,7 @@ const OrderPage = () => {
                           <div className="flex justify-center">
                             <button
                               onClick={() => handleCreateSupplierOrderFromNSO(row)}
-                              className="bg-[#059669] text-white px-4 py-2 rounded-lg flex items-center gap-2 text-xs font-bold hover:bg-green-700 transition shadow-sm"
+                              className="bg-[#059669] text-white px-4 py-2 rounded-[4px] flex items-center gap-2 text-xs font-bold hover:bg-green-700 transition shadow-md"
                             >
                               <PlusCircleIcon className="h-5 w-5" />
                               Supplier order
@@ -1072,7 +1091,7 @@ const OrderPage = () => {
                         align: "center",
                         render: (row) => (
                           <div className="flex items-center justify-center gap-1 group cursor-pointer">
-                            <div className="bg-[#475569] text-white rounded px-3 py-1.5 flex items-center gap-4 text-xs font-bold w-20 justify-between shadow-sm">
+                            <div className="bg-[#475569] text-white rounded px-3 py-1.5 flex items-center gap-4 text-xs font-bold w-20 justify-between shadow-md">
                               {row.supplier_id}
                               <div className="bg-white rounded-full p-0.5">
                                 <ArrowRightIcon className="h-2 w-2 text-[#475569]" />
@@ -1092,7 +1111,7 @@ const OrderPage = () => {
                           <div className="flex justify-center">
                             <button
                               onClick={() => handleCreateSupplierOrderFromNSO(row)}
-                              className="bg-[#059669] text-white px-4 py-2 rounded-lg flex items-center gap-2 text-xs font-bold hover:bg-green-700 transition shadow-sm"
+                              className="bg-[#059669] text-white px-4 py-2 rounded-[4px] flex items-center gap-2 text-xs font-bold hover:bg-green-700 transition shadow-md"
                             >
                               <PlusCircleIcon className="h-5 w-5" />
                               Supplier order
@@ -1112,7 +1131,7 @@ const OrderPage = () => {
                   <div className="flex gap-2 items-center">
                     <button
                       onClick={() => setActiveTab("orders")}
-                      className="bg-blue-600 text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-blue-700 transition shadow-sm"
+                      className="bg-[#059669] text-white px-4 py-2 rounded-[4px] text-xs font-bold hover:bg-green-700 transition shadow-md"
                     >
                       Back
                     </button>
@@ -1121,13 +1140,13 @@ const OrderPage = () => {
                       <input
                         type="text"
                         placeholder="Search Supplier Orders..."
-                        className="pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-xs w-64 focus:ring-2 focus:ring-blue-500 transition"
+                        className="pl-9 pr-4 py-2 border border-gray-200 rounded-[4px] text-xs w-64 focus:ring-2 focus:ring-blue-500 transition"
                         value={supplierOrderSearch}
                         onChange={(e) => setSupplierOrderSearch(e.target.value)}
                       />
                     </div>
                   </div>
-                  <div className="text-blue-600 font-bold text-lg">Supplier Orders</div>
+                  <div className="text-[#059669] font-bold text-lg">Supplier Orders</div>
                 </div>
                 <DataTable
                   data={supplierOrdersList}
@@ -1139,7 +1158,7 @@ const OrderPage = () => {
                       align: "center",
                       render: (row) => (
                         <div className="flex items-center justify-center gap-1 group cursor-pointer">
-                          <div className="bg-[#475569] text-white rounded px-3 py-1.5 flex items-center gap-4 text-xs font-bold w-20 justify-between shadow-sm">
+                          <div className="bg-[#475569] text-white rounded px-3 py-1.5 flex items-center gap-4 text-xs font-bold w-20 justify-between shadow-md">
                             {row.id}
                             <div className="bg-white rounded-full p-0.5">
                               <ArrowRightIcon className="h-2 w-2 text-[#475569]" />
@@ -1158,7 +1177,10 @@ const OrderPage = () => {
                       width: "100px",
                       align: "center",
                       render: (row) => (
-                        <button className="px-4 py-1.5 bg-blue-600 text-white text-xs font-bold rounded-lg hover:bg-blue-700 transition flex items-center gap-2">
+                        <button
+                          onClick={() => openEdit(row as any)}
+                          className="px-4 py-1.5 bg-[#8CC21B] text-white text-xs font-bold rounded-[4px] hover:bg-green-700 transition flex items-center gap-2 shadow-md"
+                        >
                           <PencilIcon className="h-4 w-4" />
                           Edit
                         </button>
@@ -1210,7 +1232,7 @@ const OrderPage = () => {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Select Cargo</label>
                 <select
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-[4px] text-sm"
                   onChange={async (e) => {
                     const cargoId = Number(e.target.value);
                     if (!cargoId) return;
@@ -1221,6 +1243,7 @@ const OrderPage = () => {
                       fetchOrders();
                     } catch (err) {
                       console.error(err);
+                      toast.error("Failed to reassign order to cargo");
                     }
                   }}
                 >
@@ -1236,7 +1259,7 @@ const OrderPage = () => {
             <div className="mt-6 flex justify-end">
               <button
                 onClick={() => setShowReassignModal(false)}
-                className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition"
+                className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-[4px] hover:bg-gray-200 transition"
               >
                 Cancel
               </button>
@@ -1271,19 +1294,19 @@ const OrderPage = () => {
                 <span className="font-semibold text-gray-800">{pendingNsoGroup.qty}</span>
               </div>
             </div>
-            <p className="text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-2 mb-5">
+            <p className="text-xs text-amber-600 bg-amber-50 rounded-[4px] px-3 py-2 mb-5">
               ⚠ These items will be moved out of NSO and linked to the new supplier order.
             </p>
             <div className="flex gap-3 justify-end">
               <button
                 onClick={() => { setShowSupplierConfirm(false); setPendingNsoGroup(null); }}
-                className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition font-medium"
+                className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-[4px] hover:bg-gray-200 transition font-medium"
               >
                 Cancel
               </button>
               <button
                 onClick={confirmCreateSupplierOrder}
-                className="px-5 py-2 text-sm bg-[#059669] text-white rounded-lg hover:bg-green-700 transition font-bold flex items-center gap-2"
+                className="px-5 py-2 text-sm bg-[#059669] text-white rounded-[4px] hover:bg-green-700 transition font-bold flex items-center gap-2"
               >
                 <PlusCircleIcon className="h-4 w-4" />
                 Confirm
@@ -1334,7 +1357,7 @@ const OrderPage = () => {
               </div>
 
               <div className="overflow-x-auto">
-                <table className="min-w-full bg-white border border-gray-200 rounded-lg shadow-sm">
+                <table className="min-w-full bg-white border border-gray-200 rounded-[4px] shadow-md">
                   <thead className="bg-gray-100">
                     <tr>
                       <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-b">
@@ -1378,7 +1401,7 @@ const OrderPage = () => {
               <div className="flex justify-end pt-6">
                 <button
                   onClick={closeView}
-                  className="px-4 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-all"
+                  className="px-4 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-[4px] hover:bg-gray-50 transition-all"
                 >
                   Close
                 </button>
@@ -1414,7 +1437,7 @@ const OrderPage = () => {
                 </div>
 
                 {isConvertMode && (
-                  <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                  <div className="mb-4 rounded-[4px] border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
                     <b>Note</b>. All other fields are locked. Only <b>QTY</b> and <b>Item remark</b>  is editable.
                   </div>
                 )}
@@ -1429,7 +1452,7 @@ const OrderPage = () => {
                         value={form.category_id}
                         onChange={(e) => handleCategoryChange(e.target.value)}
                         disabled={lockAllExceptQty}
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:bg-gray-50"
+                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:bg-gray-50"
                       >
                         <option value="">Select Category</option>
                         {categories.map((cat) => (
@@ -1449,7 +1472,7 @@ const OrderPage = () => {
                           value={form.supplier_id}
                           onChange={(e) => handleSupplierChange(e.target.value)}
                           disabled={lockAllExceptQty}
-                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:bg-gray-50"
+                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:bg-gray-50"
                         >
                           <option value="">Select Supplier</option>
                           {suppliers.map((s) => (
@@ -1463,7 +1486,7 @@ const OrderPage = () => {
                           value={form.customer_id}
                           onChange={(e) => handleCustomerChange(e.target.value)}
                           disabled={lockAllExceptQty}
-                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:bg-gray-50"
+                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:bg-gray-50"
                         >
                           <option value="">Select Customer</option>
                           {customers.map((customer) => (
@@ -1495,7 +1518,7 @@ const OrderPage = () => {
                       value={form.comment}
                       onChange={(e) => setForm((prev) => ({ ...prev, comment: e.target.value }))}
                       disabled={lockAllExceptQty}
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:bg-gray-50"
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:bg-gray-50"
                       placeholder="Enter order comment..."
                       rows={3}
                     />
@@ -1503,7 +1526,7 @@ const OrderPage = () => {
 
                   {orderItems.length > 0 && (
                     <div className="mt-3 overflow-x-auto">
-                      <table className="min-w-full bg-white border border-gray-200 rounded-lg shadow-sm">
+                      <table className="min-w-full bg-white border border-gray-200 rounded-[4px] shadow-md">
                         <thead className="bg-gray-100">
                           <tr>
                             <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-b">
@@ -1538,7 +1561,7 @@ const OrderPage = () => {
                                   onChange={(e) =>
                                     handleUpdateOrderItemQty(row.item_id, Number(e.target.value))
                                   }
-                                  className="w-20 px-2 py-1 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-gray-500 focus:border-transparent"
+                                  className="w-20 px-2 py-1 text-sm border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500 focus:border-transparent"
                                 />
                               </td>
 
@@ -1550,7 +1573,7 @@ const OrderPage = () => {
                                     handleUpdateOrderItemRemark(row.item_id, String(e.target.value))
                                   }
 
-                                  className="w-64 px-2 py-1 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:bg-gray-50"
+                                  className="w-64 px-2 py-1 text-sm border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:bg-gray-50"
                                 />
                               </td>
 
@@ -1559,7 +1582,7 @@ const OrderPage = () => {
                                   type="button"
                                   onClick={() => handleRemoveOrderItem(row.item_id)}
                                   disabled={lockAllExceptQty}
-                                  className="inline-flex items-center gap-1 px-3 py-1.5 text-sm bg-red-600 text-white rounded-lg hover:bg-red-500 disabled:opacity-50"
+                                  className="inline-flex items-center gap-1 px-3 py-1.5 text-sm bg-red-600 text-white rounded-[4px] hover:bg-red-500 disabled:opacity-50"
                                 >
                                   <TrashIcon className="h-4 w-4" />
                                 </button>
@@ -1574,7 +1597,7 @@ const OrderPage = () => {
                   <div className="flex justify-end gap-2 pt-4">
                     <button
                       onClick={closeModal}
-                      className="px-4 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-all"
+                      className="px-4 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-[4px] hover:bg-gray-50 transition-all"
                     >
                       Cancel
                     </button>
@@ -1589,7 +1612,7 @@ const OrderPage = () => {
                             ? handleUpdateOrder
                             : handleCreateOrder
                       }
-                      className="px-4 py-2 text-sm bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-all disabled:opacity-50"
+                      className="px-6 py-2 text-sm bg-[#059669] text-white rounded-[4px] hover:bg-green-700 transition-all shadow-md font-bold disabled:opacity-50"
                     >
                       {mode === "convert"
                         ? "CONVERT ORDER"

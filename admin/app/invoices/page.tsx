@@ -40,6 +40,7 @@ import PageHeader from "@/components/UI/PageHeader";
 import Link from "next/link";
 import CargosTab from "@/components/cargos/CargosTab";
 import CargoTypesTab from "@/components/cargos/CargoTypesTab";
+import { getAllCustomers, CustomerData as APICustomerData } from "@/api/customers";
 
 interface Invoice {
   id: string;
@@ -93,16 +94,23 @@ interface FilterOptions {
 }
 
 const invoiceTabs = [
-  { id: "invoices", label: "Invoices" },
+  { id: "open_invoices", label: "Open Invoices" },
+  { id: "closed_invoices", label: "Closed Invoices" },
+  { id: "billto_shipto", label: "Bill To / Ship To" },
   { id: "cargos", label: "Cargos" },
-  { id: "cargo_type", label: "Cargo Types" },
+  { id: "cargo_type", label: "Cargo Type" },
+  { id: "packing_list", label: "Packing List" },
 ] as const;
+
+type InvoiceTab = typeof invoiceTabs[number]["id"];
 
 const InvoiceListPage: React.FC = () => {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [filteredInvoices, setFilteredInvoices] = useState<Invoice[]>([]);
+  const [customers, setCustomers] = useState<APICustomerData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeInvTab, setActiveInvTab] = useState<"invoices" | "cargos" | "cargo_type">("invoices");
+  const [activeInvTab, setActiveInvTab] =
+    useState<InvoiceTab>("open_invoices");
   const [searchTerm, setSearchTerm] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const [sortField, setSortField] = useState<keyof Invoice>("createdAt");
@@ -126,10 +134,37 @@ const InvoiceListPage: React.FC = () => {
 
   useEffect(() => {
     loadInvoices();
-  }, []);
+    if (activeInvTab === "billto_shipto") {
+      fetchCustomers();
+    }
+  }, [activeInvTab]);
+
+  const fetchCustomers = async () => {
+    try {
+      setLoading(true);
+      const response = await getAllCustomers();
+      if (response?.data) {
+        setCustomers(response.data);
+      }
+    } catch (error) {
+      console.error("Failed to fetch customers:", error);
+    } finally {
+      if (activeInvTab === "billto_shipto") setLoading(false);
+    }
+  };
 
   useEffect(() => {
     let filtered = invoices || [];
+
+    if (activeInvTab === "open_invoices") {
+      filtered = filtered.filter(
+        (invoice) => invoice.status !== "paid" && invoice.status !== "cancelled"
+      );
+    } else if (activeInvTab === "closed_invoices") {
+      filtered = filtered.filter(
+        (invoice) => invoice.status === "paid" || invoice.status === "cancelled"
+      );
+    }
 
     if (searchTerm) {
       const searchLower = searchTerm.toLowerCase();
@@ -185,8 +220,8 @@ const InvoiceListPage: React.FC = () => {
     }
 
     filtered.sort((a, b) => {
-      let aValue = a[sortField];
-      let bValue = b[sortField];
+      let aValue: any = a[sortField];
+      let bValue: any = b[sortField];
 
       if (sortField === "customer") {
         aValue = a.customer?.companyName || "";
@@ -212,7 +247,7 @@ const InvoiceListPage: React.FC = () => {
 
     setFilteredInvoices(filtered);
     setCurrentPage(1);
-  }, [searchTerm, filters, invoices, sortField, sortDirection]);
+  }, [searchTerm, filters, invoices, sortField, sortDirection, activeInvTab]);
 
   const loadInvoices = async () => {
     try {
@@ -222,7 +257,6 @@ const InvoiceListPage: React.FC = () => {
       setLoading(false);
     } catch (error) {
       console.error("Failed to load invoices:", error);
-
       setLoading(false);
     }
   };
@@ -327,7 +361,7 @@ const InvoiceListPage: React.FC = () => {
     (sum, inv) => sum + (Number(inv.grossTotal) || 0),
     0
   );
-  const paidAmount = filteredInvoices.reduce(
+  const totalPaid = filteredInvoices.reduce(
     (sum, inv) => sum + (Number(inv.paidAmount) || 0),
     0
   );
@@ -342,7 +376,7 @@ const InvoiceListPage: React.FC = () => {
       style={{ backgroundColor: "#F8F9FA", color: "#212529" }}
     >
       <div className="w-full mx-auto p-0">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-3">
           <div>
             <PageHeader title="Invoice Management" icon={FileText} />
           </div>
@@ -351,9 +385,10 @@ const InvoiceListPage: React.FC = () => {
               onClick={() => {
                 setLoading(true);
                 loadInvoices();
+                if (activeInvTab === "billto_shipto") fetchCustomers();
               }}
               disabled={loading}
-              className="px-4 py-2.5 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-all flex items-center gap-2 disabled:opacity-50"
+              className="px-4 py-2.5 bg-gray-100 text-gray-700 rounded-[4px] font-medium hover:bg-gray-200 transition-all flex items-center gap-2 disabled:opacity-50"
             >
               <RefreshCw
                 className={`w-4 h-4 ${loading ? "animate-spin" : ""}`}
@@ -364,7 +399,7 @@ const InvoiceListPage: React.FC = () => {
               onClick={() => {
                 router.push("/invoices/new");
               }}
-              className="px-6 py-2.5 bg-[#8CC21B] text-white rounded-lg font-medium hover:bg-[#8CC21B]/90 transition-all flex items-center gap-2"
+              className="px-6 py-2.5 bg-[#8CC21B] text-white rounded-[4px] font-medium hover:bg-[#8CC21B]/90 transition-all flex items-center gap-2"
             >
               <Plus className="w-4 h-4" />
               New Invoice
@@ -372,702 +407,612 @@ const InvoiceListPage: React.FC = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 mb-6">
-          <div
-            className="bg-white rounded-md p-4 lg:p-6 border border-[#E9ECEF]"
-            style={{ boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)" }}
-          >
-            <div className="flex items-center gap-3">
-              <div
-                className="p-2 rounded-lg"
-                style={{ backgroundColor: "#E3F2FD" }}
-              >
-                <FileText className="w-5 h-5" style={{ color: "#1976D2" }} />
-              </div>
-              <div>
-                <p className="text-sm" style={{ color: "#495057" }}>
-                  Total Invoices
-                </p>
-                <p className="text-xl font-bold" style={{ color: "#212529" }}>
-                  {filteredInvoices.length}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div
-            className="bg-white rounded-md p-4 lg:p-6 border border-[#E9ECEF]"
-            style={{ boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)" }}
-          >
-            <div className="flex items-center gap-3">
-              <div
-                className="p-2 rounded-lg"
-                style={{ backgroundColor: "#E8F5E8" }}
-              >
-                <DollarSign className="w-5 h-5" style={{ color: "#2E7D32" }} />
-              </div>
-              <div>
-                <p className="text-sm" style={{ color: "#495057" }}>
-                  Total Amount
-                </p>
-                <p className="text-xl font-bold" style={{ color: "#212529" }}>
-                  ${Number(totalAmount).toFixed(2)}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div
-            className="bg-white rounded-md p-4 lg:p-6 border border-[#E9ECEF]"
-            style={{ boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)" }}
-          >
-            <div className="flex items-center gap-3">
-              <div
-                className="p-2 rounded-lg"
-                style={{ backgroundColor: "#E8F4D6" }}
-              >
-                <CheckCircle className="w-5 h-5" style={{ color: "#8CC21B" }} />
-              </div>
-              <div>
-                <p className="text-sm" style={{ color: "#495057" }}>
-                  Paid Amount
-                </p>
-                <p className="text-xl font-bold" style={{ color: "#212529" }}>
-                  ${Number(paidAmount).toFixed(2)}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div
-            className="bg-white rounded-md p-4 lg:p-6 border border-[#E9ECEF]"
-            style={{ boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)" }}
-          >
-            <div className="flex items-center gap-3">
-              <div
-                className="p-2 rounded-lg"
-                style={{ backgroundColor: "#FFF3E0" }}
-              >
-                <Clock className="w-5 h-5" style={{ color: "#F57C00" }} />
-              </div>
-              <div>
-                <p className="text-sm" style={{ color: "#495057" }}>
-                  Outstanding
-                </p>
-                <p className="text-xl font-bold" style={{ color: "#212529" }}>
-                  ${Number(outstandingAmount).toFixed(2)}
-                </p>
-              </div>
-            </div>
-          </div>
+        <div className="flex overflow-x-auto mb-6 border-b border-gray-200">
+          {invoiceTabs.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveInvTab(tab.id)}
+              className={`px-6 py-3 text-sm font-semibold transition-all relative min-w-fit ${activeInvTab === tab.id
+                ? "text-[#8CC21B]"
+                : "text-gray-500 hover:text-gray-700"
+                }`}
+            >
+              {tab.label}
+              {activeInvTab === tab.id && (
+                <div className="absolute bottom-0 left-0 w-full h-0.5 bg-[#8CC21B]" />
+              )}
+            </button>
+          ))}
         </div>
 
-        <div
-          className="bg-white rounded-md border border-[#E9ECEF] mb-6"
-          style={{ boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)" }}
-        >
-          <div className="p-4 lg:p-6">
-            <div className="flex flex-col lg:flex-row gap-4">
-              <div className="flex-1 relative">
-                <Search
-                  className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4"
-                  style={{ color: "#495057" }}
-                />
-                <input
-                  type="text"
-                  placeholder="Search invoices, customers, or order numbers..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 lg:py-3 border rounded-lg transition-all duration-200"
-                  style={{ borderColor: "#E9ECEF", color: "#212529" }}
-                  onFocus={(e) => {
-                    e.target.style.borderColor = "#8CC21B";
-                    e.target.style.boxShadow =
-                      "0 0 0 3px rgba(140, 194, 27, 0.1)";
-                  }}
-                  onBlur={(e) => {
-                    e.target.style.borderColor = "#E9ECEF";
-                    e.target.style.boxShadow = "none";
-                  }}
-                />
-              </div>
-
-              <button
-                onClick={() => setShowFilters(!showFilters)}
-                className="flex items-center gap-2 px-4 py-2 lg:py-3 border rounded-lg transition-colors"
-                style={{ borderColor: "#E9ECEF", color: "#495057" }}
-              >
-                <Filter className="w-4 h-4" />
-                Filters
-                <ChevronDown
-                  className={`w-4 h-4 transition-transform ${showFilters ? "rotate-180" : ""
-                    }`}
-                />
-              </button>
-            </div>
-
-            {showFilters && (
-              <div className="mt-4 pt-4 border-t border-[#E9ECEF]">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-                  <div>
-                    <label
-                      className="block text-sm font-medium mb-1"
-                      style={{ color: "#212529" }}
-                    >
-                      Status
-                    </label>
-                    <select
-                      value={filters.status}
-                      onChange={(e) =>
-                        setFilters({ ...filters, status: e.target.value })
-                      }
-                      className="w-full px-3 py-2 border rounded-lg text-sm"
-                      style={{ borderColor: "#E9ECEF", color: "#212529" }}
-                    >
-                      <option value="">All Status</option>
-                      <option value="draft">Draft</option>
-                      <option value="sent">Sent</option>
-                      <option value="paid">Paid</option>
-                      <option value="overdue">Overdue</option>
-                      <option value="cancelled">Cancelled</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label
-                      className="block text-sm font-medium mb-1"
-                      style={{ color: "#212529" }}
-                    >
-                      From Date
-                    </label>
-                    <input
-                      type="date"
-                      value={filters.dateFrom}
-                      onChange={(e) =>
-                        setFilters({ ...filters, dateFrom: e.target.value })
-                      }
-                      className="w-full px-3 py-2 border rounded-lg text-sm"
-                      style={{ borderColor: "#E9ECEF", color: "#212529" }}
-                    />
-                  </div>
-
-                  <div>
-                    <label
-                      className="block text-sm font-medium mb-1"
-                      style={{ color: "#212529" }}
-                    >
-                      To Date
-                    </label>
-                    <input
-                      type="date"
-                      value={filters.dateTo}
-                      onChange={(e) =>
-                        setFilters({ ...filters, dateTo: e.target.value })
-                      }
-                      className="w-full px-3 py-2 border rounded-lg text-sm"
-                      style={{ borderColor: "#E9ECEF", color: "#212529" }}
-                    />
-                  </div>
-
-                  <div>
-                    <label
-                      className="block text-sm font-medium mb-1"
-                      style={{ color: "#212529" }}
-                    >
-                      Customer
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="Customer name"
-                      value={filters.customer}
-                      onChange={(e) =>
-                        setFilters({ ...filters, customer: e.target.value })
-                      }
-                      className="w-full px-3 py-2 border rounded-lg text-sm"
-                      style={{ borderColor: "#E9ECEF", color: "#212529" }}
-                    />
-                  </div>
-
-                  <div>
-                    <label
-                      className="block text-sm font-medium mb-1"
-                      style={{ color: "#212529" }}
-                    >
-                      Min Amount
-                    </label>
-                    <input
-                      type="number"
-                      placeholder="0.00"
-                      value={filters.minAmount}
-                      onChange={(e) =>
-                        setFilters({ ...filters, minAmount: e.target.value })
-                      }
-                      className="w-full px-3 py-2 border rounded-lg text-sm"
-                      style={{ borderColor: "#E9ECEF", color: "#212529" }}
-                    />
-                  </div>
-
-                  <div>
-                    <label
-                      className="block text-sm font-medium mb-1"
-                      style={{ color: "#212529" }}
-                    >
-                      Max Amount
-                    </label>
-                    <input
-                      type="number"
-                      placeholder="0.00"
-                      value={filters.maxAmount}
-                      onChange={(e) =>
-                        setFilters({ ...filters, maxAmount: e.target.value })
-                      }
-                      className="w-full px-3 py-2 border rounded-lg text-sm"
-                      style={{ borderColor: "#E9ECEF", color: "#212529" }}
-                    />
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap gap-2 mt-4">
-                  <button
-                    onClick={() =>
-                      setFilters({
-                        status: "",
-                        dateFrom: "",
-                        dateTo: "",
-                        customer: "",
-                        minAmount: "",
-                        maxAmount: "",
-                      })
-                    }
-                    className="px-3 py-1 text-sm border rounded-lg transition-colors"
-                    style={{ borderColor: "#E9ECEF", color: "#495057" }}
-                  >
-                    Clear Filters
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div
-          className="bg-white rounded-md border border-[#E9ECEF] overflow-hidden"
-          style={{ boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)" }}
-        >
-          {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="text-center">
-                <Loader2
-                  className="w-8 h-8 animate-spin mx-auto mb-4"
-                  style={{ color: "#8CC21B" }}
-                />
-                <p style={{ color: "#495057" }}>Loading invoices...</p>
-              </div>
-            </div>
-          ) : filteredInvoices.length === 0 ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="text-center">
-                <FileText
-                  className="w-12 h-12 mx-auto mb-4"
-                  style={{ color: "#ADB5BD" }}
-                />
-                <h3
-                  className="text-lg font-medium mb-2"
-                  style={{ color: "#212529" }}
-                >
-                  No invoices found
-                </h3>
-                <p style={{ color: "#495057" }}>
-                  {searchTerm || Object.values(filters).some((f) => f)
-                    ? "Try adjusting your search or filters"
-                    : "Create your first invoice to get started"}
-                </p>
-              </div>
-            </div>
-          ) : (
+        {(activeInvTab === "open_invoices" ||
+          activeInvTab === "closed_invoices") && (
             <>
-              {/* Desktop Table */}
-              <div className="hidden lg:block overflow-x-auto">
-                <table className="w-full">
-                  <thead style={{ backgroundColor: "#F8F9FA" }}>
-                    <tr>
-                      <th
-                        className="text-left py-4 px-6 font-semibold text-sm border-b border-[#E9ECEF]"
-                        style={{ color: "#212529" }}
-                      >
-                        <button
-                          onClick={() => handleSort("invoiceNumber")}
-                          className="flex items-center gap-1 hover:text-[#8CC21B]"
-                        >
-                          Invoice #
-                          {sortField === "invoiceNumber" &&
-                            (sortDirection === "asc" ? (
-                              <SortAsc className="w-3 h-3" />
-                            ) : (
-                              <SortDesc className="w-3 h-3" />
-                            ))}
-                        </button>
-                      </th>
-                      <th
-                        className="text-left py-4 px-6 font-semibold text-sm border-b border-[#E9ECEF]"
-                        style={{ color: "#212529" }}
-                      >
-                        <button
-                          onClick={() => handleSort("customer")}
-                          className="flex items-center gap-1 hover:text-[#8CC21B]"
-                        >
-                          Customer
-                          {sortField === "customer" &&
-                            (sortDirection === "asc" ? (
-                              <SortAsc className="w-3 h-3" />
-                            ) : (
-                              <SortDesc className="w-3 h-3" />
-                            ))}
-                        </button>
-                      </th>
-                      <th
-                        className="text-left py-4 px-6 font-semibold text-sm border-b border-[#E9ECEF]"
-                        style={{ color: "#212529" }}
-                      >
-                        <button
-                          onClick={() => handleSort("invoiceDate")}
-                          className="flex items-center gap-1 hover:text-[#8CC21B]"
-                        >
-                          Date
-                          {sortField === "invoiceDate" &&
-                            (sortDirection === "asc" ? (
-                              <SortAsc className="w-3 h-3" />
-                            ) : (
-                              <SortDesc className="w-3 h-3" />
-                            ))}
-                        </button>
-                      </th>
-                      <th
-                        className="text-right py-4 px-6 font-semibold text-sm border-b border-[#E9ECEF]"
-                        style={{ color: "#212529" }}
-                      >
-                        <button
-                          onClick={() => handleSort("grossTotal")}
-                          className="flex items-center gap-1 hover:text-[#8CC21B] ml-auto"
-                        >
-                          Amount
-                          {sortField === "grossTotal" &&
-                            (sortDirection === "asc" ? (
-                              <SortAsc className="w-3 h-3" />
-                            ) : (
-                              <SortDesc className="w-3 h-3" />
-                            ))}
-                        </button>
-                      </th>
-                      <th
-                        className="text-center py-4 px-6 font-semibold text-sm border-b border-[#E9ECEF]"
-                        style={{ color: "#212529" }}
-                      >
-                        Status
-                      </th>
-                      <th
-                        className="text-center py-4 px-6 font-semibold text-sm border-b border-[#E9ECEF]"
-                        style={{ color: "#212529" }}
-                      >
-                        Actions
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {currentInvoices.map((invoice, index) => (
-                      <tr
-                        key={invoice.id}
-                        className={`border-b border-[#F1F3F5] hover:bg-[#F8F9FA] transition-colors ${index % 2 === 0 ? "bg-white" : "bg-[#FAFBFC]"
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 mb-6">
+                <div
+                  className="bg-white rounded-[4px] p-4 lg:p-6 border border-[#E9ECEF]"
+                  style={{ boxShadow: "0 2px 8px rgba(0, 0, 0, 0.05)" }}
+                >
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="p-2 rounded-[4px]"
+                      style={{ backgroundColor: "#E8F5E8" }}
+                    >
+                      <FileText className="w-5 h-5" style={{ color: "#059669" }} />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium" style={{ color: "#6C757D" }}>
+                        Total Invoices
+                      </p>
+                      <p className="text-xl font-bold" style={{ color: "#212529" }}>
+                        {filteredInvoices.length}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div
+                  className="bg-white rounded-[4px] p-4 lg:p-6 border border-[#E9ECEF]"
+                  style={{ boxShadow: "0 2px 8px rgba(0, 0, 0, 0.05)" }}
+                >
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="p-2 rounded-[4px]"
+                      style={{ backgroundColor: "#E8F5E8" }}
+                    >
+                      <DollarSign
+                        className="w-5 h-5"
+                        style={{ color: "#2E7D32" }}
+                      />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium" style={{ color: "#6C757D" }}>
+                        Total Amount
+                      </p>
+                      <p className="text-xl font-bold" style={{ color: "#212529" }}>
+                        ${Number(totalAmount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div
+                  className="bg-white rounded-[4px] p-4 lg:p-6 border border-[#E9ECEF]"
+                  style={{ boxShadow: "0 2px 8px rgba(0, 0, 0, 0.05)" }}
+                >
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="p-2 rounded-[4px]"
+                      style={{ backgroundColor: "#E8F4D6" }}
+                    >
+                      <CheckCircle
+                        className="w-5 h-5"
+                        style={{ color: "#8CC21B" }}
+                      />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium" style={{ color: "#6C757D" }}>
+                        Paid Amount
+                      </p>
+                      <p className="text-xl font-bold" style={{ color: "#212529" }}>
+                        ${Number(totalPaid).toFixed(2)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div
+                  className="bg-white rounded-[4px] p-4 lg:p-6 border border-[#E9ECEF]"
+                  style={{ boxShadow: "0 2px 8px rgba(0, 0, 0, 0.05)" }}
+                >
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="p-2 rounded-[4px]"
+                      style={{ backgroundColor: "#FFF3E0" }}
+                    >
+                      <Clock className="w-5 h-5" style={{ color: "#F57C00" }} />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium" style={{ color: "#6C757D" }}>
+                        Outstanding
+                      </p>
+                      <p className="text-xl font-bold" style={{ color: "#212529" }}>
+                        ${Number(outstandingAmount).toFixed(2)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div
+                className="bg-white rounded-[4px] border border-[#E9ECEF] mb-6"
+                style={{ boxShadow: "0 2px 8px rgba(0, 0, 0, 0.05)" }}
+              >
+                <div className="p-4 lg:p-6">
+                  <div className="flex flex-col lg:flex-row gap-4">
+                    <div className="flex-1 relative">
+                      <Search
+                        className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4"
+                        style={{ color: "#ADB5BD" }}
+                      />
+                      <input
+                        type="text"
+                        placeholder="Search invoices, customers, or order numbers..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2 border rounded-[4px] transition-all duration-200 text-sm"
+                        style={{ borderColor: "#E9ECEF", color: "#212529" }}
+                      />
+                    </div>
+
+                    <button
+                      onClick={() => setShowFilters(!showFilters)}
+                      className="flex items-center gap-2 px-4 py-2 border rounded-[4px] transition-colors text-sm font-medium"
+                      style={{ borderColor: "#E9ECEF", color: "#495057" }}
+                    >
+                      <Filter className="w-4 h-4" />
+                      Filters
+                      <ChevronDown
+                        className={`w-4 h-4 transition-transform ${showFilters ? "rotate-180" : ""
                           }`}
-                      >
-                        <td className="py-4 px-6">
-                          <div>
-                            <div
-                              className="font-medium"
-                              style={{ color: "#212529" }}
-                            >
-                              {invoice.invoiceNumber || "N/A"}
+                      />
+                    </button>
+                  </div>
+
+                  {showFilters && (
+                    <div className="mt-4 pt-4 border-t border-[#E9ECEF]">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+                        <div>
+                          <label
+                            className="block text-sm font-medium mb-1"
+                            style={{ color: "#212529" }}
+                          >
+                            Status
+                          </label>
+                          <select
+                            value={filters.status}
+                            onChange={(e) =>
+                              setFilters({ ...filters, status: e.target.value })
+                            }
+                            className="w-full px-3 py-2 border rounded-[4px] text-sm"
+                            style={{ borderColor: "#E9ECEF", color: "#212529" }}
+                          >
+                            <option value="">All Status</option>
+                            <option value="draft">Draft</option>
+                            <option value="sent">Sent</option>
+                            <option value="paid">Paid</option>
+                            <option value="overdue">Overdue</option>
+                            <option value="cancelled">Cancelled</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label
+                            className="block text-sm font-medium mb-1"
+                            style={{ color: "#212529" }}
+                          >
+                            From Date
+                          </label>
+                          <input
+                            type="date"
+                            value={filters.dateFrom}
+                            onChange={(e) =>
+                              setFilters({ ...filters, dateFrom: e.target.value })
+                            }
+                            className="w-full px-3 py-2 border rounded-[4px] text-sm"
+                            style={{ borderColor: "#E9ECEF", color: "#212529" }}
+                          />
+                        </div>
+
+                        <div>
+                          <label
+                            className="block text-sm font-medium mb-1"
+                            style={{ color: "#212529" }}
+                          >
+                            To Date
+                          </label>
+                          <input
+                            type="date"
+                            value={filters.dateTo}
+                            onChange={(e) =>
+                              setFilters({ ...filters, dateTo: e.target.value })
+                            }
+                            className="w-full px-3 py-2 border rounded-[4px] text-sm"
+                            style={{ borderColor: "#E9ECEF", color: "#212529" }}
+                          />
+                        </div>
+
+                        <div>
+                          <label
+                            className="block text-sm font-medium mb-1"
+                            style={{ color: "#212529" }}
+                          >
+                            Customer
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Customer name"
+                            value={filters.customer}
+                            onChange={(e) =>
+                              setFilters({ ...filters, customer: e.target.value })
+                            }
+                            className="w-full px-3 py-2 border rounded-[4px] text-sm"
+                            style={{ borderColor: "#E9ECEF", color: "#212529" }}
+                          />
+                        </div>
+
+                        <div>
+                          <label
+                            className="block text-sm font-medium mb-1"
+                            style={{ color: "#212529" }}
+                          >
+                            Min Amount
+                          </label>
+                          <input
+                            type="number"
+                            placeholder="0.00"
+                            value={filters.minAmount}
+                            onChange={(e) =>
+                              setFilters({ ...filters, minAmount: e.target.value })
+                            }
+                            className="w-full px-3 py-2 border rounded-[4px] text-sm"
+                            style={{ borderColor: "#E9ECEF", color: "#212529" }}
+                          />
+                        </div>
+
+                        <div>
+                          <label
+                            className="block text-sm font-medium mb-1"
+                            style={{ color: "#212529" }}
+                          >
+                            Max Amount
+                          </label>
+                          <input
+                            type="number"
+                            placeholder="0.00"
+                            value={filters.maxAmount}
+                            onChange={(e) =>
+                              setFilters({ ...filters, maxAmount: e.target.value })
+                            }
+                            className="w-full px-3 py-2 border rounded-[4px] text-sm"
+                            style={{ borderColor: "#E9ECEF", color: "#212529" }}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2 mt-4">
+                        <button
+                          onClick={() =>
+                            setFilters({
+                              status: "",
+                              dateFrom: "",
+                              dateTo: "",
+                              customer: "",
+                              minAmount: "",
+                              maxAmount: "",
+                            })
+                          }
+                          className="px-3 py-1 text-sm border rounded-[4px] transition-colors"
+                          style={{ borderColor: "#E9ECEF", color: "#495057" }}
+                        >
+                          Clear Filters
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div
+                className="bg-white rounded-[4px] border border-[#E9ECEF] overflow-hidden"
+                style={{ boxShadow: "0 2px 8px rgba(0, 0, 0, 0.05)" }}
+              >
+                {loading ? (
+                  <div className="flex items-center justify-center py-12">
+                    <div className="text-center">
+                      <Loader2
+                        className="w-8 h-8 animate-spin mx-auto mb-4 text-[#8CC21B]"
+                      />
+                      <p className="text-xs text-[#6C757D]">Loading invoices...</p>
+                    </div>
+                  </div>
+                ) : filteredInvoices.length === 0 ? (
+                  <div className="flex items-center justify-center py-12">
+                    <div className="text-center">
+                      <FileText className="w-12 h-12 mx-auto mb-4 text-[#ADB5BD]" />
+                      <h3 className="text-lg font-medium mb-1 text-[#212529]">No invoices found</h3>
+                      <p className="text-xs text-[#6C757D]">Try adjusting your search or filters</p>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="hidden lg:block overflow-x-auto">
+                      <table className="w-full border-collapse">
+                        <thead className="bg-[#F8F9FA] border-b border-[#E9ECEF]">
+                          <tr>
+                            {activeInvTab === "closed_invoices" && (
+                              <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">#</th>
+                            )}
+                            <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
+                              <div className="flex items-center gap-1.5">
+                                ID <XCircle className="w-4 h-4 text-[#DC3545] fill-white" />
+                              </div>
+                            </th>
+                            {activeInvTab === "closed_invoices" && (
+                              <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">Invoice No</th>
+                            )}
+                            <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">Bill To</th>
+                            <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">Ship To</th>
+                            <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
+                              {activeInvTab === "open_invoices" ? "ID - Cargo No" : "Cargo No."}
+                            </th>
+                            <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
+                              {activeInvTab === "open_invoices" ? "Date created" : "Closed Date"}
+                            </th>
+                            <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
+                              {activeInvTab === "open_invoices" ? "Count Item" : "Item Count"}
+                            </th>
+                            <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
+                              {activeInvTab === "open_invoices" ? "QTY" : "Total Qty"}
+                            </th>
+                            {activeInvTab === "closed_invoices" && (
+                              <th className="text-right py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">Total Price</th>
+                            )}
+                            <th className="text-center py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[#F1F3F5]">
+                          {currentInvoices.map((invoice, index) => (
+                            <tr key={invoice.id} className="hover:bg-[#F8F9FA] transition-colors group">
+                              {activeInvTab === "closed_invoices" && (
+                                <td className="py-4 px-4 text-xs text-[#212529]">{startIndex + index + 1}</td>
+                              )}
+                              <td className="py-4 px-4">
+                                <button className="flex items-center gap-1.5 px-2.5 py-1 bg-[#495057] text-white text-[10px] font-bold rounded-[4px] hover:bg-[#343A40] transition-colors whitespace-nowrap">
+                                  {invoice.id.slice(-2)} <ChevronRight className="w-3 h-3" />
+                                </button>
+                              </td>
+                              {activeInvTab === "closed_invoices" && (
+                                <td className="py-4 px-4 text-xs font-semibold text-[#212529]">{invoice.invoiceNumber || "N/A"}</td>
+                              )}
+                              <td className="py-4 px-4 text-xs text-[#212529]">{invoice.customer?.companyName || "N/A"}</td>
+                              <td className="py-4 px-4 text-xs text-[#6C757D]">{invoice.customer?.city || "-"}</td>
+                              <td className="py-4 px-4 text-xs text-[#212529]">
+                                {activeInvTab === "open_invoices" ? (
+                                  <span className="font-medium">{invoice.id.slice(-2)} - {invoice.orderNumber || "No Cargo"}</span>
+                                ) : (
+                                  <span className="font-medium">{invoice.orderNumber || "No Cargo"}</span>
+                                )}
+                              </td>
+                              <td className="py-4 px-4 text-xs text-[#495057]">
+                                {new Date(invoice.invoiceDate).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}
+                              </td>
+                              <td className="py-4 px-4 text-xs">
+                                <span className="text-[#059669] font-bold hover:underline cursor-pointer">
+                                  {invoice.items?.length || 0}
+                                </span>
+                              </td>
+                              <td className="py-4 px-4 text-xs text-[#212529] font-medium">
+                                {invoice.items?.reduce((sum, item) => sum + item.quantity, 0) || 0}
+                              </td>
+                              {activeInvTab === "closed_invoices" && (
+                                <td className="py-4 px-4 text-xs text-right font-bold text-[#212529]">
+                                  {Number(invoice.grossTotal).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </td>
+                              )}
+                              <td className="py-4 px-4">
+                                <div className="flex items-center justify-center gap-2">
+                                  {activeInvTab === "open_invoices" ? (
+                                    <button
+                                      onClick={() => handleMarkAsPaid(invoice.id)}
+                                      className="flex items-center gap-1.5 px-4 py-1.5 bg-[#059669] text-white text-[10px] font-bold rounded-[4px] hover:bg-green-700 transition-all shadow-md"
+                                    >
+                                      <CheckCircle className="w-3.5 h-3.5" /> VERIFY
+                                    </button>
+                                  ) : (
+                                    <>
+                                      <button className="text-[#DC3545] hover:text-red-700 transition-colors" title="Download PDF">
+                                        <FileText className="w-5 h-5" />
+                                      </button>
+                                      <button className="px-3.5 py-1 bg-[#28A745] text-white text-[10px] font-bold rounded-[4px] hover:bg-green-600 transition-colors">
+                                        Edit
+                                      </button>
+                                      <button className="px-3 py-1 border border-[#6C757D] text-[#6C757D] text-[10px] font-bold rounded-[4px] hover:bg-gray-50 transition-colors">
+                                        Create PL
+                                      </button>
+                                      <button className="px-3.5 py-1 bg-[#F15A24] text-white text-[10px] font-bold rounded-[4px] flex items-center gap-1 hover:bg-[#D9481B] transition-colors">
+                                        <RefreshCw className="w-3 h-3" /> Ship
+                                      </button>
+                                    </>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    <div className="lg:hidden divide-y divide-[#F1F3F5]">
+                      {currentInvoices.map((invoice) => (
+                        <div key={invoice.id} className="p-4">
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-2">
+                              <div className="px-2 py-1 bg-[#495057] text-white text-[10px] font-bold rounded-[4px]">
+                                {invoice.id.slice(-2)}
+                              </div>
+                              <div className="font-bold text-sm text-[#212529]">
+                                {activeInvTab === "closed_invoices" ? invoice.invoiceNumber : `ID: ${invoice.id.slice(-5)}`}
+                              </div>
                             </div>
-                            {invoice.orderNumber && (
-                              <div
-                                className="text-sm"
-                                style={{ color: "#495057" }}
-                              >
-                                Order: {invoice.orderNumber}
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-[4px] uppercase" style={getStatusColor(invoice.status)}>
+                              {invoice.status}
+                            </span>
+                          </div>
+
+                          <div className="space-y-2 mb-4">
+                            <div className="flex justify-between text-xs">
+                              <span className="text-[#6C757D]">Customer</span>
+                              <span className="font-medium text-[#212529]">{invoice.customer?.companyName}</span>
+                            </div>
+                            <div className="flex justify-between text-xs">
+                              <span className="text-[#6C757D]">{activeInvTab === "open_invoices" ? "Cargo" : "Cargo No."}</span>
+                              <span className="font-medium text-[#212529]">{invoice.orderNumber || "-"}</span>
+                            </div>
+                            <div className="flex justify-between text-xs">
+                              <span className="text-[#6C757D]">Items / Qty</span>
+                              <span className="font-medium text-[#212529]">
+                                {invoice.items?.length || 0} / {invoice.items?.reduce((sum, item) => sum + item.quantity, 0) || 0}
+                              </span>
+                            </div>
+                            {activeInvTab === "closed_invoices" && (
+                              <div className="flex justify-between text-xs font-bold pt-1 border-t border-dashed border-gray-100">
+                                <span className="text-[#6C757D]">Total Price</span>
+                                <span className="text-[#212529]">${Number(invoice.grossTotal).toFixed(2)}</span>
                               </div>
                             )}
                           </div>
-                        </td>
-                        <td className="py-4 px-6">
-                          <div>
-                            <div
-                              className="font-medium"
-                              style={{ color: "#212529" }}
-                            >
-                              {invoice.customer?.companyName || "N/A"}
-                            </div>
-                            <div
-                              className="text-sm"
-                              style={{ color: "#495057" }}
-                            >
-                              {invoice.customer?.email ||
-                                invoice.customer?.contactEmail ||
-                                "N/A"}
-                            </div>
-                          </div>
-                        </td>
-                        <td className="py-4 px-6">
-                          <div className="text-sm" style={{ color: "#212529" }}>
-                            {new Date(invoice.invoiceDate).toLocaleDateString()}
-                          </div>
-                        </td>
-                        <td className="py-4 px-6 text-right">
-                          <div
-                            className="font-semibold"
-                            style={{ color: "#212529" }}
-                          >
-                            ${Number(invoice.grossTotal).toFixed(2)}
-                          </div>
-                          {invoice.outstandingAmount > 0 && (
-                            <div
-                              className="text-sm"
-                              style={{ color: "#F57C00" }}
-                            >
-                              Outstanding: $
-                              {Number(invoice.outstandingAmount).toFixed(2)}
-                            </div>
-                          )}
-                        </td>
-                        <td className="py-4 px-6 text-center">
-                          <span
-                            className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium capitalize"
-                            style={getStatusColor(invoice.status)}
-                          >
-                            {getStatusIcon(invoice.status)}
-                            {invoice.status}
-                          </span>
-                        </td>
-                        <td className="py-4 px-6">
-                          <div className="flex items-center justify-center gap-1">
-                            <Link
-                              target="_blank"
-                              href={`https://api.gtech.de${invoice.pdfUrl}`}
-                              className="p-2 rounded-lg transition-colors hover:bg-[#E8F4D6]"
-                              title="Download PDF"
-                            >
-                              {actionLoading[`pdf-${invoice.id}`] ? (
-                                <Loader2
-                                  className="w-4 h-4 animate-spin"
-                                  style={{ color: "#8CC21B" }}
-                                />
-                              ) : (
-                                <Download
-                                  className="w-4 h-4"
-                                  style={{ color: "#8CC21B" }}
-                                />
-                              )}
-                            </Link>
-                            <Link
-                              target="_blank"
-                              href={`https://api.gtech.de${invoice.pdfUrl}`}
-                              className="p-2 rounded-lg transition-colors hover:bg-[#E3F2FD]"
-                              title="View"
-                            >
-                              <Eye
-                                className="w-4 h-4"
-                                style={{ color: "#1976D2" }}
-                              />
-                            </Link>
-                            {/* <button
-                              className="p-2 rounded-lg transition-colors hover:bg-[#FFF3E0]"
-                              title="Edit"
-                            >
-                              <Edit
-                                className="w-4 h-4"
-                                style={{ color: "#F57C00" }}
-                              />
-                            </button>
-                            {invoice.status !== "paid" && (
-                              <button
-                                onClick={() => handleMarkAsPaid(invoice.id)}
-                                disabled={actionLoading[`paid-${invoice.id}`]}
-                                className="p-2 rounded-lg transition-colors hover:bg-[#E8F5E8]"
-                                title="Mark as Paid"
-                              >
-                                {actionLoading[`paid-${invoice.id}`] ? (
-                                  <Loader2
-                                    className="w-4 h-4 animate-spin"
-                                    style={{ color: "#2E7D32" }}
-                                  />
-                                ) : (
-                                  <Check
-                                    className="w-4 h-4"
-                                    style={{ color: "#2E7D32" }}
-                                  />
-                                )}
+
+                          <div className="flex gap-2">
+                            {activeInvTab === "open_invoices" ? (
+                              <button className="flex-1 flex items-center justify-center gap-2 py-2 bg-[#28A745] text-white text-[11px] font-bold rounded-[4px] shadow-md">
+                                <CheckCircle className="w-4 h-4" /> VERIFY
                               </button>
-                            )} */}
+                            ) : (
+                              <>
+                                <button className="flex-1 py-2 bg-[#28A745] text-white text-[11px] font-bold rounded-[4px]">Edit</button>
+                                <button className="flex-1 py-2 border border-[#6C757D] text-[#6C757D] text-[11px] font-bold rounded-[4px]">Create PL</button>
+                                <button className="p-2 bg-[#F15A24] text-white rounded-[4px]"><RefreshCw className="w-4 h-4" /></button>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {totalPages > 1 && (
+                      <div className="flex items-center justify-between p-4 border-t border-[#E9ECEF] bg-[#F8F9FA]">
+                        <div className="text-[11px] font-medium text-[#6C757D]">
+                          Showing {startIndex + 1} to {Math.min(endIndex, filteredInvoices.length)} of {filteredInvoices.length} invoices
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                            disabled={currentPage === 1}
+                            className="p-1.5 rounded-[4px] border border-[#DEE2E6] bg-white disabled:opacity-30 hover:bg-gray-50 transition-colors"
+                          >
+                            <ChevronLeft className="w-3.5 h-3.5 text-[#495057]" />
+                          </button>
+                          {[...Array(totalPages)].map((_, i) => (
                             <button
-                              onClick={() => handleDeleteInvoice(invoice.id)}
-                              disabled={actionLoading[`delete-${invoice.id}`]}
-                              className="p-2 rounded-lg transition-colors hover:bg-[#FFEBEE]"
-                              title="Delete"
+                              key={i + 1}
+                              onClick={() => setCurrentPage(i + 1)}
+                              className={`min-w-[28px] h-7 text-[11px] font-bold rounded-[4px] border transition-all ${currentPage === i + 1
+                                ? "bg-[#8CC21B] text-white border-[#8CC21B] shadow-md"
+                                : "bg-white text-[#495057] border-[#DEE2E6] hover:bg-gray-50"
+                                }`}
                             >
-                              {actionLoading[`delete-${invoice.id}`] ? (
-                                <Loader2
-                                  className="w-4 h-4 animate-spin"
-                                  style={{ color: "#D32F2F" }}
-                                />
-                              ) : (
-                                <Trash2
-                                  className="w-4 h-4"
-                                  style={{ color: "#D32F2F" }}
-                                />
-                              )}
+                              {i + 1}
+                            </button>
+                          ))}
+                          <button
+                            onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                            disabled={currentPage === totalPages}
+                            className="p-1.5 rounded-[4px] border border-[#DEE2E6] bg-white disabled:opacity-30 hover:bg-gray-50 transition-colors"
+                          >
+                            <ChevronRight className="w-3.5 h-3.5 text-[#495057]" />
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </>
+          )}
+
+        {activeInvTab === "cargos" && (
+          <div className="bg-white rounded-[4px] border border-[#E9ECEF] p-4" style={{ boxShadow: "0 2px 8px rgba(0, 0, 0, 0.05)" }}>
+            <CargosTab />
+          </div>
+        )}
+
+        {activeInvTab === "cargo_type" && (
+          <div className="bg-white rounded-[4px] border border-[#E9ECEF] p-4" style={{ boxShadow: "0 2px 8px rgba(0, 0, 0, 0.05)" }}>
+            <CargoTypesTab />
+          </div>
+        )}
+
+        {activeInvTab === "billto_shipto" && (
+          <div className="bg-white rounded-[4px] border border-[#E9ECEF] overflow-hidden" style={{ boxShadow: "0 2px 8px rgba(0, 0, 0, 0.05)" }}>
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse">
+                <thead style={{ backgroundColor: "#F8F9FA" }}>
+                  <tr className="border-b border-[#E9ECEF]">
+                    <th className="text-left py-3 px-4 font-semibold text-xs text-[#495057]">ID</th>
+                    <th className="text-left py-3 px-4 font-semibold text-xs text-[#495057]">Customer Type</th>
+                    <th className="text-left py-3 px-4 font-semibold text-xs text-[#495057]">Bill To</th>
+                    <th className="text-left py-3 px-4 font-semibold text-xs text-[#495057]">Ship To</th>
+                    <th className="text-left py-3 px-4 font-semibold text-xs text-[#495057]">Delivery address</th>
+                    <th className="text-left py-3 px-4 font-semibold text-xs text-[#495057]">Email</th>
+                    <th className="text-left py-3 px-4 font-semibold text-xs text-[#495057]">Phone</th>
+                    <th className="text-left py-3 px-4 font-semibold text-xs text-[#495057]">Website</th>
+                    <th className="text-center py-3 px-4 font-semibold text-xs text-[#495057]">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#F1F3F5]">
+                  {loading ? (
+                    <tr><td colSpan={9} className="py-12 text-center text-xs text-[#6C757D]">Loading customers...</td></tr>
+                  ) : customers.length === 0 ? (
+                    <tr><td colSpan={9} className="py-12 text-center text-xs text-[#6C757D]">No customers found</td></tr>
+                  ) : (
+                    customers.map((customer) => (
+                      <tr key={customer.id} className="hover:bg-[#F8F9FA] transition-colors group">
+                        <td className="py-4 px-4">
+                          <button className="flex items-center gap-1.5 px-2.5 py-1 bg-[#495057] text-white text-[10px] font-bold rounded-[4px] hover:bg-[#343A40] transition-colors whitespace-nowrap">
+                            {customer.id.slice(-2)} <ChevronRight className="w-3 h-3" />
+                          </button>
+                        </td>
+                        <td className="py-4 px-4 text-xs text-[#212529]">
+                          <span className="px-2 py-0.5 bg-gray-100 rounded-[4px] text-[10px] font-medium uppercase text-[#495057]">GT-Warehouse</span>
+                        </td>
+                        <td className="py-4 px-4 text-xs font-semibold text-[#212529]">GTech</td>
+                        <td className="py-4 px-4 text-xs text-[#212529]">{customer.companyName}</td>
+                        <td className="py-4 px-4 text-xs text-[#6C757D] max-w-[200px] truncate">
+                          {customer.country}, {customer.city}, {customer.addressLine1}
+                        </td>
+                        <td className="py-4 px-4 text-xs text-[#212529]">{customer.email}</td>
+                        <td className="py-4 px-4 text-xs text-[#212529] whitespace-nowrap">{customer.contactPhoneNumber}</td>
+                        <td className="py-4 px-4 text-xs text-[#6C757D]">-</td>
+                        <td className="py-4 px-4">
+                          <div className="flex justify-center">
+                            <button
+                              onClick={() => router.push(`/customers/${customer.id}`)}
+                              className="px-3.5 py-1.5 bg-[#059669] text-white text-[10px] font-bold rounded-[4px] hover:bg-green-600 transition-all shadow-md"
+                            >
+                              EDIT
                             </button>
                           </div>
                         </td>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
 
-              {/* Mobile Cards */}
-              <div className="lg:hidden">
-                {currentInvoices.map((invoice) => (
-                  <div
-                    key={invoice.id}
-                    className="p-4 border-b border-[#F1F3F5] last:border-b-0"
-                  >
-                    <div className="flex items-start justify-between mb-3">
-                      <div>
-                        <div
-                          className="font-semibold"
-                          style={{ color: "#212529" }}
-                        >
-                          {invoice.invoiceNumber || "N/A"}
-                        </div>
-                        <div className="text-sm" style={{ color: "#495057" }}>
-                          {invoice.customer?.companyName || "N/A"}
-                        </div>
-                      </div>
-                      <span
-                        className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium capitalize"
-                        style={getStatusColor(invoice.status)}
-                      >
-                        {getStatusIcon(invoice.status)}
-                        {invoice.status}
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4 mb-3 text-sm">
-                      <div>
-                        <div style={{ color: "#495057" }}>Date</div>
-                        <div style={{ color: "#212529" }}>
-                          {new Date(invoice.invoiceDate).toLocaleDateString()}
-                        </div>
-                      </div>
-                      <div>
-                        <div style={{ color: "#495057" }}>Amount</div>
-                        <div
-                          className="font-semibold"
-                          style={{ color: "#212529" }}
-                        >
-                          ${Number(invoice.grossTotal).toFixed(2)}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => handleDownloadPDF(invoice.id)}
-                        disabled={actionLoading[`pdf-${invoice.id}`]}
-                        className="flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-sm font-medium transition-colors"
-                        style={{ backgroundColor: "#E8F4D6", color: "#6B8F1A" }}
-                      >
-                        {actionLoading[`pdf-${invoice.id}`] ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <Download className="w-4 h-4" />
-                        )}
-                        PDF
-                      </button>
-                      <button
-                        className="p-2 rounded-lg transition-colors"
-                        style={{ backgroundColor: "#E3F2FD", color: "#1976D2" }}
-                      >
-                        <Eye className="w-4 h-4" />
-                      </button>
-                      <button
-                        className="p-2 rounded-lg transition-colors"
-                        style={{ backgroundColor: "#FFF3E0", color: "#F57C00" }}
-                      >
-                        <Edit className="w-4 h-4" />
-                      </button>
-                      <button
-                        className="p-2 rounded-lg transition-colors"
-                        style={{ backgroundColor: "#FFEBEE", color: "#D32F2F" }}
-                      >
-                        <MoreVertical className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Pagination */}
-              {totalPages > 1 && (
-                <div className="flex items-center justify-between p-4 lg:p-6 border-t border-[#E9ECEF]">
-                  <div className="text-sm" style={{ color: "#495057" }}>
-                    Showing {startIndex + 1} to{" "}
-                    {Math.min(endIndex, filteredInvoices.length)} of{" "}
-                    {filteredInvoices.length} invoices
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() =>
-                        setCurrentPage(Math.max(1, currentPage - 1))
-                      }
-                      disabled={currentPage === 1}
-                      className="p-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                      style={{ backgroundColor: "#F8F9FA", color: "#495057" }}
-                    >
-                      <ChevronLeft className="w-4 h-4" />
-                    </button>
-
-                    {[...Array(totalPages)].map((_, i) => (
-                      <button
-                        key={i + 1}
-                        onClick={() => setCurrentPage(i + 1)}
-                        className={`px-3 py-2 rounded-lg text-sm transition-colors ${currentPage === i + 1 ? "font-medium" : ""
-                          }`}
-                        style={{
-                          backgroundColor:
-                            currentPage === i + 1 ? "#8CC21B" : "#F8F9FA",
-                          color: currentPage === i + 1 ? "#FFFFFF" : "#495057",
-                        }}
-                      >
-                        {i + 1}
-                      </button>
-                    ))}
-
-                    <button
-                      onClick={() =>
-                        setCurrentPage(Math.min(totalPages, currentPage + 1))
-                      }
-                      disabled={currentPage === totalPages}
-                      className="p-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                      style={{ backgroundColor: "#F8F9FA", color: "#495057" }}
-                    >
-                      <ChevronRight className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-        </div>
+        {activeInvTab === "packing_list" && (
+          <div className="bg-white p-6 rounded-[4px] shadow-md border border-gray-200">
+            <h2 className="text-lg font-bold mb-2">Packing List</h2>
+            <p className="text-xs text-gray-500 mb-6">Manage packing lists for invoices.</p>
+            <div className="border-2 border-dashed border-gray-100 rounded-[4px] h-48 flex flex-col items-center justify-center text-gray-300">
+              <FileText className="w-10 h-10 mb-2 opacity-10" />
+              <p className="text-xs">Packing List functionalities will be added here.</p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -71,6 +71,15 @@ const formatDateInput = (dateString: string | Date | undefined | null) => {
     return date.toISOString().split("T")[0];
 };
 
+const formatCargoDateShort = (dateString: string | Date | undefined | null) => {
+    if (!dateString) return "-";
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return "-";
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    return `${day}.${month}`;
+};
+
 const CargosTab: React.FC<CargosTabProps> = ({ customers: externalCustomers }) => {
     const [cargos, setCargos] = useState<CargoType[]>([]);
     const [loading, setLoading] = useState(false);
@@ -497,36 +506,45 @@ const CargosTab: React.FC<CargosTabProps> = ({ customers: externalCustomers }) =
                     </div>
                 ) : (
                     <table className="w-full">
-                        <thead className="bg-gray-50 border-b border-gray-200">
+                        <thead className="bg-[#F8F9FA] border-b border-[#E9ECEF]">
                             <tr>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <th className="px-3 py-3.5 text-left text-[11px] font-semibold text-[#495057] uppercase tracking-wider">
                                     ID
                                 </th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Cargo No
+                                <th className="px-3 py-3.5 text-left text-[11px] font-semibold text-[#495057] uppercase tracking-wider">
+                                    CARGO NO
                                 </th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Cargo Type
+                                <th className="px-3 py-3.5 text-left text-[11px] font-semibold text-[#495057] uppercase tracking-wider">
+                                    STATUS
                                 </th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Customer
+                                <th className="px-3 py-3.5 text-left text-[11px] font-semibold text-[#495057] uppercase tracking-wider">
+                                    CARGO TYPE
                                 </th>
-                                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Status
+                                <th className="px-3 py-3.5 text-left text-[11px] font-semibold text-[#495057] uppercase tracking-wider">
+                                    BILL TO
                                 </th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Pickup
+                                <th className="px-3 py-3.5 text-left text-[11px] font-semibold text-[#495057] uppercase tracking-wider">
+                                    SHIP TO
                                 </th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Departure
+                                <th className="px-3 py-3.5 text-left text-[11px] font-semibold text-[#495057] uppercase tracking-wider">
+                                    EST. DEPARTURE
                                 </th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    ETA
+                                <th className="px-3 py-3.5 text-left text-[11px] font-semibold text-[#495057] uppercase tracking-wider">
+                                    SHIPPED
                                 </th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Note
+                                <th className="px-3 py-3.5 text-left text-[11px] font-semibold text-[#495057] uppercase tracking-wider">
+                                    EST. ARRIVAL
                                 </th>
-                                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <th className="px-3 py-3.5 text-left text-[11px] font-semibold text-[#495057] uppercase tracking-wider">
+                                    ARRIVED (DAYS)
+                                </th>
+                                <th className="px-3 py-3.5 text-left text-[11px] font-semibold text-[#495057] uppercase tracking-wider">
+                                    ONLINE TRACK
+                                </th>
+                                <th className="px-3 py-3.5 text-left text-[11px] font-semibold text-[#495057] uppercase tracking-wider">
+                                    REMARKS
+                                </th>
+                                <th className="px-3 py-3.5 text-center text-[11px] font-semibold text-[#495057] uppercase tracking-wider">
                                     Actions
                                 </th>
                             </tr>
@@ -535,77 +553,78 @@ const CargosTab: React.FC<CargosTabProps> = ({ customers: externalCustomers }) =
                             {cargos.map((cargo) => (
                                 <tr
                                     key={cargo.id}
-                                    className="hover:bg-gray-50 transition-colors cursor-pointer"
+                                    className="hover:bg-gray-50 border-b border-[#F1F3F5] transition-colors cursor-pointer group"
                                     onClick={() => handleOpenEdit(cargo.id)}
                                 >
-                                    <td className="px-4 py-3">
-                                        <div className="text-sm font-medium text-gray-900">{cargo.id}</div>
+                                    <td className="px-3 py-3 text-xs text-[#6C757D]">
+                                        {cargo.id}
                                     </td>
-                                    <td className="px-4 py-3">
-                                        <div className="text-sm text-gray-900 font-medium">
-                                            {cargo.cargo_no || "-"}
-                                        </div>
+                                    <td className="px-3 py-3 text-xs font-medium text-[#212529]">
+                                        {cargo.cargo_no || "-"}
                                     </td>
-                                    <td className="px-4 py-3">
-                                        <div className="text-sm text-gray-900">
-                                            {cargo.cargo_type_id ? getCargoTypeName(cargo.cargo_type_id) : "-"}
-                                        </div>
-                                    </td>
-                                    <td className="px-4 py-3">
-                                        <div className="text-sm text-gray-900">
-                                            {cargo.customer_id ? getCustomerName(cargo.customer_id) : "-"}
-                                        </div>
-                                    </td>
-                                    <td className="px-4 py-3 text-center">
-                                        <span
-                                            className={`text-xs px-2 py-1 rounded-[4px] font-medium ${getCargoStatusColor(
-                                                cargo.cargo_status
-                                            )}`}
-                                        >
+                                    <td className="px-3 py-3">
+                                        <span className="text-[10px] font-bold text-[#495057]">
                                             {cargo.cargo_status || "Open"}
                                         </span>
                                     </td>
-                                    <td className="px-4 py-3">
-                                        <div className="text-sm text-gray-600 text-nowrap">
-                                            {formatDate(cargo.pickup_date)}
-                                        </div>
+                                    <td className="px-3 py-3 text-xs text-[#495057]">
+                                        {cargo.cargo_type_id ? getCargoTypeName(cargo.cargo_type_id) : "-"}
                                     </td>
-                                    <td className="px-4 py-3">
-                                        <div className="text-sm text-gray-600 text-nowrap">
-                                            {formatDate(cargo.dep_date)}
-                                        </div>
+                                    <td className="px-3 py-3 text-xs text-[#212529]">
+                                        {cargo.bill_to_company_name || "GTech"}
                                     </td>
-                                    <td className="px-4 py-3">
-                                        <div className="text-sm text-gray-600 text-nowrap">
-                                            {formatDate(cargo.eta)}
-                                        </div>
+                                    <td className="px-3 py-3 text-xs text-[#6C757D]">
+                                        {cargo.ship_to_company_name || (cargo.customer_id ? getCustomerName(cargo.customer_id) : "-")}
                                     </td>
-                                    <td className="px-4 py-3">
-                                        <div className="text-sm text-gray-600 truncate max-w-[150px]">
-                                            {cargo.note || "-"}
-                                        </div>
+                                    <td className="px-3 py-3 text-xs text-[#212529]">
+                                        {formatCargoDateShort(cargo.dep_date)}
                                     </td>
-                                    <td className="px-4 py-3">
-                                        <div className="flex items-center justify-center gap-2">
+                                    <td className="px-3 py-3 text-xs text-[#212529]">
+                                        {formatCargoDateShort(cargo.shipped_at)}
+                                    </td>
+                                    <td className="px-3 py-3 text-xs text-[#212529]">
+                                        {formatCargoDateShort(cargo.eta)}
+                                    </td>
+                                    <td className="px-3 py-3 text-xs text-[#6C757D]">
+                                        -
+                                    </td>
+                                    <td className="px-3 py-3 text-xs max-w-[120px] truncate">
+                                        {cargo.online_track ? (
+                                            <a
+                                                href={cargo.online_track}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-blue-500 hover:underline"
+                                                onClick={(e) => e.stopPropagation()}
+                                            >
+                                                {cargo.online_track}
+                                            </a>
+                                        ) : "-"}
+                                    </td>
+                                    <td className="px-3 py-3 text-xs text-[#6C757D] max-w-[150px] truncate">
+                                        {cargo.remark || cargo.note || "-"}
+                                    </td>
+                                    <td className="px-3 py-3">
+                                        <div className="flex items-center justify-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
                                             <button
                                                 onClick={(e) => {
                                                     e.stopPropagation();
                                                     handleOpenEdit(cargo.id);
                                                 }}
-                                                className="text-gray-600 hover:text-gray-800 transition-colors p-1"
+                                                className="text-gray-400 hover:text-gray-600 transition-colors p-1"
                                                 title="Edit"
                                             >
-                                                <PencilIcon className="h-4 w-4" />
+                                                <PencilIcon className="h-3.5 w-3.5" />
                                             </button>
                                             <button
                                                 onClick={(e) => {
                                                     e.stopPropagation();
                                                     handleDelete(cargo.id);
                                                 }}
-                                                className="text-red-600 hover:text-red-800 transition-colors p-1"
+                                                className="text-red-300 hover:text-red-500 transition-colors p-1"
                                                 title="Delete"
                                             >
-                                                <TrashIcon className="h-4 w-4" />
+                                                <TrashIcon className="h-3.5 w-3.5" />
                                             </button>
                                         </div>
                                     </td>

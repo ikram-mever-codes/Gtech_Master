@@ -18,15 +18,12 @@ import {
   Router,
 } from "lucide-react";
 import { toast } from "react-hot-toast";
-
-// Import your API functions
 import { createNewInvoice } from "@/api/invoice";
 import { getAllCustomers } from "@/api/customers";
 import CustomButton from "@/components/UI/CustomButton";
 import { useRouter } from "next/navigation";
 import PageHeader from "@/components/UI/PageHeader";
 
-// Types based on your code
 interface CustomerData {
   id: string;
   companyName: string;
@@ -106,12 +103,9 @@ const InvoiceGenerator: React.FC = () => {
     },
   ]);
 
-  // Load customers on component mount
   useEffect(() => {
     loadCustomers();
   }, []);
-
-  // Filter customers based on search term
   useEffect(() => {
     const filtered = customers.filter(
       (customer) =>
@@ -144,7 +138,6 @@ const InvoiceGenerator: React.FC = () => {
     }
   };
 
-  // Calculate item totals
   const calculateItemTotals = (item: Partial<InvoiceItem>): InvoiceItem => {
     const quantity = item.quantity || 0;
     const unitPrice = item.unitPrice || 0;
@@ -165,7 +158,6 @@ const InvoiceGenerator: React.FC = () => {
     } as InvoiceItem;
   };
 
-  // Update item
   const updateItem = (index: number, field: keyof InvoiceItem, value: any) => {
     const updatedItems = [...items];
     updatedItems[index] = calculateItemTotals({
@@ -175,7 +167,6 @@ const InvoiceGenerator: React.FC = () => {
     setItems(updatedItems);
   };
 
-  // Add new item
   const addItem = () => {
     const newItem: InvoiceItem = {
       quantity: 1,
@@ -190,14 +181,12 @@ const InvoiceGenerator: React.FC = () => {
     setItems([...items, newItem]);
   };
 
-  // Remove item
   const removeItem = (index: number) => {
     if (items.length > 1) {
       setItems(items.filter((_, i) => i !== index));
     }
   };
 
-  // Calculate totals
   const totals = items.reduce(
     (acc, item) => ({
       netTotal: acc.netTotal + item.netPrice,
@@ -208,10 +197,8 @@ const InvoiceGenerator: React.FC = () => {
   );
 
   const router = useRouter();
-  // Handle invoice creation
   const handleCreateInvoice = async () => {
     try {
-      // Validation
       if (!selectedCustomer) {
         toast.error("Please select a customer");
         return;
@@ -292,7 +279,6 @@ const InvoiceGenerator: React.FC = () => {
         </div>
 
         <div className="space-y-8">
-          {/* Enhanced Customer Selection */}
           <div
             className="bg-white rounded-md border border-[#E9ECEF] overflow-hidden"
             style={{ boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)" }}
@@ -508,7 +494,6 @@ const InvoiceGenerator: React.FC = () => {
             </div>
           </div>
 
-          {/* Enhanced Invoice Details */}
           <div
             className="bg-white rounded-md border border-[#E9ECEF] overflow-hidden"
             style={{ boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)" }}
@@ -1026,8 +1011,6 @@ const InvoiceGenerator: React.FC = () => {
               </div>
             </div>
           </div>
-
-          {/* Enhanced Totals */}
           <div
             className="bg-white rounded-md border border-[#E9ECEF] overflow-hidden"
             style={{ boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)" }}
@@ -1105,7 +1088,6 @@ const InvoiceGenerator: React.FC = () => {
             </div>
           </div>
 
-          {/* Enhanced Actions */}
           <div className="flex justify-end gap-4 pb-8">
             <button
               type="button"
