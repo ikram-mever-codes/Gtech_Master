@@ -7,6 +7,7 @@ import {
   updateOrder,
   deleteOrder,
   updateOrderItemStatus,
+  splitOrderItem,
 } from "../controllers/order_controller";
 import { authenticateUser, authorize } from "../middlewares/authorized";
 import { UserRole } from "../models/users";
@@ -18,7 +19,7 @@ router.get("/", authorize(UserRole.SALES), getAllOrders);
 router.get("/:orderId", authorize(UserRole.SALES), getOrderById);
 router.put("/:orderId", authorize(UserRole.SALES), updateOrder);
 router.delete("/:orderId", authorize(UserRole.SALES), deleteOrder);
-
 router.put("/items/:id/status", authorize(UserRole.SALES), updateOrderItemStatus);
+router.post("/items/:id/split", authorize(UserRole.SALES), splitOrderItem);
 
 export default router;

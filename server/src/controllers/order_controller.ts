@@ -4,6 +4,7 @@ import ErrorHandler from "../utils/errorHandler";
 import { AppDataSource } from "../config/database";
 import { Order } from "../models/orders";
 import { OrderItem } from "../models/order_items";
+import { Item } from "../models/items";
 
 const padorder_no = (n: number) => `MA${String(n).padStart(4, "0")}`;
 
@@ -65,6 +66,13 @@ export const createOrder = async (req: Request, res: Response, next: NextFunctio
 
     await orderRepo.save(order);
 
+    const itemRepo = queryRunner.manager.getRepository(Item);
+    const itemIds = items.map((it: any) => Number(it.item_id));
+    const dbItems = await itemRepo.createQueryBuilder("i")
+      .where("i.id IN (:...itemIds)", { itemIds })
+      .getMany();
+    const itemMap = new Map(dbItems.map((i) => [i.id, i]));
+
     const lines = items.map((it: any) => {
       const item_id = Number(it.item_id);
       const qty = Number(it.qty);
@@ -76,11 +84,18 @@ export const createOrder = async (req: Request, res: Response, next: NextFunctio
         throw new ErrorHandler("Invalid qty in items[]", 400);
       }
 
+      const dbItem = itemMap.get(item_id);
+
       return orderItemsRepo.create({
         order_id: order.id,
         item_id,
         qty,
-        remark_de: it.remark_de ?? null,
+        remark_de: it.remark_de,
+        rmb_special_price: dbItem?.RMB_Price,
+        taric_id: dbItem?.taric_id,
+        category_id: dbItem?.cat_id ?? order.category_id,
+        cargo_id: order.cargo_id,
+        status: "NSO",
         created_at: new Date(),
         updated_at: new Date(),
       });
@@ -167,6 +182,13 @@ export const updateOrder = async (req: Request, res: Response, next: NextFunctio
         .where("order_id = :order_id", { order_id: order.id })
         .execute();
 
+      const itemRepo = queryRunner.manager.getRepository(Item);
+      const itemIds = items.map((it: any) => Number(it.item_id));
+      const dbItems = await itemRepo.createQueryBuilder("i")
+        .where("i.id IN (:...itemIds)", { itemIds })
+        .getMany();
+      const itemMap = new Map(dbItems.map((i) => [i.id, i]));
+
       const newLines = items.map((it: any) => {
         const item_id = Number(it.item_id);
         const qty = Number(it.qty);
@@ -174,11 +196,18 @@ export const updateOrder = async (req: Request, res: Response, next: NextFunctio
         if (!Number.isFinite(item_id) || item_id <= 0) throw new ErrorHandler("Invalid item_id in items[]", 400);
         if (!Number.isFinite(qty) || qty <= 0) throw new ErrorHandler("Invalid qty in items[]", 400);
 
+        const dbItem = itemMap.get(item_id);
+
         return orderItemsRepo.create({
           order_id: order.id,
           item_id,
           qty,
-          remark_de: it.remark_de ?? null,
+          remark_de: it.remark_de,
+          rmb_special_price: dbItem?.RMB_Price,
+          taric_id: dbItem?.taric_id,
+          category_id: dbItem?.cat_id ?? order.category_id,
+          cargo_id: order.cargo_id,
+          status: "NSO",
           created_at: new Date(),
           updated_at: new Date(),
         });
@@ -398,5 +427,56 @@ export const updateOrderItemStatus = async (req: Request, res: Response, next: N
     });
   } catch (error) {
     return next(error);
+  }
+}; export const splitOrderItem = async (req: Request, res: Response, next: NextFunction) => {
+  const queryRunner = AppDataSource.createQueryRunner();
+
+  try {
+    const { id } = req.params;
+    const { splitQty } = req.body;
+
+    if (!splitQty || splitQty <= 0) {
+      return next(new ErrorHandler("Split quantity must be greater than 0", 400));
+    }
+
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    const orderItemsRepo = queryRunner.manager.getRepository(OrderItem);
+    const orderItem = await orderItemsRepo.findOne({ where: { id: Number(id) } });
+
+    if (!orderItem) {
+      throw new ErrorHandler("Order item not found", 404);
+    }
+
+    if (splitQty >= (orderItem.qty || 0)) {
+      throw new ErrorHandler("Split quantity must be less than current quantity", 400);
+    }
+    const newItem = orderItemsRepo.create({
+      ...orderItem,
+      id: undefined,
+      qty: splitQty,
+      created_at: new Date(),
+      updated_at: new Date(),
+    });
+
+    orderItem.qty = (orderItem.qty || 0) - splitQty;
+    orderItem.updated_at = new Date();
+
+    await orderItemsRepo.save(orderItem);
+    await orderItemsRepo.save(newItem);
+
+    await queryRunner.commitTransaction();
+
+    return res.status(200).json({
+      success: true,
+      message: "Order item split successfully",
+      data: { original: orderItem, new: newItem },
+    });
+  } catch (error) {
+    await queryRunner.rollbackTransaction();
+    return next(error);
+  } finally {
+    await queryRunner.release();
   }
 };

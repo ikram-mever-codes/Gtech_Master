@@ -16,5 +16,10 @@ router.get(
     authorize(UserRole.SALES),
     InvoiceController.getInvoicesByCustomer
 );
+router.get(
+    "/:id/expanded",
+    authorize(UserRole.SALES),
+    InvoiceController.getInvoiceExpandedDetails
+);
 
 export default router;
