@@ -26,6 +26,7 @@ import {
   ChevronDown,
   SortAsc,
   SortDesc,
+  Printer,
 } from "lucide-react";
 
 import {
@@ -34,13 +35,20 @@ import {
   deleteInvoice,
   markInvoiceAsPaid,
   cancelInvoice,
+  getExpandedInvoiceDetails,
 } from "@/api/invoice";
+import SpreadSheet from "@/components/UI/SpreadSheet";
 import { useRouter } from "next/navigation";
 import PageHeader from "@/components/UI/PageHeader";
 import Link from "next/link";
 import CargosTab from "@/components/cargos/CargosTab";
 import CargoTypesTab from "@/components/cargos/CargoTypesTab";
 import { getAllCustomers, CustomerData as APICustomerData } from "@/api/customers";
+import { updateOrderItemStatus, splitOrderItem } from "@/api/orders";
+import { getAllCargos, CargoType } from "@/api/cargos";
+import { toast } from "react-hot-toast";
+import CustomModal from "@/components/UI/CustomModal";
+import { Pencil, Scissors, MoveRight } from "lucide-react";
 
 interface Invoice {
   id: string;
@@ -131,6 +139,175 @@ const InvoiceListPage: React.FC = () => {
     minAmount: "",
     maxAmount: "",
   });
+
+  const [expandedStates, setExpandedStates] = useState<Record<string, { taric?: boolean, items?: boolean, data?: any, loading?: boolean }>>({});
+
+  const [showREModal, setShowREModal] = useState(false);
+  const [showSPModal, setShowSPModal] = useState(false);
+  const [showQTYModal, setShowQTYModal] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<any>(null);
+  const [cargos, setCargos] = useState<CargoType[]>([]);
+  const [splitQty, setSplitQty] = useState<number>(0);
+  const [newQty, setNewQty] = useState<number>(0);
+  const [targetCargoId, setTargetCargoId] = useState<string>("");
+
+  const toggleExpansion = async (id: string, type: 'taric' | 'items') => {
+    const currentState = expandedStates[id] || {};
+    const isCurrentlyOpen = type === 'taric' ? currentState.taric : currentState.items;
+
+    const newState = {
+      ...currentState,
+      [type]: !isCurrentlyOpen
+    };
+
+    if (!isCurrentlyOpen && !currentState.data) {
+      setExpandedStates(prev => ({ ...prev, [id]: { ...newState, loading: true } }));
+      try {
+        const response = await getExpandedInvoiceDetails(id);
+        if (response.success) {
+          setExpandedStates(prev => ({
+            ...prev,
+            [id]: { ...newState, data: response.data, loading: false }
+          }));
+        }
+      } catch (error) {
+        console.error(error);
+        setExpandedStates(prev => ({
+          ...prev,
+          [id]: { ...newState, loading: false }
+        }));
+      }
+    } else {
+      setExpandedStates(prev => ({ ...prev, [id]: newState }));
+    }
+  };
+
+  useEffect(() => {
+    getAllCargos().then(res => {
+      if (res.success) setCargos(res.data);
+    });
+  }, []);
+
+  const handleReassignItem = async () => {
+    if (!selectedItem || !targetCargoId) return;
+    try {
+      await updateOrderItemStatus(selectedItem.id, { cargo_id: Number(targetCargoId) });
+      toast.success("Item reassigned successfully");
+      setShowREModal(false);
+      const invId = Object.keys(expandedStates).find(key =>
+        expandedStates[key].data?.detailedItems?.some((it: any) => it.id === selectedItem.id)
+      );
+      if (invId) {
+        const res = await getExpandedInvoiceDetails(invId);
+        setExpandedStates(prev => ({ ...prev, [invId]: { ...prev[invId], data: res.data } }));
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleSplitItem = async () => {
+    if (!selectedItem || splitQty <= 0) return;
+    try {
+      await splitOrderItem(selectedItem.id, splitQty);
+      toast.success("Item split successfully");
+      setShowSPModal(false);
+      const invId = Object.keys(expandedStates).find(key =>
+        expandedStates[key].data?.detailedItems?.some((it: any) => it.id === selectedItem.id)
+      );
+      if (invId) {
+        const res = await getExpandedInvoiceDetails(invId);
+        setExpandedStates(prev => ({ ...prev, [invId]: { ...prev[invId], data: res.data } }));
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleUpdateQty = async () => {
+    if (!selectedItem || newQty <= 0) return;
+    try {
+      await updateOrderItemStatus(selectedItem.id, { qty: newQty });
+      toast.success("Quantity updated successfully");
+      setShowQTYModal(false);
+      const invId = Object.keys(expandedStates).find(key =>
+        expandedStates[key].data?.detailedItems?.some((it: any) => it.id === selectedItem.id)
+      );
+      if (invId) {
+        const res = await getExpandedInvoiceDetails(invId);
+        setExpandedStates(prev => ({ ...prev, [invId]: { ...prev[invId], data: res.data } }));
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handlePrintLabel = (item: any) => {
+    const details = item.item;
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return;
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Print Label - ${details?.item_name || 'Item'}</title>
+          <style>
+            @page { size: 100mm 150mm; margin: 0; }
+            body { 
+              font-family: 'Poppins', sans-serif; 
+              padding: 20px; 
+              border: 1px solid #eee; 
+              width: 100mm; 
+              height: 150mm; 
+              box-sizing: border-box; 
+              position: relative;
+            }
+            .header { border-bottom: 2px solid #000; padding-bottom: 5px; margin-bottom: 10px; }
+            .item-name { font-size: 16px; font-weight: bold; margin-bottom: 2px; height: 48px; overflow: hidden; }
+            .ean { font-size: 11px; margin-bottom: 5px; color: #555; }
+            .details { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+            .label-field { font-size: 9px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; }
+            .value-field { font-size: 12px; font-weight: bold; margin-bottom: 2px; }
+            .barcode { margin-top: 20px; text-align: center; }
+            .qr-placeholder { width: 80px; height: 80px; background: #eee; margin: 0 auto; display: flex; align-items: center; justify-content: center; font-size: 8px; border: 1px dashed #ccc; }
+            .footer { position: absolute; bottom: 20px; left: 20px; right: 20px; font-size: 9px; text-align: center; color: #999; }
+          </style>
+        </head>
+        <body onload="window.print(); window.close();">
+          <div class="header">
+            <div class="item-name">${details?.item_name || 'N/A'}</div>
+            <div class="ean">EAN: ${details?.ean || '-'}</div>
+          </div>
+          <div class="details">
+            <div>
+              <div class="label-field">Order / Cargo No.</div>
+              <div class="value-field">${item.order?.order_no || '-'}</div>
+            </div>
+            <div>
+              <div class="label-field">QTY Label</div>
+              <div class="value-field">${item.qty_label || item.qty}</div>
+            </div>
+            <div>
+              <div class="label-field">SOID</div>
+              <div class="value-field">${item.supplier_order_id || '-'}</div>
+            </div>
+            <div>
+              <div class="label-field">Taric</div>
+              <div class="value-field">${details?.taric?.code || '-'}</div>
+            </div>
+          </div>
+          <div class="barcode">
+            <div class="qr-placeholder">G-TECH LABEL</div>
+            <div style="font-size: 9px; margin-top: 5px; font-weight: 500;">Item ID: ${item.id}</div>
+          </div>
+          <div class="footer">
+            Printed on ${new Date().toLocaleString('de-DE')}
+          </div>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
 
   useEffect(() => {
     loadInvoices();
@@ -735,7 +912,7 @@ const InvoiceListPage: React.FC = () => {
                             )}
                             <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
                               <div className="flex items-center gap-1.5">
-                                ID <XCircle className="w-4 h-4 text-[#DC3545] fill-white" />
+                                ID
                               </div>
                             </th>
                             {activeInvTab === "closed_invoices" && (
@@ -762,73 +939,202 @@ const InvoiceListPage: React.FC = () => {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-[#F1F3F5]">
-                          {currentInvoices.map((invoice, index) => (
-                            <tr key={invoice.id} className="hover:bg-[#F8F9FA] transition-colors group">
-                              {activeInvTab === "closed_invoices" && (
-                                <td className="py-4 px-4 text-xs text-[#212529]">{startIndex + index + 1}</td>
-                              )}
-                              <td className="py-4 px-4">
-                                <button className="flex items-center gap-1.5 px-2.5 py-1 bg-[#495057] text-white text-[10px] font-bold rounded-[4px] hover:bg-[#343A40] transition-colors whitespace-nowrap">
-                                  {invoice.id.slice(-2)} <ChevronRight className="w-3 h-3" />
-                                </button>
-                              </td>
-                              {activeInvTab === "closed_invoices" && (
-                                <td className="py-4 px-4 text-xs font-semibold text-[#212529]">{invoice.invoiceNumber || "N/A"}</td>
-                              )}
-                              <td className="py-4 px-4 text-xs text-[#212529]">{invoice.customer?.companyName || "N/A"}</td>
-                              <td className="py-4 px-4 text-xs text-[#6C757D]">{invoice.customer?.city || "-"}</td>
-                              <td className="py-4 px-4 text-xs text-[#212529]">
-                                {activeInvTab === "open_invoices" ? (
-                                  <span className="font-medium">{invoice.id.slice(-2)} - {invoice.orderNumber || "No Cargo"}</span>
-                                ) : (
-                                  <span className="font-medium">{invoice.orderNumber || "No Cargo"}</span>
-                                )}
-                              </td>
-                              <td className="py-4 px-4 text-xs text-[#495057]">
-                                {new Date(invoice.invoiceDate).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}
-                              </td>
-                              <td className="py-4 px-4 text-xs">
-                                <span className="text-[#059669] font-bold hover:underline cursor-pointer">
-                                  {invoice.items?.length || 0}
-                                </span>
-                              </td>
-                              <td className="py-4 px-4 text-xs text-[#212529] font-medium">
-                                {invoice.items?.reduce((sum, item) => sum + item.quantity, 0) || 0}
-                              </td>
-                              {activeInvTab === "closed_invoices" && (
-                                <td className="py-4 px-4 text-xs text-right font-bold text-[#212529]">
-                                  {Number(invoice.grossTotal).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                </td>
-                              )}
-                              <td className="py-4 px-4">
-                                <div className="flex items-center justify-center gap-2">
-                                  {activeInvTab === "open_invoices" ? (
-                                    <button
-                                      onClick={() => handleMarkAsPaid(invoice.id)}
-                                      className="flex items-center gap-1.5 px-4 py-1.5 bg-[#059669] text-white text-[10px] font-bold rounded-[4px] hover:bg-green-700 transition-all shadow-md"
-                                    >
-                                      <CheckCircle className="w-3.5 h-3.5" /> VERIFY
-                                    </button>
-                                  ) : (
-                                    <>
-                                      <button className="text-[#DC3545] hover:text-red-700 transition-colors" title="Download PDF">
-                                        <FileText className="w-5 h-5" />
-                                      </button>
-                                      <button className="px-3.5 py-1 bg-[#28A745] text-white text-[10px] font-bold rounded-[4px] hover:bg-green-600 transition-colors">
-                                        Edit
-                                      </button>
-                                      <button className="px-3 py-1 border border-[#6C757D] text-[#6C757D] text-[10px] font-bold rounded-[4px] hover:bg-gray-50 transition-colors">
-                                        Create PL
-                                      </button>
-                                      <button className="px-3.5 py-1 bg-[#F15A24] text-white text-[10px] font-bold rounded-[4px] flex items-center gap-1 hover:bg-[#D9481B] transition-colors">
-                                        <RefreshCw className="w-3 h-3" /> Ship
-                                      </button>
-                                    </>
+                          {currentInvoices.map((invoice, index) => {
+                            const expState = expandedStates[invoice.id] || {};
+                            const showExpanded = expState.taric || expState.items;
+
+                            return (
+                              <React.Fragment key={invoice.id}>
+                                <tr className="hover:bg-[#F8F9FA] transition-colors group">
+                                  {activeInvTab === "closed_invoices" && (
+                                    <td className="py-4 px-4 text-xs text-[#212529]">{startIndex + index + 1}</td>
                                   )}
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
+                                  <td className="py-4 px-4">
+                                    <button
+                                      onClick={() => toggleExpansion(invoice.id, 'taric')}
+                                      className="flex items-center gap-1.5 px-2.5 py-1 bg-[#495057] text-white text-[10px] font-bold rounded-[4px] hover:bg-[#343A40] transition-colors whitespace-nowrap"
+                                    >
+                                      {invoice.id.slice(-2)} {expState.taric ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                                    </button>
+                                  </td>
+                                  {activeInvTab === "closed_invoices" && (
+                                    <td className="py-4 px-4 text-xs font-semibold text-[#212529]">{invoice.invoiceNumber || "N/A"}</td>
+                                  )}
+                                  <td className="py-4 px-4 text-xs text-[#212529]">{invoice.customer?.companyName || "N/A"}</td>
+                                  <td className="py-4 px-4 text-xs text-[#6C757D]">{invoice.customer?.city || "-"}</td>
+                                  <td className="py-4 px-4 text-xs text-[#212529]">
+                                    {activeInvTab === "open_invoices" ? (
+                                      <span className="font-medium">{invoice.id.slice(-2)} - {invoice.orderNumber || "No Cargo"}</span>
+                                    ) : (
+                                      <span className="font-medium">{invoice.orderNumber || "No Cargo"}</span>
+                                    )}
+                                  </td>
+                                  <td className="py-4 px-4 text-xs text-[#495057]">
+                                    {new Date(invoice.invoiceDate).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}
+                                  </td>
+                                  <td className="py-4 px-4 text-xs">
+                                    <span
+                                      onClick={() => toggleExpansion(invoice.id, 'items')}
+                                      className="text-[#059669] font-bold hover:underline cursor-pointer"
+                                    >
+                                      {invoice.items?.length || 0}
+                                    </span>
+                                  </td>
+                                  <td className="py-4 px-4 text-xs text-[#212529] font-medium">
+                                    {invoice.items?.reduce((sum, item) => sum + item.quantity, 0) || 0}
+                                  </td>
+                                  {activeInvTab === "closed_invoices" && (
+                                    <td className="py-4 px-4 text-xs text-right font-bold text-[#212529]">
+                                      {Number(invoice.grossTotal).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </td>
+                                  )}
+                                  <td className="py-4 px-4">
+                                    <div className="flex items-center justify-center gap-2">
+                                      {activeInvTab === "open_invoices" ? (
+                                        <button
+                                          onClick={() => handleMarkAsPaid(invoice.id)}
+                                          className="flex items-center gap-1.5 px-4 py-1.5 bg-[#059669] text-white text-[10px] font-bold rounded-[4px] hover:bg-green-700 transition-all shadow-md"
+                                        >
+                                          <CheckCircle className="w-3.5 h-3.5" /> VERIFY
+                                        </button>
+                                      ) : (
+                                        <>
+                                          <button className="text-[#DC3545] hover:text-red-700 transition-colors" title="Download PDF">
+                                            <FileText className="w-5 h-5" />
+                                          </button>
+                                          <button className="px-3.5 py-1 bg-[#28A745] text-white text-[10px] font-bold rounded-[4px] hover:bg-green-600 transition-colors">
+                                            Edit
+                                          </button>
+                                          <button className="px-3 py-1 border border-[#6C757D] text-[#6C757D] text-[10px] font-bold rounded-[4px] hover:bg-gray-50 transition-colors">
+                                            Create PL
+                                          </button>
+                                          <button className="px-3.5 py-1 bg-[#F15A24] text-white text-[10px] font-bold rounded-[4px] flex items-center gap-1 hover:bg-[#D9481B] transition-colors">
+                                            <RefreshCw className="w-3 h-3" /> Ship
+                                          </button>
+                                        </>
+                                      )}
+                                    </div>
+                                  </td>
+                                </tr>
+                                {showExpanded && (
+                                  <tr>
+                                    <td colSpan={activeInvTab === "closed_invoices" ? 11 : 9} className="p-0 bg-[#F8F9FA]">
+                                      <div className="p-4 space-y-4">
+                                        {expState.loading ? (
+                                          <div className="flex justify-center py-4">
+                                            <Loader2 className="w-6 h-6 animate-spin text-[#8CC21B]" />
+                                          </div>
+                                        ) : (
+                                          <>
+                                            {expState.taric && expState.data?.taricGroups && (
+                                              <SpreadSheet
+                                                data={expState.data.taricGroups}
+                                                showTotals={true}
+                                                totalQty={expState.data.taricGroups.reduce((s: any, g: any) => s + g.totalQty, 0)}
+                                                totalPrice={expState.data.taricGroups.reduce((s: any, g: any) => s + g.totalPrice, 0)}
+                                                columns={[
+                                                  { header: "Pos", render: (_: any, idx: number) => idx + 1, width: "40px" },
+                                                  { header: "Taric Name EN", render: (it: any) => it.taricNameEn },
+                                                  { header: "Taric Code", render: (it: any) => `/ ${it.taricCode}` },
+                                                  { header: "Duty rate", render: (it: any) => it.dutyRate ? `${it.dutyRate}%` : "0.00%" },
+                                                  { header: "Total Qty", render: (it: any) => it.totalQty, align: "center" },
+                                                  { header: "Unit Price", render: (it: any) => `€${it.unitPrice?.toFixed(2)}` },
+                                                  { header: "Total Price", render: (it: any) => `€${it.totalPrice?.toFixed(2)}` },
+                                                  {
+                                                    header: "Operation",
+                                                    render: () => (
+                                                      <button className="flex items-center gap-1 px-3 py-1 bg-[#1A73E8] text-white text-[10px] font-bold rounded hover:bg-[#1557B0]">
+                                                        <RefreshCw className="w-3 h-3" /> Set taric
+                                                      </button>
+                                                    )
+                                                  }
+                                                ]}
+                                              />
+                                            )}
+                                            {expState.items && expState.data?.detailedItems && (
+                                              <SpreadSheet
+                                                data={expState.data.detailedItems}
+                                                columns={[
+                                                  {
+                                                    header: "ID",
+                                                    render: (it: any) => (
+                                                      <div className="flex flex-col gap-2">
+                                                        <div className="px-2 py-1 bg-[#475569] text-white text-[10px] font-bold rounded-[4px] text-center mb-1">
+                                                          {it.id}
+                                                        </div>
+                                                        <div className="flex flex-col gap-1">
+                                                          <button
+                                                            onClick={() => {
+                                                              setSelectedItem(it);
+                                                              setNewQty(it.qty);
+                                                              setShowQTYModal(true);
+                                                            }}
+                                                            className="flex items-center gap-1.5 px-2 py-1 text-[9px] font-bold bg-[#E2E8F0] text-[#475569] rounded-[4px] hover:bg-gray-200 transition"
+                                                          >
+                                                            <Pencil className="w-2.5 h-2.5" /> QTY
+                                                          </button>
+                                                          <button
+                                                            onClick={() => {
+                                                              setSelectedItem(it);
+                                                              setSplitQty(Math.floor(it.qty / 2));
+                                                              setShowSPModal(true);
+                                                            }}
+                                                            className="flex items-center gap-1.5 px-2 py-1 text-[9px] font-bold bg-[#FFF7ED] text-[#EA580C] rounded-[4px] hover:bg-orange-100 transition"
+                                                          >
+                                                            <Scissors className="w-2.5 h-2.5" /> Split
+                                                          </button>
+                                                          <button
+                                                            onClick={() => {
+                                                              setSelectedItem(it);
+                                                              setTargetCargoId(it.cargo_id || "");
+                                                              setShowREModal(true);
+                                                            }}
+                                                            className="flex items-center gap-1.5 px-2 py-1 text-[9px] font-bold bg-[#F0FDF4] text-[#16A34A] rounded-[4px] hover:bg-green-100 transition"
+                                                          >
+                                                            <MoveRight className="w-2.5 h-2.5" /> ReAssign
+                                                          </button>
+                                                          <button
+                                                            onClick={() => handlePrintLabel(it)}
+                                                            className="flex items-center gap-1.5 px-2 py-1 text-[9px] font-bold bg-gray-100 text-gray-700 rounded-[4px] hover:bg-gray-200 transition"
+                                                          >
+                                                            <Printer className="w-2.5 h-2.5" /> Print
+                                                          </button>
+                                                        </div>
+                                                      </div>
+                                                    ),
+                                                    width: "100px"
+                                                  },
+                                                  { header: "EAN", render: (it: any) => it.item?.ean },
+                                                  { header: "Item Name", render: (it: any) => it.item?.item_name, width: "200px" },
+                                                  { header: "Taric code", render: (it: any) => it.item?.taric?.code },
+                                                  { header: "Remark", render: (it: any) => it.remark_de },
+                                                  { header: "Order_no", render: (it: any) => it.order?.order_no },
+                                                  { header: "SOID", render: (it: any) => it.supplier_order_id },
+                                                  { header: "Status", render: (it: any) => it.status },
+                                                  { header: "V(dm³)", render: (it: any) => it.v?.toFixed(2) },
+                                                  { header: "W(kg)", render: (it: any) => it.w?.toFixed(2) },
+                                                  { header: "QTY", render: (it: any) => it.qty },
+                                                  { header: "RMB", render: (it: any) => it.rmb_special_price },
+                                                  { header: "EK", render: (it: any) => it.eur_special_price },
+                                                ]}
+                                                showTotals={true}
+                                                totalCols={[
+                                                  { label: "Total Qty", value: expState.data.detailedItems.reduce((s: any, it: any) => s + (it.qty || 0), 0), width: "100px", align: "center" },
+                                                  { label: "Total V(dm³)", value: expState.data.detailedItems.reduce((s: any, it: any) => s + (it.v || 0), 0).toFixed(2), width: "120px", align: "center" },
+                                                  { label: "Total W(kg)", value: expState.data.detailedItems.reduce((s: any, it: any) => s + (it.w || 0), 0).toFixed(2), width: "120px", align: "center" },
+                                                  { label: "Items count", value: expState.data.detailedItems.length, width: "100px", align: "right" }
+                                                ]}
+                                              />
+                                            )}
+                                          </>
+                                        )}
+                                      </div>
+                                    </td>
+                                  </tr>
+                                )}
+                              </React.Fragment>
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>
@@ -1012,6 +1318,103 @@ const InvoiceListPage: React.FC = () => {
               <p className="text-xs">Packing List functionalities will be added here.</p>
             </div>
           </div>
+        )}
+        {showREModal && selectedItem && (
+          <CustomModal
+            isOpen={showREModal}
+            onClose={() => setShowREModal(false)}
+            title={`Reassign Item ${selectedItem.id}`}
+          >
+            <div className="p-4 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Select Cargo</label>
+                <select
+                  value={targetCargoId}
+                  onChange={(e) => setTargetCargoId(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-[#059669]"
+                >
+                  <option value="">-- Choose Cargo --</option>
+                  {cargos.map(c => (
+                    <option key={c.id} value={c.id}>{c.cargo_no}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex justify-end gap-2 mt-6">
+                <button onClick={() => setShowREModal(false)} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Cancel</button>
+                <button
+                  onClick={handleReassignItem}
+                  disabled={!targetCargoId}
+                  className="px-4 py-2 text-sm bg-[#059669] text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+                >
+                  Reassign
+                </button>
+              </div>
+            </div>
+          </CustomModal>
+        )}
+
+        {showSPModal && selectedItem && (
+          <CustomModal
+            isOpen={showSPModal}
+            onClose={() => setShowSPModal(false)}
+            title={`Split Item ${selectedItem.id}`}
+          >
+            <div className="p-4 space-y-4">
+              <p className="text-sm text-gray-600">Current Qty: <span className="font-bold">{selectedItem.qty}</span></p>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Split Quantity (amount to move to new row)</label>
+                <input
+                  type="number"
+                  value={splitQty}
+                  onChange={(e) => setSplitQty(Number(e.target.value))}
+                  min={1}
+                  max={selectedItem.qty - 1}
+                  className="w-full border border-gray-300 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-orange-500"
+                />
+              </div>
+              <div className="flex justify-end gap-2 mt-6">
+                <button onClick={() => setShowSPModal(false)} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Cancel</button>
+                <button
+                  onClick={handleSplitItem}
+                  disabled={splitQty <= 0 || splitQty >= selectedItem.qty}
+                  className="px-4 py-2 text-sm bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50"
+                >
+                  Split Now
+                </button>
+              </div>
+            </div>
+          </CustomModal>
+        )}
+
+        {showQTYModal && selectedItem && (
+          <CustomModal
+            isOpen={showQTYModal}
+            onClose={() => setShowQTYModal(false)}
+            title={`Update Quantity for Item ${selectedItem.id}`}
+          >
+            <div className="p-4 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">New Quantity</label>
+                <input
+                  type="number"
+                  value={newQty}
+                  onChange={(e) => setNewQty(Number(e.target.value))}
+                  min={1}
+                  className="w-full border border-gray-300 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-[#059669]"
+                />
+              </div>
+              <div className="flex justify-end gap-2 mt-6">
+                <button onClick={() => setShowQTYModal(false)} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Cancel</button>
+                <button
+                  onClick={handleUpdateQty}
+                  disabled={newQty <= 0}
+                  className="px-4 py-2 text-sm bg-[#059669] text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+                >
+                  Update Qty
+                </button>
+              </div>
+            </div>
+          </CustomModal>
         )}
       </div>
     </div>

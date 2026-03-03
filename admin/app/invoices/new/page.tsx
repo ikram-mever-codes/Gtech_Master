@@ -613,7 +613,6 @@ const InvoiceGenerator: React.FC = () => {
                     required
                   />
                 </div>
-
                 <div className="space-y-2">
                   <label
                     className="block text-sm font-medium"
@@ -643,7 +642,6 @@ const InvoiceGenerator: React.FC = () => {
                     }}
                   />
                 </div>
-
                 <div className="space-y-2">
                   <label
                     className="block text-sm font-medium"

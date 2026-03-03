@@ -160,6 +160,20 @@ export const updateOrderItemStatus = async (id: string | number, data: Record<st
   }
 };
 
+export const splitOrderItem = async (id: string | number, splitQty: number) => {
+  try {
+    toast.loading("Splitting item...", loadingStyles);
+    const response = await api.post(`/orders/items/${id}/split`, { splitQty });
+    toast.dismiss();
+    toast.success("Item split successfully", successStyles);
+    return response.data;
+  } catch (error) {
+    toast.dismiss();
+    handleApiError(error, "Split failed");
+    throw error;
+  }
+};
+
 export const getOrderStatusColor = (status: string | number) => {
   const statusObj = getOrderStatuses().find((s) => String(s.value) === String(status));
   return statusObj?.color || "bg-gray-100 text-gray-800";

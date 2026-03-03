@@ -16,6 +16,8 @@ import {
   ArrowRightIcon,
   PlusCircleIcon,
   PrinterIcon,
+  ScissorsIcon,
+  ArrowRightCircleIcon,
 } from "@heroicons/react/24/outline";
 import { toast } from "react-hot-toast";
 import {
@@ -25,6 +27,7 @@ import {
   updateOrder,
   deleteOrder,
   updateOrderItemStatus,
+  splitOrderItem,
   type Order,
   type OrderSearchFilters,
   getOrderStatusColor,
@@ -44,8 +47,6 @@ import { ShoppingCart } from "lucide-react";
 import { useSelector } from "react-redux";
 import { RootState } from "@/app/Redux/store";
 import { UserRole } from "@/utils/interfaces";
-import CargosTab from "@/components/cargos/CargosTab";
-import CargoTypesTab from "@/components/cargos/CargoTypesTab";
 
 type Item = {
   id: string | number;
@@ -58,6 +59,7 @@ type Item = {
   width?: number;
   height?: number;
   weight?: number;
+  taric?: any;
 };
 type Customer = {
   id: string | number;
@@ -76,7 +78,6 @@ type Customer = {
 type Category = { id: string | number; name: string };
 
 type Option = { value: string; label: string };
-
 type OrderItemRow = {
   item_id: string;
   itemName: string;
@@ -377,6 +378,12 @@ const OrderPage = () => {
   const [newRemarkCN, setNewRemarkCN] = useState<string>("");
   const [reprintSearch, setReprintSearch] = useState("");
 
+  const [showREModal, setShowREModal] = useState(false);
+  const [showSPModal, setShowSPModal] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<any>(null);
+  const [splitQty, setSplitQty] = useState<number>(0);
+  const [targetCargoId, setTargetCargoId] = useState<string>("");
+
   const itemById = useMemo(() => {
     const map = new Map<string, Item>();
     for (const it of itemsAll) map.set(String(it.id), it);
@@ -586,6 +593,97 @@ const OrderPage = () => {
     } catch (e) {
       console.error(e);
       toast.error("Failed to update item");
+    }
+  };
+
+  const handlePrintLabel = (item: any) => {
+    const details = itemById.get(String(item.item_id));
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return;
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Print Label - ${details?.item_name || 'Item'}</title>
+          <style>
+            @page { size: 100mm 150mm; margin: 0; }
+            body { 
+              font-family: 'Poppins', sans-serif; 
+              padding: 20px; 
+              border: 1px solid #eee; 
+              width: 100mm; 
+              height: 150mm; 
+              box-sizing: border-box; 
+              position: relative;
+            }
+            .header { border-bottom: 2px solid #000; padding-bottom: 5px; margin-bottom: 10px; }
+            .item-name { font-size: 16px; font-weight: bold; margin-bottom: 2px; height: 48px; overflow: hidden; }
+            .ean { font-size: 11px; margin-bottom: 5px; color: #555; }
+            .details { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+            .label-field { font-size: 9px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; }
+            .value-field { font-size: 12px; font-weight: bold; margin-bottom: 2px; }
+            .barcode { margin-top: 20px; text-align: center; }
+            .qr-placeholder { width: 80px; height: 80px; background: #eee; margin: 0 auto; display: flex; align-items: center; justify-content: center; font-size: 8px; border: 1px dashed #ccc; }
+            .footer { position: absolute; bottom: 20px; left: 20px; right: 20px; font-size: 9px; text-align: center; color: #999; }
+          </style>
+        </head>
+        <body onload="window.print(); window.close();">
+          <div class="header">
+            <div class="item-name">${details?.item_name || 'N/A'}</div>
+            <div class="ean">EAN: ${details?.ean || '-'}</div>
+          </div>
+          <div class="details">
+            <div>
+              <div class="label-field">Order / Cargo No.</div>
+              <div class="value-field">${item.parentOrder?.order_no || '-'}</div>
+            </div>
+            <div>
+              <div class="label-field">QTY Label</div>
+              <div class="value-field">${item.qty_label || item.qty}</div>
+            </div>
+            <div>
+              <div class="label-field">SOID</div>
+              <div class="value-field">${item.supplier_order_id || '-'}</div>
+            </div>
+            <div>
+              <div class="label-field">Taric</div>
+              <div class="value-field">${details?.taric?.code || '-'}</div>
+            </div>
+          </div>
+          <div class="barcode">
+            <div class="qr-placeholder">G-TECH LABEL</div>
+            <div style="font-size: 9px; margin-top: 5px; font-weight: 500;">Item ID: ${item.id}</div>
+          </div>
+          <div class="footer">
+            Printed on ${new Date().toLocaleString('de-DE')}
+          </div>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
+  const handleSplitItemAction = async () => {
+    if (!selectedItem || splitQty <= 0) return;
+    try {
+      await splitOrderItem(selectedItem.id, splitQty);
+      toast.success("Item split successfully");
+      setShowSPModal(false);
+      fetchOrders();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleReassignItemAction = async () => {
+    if (!selectedItem || !targetCargoId) return;
+    try {
+      await updateOrderItemStatus(selectedItem.id, { cargo_id: Number(targetCargoId) });
+      toast.success("Item reassigned successfully");
+      setShowREModal(false);
+      fetchOrders();
+    } catch (err) {
+      console.error(err);
     }
   };
 
@@ -1411,22 +1509,14 @@ const OrderPage = () => {
 
                                 return (
                                   <div className="flex gap-1.5 justify-center flex-wrap w-fit mx-auto">
-                                    <button
-                                      onClick={() => handleEditQty(item)}
-                                      className="bg-slate-600 hover:bg-slate-700 text-white px-2 py-1 rounded text-[9px] font-bold uppercase flex items-center gap-1 shadow-sm transition-all active:scale-95 whitespace-nowrap"
-                                    >
-                                      <PencilIcon className="h-3 w-3" /> Edit
-                                    </button>
-
-                                    <button
-                                      onClick={() => {
-                                        if (det?.parentOrder) openEdit(det.parentOrder);
-                                        else toast.error("Could not find parent order to view");
-                                      }}
-                                      className="bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded text-[9px] font-bold uppercase flex items-center gap-1 shadow-sm transition-all active:scale-95 whitespace-nowrap"
-                                    >
-                                      <EyeIcon className="h-3 w-3" /> Full Order
-                                    </button>
+                                    {(isSO || isPurchased) && (
+                                      <button
+                                        onClick={() => handleEditQty(item)}
+                                        className="bg-slate-600 hover:bg-slate-700 text-white px-2 py-1 rounded text-[9px] font-bold uppercase flex items-center gap-1 shadow-sm transition-all active:scale-95 whitespace-nowrap"
+                                      >
+                                        <PencilIcon className="h-3 w-3" /> Edit
+                                      </button>
+                                    )}
 
                                     {isSO && (
                                       <button
@@ -1637,6 +1727,7 @@ const OrderPage = () => {
                               <PencilIcon className="h-3 w-3" /> edit
                             </button>
                             <button
+                              onClick={() => handlePrintLabel(row)}
                               className="bg-[#059669] hover:bg-green-700 text-white px-3 py-1.5 rounded text-[10px] font-bold flex items-center gap-1 shadow-sm transition-all active:scale-95"
                             >
                               <PrinterIcon className="h-3 w-3" /> Print
@@ -2121,6 +2212,72 @@ const OrderPage = () => {
                 className="w-full px-4 py-3 border-2 border-gray-100 rounded-xl focus:ring-2 focus:ring-[#059669] focus:border-transparent outline-none transition-all font-medium text-gray-600 resize-none"
                 placeholder="Enter Chinese remarks..."
               />
+            </div>
+          </div>
+        </CustomModal>
+      )}
+      {showREModal && selectedItem && (
+        <CustomModal
+          isOpen={showREModal}
+          onClose={() => setShowREModal(false)}
+          title={`Reassign Item ${selectedItem.id}`}
+        >
+          <div className="p-4 space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Select Cargo</label>
+              <select
+                value={targetCargoId}
+                onChange={(e) => setTargetCargoId(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-[#059669]"
+              >
+                <option value="">-- Choose Cargo --</option>
+                {cargos.map(c => (
+                  <option key={c.id} value={c.id}>{c.cargo_no}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex justify-end gap-2 mt-6">
+              <button onClick={() => setShowREModal(false)} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Cancel</button>
+              <button
+                onClick={handleReassignItemAction}
+                disabled={!targetCargoId}
+                className="px-4 py-2 text-sm bg-[#059669] text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+              >
+                Reassign
+              </button>
+            </div>
+          </div>
+        </CustomModal>
+      )}
+
+      {showSPModal && selectedItem && (
+        <CustomModal
+          isOpen={showSPModal}
+          onClose={() => setShowSPModal(false)}
+          title={`Split Item ${selectedItem.id}`}
+        >
+          <div className="p-4 space-y-4">
+            <p className="text-sm text-gray-600">Current Qty: <span className="font-bold">{selectedItem.qty}</span></p>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Split Quantity (amount to move to new row)</label>
+              <input
+                type="number"
+                value={splitQty}
+                onChange={(e) => setSplitQty(Number(e.target.value))}
+                min={1}
+                max={selectedItem.qty - 1}
+                className="w-full border border-gray-300 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-orange-500"
+              />
+            </div>
+            <div className="flex justify-end gap-2 mt-6">
+              <button onClick={() => setShowSPModal(false)} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Cancel</button>
+              <button
+                onClick={handleSplitItemAction}
+                disabled={splitQty <= 0 || splitQty >= selectedItem.qty}
+                className="px-4 py-2 text-sm bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50"
+              >
+                Split Now
+              </button>
             </div>
           </div>
         </CustomModal>
