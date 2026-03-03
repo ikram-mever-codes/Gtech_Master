@@ -146,6 +146,20 @@ export const deleteOrder = async (orderId: string | number) => {
   }
 };
 
+export const updateOrderItemStatus = async (id: string | number, data: Record<string, any>) => {
+  try {
+    toast.loading("Updating item status...", loadingStyles);
+    const response = await api.put(`/orders/items/${id}/status`, data);
+    toast.dismiss();
+    toast.success("Status updated successfully", successStyles);
+    return response.data;
+  } catch (error) {
+    toast.dismiss();
+    handleApiError(error, "Update failed");
+    throw error;
+  }
+};
+
 export const getOrderStatusColor = (status: string | number) => {
   const statusObj = getOrderStatuses().find((s) => String(s.value) === String(status));
   return statusObj?.color || "bg-gray-100 text-gray-800";

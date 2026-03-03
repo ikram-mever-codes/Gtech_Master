@@ -16,6 +16,8 @@ export type DataTableProps<T> = {
     emptyMessage?: string;
     showTotals?: boolean;
     getRowClassName?: (row: T, index: number) => string;
+    renderRowDetails?: (row: T, index: number) => React.ReactNode;
+    expandedRowId?: string | number | null;
 };
 
 export function DataTable<T>({
@@ -24,7 +26,9 @@ export function DataTable<T>({
     loading,
     emptyMessage = "No Data Found",
     showTotals = false,
-    getRowClassName
+    getRowClassName,
+    renderRowDetails,
+    expandedRowId
 }: DataTableProps<T>) {
     if (loading) {
         return (
@@ -76,22 +80,34 @@ export function DataTable<T>({
                             ))}
                         </tr>
                     )}
-                    {data.map((row, idx) => (
-                        <tr
-                            key={(row as any).id || idx}
-                            className={`hover:bg-gray-50 transition-colors ${getRowClassName ? getRowClassName(row, idx) : ""}`}
-                        >
-                            {columns.map((c, i) => (
-                                <td
-                                    key={i}
-                                    className={`px-2 py-1.5 text-${c.align || "left"} border border-gray-200 text-[11px] leading-tight`}
-                                    style={c.width ? { width: c.width, minWidth: c.width } : {}}
+                    {data.map((row, idx) => {
+                        const isExpanded = expandedRowId !== undefined && expandedRowId !== null && ((row as any).id === expandedRowId || (row as any)._id === expandedRowId);
+
+                        return (
+                            <React.Fragment key={(row as any).id || (row as any)._id || idx}>
+                                <tr
+                                    className={`hover:bg-gray-50 transition-colors ${getRowClassName ? getRowClassName(row, idx) : ""}`}
                                 >
-                                    {c.render(row, idx)}
-                                </td>
-                            ))}
-                        </tr>
-                    ))}
+                                    {columns.map((c, i) => (
+                                        <td
+                                            key={i}
+                                            className={`px-2 py-1.5 text-${c.align || "left"} border border-gray-200 text-[11px] leading-tight`}
+                                            style={c.width ? { width: c.width, minWidth: c.width } : {}}
+                                        >
+                                            {c.render(row, idx)}
+                                        </td>
+                                    ))}
+                                </tr>
+                                {isExpanded && renderRowDetails && (
+                                    <tr>
+                                        <td colSpan={columns.length} className="px-4 py-4 bg-gray-50 border border-gray-200">
+                                            {renderRowDetails(row, idx)}
+                                        </td>
+                                    </tr>
+                                )}
+                            </React.Fragment>
+                        );
+                    })}
                 </tbody>
             </table>
         </div>
