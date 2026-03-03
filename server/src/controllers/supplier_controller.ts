@@ -16,7 +16,6 @@ export const getAllSuppliers = async (req: Request, res: Response, next: NextFun
         const skip = (page - 1) * limit;
 
         let whereClause: any = {};
-
         if (search) {
             whereClause = [
                 { name: Like(`%${search}%`) },
@@ -37,7 +36,6 @@ export const getAllSuppliers = async (req: Request, res: Response, next: NextFun
         });
 
         const totalPages = Math.ceil(totalRecords / limit);
-
         res.status(200).json({
             success: true,
             data: suppliers,
@@ -70,7 +68,6 @@ export const getSupplierById = async (req: Request, res: Response, next: NextFun
             });
             return;
         }
-
         res.status(200).json({
             success: true,
             data: supplier,
