@@ -14,7 +14,6 @@ const parseorder_noNumber = (order_no: string) => {
   return Number.isFinite(num) ? num : null;
 };
 
-
 export const createOrder = async (req: Request, res: Response, next: NextFunction) => {
   const queryRunner = AppDataSource.createQueryRunner();
 
@@ -367,5 +366,37 @@ export const deleteOrder = async (req: Request, res: Response, next: NextFunctio
     try {
       await queryRunner.release();
     } catch { }
+  }
+};
+export const updateOrderItemStatus = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const body = req.body;
+
+    const orderItemsRepo = AppDataSource.getRepository(OrderItem);
+    const orderItem = await orderItemsRepo.findOne({ where: { id: Number(id) } });
+
+    if (!orderItem) {
+      return next(new ErrorHandler("Order Item not found", 404));
+    }
+
+    Object.keys(body).forEach((key) => {
+      if (key === "supplier_order_id" && body[key] === null) {
+        orderItem.supplier_order_id = undefined;
+      } else if (key !== "id" && key !== "updated_at") {
+        (orderItem as any)[key] = body[key];
+      }
+    });
+
+    orderItem.updated_at = new Date();
+    await orderItemsRepo.save(orderItem);
+
+    return res.status(200).json({
+      success: true,
+      message: "Order item updated successfully",
+      data: orderItem,
+    });
+  } catch (error) {
+    return next(error);
   }
 };
