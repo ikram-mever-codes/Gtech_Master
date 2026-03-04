@@ -301,6 +301,10 @@ const ItemDetailsPage = () => {
                   value={itemData.remark}
                   field="remark"
                 />
+                <InfoRow
+                  label="Price (RMB) ¥"
+                  value={(itemData as any).others?.rmbPrice ? `¥ ${(itemData as any).others.rmbPrice}` : "—"}
+                />
                 <InfoRow label="Active">
                   <StatusIndicator value={itemData.isActive} />
                 </InfoRow>

@@ -115,6 +115,8 @@ const EditItemPage = () => {
             is_snsi: false,
             rmb_price: "0",
             supplier_id: 0,
+            price: 0,
+            currency: "CNY",
         },
         validationSchema,
         onSubmit: async (values) => {
@@ -151,6 +153,8 @@ const EditItemPage = () => {
                     ItemID_DE: Number(values.id_de),
                     RMB_Price: Number(values.rmb_price),
                     supplier_id: Number(values.supplier_id),
+                    price: Number(values.price),
+                    currency: values.currency,
                 };
 
                 const response: any = await updateItem(Number(id), payload);
@@ -219,6 +223,8 @@ const EditItemPage = () => {
                         is_nao: item.others?.isNAO || false,
                         is_snsi: item.others?.isSnSI || false,
                         rmb_price: item.others?.rmbPrice || item.parent?.priceRMB || "0",
+                        price: Number(item.price) || 0,
+                        currency: item.currency || "CNY",
                     });
                 }
 
@@ -372,9 +378,43 @@ const EditItemPage = () => {
                                 </FormControl>
                             </Grid>
                             <Grid size={{ xs: 12, md: 3 }}>
+                                <TextField
+                                    fullWidth
+                                    label="Price"
+                                    name="price"
+                                    type="number"
+                                    value={formik.values.price}
+                                    onChange={formik.handleChange}
+                                    variant="outlined"
+                                    size="small"
+                                    error={formik.touched.price && Boolean(formik.errors.price)}
+                                    helperText={formik.touched.price && formik.errors.price}
+                                />
+                            </Grid>
+                            <Grid size={{ xs: 12, md: 3 }}>
+                                <TextField
+                                    fullWidth
+                                    select
+                                    label="Currency"
+                                    name="currency"
+                                    value={formik.values.currency}
+                                    onChange={formik.handleChange}
+                                    variant="outlined"
+                                    size="small"
+                                    SelectProps={{ native: true }}
+                                    error={formik.touched.currency && Boolean(formik.errors.currency)}
+                                    helperText={formik.touched.currency && formik.errors.currency}
+                                >
+                                    <option value="CNY">CNY (¥)</option>
+                                    <option value="EUR">EUR (€)</option>
+                                    <option value="USD">USD ($)</option>
+                                    <option value="GBP">GBP (£)</option>
+                                </TextField>
+                            </Grid>
+                            <Grid size={{ xs: 12, md: 3 }}>
                                 <FormControlLabel
-                                    control={<Switch checked={formik.values.isActive} onChange={(e) => formik.setFieldValue("isActive", e.target.checked)} />}
-                                    label="Is Active?"
+                                    control={<Switch checked={formik.values.isActive} onChange={(e) => formik.setFieldValue("isActive", e.target.checked)} color="primary" />}
+                                    label="Is Active"
                                 />
                             </Grid>
                         </Grid>

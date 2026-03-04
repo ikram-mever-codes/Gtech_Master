@@ -168,6 +168,8 @@ const ItemsManagementPage: React.FC = () => {
     height: 0,
     remark: "",
     model: "",
+    price: 0,
+    currency: "CNY",
     isActive: true,
     is_qty_dividable: true,
     is_npr: false,
@@ -385,6 +387,8 @@ const ItemsManagementPage: React.FC = () => {
       height: 0,
       remark: "",
       model: "",
+      price: 0,
+      currency: "CNY",
       isActive: true,
       is_qty_dividable: true,
       is_npr: false,
@@ -425,6 +429,8 @@ const ItemsManagementPage: React.FC = () => {
         height: itemFormData.height || undefined,
         remark: itemFormData.remark,
         model: itemFormData.model,
+        price: Number(itemFormData.price) || 0,
+        currency: itemFormData.currency || "CNY",
         isActive: itemFormData.isActive ? "Y" : "N",
       });
 
@@ -2068,7 +2074,7 @@ const ItemsManagementPage: React.FC = () => {
                   />
                 </div>
 
-                <div className="md:col-span-2">
+                <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Model
                   </label>
@@ -2084,6 +2090,46 @@ const ItemsManagementPage: React.FC = () => {
                     className="w-full px-3 py-2 border border-gray-300 rounded-md"
                     placeholder="Enter model"
                   />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Price
+                  </label>
+                  <input
+                    type="number"
+                    value={itemFormData.price}
+                    onChange={(e) =>
+                      setItemFormData({
+                        ...itemFormData,
+                        price: parseFloat(e.target.value),
+                      })
+                    }
+                    className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-all"
+                    placeholder="0.00"
+                    step="0.01"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Currency
+                  </label>
+                  <select
+                    value={itemFormData.currency}
+                    onChange={(e) =>
+                      setItemFormData({
+                        ...itemFormData,
+                        currency: e.target.value,
+                      })
+                    }
+                    className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-all bg-white"
+                  >
+                    <option value="CNY">CNY (¥)</option>
+                    <option value="EUR">EUR (€)</option>
+                    <option value="USD">USD ($)</option>
+                    <option value="GBP">GBP (£)</option>
+                  </select>
                 </div>
 
                 <div className="md:col-span-2">

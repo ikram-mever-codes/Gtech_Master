@@ -26,6 +26,9 @@ export interface Item {
   model: string | null;
   supplier_id: number | null;
   supplier_name: string | null;
+  RMB_Price: number | null;
+  price: number | null;
+  currency: string | null;
   created_at: Date;
   updated_at: Date;
 }
@@ -148,6 +151,8 @@ export interface ItemDetails {
     shopPicture: string;
     ebayPictures: string;
   };
+  price: string;
+  currency: string;
   nprRemarks: string;
 }
 
@@ -241,6 +246,9 @@ export const createItem = async (itemData: {
   remark?: string;
   model?: string;
   supplier_id?: number;
+  RMB_Price?: number;
+  price?: number;
+  currency?: string;
   isActive?: string;
 }) => {
   try {
@@ -283,6 +291,8 @@ export const updateItem = async (
     FSQ?: number;
     ISBN?: number;
     RMB_Price?: number;
+    price?: number;
+    currency?: string;
     many_components?: number;
     effort_rating?: number;
     is_pu_item?: number;

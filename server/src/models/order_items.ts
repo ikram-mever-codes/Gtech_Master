@@ -48,6 +48,12 @@ export class OrderItem {
   @Column({ type: "float", nullable: true })
   eur_special_price?: number;
 
+  @Column({ type: "decimal", precision: 10, scale: 2, nullable: true })
+  price?: number;
+
+  @Column({ type: "varchar", length: 10, nullable: true })
+  currency?: string;
+
   @Column({ type: "int", nullable: true })
   taric_id?: number;
 

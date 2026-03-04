@@ -94,6 +94,8 @@ export const createOrder = async (
         qty,
         remark_de: it.remark_de,
         rmb_special_price: dbItem?.RMB_Price,
+        price: dbItem?.price,
+        currency: dbItem?.currency,
         taric_id: dbItem?.taric_id,
         category_id: dbItem?.cat_id ?? order.category_id,
         cargo_id: order.cargo_id,
@@ -126,6 +128,8 @@ export const createOrder = async (
           item_id: oi.item_id,
           qty: oi.qty,
           remark_de: oi.remark_de,
+          price: oi.price,
+          currency: oi.currency,
         })),
       },
     });
@@ -232,6 +236,8 @@ export const updateOrder = async (
           qty,
           remark_de: it.remark_de,
           rmb_special_price: dbItem?.RMB_Price,
+          price: dbItem?.price,
+          currency: dbItem?.currency,
           taric_id: dbItem?.taric_id,
           category_id: dbItem?.cat_id ?? order.category_id,
           cargo_id: order.cargo_id,
@@ -270,6 +276,8 @@ export const updateOrder = async (
           item_id: oi.item_id,
           qty: oi.qty,
           remark_de: oi.remark_de,
+          price: oi.price,
+          currency: oi.currency,
         })),
       },
     });
@@ -294,26 +302,55 @@ export const getAllOrders = async (
     const orderRepo = AppDataSource.getRepository(Order);
     const { search = "", status = "" } = (req.query || {}) as any;
 
-    const orders = await orderRepo.find({
-      relations: {
-        orderItems: {
-          item: true,
-        },
-      },
-      where: {
-        ...(status && { status }),
-        ...(search && [
-          { order_no: Like(`%${search}%`) },
-          { comment: Like(`%${search}%`) },
-        ]),
-      },
-      order: {
-        id: "DESC",
-        orderItems: {
-          id: "ASC",
-        },
-      },
-    });
+    const qb = orderRepo
+      .createQueryBuilder("o")
+      .leftJoinAndSelect("o.orderItems", "items")
+      .select([
+        "o.id",
+        "o.order_no",
+        "o.category_id",
+        "o.customer_id",
+        "o.supplier_id",
+        "o.cargo_id",
+        "o.status",
+        "o.comment",
+        "o.created_at",
+        "o.updated_at",
+        "items.id",
+        "items.order_id",
+        "items.item_id",
+        "items.qty",
+        "items.remark_de",
+        "items.qty_delivered",
+        "items.category_id",
+        "items.rmb_special_price",
+        "items.eur_special_price",
+        "items.taric_id",
+        "items.set_taric_code",
+        "items.status",
+        "items.remarks_cn",
+        "items.problems",
+        "items.qty_label",
+        "items.qty_split",
+        "items.supplier_order_id",
+        "items.ref_no",
+        "items.cargo_id",
+        "items.printed",
+        "items.cargo_date",
+        "items.price",
+        "items.currency",
+      ]);
+
+    if (status) qb.andWhere("o.status = :status", { status });
+    if (search)
+      qb.andWhere("(o.order_no LIKE :q OR o.comment LIKE :q)", {
+        q: `%${search}%`,
+      });
+
+    const orders = await qb
+      .orderBy("o.id", "DESC")
+      .addOrderBy("items.id", "ASC")
+      .getMany();
 
     // Map the items correctly - note the field name is ItemID_DE, not item_id
     const mappedOrders = orders.map((order: any) => ({
@@ -389,6 +426,8 @@ export const getOrderById = async (
           item_id: oi.item_id,
           qty: oi.qty,
           remark_de: oi.remark_de,
+          price: oi.price,
+          currency: oi.currency,
         })),
       },
     });
