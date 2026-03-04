@@ -7,6 +7,7 @@ import { AppDataSource } from "../config/database";
 import { Order } from "../models/orders";
 import { OrderItem } from "../models/order_items";
 import { Item } from "../models/items";
+import { Like } from "typeorm";
 
 const padorder_no = (n: number) => `MA${String(n).padStart(4, "0")}`;
 
@@ -283,6 +284,7 @@ export const updateOrder = async (
     } catch {}
   }
 };
+
 export const getAllOrders = async (
   req: Request,
   res: Response,
@@ -292,55 +294,26 @@ export const getAllOrders = async (
     const orderRepo = AppDataSource.getRepository(Order);
     const { search = "", status = "" } = (req.query || {}) as any;
 
-    const qb = orderRepo
-      .createQueryBuilder("o")
-      .leftJoinAndSelect("o.orderItems", "items")
-      .select([
-        "o.id",
-        "o.order_no",
-        "o.category_id",
-        "o.customer_id",
-        "o.supplier_id",
-        "o.cargo_id",
-        "o.status",
-        "o.comment",
-        "o.created_at",
-        "o.updated_at",
-        "items.id",
-        "items.order_id",
-        "items.master_id",
-        "items.ItemID_DE",
-        "items.qty",
-        "items.remark_de",
-        "items.qty_delivered",
-        "items.category_id",
-        "items.rmb_special_price",
-        "items.eur_special_price",
-        "items.taric_id",
-        "items.set_taric_code",
-        "items.status",
-        "items.remarks_cn",
-        "items.problems",
-        "items.qty_label",
-        "items.qty_split",
-        "items.supplier_order_id",
-        "items.ref_no",
-        "items.cargo_id",
-        "items.printed",
-        "items.cargo_date",
-      ]);
-
-    if (status) qb.andWhere("o.status = :status", { status });
-    if (search) {
-      qb.andWhere("(o.order_no LIKE :q OR o.comment LIKE :q)", {
-        q: `%${search}%`,
-      });
-    }
-
-    const orders = await qb
-      .orderBy("o.id", "DESC")
-      .addOrderBy("items.id", "ASC")
-      .getMany();
+    const orders = await orderRepo.find({
+      relations: {
+        orderItems: {
+          item: true,
+        },
+      },
+      where: {
+        ...(status && { status }),
+        ...(search && [
+          { order_no: Like(`%${search}%`) },
+          { comment: Like(`%${search}%`) },
+        ]),
+      },
+      order: {
+        id: "DESC",
+        orderItems: {
+          id: "ASC",
+        },
+      },
+    });
 
     // Map the items correctly - note the field name is ItemID_DE, not item_id
     const mappedOrders = orders.map((order: any) => ({
@@ -349,6 +322,8 @@ export const getAllOrders = async (
         ...item,
         // Map ItemID_DE to item_id for frontend compatibility if needed
         item_id: item.ItemID_DE,
+        // The item relation is already loaded
+        item: item.item, // This will contain all the item data with its actual fields
       })),
       orderItems: undefined, // Remove the raw orderItems property
     }));
@@ -361,6 +336,7 @@ export const getAllOrders = async (
           id: order.items[0].id,
           ItemID_DE: order.items[0].ItemID_DE,
           qty: order.items[0].qty,
+          itemData: order.items[0].item, // This will show all the actual item fields
         });
       }
     });
@@ -374,6 +350,7 @@ export const getAllOrders = async (
     return next(error);
   }
 };
+
 export const getOrderById = async (
   req: Request,
   res: Response,
@@ -487,7 +464,8 @@ export const generateLabelPDF = async (
 
     const order = await orderRepo.findOne({ where: { id: item.order_id } });
 
-    const doc = new PDFDocument({ size: [288, 144], margin: 0 });
+    // New Dimension: 336 x 136
+    const doc = new PDFDocument({ size: [336, 136], margin: 0 });
     const logoPath = path.join(__dirname, "../../public/logo.png");
 
     res.setHeader("Content-Type", "application/pdf");
@@ -497,75 +475,86 @@ export const generateLabelPDF = async (
     );
     doc.pipe(res);
 
-    // --- Layout Constants (Matching the Reference Image) ---
-    const row1LabelY = 15;
-    const row1ValueY = 25;
+    // --- Dynamic Spacing for 336 Width ---
+    const colA = 20; // ItemNoW
+    const colB = 125; // Order No (Moved right to utilize width)
+    const colD = 210; // Qty (Moved right)
+    const colLogo = 250; // Logo position
 
-    const colA = 25; // ItemNoW
-    const colB = 115; // Order No
-    const colD = 185; // Qty
+    const row1LabelY = 12;
+    const row1ValueY = 22;
 
-    // 1. TOP ROW: Labels (Italicized and Small)
-    doc.fillColor("black").font("Helvetica-Oblique").fontSize(7);
+    // 1. TOP ROW: Labels (Italicized)
+    doc.fillColor("black").font("Helvetica-Oblique").fontSize(7.5);
     doc.text("ItemNoW", colA, row1LabelY);
     doc.text("Order No / Qty", colB, row1LabelY);
     doc.text("Qty", colD, row1LabelY);
 
-    // 2. TOP ROW: Values (Bold and Large)
-    doc.font("Helvetica-Bold").fontSize(16);
-    doc.text(item?.item?.ItemID_DE?.toString() || "N/A", colA, row1ValueY); // A
-    doc.text(order?.order_no || "S2108", colB, row1ValueY); // B
-    doc.text(`${item.qty || 15}`, colD, row1ValueY); // D
+    // 2. TOP ROW: Values (Bold)
+    doc.font("Helvetica-Bold").fontSize(17);
+    // Identifiers
+    doc.text(item?.item?.ItemID_DE?.toString() || "H012-05", colA, row1ValueY);
+    doc.text(order?.order_no || "S2108", colB, row1ValueY);
+    doc.text(`${item.qty || 15}`, colD, row1ValueY);
 
-    // 3. SECTION C: The /20 (Smaller, positioned under Order No)
+    // 3. SECTION C: The /20 split
     doc
       .font("Helvetica")
-      .fontSize(10)
-      .text(`/${item.qty_split || 20}`, colB + 35, row1ValueY + 10);
+      .fontSize(11)
+      .text(`/${item.qty_split || 20}`, colB + 48, row1ValueY + 11);
 
-    // 4. LOGO (Top Right - Section GTech)
+    // 4. LOGO (Top Right)
     try {
-      doc.image(logoPath, 215, 12, { width: 55 });
+      doc.image(logoPath, colLogo, 10, { width: 65 });
     } catch (e) {
-      console.error("Logo missing at /public/logo.png");
+      console.error("Logo missing");
     }
 
-    // 5. SECTION E: Main Description (Centered Vertically)
-    doc.font("Helvetica").fontSize(9).fillColor("#333333");
+    // 5. SECTION E: Description (Adjusted Y to 55 for vertical balance)
+    doc.font("Helvetica").fontSize(10).fillColor("#222222");
     const description =
       item.remark_de ||
       "Toothed Belt GT2-140-6: profile GT2, length 140mm, width 6mm";
-    doc.text(description, colA, 60, { width: 250 });
+    doc.text(description, colA, 55, { width: 300 });
 
     // 6. SECTION F & G: Remarks (Left Bottom)
-    doc.font("Helvetica-Oblique").fontSize(7).text("RemarkCN", colA, 85);
+    const bottomSectionY = 82;
+    doc
+      .font("Helvetica-Oblique")
+      .fontSize(7.5)
+      .text("RemarkCN", colA, bottomSectionY);
     doc
       .font("Helvetica")
-      .fontSize(12)
-      .text(item.remarks_cn || "no problem", colA, 95); // F
+      .fontSize(13)
+      .text(item.remarks_cn || "no problem", colA, bottomSectionY + 10);
 
-    doc.font("Helvetica-Oblique").fontSize(7).text("RemarkW", colA, 115); // G
+    doc
+      .font("Helvetica-Oblique")
+      .fontSize(7.5)
+      .text("RemarkW", colA, bottomSectionY + 30);
 
-    // 7. SECTION H: Barcode (Right Bottom)
     const barcodeValue = item.ref_no || "4283230040725";
+
     const barcodeBuffer = await bwipjs.toBuffer({
-      bcid: "code128",
-      text: barcodeValue,
-      scale: 2,
-      height: 12,
-      includetext: true,
-      textsize: 9,
-      textxalign: "center",
+      bcid: "code128", // Barcode type
+      text: barcodeValue, // The number to encode
+      scale: 3, // High resolution scaling
+      height: 12, // Height of the bars in mm
+      includetext: true, // Show the EAN numbers below
+      textsize: 11, // INCREASED: Makes the numbers larger and clearer
+      textgaps: 2, // NEW: Adds vertical space between the bars and the text
+      textxalign: "center", // Centers the text under the barcode
     });
 
-    // Positioning the barcode to match the image (Lower Right)
-    doc.image(barcodeBuffer, 155, 75, { width: 110 });
-
+    // Positioning: Placed at the bottom right of the 336x136 label
+    // Adjusted Y to 72 to account for the larger text height
+    doc.image(barcodeBuffer, 185, 72, { width: 140 });
     doc.end();
   } catch (error) {
     return next(error);
   }
 };
+
 export const updateOrderItemStatus = async (
   req: Request,
   res: Response,

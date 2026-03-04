@@ -71,6 +71,7 @@ type Item = {
   length?: number;
   width?: number;
   height?: number;
+  item: any;
   weight?: number;
   taric?: any;
 };
@@ -245,6 +246,95 @@ function OrdersTable({
 
   const itemColumns: ColumnDef<any>[] = [
     {
+      header: "S. No",
+      width: "30px",
+      render: (_, i) => i + 1,
+      align: "center",
+    },
+    {
+      header: "EAN",
+      width: "80px",
+      render: (row) => {
+        const item = itemById.get(String(row.item_id))?.item;
+        return item?.ean || "-";
+      },
+    },
+    {
+      header: "Item name",
+      width: "150px",
+      render: (row) => {
+        const item: any = itemById.get(String(row.item_id));
+        console.log(
+          "Rendering item name for row:",
+          row,
+          "Resolved item:",
+          item,
+        );
+        return (
+          <div
+            className="truncate"
+            title={item?.item_name || item?.item_name_cn || "Unknown Item"}
+          >
+            {item?.item_name || item?.item_name_cn || "Unknown Item"}
+          </div>
+        );
+      },
+    },
+    {
+      header: "Price",
+      width: "60px",
+      render: (row) => row.rmb_special_price ?? "-",
+    },
+    { header: "QTY", width: "40px", render: (row) => row.qty, align: "center" },
+    {
+      header: "Total",
+      width: "60px",
+      render: (row) =>
+        row.rmb_special_price
+          ? (row.rmb_special_price * row.qty).toFixed(2)
+          : "-",
+      align: "center",
+    },
+    {
+      header: "Supplier",
+      width: "100px",
+      render: (row) => (
+        <div className="truncate">
+          {row.supplier_id
+            ? getSupplierName?.(row.supplier_id)
+            : getCategoryName(row.category_id)}
+        </div>
+      ),
+    },
+    { header: "Order No.", width: "80px", render: (row) => row.order_no },
+    {
+      header: "Remarks",
+      width: "150px",
+      render: (row) => (
+        <div className="line-clamp-2" title={row.remarks_cn || row.remark_de}>
+          {row.remarks_cn || row.remark_de || "-"}
+        </div>
+      ),
+    },
+    {
+      header: "Status",
+      width: "60px",
+      render: (row) => row.item_status || "-",
+      align: "center",
+    },
+    {
+      header: "Cargo",
+      width: "40px",
+      render: (row) => row.cargo_id || "-",
+      align: "center",
+    },
+    {
+      header: "SOID",
+      width: "40px",
+      render: (row) => row.supplier_order_id || "-",
+      align: "center",
+    },
+    {
       header: "Actions",
       width: "135px",
       align: "center",
@@ -267,6 +357,15 @@ function OrdersTable({
       ),
     },
   ];
+
+  const calcV = (it: any) => {
+    const d = itemById.get(String(it.item_id));
+    if (d?.length && d?.width && d?.height)
+      return (d.length * d.width * d.height) / 1000;
+    return 0;
+  };
+
+  const calcW = (it: any) => itemById.get(String(it.item_id))?.weight || 0;
 
   const getCount = (items: any[] | undefined, ...statuses: string[]) => {
     return (
@@ -630,11 +729,28 @@ const OrderPage = () => {
 
   const itemById = useMemo(() => {
     const map = new Map<string, Item>();
+
+    // Add items from all sources
     for (const it of itemsAll) map.set(String(it.id), it);
     for (const it of itemsByCategory) map.set(String(it.id), it);
     for (const it of itemsBySupplier) map.set(String(it.id), it);
+
+    // Also add items from orders that have nested item data
+    orders.forEach((order: any) => {
+      (order.items || []).forEach((item: any) => {
+        // If the item has nested item data from the relation
+        if (item.item && item.item.id) {
+          map.set(String(item.item.id), item.item);
+        }
+        // Also map by the order item's item_id to the nested item
+        if (item.item_id && item.item) {
+          map.set(String(item.item_id), item.item);
+        }
+      });
+    });
+
     return map;
-  }, [itemsAll, itemsByCategory, itemsBySupplier]);
+  }, [itemsAll, itemsByCategory, itemsBySupplier, orders]);
 
   const problemItems = useMemo(() => {
     const list: any[] = [];
@@ -1045,7 +1161,7 @@ const OrderPage = () => {
   const fetchOrders = useCallback(async () => {
     setLoadingOrders(true);
     try {
-      const response: any = await getAllOrders(filters);
+      const response = await getAllOrders(filters);
       if (response?.success) setOrders(response.data);
       else if (response?.data) setOrders(response.data);
     } catch (error) {
@@ -1464,6 +1580,7 @@ const OrderPage = () => {
           item_status: i.status || "NSO",
           supplier_id: o.supplier_id,
           category_id: o.category_id,
+          comment: o.comment,
         })),
       ),
     [orders],
@@ -2015,36 +2132,6 @@ const OrderPage = () => {
                           </div>
                         </div>
                       ),
-                    },
-                    {
-                      header: "Supplier - ID",
-                      render: (row) =>
-                        `${row.supplier?.company_name || "-"} - ${row.supplier_id || ""}`,
-                      align: "center",
-                    },
-                    {
-                      header: "Order Type",
-                      render: (row) => row.order_type?.name || "Taobao",
-                      align: "center",
-                    },
-                    {
-                      header: "Ref No.",
-                      render: (row) => row.ref_no || "-",
-                      align: "center",
-                    },
-                    {
-                      header: "Remark",
-                      render: (row) => row.remark || "-",
-                      align: "center",
-                    },
-                    {
-                      header: "Date created",
-                      render: (row) =>
-                        new Date(row.created_at).toLocaleDateString(undefined, {
-                          day: "2-digit",
-                          month: "2-digit",
-                        }),
-                      align: "center",
                     },
                     {
                       header: "Supplier - ID",
@@ -2619,7 +2706,7 @@ const OrderPage = () => {
               </div>
 
               {isConvertMode && (
-                <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                <div className="mb-4 rounded-[4px] border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
                   <b>Note</b>. All other fields are locked. Only <b>QTY</b> and{" "}
                   <b>Item remark</b> is editable.
                 </div>
@@ -2635,7 +2722,7 @@ const OrderPage = () => {
                       value={form.category_id}
                       onChange={(e) => handleCategoryChange(e.target.value)}
                       disabled={lockAllExceptQty}
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:bg-gray-50"
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:bg-gray-50"
                     >
                       <option value="">Select Category</option>
                       {categories.map((cat) => (
@@ -2669,7 +2756,7 @@ const OrderPage = () => {
                         value={form.customer_id}
                         onChange={(e) => handleCustomerChange(e.target.value)}
                         disabled={lockAllExceptQty}
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:bg-gray-50"
+                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:bg-gray-50"
                       >
                         <option value="">Select Customer</option>
                         {customers.map((customer) => (
@@ -2705,7 +2792,7 @@ const OrderPage = () => {
                       setForm((prev) => ({ ...prev, comment: e.target.value }))
                     }
                     disabled={lockAllExceptQty}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:bg-gray-50"
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:bg-gray-50"
                     placeholder="Enter order comment..."
                     rows={3}
                   />
@@ -2713,7 +2800,7 @@ const OrderPage = () => {
 
                 {orderItems.length > 0 && (
                   <div className="mt-3 overflow-x-auto">
-                    <table className="min-w-full bg-white border border-gray-200 rounded-lg shadow-sm">
+                    <table className="min-w-full bg-white border border-gray-200 rounded-[4px] shadow-md">
                       <thead className="bg-gray-100">
                         <tr>
                           <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-b">
@@ -2755,7 +2842,7 @@ const OrderPage = () => {
                                     Number(e.target.value),
                                   )
                                 }
-                                className="w-20 px-2 py-1 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-gray-500 focus:border-transparent"
+                                className="w-20 px-2 py-1 text-sm border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500 focus:border-transparent"
                               />
                             </td>
 
@@ -2769,7 +2856,7 @@ const OrderPage = () => {
                                     String(e.target.value),
                                   )
                                 }
-                                className="w-64 px-2 py-1 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:bg-gray-50"
+                                className="w-64 px-2 py-1 text-sm border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:bg-gray-50"
                               />
                             </td>
 
@@ -2780,7 +2867,7 @@ const OrderPage = () => {
                                   handleRemoveOrderItem(row.item_id)
                                 }
                                 disabled={lockAllExceptQty}
-                                className="inline-flex items-center gap-1 px-3 py-1.5 text-sm bg-red-600 text-white rounded-lg hover:bg-red-500 disabled:opacity-50"
+                                className="inline-flex items-center gap-1 px-3 py-1.5 text-sm bg-red-600 text-white rounded-[4px] hover:bg-red-500 disabled:opacity-50"
                               >
                                 <TrashIcon className="h-4 w-4" />
                               </button>
@@ -2795,7 +2882,7 @@ const OrderPage = () => {
                 <div className="flex justify-end gap-2 pt-4">
                   <button
                     onClick={closeModal}
-                    className="px-4 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-all"
+                    className="px-4 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-[4px] hover:bg-gray-50 transition-all"
                   >
                     Cancel
                   </button>
@@ -2810,7 +2897,7 @@ const OrderPage = () => {
                           ? handleUpdateOrder
                           : handleCreateOrder
                     }
-                    className="px-4 py-2 text-sm bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-all disabled:opacity-50"
+                    className="px-6 py-2 text-sm bg-[#059669] text-white rounded-[4px] hover:bg-green-700 transition-all shadow-md font-bold disabled:opacity-50"
                   >
                     {mode === "convert"
                       ? "CONVERT ORDER"
@@ -2823,6 +2910,133 @@ const OrderPage = () => {
             </div>
           </div>
         </div>
+      )}
+      {isEditQtyModalOpen && editQtyItem && (
+        <CustomModal
+          isOpen={isEditQtyModalOpen}
+          onClose={() => setIsEditQtyModalOpen(false)}
+          title={`Update QTY QtyLabel (ID: ${editQtyItem.id})`}
+          width="max-w-md"
+          footer={
+            <button
+              onClick={saveQtyChanges}
+              className="bg-[#059669] hover:bg-green-700 text-white px-6 py-2 rounded-xl font-bold transition-all shadow-lg active:scale-95"
+            >
+              Save QTY changes
+            </button>
+          }
+        >
+          <div className="space-y-6">
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">
+                New QTY:
+              </label>
+              <input
+                type="number"
+                value={newQty}
+                onChange={(e) => setNewQty(e.target.value)}
+                className="w-full px-4 py-3 border-2 border-gray-100 rounded-xl focus:ring-2 focus:ring-[#059669] focus:border-transparent outline-none transition-all font-medium text-lg text-gray-800"
+                placeholder="Enter new quantity..."
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">
+                Enter Remarks RemarkCN:
+              </label>
+              <textarea
+                value={newRemarkCN}
+                onChange={(e) => setNewRemarkCN(e.target.value)}
+                rows={4}
+                className="w-full px-4 py-3 border-2 border-gray-100 rounded-xl focus:ring-2 focus:ring-[#059669] focus:border-transparent outline-none transition-all font-medium text-gray-600 resize-none"
+                placeholder="Enter Chinese remarks..."
+              />
+            </div>
+          </div>
+        </CustomModal>
+      )}
+      {showREModal && selectedItem && (
+        <CustomModal
+          isOpen={showREModal}
+          onClose={() => setShowREModal(false)}
+          title={`Reassign Item ${selectedItem.id}`}
+        >
+          <div className="p-4 space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Select Cargo
+              </label>
+              <select
+                value={targetCargoId}
+                onChange={(e) => setTargetCargoId(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-[#059669]"
+              >
+                <option value="">-- Choose Cargo --</option>
+                {cargos.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.cargo_no}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex justify-end gap-2 mt-6">
+              <button
+                onClick={() => setShowREModal(false)}
+                className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleReassignItemAction}
+                disabled={!targetCargoId}
+                className="px-4 py-2 text-sm bg-[#059669] text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+              >
+                Reassign
+              </button>
+            </div>
+          </div>
+        </CustomModal>
+      )}
+
+      {showSPModal && selectedItem && (
+        <CustomModal
+          isOpen={showSPModal}
+          onClose={() => setShowSPModal(false)}
+          title={`Split Item ${selectedItem.id}`}
+        >
+          <div className="p-4 space-y-4">
+            <p className="text-sm text-gray-600">
+              Current Qty: <span className="font-bold">{selectedItem.qty}</span>
+            </p>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Split Quantity (amount to move to new row)
+              </label>
+              <input
+                type="number"
+                value={splitQty}
+                onChange={(e) => setSplitQty(Number(e.target.value))}
+                min={1}
+                max={selectedItem.qty - 1}
+                className="w-full border border-gray-300 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-orange-500"
+              />
+            </div>
+            <div className="flex justify-end gap-2 mt-6">
+              <button
+                onClick={() => setShowSPModal(false)}
+                className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSplitItemAction}
+                disabled={splitQty <= 0 || splitQty >= selectedItem.qty}
+                className="px-4 py-2 text-sm bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50"
+              >
+                Split Now
+              </button>
+            </div>
+          </div>
+        </CustomModal>
       )}
     </>
   );
