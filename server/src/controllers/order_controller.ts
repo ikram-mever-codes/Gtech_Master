@@ -92,6 +92,8 @@ export const createOrder = async (req: Request, res: Response, next: NextFunctio
         qty,
         remark_de: it.remark_de,
         rmb_special_price: dbItem?.RMB_Price,
+        price: dbItem?.price,
+        currency: dbItem?.currency,
         taric_id: dbItem?.taric_id,
         category_id: dbItem?.cat_id ?? order.category_id,
         cargo_id: order.cargo_id,
@@ -124,6 +126,8 @@ export const createOrder = async (req: Request, res: Response, next: NextFunctio
           item_id: oi.item_id,
           qty: oi.qty,
           remark_de: oi.remark_de,
+          price: oi.price,
+          currency: oi.currency,
         })),
       },
     });
@@ -204,6 +208,8 @@ export const updateOrder = async (req: Request, res: Response, next: NextFunctio
           qty,
           remark_de: it.remark_de,
           rmb_special_price: dbItem?.RMB_Price,
+          price: dbItem?.price,
+          currency: dbItem?.currency,
           taric_id: dbItem?.taric_id,
           category_id: dbItem?.cat_id ?? order.category_id,
           cargo_id: order.cargo_id,
@@ -240,6 +246,8 @@ export const updateOrder = async (req: Request, res: Response, next: NextFunctio
           item_id: oi.item_id,
           qty: oi.qty,
           remark_de: oi.remark_de,
+          price: oi.price,
+          currency: oi.currency,
         })),
       },
     });
@@ -295,6 +303,8 @@ export const getAllOrders = async (req: Request, res: Response, next: NextFuncti
         "items.cargo_id",
         "items.printed",
         "items.cargo_date",
+        "items.price",
+        "items.currency",
       ]);
 
     if (status) qb.andWhere("o.status = :status", { status });
@@ -347,6 +357,8 @@ export const getOrderById = async (req: Request, res: Response, next: NextFuncti
           item_id: oi.item_id,
           qty: oi.qty,
           remark_de: oi.remark_de,
+          price: oi.price,
+          currency: oi.currency,
         })),
       },
     });

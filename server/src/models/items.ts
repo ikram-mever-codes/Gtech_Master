@@ -82,6 +82,12 @@ export class Item {
   @Column({ type: "decimal", precision: 10, scale: 2, nullable: true })
   RMB_Price?: number;
 
+  @Column({ type: "decimal", precision: 10, scale: 2, nullable: true })
+  price?: number;
+
+  @Column({ type: "varchar", length: 10, nullable: true })
+  currency?: string;
+
   @Column({ type: "varchar", length: 255, nullable: true })
   photo?: string;
 
