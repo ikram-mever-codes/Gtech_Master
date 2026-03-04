@@ -32,6 +32,7 @@ import {
   type Order,
   type OrderSearchFilters,
   getOrderStatusColor,
+  downloadItemLabel,
 } from "@/api/orders";
 import {
   getAllCargos,
@@ -777,6 +778,17 @@ const OrderPage = () => {
     return list;
   }, [orders, reprintSearch, itemById]);
 
+  // Inside your Component logic
+  const handlePrintLabel = async (row: any) => {
+    if (!row.id) {
+      toast.error("Invalid Item ID");
+      return;
+    }
+
+    // Call the function we just created
+    await downloadItemLabel(row.id);
+  };
+
   const labelPrintItems = useMemo(() => {
     const list: any[] = [];
     orders.forEach((o: any) => {
@@ -991,73 +1003,6 @@ const OrderPage = () => {
       console.error(e);
       toast.error("Failed to update item");
     }
-  };
-
-  const handlePrintLabel = (item: any) => {
-    const details = itemById.get(String(item.item_id));
-    const printWindow = window.open("", "_blank");
-    if (!printWindow) return;
-
-    printWindow.document.write(`
-      <html>
-        <head>
-          <title>Print Label - ${details?.item_name || "Item"}</title>
-          <style>
-            @page { size: 100mm 150mm; margin: 0; }
-            body { 
-              font-family: 'Poppins', sans-serif; 
-              padding: 20px; 
-              border: 1px solid #eee; 
-              width: 100mm; 
-              height: 150mm; 
-              box-sizing: border-box; 
-              position: relative;
-            }
-            .header { border-bottom: 2px solid #000; padding-bottom: 5px; margin-bottom: 10px; }
-            .item-name { font-size: 16px; font-weight: bold; margin-bottom: 2px; height: 48px; overflow: hidden; }
-            .ean { font-size: 11px; margin-bottom: 5px; color: #555; }
-            .details { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
-            .label-field { font-size: 9px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; }
-            .value-field { font-size: 12px; font-weight: bold; margin-bottom: 2px; }
-            .barcode { margin-top: 20px; text-align: center; }
-            .qr-placeholder { width: 80px; height: 80px; background: #eee; margin: 0 auto; display: flex; align-items: center; justify-content: center; font-size: 8px; border: 1px dashed #ccc; }
-            .footer { position: absolute; bottom: 20px; left: 20px; right: 20px; font-size: 9px; text-align: center; color: #999; }
-          </style>
-        </head>
-        <body onload="window.print(); window.close();">
-          <div class="header">
-            <div class="item-name">${details?.item_name || "N/A"}</div>
-            <div class="ean">EAN: ${details?.ean || "-"}</div>
-          </div>
-          <div class="details">
-            <div>
-              <div class="label-field">Order / Cargo No.</div>
-              <div class="value-field">${item.parentOrder?.order_no || "-"}</div>
-            </div>
-            <div>
-              <div class="label-field">QTY Label</div>
-              <div class="value-field">${item.qty_label || item.qty}</div>
-            </div>
-            <div>
-              <div class="label-field">SOID</div>
-              <div class="value-field">${item.supplier_order_id || "-"}</div>
-            </div>
-            <div>
-              <div class="label-field">Taric</div>
-              <div class="value-field">${details?.taric?.code || "-"}</div>
-            </div>
-          </div>
-          <div class="barcode">
-            <div class="qr-placeholder">G-TECH LABEL</div>
-            <div style="font-size: 9px; margin-top: 5px; font-weight: 500;">Item ID: ${item.id}</div>
-          </div>
-          <div class="footer">
-            Printed on ${new Date().toLocaleString("de-DE")}
-          </div>
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
   };
 
   const handleSplitItemAction = async () => {
@@ -2122,10 +2067,11 @@ const OrderPage = () => {
                                     </button>
 
                                     <button
-                                      onClick={() => handlePrintLabel(item)}
-                                      className="bg-gray-500 hover:bg-gray-600 text-white px-2 py-1 rounded text-[9px] font-bold uppercase flex items-center gap-1 shadow-sm transition-all active:scale-95 whitespace-nowrap"
+                                      onClick={() => handlePrintLabel(row)}
+                                      className="bg-[#059669] hover:bg-green-700 text-white px-3 py-1.5 rounded-[4px] text-[10px] font-bold uppercase flex items-center gap-1.5 shadow-sm transition-all active:scale-95"
                                     >
-                                      <PrinterIcon className="h-3 w-3" /> Print
+                                      <PrinterIcon className="h-3.5 w-3.5" />{" "}
+                                      Print
                                     </button>
 
                                     <button
@@ -2513,14 +2459,14 @@ const OrderPage = () => {
               </div>
             ) : activeTab === "label_print" ? (
               <div className="p-4 bg-gray-50/30 min-h-[600px]">
-                <div className="mb-4 bg-green-50 border border-green-200 rounded-[4px] p-3 flex items-center gap-3 shadow-sm">
+                {/* <div className="mb-4 bg-green-50 border border-green-200 rounded-[4px] p-3 flex items-center gap-3 shadow-sm">
                   <div className="bg-green-500 rounded-full p-1">
                     <CheckCircleIcon className="h-3 w-3 text-white" />
                   </div>
                   <span className="text-sm font-medium text-green-800">
                     QTY delivery set successfully!
                   </span>
-                </div>
+                </div> */}
 
                 <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                   <div className="p-4 bg-gray-50 border-b border-gray-100 flex items-center justify-between">

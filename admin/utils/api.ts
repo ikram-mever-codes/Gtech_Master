@@ -25,7 +25,10 @@ export const handleApiError = (error: unknown, defaultMessage?: string) => {
     const status = error.response?.status;
     const message = error.response?.data?.message;
 
-    if (status === 403 && (message === "Access Denied" || message?.startsWith("Forbidden"))) {
+    if (
+      status === 403 &&
+      (message === "Access Denied" || message?.startsWith("Forbidden"))
+    ) {
       console.warn("Forbidden access:", message);
       return;
     }
@@ -53,6 +56,9 @@ export const api = axios.create({
 
 api.interceptors.response.use(
   (response) => {
+    if (response.config.responseType === "blob") {
+      return response;
+    }
     return response.data;
   },
   (error: AxiosError) => {
@@ -68,5 +74,5 @@ api.interceptors.response.use(
       console.error("Error: ", error.message);
     }
     return Promise.reject(error);
-  }
+  },
 );

@@ -153,7 +153,10 @@ export const deleteOrder = async (orderId: string | number) => {
   }
 };
 
-export const updateOrderItemStatus = async (id: string | number, data: Record<string, any>) => {
+export const updateOrderItemStatus = async (
+  id: string | number,
+  data: Record<string, any>,
+) => {
   try {
     toast.loading("Updating item status...", loadingStyles);
     const response = await api.put(`/orders/items/${id}/status`, data);
@@ -194,3 +197,36 @@ export const getOrderStatuses = () => [
   { value: 3, label: "Cancelled", color: "bg-gray-300 text-gray-800" },
   { value: 4, label: "Converted", color: "bg-green-300 text-green-800" },
 ];
+
+export const downloadItemLabel = async (itemId: number | string) => {
+  try {
+    toast.loading("Generating label...", loadingStyles);
+
+    const response = await api.get(`/orders/item/${itemId}/label`, {
+      responseType: "blob",
+    });
+
+    // Create a blob from the response data
+    const file = new Blob([response.data], { type: "application/pdf" });
+
+    // Create a link and trigger click to download/open
+    const fileURL = URL.createObjectURL(file);
+    const link = document.createElement("a");
+    link.href = fileURL;
+    link.download = `label_item_${itemId}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+
+    // Cleanup
+    setTimeout(() => {
+      document.body.removeChild(link);
+      URL.revokeObjectURL(fileURL);
+    }, 100);
+
+    toast.dismiss();
+    toast.success("Label generated!", successStyles);
+  } catch (error) {
+    toast.dismiss();
+    handleApiError(error, "Failed to generate label");
+  }
+};
