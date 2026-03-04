@@ -13,7 +13,6 @@ export const migrateExistingCustomers = async () => {
     const starCustomerDetailsRepository =
       AppDataSource.getRepository(StarCustomerDetails);
 
-    // Get all existing customers WITHOUT invalid relations
     const existingCustomers = await customerRepository.find();
 
     console.log(`Found ${existingCustomers.length} customers to migrate`);
@@ -27,7 +26,6 @@ export const migrateExistingCustomers = async () => {
           `Migrating customer: ${customer.companyName} (${customer.id})`
         );
 
-        // Check if customer already has starCustomerDetails
         const existingStarDetails = await starCustomerDetailsRepository.findOne(
           {
             where: { customer: { id: customer.id } },
@@ -41,7 +39,6 @@ export const migrateExistingCustomers = async () => {
           continue;
         }
 
-        // Handle missing password - generate a temporary one
         let password = (customer as any).password;
         let shouldNotifyPassword = false;
 
@@ -52,10 +49,8 @@ export const migrateExistingCustomers = async () => {
           const tempPassword = crypto.randomBytes(8).toString("hex");
           password = await bcrypt.hash(tempPassword, 10);
           shouldNotifyPassword = true;
-          // In a real scenario, you'd want to email this temp password to the customer
         }
 
-        // Create starCustomerDetails from existing customer data
         const starCustomerDetails = starCustomerDetailsRepository.create({
           customer: customer,
           taxNumber: (customer as any).taxNumber || "",
@@ -78,17 +73,14 @@ export const migrateExistingCustomers = async () => {
           resetPasswordExp: (customer as any).resetPasswordExp,
         });
 
-        // Save star customer details
         await starCustomerDetailsRepository.save(starCustomerDetails);
 
-        // Update customer stage based on existing data
         if ((customer as any).accountVerificationStatus === "verified") {
           customer.stage = "star_customer";
         } else {
           customer.stage = "business";
         }
 
-        // Link the starCustomerDetails to customer
         customer.starCustomerDetails = starCustomerDetails;
         await customerRepository.save(customer);
 
@@ -130,7 +122,6 @@ export const migrateExistingCustomers = async () => {
   }
 };
 
-// Run migration if called directly
 if (require.main === module) {
   migrateExistingCustomers();
 }

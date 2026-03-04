@@ -612,7 +612,6 @@ export class InquiryController {
                   parseFloat(reqData.unitWeight) * parseFloat(currentQty);
               }
 
-              // Strip `id` so TypeORM always INSERTs a fresh row.
               const { id: _ignored, ...reqDataWithoutId } = reqData;
 
               const requestItem = this.requestRepository.create({

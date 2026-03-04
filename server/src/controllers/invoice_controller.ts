@@ -5,6 +5,11 @@ import path from "path";
 import { AppDataSource } from "../config/database";
 import { Customer } from "../models/customers";
 import { Invoice, InvoiceItem } from "../models/invoice";
+import { Cargo } from "../models/cargos";
+import { Order } from "../models/orders";
+import { OrderItem } from "../models/order_items";
+import { Item } from "../models/items";
+import { Taric } from "../models/tarics";
 
 export class InvoiceController {
   static createInvoice = async (
@@ -26,13 +31,11 @@ export class InvoiceController {
         return res.status(404).json({ message: "Customer not found" });
       }
 
-      // Create invoice
       const invoice = invoiceRepository.create({
         ...invoiceData,
         customer,
       });
 
-      // Save invoice to get the ID
       const savedInvoice: any = await invoiceRepository.save(invoice);
 
       if (req.body.items && req.body.items.length > 0) {
@@ -50,12 +53,9 @@ export class InvoiceController {
         relations: ["customer", "items"],
       });
 
-      // Generate PDF
       const pdfUrl = await InvoiceController.generateInvoicePDF(
         completeInvoice
       );
-
-      // Update invoice with PDF URL
       await invoiceRepository.update(savedInvoice.id, { pdfUrl });
 
       return res.status(201).json({
@@ -72,17 +72,13 @@ export class InvoiceController {
   static generateInvoicePDF = async (invoice: any): Promise<string> => {
     return new Promise((resolve, reject) => {
       try {
-        // Create uploads directory if it doesn't exist
         const uploadsDir = path.join(process.cwd(), "uploads");
         if (!fs.existsSync(uploadsDir)) {
           fs.mkdirSync(uploadsDir, { recursive: true });
         }
-
-        // Create PDF filename
         const fileName = `invoice_${invoice.invoiceNumber}_${Date.now()}.pdf`;
         const filePath = path.join(uploadsDir, fileName);
 
-        // Create PDF document
         const doc = new PDFDocument({
           size: "A4",
           margin: 50,
@@ -90,17 +86,15 @@ export class InvoiceController {
         const stream = fs.createWriteStream(filePath);
         doc.pipe(stream);
 
-        // Page constants
         const pageWidth = 595.28;
         const pageHeight = 841.89;
         const margin = 50;
 
-        const leftAlignX = margin; // 50 - All left elements
-        const rightAlignX = 350; // 350 - All right elements
-        const centerColumnX = 200; // 200 - Footer center column
-        const rightColumnX = 420; // 420 - Footer right column
+        const leftAlignX = margin;
+        const rightAlignX = 350;
+        const centerColumnX = 200;
+        const rightColumnX = 420;
 
-        // Company Information
         const companyInfo = {
           name: "GTech Industries GmbH",
           address: "Reichshofstr. 137",
@@ -119,16 +113,13 @@ export class InvoiceController {
           bank: "Commerzbank Dortmund",
         };
 
-        // === HEADER SECTION ===
         let yPos = 50;
 
-        // Logo (left side - perfectly aligned)
         const logoPath = path.join(process.cwd(), "assets", "logo.png");
         if (fs.existsSync(logoPath)) {
           doc.image(logoPath, leftAlignX, yPos, { width: 100, height: 50 });
         }
 
-        // Company details (right side - perfectly aligned)
         doc.fontSize(12).font("Helvetica-Bold");
         doc.text(companyInfo.name, rightAlignX, yPos);
 
@@ -150,10 +141,8 @@ export class InvoiceController {
         doc.text("Shop:", rightAlignX, yPos);
         doc.text(companyInfo.website, rightAlignX + 50, yPos);
 
-        // === CUSTOMER & INVOICE SECTION ===
         yPos = 180;
 
-        // Return address line (left aligned)
         doc.fontSize(8).font("Helvetica");
         doc.fillColor("#666666");
         doc.text(
@@ -162,7 +151,6 @@ export class InvoiceController {
           yPos
         );
 
-        // Customer information (left aligned)
         yPos += 20;
         doc.fontSize(12).font("Helvetica-Bold");
         doc.fillColor("#000000");
@@ -173,9 +161,8 @@ export class InvoiceController {
         doc.text(invoice.customer.addressLine1 || "", leftAlignX, yPos);
         yPos += 12;
         doc.text(
-          `${invoice.customer.postalCode || ""} ${
-            invoice.customer.city || ""
-          }`.trim(),
+          `${invoice.customer.postalCode || ""} ${invoice.customer.city || ""
+            }`.trim(),
           leftAlignX,
           yPos
         );
@@ -186,7 +173,6 @@ export class InvoiceController {
         doc.lineWidth(0.3);
         doc.rect(rightAlignX, boxY, boxWidth, boxHeight).stroke("#CCCCCC");
 
-        // Gray header
         doc
           .rect(rightAlignX, boxY, boxWidth, 30)
           .fillAndStroke("#CCCCCC", "#CCCCCC");
@@ -195,7 +181,6 @@ export class InvoiceController {
         doc.fillColor("#000000");
         doc.text("Rechnung", rightAlignX + 5, boxY + 8);
 
-        // Invoice details with German labels
         const detailsStartY = boxY + 40;
         doc.fontSize(10).font("Helvetica");
 
@@ -218,7 +203,6 @@ export class InvoiceController {
           doc.font("Helvetica");
         });
 
-        // === TABLE SECTION ===
         yPos = 320;
         doc.fontSize(10).font("Helvetica");
         doc.text("Lieferdatum", leftAlignX, yPos);
@@ -228,11 +212,9 @@ export class InvoiceController {
           yPos
         );
 
-        // Clean Professional Table (perfectly aligned with left margin)
         yPos += 20;
         const tableY = yPos;
 
-        // Column configuration
         const columns = [
           { header: "Menge", width: 45, align: "left" },
           { header: "Art. Nr.", width: 50, align: "left" },
@@ -247,13 +229,10 @@ export class InvoiceController {
         const rowHeight = 20;
         const headerHeight = 35;
 
-        // Header background (aligned with left margin)
         doc.lineWidth(0.3);
         doc
           .rect(leftAlignX, tableY, tableWidth, headerHeight)
           .fillAndStroke("#E8E8E8", "#333333");
-
-        // Header text
         doc.fontSize(9).font("Helvetica-Bold");
         doc.fillColor("#000000");
         let currentX = leftAlignX;
@@ -265,24 +244,19 @@ export class InvoiceController {
           currentX += col.width;
         });
 
-        // Top border line after header
         doc.lineWidth(0.3);
         doc
           .moveTo(leftAlignX, tableY + headerHeight)
           .lineTo(leftAlignX + tableWidth, tableY + headerHeight)
           .stroke("#333333");
 
-        // Data rows
         doc.fontSize(9).font("Helvetica");
         invoice.items.forEach((item: any, rowIndex: number) => {
           const rowY = tableY + headerHeight + rowIndex * rowHeight;
-
-          // Subtle alternating background
           if (rowIndex % 2 === 1) {
             doc.rect(leftAlignX, rowY, tableWidth, rowHeight).fill("#FAFAFA");
           }
 
-          // Row data
           const rowData = [
             item.quantity?.toString() || "1",
             item.articleNumber || "",
@@ -312,7 +286,6 @@ export class InvoiceController {
             currentX += columns[colIndex].width;
           });
 
-          // Light bottom border for each row
           if (rowIndex < invoice.items.length - 1) {
             doc.lineWidth(0.5);
             doc
@@ -322,7 +295,6 @@ export class InvoiceController {
           }
         });
 
-        // Bottom border of table
         const tableBottomY =
           tableY + headerHeight + invoice.items.length * rowHeight;
         doc.lineWidth(0.3);
@@ -331,10 +303,8 @@ export class InvoiceController {
           .lineTo(leftAlignX + tableWidth, tableBottomY)
           .stroke("#333333");
 
-        // === TOTALS SECTION (right aligned to match invoice box) ===
         yPos = tableBottomY + 30;
 
-        // Net Total
         doc.fontSize(10).font("Helvetica");
         doc.text("Gesamtpreis Netto", rightAlignX, yPos);
         doc.text(
@@ -344,7 +314,6 @@ export class InvoiceController {
           { align: "right" }
         );
 
-        // VAT
         yPos += 18;
         doc.text("MwSt. 19,00%", rightAlignX, yPos);
         doc.text(
@@ -354,7 +323,6 @@ export class InvoiceController {
           { align: "right" }
         );
 
-        // Gross Total with subtle styling (right aligned)
         yPos += 20;
         doc.lineWidth(0.3);
         doc
@@ -370,7 +338,6 @@ export class InvoiceController {
           { align: "right" }
         );
 
-        // Payment info if applicable (right aligned)
         if (invoice.paidAmount > 0) {
           yPos += 35;
           doc.fontSize(10).font("Helvetica");
@@ -399,7 +366,6 @@ export class InvoiceController {
           );
         }
 
-        // === ADDITIONAL INFO (left aligned) ===
         yPos += 40;
         doc.fontSize(10).font("Helvetica");
 
@@ -413,16 +379,14 @@ export class InvoiceController {
         }
 
         doc.text(
-          `Zahlungsart: ${
-            invoice.paymentMethod?.replace("_", " ") || "Kauf-auf-Rechnung"
+          `Zahlungsart: ${invoice.paymentMethod?.replace("_", " ") || "Kauf-auf-Rechnung"
           }`,
           leftAlignX,
           yPos
         );
         yPos += 15;
         doc.text(
-          `Versandart: ${
-            invoice.shippingMethod?.replace("_", " ") || "Standard-Versand"
+          `Versandart: ${invoice.shippingMethod?.replace("_", " ") || "Standard-Versand"
           }`,
           leftAlignX,
           yPos
@@ -433,7 +397,6 @@ export class InvoiceController {
           doc.text(`Hinweise: ${invoice.notes}`, leftAlignX, yPos);
         }
 
-        // Thank you message (left aligned)
         yPos += 25;
         doc.text(
           "Wir danken Ihnen für Ihr Vertrauen und die gute Zusammenarbeit. Wir freuen uns über Ihre Weiterempfehlung.",
@@ -451,7 +414,6 @@ export class InvoiceController {
 
         doc.fontSize(8).font("Helvetica");
 
-        // Left column - Company & Banking (left aligned)
         doc.font("Helvetica-Bold");
         doc.text(companyInfo.name, leftAlignX, footerY);
         doc.font("Helvetica");
@@ -459,7 +421,6 @@ export class InvoiceController {
         doc.text(`BIC: ${companyInfo.bic}`, leftAlignX, footerY + 24);
         doc.text(companyInfo.bank, leftAlignX, footerY + 36);
 
-        // Center column - Registration & Tax Info (center aligned)
         doc.text(companyInfo.registrationNumber, centerColumnX, footerY);
         doc.text(companyInfo.ceo, centerColumnX, footerY + 12);
         doc.text(`Ust.-ID: ${companyInfo.vatId}`, centerColumnX, footerY + 24);
@@ -474,14 +435,12 @@ export class InvoiceController {
           footerY + 48
         );
 
-        // Right column - Order Info & Page (right aligned)
         doc.text(`Auftrags Nr:`, rightColumnX, footerY);
         doc.font("Helvetica-Bold");
         doc.text(`${invoice.orderNumber || "N/A"}`, rightColumnX + 60, footerY);
         doc.font("Helvetica");
         doc.text("1/1", rightColumnX + 60, footerY + 48);
 
-        // Finalize PDF
         doc.end();
 
         stream.on("finish", () => {
@@ -496,7 +455,6 @@ export class InvoiceController {
       }
     });
   };
-  // Method to serve PDF files
   static downloadInvoicePDF = async (
     req: Request,
     res: Response,
@@ -516,7 +474,6 @@ export class InvoiceController {
       }
 
       if (!invoice.pdfUrl) {
-        // Generate PDF if it doesn't exist
         const pdfUrl = await InvoiceController.generateInvoicePDF(invoice);
         await invoiceRepository.update(invoiceId, { pdfUrl });
         invoice.pdfUrl = pdfUrl;
@@ -542,7 +499,6 @@ export class InvoiceController {
     }
   };
 
-  // Update an existing invoice
   static updateInvoice = async (
     req: Request,
     res: Response,
@@ -555,7 +511,6 @@ export class InvoiceController {
       const { id } = req.params;
       const { items, ...invoiceData } = req.body;
 
-      // Find the invoice
       const invoice = await invoiceRepository.findOne({
         where: { id },
         relations: ["items"],
@@ -564,16 +519,12 @@ export class InvoiceController {
         return res.status(404).json({ message: "Invoice not found" });
       }
 
-      // Update invoice fields
       invoiceRepository.merge(invoice, invoiceData);
       const updatedInvoice = await invoiceRepository.save(invoice);
 
-      // Handle items update (delete existing and create new)
       if (items) {
-        // Remove existing items
         await itemRepository.delete({ invoice: invoice });
 
-        // Create new items
         const newItems = items.map((item: any) => {
           return itemRepository.create({
             ...item,
@@ -583,7 +534,6 @@ export class InvoiceController {
         await itemRepository.save(newItems);
       }
 
-      // Fetch the complete updated invoice
       const completeInvoice = await invoiceRepository.findOne({
         where: { id: updatedInvoice.id },
         relations: ["customer", "items"],
@@ -596,7 +546,6 @@ export class InvoiceController {
     }
   };
 
-  // Delete an invoice
   static deleteInvoice = async (
     req: Request,
     res: Response,
@@ -608,10 +557,8 @@ export class InvoiceController {
     try {
       const { id } = req.params;
 
-      // First delete all related invoice items
       await invoiceItemRepository.delete({ invoice: { id } });
 
-      // Then delete the invoice
       const result = await invoiceRepository.delete(id);
 
       if (result.affected === 0) {
@@ -627,7 +574,6 @@ export class InvoiceController {
     }
   };
 
-  // Get all invoices
   static getAllInvoices = async (
     req: Request,
     res: Response,
@@ -647,7 +593,6 @@ export class InvoiceController {
     }
   };
 
-  // Get a single invoice by ID
   static getInvoiceById = async (
     req: Request,
     res: Response,
@@ -689,6 +634,93 @@ export class InvoiceController {
       });
 
       return res.json(invoices);
+    } catch (error) {
+      console.error(error);
+      return next(error);
+    }
+  };
+
+  static getInvoiceExpandedDetails = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ) => {
+    const invoiceRepository = AppDataSource.getRepository(Invoice);
+    const cargoRepository = AppDataSource.getRepository(Cargo);
+    const orderRepository = AppDataSource.getRepository(Order);
+    const orderItemRepository = AppDataSource.getRepository(OrderItem);
+
+    try {
+      const { id } = req.params;
+      const invoice = await invoiceRepository.findOne({
+        where: { id },
+        relations: ["customer", "items"],
+      });
+
+      if (!invoice) {
+        return res.status(404).json({ success: false, message: "Invoice not found" });
+      }
+
+      const orderNumber = invoice.orderNumber;
+      let orderItems: any[] = [];
+
+      const cargo = await cargoRepository.findOne({
+        where: { cargo_no: orderNumber },
+      });
+
+      if (cargo) {
+        orderItems = await orderItemRepository.find({
+          where: { cargo_id: cargo.id },
+          relations: ["item", "item.taric", "order"],
+        });
+      } else {
+        const order = await orderRepository.findOne({
+          where: { order_no: orderNumber },
+        });
+        if (order) {
+          orderItems = await orderItemRepository.find({
+            where: { order_id: order.id },
+            relations: ["item", "item.taric", "order"],
+          });
+        }
+      }
+      const taricGroupsMap = new Map<number | string, any>();
+      orderItems.forEach((oi: any) => {
+        const item = oi.item;
+        const taric = item?.taric;
+        const taricId = taric?.id || "unknown";
+
+        if (!taricGroupsMap.has(taricId)) {
+          taricGroupsMap.set(taricId, {
+            taricId,
+            taricNameEn: taric?.name_en || "Unknown",
+            taricCode: taric?.code || "-",
+            dutyRate: taric?.duty_rate || 0,
+            totalQty: 0,
+            totalPrice: 0,
+            unitPrice: item?.RMB_Price || 0,
+          });
+        }
+
+        const group = taricGroupsMap.get(taricId);
+        group.totalQty += oi.qty || 0;
+        group.totalPrice += (oi.qty || 0) * (item?.RMB_Price || 0);
+      });
+
+      const taricGroups = Array.from(taricGroupsMap.values());
+
+      return res.json({
+        success: true,
+        data: {
+          invoice,
+          detailedItems: orderItems.map((oi: any) => ({
+            ...oi,
+            v: (oi.item?.length * oi.item?.width * oi.item?.height) / 1000 || 0,
+            w: oi.item?.weight || 0,
+          })),
+          taricGroups,
+        },
+      });
     } catch (error) {
       console.error(error);
       return next(error);

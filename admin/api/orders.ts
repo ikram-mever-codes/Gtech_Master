@@ -153,6 +153,34 @@ export const deleteOrder = async (orderId: string | number) => {
   }
 };
 
+export const updateOrderItemStatus = async (id: string | number, data: Record<string, any>) => {
+  try {
+    toast.loading("Updating item status...", loadingStyles);
+    const response = await api.put(`/orders/items/${id}/status`, data);
+    toast.dismiss();
+    toast.success("Status updated successfully", successStyles);
+    return response.data;
+  } catch (error) {
+    toast.dismiss();
+    handleApiError(error, "Update failed");
+    throw error;
+  }
+};
+
+export const splitOrderItem = async (id: string | number, splitQty: number) => {
+  try {
+    toast.loading("Splitting item...", loadingStyles);
+    const response = await api.post(`/orders/items/${id}/split`, { splitQty });
+    toast.dismiss();
+    toast.success("Item split successfully", successStyles);
+    return response.data;
+  } catch (error) {
+    toast.dismiss();
+    handleApiError(error, "Split failed");
+    throw error;
+  }
+};
+
 export const getOrderStatusColor = (status: string | number) => {
   const statusObj = getOrderStatuses().find(
     (s) => String(s.value) === String(status),

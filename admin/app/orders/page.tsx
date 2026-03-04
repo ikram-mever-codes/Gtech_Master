@@ -11,9 +11,13 @@ import {
   DocumentTextIcon,
   XMarkIcon,
   ArrowUturnRightIcon,
+  ArrowUturnLeftIcon,
   MagnifyingGlassIcon,
   ArrowRightIcon,
   PlusCircleIcon,
+  PrinterIcon,
+  ScissorsIcon,
+  ArrowRightCircleIcon,
 } from "@heroicons/react/24/outline";
 import { toast } from "react-hot-toast";
 import {
@@ -22,6 +26,8 @@ import {
   createOrder,
   updateOrder,
   deleteOrder,
+  updateOrderItemStatus,
+  splitOrderItem,
   type Order,
   type OrderSearchFilters,
   getOrderStatusColor,
@@ -47,14 +53,13 @@ import {
 import { getItems } from "@/api/items";
 import { getCategories } from "@/api/categories";
 import CustomButton from "@/components/UI/CustomButton";
+import CustomModal from "@/components/UI/CustomModal";
 import PageHeader from "@/components/UI/PageHeader";
 import { DataTable, ColumnDef } from "@/components/UI/DataTable";
 import { ShoppingCart } from "lucide-react";
 import { useSelector } from "react-redux";
 import { RootState } from "@/app/Redux/store";
 import { UserRole } from "@/utils/interfaces";
-import CargosTab from "@/components/cargos/CargosTab";
-import CargoTypesTab from "@/components/cargos/CargoTypesTab";
 
 type Item = {
   id: string | number;
@@ -63,6 +68,11 @@ type Item = {
   ean?: number | string;
   rmb_special_price?: number;
   supplier_id?: string | number;
+  length?: number;
+  width?: number;
+  height?: number;
+  weight?: number;
+  taric?: any;
 };
 type Customer = {
   id: string | number;
@@ -81,7 +91,6 @@ type Customer = {
 type Category = { id: string | number; name: string };
 
 type Option = { value: string; label: string };
-
 type OrderItemRow = {
   item_id: string;
   itemName: string;
@@ -134,6 +143,11 @@ const tabs = [
     label: "Suppliers Order",
     description: "Orders with suppliers",
   },
+  {
+    id: "problems",
+    label: "Problems",
+    description: "Manage order problems and label reprints",
+  },
 ] as const;
 
 function ItemSelectorWithQuantity({
@@ -178,7 +192,7 @@ function ItemSelectorWithQuantity({
           className="text-sm"
           classNames={{
             control: () =>
-              "border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500",
+              "border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500",
           }}
           options={options}
           value={options.find((opt) => opt.value === selectedItemId) || null}
@@ -195,7 +209,7 @@ function ItemSelectorWithQuantity({
         value={quantity}
         onChange={(e) => setQuantity(e.target.value)}
         placeholder="Qty"
-        className="w-24 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:bg-gray-50"
+        className="w-24 px-3 py-2 text-sm border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:bg-gray-50"
         min="1"
         disabled={disabled}
       />
@@ -204,7 +218,7 @@ function ItemSelectorWithQuantity({
         type="button"
         onClick={handleAdd}
         disabled={disabled || !selectedItemId || !quantity}
-        className="px-4 py-2 text-sm bg-green-700 text-white rounded-lg hover:bg-green-600 disabled:opacity-50"
+        className="px-4 py-2 text-sm bg-green-700 text-white rounded-[4px] hover:bg-green-600 disabled:opacity-50"
       >
         +
       </button>
@@ -231,98 +245,23 @@ function OrdersTable({
 
   const itemColumns: ColumnDef<any>[] = [
     {
-      header: "S. No",
-      width: "30px",
-      render: (_, i) => i + 1,
-      align: "center",
-    },
-    {
-      header: "EAN",
-      width: "80px",
-      render: (row) => itemById.get(String(row.item_id))?.ean || "-",
-    },
-    {
-      header: "Item name",
-      width: "150px",
-      render: (row) => (
-        <div
-          className="truncate"
-          title={
-            itemById.get(String(row.item_id))?.item_name ||
-            itemById.get(String(row.item_id))?.name
-          }
-        >
-          {itemById.get(String(row.item_id))?.item_name ||
-            itemById.get(String(row.item_id))?.name ||
-            "Unknown"}
-        </div>
-      ),
-    },
-    {
-      header: "Price",
-      width: "60px",
-      render: (row) => row.rmb_special_price ?? "-",
-    },
-    { header: "QTY", width: "40px", render: (row) => row.qty, align: "center" },
-    {
-      header: "Total",
-      width: "60px",
-      render: (row) =>
-        row.rmb_special_price
-          ? (row.rmb_special_price * row.qty).toFixed(2)
-          : "-",
-      align: "center",
-    },
-    {
-      header: "Supplier",
-      width: "100px",
-      render: (row) => (
-        <div className="truncate">
-          {row.supplier_id
-            ? getSupplierName?.(row.supplier_id)
-            : getCategoryName(row.category_id)}
-        </div>
-      ),
-    },
-    { header: "Order No.", width: "80px", render: (row) => row.order_no },
-    {
-      header: "Remarks",
-      width: "150px",
-      render: (row) => (
-        <div className="line-clamp-2" title={row.remarks_cn || row.remark_de}>
-          {row.remarks_cn || row.remark_de || "-"}
-        </div>
-      ),
-    },
-    {
-      header: "Status",
-      width: "60px",
-      render: (row) => row.item_status || "-",
-      align: "center",
-    },
-    {
-      header: "Cargo",
-      width: "40px",
-      render: (row) => row.cargo_id || "-",
-      align: "center",
-    },
-    {
-      header: "SOID",
-      width: "40px",
-      render: (row) => row.supplier_order_id || "-",
-      align: "center",
-    },
-    {
       header: "Actions",
-      width: "130px",
+      width: "135px",
       align: "center",
       render: (row) => (
-        <div className="flex items-center justify-center gap-1">
-          <button className="px-1.5 py-0.5 text-[10px] font-semibold bg-amber-600 text-white rounded hover:bg-amber-700 transition">
-            Split
+        <div className="flex items-center justify-center gap-1.5">
+          <button
+            onClick={() => onReassign(row)}
+            title="Re-assign to Cargo"
+            className="px-2 py-1 text-[10px] font-bold bg-[#8CC21B] text-white rounded-[4px] hover:bg-green-700 transition shadow-md flex items-center gap-1"
+          >
+            <span>&#8617;</span> ReAssign
           </button>
-          <button className="px-1.5 py-0.5 text-[10px] font-semibold bg-gray-600 text-white rounded hover:bg-gray-700 transition">
-            ReAssign
+          <button
+            title="Split Order Item"
+            className="px-2 py-1 text-[10px] font-bold bg-amber-600 text-white rounded-[4px] hover:bg-amber-700 transition shadow-md"
+          >
+            Split
           </button>
         </div>
       ),
@@ -337,49 +276,44 @@ function OrdersTable({
 
   const CountCell = ({ count }: { count: number }) => (
     <span
-      className={count > 0 ? "text-blue-600 font-semibold" : "text-gray-800"}
+      className={count > 0 ? "text-green-600 font-semibold" : "text-gray-800"}
     >
       {count}
     </span>
   );
 
+  const ActionCell = ({ row }: { row: any }) => (
+    <div className="flex items-center justify-center gap-1.5">
+      <button
+        onClick={() => onReassign(row)}
+        title="Re-assign to Cargo"
+        className="px-2 py-1 text-[10px] font-bold bg-[#8CC21B] text-white rounded-[4px] hover:bg-green-700 transition shadow-md flex items-center gap-1"
+      >
+        <span>&#8617;</span> ReAssign
+      </button>
+      <button
+        onClick={() => onEdit(row)}
+        title="Edit Order"
+        className="px-2 py-1 text-[10px] font-bold bg-[#059669] text-white rounded-[4px] hover:bg-green-700 transition shadow-md"
+      >
+        Edit
+      </button>
+    </div>
+  );
+
   const orderColumns: ColumnDef<any>[] = [
     {
       header: "No",
-      width: "30px",
+      width: "40px",
       render: (_, i) => i + 1,
       align: "center",
       renderTotal: () => <span className="text-transparent">Total</span>,
     },
     {
-      header: "Re Assign",
-      width: "85px",
+      header: "Actions",
+      width: "150px",
       align: "center",
-      render: (row) => (
-        <button
-          onClick={() => onReassign(row)}
-          className="px-2 py-0.5 text-[10px] font-semibold bg-gray-600 text-white rounded hover:bg-gray-700 transition whitespace-nowrap"
-        >
-          &#8617; ReAssign
-        </button>
-      ),
-    },
-    {
-      header: "Order No.",
-      render: (row) => (
-        <button
-          onClick={() => onView(row)}
-          className="text-blue-600 hover:underline font-semibold whitespace-nowrap"
-        >
-          {row.order_no}
-        </button>
-      ),
-      align: "center",
-    },
-    {
-      header: "Catgy",
-      render: (row) => getCategoryName(row.category_id),
-      align: "center",
+      render: (row) => <ActionCell row={row} />,
     },
     {
       header: "Order No.",
@@ -387,7 +321,7 @@ function OrdersTable({
       render: (row) => (
         <button
           onClick={() => onView(row)}
-          className="text-blue-600 hover:underline font-semibold whitespace-nowrap"
+          className="text-green-600 hover:underline font-semibold whitespace-nowrap"
         >
           {row.order_no}
         </button>
@@ -638,6 +572,9 @@ const OrderPage = () => {
   const [supplierOrdersList, setSupplierOrdersList] = useState<SupplierOrder[]>(
     [],
   );
+  const [expandedSupplierOrderId, setExpandedSupplierOrderId] = useState<
+    number | null
+  >(null);
   const [loadingSupplierOrders, setLoadingSupplierOrders] = useState(false);
   const [supplierOrderSearch, setSupplierOrderSearch] = useState("");
 
@@ -679,6 +616,18 @@ const OrderPage = () => {
   const [orderItems, setOrderItems] = useState<OrderItemRow[]>([]);
   const [nsoSearch, setNsoSearch] = useState("");
 
+  const [isEditQtyModalOpen, setIsEditQtyModalOpen] = useState(false);
+  const [editQtyItem, setEditQtyItem] = useState<any>(null);
+  const [newQty, setNewQty] = useState<string>("");
+  const [newRemarkCN, setNewRemarkCN] = useState<string>("");
+  const [reprintSearch, setReprintSearch] = useState("");
+
+  const [showREModal, setShowREModal] = useState(false);
+  const [showSPModal, setShowSPModal] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<any>(null);
+  const [splitQty, setSplitQty] = useState<number>(0);
+  const [targetCargoId, setTargetCargoId] = useState<string>("");
+
   const itemById = useMemo(() => {
     const map = new Map<string, Item>();
     for (const it of itemsAll) map.set(String(it.id), it);
@@ -686,6 +635,66 @@ const OrderPage = () => {
     for (const it of itemsBySupplier) map.set(String(it.id), it);
     return map;
   }, [itemsAll, itemsByCategory, itemsBySupplier]);
+
+  const problemItems = useMemo(() => {
+    const list: any[] = [];
+    orders.forEach((o: any) => {
+      (o.items || []).forEach((it: any) => {
+        if (it.status?.toLowerCase().includes("problem") || it.problems) {
+          list.push({ ...it, parentOrder: o });
+        }
+      });
+    });
+    return list;
+  }, [orders]);
+
+  const reprintItems = useMemo(() => {
+    const list: any[] = [];
+    orders.forEach((o: any) => {
+      (o.items || []).forEach((it: any) => {
+        const isPrinted =
+          it.status?.toLowerCase() === "printed" || it.printed === "Y";
+        if (isPrinted) {
+          const matchesSearch =
+            !reprintSearch ||
+            String(it.id).includes(reprintSearch) ||
+            String(it.item_id).includes(reprintSearch) ||
+            itemById
+              .get(String(it.item_id))
+              ?.ean?.toString()
+              .includes(reprintSearch) ||
+            itemById
+              .get(String(it.item_id))
+              ?.item_name?.toLowerCase()
+              .includes(reprintSearch.toLowerCase());
+
+          if (matchesSearch) {
+            list.push({ ...it, parentOrder: o });
+          }
+        }
+      });
+    });
+    return list;
+  }, [orders, reprintSearch, itemById]);
+
+  const orderItemDetailsMap = useMemo(() => {
+    const map = new Map<string, any>();
+    orders.forEach((o: any) => {
+      (o.items || []).forEach((it: any) => {
+        map.set(String(it.id), {
+          order_no: o.order_no,
+          cargo_id: o.cargo_id || it.cargo_id,
+          price: it.price || it.rmb_special_price || it.price_eur || 0,
+          status:
+            it.status ||
+            it.item_status ||
+            (o.status === 4 ? "Purchased" : "SO"),
+          parentOrder: o,
+        });
+      });
+    });
+    return map;
+  }, [orders]);
 
   const getCategoryName = useCallback(
     (categoryId: string | number) =>
@@ -814,6 +823,152 @@ const OrderPage = () => {
     setSelectedOrder(null);
     setMode("create");
   }, []);
+
+  const handlePurchaseItem = async (itemId: string | number) => {
+    try {
+      await updateOrderItemStatus(itemId, { status: "Purchased" });
+      await Promise.all([fetchOrders(), fetchSupplierOrders()]);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleBackToNSO = async (itemId: string | number) => {
+    if (!window.confirm("Return this item to NSO?")) return;
+    try {
+      await updateOrderItemStatus(itemId, {
+        status: "NSO",
+        supplier_order_id: null,
+      });
+      await Promise.all([fetchOrders(), fetchSupplierOrders()]);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleEditQty = (item: any) => {
+    setEditQtyItem(item);
+    setNewQty(String(item.qty_label || item.qty || ""));
+    setNewRemarkCN(item.remarks_cn || "");
+    setIsEditQtyModalOpen(true);
+  };
+
+  const saveQtyChanges = async () => {
+    if (!editQtyItem) return;
+    try {
+      await updateOrderItemStatus(editQtyItem.id, {
+        qty_label: Number(newQty),
+        remarks_cn: newRemarkCN,
+      });
+      setIsEditQtyModalOpen(false);
+      fetchOrders();
+    } catch (e) {
+      console.error(e);
+      toast.error("Failed to update item");
+    }
+  };
+
+  const handlePrintLabel = (item: any) => {
+    const details = itemById.get(String(item.item_id));
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return;
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Print Label - ${details?.item_name || "Item"}</title>
+          <style>
+            @page { size: 100mm 150mm; margin: 0; }
+            body { 
+              font-family: 'Poppins', sans-serif; 
+              padding: 20px; 
+              border: 1px solid #eee; 
+              width: 100mm; 
+              height: 150mm; 
+              box-sizing: border-box; 
+              position: relative;
+            }
+            .header { border-bottom: 2px solid #000; padding-bottom: 5px; margin-bottom: 10px; }
+            .item-name { font-size: 16px; font-weight: bold; margin-bottom: 2px; height: 48px; overflow: hidden; }
+            .ean { font-size: 11px; margin-bottom: 5px; color: #555; }
+            .details { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+            .label-field { font-size: 9px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; }
+            .value-field { font-size: 12px; font-weight: bold; margin-bottom: 2px; }
+            .barcode { margin-top: 20px; text-align: center; }
+            .qr-placeholder { width: 80px; height: 80px; background: #eee; margin: 0 auto; display: flex; align-items: center; justify-content: center; font-size: 8px; border: 1px dashed #ccc; }
+            .footer { position: absolute; bottom: 20px; left: 20px; right: 20px; font-size: 9px; text-align: center; color: #999; }
+          </style>
+        </head>
+        <body onload="window.print(); window.close();">
+          <div class="header">
+            <div class="item-name">${details?.item_name || "N/A"}</div>
+            <div class="ean">EAN: ${details?.ean || "-"}</div>
+          </div>
+          <div class="details">
+            <div>
+              <div class="label-field">Order / Cargo No.</div>
+              <div class="value-field">${item.parentOrder?.order_no || "-"}</div>
+            </div>
+            <div>
+              <div class="label-field">QTY Label</div>
+              <div class="value-field">${item.qty_label || item.qty}</div>
+            </div>
+            <div>
+              <div class="label-field">SOID</div>
+              <div class="value-field">${item.supplier_order_id || "-"}</div>
+            </div>
+            <div>
+              <div class="label-field">Taric</div>
+              <div class="value-field">${details?.taric?.code || "-"}</div>
+            </div>
+          </div>
+          <div class="barcode">
+            <div class="qr-placeholder">G-TECH LABEL</div>
+            <div style="font-size: 9px; margin-top: 5px; font-weight: 500;">Item ID: ${item.id}</div>
+          </div>
+          <div class="footer">
+            Printed on ${new Date().toLocaleString("de-DE")}
+          </div>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
+  const handleSplitItemAction = async () => {
+    if (!selectedItem || splitQty <= 0) return;
+    try {
+      await splitOrderItem(selectedItem.id, splitQty);
+      toast.success("Item split successfully");
+      setShowSPModal(false);
+      fetchOrders();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleReassignItemAction = async () => {
+    if (!selectedItem || !targetCargoId) return;
+    try {
+      await updateOrderItemStatus(selectedItem.id, {
+        cargo_id: Number(targetCargoId),
+      });
+      toast.success("Item reassigned successfully");
+      setShowREModal(false);
+      fetchOrders();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const calcV = (it: any) => {
+    const d = itemById.get(String(it.item_id));
+    if (d?.length && d?.width && d?.height)
+      return (d.length * d.width * d.height) / 1000;
+    return 0;
+  };
+
+  const calcW = (it: any) => itemById.get(String(it.item_id))?.weight || 0;
 
   const fetchCategories = useCallback(async () => {
     try {
@@ -999,7 +1154,7 @@ const OrderPage = () => {
       try {
         const response: any = await getSupplierItems(supplier_id);
         const data = response?.data ?? response;
-        const arr = Array.isArray(data) ? data : [];
+        const arr = Array.isArray(data) ? data : data?.items || [];
         setItemsBySupplier(arr);
       } catch (e) {
         console.error(e);
@@ -1330,7 +1485,7 @@ const OrderPage = () => {
       <button
         onClick={fetchOrders}
         disabled={loadingOrders}
-        className="px-3 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-all flex items-center gap-2 disabled:opacity-50"
+        className="px-3 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-[4px] hover:bg-gray-50 transition-all flex items-center gap-2 disabled:opacity-50"
       >
         <ArrowPathIcon
           className={`h-4 w-4 ${loadingOrders ? "animate-spin" : ""}`}
@@ -1341,7 +1496,7 @@ const OrderPage = () => {
       <CustomButton
         gradient={true}
         onClick={openCreate}
-        className="px-3 py-2 text-sm bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-all flex items-center gap-2"
+        className="px-4 py-2 text-sm bg-[#059669] text-white rounded-[4px] hover:bg-green-700 transition-all shadow-md font-bold flex items-center gap-2"
       >
         <PlusIcon className="h-4 w-4" />
         New Order
@@ -1354,13 +1509,14 @@ const OrderPage = () => {
     order_items: defaultAction,
     nso: defaultAction,
     supplier_orders: defaultAction,
+    problems: defaultAction,
   };
 
   const lockAllExceptQty = isConvertMode;
 
   return (
     <>
-      <div className="min-h-screen bg-white shadow-xl rounded-lg p-2 md:p-4">
+      <div className="min-h-screen bg-white shadow-xl rounded-[4px] p-2 md:p-4">
         <div className="max-w-full mx-auto">
           <div className="mb-6">
             <div className="flex justify-between items-center mb-4">
@@ -1393,15 +1549,15 @@ const OrderPage = () => {
             </nav>
           </div>
 
-          <div className="bg-white rounded-md shadow-lg border border-gray-200 overflow-hidden">
+          <div className="bg-white rounded-[4px] shadow-lg border border-gray-200 overflow-hidden">
             {activeTab === "nso" ? (
               <div className="p-4 bg-gray-50/30 min-h-[600px]">
                 <div className="flex items-center justify-between mb-8 px-4">
                   <button
                     onClick={() => setActiveTab("orders")}
-                    className="bg-[#1e40af] text-white rounded px-6 py-2 flex items-center gap-2 font-bold text-sm shadow-md hover:bg-blue-800 transition"
+                    className="bg-[#059669] text-white rounded-[4px] px-6 py-2 flex items-center gap-2 font-bold text-sm shadow-md hover:bg-green-700 transition"
                   >
-                    <XMarkIcon className="h-4 w-4 bg-white text-[#1e40af] rounded-full p-0.5" />
+                    <XMarkIcon className="h-4 w-4 bg-white text-[#059669] rounded-full p-0.5" />
                     Back
                   </button>
                   <div className="relative">
@@ -1413,7 +1569,7 @@ const OrderPage = () => {
                       placeholder="Search NSOs"
                       value={nsoSearch}
                       onChange={(e) => setNsoSearch(e.target.value)}
-                      className="pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 w-80 shadow-sm text-sm"
+                      className="pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 w-80 shadow-md text-sm"
                     />
                   </div>
                 </div>
@@ -1430,7 +1586,7 @@ const OrderPage = () => {
                         align: "center",
                         render: (row) => (
                           <div className="flex items-center justify-center gap-1 group cursor-pointer">
-                            <div className="bg-[#475569] text-white rounded px-3 py-1.5 flex items-center gap-4 text-xs font-bold w-20 justify-between shadow-sm">
+                            <div className="bg-[#475569] text-white rounded px-3 py-1.5 flex items-center gap-4 text-xs font-bold w-20 justify-between shadow-md">
                               {row.supplier_id}
                               <div className="bg-white rounded-full p-0.5">
                                 <ArrowRightIcon className="h-2 w-2 text-[#475569]" />
@@ -1468,7 +1624,7 @@ const OrderPage = () => {
                               onClick={() =>
                                 handleCreateSupplierOrderFromNSO(row)
                               }
-                              className="bg-[#059669] text-white px-4 py-2 rounded-lg flex items-center gap-2 text-xs font-bold hover:bg-green-700 transition shadow-sm"
+                              className="bg-[#059669] text-white px-4 py-2 rounded-[4px] flex items-center gap-2 text-xs font-bold hover:bg-green-700 transition shadow-md"
                             >
                               <PlusCircleIcon className="h-5 w-5" />
                               Supplier order
@@ -1495,7 +1651,7 @@ const OrderPage = () => {
                         align: "center",
                         render: (row) => (
                           <div className="flex items-center justify-center gap-1 group cursor-pointer">
-                            <div className="bg-[#475569] text-white rounded px-3 py-1.5 flex items-center gap-4 text-xs font-bold w-20 justify-between shadow-sm">
+                            <div className="bg-[#475569] text-white rounded px-3 py-1.5 flex items-center gap-4 text-xs font-bold w-20 justify-between shadow-md">
                               {row.supplier_id}
                               <div className="bg-white rounded-full p-0.5">
                                 <ArrowRightIcon className="h-2 w-2 text-[#475569]" />
@@ -1533,7 +1689,7 @@ const OrderPage = () => {
                               onClick={() =>
                                 handleCreateSupplierOrderFromNSO(row)
                               }
-                              className="bg-[#059669] text-white px-4 py-2 rounded-lg flex items-center gap-2 text-xs font-bold hover:bg-green-700 transition shadow-sm"
+                              className="bg-[#059669] text-white px-4 py-2 rounded-[4px] flex items-center gap-2 text-xs font-bold hover:bg-green-700 transition shadow-md"
                             >
                               <PlusCircleIcon className="h-5 w-5" />
                               Supplier order
@@ -1553,7 +1709,7 @@ const OrderPage = () => {
                   <div className="flex gap-2 items-center">
                     <button
                       onClick={() => setActiveTab("orders")}
-                      className="bg-blue-600 text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-blue-700 transition shadow-sm"
+                      className="bg-[#059669] text-white px-4 py-2 rounded-[4px] text-xs font-bold hover:bg-green-700 transition shadow-md"
                     >
                       Back
                     </button>
@@ -1562,18 +1718,271 @@ const OrderPage = () => {
                       <input
                         type="text"
                         placeholder="Search Supplier Orders..."
-                        className="pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-xs w-64 focus:ring-2 focus:ring-blue-500 transition"
+                        className="pl-9 pr-4 py-2 border border-gray-200 rounded-[4px] text-xs w-64 focus:ring-2 focus:ring-blue-500 transition"
                         value={supplierOrderSearch}
                         onChange={(e) => setSupplierOrderSearch(e.target.value)}
                       />
                     </div>
                   </div>
-                  <div className="text-blue-600 font-bold text-lg">
+                  <div className="text-[#059669] font-bold text-lg">
                     Supplier Orders
                   </div>
                 </div>
                 <DataTable
                   data={supplierOrdersList}
+                  expandedRowId={expandedSupplierOrderId}
+                  renderRowDetails={(row) => {
+                    const items = (row as any).items || [];
+                    return (
+                      <div className="bg-white p-4 border-t border-b border-gray-200">
+                        <DataTable
+                          data={items}
+                          showTotals={items.length > 0}
+                          columns={[
+                            {
+                              header: "#",
+                              width: "35px",
+                              render: (_, i) => i + 1,
+                              align: "center",
+                              renderTotal: () => (
+                                <b className="text-[11px] uppercase">Grand</b>
+                              ),
+                            },
+                            {
+                              header: "EAN",
+                              width: "100px",
+                              render: (item: any) => {
+                                const details = itemById.get(
+                                  String(item.item_id),
+                                );
+                                const parent = orderItemDetailsMap.get(
+                                  String(item.id),
+                                );
+                                const isSo =
+                                  parent?.status === "SO" ||
+                                  item.status === "SO";
+                                return (
+                                  <div className="flex flex-col gap-1 items-center">
+                                    {isSo && (
+                                      <button
+                                        onClick={() => handleBackToNSO(item.id)}
+                                        className="bg-[#f43f5e] hover:bg-rose-700 text-white rounded-[4px] px-2 py-0.5 text-[9px] font-bold flex items-center gap-1 w-full justify-center transition-all shadow-sm active:scale-95"
+                                      >
+                                        <ArrowUturnLeftIcon className="h-2.5 w-2.5" />{" "}
+                                        NSO
+                                      </button>
+                                    )}
+                                    <span className="text-blue-600 hover:underline cursor-pointer font-semibold text-[10px]">
+                                      {details?.ean || "-"}
+                                    </span>
+                                  </div>
+                                );
+                              },
+                              align: "center",
+                            },
+                            {
+                              header: "Item Name",
+                              render: (item: any) => (
+                                <div className="text-[10px] leading-tight font-semibold text-gray-800 break-words max-w-[180px]">
+                                  {itemById.get(String(item.item_id))
+                                    ?.item_name ||
+                                    itemById.get(String(item.item_id))?.name ||
+                                    "Unknown"}
+                                </div>
+                              ),
+                            },
+                            {
+                              header: "Remarks",
+                              render: (item: any) => (
+                                <div className="text-[10px] text-gray-500 italic max-h-12 overflow-y-auto min-w-[120px]">
+                                  {item.remark_de || "-"}
+                                </div>
+                              ),
+                            },
+                            {
+                              header: "Order_no",
+                              width: "80px",
+                              render: (item: any) => (
+                                <span className="font-mono text-[10px] font-bold text-[#006FBA]">
+                                  {orderItemDetailsMap.get(String(item.id))
+                                    ?.order_no ||
+                                    item.order_no ||
+                                    "-"}
+                                </span>
+                              ),
+                              align: "center",
+                            },
+                            {
+                              header: "Cargold",
+                              width: "60px",
+                              render: (item: any) => (
+                                <span className="text-[10px] font-medium text-slate-600">
+                                  {orderItemDetailsMap.get(String(item.id))
+                                    ?.cargo_id ||
+                                    item.cargo_id ||
+                                    "-"}
+                                </span>
+                              ),
+                              align: "center",
+                            },
+                            {
+                              header: "V(dm³)",
+                              width: "55px",
+                              render: (item: any) => calcV(item).toFixed(2),
+                              align: "center",
+                              renderTotal: (data) => (
+                                <span className="font-bold">
+                                  {data
+                                    .reduce((acc, it) => acc + calcV(it), 0)
+                                    .toFixed(2)}
+                                </span>
+                              ),
+                            },
+                            {
+                              header: "W(kg)",
+                              width: "55px",
+                              render: (item: any) => calcW(item).toFixed(2),
+                              align: "center",
+                              renderTotal: (data) => (
+                                <span className="font-bold">
+                                  {data
+                                    .reduce((acc, it) => acc + calcW(it), 0)
+                                    .toFixed(2)}
+                                </span>
+                              ),
+                            },
+                            {
+                              header: "QTY",
+                              width: "45px",
+                              render: (item: any) => (
+                                <span className="font-bold">{item.qty}</span>
+                              ),
+                              align: "center",
+                              renderTotal: (data) => (
+                                <span className="font-bold">
+                                  {data.reduce(
+                                    (acc, it) => acc + (it.qty || 0),
+                                    0,
+                                  )}
+                                </span>
+                              ),
+                            },
+                            {
+                              header: "RMB",
+                              width: "55px",
+                              render: (item: any) =>
+                                orderItemDetailsMap.get(String(item.id))
+                                  ?.price ||
+                                item.price ||
+                                "-",
+                              align: "center",
+                            },
+                            {
+                              header: "Total",
+                              width: "70px",
+                              render: (item: any) => {
+                                const p =
+                                  orderItemDetailsMap.get(String(item.id))
+                                    ?.price ||
+                                  item.price ||
+                                  0;
+                                return (p * (item.qty || 0)).toFixed(2);
+                              },
+                              align: "center",
+                              renderTotal: (data) => (
+                                <span className="font-bold text-green-700">
+                                  {data
+                                    .reduce((acc, it) => {
+                                      const p =
+                                        orderItemDetailsMap.get(String(it.id))
+                                          ?.price ||
+                                        it.price ||
+                                        0;
+                                      return acc + p * (it.qty || 0);
+                                    }, 0)
+                                    .toFixed(2)}
+                                </span>
+                              ),
+                            },
+                            {
+                              header: "Status",
+                              width: "80px",
+                              render: (item: any) => {
+                                const st =
+                                  orderItemDetailsMap.get(String(item.id))
+                                    ?.status ||
+                                  item.status ||
+                                  "SO";
+                                const isPurchased =
+                                  st?.toLowerCase() === "purchased";
+                                return (
+                                  <span
+                                    className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase ${isPurchased ? "bg-green-100 text-green-700" : "bg-blue-100 text-blue-700"}`}
+                                  >
+                                    {st}
+                                  </span>
+                                );
+                              },
+                              align: "center",
+                            },
+                            {
+                              header: "Actions",
+                              align: "center",
+                              render: (item: any) => {
+                                const det = orderItemDetailsMap.get(
+                                  String(item.id),
+                                );
+                                const st = det?.status || item.status || "SO";
+                                const isSO = st?.toUpperCase() === "SO";
+                                const isPurchased =
+                                  st?.toLowerCase() === "purchased";
+
+                                return (
+                                  <div className="flex gap-1.5 justify-center flex-wrap w-fit mx-auto">
+                                    {(isSO || isPurchased) && (
+                                      <button
+                                        onClick={() => handleEditQty(item)}
+                                        className="bg-slate-600 hover:bg-slate-700 text-white px-2 py-1 rounded text-[9px] font-bold uppercase flex items-center gap-1 shadow-sm transition-all active:scale-95 whitespace-nowrap"
+                                      >
+                                        <PencilIcon className="h-3 w-3" /> Edit
+                                      </button>
+                                    )}
+
+                                    {isSO && (
+                                      <button
+                                        onClick={() =>
+                                          handlePurchaseItem(item.id)
+                                        }
+                                        className="bg-[#059669] hover:bg-green-700 text-white px-2 py-1 rounded text-[9px] font-bold uppercase flex items-center gap-1 shadow-sm transition-all active:scale-95 whitespace-nowrap"
+                                      >
+                                        <PlusCircleIcon className="h-3 w-3" />{" "}
+                                        Purchase
+                                      </button>
+                                    )}
+
+                                    {isPurchased && (
+                                      <>
+                                        <button className="bg-orange-500 hover:bg-orange-600 text-white px-2 py-1 rounded text-[9px] font-bold uppercase flex items-center gap-1 shadow-sm transition-all active:scale-95 whitespace-nowrap">
+                                          <EyeIcon className="h-3 w-3" />{" "}
+                                          P_Problem
+                                        </button>
+                                        <button className="bg-purple-500 hover:bg-purple-600 text-white px-2 py-1 rounded text-[9px] font-bold uppercase flex items-center gap-1 shadow-sm transition-all active:scale-95 whitespace-nowrap">
+                                          <DocumentTextIcon className="h-3 w-3" />{" "}
+                                          Ref No.
+                                        </button>
+                                      </>
+                                    )}
+                                  </div>
+                                );
+                              },
+                            },
+                          ]}
+                          loading={false}
+                          getRowClassName={() => "bg-white"}
+                        />
+                      </div>
+                    );
+                  }}
                   columns={[
                     {
                       header: "#",
@@ -1586,11 +1995,22 @@ const OrderPage = () => {
                       width: "100px",
                       align: "center",
                       render: (row) => (
-                        <div className="flex items-center justify-center gap-1 group cursor-pointer">
-                          <div className="bg-[#475569] text-white rounded px-3 py-1.5 flex items-center gap-4 text-xs font-bold w-20 justify-between shadow-sm">
+                        <div
+                          onClick={() =>
+                            setExpandedSupplierOrderId(
+                              expandedSupplierOrderId === row.id
+                                ? null
+                                : row.id,
+                            )
+                          }
+                          className="flex items-center justify-center gap-1 group cursor-pointer"
+                        >
+                          <div className="bg-[#475569] text-white rounded px-3 py-1.5 flex items-center gap-4 text-xs font-bold w-20 justify-between shadow-md hover:bg-slate-700 transition">
                             {row.id}
                             <div className="bg-white rounded-full p-0.5">
-                              <ArrowRightIcon className="h-2 w-2 text-[#475569]" />
+                              <ArrowRightIcon
+                                className={`h-2 w-2 text-[#475569] transition-transform ${expandedSupplierOrderId === row.id ? "rotate-90" : ""}`}
+                              />
                             </div>
                           </div>
                         </div>
@@ -1627,11 +2047,61 @@ const OrderPage = () => {
                       align: "center",
                     },
                     {
-                      header: "Actions",
+                      header: "Supplier - ID",
+                      width: "300px",
+                      render: (row) => (
+                        <div className="font-semibold text-gray-700">
+                          {row.supplier?.company_name || "-"} -{" "}
+                          <span className="text-gray-400">
+                            {row.supplier_id || ""}
+                          </span>
+                        </div>
+                      ),
+                      align: "center",
+                    },
+                    {
+                      header: "Order Type",
+                      width: "120px",
+                      render: (row) => row.order_type?.name || "Taobao",
+                      align: "center",
+                    },
+                    {
+                      header: "Ref No.",
+                      width: "120px",
+                      render: (row) => (
+                        <div className="text-gray-500 font-medium italic">
+                          {row.ref_no || "-"}
+                        </div>
+                      ),
+                      align: "center",
+                    },
+                    {
+                      header: "Remark",
+                      render: (row) => (
+                        <div className="truncate max-w-[150px]">
+                          {row.remark || "-"}
+                        </div>
+                      ),
+                      align: "center",
+                    },
+                    {
+                      header: "Date created",
                       width: "100px",
+                      render: (row) =>
+                        new Date(row.created_at).toLocaleDateString(undefined, {
+                          day: "2-digit",
+                          month: "2-digit",
+                        }),
+                      align: "center",
+                    },
+                    {
+                      header: "Actions",
                       align: "center",
                       render: (row) => (
-                        <button className="px-4 py-1.5 bg-blue-600 text-white text-xs font-bold rounded-lg hover:bg-blue-700 transition flex items-center gap-2">
+                        <button
+                          onClick={() => openEdit(row as any)}
+                          className="px-6 py-1.5 bg-[#007bff] text-white text-xs font-bold rounded-[4px] hover:bg-blue-700 transition flex items-center gap-2 shadow-md mx-auto"
+                        >
                           <PencilIcon className="h-4 w-4" />
                           Edit
                         </button>
@@ -1639,8 +2109,238 @@ const OrderPage = () => {
                     },
                   ]}
                   loading={loadingSupplierOrders}
+                  getRowClassName={(row) =>
+                    expandedSupplierOrderId === row.id ? "bg-blue-50/30" : ""
+                  }
                   emptyMessage="No Supplier Orders Found"
                 />
+              </div>
+            ) : activeTab === "problems" ? (
+              <div className="p-4 bg-gray-50/30 min-h-[600px] flex flex-col gap-10">
+                <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                  <div className="p-4 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
+                    <h2 className="text-lg font-bold text-gray-800">
+                      Pending Problems
+                    </h2>
+                  </div>
+                  <DataTable
+                    data={problemItems}
+                    columns={[
+                      {
+                        header: "ID",
+                        width: "40px",
+                        render: (row) => row.id,
+                        align: "center",
+                      },
+                      {
+                        header: "Supplier ID",
+                        width: "80px",
+                        render: (row) =>
+                          row.parentOrder?.supplier_id ||
+                          row.supplier_id ||
+                          "-",
+                        align: "center",
+                      },
+                      {
+                        header: "Item name",
+                        render: (row) => (
+                          <div
+                            className="truncate max-w-[200px]"
+                            title={itemById.get(String(row.item_id))?.item_name}
+                          >
+                            {itemById.get(String(row.item_id))?.item_name ||
+                              "Unknown"}
+                          </div>
+                        ),
+                      },
+                      {
+                        header: "Order No.",
+                        width: "80px",
+                        render: (row) => row.parentOrder?.order_no || "-",
+                        align: "center",
+                      },
+                      {
+                        header: "SOID",
+                        width: "50px",
+                        render: (row) => row.supplier_order_id || "-",
+                        align: "center",
+                      },
+                      {
+                        header: "QTY",
+                        width: "40px",
+                        render: (row) => row.qty,
+                        align: "center",
+                      },
+                      {
+                        header: "Problem type",
+                        width: "100px",
+                        render: (row) => (
+                          <span className="text-red-600 font-semibold uppercase text-[10px]">
+                            {row.status}
+                          </span>
+                        ),
+                        align: "center",
+                      },
+                      {
+                        header: "Description",
+                        render: (row) => (
+                          <div className="line-clamp-2 text-xs italic text-gray-500">
+                            {row.problems || "No description"}
+                          </div>
+                        ),
+                      },
+                      {
+                        header: "Remark",
+                        render: (row) => (
+                          <div className="truncate max-w-[150px]">
+                            {row.remarks_cn || row.remark_de || "-"}
+                          </div>
+                        ),
+                      },
+                      {
+                        header: "Actions",
+                        width: "100px",
+                        align: "center",
+                        render: (row) => (
+                          <button
+                            onClick={() => openEdit(row.parentOrder)}
+                            className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded text-[10px] font-bold shadow-md transition-all active:scale-95 flex items-center gap-1 mx-auto"
+                          >
+                            <PencilIcon className="h-3 w-3" /> View Order
+                          </button>
+                        ),
+                      },
+                    ]}
+                    emptyMessage="No problem found"
+                    loading={loadingOrders}
+                  />
+                </div>
+
+                <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                  <div className="p-4 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
+                    <h2 className="text-lg font-bold text-gray-800">
+                      Label Reprint
+                    </h2>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
+                        <MagnifyingGlassIcon className="h-4 w-4 text-gray-400" />
+                      </div>
+                      <input
+                        type="text"
+                        placeholder="Search items..."
+                        value={reprintSearch}
+                        onChange={(e) => setReprintSearch(e.target.value)}
+                        className="pl-9 pr-4 py-1.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 w-64 shadow-sm text-xs"
+                      />
+                    </div>
+                  </div>
+                  <DataTable
+                    data={reprintItems}
+                    columns={[
+                      {
+                        header: "ID",
+                        width: "40px",
+                        render: (row) => row.id,
+                        align: "center",
+                      },
+                      {
+                        header: "EAN",
+                        width: "100px",
+                        render: (row) =>
+                          itemById.get(String(row.item_id))?.ean || "-",
+                        align: "center",
+                      },
+                      {
+                        header: "Item Name",
+                        render: (row) => (
+                          <div
+                            className="truncate max-w-[200px]"
+                            title={itemById.get(String(row.item_id))?.item_name}
+                          >
+                            {itemById.get(String(row.item_id))?.item_name ||
+                              "Unknown"}
+                          </div>
+                        ),
+                      },
+                      {
+                        header: "Remark",
+                        render: (row) => (
+                          <div className="truncate max-w-[150px]">
+                            {row.remarks_cn || "/"}
+                          </div>
+                        ),
+                      },
+                      {
+                        header: "Order_no",
+                        width: "80px",
+                        render: (row) => row.parentOrder?.order_no || "-",
+                        align: "center",
+                      },
+                      {
+                        header: "QTY",
+                        width: "60px",
+                        align: "center",
+                        render: (row) => (
+                          <div className="flex flex-col items-center leading-none">
+                            <span className="font-bold text-gray-800">
+                              {row.qty_label || row.qty}
+                            </span>
+                            {row.qty_label && row.qty_label !== row.qty && (
+                              <span className="text-[10px] text-gray-400">
+                                Orig: {row.qty}
+                              </span>
+                            )}
+                          </div>
+                        ),
+                      },
+                      {
+                        header: "RMB",
+                        width: "50px",
+                        render: (row) => row.rmb_special_price || "-",
+                        align: "center",
+                      },
+                      {
+                        header: "SOID",
+                        width: "50px",
+                        render: (row) => row.supplier_order_id || "-",
+                        align: "center",
+                      },
+                      {
+                        header: "Status",
+                        width: "60px",
+                        render: (row) => (
+                          <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full text-[10px] font-bold">
+                            {row.status}
+                          </span>
+                        ),
+                        align: "center",
+                      },
+                      {
+                        header: "Actions",
+                        width: "150px",
+                        align: "center",
+                        render: (row) => (
+                          <div className="flex items-center justify-center gap-2">
+                            <button
+                              onClick={() => handleEditQty(row)}
+                              className="bg-slate-700 hover:bg-slate-800 text-white px-3 py-1.5 rounded text-[10px] font-bold flex items-center gap-1 shadow-sm transition-all active:scale-95"
+                            >
+                              <PencilIcon className="h-3 w-3" /> edit
+                            </button>
+                            <button
+                              onClick={() => handlePrintLabel(row)}
+                              className="bg-[#059669] hover:bg-green-700 text-white px-3 py-1.5 rounded text-[10px] font-bold flex items-center gap-1 shadow-sm transition-all active:scale-95"
+                            >
+                              <PrinterIcon className="h-3 w-3" /> Print
+                            </button>
+                          </div>
+                        ),
+                      },
+                    ]}
+                    emptyMessage="No items for reprint found"
+                    loading={loadingOrders}
+                  />
+                </div>
               </div>
             ) : (
               <OrdersTable
@@ -1688,7 +2388,7 @@ const OrderPage = () => {
                   Select Cargo
                 </label>
                 <select
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-[4px] text-sm"
                   onChange={async (e) => {
                     const cargoId = Number(e.target.value);
                     if (!cargoId) return;
@@ -1699,6 +2399,7 @@ const OrderPage = () => {
                       fetchOrders();
                     } catch (err) {
                       console.error(err);
+                      toast.error("Failed to reassign order to cargo");
                     }
                   }}
                 >
@@ -1714,7 +2415,7 @@ const OrderPage = () => {
             <div className="mt-6 flex justify-end">
               <button
                 onClick={() => setShowReassignModal(false)}
-                className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition"
+                className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-[4px] hover:bg-gray-200 transition"
               >
                 Cancel
               </button>
@@ -1757,7 +2458,7 @@ const OrderPage = () => {
                 </span>
               </div>
             </div>
-            <p className="text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-2 mb-5">
+            <p className="text-xs text-amber-600 bg-amber-50 rounded-[4px] px-3 py-2 mb-5">
               ⚠ These items will be moved out of NSO and linked to the new
               supplier order.
             </p>
@@ -1767,13 +2468,13 @@ const OrderPage = () => {
                   setShowSupplierConfirm(false);
                   setPendingNsoGroup(null);
                 }}
-                className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition font-medium"
+                className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-[4px] hover:bg-gray-200 transition font-medium"
               >
                 Cancel
               </button>
               <button
                 onClick={confirmCreateSupplierOrder}
-                className="px-5 py-2 text-sm bg-[#059669] text-white rounded-lg hover:bg-green-700 transition font-bold flex items-center gap-2"
+                className="px-5 py-2 text-sm bg-[#059669] text-white rounded-[4px] hover:bg-green-700 transition font-bold flex items-center gap-2"
               >
                 <PlusCircleIcon className="h-4 w-4" />
                 Confirm
@@ -1831,7 +2532,7 @@ const OrderPage = () => {
               </div>
 
               <div className="overflow-x-auto">
-                <table className="min-w-full bg-white border border-gray-200 rounded-lg shadow-sm">
+                <table className="min-w-full bg-white border border-gray-200 rounded-[4px] shadow-md">
                   <thead className="bg-gray-100">
                     <tr>
                       <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-b">
@@ -1884,7 +2585,7 @@ const OrderPage = () => {
               <div className="flex justify-end pt-6">
                 <button
                   onClick={closeView}
-                  className="px-4 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-all"
+                  className="px-4 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-[4px] hover:bg-gray-50 transition-all"
                 >
                   Close
                 </button>
@@ -1954,7 +2655,7 @@ const OrderPage = () => {
                         value={form.supplier_id}
                         onChange={(e) => handleSupplierChange(e.target.value)}
                         disabled={lockAllExceptQty}
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:bg-gray-50"
+                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:bg-gray-50"
                       >
                         <option value="">Select Supplier</option>
                         {suppliers.map((s) => (
