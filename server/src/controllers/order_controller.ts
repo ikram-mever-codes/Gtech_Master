@@ -1,5 +1,7 @@
 import { Request, Response, NextFunction } from "express";
-
+import PDFDocument from "pdfkit";
+import bwipjs from "bwip-js";
+import path from "path";
 import ErrorHandler from "../utils/errorHandler";
 import { AppDataSource } from "../config/database";
 import { Order } from "../models/orders";
@@ -433,5 +435,103 @@ export const deleteOrder = async (
     try {
       await queryRunner.release();
     } catch {}
+  }
+};
+
+export const generateLabelPDF = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { itemId } = req.params;
+    const orderItemRepo = AppDataSource.getRepository(OrderItem);
+    const orderRepo = AppDataSource.getRepository(Order);
+
+    const item = await orderItemRepo.findOne({
+      where: { id: Number(itemId) },
+      relations: ["item"],
+    });
+    if (!item) return next(new ErrorHandler("Item not found", 404));
+
+    const order = await orderRepo.findOne({ where: { id: item.order_id } });
+
+    const doc = new PDFDocument({ size: [288, 144], margin: 0 });
+    const logoPath = path.join(__dirname, "../../public/logo.png");
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename=label_${item.id}.pdf`,
+    );
+    doc.pipe(res);
+
+    // --- Layout Constants (Matching the Reference Image) ---
+    const row1LabelY = 15;
+    const row1ValueY = 25;
+
+    const colA = 25; // ItemNoW
+    const colB = 115; // Order No
+    const colD = 185; // Qty
+
+    // 1. TOP ROW: Labels (Italicized and Small)
+    doc.fillColor("black").font("Helvetica-Oblique").fontSize(7);
+    doc.text("ItemNoW", colA, row1LabelY);
+    doc.text("Order No / Qty", colB, row1LabelY);
+    doc.text("Qty", colD, row1LabelY);
+
+    // 2. TOP ROW: Values (Bold and Large)
+    doc.font("Helvetica-Bold").fontSize(16);
+    doc.text(item?.item?.ItemID_DE?.toString() || "N/A", colA, row1ValueY); // A
+    doc.text(order?.order_no || "S2108", colB, row1ValueY); // B
+    doc.text(`${item.qty || 15}`, colD, row1ValueY); // D
+
+    // 3. SECTION C: The /20 (Smaller, positioned under Order No)
+    doc
+      .font("Helvetica")
+      .fontSize(10)
+      .text(`/${item.qty_split || 20}`, colB + 35, row1ValueY + 10);
+
+    // 4. LOGO (Top Right - Section GTech)
+    try {
+      doc.image(logoPath, 215, 12, { width: 55 });
+    } catch (e) {
+      console.error("Logo missing at /public/logo.png");
+    }
+
+    // 5. SECTION E: Main Description (Centered Vertically)
+    doc.font("Helvetica").fontSize(9).fillColor("#333333");
+    const description =
+      item.remark_de ||
+      "Toothed Belt GT2-140-6: profile GT2, length 140mm, width 6mm";
+    doc.text(description, colA, 60, { width: 250 });
+
+    // 6. SECTION F & G: Remarks (Left Bottom)
+    doc.font("Helvetica-Oblique").fontSize(7).text("RemarkCN", colA, 85);
+    doc
+      .font("Helvetica")
+      .fontSize(12)
+      .text(item.remarks_cn || "no problem", colA, 95); // F
+
+    doc.font("Helvetica-Oblique").fontSize(7).text("RemarkW", colA, 115); // G
+
+    // 7. SECTION H: Barcode (Right Bottom)
+    const barcodeValue = item.ref_no || "4283230040725";
+    const barcodeBuffer = await bwipjs.toBuffer({
+      bcid: "code128",
+      text: barcodeValue,
+      scale: 2,
+      height: 12,
+      includetext: true,
+      textsize: 9,
+      textxalign: "center",
+    });
+
+    // Positioning the barcode to match the image (Lower Right)
+    doc.image(barcodeBuffer, 155, 75, { width: 110 });
+
+    doc.end();
+  } catch (error) {
+    return next(error);
   }
 };
