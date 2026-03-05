@@ -110,13 +110,13 @@ const InvoiceGenerator: React.FC = () => {
     const filtered = customers.filter(
       (customer) =>
         customer.companyName
-          .toLowerCase()
+          ?.toLowerCase()
           .includes(customerSearchTerm.toLowerCase()) ||
         customer.email
-          .toLowerCase()
+          ?.toLowerCase()
           .includes(customerSearchTerm.toLowerCase()) ||
         customer.contactEmail
-          .toLowerCase()
+          ?.toLowerCase()
           .includes(customerSearchTerm.toLowerCase())
     );
     setFilteredCustomers(filtered);
@@ -126,7 +126,10 @@ const InvoiceGenerator: React.FC = () => {
     try {
       setLoadingCustomers(true);
       const response = await getAllCustomers();
-      if (response && response.data) {
+      if (response && response.data && Array.isArray(response.data.businesses)) {
+        setCustomers(response.data.businesses);
+        setFilteredCustomers(response.data.businesses);
+      } else if (response && Array.isArray(response.data)) {
         setCustomers(response.data);
         setFilteredCustomers(response.data);
       }

@@ -105,12 +105,12 @@ const allMenuItems = [
     path: "/offers",
     resource: "Offers",
   },
-  // {
-  //   icon: DollarSign,
-  //   text: "Invoices",
-  //   path: "/invoices",
-  //   resource: "Invoices",
-  // },
+  {
+    icon: DollarSign,
+    text: "Invoices",
+    path: "/invoices",
+    resource: "Invoices",
+  },
   // {
   //   icon: LibraryAdd,
   //   text: "Library",
@@ -299,8 +299,6 @@ const Sidebar = () => {
         }}
       >
         <Divider sx={{ borderColor: "divider", mb: 2 }} />
-
-        {/* Scroll Up Button - Only shows when needed */}
         <Fade in={isMounted && hasOverflow && showScrollUp}>
           <Box
             suppressHydrationWarning
@@ -388,7 +386,7 @@ const Sidebar = () => {
                       height: "100%",
                       width:
                         activePath === item.path ||
-                        activePath.includes(item.path)
+                          activePath.includes(item.path)
                           ? "3px"
                           : 0,
                       backgroundColor: "primary.main",
@@ -401,7 +399,7 @@ const Sidebar = () => {
                       minWidth: 40,
                       color:
                         activePath === item.path ||
-                        activePath.includes(item.path)
+                          activePath.includes(item.path)
                           ? "white"
                           : "text.secondary",
                       transition: "color 0.2s ease",
@@ -453,10 +451,7 @@ const Sidebar = () => {
             </IconButton>
           </Box>
         </Fade>
-
         <Divider sx={{ borderColor: "divider", my: 2 }} />
-
-        {/* If admin, show a section with user role info */}
         {user?.role && !isCollapsed && (
           <Box sx={{ px: 3, mb: 2 }}>
             <Box
