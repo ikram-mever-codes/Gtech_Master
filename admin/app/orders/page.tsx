@@ -1,6 +1,13 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, {
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Select from "react-select";
 import {
   ArrowPathIcon,
@@ -125,10 +132,10 @@ type OrdersTableProps = {
   onEdit: (o: any) => void;
   onDelete: (id: string | number) => void;
   canDelete: boolean;
-
   showConvert: boolean;
   onConvert: (o: any) => void;
   onReassign: (o: any) => void;
+  onGoToItems: (orderNo: string) => void;
   activeTab: string;
   itemById: Map<string, Item>;
 };
@@ -250,6 +257,7 @@ function OrdersTable({
   canDelete,
   onConvert,
   onReassign,
+  onGoToItems,
   activeTab,
   itemById,
 }: OrdersTableProps) {
@@ -420,8 +428,9 @@ function OrdersTable({
       width: "90px",
       render: (row) => (
         <button
-          onClick={() => onView(row)}
+          onClick={() => onGoToItems(String(row.order_no))}
           className="text-green-600 hover:underline font-semibold whitespace-nowrap"
+          title="Click to see all items in this order"
         >
           {row.order_no}
         </button>
@@ -658,8 +667,15 @@ function OrdersTable({
 const OrderPage = () => {
   const { user } = useSelector((state: RootState) => state.user);
 
-  const [activeTab, setActiveTab] =
-    useState<(typeof tabs)[number]["id"]>("orders");
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const [activeTab, setActiveTab] = useState<(typeof tabs)[number]["id"]>(
+    () => (searchParams.get("tab") as any) || "orders",
+  );
+  const [orderNoFilter, setOrderNoFilter] = useState<string>(
+    () => searchParams.get("order_no") || "",
+  );
   const activeTabObj = tabs.find((t) => t.id === activeTab);
 
   const [orders, setOrders] = useState<Order[]>([]);
@@ -776,15 +792,11 @@ const OrderPage = () => {
     });
     return list;
   }, [orders, reprintSearch, itemById]);
-
-  // Inside your Component logic
   const handlePrintLabel = async (row: any) => {
     if (!row.id) {
       toast.error("Invalid Item ID");
       return;
     }
-
-    // Call the function we just created
     await downloadItemLabel(row.id);
   };
 
@@ -1019,14 +1031,26 @@ const OrderPage = () => {
   const handleReassignItemAction = async () => {
     if (!selectedItem || !targetCargoId) return;
     try {
+      // Get the order_id for the selected item
+      const orderId = selectedItem.order_id || selectedItem.parentOrder?.id;
+      if (!orderId) {
+        toast.error("Could not determine order for this item");
+        return;
+      }
+      // Update the item's cargo_id
       await updateOrderItemStatus(selectedItem.id, {
         cargo_id: Number(targetCargoId),
       });
-      toast.success("Item reassigned successfully");
+      // Call assignOrdersToCargo to trigger invoice generation
+      await assignOrdersToCargo(Number(targetCargoId), [Number(orderId)]);
+      toast.success(
+        `Item reassigned to Cargo ${targetCargoId} — invoice generated!`,
+      );
       setShowREModal(false);
       fetchOrders();
     } catch (err) {
       console.error(err);
+      toast.error("Failed to reassign item");
     }
   };
 
@@ -1128,6 +1152,14 @@ const OrderPage = () => {
   useEffect(() => {
     fetchOrders();
   }, [fetchOrders]);
+
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (activeTab !== "orders") params.set("tab", activeTab);
+    if (orderNoFilter) params.set("order_no", orderNoFilter);
+    const qs = params.toString();
+    router.replace(qs ? `/orders?${qs}` : "/orders", { scroll: false });
+  }, [activeTab, orderNoFilter, router]);
 
   useEffect(() => {
     fetchCustomers();
@@ -1532,21 +1564,25 @@ const OrderPage = () => {
     () => orders.filter((o: any) => !!o.supplier_id),
     [orders],
   );
-  const orderItemsFlat = useMemo(
-    () =>
-      orders.flatMap((o: any) =>
-        (o.items || []).map((i: any) => ({
-          ...i,
-          order_no: o.order_no,
-          order_status: o.status,
-          item_status: i.status || "NSO",
-          supplier_id: o.supplier_id,
-          category_id: o.category_id,
-          comment: o.comment,
-        })),
-      ),
-    [orders],
-  );
+  const orderItemsFlat = useMemo(() => {
+    const allItems = orders.flatMap((o: any) =>
+      (o.items || []).map((i: any) => ({
+        ...i,
+        order_id: o.id,
+        parentOrder: o,
+        order_no: o.order_no,
+        order_status: o.status,
+        item_status: i.status || "NSO",
+        supplier_id: o.supplier_id,
+        category_id: o.category_id,
+        comment: o.comment,
+      })),
+    );
+    if (!orderNoFilter) return allItems;
+    return allItems.filter((i) =>
+      String(i.order_no).toLowerCase().includes(orderNoFilter.toLowerCase()),
+    );
+  }, [orders, orderNoFilter]);
 
   const visibleOrders =
     activeTab === "orders"
@@ -1864,8 +1900,9 @@ const OrderPage = () => {
                               header: "Item Name",
                               render: (item: any) => (
                                 <div className="text-[10px] leading-tight font-semibold text-gray-800 break-words max-w-[180px]">
-                                  {itemById.get(String(item.item_id))
-                                    ?.item_name ||
+                                  {item.item?.item_name ||
+                                    itemById.get(String(item.item_id))
+                                      ?.item_name ||
                                     itemById.get(String(item.item_id))?.name ||
                                     "Unknown"}
                                 </div>
@@ -2035,72 +2072,48 @@ const OrderPage = () => {
 
                                 return (
                                   <div className="flex gap-1.5 justify-center flex-wrap w-fit mx-auto">
-                                    <button
-                                      onClick={() => handleEditQty(item)}
-                                      className="bg-slate-600 hover:bg-slate-700 text-white px-2 py-1 rounded text-[9px] font-bold uppercase flex items-center gap-1 shadow-sm transition-all active:scale-95 whitespace-nowrap"
-                                    >
-                                      <PencilIcon className="h-3 w-3" /> QTY
-                                    </button>
-
-                                    <button
-                                      onClick={() => {
-                                        setSelectedItem(item);
-                                        setSplitQty(Math.floor(item.qty / 2));
-                                        setShowSPModal(true);
-                                      }}
-                                      className="bg-orange-600 hover:bg-orange-700 text-white px-2 py-1 rounded text-[9px] font-bold uppercase flex items-center gap-1 shadow-sm transition-all active:scale-95 whitespace-nowrap"
-                                    >
-                                      <ScissorsIcon className="h-3 w-3" /> Split
-                                    </button>
-
-                                    <button
-                                      onClick={() => {
-                                        setSelectedItem(item);
-                                        setTargetCargoId(det?.cargo_id || "");
-                                        setShowREModal(true);
-                                      }}
-                                      className="bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded text-[9px] font-bold uppercase flex items-center gap-1 shadow-sm transition-all active:scale-95 whitespace-nowrap"
-                                    >
-                                      <ArrowRightCircleIcon className="h-3 w-3" />{" "}
-                                      ReAssgn
-                                    </button>
-
-                                    <button
-                                      onClick={() => handlePrintLabel(row)}
-                                      className="bg-[#059669] hover:bg-green-700 text-white px-3 py-1.5 rounded-[4px] text-[10px] font-bold uppercase flex items-center gap-1.5 shadow-sm transition-all active:scale-95"
-                                    >
-                                      <PrinterIcon className="h-3.5 w-3.5" />{" "}
-                                      Print
-                                    </button>
-
-                                    <button
-                                      onClick={() => {
-                                        if (det?.parentOrder)
-                                          openEdit(det.parentOrder);
-                                        else
-                                          toast.error(
-                                            "Could not find parent order to view",
-                                          );
-                                      }}
-                                      className="bg-[#059669] hover:bg-green-700 text-white px-2 py-1 rounded text-[9px] font-bold uppercase flex items-center gap-1 shadow-sm transition-all active:scale-95 whitespace-nowrap"
-                                    >
-                                      <EyeIcon className="h-3 w-3" /> Full Order
-                                    </button>
-
-                                    {isSO && (
-                                      <button
-                                        onClick={() =>
-                                          handlePurchaseItem(item.id)
-                                        }
-                                        className="bg-[#059669] hover:bg-green-700 text-white px-2 py-1 rounded text-[9px] font-bold uppercase flex items-center gap-1 shadow-sm transition-all active:scale-95 whitespace-nowrap"
-                                      >
-                                        <PlusCircleIcon className="h-3 w-3" />{" "}
-                                        Purchase
-                                      </button>
-                                    )}
-
-                                    {isPurchased && (
+                                    {isSO ? (
                                       <>
+                                        <button
+                                          onClick={() => {
+                                            if (det?.parentOrder)
+                                              openEdit(det.parentOrder);
+                                            else
+                                              toast.error(
+                                                "Could not find parent order to view",
+                                              );
+                                          }}
+                                          className="bg-[#059669] hover:bg-green-700 text-white px-2 py-1 rounded text-[9px] font-bold uppercase flex items-center gap-1 shadow-sm transition-all active:scale-95 whitespace-nowrap"
+                                        >
+                                          <PencilIcon className="h-3 w-3" />{" "}
+                                          Edit
+                                        </button>
+                                        <button
+                                          onClick={() =>
+                                            handlePurchaseItem(item.id)
+                                          }
+                                          className="bg-[#059669] hover:bg-green-700 text-white px-2 py-1 rounded text-[9px] font-bold uppercase flex items-center gap-1 shadow-sm transition-all active:scale-95 whitespace-nowrap"
+                                        >
+                                          <PlusCircleIcon className="h-3 w-3" />{" "}
+                                          Purchase
+                                        </button>
+                                      </>
+                                    ) : isPurchased ? (
+                                      <>
+                                        <button
+                                          onClick={() => {
+                                            if (det?.parentOrder)
+                                              openEdit(det.parentOrder);
+                                            else
+                                              toast.error(
+                                                "Could not find parent order to view",
+                                              );
+                                          }}
+                                          className="bg-[#059669] hover:bg-green-700 text-white px-2 py-1 rounded text-[9px] font-bold uppercase flex items-center gap-1 shadow-sm transition-all active:scale-95 whitespace-nowrap"
+                                        >
+                                          <PencilIcon className="h-3 w-3" />{" "}
+                                          Edit
+                                        </button>
                                         <button className="bg-orange-500 hover:bg-orange-600 text-white px-2 py-1 rounded text-[9px] font-bold uppercase flex items-center gap-1 shadow-sm transition-all active:scale-95 whitespace-nowrap">
                                           <EyeIcon className="h-3 w-3" />{" "}
                                           P_Problem
@@ -2108,6 +2121,66 @@ const OrderPage = () => {
                                         <button className="bg-purple-500 hover:bg-purple-600 text-white px-2 py-1 rounded text-[9px] font-bold uppercase flex items-center gap-1 shadow-sm transition-all active:scale-95 whitespace-nowrap">
                                           <DocumentTextIcon className="h-3 w-3" />{" "}
                                           Ref No.
+                                        </button>
+                                      </>
+                                    ) : (
+                                      /* Default buttons for other statuses if any */
+                                      <>
+                                        <button
+                                          onClick={() => handleEditQty(item)}
+                                          className="bg-slate-600 hover:bg-slate-700 text-white px-2 py-1 rounded text-[9px] font-bold uppercase flex items-center gap-1 shadow-sm transition-all active:scale-95 whitespace-nowrap"
+                                        >
+                                          <PencilIcon className="h-3 w-3" /> QTY
+                                        </button>
+
+                                        <button
+                                          onClick={() => {
+                                            setSelectedItem(item);
+                                            setSplitQty(
+                                              Math.floor(item.qty / 2),
+                                            );
+                                            setShowSPModal(true);
+                                          }}
+                                          className="bg-orange-600 hover:bg-orange-700 text-white px-2 py-1 rounded text-[9px] font-bold uppercase flex items-center gap-1 shadow-sm transition-all active:scale-95 whitespace-nowrap"
+                                        >
+                                          <ScissorsIcon className="h-3 w-3" />{" "}
+                                          Split
+                                        </button>
+
+                                        <button
+                                          onClick={() => {
+                                            setSelectedItem(item);
+                                            setTargetCargoId(
+                                              det?.cargo_id || "",
+                                            );
+                                            setShowREModal(true);
+                                          }}
+                                          className="bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded text-[9px] font-bold uppercase flex items-center gap-1 shadow-sm transition-all active:scale-95 whitespace-nowrap"
+                                        >
+                                          <ArrowRightCircleIcon className="h-3 w-3" />{" "}
+                                          ReAssgn
+                                        </button>
+
+                                        <button
+                                          onClick={() => handlePrintLabel(row)}
+                                          className="bg-[#059669] hover:bg-green-700 text-white px-3 py-1.5 rounded-[4px] text-[10px] font-bold uppercase flex items-center gap-1.5 shadow-sm transition-all active:scale-95"
+                                        >
+                                          <PrinterIcon className="h-3.5 w-3.5" />{" "}
+                                          Print
+                                        </button>
+                                        <button
+                                          onClick={() => {
+                                            if (det?.parentOrder)
+                                              openEdit(det.parentOrder);
+                                            else
+                                              toast.error(
+                                                "Could not find parent order to view",
+                                              );
+                                          }}
+                                          className="bg-[#059669] hover:bg-green-700 text-white px-2 py-1 rounded text-[9px] font-bold uppercase flex items-center gap-1 shadow-sm transition-all active:scale-95 whitespace-nowrap"
+                                        >
+                                          <EyeIcon className="h-3 w-3" /> Full
+                                          Order
                                         </button>
                                       </>
                                     )}
@@ -2255,9 +2328,13 @@ const OrderPage = () => {
                         render: (row) => (
                           <div
                             className="truncate max-w-[200px]"
-                            title={itemById.get(String(row.item_id))?.item_name}
+                            title={
+                              row.item?.item_name ||
+                              itemById.get(String(row.item_id))?.item_name
+                            }
                           >
-                            {itemById.get(String(row.item_id))?.item_name ||
+                            {row.item?.item_name ||
+                              itemById.get(String(row.item_id))?.item_name ||
                               "Unknown"}
                           </div>
                         ),
@@ -2364,9 +2441,13 @@ const OrderPage = () => {
                         render: (row) => (
                           <div
                             className="truncate max-w-[200px]"
-                            title={itemById.get(String(row.item_id))?.item_name}
+                            title={
+                              row.item?.item_name ||
+                              itemById.get(String(row.item_id))?.item_name
+                            }
                           >
-                            {itemById.get(String(row.item_id))?.item_name ||
+                            {row.item?.item_name ||
+                              itemById.get(String(row.item_id))?.item_name ||
                               "Unknown"}
                           </div>
                         ),
@@ -2458,15 +2539,6 @@ const OrderPage = () => {
               </div>
             ) : activeTab === "label_print" ? (
               <div className="p-4 bg-gray-50/30 min-h-[600px]">
-                {/* <div className="mb-4 bg-green-50 border border-green-200 rounded-[4px] p-3 flex items-center gap-3 shadow-sm">
-                  <div className="bg-green-500 rounded-full p-1">
-                    <CheckCircleIcon className="h-3 w-3 text-white" />
-                  </div>
-                  <span className="text-sm font-medium text-green-800">
-                    QTY delivery set successfully!
-                  </span>
-                </div> */}
-
                 <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                   <div className="p-4 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
                     <h2 className="text-lg font-bold text-gray-800">
@@ -2602,25 +2674,47 @@ const OrderPage = () => {
                 </div>
               </div>
             ) : (
-              <OrdersTable
-                orders={visibleOrders}
-                loading={loadingOrders}
-                getCategoryName={getCategoryName}
-                getSupplierName={getSupplierName}
-                getOrderStatusColor={getOrderStatusColor}
-                onView={openView}
-                onEdit={openEdit}
-                onDelete={handleDeleteOrder}
-                canDelete={user?.role === UserRole.ADMIN}
-                showConvert={false}
-                onConvert={openConvert}
-                onReassign={(o) => {
-                  setReassignOrder(o);
-                  setShowReassignModal(true);
-                }}
-                activeTab={activeTab}
-                itemById={itemById}
-              />
+              <>
+                {activeTab === "order_items" && orderNoFilter && (
+                  <div className="flex items-center gap-3 px-4 py-2 bg-blue-50 border-b border-blue-100">
+                    <span className="text-xs text-blue-700 font-medium">
+                      🔍 Showing items for order:&nbsp;
+                      <span className="font-bold bg-blue-100 px-1.5 py-0.5 rounded">
+                        {orderNoFilter}
+                      </span>
+                    </span>
+                    <button
+                      onClick={() => setOrderNoFilter("")}
+                      className="text-[10px] text-blue-600 hover:text-blue-800 underline font-semibold ml-1"
+                    >
+                      Clear filter (show all)
+                    </button>
+                  </div>
+                )}
+                <OrdersTable
+                  orders={visibleOrders}
+                  loading={loadingOrders}
+                  getCategoryName={getCategoryName}
+                  getSupplierName={getSupplierName}
+                  getOrderStatusColor={getOrderStatusColor}
+                  onView={openView}
+                  onEdit={openEdit}
+                  onDelete={handleDeleteOrder}
+                  canDelete={user?.role === UserRole.ADMIN}
+                  showConvert={false}
+                  onConvert={openConvert}
+                  onReassign={(o) => {
+                    setReassignOrder(o);
+                    setShowReassignModal(true);
+                  }}
+                  onGoToItems={(orderNo) => {
+                    setOrderNoFilter(orderNo);
+                    setActiveTab("order_items");
+                  }}
+                  activeTab={activeTab}
+                  itemById={itemById}
+                />
+              </>
             )}
           </div>
         </div>
@@ -2652,7 +2746,9 @@ const OrderPage = () => {
                     const cargoId = Number(e.target.value);
                     if (!cargoId) return;
                     try {
-                      await assignOrdersToCargo(cargoId, [reassignOrder.id]);
+                      const orderId =
+                        reassignOrder.order_id || reassignOrder.id;
+                      await assignOrdersToCargo(cargoId, [orderId]);
                       toast.success(`Order reassigned to Cargo ${cargoId}`);
                       setShowReassignModal(false);
                       fetchOrders();
@@ -3221,4 +3317,12 @@ const OrderPage = () => {
   );
 };
 
-export default OrderPage;
+const OrderPageWrapper = () => (
+  <Suspense
+    fallback={<div className="p-8 text-center text-gray-400">Loading...</div>}
+  >
+    <OrderPage />
+  </Suspense>
+);
+
+export default OrderPageWrapper;

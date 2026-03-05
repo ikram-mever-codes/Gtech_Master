@@ -76,7 +76,6 @@ import {
 import { CustomerVerificationStatus } from "@/utils/interfaces";
 import { successStyles } from "@/utils/constants";
 
-// Main customer page component
 const CustomersPage = () => {
   const muiTheme = useTheme();
   const router = useRouter();
@@ -85,7 +84,7 @@ const CustomersPage = () => {
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(
     null
   );
-  const [customers, setCustomers] = useState([]);
+  const [customers, setCustomers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -106,14 +105,19 @@ const CustomersPage = () => {
   const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
   const [newStatus, setNewStatus] = useState<any>("");
 
-  // Function to fetch customers
   const fetchCustomers = async () => {
     setLoading(true);
     setError(null);
     try {
       const response = await getAllCustomers();
       if (response && response.data) {
-        setCustomers(response.data);
+        if (Array.isArray(response.data)) {
+          setCustomers(response.data);
+        } else if (response.data.businesses && Array.isArray(response.data.businesses)) {
+          setCustomers(response.data.businesses);
+        } else {
+          setCustomers([]);
+        }
       } else {
         setCustomers([]);
         setError("No data received from server");
@@ -273,7 +277,6 @@ const CustomersPage = () => {
     }
   };
 
-  // Get status chip configuration
   const getStatusChipConfig = (status: string) => {
     switch (status) {
       case CustomerVerificationStatus.APPROVED:
@@ -327,7 +330,6 @@ const CustomersPage = () => {
     );
   };
 
-  // Define table columns
   const columns = [
     {
       key: "company",
@@ -493,7 +495,6 @@ const CustomersPage = () => {
     },
   ];
 
-  // Filter customers
   const filteredCustomers = customers.filter((customer: any) => {
     const matchesSearch =
       !searchText ||
@@ -514,7 +515,6 @@ const CustomersPage = () => {
     return matchesSearch && matchesStatus;
   });
 
-  // Sort customers
   const sortedCustomers = [...filteredCustomers].sort((a: any, b: any) => {
     if (
       a.accountVerificationStatus === CustomerVerificationStatus.PENDING &&
@@ -531,7 +531,6 @@ const CustomersPage = () => {
     return 0;
   });
 
-  // Count stats
   const pendingCount = customers.filter(
     (customer: any) =>
       customer.accountVerificationStatus === CustomerVerificationStatus.PENDING
@@ -567,7 +566,6 @@ const CustomersPage = () => {
   return (
     <Box sx={{ backgroundColor: "#fafafa", minHeight: "100vh", pb: 4 }}>
       <Box sx={{ maxWidth: "1400px", mx: "auto", px: 3, pt: 3 }}>
-        {/* Header Section */}
         <Box sx={{ mb: 4 }}>
           <Stack
             direction="row"
@@ -580,7 +578,6 @@ const CustomersPage = () => {
             </Box>
           </Stack>
 
-          {/* Stats Cards */}
           <Grid container spacing={3} sx={{ mb: 3 }}>
             <Grid size={{ xs: 12, sm: 6, md: 3 }}>
               <Card
@@ -798,8 +795,6 @@ const CustomersPage = () => {
               </Card>
             </Grid>
           </Grid>
-
-          {/* Filters and Search Section */}
           <Paper
             elevation={0}
             sx={{
@@ -901,7 +896,6 @@ const CustomersPage = () => {
           </Paper>
         </Box>
 
-        {/* Alerts */}
         {error && (
           <Alert
             severity="error"
@@ -933,8 +927,6 @@ const CustomersPage = () => {
             </Box>
           </Alert>
         )}
-
-        {/* Customers Table */}
         <Card
           elevation={0}
           sx={{
@@ -954,7 +946,6 @@ const CustomersPage = () => {
           />
         </Card>
 
-        {/* Action Menu */}
         <Menu
           anchorEl={anchorEl}
           open={Boolean(anchorEl)}
@@ -1017,8 +1008,6 @@ const CustomersPage = () => {
             <Typography variant="body2">Delete Customer</Typography>
           </MenuItem>
         </Menu>
-
-        {/* Dialogs */}
         <Dialog
           open={approveDialogOpen}
           onClose={() => setApproveDialogOpen(false)}
@@ -1287,8 +1276,6 @@ const CustomersPage = () => {
             </Button>
           </DialogActions>
         </Dialog>
-
-        {/* Snackbar */}
         <Snackbar
           open={snackbar.open}
           autoHideDuration={6000}

@@ -319,9 +319,15 @@ const InvoiceListPage: React.FC = () => {
   const fetchCustomers = async () => {
     try {
       setLoading(true);
-      const response = await getAllCustomers();
-      if (response?.data) {
+      const response: any = await getAllCustomers();
+      if (response?.data?.businesses) {
+        setCustomers(response.data.businesses);
+      } else if (Array.isArray(response?.data)) {
         setCustomers(response.data);
+      } else if (Array.isArray(response)) {
+        setCustomers(response);
+      } else {
+        setCustomers([]);
       }
     } catch (error) {
       console.error("Failed to fetch customers:", error);

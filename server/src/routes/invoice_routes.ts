@@ -21,5 +21,7 @@ router.get(
     authorize(UserRole.SALES),
     InvoiceController.getInvoiceExpandedDetails
 );
+router.patch("/:id/paid", authorize(UserRole.SALES), InvoiceController.markAsPaid);
+router.patch("/:id/cancel", authorize(UserRole.SALES), InvoiceController.cancelInvoice);
 
 export default router;

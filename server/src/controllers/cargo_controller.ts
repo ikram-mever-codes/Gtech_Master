@@ -4,7 +4,114 @@ import { Cargo } from "../models/cargos";
 import { CargoOrder } from "../models/cargo_orders";
 import { Order } from "../models/orders";
 import { OrderItem } from "../models/order_items";
+import { Invoice, InvoiceItem } from "../models/invoice";
+import { Customer } from "../models/customers";
 import { Like } from "typeorm";
+
+const generateInvoicesForOrders = async (orderIds: number[]) => {
+    if (!orderIds || orderIds.length === 0) return;
+    try {
+        const orderRepo = AppDataSource.getRepository(Order);
+        const orderItemRepo = AppDataSource.getRepository(OrderItem);
+        const invoiceRepo = AppDataSource.getRepository(Invoice);
+        const invoiceItemRepo = AppDataSource.getRepository(InvoiceItem);
+        const customerRepo = AppDataSource.getRepository(Customer);
+
+        for (const orderId of orderIds) {
+            const order = await orderRepo.findOne({ where: { id: orderId } });
+            if (!order) {
+                console.warn(`[Invoice] Order ${orderId} not found, skipping.`);
+                continue;
+            }
+
+            // Delete existing invoice for this order_no to regenerate fresh
+            const existingInvoice = await invoiceRepo.findOne({ where: { orderNumber: order.order_no } });
+            if (existingInvoice) {
+                await invoiceItemRepo.delete({ invoice: { id: existingInvoice.id } });
+                await invoiceRepo.remove(existingInvoice);
+            }
+
+            let customer = null;
+            if (order.customer_id) {
+                customer = await customerRepo.findOne({ where: { id: order.customer_id as string } });
+            }
+            if (!customer) {
+                console.warn(`[Invoice] Order ${order.order_no} has no customer (customer_id=${order.customer_id}), skipping invoice generation.`);
+                continue;
+            }
+
+            const orderItems = await orderItemRepo.find({
+                where: { order_id: order.id },
+                relations: ["item", "item.taric"]
+            });
+
+            if (orderItems.length === 0) {
+                console.warn(`[Invoice] Order ${order.order_no} has no items, skipping.`);
+                continue;
+            }
+
+            let netTotal = 0;
+            let taxAmount = 0;
+            let grossTotal = 0;
+
+            // First save the invoice without items
+            const invoice = invoiceRepo.create({
+                invoiceNumber: `INV-${Date.now().toString().slice(-6)}-${order.id}`,
+                orderNumber: order.order_no,
+                invoiceDate: new Date(),
+                deliveryDate: new Date(),
+                netTotal: 0,
+                taxAmount: 0,
+                grossTotal: 0,
+                paidAmount: 0,
+                outstandingAmount: 0,
+                paymentMethod: "Bank Transfer",
+                shippingMethod: "Standard",
+                customer: customer,
+                status: "draft",
+            });
+            const savedInvoice = await invoiceRepo.save(invoice);
+
+            const invoiceItemEntities: InvoiceItem[] = [];
+            for (const oi of orderItems) {
+                const quantity = oi.qty || 1;
+                const unitPrice = oi.price || oi.rmb_special_price || 0;
+                const netPrice = quantity * unitPrice;
+                const itemTaxRate = oi.item?.taric?.duty_rate ? Number(oi.item.taric.duty_rate) : 19;
+                const itemTax = (netPrice * itemTaxRate) / 100;
+                const grossPrice = netPrice + itemTax;
+                netTotal += netPrice;
+                taxAmount += itemTax;
+                grossTotal += grossPrice;
+
+                const invItem = invoiceItemRepo.create({
+                    quantity,
+                    articleNumber: oi.item?.ean?.toString() || oi.item?.model || oi.item?.ItemID_DE?.toString() || "Unknown",
+                    description: oi.item?.item_name || "Unknown Item",
+                    unitPrice,
+                    netPrice,
+                    taxRate: itemTaxRate,
+                    taxAmount: itemTax,
+                    grossPrice,
+                    invoice: savedInvoice,
+                });
+                invoiceItemEntities.push(invItem);
+            }
+            await invoiceItemRepo.save(invoiceItemEntities);
+
+            // Update totals on the invoice
+            savedInvoice.netTotal = netTotal;
+            savedInvoice.taxAmount = taxAmount;
+            savedInvoice.grossTotal = grossTotal;
+            savedInvoice.outstandingAmount = grossTotal;
+            await invoiceRepo.save(savedInvoice);
+
+            console.log(`[Invoice] Created invoice ${savedInvoice.invoiceNumber} for order ${order.order_no}`);
+        }
+    } catch (e) {
+        console.error("Failed to generate invoices for orders", e);
+    }
+};
 
 export const getAllCargos = async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -110,6 +217,7 @@ export const createCargo = async (req: Request, res: Response, next: NextFunctio
                 })
             );
             await cargoOrderRepo.save(cargoOrderEntries);
+            await generateInvoicesForOrders(orders);
         }
 
         res.status(201).json({
@@ -157,6 +265,7 @@ export const updateCargo = async (req: Request, res: Response, next: NextFunctio
                     })
                 );
                 await cargoOrderRepo.save(cargoOrderEntries);
+                await generateInvoicesForOrders(orders);
             }
         }
 
@@ -207,8 +316,9 @@ export const assignOrdersToCargo = async (req: Request, res: Response, next: Nex
         const { id } = req.params;
         const { orderIds } = req.body;
 
-        if (!Array.isArray(orderIds) || orderIds.length === 0) {
-            res.status(400).json({ success: false, message: "orderIds array is required" });
+        const validOrderIds = (orderIds as any[]).filter(id => Boolean(id) && !isNaN(Number(id))).map(id => Number(id));
+        if (validOrderIds.length === 0) {
+            res.status(400).json({ success: false, message: "No valid orderIds provided" });
             return;
         }
 
@@ -237,12 +347,24 @@ export const assignOrdersToCargo = async (req: Request, res: Response, next: Nex
             await cargoOrderRepo.save(newEntries);
         }
 
+        const orderItemRepo = AppDataSource.getRepository(OrderItem);
+        if (validOrderIds.length > 0) {
+            await orderItemRepo
+                .createQueryBuilder()
+                .update(OrderItem)
+                .set({ cargo_id: cargo.id })
+                .where("order_id IN (:...validOrderIds)", { validOrderIds })
+                .execute();
+        }
+
+        await generateInvoicesForOrders(validOrderIds);
+
         res.status(200).json({
             success: true,
             message: `Assigned ${newEntries.length} order(s) to cargo`,
         });
         return;
-    } catch (error) {
+    } catch (error: any) {
         return next(error);
     }
 };
@@ -282,7 +404,6 @@ export const getCargoOrders = async (req: Request, res: Response, next: NextFunc
             relations: ["order"],
         });
 
-        // Get order items for these orders
         const orderIds = cargoOrders.map((co) => co.order_id);
         let orderItems: any[] = [];
         if (orderIds.length > 0) {

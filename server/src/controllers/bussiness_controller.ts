@@ -256,8 +256,8 @@ export const bulkImportBusinesses = async (
         customer.email = businessData.email
           ? businessData.email.trim().toLowerCase()
           : `${companyNameFirstWord
-              .toLowerCase()
-              .replace(/[^a-z0-9]/g, ".")}@imported.business`;
+            .toLowerCase()
+            .replace(/[^a-z0-9]/g, ".")}@imported.business`;
         customer.stage = "business";
         customer.contactEmail = businessData.contactEmail
           ? businessData.contactEmail.trim().toLowerCase()
@@ -265,8 +265,8 @@ export const bulkImportBusinesses = async (
         customer.contactPhoneNumber = businessData.contactPhoneNumber
           ? businessData.contactPhoneNumber.trim()
           : businessData.phoneNumber
-          ? businessData.phoneNumber.trim()
-          : "";
+            ? businessData.phoneNumber.trim()
+            : "";
 
         // Optional fields for Customer
         customer.avatar = businessData.avatar
@@ -389,8 +389,7 @@ export const bulkImportBusinesses = async (
         for (let i = 0; i < customersToSave.length; i += CHUNK_SIZE) {
           const chunk = customersToSave.slice(i, i + CHUNK_SIZE);
           console.log(
-            `Saving chunk ${Math.floor(i / CHUNK_SIZE) + 1} with ${
-              chunk.length
+            `Saving chunk ${Math.floor(i / CHUNK_SIZE) + 1} with ${chunk.length
             } businesses`
           );
 
@@ -398,7 +397,6 @@ export const bulkImportBusinesses = async (
             const savedChunk = await customerRepository.save(chunk);
             savedCustomers.push(...savedChunk);
 
-            // Add saved businesses to results
             savedChunk.forEach((customer) => {
               results.importedBusinesses.push({
                 id: customer.id,
@@ -523,12 +521,9 @@ export const createBusiness = async (
 ) => {
   try {
     const {
-      // Names from frontend - PROPER MAPPING
-      displayName, // Frontend display name -> maps to DB companyName (what customers see)
-      companyName, // Frontend legal name -> maps to DB legalName (legal registered name)
-      name, // Legacy support
-
-      // Address fields
+      displayName,
+      companyName,
+      name,
       address,
       website,
       description,
@@ -538,14 +533,10 @@ export const createBusiness = async (
       postalCode,
       latitude,
       longitude,
-
-      // Contact fields
       phoneNumber,
       email,
       contactEmail,
       contactPhoneNumber,
-
-      // Business metadata
       googleMapsUrl,
       reviewCount,
       category,
@@ -554,23 +545,16 @@ export const createBusiness = async (
       source = BUSINESS_SOURCE.MANUAL,
       isDeviceMaker,
       starBusinessDetails,
-
-      // Star Customer specific fields
       isStarCustomer,
       starCustomerEmail,
     } = req.body;
 
-    // Get current user from request
     const user = (req as any).user;
 
-    // FIELD MAPPING: Frontend to Database
-    // displayName (frontend) -> companyName (DB) - this is what customers see
-    const dbCompanyName = displayName || name; // fallback to name for backward compatibility
-    // companyName (frontend) -> legalName (DB) - this is the legal registered name
+    const dbCompanyName = displayName || name;
     const dbLegalName = companyName;
     const finalEmail = email;
 
-    // Required field validation
     if (!dbCompanyName) {
       return next(new ErrorHandler("Business display name is required", 400));
     }
@@ -600,7 +584,6 @@ export const createBusiness = async (
       );
     }
 
-    // Star Customer validation
     if (isStarCustomer && isDeviceMaker !== "Yes") {
       return next(
         new ErrorHandler(
@@ -625,10 +608,8 @@ export const createBusiness = async (
       AppDataSource.getRepository(StarCustomerDetails);
     const listRepository = AppDataSource.getRepository(List);
 
-    // Normalize website for comparison
     const normalizedWebsite = website ? normalizeWebsite(website) : null;
 
-    // Check for duplicate website
     if (normalizedWebsite) {
       const existingBusinessWithWebsite = await businessDetailsRepository
         .createQueryBuilder("businessDetails")
@@ -645,7 +626,6 @@ export const createBusiness = async (
       }
     }
 
-    // Check for duplicate display name (stored in companyName field)
     const trimmedDisplayName = dbCompanyName.trim();
     const existingCustomerWithName = await customerRepository
       .createQueryBuilder("customer")
@@ -663,7 +643,6 @@ export const createBusiness = async (
       );
     }
 
-    // Check for duplicate email
     const emailToCheck = isStarCustomer ? starCustomerEmail : finalEmail;
     if (emailToCheck) {
       const existingCustomerWithEmail = await customerRepository.findOne({
@@ -677,30 +656,21 @@ export const createBusiness = async (
       }
     }
 
-    // AUTOMATIC STAGE DETERMINATION LOGIC
-    // Check if conditions are met for automatic star_business stage
     const shouldBeStarBusiness =
       isDeviceMaker === "Yes" &&
       starBusinessDetails?.inSeries === true &&
       starBusinessDetails?.madeIn;
-
-    // Use transaction to ensure all entities are created together
     const result = await AppDataSource.transaction(
       async (transactionalEntityManager) => {
-        // Create Customer entity with PROPER FIELD MAPPING
         const customer = new Customer();
-        // IMPORTANT: displayName from frontend goes to companyName in DB
         customer.companyName = trimmedDisplayName;
-        // IMPORTANT: companyName from frontend goes to legalName in DB
         customer.legalName = dbLegalName ? dbLegalName.trim() : undefined;
 
-        // Set customer stage and email - UPDATED LOGIC
         if (isStarCustomer) {
           customer.stage = "star_customer";
           customer.email = starCustomerEmail.trim().toLowerCase();
           customer.contactEmail = starCustomerEmail.trim().toLowerCase();
         } else if (shouldBeStarBusiness) {
-          // AUTOMATIC PROMOTION TO STAR BUSINESS
           customer.stage = "star_business";
           customer.email = finalEmail
             ? finalEmail.trim().toLowerCase()
@@ -708,8 +678,8 @@ export const createBusiness = async (
           customer.contactEmail = contactEmail
             ? contactEmail.trim().toLowerCase()
             : finalEmail
-            ? finalEmail.trim().toLowerCase()
-            : undefined;
+              ? finalEmail.trim().toLowerCase()
+              : undefined;
         } else if (isDeviceMaker === "Yes") {
           customer.stage = "star_business";
           customer.email = finalEmail
@@ -718,8 +688,8 @@ export const createBusiness = async (
           customer.contactEmail = contactEmail
             ? contactEmail.trim().toLowerCase()
             : finalEmail
-            ? finalEmail.trim().toLowerCase()
-            : undefined;
+              ? finalEmail.trim().toLowerCase()
+              : undefined;
         } else {
           customer.stage = "business";
           customer.email = finalEmail
@@ -728,23 +698,20 @@ export const createBusiness = async (
           customer.contactEmail = contactEmail
             ? contactEmail.trim().toLowerCase()
             : finalEmail
-            ? finalEmail.trim().toLowerCase()
-            : undefined;
+              ? finalEmail.trim().toLowerCase()
+              : undefined;
         }
 
         customer.contactPhoneNumber = contactPhoneNumber
           ? contactPhoneNumber.trim()
           : phoneNumber
-          ? phoneNumber.trim()
-          : undefined;
+            ? phoneNumber.trim()
+            : undefined;
 
-        // Save customer first
         const savedCustomer = await transactionalEntityManager.save(
           Customer,
           customer
         );
-
-        // Create BusinessDetails
         const businessDetails = new BusinessDetails();
         businessDetails.businessSource = source as any;
         businessDetails.isDeviceMaker = isDeviceMaker as
@@ -804,18 +771,15 @@ export const createBusiness = async (
           savedCustomer.starBusinessDetails = savedStarBusiness;
         }
 
-        // Create StarCustomerDetails if this is a star customer
         let tempPassword: string | undefined;
         let defaultList: any;
 
         if (isStarCustomer) {
           const starCustomer = new StarCustomerDetails();
 
-          // Generate temporary password
           tempPassword = generateTempPassword();
           starCustomer.password = await bcrypt.hash(tempPassword, 10);
 
-          // Set delivery address from business details
           starCustomer.deliveryPostalCode = businessDetails.postalCode || "";
           starCustomer.deliveryCity = businessDetails.city || "";
           starCustomer.deliveryCountry = businessDetails.country || "Germany";
@@ -829,7 +793,6 @@ export const createBusiness = async (
 
           savedCustomer.starCustomerDetails = savedStarCustomer;
 
-          // Create default list for star customer
           defaultList = new List();
           defaultList.name = `Default`;
           defaultList.description = `Default list for ${savedCustomer.companyName}`;
@@ -842,7 +805,6 @@ export const createBusiness = async (
           );
         }
 
-        // Update customer with relationships
         savedCustomer.businessDetails = savedBusinessDetails;
         await transactionalEntityManager.save(Customer, savedCustomer);
 
@@ -851,14 +813,13 @@ export const createBusiness = async (
           businessDetails: savedBusinessDetails,
           tempPassword,
           defaultList,
-          shouldBeStarBusiness, // Return this flag for response message
+          shouldBeStarBusiness,
         };
       }
     );
 
     const { customer, businessDetails, tempPassword, defaultList } = result;
 
-    // Send email if this is a star customer - USING ALISHA'S PROPOSED TEXT
     if (isStarCustomer && tempPassword) {
       const loginLink = `${process.env.STAR_URL}/login`;
       const portalLink = "https://stars.gtech.de/potis";
@@ -876,10 +837,9 @@ export const createBusiness = async (
         <p><strong>Email:</strong> ${customer.email}</p>
         <p><strong>Temporary Password:</strong> ${tempPassword}</p>
         <p>Please login <a href="${loginLink}">here</a> to access your full account features.</p>
-        ${
-          defaultList
-            ? `<p>A default list "${defaultList.name}" has been created for your company.</p>`
-            : ""
+        ${defaultList
+          ? `<p>A default list "${defaultList.name}" has been created for your company.</p>`
+          : ""
         }
       `;
 
@@ -890,7 +850,6 @@ export const createBusiness = async (
       });
     }
 
-    // Fetch complete customer with all relations
     const finalCustomer = await customerRepository.findOne({
       where: { id: customer.id },
       relations: [
@@ -905,48 +864,40 @@ export const createBusiness = async (
       return next(new ErrorHandler("Business not found after creation", 404));
     }
 
-    // RETURN RESPONSE WITH PROPER FIELD MAPPING
     const businessResponse = {
       id: finalCustomer.id,
-      // IMPORTANT: Map DB fields back to frontend expected fields
-      displayName: finalCustomer.companyName, // DB companyName -> Frontend displayName
-      companyName: finalCustomer.legalName, // DB legalName -> Frontend companyName
-      // Legacy field support
-      name: finalCustomer.companyName, // For backward compatibility
-      legalName: finalCustomer.legalName, // Direct mapping
-      // Contact information
+      displayName: finalCustomer.companyName,
+      companyName: finalCustomer.legalName,
+      name: finalCustomer.companyName,
+      legalName: finalCustomer.legalName,
       email: finalCustomer.email,
       contactEmail: finalCustomer.contactEmail,
       contactPhoneNumber: finalCustomer.contactPhoneNumber,
       stage: finalCustomer.stage,
-      // Business details
       ...finalCustomer.businessDetails,
-      // Star business details if present
       starBusinessDetails: finalCustomer.starBusinessDetails
         ? {
-            inSeries: finalCustomer.starBusinessDetails.inSeries,
-            madeIn: finalCustomer.starBusinessDetails.madeIn,
-            device: finalCustomer.starBusinessDetails.device,
-            industry: finalCustomer.starBusinessDetails.industry,
-            converted_timestamp:
-              finalCustomer.starBusinessDetails.converted_timestamp,
-            convertedBy: finalCustomer.starBusinessDetails.convertedBy
-              ? {
-                  id: finalCustomer.starBusinessDetails.convertedBy.id,
-                  name: finalCustomer.starBusinessDetails.convertedBy.name,
-                  email: finalCustomer.starBusinessDetails.convertedBy.email,
-                }
-              : undefined,
-          }
+          inSeries: finalCustomer.starBusinessDetails.inSeries,
+          madeIn: finalCustomer.starBusinessDetails.madeIn,
+          device: finalCustomer.starBusinessDetails.device,
+          industry: finalCustomer.starBusinessDetails.industry,
+          converted_timestamp:
+            finalCustomer.starBusinessDetails.converted_timestamp,
+          convertedBy: finalCustomer.starBusinessDetails.convertedBy
+            ? {
+              id: finalCustomer.starBusinessDetails.convertedBy.id,
+              name: finalCustomer.starBusinessDetails.convertedBy.name,
+              email: finalCustomer.starBusinessDetails.convertedBy.email,
+            }
+            : undefined,
+        }
         : undefined,
-      // Default list if created
       defaultList: defaultList
         ? {
-            id: defaultList.id,
-            name: defaultList.name,
-          }
+          id: defaultList.id,
+          name: defaultList.name,
+        }
         : undefined,
-      // Backward compatibility fields
       website: finalCustomer.businessDetails?.website,
       hasWebsite: !!finalCustomer.businessDetails?.website,
       phoneNumber: finalCustomer.businessDetails?.contactPhone,
@@ -1018,7 +969,6 @@ export const updateBusiness = async (
       AppDataSource.getRepository(StarCustomerDetails);
     const listRepository = AppDataSource.getRepository(List);
 
-    // Fetch existing customer with all relations
     const customer = await customerRepository.findOne({
       where: { id },
       relations: [
@@ -1034,24 +984,17 @@ export const updateBusiness = async (
       return next(new ErrorHandler("Business not found", 404));
     }
 
-    // Check if device maker status is changing
     const currentIsDeviceMaker = customer.businessDetails?.isDeviceMaker;
     const isDeviceMakerChanged =
       isDeviceMaker !== undefined && isDeviceMaker !== currentIsDeviceMaker;
-
-    // Check if star customer status is changing
     const currentIsStarCustomer = !!customer.starCustomerDetails;
     const isStarCustomerChanged =
       isStarCustomer !== undefined && isStarCustomer !== currentIsStarCustomer;
 
-    // AUTOMATIC STAGE DETERMINATION LOGIC FOR UPDATE
-    // Check if conditions are met for automatic star_business stage
     const shouldBeStarBusiness =
       (isDeviceMaker === "Yes" || currentIsDeviceMaker === "Yes") &&
       starBusinessDetails?.inSeries === true &&
       starBusinessDetails?.madeIn;
-
-    // Validate star customer requirements
     if (
       isStarCustomer &&
       isDeviceMaker !== "Yes" &&
@@ -1071,7 +1014,6 @@ export const updateBusiness = async (
       );
     }
 
-    // Check for duplicate email if updating
     const emailToCheck = isStarCustomer ? starCustomerEmail : updateData.email;
     if (emailToCheck && emailToCheck !== customer.email) {
       const existingCustomer = await customerRepository.findOne({
@@ -1085,16 +1027,12 @@ export const updateBusiness = async (
       }
     }
 
-    // Update in transaction
     const result = await AppDataSource.transaction(
       async (transactionalEntityManager) => {
-        // Update Customer entity with PROPER FIELD MAPPING
         if (displayName !== undefined) {
-          // IMPORTANT: displayName from frontend goes to companyName in DB
           customer.companyName = displayName.trim();
         }
         if (name !== undefined) {
-          // IMPORTANT: companyName from frontend goes to legalName in DB
           customer.legalName = name.trim();
         }
         if (contactEmail !== undefined) {
@@ -1104,11 +1042,9 @@ export const updateBusiness = async (
           customer.contactPhoneNumber = contactPhoneNumber.trim();
         }
 
-        // Update BusinessDetails
         if (customer.businessDetails) {
           const businessDetails = customer.businessDetails;
 
-          // Update fields from updateData
           if (updateData.address !== undefined)
             businessDetails.address = updateData.address.trim();
           if (updateData.website !== undefined) {
@@ -1296,10 +1232,9 @@ export const updateBusiness = async (
         <p><strong>Email:</strong> ${customer.email}</p>
         <p><strong>Temporary Password:</strong> ${tempPassword}</p>
         <p>Please login <a href="${loginLink}">here</a> to access your full account features and change your password.</p>
-        ${
-          defaultList
-            ? `<p>A default list "${defaultList.name}" has been created for your company.</p>`
-            : ""
+        ${defaultList
+          ? `<p>A default list "${defaultList.name}" has been created for your company.</p>`
+          : ""
         }
       `;
 
@@ -1340,36 +1275,36 @@ export const updateBusiness = async (
       ...finalCustomer.businessDetails,
       check_by: finalCustomer.businessDetails?.check_by
         ? {
-            id: finalCustomer.businessDetails.check_by.id,
-            name: finalCustomer.businessDetails.check_by.name,
-            email: finalCustomer.businessDetails.check_by.email,
-          }
+          id: finalCustomer.businessDetails.check_by.id,
+          name: finalCustomer.businessDetails.check_by.name,
+          email: finalCustomer.businessDetails.check_by.email,
+        }
         : undefined,
       starBusinessDetails: finalCustomer.starBusinessDetails
         ? {
-            inSeries: finalCustomer.starBusinessDetails.inSeries,
-            madeIn: finalCustomer.starBusinessDetails.madeIn,
-            lastChecked: finalCustomer.starBusinessDetails.lastChecked,
-            checkedBy: finalCustomer.starBusinessDetails.checkedBy,
-            device: finalCustomer.starBusinessDetails.device,
-            industry: finalCustomer.starBusinessDetails.industry,
-            converted_timestamp:
-              finalCustomer.starBusinessDetails.converted_timestamp,
-            convertedBy: finalCustomer.starBusinessDetails.convertedBy
-              ? {
-                  id: finalCustomer.starBusinessDetails.convertedBy.id,
-                  name: finalCustomer.starBusinessDetails.convertedBy.name,
-                  email: finalCustomer.starBusinessDetails.convertedBy.email,
-                }
-              : undefined,
-          }
+          inSeries: finalCustomer.starBusinessDetails.inSeries,
+          madeIn: finalCustomer.starBusinessDetails.madeIn,
+          lastChecked: finalCustomer.starBusinessDetails.lastChecked,
+          checkedBy: finalCustomer.starBusinessDetails.checkedBy,
+          device: finalCustomer.starBusinessDetails.device,
+          industry: finalCustomer.starBusinessDetails.industry,
+          converted_timestamp:
+            finalCustomer.starBusinessDetails.converted_timestamp,
+          convertedBy: finalCustomer.starBusinessDetails.convertedBy
+            ? {
+              id: finalCustomer.starBusinessDetails.convertedBy.id,
+              name: finalCustomer.starBusinessDetails.convertedBy.name,
+              email: finalCustomer.starBusinessDetails.convertedBy.email,
+            }
+            : undefined,
+        }
         : undefined,
       // Include default list if just created
       defaultList: defaultList
         ? {
-            id: defaultList.id,
-            name: defaultList.name,
-          }
+          id: defaultList.id,
+          name: defaultList.name,
+        }
         : undefined,
       // Backward compatibility fields
       website: finalCustomer.businessDetails?.website,
@@ -1453,55 +1388,55 @@ export const getBusinessById = async (
       stage: customer.stage,
       businessDetails: customer.businessDetails
         ? {
-            ...customer.businessDetails,
-            // Include check_by user details if present
-            check_by: customer.businessDetails.check_by
-              ? {
-                  id: customer.businessDetails.check_by.id,
-                  name: customer.businessDetails.check_by.name,
-                  email: customer.businessDetails.check_by.email,
-                }
-              : undefined,
-          }
+          ...customer.businessDetails,
+          // Include check_by user details if present
+          check_by: customer.businessDetails.check_by
+            ? {
+              id: customer.businessDetails.check_by.id,
+              name: customer.businessDetails.check_by.name,
+              email: customer.businessDetails.check_by.email,
+            }
+            : undefined,
+        }
         : undefined,
       starBusinessDetails: customer.starBusinessDetails
         ? {
-            id: customer.starBusinessDetails.id,
-            inSeries: customer.starBusinessDetails.inSeries,
-            madeIn: customer.starBusinessDetails.madeIn,
-            lastChecked: customer.starBusinessDetails.lastChecked,
-            checkedBy: customer.starBusinessDetails.checkedBy,
-            device: customer.starBusinessDetails.device,
-            industry: customer.starBusinessDetails.industry,
-            converted_timestamp:
-              customer.starBusinessDetails.converted_timestamp,
-            convertedBy: customer.starBusinessDetails.convertedBy
-              ? {
-                  id: customer.starBusinessDetails.convertedBy.id,
-                  name: customer.starBusinessDetails.convertedBy.name,
-                  email: customer.starBusinessDetails.convertedBy.email,
-                }
-              : undefined,
-            comment: customer.starBusinessDetails.comment,
-            createdAt: customer.starBusinessDetails.createdAt,
-            updatedAt: customer.starBusinessDetails.updatedAt,
-          }
+          id: customer.starBusinessDetails.id,
+          inSeries: customer.starBusinessDetails.inSeries,
+          madeIn: customer.starBusinessDetails.madeIn,
+          lastChecked: customer.starBusinessDetails.lastChecked,
+          checkedBy: customer.starBusinessDetails.checkedBy,
+          device: customer.starBusinessDetails.device,
+          industry: customer.starBusinessDetails.industry,
+          converted_timestamp:
+            customer.starBusinessDetails.converted_timestamp,
+          convertedBy: customer.starBusinessDetails.convertedBy
+            ? {
+              id: customer.starBusinessDetails.convertedBy.id,
+              name: customer.starBusinessDetails.convertedBy.name,
+              email: customer.starBusinessDetails.convertedBy.email,
+            }
+            : undefined,
+          comment: customer.starBusinessDetails.comment,
+          createdAt: customer.starBusinessDetails.createdAt,
+          updatedAt: customer.starBusinessDetails.updatedAt,
+        }
         : undefined,
       starCustomerDetails: customer.starCustomerDetails
         ? {
-            id: customer.starCustomerDetails.id,
-            taxNumber: customer.starCustomerDetails.taxNumber,
-            accountVerificationStatus:
-              customer.starCustomerDetails.accountVerificationStatus,
-            isEmailVerified: customer.starCustomerDetails.isEmailVerified,
-            deliveryAddressLine1:
-              customer.starCustomerDetails.deliveryAddressLine1,
-            deliveryPostalCode: customer.starCustomerDetails.deliveryPostalCode,
-            deliveryCity: customer.starCustomerDetails.deliveryCity,
-            deliveryCountry: customer.starCustomerDetails.deliveryCountry,
-            createdAt: customer.starCustomerDetails.createdAt,
-            updatedAt: customer.starCustomerDetails.updatedAt,
-          }
+          id: customer.starCustomerDetails.id,
+          taxNumber: customer.starCustomerDetails.taxNumber,
+          accountVerificationStatus:
+            customer.starCustomerDetails.accountVerificationStatus,
+          isEmailVerified: customer.starCustomerDetails.isEmailVerified,
+          deliveryAddressLine1:
+            customer.starCustomerDetails.deliveryAddressLine1,
+          deliveryPostalCode: customer.starCustomerDetails.deliveryPostalCode,
+          deliveryCity: customer.starCustomerDetails.deliveryCity,
+          deliveryCountry: customer.starCustomerDetails.deliveryCountry,
+          createdAt: customer.starCustomerDetails.createdAt,
+          updatedAt: customer.starCustomerDetails.updatedAt,
+        }
         : undefined,
       // Backward compatibility fields
       website: customer.businessDetails?.website,
@@ -1702,6 +1637,7 @@ export const getAllBusinesses = async (
       success: true,
       data: {
         businesses,
+        customers: businesses,
         pagination: {
           page: pageNum,
           limit: limitNum,

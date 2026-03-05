@@ -118,7 +118,6 @@ const allMenuItems = [
     path: "/offers",
     resource: "Offers",
   },
-
   // {
   //   icon: LibraryAdd,
   //   text: "Library",
@@ -302,8 +301,6 @@ const Sidebar = () => {
         }}
       >
         <Divider sx={{ borderColor: "divider", mb: 2 }} />
-
-        {/* Scroll Up Button - Only shows when needed */}
         <Fade in={isMounted && hasOverflow && showScrollUp}>
           <Box
             suppressHydrationWarning
@@ -456,10 +453,7 @@ const Sidebar = () => {
             </IconButton>
           </Box>
         </Fade>
-
         <Divider sx={{ borderColor: "divider", my: 2 }} />
-
-        {/* If admin, show a section with user role info */}
         {user?.role && !isCollapsed && (
           <Box sx={{ px: 3, mb: 2 }}>
             <Box

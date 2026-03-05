@@ -726,4 +726,36 @@ export class InvoiceController {
       return next(error);
     }
   };
+
+  static markAsPaid = async (req: Request, res: Response, next: NextFunction) => {
+    const invoiceRepository = AppDataSource.getRepository(Invoice);
+    try {
+      const { id } = req.params;
+      const invoice = await invoiceRepository.findOne({ where: { id } });
+      if (!invoice) return res.status(404).json({ message: "Invoice not found" });
+      (invoice as any).status = "paid";
+      invoice.paidAmount = invoice.grossTotal;
+      invoice.outstandingAmount = 0;
+      (invoice as any).closedAt = new Date();
+      await invoiceRepository.save(invoice);
+      return res.json({ success: true, message: "Invoice marked as paid" });
+    } catch (error) {
+      return next(error);
+    }
+  };
+
+  static cancelInvoice = async (req: Request, res: Response, next: NextFunction) => {
+    const invoiceRepository = AppDataSource.getRepository(Invoice);
+    try {
+      const { id } = req.params;
+      const invoice = await invoiceRepository.findOne({ where: { id } });
+      if (!invoice) return res.status(404).json({ message: "Invoice not found" });
+      (invoice as any).status = "cancelled";
+      (invoice as any).closedAt = new Date();
+      await invoiceRepository.save(invoice);
+      return res.json({ success: true, message: "Invoice cancelled" });
+    } catch (error) {
+      return next(error);
+    }
+  };
 }
