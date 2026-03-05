@@ -6,21 +6,29 @@ import { initializeDatabase } from "./config/database";
 import { getConnection } from "./config/misDb";
 import ErrorHandler from "./utils/errorHandler";
 
-const PORT = process.env.PORT || 1000;
+const PORT = process.env.PORT || 1001;
 
-(async () => {
+const startServer = async () => {
   try {
     await initializeDatabase();
 
-    app.listen(PORT, () => {
+    const server = app.listen(PORT, () => {
       console.log(`Server is running on port ${PORT}`);
       console.log(`WebSocket server is running`);
     });
+
+    server.on('error', (error: any) => {
+      console.error("Server execution error:", error);
+      process.exit(1);
+    });
+
   } catch (error) {
     console.error("Failed to start server:", error);
     process.exit(1);
   }
-})();
+};
+
+startServer();
 
 export async function fetchItemData(itemId: number) {
   const connection = await getConnection();

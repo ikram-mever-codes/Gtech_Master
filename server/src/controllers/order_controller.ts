@@ -136,12 +136,12 @@ export const createOrder = async (
   } catch (error) {
     try {
       await queryRunner.rollbackTransaction();
-    } catch {}
+    } catch { }
     return next(error);
   } finally {
     try {
       await queryRunner.release();
-    } catch {}
+    } catch { }
   }
 };
 
@@ -284,12 +284,12 @@ export const updateOrder = async (
   } catch (error) {
     try {
       await queryRunner.rollbackTransaction();
-    } catch {}
+    } catch { }
     return next(error);
   } finally {
     try {
       await queryRunner.release();
-    } catch {}
+    } catch { }
   }
 };
 
@@ -305,6 +305,7 @@ export const getAllOrders = async (
     const qb = orderRepo
       .createQueryBuilder("o")
       .leftJoinAndSelect("o.orderItems", "items")
+      .leftJoinAndSelect("items.item", "itemDetails")
       .select([
         "o.id",
         "o.order_no",
@@ -339,6 +340,11 @@ export const getAllOrders = async (
         "items.cargo_date",
         "items.price",
         "items.currency",
+        "itemDetails.id",
+        "itemDetails.item_name",
+        "itemDetails.ean",
+        "itemDetails.model",
+        "itemDetails.ItemID_DE",
       ]);
 
     if (status) qb.andWhere("o.status = :status", { status });
@@ -364,19 +370,6 @@ export const getAllOrders = async (
       })),
       orderItems: undefined, // Remove the raw orderItems property
     }));
-
-    // Log for debugging
-    mappedOrders.forEach((order) => {
-      console.log(`Order ${order.order_no}: ${order.items?.length || 0} items`);
-      if (order.items?.length > 0) {
-        console.log(`  First item:`, {
-          id: order.items[0].id,
-          ItemID_DE: order.items[0].ItemID_DE,
-          qty: order.items[0].qty,
-          itemData: order.items[0].item, // This will show all the actual item fields
-        });
-      }
-    });
 
     return res.status(200).json({
       success: true,
@@ -476,12 +469,12 @@ export const deleteOrder = async (
   } catch (error) {
     try {
       await queryRunner.rollbackTransaction();
-    } catch {}
+    } catch { }
     return next(error);
   } finally {
     try {
       await queryRunner.release();
-    } catch {}
+    } catch { }
   }
 };
 
