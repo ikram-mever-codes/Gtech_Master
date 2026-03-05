@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Select from "react-select";
 import {
   ArrowPathIcon,
@@ -124,10 +125,10 @@ type OrdersTableProps = {
   onEdit: (o: any) => void;
   onDelete: (id: string | number) => void;
   canDelete: boolean;
-
   showConvert: boolean;
   onConvert: (o: any) => void;
   onReassign: (o: any) => void;
+  onGoToItems: (orderNo: string) => void;
   activeTab: string;
   itemById: Map<string, Item>;
 };
@@ -249,6 +250,7 @@ function OrdersTable({
   canDelete,
   onConvert,
   onReassign,
+  onGoToItems,
   activeTab,
   itemById,
 }: OrdersTableProps) {
@@ -423,8 +425,9 @@ function OrdersTable({
       width: "90px",
       render: (row) => (
         <button
-          onClick={() => onView(row)}
+          onClick={() => onGoToItems(String(row.order_no))}
           className="text-green-600 hover:underline font-semibold whitespace-nowrap"
+          title="Click to see all items in this order"
         >
           {row.order_no}
         </button>
@@ -661,8 +664,15 @@ function OrdersTable({
 const OrderPage = () => {
   const { user } = useSelector((state: RootState) => state.user);
 
-  const [activeTab, setActiveTab] =
-    useState<(typeof tabs)[number]["id"]>("orders");
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const [activeTab, setActiveTab] = useState<(typeof tabs)[number]["id"]>(
+    () => (searchParams.get("tab") as any) || "orders"
+  );
+  const [orderNoFilter, setOrderNoFilter] = useState<string>(
+    () => searchParams.get("order_no") || ""
+  );
   const activeTabObj = tabs.find((t) => t.id === activeTab);
 
   const [orders, setOrders] = useState<Order[]>([]);
@@ -1018,14 +1028,24 @@ const OrderPage = () => {
   const handleReassignItemAction = async () => {
     if (!selectedItem || !targetCargoId) return;
     try {
+      // Get the order_id for the selected item
+      const orderId = selectedItem.order_id || selectedItem.parentOrder?.id;
+      if (!orderId) {
+        toast.error("Could not determine order for this item");
+        return;
+      }
+      // Update the item's cargo_id
       await updateOrderItemStatus(selectedItem.id, {
         cargo_id: Number(targetCargoId),
       });
-      toast.success("Item reassigned successfully");
+      // Call assignOrdersToCargo to trigger invoice generation
+      await assignOrdersToCargo(Number(targetCargoId), [Number(orderId)]);
+      toast.success(`Item reassigned to Cargo ${targetCargoId} — invoice generated!`);
       setShowREModal(false);
       fetchOrders();
     } catch (err) {
       console.error(err);
+      toast.error("Failed to reassign item");
     }
   };
 
@@ -1127,6 +1147,14 @@ const OrderPage = () => {
   useEffect(() => {
     fetchOrders();
   }, [fetchOrders]);
+
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (activeTab !== "orders") params.set("tab", activeTab);
+    if (orderNoFilter) params.set("order_no", orderNoFilter);
+    const qs = params.toString();
+    router.replace(qs ? `/orders?${qs}` : "/orders", { scroll: false });
+  }, [activeTab, orderNoFilter, router]);
 
   useEffect(() => {
     fetchCustomers();
@@ -1531,21 +1559,25 @@ const OrderPage = () => {
     () => orders.filter((o: any) => !!o.supplier_id),
     [orders],
   );
-  const orderItemsFlat = useMemo(
-    () =>
-      orders.flatMap((o: any) =>
-        (o.items || []).map((i: any) => ({
-          ...i,
-          order_no: o.order_no,
-          order_status: o.status,
-          item_status: i.status || "NSO",
-          supplier_id: o.supplier_id,
-          category_id: o.category_id,
-          comment: o.comment,
-        })),
-      ),
-    [orders],
-  );
+  const orderItemsFlat = useMemo(() => {
+    const allItems = orders.flatMap((o: any) =>
+      (o.items || []).map((i: any) => ({
+        ...i,
+        order_id: o.id,
+        parentOrder: o,
+        order_no: o.order_no,
+        order_status: o.status,
+        item_status: i.status || "NSO",
+        supplier_id: o.supplier_id,
+        category_id: o.category_id,
+        comment: o.comment,
+      })),
+    );
+    if (!orderNoFilter) return allItems;
+    return allItems.filter((i) =>
+      String(i.order_no).toLowerCase().includes(orderNoFilter.toLowerCase())
+    );
+  }, [orders, orderNoFilter]);
 
   const visibleOrders =
     activeTab === "orders"
@@ -2623,25 +2655,45 @@ const OrderPage = () => {
                 </div>
               </div>
             ) : (
-              <OrdersTable
-                orders={visibleOrders}
-                loading={loadingOrders}
-                getCategoryName={getCategoryName}
-                getSupplierName={getSupplierName}
-                getOrderStatusColor={getOrderStatusColor}
-                onView={openView}
-                onEdit={openEdit}
-                onDelete={handleDeleteOrder}
-                canDelete={user?.role === UserRole.ADMIN}
-                showConvert={false}
-                onConvert={openConvert}
-                onReassign={(o) => {
-                  setReassignOrder(o);
-                  setShowReassignModal(true);
-                }}
-                activeTab={activeTab}
-                itemById={itemById}
-              />
+              <>
+                {activeTab === "order_items" && orderNoFilter && (
+                  <div className="flex items-center gap-3 px-4 py-2 bg-blue-50 border-b border-blue-100">
+                    <span className="text-xs text-blue-700 font-medium">
+                      🔍 Showing items for order:&nbsp;
+                      <span className="font-bold bg-blue-100 px-1.5 py-0.5 rounded">{orderNoFilter}</span>
+                    </span>
+                    <button
+                      onClick={() => setOrderNoFilter("")}
+                      className="text-[10px] text-blue-600 hover:text-blue-800 underline font-semibold ml-1"
+                    >
+                      Clear filter (show all)
+                    </button>
+                  </div>
+                )}
+                <OrdersTable
+                  orders={visibleOrders}
+                  loading={loadingOrders}
+                  getCategoryName={getCategoryName}
+                  getSupplierName={getSupplierName}
+                  getOrderStatusColor={getOrderStatusColor}
+                  onView={openView}
+                  onEdit={openEdit}
+                  onDelete={handleDeleteOrder}
+                  canDelete={user?.role === UserRole.ADMIN}
+                  showConvert={false}
+                  onConvert={openConvert}
+                  onReassign={(o) => {
+                    setReassignOrder(o);
+                    setShowReassignModal(true);
+                  }}
+                  onGoToItems={(orderNo) => {
+                    setOrderNoFilter(orderNo);
+                    setActiveTab("order_items");
+                  }}
+                  activeTab={activeTab}
+                  itemById={itemById}
+                />
+              </>
             )}
           </div>
         </div>
@@ -3256,4 +3308,10 @@ const OrderPage = () => {
   );
 };
 
-export default OrderPage;
+const OrderPageWrapper = () => (
+  <Suspense fallback={<div className="p-8 text-center text-gray-400">Loading...</div>}>
+    <OrderPage />
+  </Suspense>
+);
+
+export default OrderPageWrapper;
