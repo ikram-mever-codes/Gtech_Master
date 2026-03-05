@@ -302,81 +302,55 @@ export const getAllOrders = async (
     const orderRepo = AppDataSource.getRepository(Order);
     const { search = "", status = "" } = (req.query || {}) as any;
 
-    const qb = orderRepo
-      .createQueryBuilder("o")
-      .leftJoinAndSelect("o.orderItems", "items")
-      .select([
-        "o.id",
-        "o.order_no",
-        "o.category_id",
-        "o.customer_id",
-        "o.supplier_id",
-        "o.cargo_id",
-        "o.status",
-        "o.comment",
-        "o.created_at",
-        "o.updated_at",
-        "items.id",
-        "items.order_id",
-        "items.item_id",
-        "items.qty",
-        "items.remark_de",
-        "items.qty_delivered",
-        "items.category_id",
-        "items.rmb_special_price",
-        "items.eur_special_price",
-        "items.taric_id",
-        "items.set_taric_code",
-        "items.status",
-        "items.remarks_cn",
-        "items.problems",
-        "items.qty_label",
-        "items.qty_split",
-        "items.supplier_order_id",
-        "items.ref_no",
-        "items.cargo_id",
-        "items.printed",
-        "items.cargo_date",
-        "items.price",
-        "items.currency",
-      ]);
+    // Build the find options
+    const orders = await orderRepo.find({
+      where: search
+        ? [
+            { order_no: Like(`%${search}%`), ...(status && { status }) },
+            { comment: Like(`%${search}%`), ...(status && { status }) },
+          ]
+        : status
+          ? { status }
+          : {},
 
-    if (status) qb.andWhere("o.status = :status", { status });
-    if (search)
-      qb.andWhere("(o.order_no LIKE :q OR o.comment LIKE :q)", {
-        q: `%${search}%`,
-      });
+      // THIS IS THE KEY: Deep nesting to get Item inside OrderItem
+      relations: ["orderItems", "orderItems.item"],
 
-    const orders = await qb
-      .orderBy("o.id", "DESC")
-      .addOrderBy("items.id", "ASC")
-      .getMany();
-
-    // Map the items correctly - note the field name is ItemID_DE, not item_id
-    const mappedOrders = orders.map((order: any) => ({
-      ...order,
-      items: (order.orderItems || []).map((item: any) => ({
-        ...item,
-        // Map ItemID_DE to item_id for frontend compatibility if needed
-        item_id: item.ItemID_DE,
-        // The item relation is already loaded
-        item: item.item, // This will contain all the item data with its actual fields
-      })),
-      orderItems: undefined, // Remove the raw orderItems property
-    }));
-
-    // Log for debugging
-    mappedOrders.forEach((order) => {
-      console.log(`Order ${order.order_no}: ${order.items?.length || 0} items`);
-      if (order.items?.length > 0) {
-        console.log(`  First item:`, {
-          id: order.items[0].id,
-          ItemID_DE: order.items[0].ItemID_DE,
-          qty: order.items[0].qty,
-          itemData: order.items[0].item, // This will show all the actual item fields
-        });
-      }
+      order: {
+        id: "DESC",
+        // @ts-ignore - TypeORM supports nested ordering in find options
+        orderItems: {
+          id: "ASC",
+        },
+      },
     });
+
+    // Format data for frontend to prevent "Unknown" or "-"
+    const mappedOrders = orders.map((order) => ({
+      ...order,
+      // Map 'orderItems' (DB name) to 'items' (Frontend name)
+      items: (order.orderItems || []).map((oi) => {
+        // Access the nested item relation
+        const itemDetails = oi.item;
+
+        return {
+          ...oi,
+          ItemID_DE: oi?.ItemID_DE || "-",
+          item_id: oi.item_id || itemDetails?.id,
+          // Pre-formatted fields so frontend doesn't need complex logic
+          ean: itemDetails?.ean || "-",
+          item_name:
+            itemDetails?.item_name || itemDetails?.item_name || "Unknown Item",
+          model: itemDetails?.model || "-",
+          // Ensure price/currency from Item is available if missing on OrderItem
+          price: oi.price || itemDetails?.price || 0,
+          currency: oi.currency || itemDetails?.currency || "CNY",
+          item: itemDetails, // Keep raw relation data if needed
+        };
+      }),
+      // Remove original array to keep payload clean
+      orderItems: undefined,
+    }));
 
     return res.status(200).json({
       success: true,
@@ -384,7 +358,7 @@ export const getAllOrders = async (
     });
   } catch (error) {
     console.error("Error in getAllOrders:", error);
-    return next(error);
+    next(error);
   }
 };
 

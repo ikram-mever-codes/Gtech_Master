@@ -161,7 +161,6 @@ export class Item {
   @JoinColumn({ name: "supplier_id" })
   supplier: Supplier | null;
 
-  @OneToMany(() => OrderItem, orderItem => orderItem.item)
+  @OneToMany(() => OrderItem, (orderItem) => orderItem.item)
   orderItems: OrderItem[];
-
 }

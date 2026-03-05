@@ -84,7 +84,7 @@ master_id,ItemID_DE,order_no,qty,remark_de,qty_delivered
 27716,4071,DE3105,2,"2pcs replacement needles ",0
 27711,6256,DE3101,4000,,0
 27710,5918,DE3100,1000,,0
-27702,4071,DE3094,3,"Ball screw nut SFU2510-4/2 L54mm Ø40mm with metal deflection Weiyuan",0
+27702,4071,DE3094,3,"Ball screw SFU2510-4/2 L335mmm nut with metal deflection, customized according to drawing Weiyuan",0
 27689,1855,DE3089,40,"40 Einheiten für Auftrag B98364",0
 27690,1852,DE3089,50,"50 Einheiten für Auftrag B98364",0
 27691,1854,DE3089,80,"80 Einheiten für Auftrag B98364",0
@@ -145,14 +145,6 @@ master_id,ItemID_DE,order_no,qty,remark_de,qty_delivered
 27614,11592,DE3077,1,"1 Einheit für Auftrag  B98392",0
 27615,11589,DE3077,1,"1 Einheit für Auftrag  B98392",0
 27616,11593,DE3077,1,"1 Einheit für Auftrag  B98392",0
-27600,4071,DE3070,1,"cable sample K011111",0
-27546,4071,DE3059,4,"telescopic slide with M6 threaded holes",0
-27547,4071,DE3059,4,"telescopic slide with 6mm through-hole",0
-27542,4071,DE3058,20,"grill cover GDO 310S",0
-27543,4071,DE3058,20,"grill cover G 310S",0
-27544,4071,DE3058,20,"grill cover K 310S",0
-27545,4071,DE3058,20,"rill cover GDU 310S",0
-27532,4071,DE3053,3,"SFU2510-4/2 L335 customized according to drawing - Weiyuan",0
 27520,5693,DE3050,100,,0
 27521,6344,DE3050,100,,0
 27522,6281,DE3050,200,,0

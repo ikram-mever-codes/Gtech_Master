@@ -74,6 +74,7 @@ type Item = {
   width?: number;
   height?: number;
   weight?: number;
+  item: any;
   taric?: any;
   price?: number;
   currency?: string;
@@ -264,22 +265,14 @@ function OrdersTable({
     {
       header: "EAN",
       width: "80px",
-      render: (row) => itemById.get(String(row.item_id))?.ean || "-",
+      render: (row) => row.item?.ean || "-",
     },
     {
       header: "Item name",
       width: "150px",
       render: (row) => (
-        <div
-          className="truncate"
-          title={
-            itemById.get(String(row.item_id))?.item_name ||
-            itemById.get(String(row.item_id))?.name
-          }
-        >
-          {itemById.get(String(row.item_id))?.item_name ||
-            itemById.get(String(row.item_id))?.name ||
-            "Unknown"}
+        <div className="truncate" title={row.item?.item_name || row.item?.name}>
+          {row.item?.item_name || row.item?.name || "Unknown"}
         </div>
       ),
     },
@@ -288,8 +281,8 @@ function OrdersTable({
       width: "80px",
       render: (row) => (
         <div className="font-semibold">
-          {row.price
-            ? `${row.currency || "CNY"} ${row.price}`
+          {row.price || row.item?.price
+            ? `${row.currency || row.item?.currency || "CNY"} ${row.price || row.item?.price}`
             : row.rmb_special_price
               ? `CNY ${row.rmb_special_price}`
               : "-"}
@@ -301,8 +294,9 @@ function OrdersTable({
       header: "Total",
       width: "80px",
       render: (row) => {
-        const p = row.price || row.rmb_special_price;
-        return p ? `${row.currency || "CNY"} ${(p * row.qty).toFixed(2)}` : "-";
+        const p = row.price || row.rmb_special_price || row.item?.price;
+        const currency = row.currency || row.item?.currency || "CNY";
+        return p ? `${currency} ${(p * row.qty).toFixed(2)}` : "-";
       },
       align: "center",
     },
@@ -330,7 +324,7 @@ function OrdersTable({
     {
       header: "Status",
       width: "60px",
-      render: (row) => row.item_status || "-",
+      render: (row) => row.item_status || row.status || "-",
       align: "center",
     },
     {
@@ -359,6 +353,11 @@ function OrdersTable({
             <span>&#8617;</span> ReAssign
           </button>
           <button
+            onClick={() => {
+              // setSelectedItem(row);
+              // setSplitQty(0);
+              // setShowSPModal(true);
+            }}
             title="Split Order Item"
             className="px-2 py-1 text-[10px] font-bold bg-amber-600 text-white rounded-[4px] hover:bg-amber-700 transition shadow-md"
           >
@@ -2503,7 +2502,8 @@ const OrderPage = () => {
                         width: "120px",
                         render: (row) => (
                           <span className="font-medium text-gray-600">
-                            {itemById.get(String(row.item_id))?.ean || "-"}
+                            {/* FIX: Use nested item object */}
+                            {row.item?.ean || "-"}
                           </span>
                         ),
                         align: "center",
@@ -2513,11 +2513,10 @@ const OrderPage = () => {
                         render: (row) => (
                           <div
                             className="font-semibold text-gray-800 line-clamp-2"
-                            title={itemById.get(String(row.item_id))?.item_name}
+                            /* FIX: Use nested item object */
+                            title={row.item?.item_name || row.item?.name}
                           >
-                            {itemById.get(String(row.item_id))?.item_name ||
-                              itemById.get(String(row.item_id))?.name ||
-                              "Unknown"}
+                            {row.item?.item_name || row.item?.name || "Unknown"}
                           </div>
                         ),
                       },
@@ -2570,7 +2569,7 @@ const OrderPage = () => {
                         width: "90px",
                         render: (row) => (
                           <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider">
-                            {row.status || "Open"}
+                            {row.status || row.item_status || "Open"}
                           </span>
                         ),
                         align: "center",
