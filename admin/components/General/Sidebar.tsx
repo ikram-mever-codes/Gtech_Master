@@ -75,6 +75,19 @@ const allMenuItems = [
     path: "/items",
     resource: "Items",
   },
+
+  {
+    icon: DollarSign,
+    text: "Invoices",
+    path: "/invoices",
+    resource: "Invoices",
+  },
+  {
+    icon: LucideFileText,
+    text: "Orders",
+    path: "/orders",
+    resource: "Orders",
+  },
   {
     icon: Timer,
     text: "Scheduled Items",
@@ -105,24 +118,14 @@ const allMenuItems = [
     path: "/offers",
     resource: "Offers",
   },
-  // {
-  //   icon: DollarSign,
-  //   text: "Invoices",
-  //   path: "/invoices",
-  //   resource: "Invoices",
-  // },
+
   // {
   //   icon: LibraryAdd,
   //   text: "Library",
   //   path: "/library",
   //   resource: "Library",
   // },
-  {
-    icon: LucideFileText,
-    text: "Orders",
-    path: "/orders",
-    resource: "Orders",
-  },
+
   // {
   //   icon: Person,
   //   text: "Customers",

@@ -477,8 +477,8 @@ export const generateLabelPDF = async (
 
     const order = await orderRepo.findOne({ where: { id: item.order_id } });
 
-    // New Dimension: 336 x 136
-    const doc = new PDFDocument({ size: [336, 136], margin: 0 });
+    // Dimension: 350 x 136
+    const doc = new PDFDocument({ size: [350, 136], margin: 0 });
     const logoPath = path.join(__dirname, "../../public/logo.png");
 
     res.setHeader("Content-Type", "application/pdf");
@@ -488,50 +488,57 @@ export const generateLabelPDF = async (
     );
     doc.pipe(res);
 
-    // --- Dynamic Spacing for 336 Width ---
-    const colA = 20; // ItemNoW
-    const colB = 125; // Order No (Moved right to utilize width)
-    const colD = 210; // Qty (Moved right)
-    const colLogo = 250; // Logo position
+    // --- Layout Constants ---
+    // colA is the label start.
+    // valColA is shifted right so the value starts under the 'W' of 'ItemNoW'
+    const colA = 20;
+    const valColA = 25;
 
-    const row1LabelY = 12;
-    const row1ValueY = 22;
+    const colB = 125;
+    const colD = 210;
+    const colLogo = 275; // Moved further right (from 250 to 275)
 
-    // 1. TOP ROW: Labels (Italicized)
+    const row1LabelY = 15;
+    const row1ValueY = 28; // Added vertical spacing between label and value
+
+    // 1. TOP ROW: Labels
     doc.fillColor("black").font("Helvetica-Oblique").fontSize(7.5);
     doc.text("ItemNoW", colA, row1LabelY);
     doc.text("Order No / Qty", colB, row1LabelY);
     doc.text("Qty", colD, row1LabelY);
 
-    // 2. TOP ROW: Values (Bold)
+    // 2. TOP ROW: Values (Now aligned to valColA and with more Y spacing)
     doc.font("Helvetica-Bold").fontSize(17);
-    // Identifiers
-    doc.text(item?.item?.ItemID_DE?.toString() || "H012-05", colA, row1ValueY);
+    doc.text(
+      item?.item?.ItemID_DE?.toString() || "H012-05",
+      valColA,
+      row1ValueY,
+    );
     doc.text(order?.order_no || "S2108", colB, row1ValueY);
     doc.text(`${item.qty || 15}`, colD, row1ValueY);
 
-    // 3. SECTION C: The /20 split
+    // 3. SECTION C: The /20 split (Added spacing to match new row1ValueY)
     doc
       .font("Helvetica")
       .fontSize(11)
-      .text(`/${item.qty_split || 20}`, colB + 48, row1ValueY + 11);
+      .text(`/${item.qty_split || 20}`, colB + 48, row1ValueY + 12);
 
-    // 4. LOGO (Top Right)
+    // 4. LOGO (Moved more to the right)
     try {
-      doc.image(logoPath, colLogo, 10, { width: 65 });
+      doc.image(logoPath, colLogo, 10, { width: 60 });
     } catch (e) {
       console.error("Logo missing");
     }
 
-    // 5. SECTION E: Description (Adjusted Y to 55 for vertical balance)
+    // 5. SECTION E: Description (Value starts under the 'W' alignment)
     doc.font("Helvetica").fontSize(10).fillColor("#222222");
     const description =
-      item.remark_de ||
+      item.item.item_name ||
       "Toothed Belt GT2-140-6: profile GT2, length 140mm, width 6mm";
-    doc.text(description, colA, 55, { width: 300 });
+    doc.text(description, valColA, 62, { width: 300 });
 
-    // 6. SECTION F & G: Remarks (Left Bottom)
-    const bottomSectionY = 82;
+    // 6. SECTION F & G: Remarks (Aligned to valColA)
+    const bottomSectionY = 85;
     doc
       .font("Helvetica-Oblique")
       .fontSize(7.5)
@@ -539,29 +546,29 @@ export const generateLabelPDF = async (
     doc
       .font("Helvetica")
       .fontSize(13)
-      .text(item.remarks_cn || "no problem", colA, bottomSectionY + 10);
+      .text(item.remarks_cn || "no problem", valColA, bottomSectionY + 12);
 
     doc
       .font("Helvetica-Oblique")
       .fontSize(7.5)
-      .text("RemarkW", colA, bottomSectionY + 30);
+      .text("RemarkW", colA, bottomSectionY + 32);
 
+    // 7. SECTION H: Barcode (Increased textgaps for more vertical spacing)
     const barcodeValue = item.ref_no || "4283230040725";
-
     const barcodeBuffer = await bwipjs.toBuffer({
-      bcid: "code128", // Barcode type
-      text: barcodeValue, // The number to encode
-      scale: 3, // High resolution scaling
-      height: 12, // Height of the bars in mm
-      includetext: true, // Show the EAN numbers below
-      textsize: 11, // INCREASED: Makes the numbers larger and clearer
-      textgaps: 2, // NEW: Adds vertical space between the bars and the text
-      textxalign: "center", // Centers the text under the barcode
+      bcid: "code128",
+      text: barcodeValue,
+      scale: 3,
+      height: 12,
+      includetext: true,
+      textsize: 11,
+      textgaps: 4,
+      textxalign: "center",
     });
 
-    // Positioning: Placed at the bottom right of the 336x136 label
-    // Adjusted Y to 72 to account for the larger text height
-    doc.image(barcodeBuffer, 185, 72, { width: 140 });
+    // Final Positioning
+    doc.image(barcodeBuffer, 195, 75, { width: 140 });
+
     doc.end();
   } catch (error) {
     return next(error);
