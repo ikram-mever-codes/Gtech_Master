@@ -19,10 +19,15 @@ const generateInvoicesForOrders = async (orderIds: number[]) => {
 
         for (const orderId of orderIds) {
             const order = await orderRepo.findOne({ where: { id: orderId } });
-            if (!order) continue;
+            if (!order) {
+                console.warn(`[Invoice] Order ${orderId} not found, skipping.`);
+                continue;
+            }
 
+            // Delete existing invoice for this order_no to regenerate fresh
             const existingInvoice = await invoiceRepo.findOne({ where: { orderNumber: order.order_no } });
             if (existingInvoice) {
+                await invoiceItemRepo.delete({ invoice: { id: existingInvoice.id } });
                 await invoiceRepo.remove(existingInvoice);
             }
 
@@ -30,18 +35,44 @@ const generateInvoicesForOrders = async (orderIds: number[]) => {
             if (order.customer_id) {
                 customer = await customerRepo.findOne({ where: { id: order.customer_id as string } });
             }
-            if (!customer) continue;
+            if (!customer) {
+                console.warn(`[Invoice] Order ${order.order_no} has no customer (customer_id=${order.customer_id}), skipping invoice generation.`);
+                continue;
+            }
 
             const orderItems = await orderItemRepo.find({
                 where: { order_id: order.id },
                 relations: ["item", "item.taric"]
             });
 
+            if (orderItems.length === 0) {
+                console.warn(`[Invoice] Order ${order.order_no} has no items, skipping.`);
+                continue;
+            }
+
             let netTotal = 0;
             let taxAmount = 0;
             let grossTotal = 0;
-            const invoiceItems = [];
 
+            // First save the invoice without items
+            const invoice = invoiceRepo.create({
+                invoiceNumber: `INV-${Date.now().toString().slice(-6)}-${order.id}`,
+                orderNumber: order.order_no,
+                invoiceDate: new Date(),
+                deliveryDate: new Date(),
+                netTotal: 0,
+                taxAmount: 0,
+                grossTotal: 0,
+                paidAmount: 0,
+                outstandingAmount: 0,
+                paymentMethod: "Bank Transfer",
+                shippingMethod: "Standard",
+                customer: customer,
+                status: "draft",
+            });
+            const savedInvoice = await invoiceRepo.save(invoice);
+
+            const invoiceItemEntities: InvoiceItem[] = [];
             for (const oi of orderItems) {
                 const quantity = oi.qty || 1;
                 const unitPrice = oi.price || oi.rmb_special_price || 0;
@@ -52,36 +83,30 @@ const generateInvoicesForOrders = async (orderIds: number[]) => {
                 netTotal += netPrice;
                 taxAmount += itemTax;
                 grossTotal += grossPrice;
-                invoiceItems.push(invoiceItemRepo.create({
+
+                const invItem = invoiceItemRepo.create({
                     quantity,
                     articleNumber: oi.item?.ean?.toString() || oi.item?.model || oi.item?.ItemID_DE?.toString() || "Unknown",
                     description: oi.item?.item_name || "Unknown Item",
-                    unitPrice: unitPrice,
-                    netPrice: netPrice,
+                    unitPrice,
+                    netPrice,
                     taxRate: itemTaxRate,
                     taxAmount: itemTax,
-                    grossPrice: grossPrice
-                }));
-            }
-
-            if (invoiceItems.length > 0) {
-                const invoice = invoiceRepo.create({
-                    invoiceNumber: `INV-${Date.now().toString().slice(-6)}-${order.id}`,
-                    orderNumber: order.order_no,
-                    invoiceDate: new Date(),
-                    deliveryDate: new Date(),
-                    netTotal,
-                    taxAmount,
-                    grossTotal,
-                    paidAmount: 0,
-                    outstandingAmount: grossTotal,
-                    paymentMethod: "Bank Transfer",
-                    shippingMethod: "Standard",
-                    customer: customer,
-                    items: invoiceItems
+                    grossPrice,
+                    invoice: savedInvoice,
                 });
-                await invoiceRepo.save(invoice);
+                invoiceItemEntities.push(invItem);
             }
+            await invoiceItemRepo.save(invoiceItemEntities);
+
+            // Update totals on the invoice
+            savedInvoice.netTotal = netTotal;
+            savedInvoice.taxAmount = taxAmount;
+            savedInvoice.grossTotal = grossTotal;
+            savedInvoice.outstandingAmount = grossTotal;
+            await invoiceRepo.save(savedInvoice);
+
+            console.log(`[Invoice] Created invoice ${savedInvoice.invoiceNumber} for order ${order.order_no}`);
         }
     } catch (e) {
         console.error("Failed to generate invoices for orders", e);
@@ -321,6 +346,17 @@ export const assignOrdersToCargo = async (req: Request, res: Response, next: Nex
         if (newEntries.length > 0) {
             await cargoOrderRepo.save(newEntries);
         }
+
+        const orderItemRepo = AppDataSource.getRepository(OrderItem);
+        if (validOrderIds.length > 0) {
+            await orderItemRepo
+                .createQueryBuilder()
+                .update(OrderItem)
+                .set({ cargo_id: cargo.id })
+                .where("order_id IN (:...validOrderIds)", { validOrderIds })
+                .execute();
+        }
+
         await generateInvoicesForOrders(validOrderIds);
 
         res.status(200).json({

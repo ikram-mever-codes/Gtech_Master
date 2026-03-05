@@ -1,5 +1,0 @@
-src/controllers/cargo_controller.ts(66,45): error TS2769: No overload matches this call.
-  Overload 1 of 3, '(entityLikeArray: DeepPartial<Invoice>[]): Invoice[]', gave the following error.
-    Object literal may only specify known properties, and 'invoiceNumber' does not exist in type 'DeepPartial<Invoice>[]'.
-  Overload 2 of 3, '(entityLike: DeepPartial<Invoice>): Invoice', gave the following error.
-    Object literal may only specify known properties, and 'status' does not exist in type 'DeepPartial<Invoice>'.

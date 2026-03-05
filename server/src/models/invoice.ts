@@ -57,6 +57,12 @@ export class Invoice {
   @Column({ nullable: true })
   notes?: string;
 
+  @Column({ type: "varchar", default: "draft" })
+  status!: string;
+
+  @Column({ nullable: true })
+  closedAt?: Date;
+
   @ManyToOne(
     () => Customer,
     (customer) => customer.starCustomerDetails?.invoices
