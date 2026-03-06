@@ -40,7 +40,6 @@ import {
   type OrderSearchFilters,
   getOrderStatusColor,
   downloadItemLabel,
-  syncOrders,
 } from "@/api/orders";
 import {
   getAllCargos,
@@ -145,6 +144,7 @@ type OrdersTableProps = {
   onReassign: (o: any) => void;
   activeTab: string;
   itemById: Map<string, Item>;
+  onSplit: (row: any) => void;
 };
 
 const tabs = [
@@ -267,6 +267,7 @@ function OrdersTable({
   onGoToItems,
   activeTab,
   itemById,
+  onSplit,
 }: OrdersTableProps) {
   const isOrderItems = activeTab === "order_items";
 
@@ -373,9 +374,7 @@ function OrdersTable({
           <button
             onClick={(e) => {
               e.stopPropagation();
-              // setSelectedItem(row);
-              // setSplitQty(0);
-              // setShowSPModal(true);
+              onSplit(row);
             }}
             title="Split Order Item"
             className="px-2 py-1 text-[10px] font-bold bg-amber-600 text-white rounded-[4px] hover:bg-amber-700 transition shadow-md"
@@ -681,9 +680,14 @@ function OrdersTable({
         return isExpress ? "bg-red-50" : "";
       }}
       onRowClick={(row) => {
+        console.log("Row clicked:", row);
         if (isOrderItems) {
-          if (row.parentOrder) onView(row.parentOrder);
-          else if (row.order_id) onView({ id: row.order_id, order_no: row.order_no });
+          const targetOrder = row.parentOrder || { id: row.order_id, order_no: row.order_no };
+          if (targetOrder && (targetOrder.id || targetOrder.order_id)) {
+            onView(targetOrder);
+          } else {
+            toast.error("Order details not found for this item");
+          }
         } else {
           onView(row);
         }
@@ -1428,11 +1432,9 @@ const OrderPage = () => {
     resetForm();
   };
 
-  const openView = async (order: any) => {
-    if (!order) return;
+  const openView = async (order: Order) => {
     setViewOrder(order);
     setShowViewModal(true);
-    setViewItems([]); // Reset items while loading
 
     try {
       const detailRes: any = await getOrderById(order.id);
@@ -1617,15 +1619,6 @@ const OrderPage = () => {
     );
   }, [orders, orderNoFilter]);
 
-  const handleSync = async () => {
-    try {
-      await syncOrders();
-      fetchOrders();
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
   const visibleOrders =
     activeTab === "orders"
       ? orders
@@ -1649,15 +1642,6 @@ const OrderPage = () => {
         />
         Refresh
       </button>
-
-      <CustomButton
-        gradient={true}
-        onClick={handleSync}
-        className="px-4 py-2 text-sm bg-blue-600 text-white rounded-[4px] hover:bg-blue-700 transition-all shadow-md font-bold flex items-center gap-2"
-      >
-        <ArrowPathIcon className="h-4 w-4" />
-        Sync Orders
-      </CustomButton>
 
       <CustomButton
         gradient={true}
@@ -2761,6 +2745,11 @@ const OrderPage = () => {
                   }}
                   activeTab={activeTab}
                   itemById={itemById}
+                  onSplit={(row) => {
+                    setSelectedItem(row);
+                    setSplitQty(Math.floor(Number(row.qty || 0) / 2) || 1);
+                    setShowSPModal(true);
+                  }}
                 />
               </>
             )}
@@ -2887,11 +2876,11 @@ const OrderPage = () => {
         </div>
       )}
 
-      {showViewModal && (
+      {showViewModal && viewOrder && (
         <CustomModal
           isOpen={showViewModal}
           onClose={closeView}
-          title={`Order ${viewOrder?.order_no || "Details"}`}
+          title={`Order ${viewOrder.order_no}`}
           width="max-w-4xl"
           footer={
             <button
@@ -2905,7 +2894,7 @@ const OrderPage = () => {
           <div className="space-y-6">
             <div>
               <p className="text-sm font-semibold text-gray-500">
-                Status: {viewOrder?.status || "-"}
+                Status: {viewOrder.status || "20"}
               </p>
             </div>
 
@@ -2915,7 +2904,7 @@ const OrderPage = () => {
                   Category
                 </label>
                 <p className="text-gray-900 font-bold">
-                  {viewOrder ? getCategoryName(viewOrder.category_id) : "-"}
+                  {getCategoryName(viewOrder.category_id) || "Imported 26"}
                 </p>
               </div>
               <div className="space-y-1">
@@ -2923,7 +2912,7 @@ const OrderPage = () => {
                   Customer
                 </label>
                 <p className="text-gray-900 font-bold">
-                  {(viewOrder && viewOrder.customer_id != null) ? getCustomerName(viewOrder.customer_id) : "-"}
+                  {viewOrder.customer_id != null ? getCustomerName(viewOrder.customer_id) : "-"}
                 </p>
               </div>
             </div>
@@ -2933,7 +2922,7 @@ const OrderPage = () => {
                 Comment
               </label>
               <p className="text-gray-800 text-sm font-medium leading-relaxed">
-                {viewOrder?.comment || "-"}
+                {viewOrder.comment || "-"}
               </p>
             </div>
 
