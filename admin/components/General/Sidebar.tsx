@@ -75,6 +75,19 @@ const allMenuItems = [
     path: "/items",
     resource: "Items",
   },
+
+  {
+    icon: DollarSign,
+    text: "Invoices",
+    path: "/invoices",
+    resource: "Invoices",
+  },
+  {
+    icon: LucideFileText,
+    text: "Orders",
+    path: "/orders",
+    resource: "Orders",
+  },
   {
     icon: Timer,
     text: "Scheduled Items",
@@ -105,24 +118,13 @@ const allMenuItems = [
     path: "/offers",
     resource: "Offers",
   },
-  {
-    icon: DollarSign,
-    text: "Invoices",
-    path: "/invoices",
-    resource: "Invoices",
-  },
   // {
   //   icon: LibraryAdd,
   //   text: "Library",
   //   path: "/library",
   //   resource: "Library",
   // },
-  {
-    icon: LucideFileText,
-    text: "Orders",
-    path: "/orders",
-    resource: "Orders",
-  },
+
   // {
   //   icon: Person,
   //   text: "Customers",
@@ -386,7 +388,7 @@ const Sidebar = () => {
                       height: "100%",
                       width:
                         activePath === item.path ||
-                          activePath.includes(item.path)
+                        activePath.includes(item.path)
                           ? "3px"
                           : 0,
                       backgroundColor: "primary.main",
@@ -399,7 +401,7 @@ const Sidebar = () => {
                       minWidth: 40,
                       color:
                         activePath === item.path ||
-                          activePath.includes(item.path)
+                        activePath.includes(item.path)
                           ? "white"
                           : "text.secondary",
                       transition: "color 0.2s ease",

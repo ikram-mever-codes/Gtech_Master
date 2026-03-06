@@ -59,63 +59,32 @@ export class EtlController {
       const orderItemRepo = AppDataSource.getRepository(OrderItem);
       const categoryRepo = AppDataSource.getRepository(Category);
 
-      // First, validate that all required categories exist
-      await EtlController.validateCategoryMappings(categoryRepo);
+      // FIX 1: Use the sync method instead of the strict validation method
+      await EtlController.syncRequiredCategories(categoryRepo);
 
-      // Read orders.csv
       const ordersFilePath = path.join(EtlController.publicPath, "orders.csv");
       const orderRecords = await EtlController.readCsv(ordersFilePath);
 
-      // First, process all orders and build a map of order_no -> order_id
       const orderMap = new Map<string, number>();
       const orderRows = orderRecords.slice(1);
 
       for (const row of orderRows) {
         const orderNo = row[0]?.toString().trim();
         if (!orderNo) continue;
-
-        // Check if order already exists
+        ``;
         let order = await orderRepo.findOne({ where: { order_no: orderNo } });
 
         if (!order) {
           const csvCategoryId = parseInt(row[1]);
-          if (isNaN(csvCategoryId)) {
-            console.error(
-              `Invalid category ID for order ${orderNo}: ${row[1]}`,
-            );
-            continue;
-          }
+          if (isNaN(csvCategoryId)) continue;
 
-          // Map CSV category ID to database category ID
-          const databaseCategoryId =
-            EtlController.CATEGORY_MAP.get(csvCategoryId);
-          if (!databaseCategoryId) {
-            console.error(
-              `No mapping found for category ID ${csvCategoryId} for order ${orderNo}`,
-            );
-            continue;
-          }
+          // FIX 2: Get or Create the category dynamically
+          const databaseCategoryId = await EtlController.getOrCreateCategory(
+            csvCategoryId,
+            categoryRepo,
+          );
 
-          // Verify category exists in database
-          const category = await categoryRepo.findOne({
-            where: { id: databaseCategoryId },
-          });
-
-          if (!category) {
-            console.error(
-              `Category ID ${databaseCategoryId} not found in database for order ${orderNo}`,
-            );
-            continue;
-          }
-
-          // Parse status
-          const status = parseInt(row[2]);
-          if (isNaN(status)) {
-            console.error(`Invalid status for order ${orderNo}: ${row[2]}`);
-            continue;
-          }
-
-          // Validate and parse dates
+          const status = parseInt(row[2]) || 0;
           const dateCreated = EtlController.validateDate(
             row[4],
             "date_created",
@@ -130,10 +99,9 @@ export class EtlController {
             "date_delivery",
           );
 
-          // Create new order with MAPPED category_id
           const newOrder = orderRepo.create({
             order_no: orderNo,
-            category_id: databaseCategoryId, // ← Use the mapped ID (55 instead of 26)
+            category_id: databaseCategoryId,
             status: status,
             comment: row[3]?.toString().substring(0, 255) || "",
             date_created: dateCreated,
@@ -142,37 +110,25 @@ export class EtlController {
           });
 
           order = await orderRepo.save(newOrder);
-          console.log(
-            `Created order ${orderNo} with ID ${order.id} and category_id ${databaseCategoryId} (mapped from ${csvCategoryId})`,
-          );
         }
-
-        // Store in map for later use
         orderMap.set(orderNo, order.id);
       }
 
-      // Now process order items using the map
+      // Process items...
       const orderItemsFilePath = path.join(
         EtlController.publicPath,
         "order_items.csv",
       );
       if (fs.existsSync(orderItemsFilePath)) {
         const itemRecords = await EtlController.readCsv(orderItemsFilePath);
-        const itemRows = itemRecords.slice(1);
-
-        const batchResults = await EtlController.processOrderItemBatch(
-          itemRows,
+        await EtlController.processOrderItemBatch(
+          itemRecords.slice(1),
           orderItemRepo,
           orderMap,
         );
-
-        console.log(`Processed ${batchResults.created} order items`);
       }
 
-      res.status(200).json({
-        success: true,
-        message: "ETL process completed successfully",
-      });
+      res.status(200).json({ success: true, message: "ETL process completed" });
     } catch (error) {
       console.error("ETL process failed:", error);
       next(error);
@@ -298,79 +254,77 @@ export class EtlController {
     orderItemRepo: any,
     existingOrders: Map<string, number>, // Map of order_no -> order_id
   ) {
+    const itemRepo = AppDataSource.getRepository(Item); // Get Item Repository
     const results = {
       processed: 0,
       created: 0,
       skipped: 0,
       failed: 0,
-      errors: [],
     };
 
     for (const row of rows) {
       try {
         results.processed++;
 
-        // Assuming CSV columns: master_id, ItemID_DE, order_no, qty, remark_de, qty_delivered
         const masterId = row[0]?.toString().trim();
-        const itemIdDe = parseInt(row[1]);
+        const itemIdDe = parseInt(row[1]); // This is the ItemID_DE from CSV
         const orderNo = row[2]?.toString().trim();
         const qty = parseInt(row[3]);
         const remarkDe = row[4]?.toString().trim() || "";
         const qtyDelivered = parseInt(row[5]) || 0;
 
-        if (!masterId || !orderNo || isNaN(qty) || qty <= 0) {
-          console.warn(`Invalid row data:`, row);
+        if (!masterId || !orderNo || isNaN(qty) || isNaN(itemIdDe)) {
           results.skipped++;
           continue;
         }
 
-        // Get the order_id from the map using order_no
         const orderId = existingOrders.get(orderNo);
         if (!orderId) {
-          console.log(`Order ${orderNo} not found in database, skipping item`);
           results.skipped++;
           continue;
         }
 
-        // Check if order item already exists - using available fields
+        // --- NEW LOGIC: LINKING TO ITEM ---
+        // Look up the actual Item primary key (id) using the CSV's ItemID_DE
+        const actualItem = await itemRepo.findOne({
+          where: { ItemID_DE: itemIdDe },
+          select: ["id"],
+        });
+
+        if (!actualItem) {
+          console.warn(
+            `Item with ItemID_DE ${itemIdDe} not found in Items table. Link will be missing.`,
+          );
+        }
+
         const existingItem = await orderItemRepo.findOne({
-          where: [
-            { master_id: masterId },
-            { order_id: orderId, ItemID_DE: itemIdDe },
-          ],
+          where: { master_id: masterId },
         });
 
         if (existingItem) {
-          console.log(`Order item ${masterId} already exists, skipping`);
           results.skipped++;
           continue;
         }
 
-        // Create order item with ONLY fields that exist in the entity
         const newItem = orderItemRepo.create({
-          order_id: orderId, // This links to the order
+          order_id: orderId,
           master_id: masterId,
-          ItemID_DE: itemIdDe, // Note: field name is ItemID_DE, not item_id
+          ItemID_DE: itemIdDe, // Keeping the reference code
+          item_id: actualItem ? actualItem.id : null, // LINKING the foreign key
           qty: qty,
           remark_de: remarkDe,
           qty_delivered: qtyDelivered,
           qty_label: qty,
           status: "NSO",
-          // Don't include order_no - it doesn't exist in the entity
         });
 
         await orderItemRepo.save(newItem);
         results.created++;
-
-        console.log(
-          `Created order item for order ${orderNo} with order_id ${orderId}`,
-        );
       } catch (error) {
         results.failed++;
         console.error(`Failed to process order item:`, error);
       }
     }
-
     return results;
   }
 
@@ -399,6 +353,29 @@ export class EtlController {
       total: requiredCategoryIds.length,
       existing: existingCategories.length,
     });
+  }
+  private static async syncRequiredCategories(
+    categoryRepo: any,
+  ): Promise<void> {
+    for (const mapping of EtlController.CATEGORY_MAPPING) {
+      let category = await categoryRepo.findOne({
+        where: [
+          { id: mapping.databaseCategoryId },
+          { de_cat: mapping.name }, // Fallback check
+        ],
+      });
+
+      if (!category) {
+        console.log(`Category ${mapping.name} not found. Creating...`);
+        category = categoryRepo.create({
+          id: mapping.databaseCategoryId, // Force ID if your DB allows, or let it auto-gen
+          de_cat: mapping.name,
+          name: mapping.name,
+          is_ignored_value: "N",
+        });
+        await categoryRepo.save(category);
+      }
+    }
   }
 
   /**
@@ -503,6 +480,44 @@ export class EtlController {
     }
   }
 
+  /**
+   * Tries to find a category in the map/database,
+   * if not found, it creates it.
+   */
+  private static async getOrCreateCategory(
+    csvId: number,
+    categoryRepo: any,
+  ): Promise<number> {
+    // 1. Check if it's in our hardcoded map
+    let dbId = EtlController.CATEGORY_MAP.get(csvId);
+
+    // 2. If it's in the map, double check it actually exists in DB
+    if (dbId) {
+      const exists = await categoryRepo.findOne({ where: { id: dbId } });
+      if (exists) return dbId;
+    }
+
+    // 3. If not in map OR not in DB, look for it by name (e.g. "CAT21")
+    const dynamicDeCat = `C${csvId}`.substring(0, 5);
+    let category = await categoryRepo.findOne({
+      where: { de_cat: dynamicDeCat },
+    });
+
+    if (!category) {
+      console.log(`Creating missing category for CSV ID: ${csvId}`);
+      category = categoryRepo.create({
+        de_cat: dynamicDeCat,
+        name: `Imported ${csvId}`,
+        is_ignored_value: "N",
+      });
+      category = await categoryRepo.save(category);
+    }
+
+    // 4. Cache it in the map so we don't query the DB for this ID again this session
+    EtlController.CATEGORY_MAP.set(csvId, category.id);
+
+    return category.id;
+  }
   /**
    * Remove unmatched items with error handling
    */

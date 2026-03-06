@@ -136,12 +136,12 @@ export const createOrder = async (
   } catch (error) {
     try {
       await queryRunner.rollbackTransaction();
-    } catch { }
+    } catch {}
     return next(error);
   } finally {
     try {
       await queryRunner.release();
-    } catch { }
+    } catch {}
   }
 };
 
@@ -284,12 +284,12 @@ export const updateOrder = async (
   } catch (error) {
     try {
       await queryRunner.rollbackTransaction();
-    } catch { }
+    } catch {}
     return next(error);
   } finally {
     try {
       await queryRunner.release();
-    } catch { }
+    } catch {}
   }
 };
 
@@ -302,73 +302,54 @@ export const getAllOrders = async (
     const orderRepo = AppDataSource.getRepository(Order);
     const { search = "", status = "" } = (req.query || {}) as any;
 
-    const qb = orderRepo
-      .createQueryBuilder("o")
-      .leftJoinAndSelect("o.orderItems", "items")
-      .leftJoinAndSelect("items.item", "itemDetails")
-      .select([
-        "o.id",
-        "o.order_no",
-        "o.category_id",
-        "o.customer_id",
-        "o.supplier_id",
-        "o.cargo_id",
-        "o.status",
-        "o.comment",
-        "o.created_at",
-        "o.updated_at",
-        "items.id",
-        "items.order_id",
-        "items.item_id",
-        "items.qty",
-        "items.remark_de",
-        "items.qty_delivered",
-        "items.category_id",
-        "items.rmb_special_price",
-        "items.eur_special_price",
-        "items.taric_id",
-        "items.set_taric_code",
-        "items.status",
-        "items.remarks_cn",
-        "items.problems",
-        "items.qty_label",
-        "items.qty_split",
-        "items.supplier_order_id",
-        "items.ref_no",
-        "items.cargo_id",
-        "items.printed",
-        "items.cargo_date",
-        "items.price",
-        "items.currency",
-        "itemDetails.id",
-        "itemDetails.item_name",
-        "itemDetails.ean",
-        "itemDetails.model",
-        "itemDetails.ItemID_DE",
-      ]);
+    // Build the find options
+    const orders = await orderRepo.find({
+      where: search
+        ? [
+            { order_no: Like(`%${search}%`), ...(status && { status }) },
+            { comment: Like(`%${search}%`), ...(status && { status }) },
+          ]
+        : status
+          ? { status }
+          : {},
 
-    if (status) qb.andWhere("o.status = :status", { status });
-    if (search)
-      qb.andWhere("(o.order_no LIKE :q OR o.comment LIKE :q)", {
-        q: `%${search}%`,
-      });
+      // THIS IS THE KEY: Deep nesting to get Item inside OrderItem
+      relations: ["orderItems", "orderItems.item"],
 
-    const orders = await qb
-      .orderBy("o.id", "DESC")
-      .addOrderBy("items.id", "ASC")
-      .getMany();
+      order: {
+        id: "DESC",
+        // @ts-ignore - TypeORM supports nested ordering in find options
+        orderItems: {
+          id: "ASC",
+        },
+      },
+    });
 
-    // Map the items correctly - note the field name is ItemID_DE, not item_id
-    const mappedOrders = orders.map((order: any) => ({
+    // Format data for frontend to prevent "Unknown" or "-"
+    const mappedOrders = orders.map((order) => ({
       ...order,
-      items: (order.orderItems || []).map((item: any) => ({
-        ...item,
-        // Map ItemID_DE to item_id for frontend compatibility if needed
-        item_id: item.ItemID_DE,
-        // The item relation is already loaded
-        item: item.item, // This will contain all the item data with its actual fields
-      })),
-      orderItems: undefined, // Remove the raw orderItems property
+      // Map 'orderItems' (DB name) to 'items' (Frontend name)
+      items: (order.orderItems || []).map((oi) => {
+        // Access the nested item relation
+        const itemDetails = oi.item;
+
+        return {
+          ...oi,
+          ItemID_DE: oi?.ItemID_DE || "-",
+          item_id: oi.item_id || itemDetails?.id,
+          // Pre-formatted fields so frontend doesn't need complex logic
+          ean: itemDetails?.ean || "-",
+          item_name:
+            itemDetails?.item_name || itemDetails?.item_name || "Unknown Item",
+          model: itemDetails?.model || "-",
+          // Ensure price/currency from Item is available if missing on OrderItem
+          price: oi.price || itemDetails?.price || 0,
+          currency: oi.currency || itemDetails?.currency || "CNY",
+          item: itemDetails, // Keep raw relation data if needed
+        };
+      }),
+      // Remove original array to keep payload clean
+      orderItems: undefined,
     }));
 
     return res.status(200).json({
@@ -377,7 +358,7 @@ export const getAllOrders = async (
     });
   } catch (error) {
     console.error("Error in getAllOrders:", error);
-    return next(error);
+    next(error);
   }
 };
 
@@ -469,12 +450,12 @@ export const deleteOrder = async (
   } catch (error) {
     try {
       await queryRunner.rollbackTransaction();
-    } catch { }
+    } catch {}
     return next(error);
   } finally {
     try {
       await queryRunner.release();
-    } catch { }
+    } catch {}
   }
 };
 
@@ -496,8 +477,8 @@ export const generateLabelPDF = async (
 
     const order = await orderRepo.findOne({ where: { id: item.order_id } });
 
-    // New Dimension: 336 x 136
-    const doc = new PDFDocument({ size: [336, 136], margin: 0 });
+    // Dimension: 350 x 136
+    const doc = new PDFDocument({ size: [350, 136], margin: 0 });
     const logoPath = path.join(__dirname, "../../public/logo.png");
 
     res.setHeader("Content-Type", "application/pdf");
@@ -507,50 +488,57 @@ export const generateLabelPDF = async (
     );
     doc.pipe(res);
 
-    // --- Dynamic Spacing for 336 Width ---
-    const colA = 20; // ItemNoW
-    const colB = 125; // Order No (Moved right to utilize width)
-    const colD = 210; // Qty (Moved right)
-    const colLogo = 250; // Logo position
+    // --- Layout Constants ---
+    // colA is the label start.
+    // valColA is shifted right so the value starts under the 'W' of 'ItemNoW'
+    const colA = 20;
+    const valColA = 25;
 
-    const row1LabelY = 12;
-    const row1ValueY = 22;
+    const colB = 125;
+    const colD = 210;
+    const colLogo = 275; // Moved further right (from 250 to 275)
 
-    // 1. TOP ROW: Labels (Italicized)
+    const row1LabelY = 15;
+    const row1ValueY = 28; // Added vertical spacing between label and value
+
+    // 1. TOP ROW: Labels
     doc.fillColor("black").font("Helvetica-Oblique").fontSize(7.5);
     doc.text("ItemNoW", colA, row1LabelY);
     doc.text("Order No / Qty", colB, row1LabelY);
     doc.text("Qty", colD, row1LabelY);
 
-    // 2. TOP ROW: Values (Bold)
+    // 2. TOP ROW: Values (Now aligned to valColA and with more Y spacing)
     doc.font("Helvetica-Bold").fontSize(17);
-    // Identifiers
-    doc.text(item?.item?.ItemID_DE?.toString() || "H012-05", colA, row1ValueY);
+    doc.text(
+      item?.item?.ItemID_DE?.toString() || "H012-05",
+      valColA,
+      row1ValueY,
+    );
     doc.text(order?.order_no || "S2108", colB, row1ValueY);
     doc.text(`${item.qty || 15}`, colD, row1ValueY);
 
-    // 3. SECTION C: The /20 split
+    // 3. SECTION C: The /20 split (Added spacing to match new row1ValueY)
     doc
       .font("Helvetica")
       .fontSize(11)
-      .text(`/${item.qty_split || 20}`, colB + 48, row1ValueY + 11);
+      .text(`/${item.qty_split || 20}`, colB + 48, row1ValueY + 12);
 
-    // 4. LOGO (Top Right)
+    // 4. LOGO (Moved more to the right)
     try {
-      doc.image(logoPath, colLogo, 10, { width: 65 });
+      doc.image(logoPath, colLogo, 10, { width: 60 });
     } catch (e) {
       console.error("Logo missing");
     }
 
-    // 5. SECTION E: Description (Adjusted Y to 55 for vertical balance)
+    // 5. SECTION E: Description (Value starts under the 'W' alignment)
     doc.font("Helvetica").fontSize(10).fillColor("#222222");
     const description =
-      item.remark_de ||
+      item.item.item_name ||
       "Toothed Belt GT2-140-6: profile GT2, length 140mm, width 6mm";
-    doc.text(description, colA, 55, { width: 300 });
+    doc.text(description, valColA, 62, { width: 300 });
 
-    // 6. SECTION F & G: Remarks (Left Bottom)
-    const bottomSectionY = 82;
+    // 6. SECTION F & G: Remarks (Aligned to valColA)
+    const bottomSectionY = 85;
     doc
       .font("Helvetica-Oblique")
       .fontSize(7.5)
@@ -558,29 +546,29 @@ export const generateLabelPDF = async (
     doc
       .font("Helvetica")
       .fontSize(13)
-      .text(item.remarks_cn || "no problem", colA, bottomSectionY + 10);
+      .text(item.remarks_cn || "no problem", valColA, bottomSectionY + 12);
 
     doc
       .font("Helvetica-Oblique")
       .fontSize(7.5)
-      .text("RemarkW", colA, bottomSectionY + 30);
+      .text("RemarkW", colA, bottomSectionY + 32);
 
+    // 7. SECTION H: Barcode (Increased textgaps for more vertical spacing)
     const barcodeValue = item.ref_no || "4283230040725";
-
     const barcodeBuffer = await bwipjs.toBuffer({
-      bcid: "code128", // Barcode type
-      text: barcodeValue, // The number to encode
-      scale: 3, // High resolution scaling
-      height: 12, // Height of the bars in mm
-      includetext: true, // Show the EAN numbers below
-      textsize: 11, // INCREASED: Makes the numbers larger and clearer
-      textgaps: 2, // NEW: Adds vertical space between the bars and the text
-      textxalign: "center", // Centers the text under the barcode
+      bcid: "code128",
+      text: barcodeValue,
+      scale: 3,
+      height: 12,
+      includetext: true,
+      textsize: 11,
+      textgaps: 4,
+      textxalign: "center",
     });
 
-    // Positioning: Placed at the bottom right of the 336x136 label
-    // Adjusted Y to 72 to account for the larger text height
-    doc.image(barcodeBuffer, 185, 72, { width: 140 });
+    // Final Positioning
+    doc.image(barcodeBuffer, 195, 75, { width: 140 });
+
     doc.end();
   } catch (error) {
     return next(error);
