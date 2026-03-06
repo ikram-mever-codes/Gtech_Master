@@ -1,7 +1,7 @@
 import dotenv from "dotenv";
 dotenv.config();
 
-import app from "./app";
+import app, { initializeCronJobs } from "./app";
 import { initializeDatabase } from "./config/database";
 import { getConnection } from "./config/misDb";
 import ErrorHandler from "./utils/errorHandler";
@@ -14,6 +14,7 @@ const startServer = async () => {
 
     const server = app.listen(PORT, () => {
       console.log(`Server is running on port ${PORT}`);
+      initializeCronJobs();
       console.log(`WebSocket server is running`);
     });
 

@@ -10,6 +10,7 @@ import { WarehouseItem } from "../models/warehouse_items";
 import { OrderItem } from "../models/order_items";
 import { ItemQuality } from "../models/item_qualities";
 import { Supplier } from "../models/suppliers";
+import { SupplierItem } from "../models/supplier_items";
 import {
   Like,
   Between,
@@ -149,6 +150,7 @@ export const getItemById = async (
     const variationRepository = AppDataSource.getRepository(VariationValue);
     const qualityRepository = AppDataSource.getRepository(ItemQuality);
     const orderItemRepository = AppDataSource.getRepository(OrderItem);
+    const supplierItemRepository = AppDataSource.getRepository(SupplierItem);
 
     const item = await itemRepository.findOne({
       where: { id: parseInt(id) },
@@ -168,6 +170,10 @@ export const getItemById = async (
     });
 
     const qualityCriteria = await qualityRepository.find({
+      where: { item_id: parseInt(id) },
+    });
+
+    const supplierItem = await supplierItemRepository.findOne({
       where: { item_id: parseInt(id) },
     });
 
@@ -198,8 +204,9 @@ export const getItemById = async (
         isSpecialItem: item.parent?.is_NwV === "Y",
         priceEUR: 0,
         priceRMB: 0,
-        isEURSpecial: item.is_eur_special === "Y",
-        isRMBSpecial: item.is_rmb_special === "Y",
+        isEURSpecial: item.is_eur_special || "N",
+        isRMBSpecial: item.is_rmb_special || "N",
+        isDimensionSpecial: item.is_dimension_special || "N",
       },
 
       dimensions: {
@@ -234,8 +241,8 @@ export const getItemById = async (
         er: item.effort_rating?.toString() || "0",
         isMeter: item.is_meter_item === 1,
         isPU: item.is_pu_item === 1,
-        isNPR: item.is_npr === "Y",
-        isNew: item.is_new === "Y",
+        isNPR: item.is_npr || "N",
+        isNew: item.is_new || "N",
         warehouseItem: warehouseItems[0]?.id?.toString() || "",
         idDE: item.ItemID_DE?.toString() || "",
         noDE: item.parent_no_de || "",
@@ -253,12 +260,13 @@ export const getItemById = async (
         foq: item.FOQ?.toString() || "0",
         fsq: item.FSQ?.toString() || "0",
         rmbPrice: item.RMB_Price?.toString() || "0",
-        isDimensionSpecial: item.is_dimension_special === "Y",
+        isDimensionSpecial: item.is_dimension_special || "N",
         suppCat: item.supp_cat || "",
       },
 
       qualityCriteria: qualityCriteria.map((qc: any) => ({
         id: qc.id,
+        itemId: qc.item_id,
         name: qc.name || "",
         picture: qc.picture || "",
         description: qc.description || "",
@@ -270,6 +278,24 @@ export const getItemById = async (
       pictures: {
         shopPicture: item.photo || "",
         ebayPictures: item.pix_path_eBay || "",
+      },
+
+      supplierItem: supplierItem ? {
+        priceRMB: supplierItem.price_rmb?.toString() || "0",
+        isPO: supplierItem.is_po || "No",
+        moq: supplierItem.moq?.toString() || "0",
+        interval: supplierItem.oi?.toString() || "0",
+        leadTime: supplierItem.lead_time || "",
+        noteCN: supplierItem.note_cn || "",
+        url: supplierItem.url || "",
+      } : {
+        priceRMB: "0",
+        isPO: "No",
+        moq: "0",
+        interval: "0",
+        leadTime: "",
+        noteCN: "",
+        url: "",
       },
 
       nprRemarks: item.npr_remark || "",
@@ -438,6 +464,8 @@ export const updateItem = async (
   try {
     const { id } = req.params;
     const itemRepository = AppDataSource.getRepository(Item);
+    const supplierItemRepository = AppDataSource.getRepository(SupplierItem);
+    const warehouseRepository = AppDataSource.getRepository(WarehouseItem);
 
     if (!id) {
       return next(new ErrorHandler("Item ID is required", 400));
@@ -505,6 +533,35 @@ export const updateItem = async (
     item.updated_at = new Date();
 
     await itemRepository.save(item);
+
+    const supplierItemData = req.body.supplierItem;
+    if (supplierItemData) {
+      const supplierItem = await supplierItemRepository.findOne({ where: { item_id: item.id } });
+      if (supplierItem) {
+        if (supplierItemData.price_rmb !== undefined) supplierItem.price_rmb = parseFloat(supplierItemData.price_rmb);
+        if (supplierItemData.is_po !== undefined) supplierItem.is_po = supplierItemData.is_po;
+        if (supplierItemData.moq !== undefined) supplierItem.moq = parseInt(supplierItemData.moq);
+        if (supplierItemData.oi !== undefined) supplierItem.oi = parseInt(supplierItemData.oi);
+        if (supplierItemData.lead_time !== undefined) supplierItem.lead_time = supplierItemData.lead_time;
+        if (supplierItemData.note_cn !== undefined) supplierItem.note_cn = supplierItemData.note_cn;
+        if (supplierItemData.url !== undefined) supplierItem.url = supplierItemData.url;
+        await supplierItemRepository.save(supplierItem);
+      }
+    }
+
+    const warehouseItemData = req.body.warehouseItemData;
+    if (warehouseItemData) {
+      const warehouseItem = await warehouseRepository.findOne({ where: { item_id: item.id } });
+      if (warehouseItem) {
+        if (warehouseItemData.is_stock_item !== undefined) warehouseItem.is_stock_item = warehouseItemData.is_stock_item;
+        if (warehouseItemData.is_active !== undefined) warehouseItem.is_active = warehouseItemData.is_active;
+        if (warehouseItemData.msq !== undefined) warehouseItem.msq = parseFloat(warehouseItemData.msq);
+        if (warehouseItemData.is_no_auto_order !== undefined) warehouseItem.is_no_auto_order = warehouseItemData.is_no_auto_order;
+        if (warehouseItemData.buffer !== undefined) warehouseItem.buffer = parseInt(warehouseItemData.buffer);
+        if (warehouseItemData.is_SnSI !== undefined) warehouseItem.is_SnSI = warehouseItemData.is_SnSI;
+        await warehouseRepository.save(warehouseItem);
+      }
+    }
 
     return res.status(200).json({
       success: true,
@@ -837,9 +894,9 @@ export const getParents = async (
       supplier_id: parent.supplier_id,
       supplier: parent.supplier
         ? {
-            id: parent.supplier.id,
-            name: parent.supplier.name,
-          }
+          id: parent.supplier.id,
+          name: parent.supplier.name,
+        }
         : null,
       item_count: parent.items?.length || 0,
       created_at: parent.created_at,
@@ -915,17 +972,17 @@ export const getParentById = async (
       is_active: parent.is_active,
       taric: parent.taric
         ? {
-            id: parent.taric.id,
-            code: parent.taric.code,
-            name_de: parent.taric.name_de,
-          }
+          id: parent.taric.id,
+          code: parent.taric.code,
+          name_de: parent.taric.name_de,
+        }
         : null,
       supplier: parent.supplier
         ? {
-            id: parent.supplier.id,
-            name: parent.supplier.name,
-            contact_person: parent.supplier.contact_person,
-          }
+          id: parent.supplier.id,
+          name: parent.supplier.name,
+          contact_person: parent.supplier.contact_person,
+        }
         : null,
       variations: {
         de: [parent.var_de_1, parent.var_de_2, parent.var_de_3].filter(Boolean),
@@ -1816,7 +1873,7 @@ const syncTaricToMIS = async (
         convertUndefinedToNull(taricData.name_cn),
         convertUndefinedToNull(taricData.updated_at) || new Date(),
         convertUndefinedToNull(taricData.originalCode) ||
-          convertUndefinedToNull(taricData.code),
+        convertUndefinedToNull(taricData.code),
       ]);
     } else if (operation === "delete") {
       const query = `DELETE FROM tarics WHERE code = ?`;
@@ -2265,7 +2322,6 @@ export const exportItemsToCSV = async (
     const warehouseRepository = AppDataSource.getRepository(WarehouseItem);
     const variationRepository = AppDataSource.getRepository(VariationValue);
 
-    // Get all items with their relations
     const items = await itemRepository.find({
       relations: ["parent", "taric", "category"],
       order: {
@@ -2273,14 +2329,12 @@ export const exportItemsToCSV = async (
       },
     });
 
-    // Helper function to format date
     const formatDate = (date: Date | undefined) => {
       if (!date) return "";
       const d = new Date(date);
       return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}:${String(d.getSeconds()).padStart(2, "0")}`;
     };
 
-    // Helper function to get warehouse data for an item
     const getWarehouseData = async (itemId: number) => {
       const warehouseItems = await warehouseRepository.find({
         where: { item_id: itemId },
@@ -2288,7 +2342,6 @@ export const exportItemsToCSV = async (
       return warehouseItems[0] || null;
     };
 
-    // Helper function to get variation values
     const getVariationValues = async (itemId: number) => {
       const variations = await variationRepository.find({
         where: { item_id: itemId },
@@ -2296,18 +2349,14 @@ export const exportItemsToCSV = async (
       return variations[0] || null;
     };
 
-    // Generate price columns based on quantity breaks
     const getPriceColumns = (item: any) => {
-      // You need to get these prices from somewhere - maybe from a pricing table
-      // For now, using RMB_Price as base with some calculations
       const basePrice = item.RMB_Price || 0;
       const priceLevels = [1, 2, 5, 10, 25, 50, 100, 200, 500, 1000, 2000];
 
       return priceLevels.map((level) => {
-        // Simple volume discount logic - you should replace this with actual pricing logic
         let discount = 0;
         if (level >= 1000)
-          discount = 0.3; // 30% discount for 1000+
+          discount = 0.3;
         else if (level >= 500) discount = 0.25;
         else if (level >= 200) discount = 0.2;
         else if (level >= 100) discount = 0.15;
@@ -2395,94 +2444,85 @@ export const exportItemsToCSV = async (
       "Max Quantity",
     ];
 
-    // Generate CSV rows
     const csvRows = [];
 
-    // Add headers
     csvRows.push(headers.join(";"));
 
-    // Process each item
     for (const item of items) {
       try {
         const warehouseData = await getWarehouseData(item.id);
         const variationData = await getVariationValues(item.id);
         const priceColumns = getPriceColumns(item);
 
-        // Get variations from parent
         const parent = item.parent;
 
-        // Calculate volume in dm³ (convert from cm³ to dm³: divide by 1000)
         const volume =
           ((item.length || 0) * (item.width || 0) * (item.height || 0)) / 1000;
-
-        // Bulk quantities
         const bulkQuantities = [2, 5, 10, 25, 50, 100, 200, 500, 1000, 2000];
 
-        // Create row data matching CSV structure
         const rowData = [
-          formatDate(item.updated_at || item.created_at || new Date()), // Timestamp
-          item.ean?.toString() || "", // EAN
-          parent?.de_no || "NONE", // Parent No DE
-          item.ItemID_DE?.toString() || item.id.toString(), // Item No DE
-          item.supp_cat || item.category?.name || "STD", // Sup_cat
-          item.item_name || parent?.name_de || "", // Item Name DE
-          parent?.var_de_1 || "", // Variation DE 1
-          variationData?.value_de || "", // Value DE
-          parent?.var_de_2 || "", // Variation DE 2
-          variationData?.value_de_2 || "", // Value DE 2
-          parent?.var_de_3 || "", // Variation DE 3
-          variationData?.value_de_3 || "", // Value DE 3
-          item.item_name_cn || parent?.name_en || "", // Item Name EN
-          item.item_name || parent?.name_en || "", // Item Name
-          parent?.var_en_1 || "", // Variation EN 1
-          variationData?.value_en || "", // Value EN
-          parent?.var_en_2 || "", // Variation EN 2
-          variationData?.value_en_2 || "", // Value EN 2
-          parent?.var_en_3 || "", // Variation EN 3
-          variationData?.value_en_3 || "", // Value EN 3
-          item.taric?.code || "", // Code
-          item.ISBN?.toString() || "0", // ISBN
-          (item.width || 0).toFixed(1).replace(".", ","), // Width
-          (item.height || 0).toFixed(1).replace(".", ","), // Height
-          (item.length || 0).toFixed(1).replace(".", ","), // Length
-          (item.weight || 0).toFixed(2).replace(".", ","), // Weight
-          (item.weight || 0).toFixed(4).replace(".", ","), // Shipping Weight (using same as weight)
-          warehouseData?.ship_class || "1", // Shipping Class
-          item.is_qty_dividable || "Y", // Is Qty Dividable
-          warehouseData?.is_stock_item || "N", // Is Stock Item
-          item.FOQ?.toString() || "0", // FOQ
-          item.FSQ?.toString() || "0", // FSQ
-          warehouseData?.msq?.toString() || "0", // MSQ
-          "0", // MOQ Result (calculate if needed)
-          "0", // Interval (calculate if needed)
-          warehouseData?.buffer?.toString() || "0", // Buffer Result
+          formatDate(item.updated_at || item.created_at || new Date()),
+          item.ean?.toString() || "",
+          parent?.de_no || "NONE",
+          item.ItemID_DE?.toString() || item.id.toString(),
+          item.supp_cat || item.category?.name || "STD",
+          item.item_name || parent?.name_de || "",
+          parent?.var_de_1 || "",
+          variationData?.value_de || "",
+          parent?.var_de_2 || "",
+          variationData?.value_de_2 || "",
+          parent?.var_de_3 || "",
+          variationData?.value_de_3 || "",
+          item.item_name_cn || parent?.name_en || "",
+          item.item_name || parent?.name_en || "",
+          parent?.var_en_1 || "",
+          variationData?.value_en || "",
+          parent?.var_en_2 || "",
+          variationData?.value_en_2 || "",
+          parent?.var_en_3 || "",
+          variationData?.value_en_3 || "",
+          item.taric?.code || "",
+          item.ISBN?.toString() || "0",
+          (item.width || 0).toFixed(1).replace(".", ","),
+          (item.height || 0).toFixed(1).replace(".", ","),
+          (item.length || 0).toFixed(1).replace(".", ","),
+          (item.weight || 0).toFixed(2).replace(".", ","),
+          (item.weight || 0).toFixed(4).replace(".", ","),
+          warehouseData?.ship_class || "1",
+          item.is_qty_dividable || "Y",
+          warehouseData?.is_stock_item || "N",
+          item.FOQ?.toString() || "0",
+          item.FSQ?.toString() || "0",
+          warehouseData?.msq?.toString() || "0",
+          "0",
+          "0",
+          warehouseData?.buffer?.toString() || "0",
           Number(item.RMB_Price || 0)
             .toFixed(2)
-            .replace(".", ","), // Price RMB
-          "Y", // Y/N (active status)
-          item.many_components?.toString() || "1", // Many Components
-          item.effort_rating?.toString() || "3", // Effort Rating
+            .replace(".", ","),
+          "Y",
+          item.many_components?.toString() || "1",
+          item.effort_rating?.toString() || "3",
           Number(item.RMB_Price || 0)
             .toFixed(2)
-            .replace(".", ","), // EK Net (using RMB price as base)
-          volume.toFixed(2).replace(".", ","), // Item Volume (dm³)
-          "0,00", // Freight Costs Volume
-          "0,00", // Freight Costs Weight
-          "0,00", // Freight Costs
-          "0,00", // Import Duty Charge (EUR)
+            .replace(".", ","),
+          volume.toFixed(2).replace(".", ","),
+          "0,00",
+          "0,00",
+          "0,00",
+          "0,00",
           Number(item.RMB_Price || 0)
             .toFixed(2)
-            .replace(".", ","), // SP_eBay (placeholder)
-          ...priceColumns, // SP_DE_NET_X columns (11 columns)
-          ...bulkQuantities.map((qty) => qty.toString()), // BulkQty columns (10 columns)
-          "19", // USt % (VAT)
-          item.photo?.split("\\").pop() || "DummyPicture.jpg", // Dummy-Bild01
-          item.pix_path || "", // Image Path EAN
-          item.pix_path_eBay || "", // Image Path eBay
-          "10000", // Max Quantity
+            .replace(".", ","),
+          ...priceColumns,
+          ...bulkQuantities.map((qty) => qty.toString()),
+          "19",
+          item.photo?.split("\\").pop() || "DummyPicture.jpg",
+          item.pix_path || "",
+          item.pix_path_eBay || "",
+          "10000",
         ];
 
-        // Ensure rowData has exactly the same number of columns as headers
         if (rowData.length !== headers.length) {
           console.warn(
             `Row data length mismatch for item ${item.id}: ${rowData.length} vs ${headers.length}`,
@@ -2492,7 +2532,6 @@ export const exportItemsToCSV = async (
         const formattedRow = rowData.map((value) => {
           if (value === null || value === undefined) return "";
           const stringValue = value.toString();
-          // Wrap in quotes if contains semicolon, newline, or double quote
           if (
             stringValue.includes(";") ||
             stringValue.includes("\n") ||
@@ -2506,13 +2545,10 @@ export const exportItemsToCSV = async (
         csvRows.push(formattedRow.join(";"));
       } catch (itemError) {
         console.error(`Error processing item ${item.id}:`, itemError);
-        // Continue with next item
       }
     }
 
     const csvContent = csvRows.join("\n");
-
-    // Set headers for file download
     res.setHeader("Content-Type", "text/csv; charset=utf-8");
     res.setHeader(
       "Content-Disposition",
@@ -2524,7 +2560,6 @@ export const exportItemsToCSV = async (
     res.setHeader("Expires", "0");
     res.setHeader("X-Content-Type-Options", "nosniff");
 
-    // Add BOM for UTF-8 to handle special characters
     const bom = "\uFEFF";
     return res.status(200).send(bom + csvContent);
   } catch (error) {

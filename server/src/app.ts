@@ -76,7 +76,7 @@ app.use("/uploads", express.static(path.join(__uploads_dirname, "/uploads")));
 
 app.use(errorMiddleware);
 
-const initializeCronJobs = () => {
+export const initializeCronJobs = () => {
   const cronJobs = CronJobs.getInstance();
 
   if (
@@ -90,12 +90,6 @@ const initializeCronJobs = () => {
   }
 };
 
-AppDataSource.initialize()
-  .then(() => {
-    console.log("📦 Database connected");
-    initializeCronJobs();
-  })
-  .catch((error) => console.log("Database connection error:", error));
 
 app.use((req: Request, res: Response, next: NextFunction) => {
   res.status(404).json({ message: "Resource Not Found!" });
