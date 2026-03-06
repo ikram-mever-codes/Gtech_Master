@@ -30,25 +30,7 @@ export function DataTable<T>({
     renderRowDetails,
     expandedRowId
 }: DataTableProps<T>) {
-    if (loading) {
-        return (
-            <div className="p-8 text-center">
-                <div className="inline-flex items-center gap-3">
-                    <ArrowPathIcon className="h-5 w-5 animate-spin text-gray-500" />
-                    <span className="text-gray-600">Loading...</span>
-                </div>
-            </div>
-        );
-    }
 
-    if (data.length === 0) {
-        return (
-            <div className="p-8 text-center">
-                <DocumentTextIcon className="h-10 w-10 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-600">{emptyMessage}</p>
-            </div>
-        );
-    }
 
     return (
         <div className="overflow-x-auto rounded-lg border border-gray-200 shadow-sm">
@@ -80,34 +62,51 @@ export function DataTable<T>({
                             ))}
                         </tr>
                     )}
-                    {data.map((row, idx) => {
-                        const isExpanded = expandedRowId !== undefined && expandedRowId !== null && ((row as any).id === expandedRowId || (row as any)._id === expandedRowId);
+                    {loading ? (
+                        <tr>
+                            <td colSpan={columns.length} className="px-4 py-8 text-center">
+                                <div className="inline-flex items-center gap-3">
+                                    <ArrowPathIcon className="h-4 w-4 animate-spin text-gray-500" />
+                                    <span className="text-gray-500 text-xs">Loading data...</span>
+                                </div>
+                            </td>
+                        </tr>
+                    ) : data.length === 0 ? (
+                        <tr>
+                            <td colSpan={columns.length} className="px-4 py-8 text-center text-gray-500 text-xs font-medium">
+                                {emptyMessage}
+                            </td>
+                        </tr>
+                    ) : (
+                        data.map((row, idx) => {
+                            const isExpanded = expandedRowId !== undefined && expandedRowId !== null && ((row as any).id === expandedRowId || (row as any)._id === expandedRowId);
 
-                        return (
-                            <React.Fragment key={(row as any).id || (row as any)._id || idx}>
-                                <tr
-                                    className={`hover:bg-gray-50 transition-colors ${getRowClassName ? getRowClassName(row, idx) : ""}`}
-                                >
-                                    {columns.map((c, i) => (
-                                        <td
-                                            key={i}
-                                            className={`px-2 py-1.5 text-${c.align || "left"} border border-gray-200 text-[11px] leading-tight`}
-                                            style={c.width ? { width: c.width, minWidth: c.width } : {}}
-                                        >
-                                            {c.render(row, idx)}
-                                        </td>
-                                    ))}
-                                </tr>
-                                {isExpanded && renderRowDetails && (
-                                    <tr>
-                                        <td colSpan={columns.length} className="px-4 py-4 bg-gray-50 border border-gray-200">
-                                            {renderRowDetails(row, idx)}
-                                        </td>
+                            return (
+                                <React.Fragment key={(row as any).id || (row as any)._id || idx}>
+                                    <tr
+                                        className={`hover:bg-gray-50 transition-colors ${getRowClassName ? getRowClassName(row, idx) : ""}`}
+                                    >
+                                        {columns.map((c, i) => (
+                                            <td
+                                                key={i}
+                                                className={`px-2 py-1.5 text-${c.align || "left"} border border-gray-200 text-[11px] leading-tight`}
+                                                style={c.width ? { width: c.width, minWidth: c.width } : {}}
+                                            >
+                                                {c.render(row, idx)}
+                                            </td>
+                                        ))}
                                     </tr>
-                                )}
-                            </React.Fragment>
-                        );
-                    })}
+                                    {isExpanded && renderRowDetails && (
+                                        <tr>
+                                            <td colSpan={columns.length} className="px-4 py-4 bg-gray-50 border border-gray-200">
+                                                {renderRowDetails(row, idx)}
+                                            </td>
+                                        </tr>
+                                    )}
+                                </React.Fragment>
+                            );
+                        })
+                    )}
                 </tbody>
             </table>
         </div>

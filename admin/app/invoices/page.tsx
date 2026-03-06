@@ -27,6 +27,7 @@ import {
   SortAsc,
   SortDesc,
   Printer,
+  Package,
 } from "lucide-react";
 
 import {
@@ -1024,115 +1025,103 @@ const InvoiceListPage: React.FC = () => {
                                 </tr>
                                 {showExpanded && (
                                   <tr>
-                                    <td colSpan={activeInvTab === "closed_invoices" ? 11 : 9} className="p-0 bg-[#F8F9FA]">
+                                    <td colSpan={activeInvTab === "closed_invoices" ? 11 : 8} className="p-0 bg-[#F8F9FA]">
                                       <div className="p-4 space-y-4">
-                                        {expState.loading ? (
-                                          <div className="flex justify-center py-4">
-                                            <Loader2 className="w-6 h-6 animate-spin text-[#8CC21B]" />
-                                          </div>
-                                        ) : (
-                                          <>
-                                            {expState.taric && expState.data?.taricGroups && (
-                                              <SpreadSheet
-                                                data={expState.data.taricGroups}
-                                                showTotals={true}
-                                                totalQty={expState.data.taricGroups.reduce((s: any, g: any) => s + g.totalQty, 0)}
-                                                totalPrice={expState.data.taricGroups.reduce((s: any, g: any) => s + g.totalPrice, 0)}
-                                                columns={[
-                                                  { header: "Pos", render: (_: any, idx: number) => idx + 1, width: "40px" },
-                                                  { header: "Taric Name EN", render: (it: any) => it.taricNameEn },
-                                                  { header: "Taric Code", render: (it: any) => `/ ${it.taricCode}` },
-                                                  { header: "Duty rate", render: (it: any) => it.dutyRate ? `${it.dutyRate}%` : "0.00%" },
-                                                  { header: "Total Qty", render: (it: any) => it.totalQty, align: "center" },
-                                                  { header: "Unit Price", render: (it: any) => `€${it.unitPrice?.toFixed(2)}` },
-                                                  { header: "Total Price", render: (it: any) => `€${it.totalPrice?.toFixed(2)}` },
-                                                  {
-                                                    header: "Operation",
-                                                    render: () => (
-                                                      <button className="flex items-center gap-1 px-3 py-1 bg-[#1A73E8] text-white text-[10px] font-bold rounded hover:bg-[#1557B0]">
-                                                        <RefreshCw className="w-3 h-3" /> Set taric
+                                        {expState.taric && (
+                                          <SpreadSheet
+                                            data={expState.data?.taricGroups || []}
+                                            loading={expState.loading}
+                                            showTotals={true}
+                                            columns={[
+                                              { header: "Position", render: (_: any, idx: number) => idx + 1, width: "70px" },
+                                              { header: "Taric Name EN", render: (it: any) => it.taricNameEn, width: "350px" },
+                                              { header: "Taric Code", render: (it: any) => `/ ${it.taricCode}`, width: "120px" },
+                                              { header: "Duty rate", render: (it: any) => it.dutyRate ? `${Number(it.dutyRate).toFixed(2)}` : "0.00", width: "80px" },
+                                              { header: "Total Qty", render: (it: any) => it.totalQty, align: "center", width: "100px" },
+                                              { header: "Unit Price (€)", render: (it: any) => it.unitPrice?.toFixed(2), width: "100px" },
+                                              { header: "Total Price (€)", render: (it: any) => it.totalPrice?.toLocaleString(undefined, { minimumFractionDigits: 2 }), width: "120px" },
+                                              {
+                                                header: "Operation",
+                                                render: () => (
+                                                  <button className="flex items-center gap-1 px-3 py-1 bg-[#1A73E8] text-white text-[10px] font-bold rounded hover:bg-[#1557B0]">
+                                                    <RefreshCw className="w-3 h-3" /> Set taric
+                                                  </button>
+                                                ),
+                                                width: "120px"
+                                              }
+                                            ]}
+                                            totalCols={[
+                                              { label: "Grand Total", value: "", width: "620px", align: "left" },
+                                              { value: expState.data?.taricGroups?.reduce((s: number, g: any) => s + (g.totalQty || 0), 0) || 0, width: "100px", align: "center" },
+                                              { value: "", width: "100px" },
+                                              { value: `€${(expState.data?.taricGroups?.reduce((s: number, g: any) => s + (g.totalPrice || 0), 0) || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`, width: "120px", align: "left" },
+                                              { value: "", width: "120px" }
+                                            ]}
+                                          />
+                                        )}
+                                        {expState.items && (
+                                          <SpreadSheet
+                                            data={expState.data?.detailedItems || []}
+                                            loading={expState.loading}
+                                            columns={[
+                                              {
+                                                header: "ID",
+                                                render: (it: any) => (
+                                                  <div className="flex flex-col gap-1.5 p-1">
+                                                    <div className="px-2 py-1 bg-[#495057] text-white text-[10px] font-bold rounded-[4px] text-center mb-1 flex items-center justify-center gap-1.5">
+                                                      <FileText className="w-3 h-3" /> {it.id}
+                                                    </div>
+                                                    <div className="flex flex-col gap-1">
+                                                      <button
+                                                        onClick={() => {
+                                                          setSelectedItem(it);
+                                                          setNewQty(it.qty);
+                                                          setShowQTYModal(true);
+                                                        }}
+                                                        className="flex items-center gap-1.5 px-2 py-1.5 text-[9px] font-bold bg-[#495057] text-white rounded-[4px] hover:bg-[#343A40] transition shadow-sm uppercase"
+                                                      >
+                                                        <div className="bg-white/20 p-0.5 rounded"><Package className="w-2.5 h-2.5" /></div> QTY
                                                       </button>
-                                                    )
-                                                  }
-                                                ]}
-                                              />
-                                            )}
-                                            {expState.items && expState.data?.detailedItems && (
-                                              <SpreadSheet
-                                                data={expState.data.detailedItems}
-                                                columns={[
-                                                  {
-                                                    header: "ID",
-                                                    render: (it: any) => (
-                                                      <div className="flex flex-col gap-2">
-                                                        <div className="px-2 py-1 bg-[#475569] text-white text-[10px] font-bold rounded-[4px] text-center mb-1">
-                                                          {it.id}
-                                                        </div>
-                                                        <div className="flex flex-col gap-1">
-                                                          <button
-                                                            onClick={() => {
-                                                              setSelectedItem(it);
-                                                              setNewQty(it.qty);
-                                                              setShowQTYModal(true);
-                                                            }}
-                                                            className="flex items-center gap-1.5 px-2 py-1 text-[9px] font-bold bg-[#E2E8F0] text-[#475569] rounded-[4px] hover:bg-gray-200 transition"
-                                                          >
-                                                            <Pencil className="w-2.5 h-2.5" /> QTY
-                                                          </button>
-                                                          <button
-                                                            onClick={() => {
-                                                              setSelectedItem(it);
-                                                              setSplitQty(Math.floor(it.qty / 2));
-                                                              setShowSPModal(true);
-                                                            }}
-                                                            className="flex items-center gap-1.5 px-2 py-1 text-[9px] font-bold bg-[#FFF7ED] text-[#EA580C] rounded-[4px] hover:bg-orange-100 transition"
-                                                          >
-                                                            <Scissors className="w-2.5 h-2.5" /> Split
-                                                          </button>
-                                                          <button
-                                                            onClick={() => {
-                                                              setSelectedItem(it);
-                                                              setTargetCargoId(it.cargo_id || "");
-                                                              setShowREModal(true);
-                                                            }}
-                                                            className="flex items-center gap-1.5 px-2 py-1 text-[9px] font-bold bg-[#F0FDF4] text-[#16A34A] rounded-[4px] hover:bg-green-100 transition"
-                                                          >
-                                                            <MoveRight className="w-2.5 h-2.5" /> ReAssign
-                                                          </button>
-                                                          <button
-                                                            onClick={() => handlePrintLabel(it)}
-                                                            className="flex items-center gap-1.5 px-2 py-1 text-[9px] font-bold bg-gray-100 text-gray-700 rounded-[4px] hover:bg-gray-200 transition"
-                                                          >
-                                                            <Printer className="w-2.5 h-2.5" /> Print
-                                                          </button>
-                                                        </div>
-                                                      </div>
-                                                    ),
-                                                    width: "100px"
-                                                  },
-                                                  { header: "EAN", render: (it: any) => it.item?.ean },
-                                                  { header: "Item Name", render: (it: any) => it.item?.item_name, width: "200px" },
-                                                  { header: "Taric code", render: (it: any) => it.item?.taric?.code },
-                                                  { header: "Remark", render: (it: any) => it.remark_de },
-                                                  { header: "Order_no", render: (it: any) => it.order?.order_no },
-                                                  { header: "SOID", render: (it: any) => it.supplier_order_id },
-                                                  { header: "Status", render: (it: any) => it.status },
-                                                  { header: "V(dm³)", render: (it: any) => it.v?.toFixed(2) },
-                                                  { header: "W(kg)", render: (it: any) => it.w?.toFixed(2) },
-                                                  { header: "QTY", render: (it: any) => it.qty },
-                                                  { header: "RMB", render: (it: any) => it.rmb_special_price },
-                                                  { header: "EK", render: (it: any) => it.eur_special_price },
-                                                ]}
-                                                showTotals={true}
-                                                totalCols={[
-                                                  { label: "Total Qty", value: expState.data.detailedItems.reduce((s: any, it: any) => s + (it.qty || 0), 0), width: "100px", align: "center" },
-                                                  { label: "Total V(dm³)", value: expState.data.detailedItems.reduce((s: any, it: any) => s + (it.v || 0), 0).toFixed(2), width: "120px", align: "center" },
-                                                  { label: "Total W(kg)", value: expState.data.detailedItems.reduce((s: any, it: any) => s + (it.w || 0), 0).toFixed(2), width: "120px", align: "center" },
-                                                  { label: "Items count", value: expState.data.detailedItems.length, width: "100px", align: "right" }
-                                                ]}
-                                              />
-                                            )}
-                                          </>
+                                                      <button
+                                                        onClick={() => {
+                                                          setSelectedItem(it);
+                                                          setSplitQty(Math.floor(it.qty / 2));
+                                                          setShowSPModal(true);
+                                                        }}
+                                                        className="flex items-center gap-1.5 px-2 py-1.5 text-[9px] font-bold bg-[#F15A24] text-white rounded-[4px] hover:bg-[#D9481B] transition shadow-sm uppercase"
+                                                      >
+                                                        <div className="bg-white/20 p-0.5 rounded"><Scissors className="w-2.5 h-2.5" /></div> Split
+                                                      </button>
+                                                      <button
+                                                        onClick={() => {
+                                                          setSelectedItem(it);
+                                                          setTargetCargoId(it.cargo_id || "");
+                                                          setShowREModal(true);
+                                                        }}
+                                                        className="flex items-center gap-1.5 px-2 py-1.5 text-[9px] font-bold bg-[#4F46E5] text-white rounded-[4px] hover:bg-[#4338CA] transition shadow-sm uppercase"
+                                                      >
+                                                        <div className="bg-white/20 p-0.5 rounded"><RefreshCw className="w-2.5 h-2.5" /></div> ReAssign
+                                                      </button>
+                                                    </div>
+                                                  </div>
+                                                ),
+                                                width: "110px"
+                                              },
+                                              { header: "EAN", render: (it: any) => it.item?.ean, width: "130px" },
+                                              { header: "Item Name", render: (it: any) => it.item?.item_name, width: "220px" },
+                                              { header: "Taric code", render: (it: any) => it.item?.taric?.code, width: "110px" },
+                                              { header: "Remark", render: (it: any) => `// ${it.remark_de || ''}`, width: "100px" },
+                                              { header: "Order_no", render: (it: any) => it.order?.order_no || "-", width: "100px" },
+                                              { header: "SOID", render: (it: any) => it.supplier_order_id || "-", width: "60px" },
+                                              { header: "Status", render: (it: any) => it.status, width: "70px" },
+                                              { header: "V(dm³)", render: (it: any) => it.v?.toFixed(2), width: "80px", align: "center" },
+                                              { header: "W(kg)", render: (it: any) => it.w?.toFixed(2), width: "80px", align: "center" },
+                                              { header: "QTY", render: (it: any) => it.qty, width: "60px", align: "center" },
+                                              { header: "RMB", render: (it: any) => it.rmb_special_price || "-", width: "60px", align: "center" },
+                                              { header: "EK", render: (it: any) => it.eur_special_price || "-", width: "60px", align: "center" },
+                                            ]}
+                                            showTotals={false}
+                                          />
                                         )}
                                       </div>
                                     </td>

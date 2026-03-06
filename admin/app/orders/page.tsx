@@ -1028,17 +1028,14 @@ const OrderPage = () => {
   const handleReassignItemAction = async () => {
     if (!selectedItem || !targetCargoId) return;
     try {
-      // Get the order_id for the selected item
       const orderId = selectedItem.order_id || selectedItem.parentOrder?.id;
       if (!orderId) {
         toast.error("Could not determine order for this item");
         return;
       }
-      // Update the item's cargo_id
       await updateOrderItemStatus(selectedItem.id, {
         cargo_id: Number(targetCargoId),
       });
-      // Call assignOrdersToCargo to trigger invoice generation
       await assignOrdersToCargo(Number(targetCargoId), [Number(orderId)]);
       toast.success(`Item reassigned to Cargo ${targetCargoId} — invoice generated!`);
       setShowREModal(false);
@@ -3190,7 +3187,7 @@ const OrderPage = () => {
             <div className="space-y-6">
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-2">
-                  New QTY:
+                  QTYLabel:
                 </label>
                 <input
                   type="number"

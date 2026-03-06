@@ -11,6 +11,7 @@ import {
   XCircleIcon,
   ExclamationTriangleIcon,
   MagnifyingGlassIcon,
+  ArrowLeftIcon,
   LinkIcon,
 } from "@heroicons/react/24/outline";
 import Image from "next/image";
@@ -22,11 +23,183 @@ import {
   updateItem,
   getItemVariations,
   getItemQualityCriteria,
+  createQualityCriterion,
+  updateQualityCriterion,
+  deleteQualityCriterion,
   ItemDetails,
 } from "@/api/items";
+import { uploadFile } from "@/api/library";
+import CustomModal from "@/components/UI/CustomModal";
 import { loadingStyles, successStyles, errorStyles } from "@/utils/constants";
 import { Package } from "lucide-react";
 import PageHeader from "@/components/UI/PageHeader";
+
+const StatusIndicator = ({
+  value,
+  label = "",
+}: {
+  value: boolean;
+  label?: string;
+}) => (
+  <span
+    className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${value ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+      }`}
+  >
+    {value ? (
+      <CheckCircleIcon className="h-3 w-3" />
+    ) : (
+      <XCircleIcon className="h-3 w-3" />
+    )}
+    {label || (value ? "Yes" : "No")}
+  </span>
+);
+
+const EditableInfoRow = ({
+  label,
+  value,
+  field,
+  type = "text",
+  editMode,
+  itemData,
+  setItemData,
+  readOnly = false,
+}: {
+  label: string;
+  value: string;
+  field: string;
+  type?: string;
+  editMode: boolean;
+  itemData: any;
+  setItemData: (data: any) => void;
+  readOnly?: boolean;
+}) => (
+  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 py-3 border-b border-gray-100">
+    <div className="text-sm font-medium text-gray-700">{label}</div>
+    <div className="md:col-span-2">
+      {editMode && !readOnly ? (
+        <input
+          type={type}
+          value={value || ""}
+          onChange={(e) => {
+            if (itemData) {
+              const updated = { ...itemData };
+              if (field.includes(".")) {
+                const [parent, child] = field.split(".");
+                (updated as any)[parent][child] = e.target.value;
+              } else {
+                (updated as any)[field] = e.target.value;
+              }
+              setItemData(updated);
+            }
+          }}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md"
+        />
+      ) : (
+        <span className="text-gray-900">{value || "—"}</span>
+      )}
+    </div>
+  </div>
+);
+
+const SelectInfoRow = ({
+  label,
+  value,
+  field,
+  options,
+  editMode,
+  itemData,
+  setItemData,
+}: {
+  label: string;
+  value: string;
+  field: string;
+  options: { label: string; value: string }[];
+  editMode: boolean;
+  itemData: any;
+  setItemData: (data: any) => void;
+}) => (
+  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 py-3 border-b border-gray-100">
+    <div className="text-sm font-medium text-gray-700">{label}</div>
+    <div className="md:col-span-2">
+      {editMode ? (
+        <select
+          value={value || ""}
+          onChange={(e) => {
+            if (itemData) {
+              const updated = { ...itemData };
+              const val = e.target.value;
+              const booleanFields = [
+                "isActive",
+                "others.isQTYdiv",
+                "others.isMeter",
+                "others.isPU",
+                "others.isNAO",
+                "others.isSnSI",
+                "others.isStock",
+                "others.isActive",
+                "others.isNew",
+                "others.isDimensionSpecial",
+                "parent.isEURSpecial",
+                "parent.isRMBSpecial",
+              ];
+              let finalValue: any = val;
+              if (booleanFields.includes(field)) {
+                finalValue = (val === "Y" || val === "Yes");
+              }
+
+              if (field.includes(".")) {
+                const [parent, child] = field.split(".");
+                (updated as any)[parent][child] = finalValue;
+              } else {
+                (updated as any)[field] = finalValue;
+              }
+              setItemData(updated);
+            }
+          }}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary"
+        >
+          {options.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+      ) : (
+        <span className="text-gray-900">{value || "—"}</span>
+      )}
+    </div>
+  </div>
+);
+
+const InfoRow = ({
+  label,
+  value,
+  children,
+}: {
+  label: string;
+  value?: string;
+  children?: React.ReactNode;
+}) => (
+  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 py-3 border-b border-gray-100">
+    <div className="text-sm font-medium text-gray-700">{label}</div>
+    <div className="md:col-span-2">
+      {children || <span className="text-gray-900">{value || "—"}</span>}
+    </div>
+  </div>
+);
+
+const SectionHeader = ({
+  title,
+  icon,
+}: {
+  title: string;
+  icon?: React.ReactNode;
+}) => (
+  <div className="flex items-center gap-2 mb-4">
+    {icon}
+    <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
+  </div>
+);
 
 const ItemDetailsPage = () => {
   const { id } = useParams();
@@ -37,6 +210,100 @@ const ItemDetailsPage = () => {
   const [itemData, setItemData] = useState<ItemDetails | null>(null);
   const [variations, setVariations] = useState<any[]>([]);
   const [qualityCriteria, setQualityCriteria] = useState<any[]>([]);
+  const [isQualityModalOpen, setIsQualityModalOpen] = useState(false);
+  const [editingQuality, setEditingQuality] = useState<any>(null);
+  const [qualityFormData, setQualityFormData] = useState({
+    name: "",
+    description: "",
+    descriptionCN: "",
+    picture: null as File | null,
+    pictureUrl: "",
+  });
+
+  const handleOpenQualityModal = (quality: any = null) => {
+    if (quality) {
+      setEditingQuality(quality);
+      setQualityFormData({
+        name: quality.name || "",
+        description: quality.description || "",
+        descriptionCN: quality.descriptionCN || "",
+        picture: null,
+        pictureUrl: quality.picture || "",
+      });
+    } else {
+      setEditingQuality(null);
+      setQualityFormData({
+        name: "",
+        description: "",
+        descriptionCN: "",
+        picture: null,
+        pictureUrl: "",
+      });
+    }
+    setIsQualityModalOpen(true);
+  };
+
+  const handleCloseQualityModal = () => {
+    setIsQualityModalOpen(false);
+    setEditingQuality(null);
+  };
+
+  const handleQualityFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setQualityFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setQualityFormData((prev) => ({ ...prev, picture: e.target.files![0] }));
+    }
+  };
+
+  const handleSaveQuality = async () => {
+    if (!id) return;
+    const itemId = parseInt(id as string);
+
+    try {
+      let pictureUrl = qualityFormData.pictureUrl;
+
+      if (qualityFormData.picture) {
+        const formData = new FormData();
+        formData.append("file", qualityFormData.picture);
+        const uploadRes = await uploadFile(formData);
+        pictureUrl = uploadRes.data.url;
+      }
+
+      const payload = {
+        name: qualityFormData.name,
+        description: qualityFormData.description,
+        description_cn: qualityFormData.descriptionCN,
+        picture: pictureUrl,
+      };
+
+      if (editingQuality) {
+        await updateQualityCriterion(editingQuality.id, payload);
+      } else {
+        await createQualityCriterion(itemId, payload);
+      }
+
+      // Refresh data
+      const qualityResponse = await getItemQualityCriteria(itemId);
+      setQualityCriteria(qualityResponse.data || []);
+      handleCloseQualityModal();
+    } catch (error) {
+      console.error("Error saving quality criterion:", error);
+    }
+  };
+
+  const handleDeleteQuality = async (qualityId: number) => {
+    if (!confirm("Are you sure you want to delete this quality criterion?")) return;
+    try {
+      await deleteQualityCriterion(qualityId);
+      setQualityCriteria((prev) => prev.filter((q) => q.id !== qualityId));
+    } catch (error) {
+      console.error("Error deleting quality criterion:", error);
+    }
+  };
 
   const tabs = [
     { id: "item", label: "Item Details" },
@@ -44,7 +311,7 @@ const ItemDetailsPage = () => {
     { id: "variations", label: "Variations & Values" },
     { id: "dimensions", label: "Dimensions" },
     { id: "others", label: "Others" },
-    { id: "supplier", label: "Supplier" },
+    { id: "supplier", label: "Supplier Item" },
     { id: "quality", label: "Quality Criteria" },
     { id: "attachments", label: "Attachments" },
     { id: "pictures", label: "Item Pictures" },
@@ -63,7 +330,36 @@ const ItemDetailsPage = () => {
             getItemQualityCriteria(itemId),
           ]);
 
-        setItemData(itemResponse.data);
+        const rawItem = itemResponse.data;
+        const toBool = (val: any) => val === "Y" || val === "Yes" || val === true || val === 1 || val === "1";
+
+        const transformedItem: ItemDetails = {
+          ...rawItem,
+          isActive: toBool(rawItem.isActive),
+          parent: {
+            ...rawItem.parent,
+            isActive: toBool(rawItem.parent.isActive),
+            isSpecialItem: toBool(rawItem.parent.isSpecialItem),
+            isEURSpecial: toBool(rawItem.parent.isEURSpecial),
+            isRMBSpecial: toBool(rawItem.parent.isRMBSpecial),
+            isDimensionSpecial: toBool(rawItem.parent.isDimensionSpecial),
+          },
+          others: {
+            ...rawItem.others,
+            isQTYdiv: toBool(rawItem.others.isQTYdiv),
+            isMeter: toBool(rawItem.others.isMeter),
+            isPU: toBool(rawItem.others.isPU),
+            isNPR: toBool(rawItem.others.isNPR),
+            isNew: toBool(rawItem.others.isNew),
+            isActive: toBool(rawItem.others.isActive),
+            isStock: toBool(rawItem.others.isStock),
+            isNAO: toBool(rawItem.others.isNAO),
+            isSnSI: toBool(rawItem.others.isSnSI),
+            isDimensionSpecial: toBool(rawItem.others.isDimensionSpecial),
+          }
+        };
+
+        setItemData(transformedItem);
         setVariations(variationsResponse.data || []);
         setQualityCriteria(qualityResponse.data || []);
       } catch (error) {
@@ -82,99 +378,73 @@ const ItemDetailsPage = () => {
 
     try {
       const itemId = parseInt(id as string);
-      await updateItem(itemId, updatedData);
+
+      const toNum = (val: any) => {
+        if (val === null || val === undefined || val === "") return null;
+        const n = parseFloat(val);
+        return isNaN(n) ? null : n;
+      };
+
+      const toInt = (val: any) => {
+        if (val === null || val === undefined || val === "") return null;
+        const n = parseInt(val);
+        return isNaN(n) ? null : n;
+      };
+
+      const payload: any = {
+        item_name: updatedData.name,
+        item_name_cn: updatedData.nameCN,
+        ean: updatedData.ean ? updatedData.ean.toString() : null,
+        model: updatedData.model,
+        remark: updatedData.remark,
+        isActive: updatedData.isActive ? "Y" : "N",
+        weight: toNum(updatedData.dimensions?.weight),
+        length: toNum(updatedData.dimensions?.length),
+        width: toNum(updatedData.dimensions?.width),
+        height: toNum(updatedData.dimensions?.height),
+        ISBN: toInt(updatedData.dimensions?.isbn) || 0,
+        is_qty_dividable: updatedData.others?.isQTYdiv ? "Y" : "N",
+        many_components: toInt(updatedData.others?.mc) || 0,
+        effort_rating: toInt(updatedData.others?.er) || 0,
+        is_pu_item: updatedData.others?.isPU ? 1 : 0,
+        is_meter_item: updatedData.others?.isMeter ? 1 : 0,
+        npr_remark: updatedData.nprRemarks,
+        RMB_Price: toNum(updatedData.others?.rmbPrice),
+        FOQ: toInt(updatedData.others?.foq) || 0,
+        is_dimension_special: updatedData.others?.isDimensionSpecial ? "Y" : "N",
+        is_eur_special: updatedData.parent?.isEURSpecial ? "Y" : "N",
+        is_rmb_special: updatedData.parent?.isRMBSpecial ? "Y" : "N",
+        is_new: updatedData.others?.isNew ? "Y" : "N",
+        is_npr: updatedData.others?.isNPR ? "Y" : "N",
+
+        supplierItem: {
+          price_rmb: toNum(updatedData.supplierItem?.priceRMB),
+          is_po: updatedData.supplierItem?.isPO,
+          moq: toInt(updatedData.supplierItem?.moq),
+          oi: toInt(updatedData.supplierItem?.interval),
+          lead_time: updatedData.supplierItem?.leadTime,
+          note_cn: updatedData.supplierItem?.noteCN,
+          url: updatedData.supplierItem?.url,
+        },
+
+        warehouseItemData: {
+          is_stock_item: updatedData.others?.isStock ? "Y" : "N",
+          is_active: updatedData.others?.isActive ? "Y" : "N",
+          msq: toNum(updatedData.others?.msq),
+          is_no_auto_order: updatedData.others?.isNAO ? "Y" : "N",
+          buffer: toInt(updatedData.others?.buffer),
+          is_SnSI: updatedData.others?.isSnSI ? "Y" : "N",
+        }
+      };
+
+      await updateItem(itemId, payload);
       setItemData({ ...itemData, ...updatedData });
       setEditMode(false);
-      toast.success("Item updated successfully", successStyles);
     } catch (error) {
-      toast.error("Failed to update item", errorStyles);
+      console.error("Save error:", error);
     }
   };
-  const StatusIndicator = ({
-    value,
-    label = "",
-  }: {
-    value: boolean;
-    label?: string;
-  }) => (
-    <span
-      className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${value ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
-        }`}
-    >
-      {value ? (
-        <CheckCircleIcon className="h-3 w-3" />
-      ) : (
-        <XCircleIcon className="h-3 w-3" />
-      )}
-      {label || (value ? "Yes" : "No")}
-    </span>
-  );
-  const EditableInfoRow = ({
-    label,
-    value,
-    field,
-    type = "text",
-  }: {
-    label: string;
-    value: string;
-    field: string;
-    type?: string;
-  }) => (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 py-3 border-b border-gray-100">
-      <div className="text-sm font-medium text-gray-700">{label}</div>
-      <div className="md:col-span-2">
-        {editMode ? (
-          <input
-            type={type}
-            value={value || ""}
-            onChange={(e) => {
-              if (itemData) {
-                const updated = { ...itemData };
-                if (field.includes(".")) {
-                  const [parent, child] = field.split(".");
-                  (updated as any)[parent][child] = e.target.value;
-                } else {
-                  (updated as any)[field] = e.target.value;
-                }
-                setItemData(updated);
-              }
-            }}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md"
-          />
-        ) : (
-          <span className="text-gray-900">{value || "—"}</span>
-        )}
-      </div>
-    </div>
-  );
-  const InfoRow = ({
-    label,
-    value,
-    children,
-  }: {
-    label: string;
-    value?: string;
-    children?: React.ReactNode;
-  }) => (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 py-3 border-b border-gray-100">
-      <div className="text-sm font-medium text-gray-700">{label}</div>
-      <div className="md:col-span-2">
-        {children || <span className="text-gray-900">{value || "—"}</span>}
-      </div>
-    </div>
-  );
-  const SectionHeader = ({
-    title,
-    icon,
-  }: {
-    title: string;
-    icon?: React.ReactNode;
-  }) => (
-    <div className="flex items-center gap-2 mb-4">
-      {icon}
-      <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
-    </div>
-  );
+
 
   if (loading) {
     return (
@@ -214,8 +484,15 @@ const ItemDetailsPage = () => {
   return (
     <div className="min-h-screen bg-white shadow-xl rounded-lg p-6">
       <div className="max-w-7xl mx-auto">
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-4">
+        <div className="flex flex-col gap-4 mb-4">
+          <button
+            onClick={() => router.push("/items")}
+            className="flex items-center gap-2 text-sm font-medium text-gray-500 hover:text-[#8CC21B] transition-colors w-fit"
+          >
+            <ArrowLeftIcon className="h-4 w-4" />
+            Back to Items Management
+          </button>
+          <div className="flex items-center justify-between">
             <div>
               <PageHeader title={`Item Details: ${itemData.itemNo}`} icon={Package} />
             </div>
@@ -243,15 +520,15 @@ const ItemDetailsPage = () => {
               )}
             </div>
           </div>
-          <div className="flex flex-wrap gap-3 mb-6">
-            <StatusIndicator value={itemData.isActive} label="Active" />
-            <StatusIndicator
-              value={itemData.parent.isSpecialItem}
-              label="Special Item"
-            />
-            <StatusIndicator value={itemData.others.isStock} label="In Stock" />
-            <StatusIndicator value={itemData.others.isNew} label="New" />
-          </div>
+        </div>
+        <div className="flex flex-wrap gap-3 mb-6">
+          <StatusIndicator value={itemData.isActive} label="Active" />
+          <StatusIndicator
+            value={itemData.parent.isSpecialItem}
+            label="Special Item"
+          />
+          <StatusIndicator value={itemData.others.isStock} label="In Stock" />
+          <StatusIndicator value={itemData.others.isNew} label="New" />
         </div>
         <div className="border-b border-gray-200 mb-6">
           <nav className="flex space-x-2 overflow-x-auto">
@@ -275,31 +552,54 @@ const ItemDetailsPage = () => {
               <SectionHeader title="Item Information" />
 
               <div className="space-y-1">
-                <EditableInfoRow label="EAN" value={itemData.ean} field="ean" />
+                <EditableInfoRow
+                  label="EAN"
+                  value={itemData.ean}
+                  field="ean"
+                  editMode={editMode}
+                  itemData={itemData}
+                  setItemData={setItemData}
+                  readOnly={true}
+                />
                 <EditableInfoRow
                   label="Item Name"
                   value={itemData.name}
                   field="name"
+                  editMode={editMode}
+                  itemData={itemData}
+                  setItemData={setItemData}
                 />
                 <EditableInfoRow
                   label="Item Name CN"
                   value={itemData.nameCN}
                   field="nameCN"
+                  editMode={editMode}
+                  itemData={itemData}
+                  setItemData={setItemData}
                 />
                 <EditableInfoRow
                   label="Category"
                   value={itemData.category}
                   field="category"
+                  editMode={editMode}
+                  itemData={itemData}
+                  setItemData={setItemData}
                 />
                 <EditableInfoRow
                   label="Model"
                   value={itemData.model}
                   field="model"
+                  editMode={editMode}
+                  itemData={itemData}
+                  setItemData={setItemData}
                 />
                 <EditableInfoRow
                   label="Remark"
                   value={itemData.remark}
                   field="remark"
+                  editMode={editMode}
+                  itemData={itemData}
+                  setItemData={setItemData}
                 />
                 <InfoRow
                   label="Price (RMB) ¥"
@@ -345,12 +645,33 @@ const ItemDetailsPage = () => {
                       label="RMB Price"
                       value={`¥${itemData.parent.priceRMB}`}
                     />
-                    <InfoRow label="EUR Special">
-                      <StatusIndicator value={itemData.parent.isEURSpecial} />
-                    </InfoRow>
-                    <InfoRow label="RMB Special">
-                      <StatusIndicator value={itemData.parent.isRMBSpecial} />
-                    </InfoRow>
+                    <SelectInfoRow
+                      label="Is this special dimension?"
+                      value={itemData.others.isDimensionSpecial ? "Yes" : "No"}
+                      field="others.isDimensionSpecial"
+                      editMode={editMode}
+                      itemData={itemData}
+                      setItemData={setItemData}
+                      options={[{ label: "Yes", value: "Yes" }, { label: "No", value: "No" }]}
+                    />
+                    <SelectInfoRow
+                      label="EUR Special"
+                      value={itemData.parent.isEURSpecial ? "Yes" : "No"}
+                      field="parent.isEURSpecial"
+                      editMode={editMode}
+                      itemData={itemData}
+                      setItemData={setItemData}
+                      options={[{ label: "Yes", value: "Yes" }, { label: "No", value: "No" }]}
+                    />
+                    <SelectInfoRow
+                      label="RMB Special"
+                      value={itemData.parent.isRMBSpecial ? "Yes" : "No"}
+                      field="parent.isRMBSpecial"
+                      editMode={editMode}
+                      itemData={itemData}
+                      setItemData={setItemData}
+                      options={[{ label: "Yes", value: "Yes" }, { label: "No", value: "No" }]}
+                    />
                   </div>
                 </div>
               </div>
@@ -429,7 +750,20 @@ const ItemDetailsPage = () => {
                                 key={index}
                                 className="text-gray-900 bg-gray-50 px-3 py-2 rounded"
                               >
-                                {variation}
+                                {editMode ? (
+                                  <input
+                                    type="text"
+                                    value={variation}
+                                    onChange={(e) => {
+                                      const updated = { ...itemData };
+                                      updated.variationsEN.variations[index] = e.target.value;
+                                      setItemData(updated);
+                                    }}
+                                    className="w-full bg-transparent border-none focus:ring-0 p-0 text-gray-900"
+                                  />
+                                ) : (
+                                  variation
+                                )}
                               </li>
                             )
                           )}
@@ -451,7 +785,20 @@ const ItemDetailsPage = () => {
                               key={index}
                               className="text-gray-900 bg-gray-50 px-3 py-2 rounded"
                             >
-                              {value}
+                              {editMode ? (
+                                <input
+                                  type="text"
+                                  value={value}
+                                  onChange={(e) => {
+                                    const updated = { ...itemData };
+                                    updated.variationsEN.values[index] = e.target.value;
+                                    setItemData(updated);
+                                  }}
+                                  className="w-full bg-transparent border-none focus:ring-0 p-0 text-gray-900"
+                                />
+                              ) : (
+                                value
+                              )}
                             </li>
                           ))}
                         </ul>
@@ -476,26 +823,41 @@ const ItemDetailsPage = () => {
                     label="ISBN"
                     value={itemData.dimensions.isbn}
                     field="dimensions.isbn"
+                    editMode={editMode}
+                    itemData={itemData}
+                    setItemData={setItemData}
                   />
                   <EditableInfoRow
                     label="Weight (kg)"
                     value={itemData.dimensions.weight}
                     field="dimensions.weight"
+                    editMode={editMode}
+                    itemData={itemData}
+                    setItemData={setItemData}
                   />
                   <EditableInfoRow
                     label="Length (mm)"
                     value={itemData.dimensions.length}
                     field="dimensions.length"
+                    editMode={editMode}
+                    itemData={itemData}
+                    setItemData={setItemData}
                   />
                   <EditableInfoRow
                     label="Width (mm)"
                     value={itemData.dimensions.width}
                     field="dimensions.width"
+                    editMode={editMode}
+                    itemData={itemData}
+                    setItemData={setItemData}
                   />
                   <EditableInfoRow
                     label="Height (mm)"
                     value={itemData.dimensions.height}
                     field="dimensions.height"
+                    editMode={editMode}
+                    itemData={itemData}
+                    setItemData={setItemData}
                   />
                 </div>
                 <div className="bg-gray-50 rounded-lg p-6 flex items-center justify-center">
@@ -522,101 +884,174 @@ const ItemDetailsPage = () => {
           )}
           {activeTab === "others" && (
             <div>
-              <SectionHeader title="Other Details" />
+              <div className="mb-10">
+                <SectionHeader title="Dimensions / Others" />
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <EditableInfoRow label="Weight" value={itemData.dimensions.weight} field="dimensions.weight" editMode={editMode} itemData={itemData} setItemData={setItemData} />
+                  <EditableInfoRow label="Length" value={itemData.dimensions.length} field="dimensions.length" editMode={editMode} itemData={itemData} setItemData={setItemData} />
+                  <EditableInfoRow label="Width" value={itemData.dimensions.width} field="dimensions.width" editMode={editMode} itemData={itemData} setItemData={setItemData} />
+                  <EditableInfoRow label="Height" value={itemData.dimensions.height} field="dimensions.height" editMode={editMode} itemData={itemData} setItemData={setItemData} />
+                  <SelectInfoRow
+                    label="Is QTY Dividable"
+                    value={itemData.others.isQTYdiv ? "Y" : "N"}
+                    field="others.isQTYdiv"
+                    editMode={editMode}
+                    itemData={itemData}
+                    setItemData={setItemData}
+                    options={[{ label: "Y", value: "Y" }, { label: "N", value: "N" }]}
+                  />
+                  <EditableInfoRow label="ISBN" value={itemData.dimensions.isbn} field="dimensions.isbn" editMode={editMode} itemData={itemData} setItemData={setItemData} />
+                  <EditableInfoRow label="MC" value={itemData.others.mc} field="others.mc" editMode={editMode} itemData={itemData} setItemData={setItemData} />
+                  <EditableInfoRow label="ER" value={itemData.others.er} field="others.er" editMode={editMode} itemData={itemData} setItemData={setItemData} />
+                  <SelectInfoRow
+                    label="Is PU"
+                    value={itemData.others.isPU ? "Yes" : "No"}
+                    field="others.isPU"
+                    editMode={editMode}
+                    itemData={itemData}
+                    setItemData={setItemData}
+                    options={[{ label: "Yes", value: "Yes" }, { label: "No", value: "No" }]}
+                  />
+                  <SelectInfoRow
+                    label="Is Meter"
+                    value={itemData.others.isMeter ? "Yes" : "No"}
+                    field="others.isMeter"
+                    editMode={editMode}
+                    itemData={itemData}
+                    setItemData={setItemData}
+                    options={[{ label: "Yes", value: "Yes" }, { label: "No", value: "No" }]}
+                  />
+                  <EditableInfoRow label="FOQ" value={itemData.others.foq} field="others.foq" editMode={editMode} itemData={itemData} setItemData={setItemData} />
+                  <SelectInfoRow
+                    label="Is New?"
+                    value={itemData.others.isNew ? "Yes" : "No"}
+                    field="others.isNew"
+                    editMode={editMode}
+                    itemData={itemData}
+                    setItemData={setItemData}
+                    options={[{ label: "Yes", value: "Yes" }, { label: "No", value: "No" }]}
+                  />
+                  <EditableInfoRow label="Taric" value={itemData.others.taricCode} field="others.taricCode" editMode={editMode} itemData={itemData} setItemData={setItemData} />
+                </div>
+              </div>
 
-              <div className="space-y-1">
-                <EditableInfoRow
-                  label="Taric Code"
-                  value={itemData.others.taricCode}
-                  field="others.taricCode"
-                />
-                <InfoRow label="QTY Divisible">
-                  <StatusIndicator value={itemData.others.isQTYdiv} />
-                </InfoRow>
-                <EditableInfoRow
-                  label="MC"
-                  value={itemData.others.mc}
-                  field="others.mc"
-                />
-                <EditableInfoRow
-                  label="ER"
-                  value={itemData.others.er}
-                  field="others.er"
-                />
-                <InfoRow label="Is Meter">
-                  <StatusIndicator value={itemData.others.isMeter} />
-                </InfoRow>
-                <InfoRow label="Is PU">
-                  <StatusIndicator value={itemData.others.isPU} />
-                </InfoRow>
-                <InfoRow label="Is NPR">
-                  <StatusIndicator value={itemData.others.isNPR} />
-                </InfoRow>
-                <InfoRow label="Is New">
-                  <StatusIndicator value={itemData.others.isNew} />
-                </InfoRow>
-                <EditableInfoRow
-                  label="Warehouse Item"
-                  value={itemData.others.warehouseItem}
-                  field="others.warehouseItem"
-                />
-                <EditableInfoRow
-                  label="ID DE"
-                  value={itemData.others.idDE}
-                  field="others.idDE"
-                />
-                <EditableInfoRow
-                  label="No DE"
-                  value={itemData.others.noDE}
-                  field="others.noDE"
-                />
-                <EditableInfoRow
-                  label="Name DE"
-                  value={itemData.others.nameDE}
-                  field="others.nameDE"
-                />
-                <EditableInfoRow
-                  label="Name EN"
-                  value={itemData.others.nameEN}
-                  field="others.nameEN"
-                />
-                <InfoRow label="Active">
-                  <StatusIndicator value={itemData.others.isActive} />
-                </InfoRow>
-                <InfoRow label="In Stock">
-                  <StatusIndicator value={itemData.others.isStock} />
-                </InfoRow>
-                <EditableInfoRow
-                  label="Quantity"
-                  value={itemData.others.qty}
-                  field="others.qty"
-                />
-                <EditableInfoRow
-                  label="MSQ"
-                  value={itemData.others.msq}
-                  field="others.msq"
-                />
-                <InfoRow label="Is NAO">
-                  <StatusIndicator value={itemData.others.isNAO} />
-                </InfoRow>
-                <EditableInfoRow
-                  label="Buffer"
-                  value={itemData.others.buffer}
-                  field="others.buffer"
-                />
-                <InfoRow label="Is SnSI">
-                  <StatusIndicator value={itemData.others.isSnSI} />
-                </InfoRow>
+              <div>
+                <SectionHeader title="Warehouse Item" />
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <EditableInfoRow label="ID DE" value={itemData.others.idDE} field="others.idDE" editMode={editMode} itemData={itemData} setItemData={setItemData} readOnly={true} />
+                  <EditableInfoRow label="NO DE" value={itemData.others.noDE} field="others.noDE" editMode={editMode} itemData={itemData} setItemData={setItemData} />
+                  <EditableInfoRow label="Name DE" value={itemData.others.nameDE} field="others.nameDE" editMode={editMode} itemData={itemData} setItemData={setItemData} />
+                  <EditableInfoRow label="Name EN" value={itemData.others.nameEN} field="others.nameEN" editMode={editMode} itemData={itemData} setItemData={setItemData} />
+                  <SelectInfoRow
+                    label="isStock"
+                    value={itemData.others.isStock ? "Y" : "N"}
+                    field="others.isStock"
+                    editMode={editMode}
+                    itemData={itemData}
+                    setItemData={setItemData}
+                    options={[{ label: "Y", value: "Y" }, { label: "N", value: "N" }]}
+                  />
+                  <EditableInfoRow label="Qty" value={itemData.others.qty} field="others.qty" editMode={editMode} itemData={itemData} setItemData={setItemData} readOnly={true} />
+                  <SelectInfoRow
+                    label="isActive"
+                    value={itemData.others.isActive ? "Y" : "N"}
+                    field="others.isActive"
+                    editMode={editMode}
+                    itemData={itemData}
+                    setItemData={setItemData}
+                    options={[{ label: "Y", value: "Y" }, { label: "N", value: "N" }]}
+                  />
+                  <EditableInfoRow label="MSQ" value={itemData.others.msq} field="others.msq" editMode={editMode} itemData={itemData} setItemData={setItemData} />
+                  <SelectInfoRow
+                    label="isNAOi"
+                    value={itemData.others.isNAO ? "Y" : "N"}
+                    field="others.isNAO"
+                    editMode={editMode}
+                    itemData={itemData}
+                    setItemData={setItemData}
+                    options={[{ label: "Y", value: "Y" }, { label: "N", value: "N" }]}
+                  />
+                  <EditableInfoRow label="Buffer" value={itemData.others.buffer} field="others.buffer" editMode={editMode} itemData={itemData} setItemData={setItemData} />
+                  <SelectInfoRow
+                    label="isSnS"
+                    value={itemData.others.isSnSI ? "Y" : "N"}
+                    field="others.isSnSI"
+                    editMode={editMode}
+                    itemData={itemData}
+                    setItemData={setItemData}
+                    options={[{ label: "Yes", value: "Y" }, { label: "No", value: "N" }]}
+                  />
+                </div>
               </div>
             </div>
           )}
           {activeTab === "supplier" && (
             <div>
-              <SectionHeader title="Supplier Information" />
-              <div className="space-y-4">
+              <SectionHeader title="Supplier Item" />
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <EditableInfoRow
+                  label="Price RMB"
+                  value={itemData.supplierItem?.priceRMB || "0"}
+                  field="supplierItem.priceRMB"
+                  editMode={editMode}
+                  itemData={itemData}
+                  setItemData={setItemData}
+                />
+                <SelectInfoRow
+                  label="isPO -"
+                  value={itemData.supplierItem?.isPO || "No"}
+                  field="supplierItem.isPO"
+                  editMode={editMode}
+                  itemData={itemData}
+                  setItemData={setItemData}
+                  options={[{ label: "Select", value: "" }, { label: "Yes", value: "Yes" }, { label: "No", value: "No" }]}
+                />
+                <EditableInfoRow
+                  label="MOQ"
+                  value={itemData.supplierItem?.moq || "0"}
+                  field="supplierItem.moq"
+                  editMode={editMode}
+                  itemData={itemData}
+                  setItemData={setItemData}
+                />
+                <EditableInfoRow
+                  label="Interval"
+                  value={itemData.supplierItem?.interval || "0"}
+                  field="supplierItem.interval"
+                  editMode={editMode}
+                  itemData={itemData}
+                  setItemData={setItemData}
+                />
+                <EditableInfoRow
+                  label="Lead time"
+                  value={itemData.supplierItem?.leadTime || ""}
+                  field="supplierItem.leadTime"
+                  editMode={editMode}
+                  itemData={itemData}
+                  setItemData={setItemData}
+                />
+                <EditableInfoRow
+                  label="Note CN"
+                  value={itemData.supplierItem?.noteCN || ""}
+                  field="supplierItem.noteCN"
+                  editMode={editMode}
+                  itemData={itemData}
+                  setItemData={setItemData}
+                />
+                <EditableInfoRow
+                  label="Item URL"
+                  value={itemData.supplierItem?.url || ""}
+                  field="supplierItem.url"
+                  editMode={editMode}
+                  itemData={itemData}
+                  setItemData={setItemData}
+                />
+              </div>
+
+              <div className="mt-8 pt-6 border-t border-gray-100">
                 <InfoRow label="Supplier Name" value={itemData.supplier_name || "No supplier assigned"} />
                 {itemData.supplier_id && (
-                  <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+                  <div className="mt-4 p-4 bg-gray-50 rounded-lg max-w-md">
                     <p className="text-sm text-gray-600 mb-2">
                       Supplier ID: {itemData.supplier_id}
                     </p>
@@ -641,37 +1076,36 @@ const ItemDetailsPage = () => {
                 }
               />
 
+              <div className="mb-4">
+                <CustomButton
+                  onClick={() => handleOpenQualityModal()}
+                  className="px-4 py-2 bg-primary text-white rounded-lg"
+                >
+                  New item quality
+                </CustomButton>
+              </div>
+
               {qualityCriteria.length > 0 ? (
                 <div className="overflow-x-auto">
                   <table className="w-full">
-                    <thead className="bg-gray-50">
+                    <thead className="bg-[#F8F9FB]">
                       <tr>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          ID
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Name
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Picture
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Description
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Description CN
-                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">ID</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Item_ID</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Name</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Picture</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Description</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Description CN</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Action</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Apply to Parent</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
                       {qualityCriteria.map((criteria, index) => (
-                        <tr key={index}>
-                          <td className="px-4 py-3 text-sm text-gray-900">
-                            {criteria.id}
-                          </td>
-                          <td className="px-4 py-3 text-sm text-gray-900">
-                            {criteria.name}
-                          </td>
+                        <tr key={index} className="hover:bg-gray-50">
+                          <td className="px-4 py-3 text-sm text-gray-900">{criteria.id}</td>
+                          <td className="px-4 py-3 text-sm text-gray-900">{criteria.itemId || itemData.id}</td>
+                          <td className="px-4 py-3 text-sm text-gray-900">{criteria.name}</td>
                           <td className="px-4 py-3 text-sm">
                             {criteria.picture ? (
                               <button className="text-blue-600 hover:text-blue-800">
@@ -681,11 +1115,24 @@ const ItemDetailsPage = () => {
                               <span className="text-gray-400">—</span>
                             )}
                           </td>
-                          <td className="px-4 py-3 text-sm text-gray-900">
-                            {criteria.description}
+                          <td className="px-4 py-3 text-sm text-gray-900">{criteria.description}</td>
+                          <td className="px-4 py-3 text-sm text-gray-900">{criteria.descriptionCN}</td>
+                          <td className="px-4 py-3 text-sm">
+                            <button
+                              onClick={() => handleOpenQualityModal(criteria)}
+                              className="text-blue-600 hover:text-blue-900 mr-2"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => handleDeleteQuality(criteria.id)}
+                              className="text-red-600 hover:text-red-900"
+                            >
+                              Delete
+                            </button>
                           </td>
                           <td className="px-4 py-3 text-sm text-gray-900">
-                            {criteria.description_cn}
+                            <input type="checkbox" className="rounded border-gray-300 text-primary focus:ring-primary" />
                           </td>
                         </tr>
                       ))}
@@ -693,60 +1140,66 @@ const ItemDetailsPage = () => {
                   </table>
                 </div>
               ) : (
-                <div className="text-center py-12">
+                <div className="text-center py-12 bg-gray-50 rounded-xl border-2 border-dashed border-gray-200">
                   <ExclamationTriangleIcon className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                  <p className="text-gray-500">
-                    No quality criteria found for this item
-                  </p>
+                  <p className="text-gray-500">No quality criteria found for this item</p>
+                  <CustomButton
+                    onClick={() => handleOpenQualityModal()}
+                    className="mt-4 px-4 py-2 bg-primary text-white rounded-lg"
+                  >
+                    New item quality
+                  </CustomButton>
                 </div>
               )}
             </div>
           )}
+
           {activeTab === "attachments" && (
             <div>
-              <SectionHeader
-                title="Attachments"
-                icon={<DocumentIcon className="h-5 w-5 text-gray-500" />}
-              />
-              {itemData.attachments.length > 0 ? (
+              <div className="flex justify-between items-center mb-6">
+                <SectionHeader
+                  title="Attachments"
+                  icon={<DocumentIcon className="h-5 w-5 text-gray-500" />}
+                />
+                <button
+                  onClick={() => { }}
+                  className="px-4 py-2 bg-[#8CC21B] text-white rounded-lg flex items-center gap-2 text-sm font-medium hover:bg-[#7ab318] transition-colors"
+                >
+                  Upload New Attachment
+                </button>
+              </div>
+
+              {itemData.attachments?.length > 0 ? (
                 <div className="overflow-x-auto">
                   <table className="w-full">
-                    <thead className="bg-gray-50">
+                    <thead className="bg-[#F8F9FB]">
                       <tr>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          #
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          PDF File Name
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Path/View
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Download
-                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">ID</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Attachment Name</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Upload date</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Action</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
-                      {itemData.attachments.map((attachment, index) => (
-                        <tr key={index}>
-                          <td className="px-4 py-3 text-sm text-gray-900">
-                            {index + 1}
+                      {itemData.attachments.map((attachment: any, index: number) => (
+                        <tr key={index} className="hover:bg-gray-50">
+                          <td className="px-4 py-3 text-sm text-gray-900">{attachment.id}</td>
+                          <td className="px-4 py-3 text-sm text-gray-900 font-medium">
+                            <div className="flex items-center gap-2">
+                              <DocumentIcon className="h-4 w-4 text-gray-400" />
+                              {attachment.name || attachment.fileName}
+                            </div>
                           </td>
-                          <td className="px-4 py-3 text-sm text-gray-900">
-                            {attachment.fileName}
-                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-500">{attachment.uploadDate || "—"}</td>
                           <td className="px-4 py-3 text-sm">
-                            <button className="text-blue-600 hover:text-blue-800 flex items-center gap-1">
-                              <EyeIcon className="h-4 w-4" />
-                              View
-                            </button>
-                          </td>
-                          <td className="px-4 py-3 text-sm">
-                            <button className="text-green-600 hover:text-green-800 flex items-center gap-1">
-                              <ArrowDownTrayIcon className="h-4 w-4" />
-                              Download
-                            </button>
+                            <div className="flex items-center gap-3">
+                              <button className="text-blue-600 hover:text-blue-800 flex items-center gap-1">
+                                <ArrowDownTrayIcon className="h-4 w-4" /> Download
+                              </button>
+                              <button className="text-red-600 hover:text-red-800">
+                                Delete
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -754,15 +1207,14 @@ const ItemDetailsPage = () => {
                   </table>
                 </div>
               ) : (
-                <div className="text-center py-12">
+                <div className="text-center py-12 bg-gray-50 rounded-xl border-2 border-dashed border-gray-200">
                   <DocumentIcon className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                  <p className="text-gray-500">
-                    No attachments found for this item
-                  </p>
+                  <p className="text-gray-500">No attachments found for this item</p>
                 </div>
               )}
             </div>
           )}
+
           {activeTab === "pictures" && (
             <div>
               <SectionHeader
@@ -827,34 +1279,36 @@ const ItemDetailsPage = () => {
                   </div>
                 </div>
               </div>
-              <div className="mt-8">
-                <h4 className="text-md font-semibold text-gray-900 mb-4">
-                  NPR Remarks
-                </h4>
-                <div className="bg-gray-50 rounded-lg p-4">
-                  {itemData.nprRemarks ? (
-                    <p className="text-gray-900">{itemData.nprRemarks}</p>
-                  ) : (
-                    <p className="text-gray-500 italic">
-                      No NPR remarks for this item
-                    </p>
-                  )}
-                </div>
-              </div>
             </div>
           )}
+
+          <div className="mt-8">
+            <h4 className="text-md font-semibold text-gray-900 mb-4">
+              NPR Remarks
+            </h4>
+            <div className="bg-gray-50 rounded-lg p-4">
+              {itemData.nprRemarks ? (
+                <p className="text-gray-900">{itemData.nprRemarks}</p>
+              ) : (
+                <p className="text-gray-500 italic">
+                  No NPR remarks for this item
+                </p>
+              )}
+            </div>
+          </div>
         </div>
+
         <div className="mt-8 flex flex-wrap gap-3 justify-between items-center">
           <div className="flex gap-3">
-            <button className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2">
+            <button className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 text-gray-700">
               <ArrowDownTrayIcon className="h-4 w-4" />
               Export Details
             </button>
-            <button className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2">
+            <button className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 text-gray-700">
               <PhotoIcon className="h-4 w-4" />
               Add Pictures
             </button>
-            <button className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2">
+            <button className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 text-gray-700">
               <DocumentIcon className="h-4 w-4" />
               Add Documents
             </button>
@@ -865,6 +1319,102 @@ const ItemDetailsPage = () => {
           </div>
         </div>
       </div>
+      <CustomModal
+        isOpen={isQualityModalOpen}
+        onClose={handleCloseQualityModal}
+        title={editingQuality ? "Update Quality of this item" : "Add Quality to this item"}
+        width="max-w-md"
+        footer={
+          <div className="flex gap-2 w-full justify-end">
+            <button
+              onClick={handleCloseQualityModal}
+              className="px-4 py-2 flex items-center gap-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+            >
+              <XCircleIcon className="h-4 w-4" />
+              Cancel
+            </button>
+            <button
+              onClick={handleSaveQuality}
+              className="px-4 py-2 flex items-center gap-2 text-white bg-[#00A651] rounded-lg hover:bg-[#008c44] transition-colors"
+            >
+              <CheckCircleIcon className="h-4 w-4" />
+              {editingQuality ? "Update" : "Add"}
+            </button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-gray-500 -mt-2">
+            Make changes to item quality details.
+          </p>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Name
+            </label>
+            <input
+              type="text"
+              name="name"
+              value={qualityFormData.name}
+              onChange={handleQualityFormChange}
+              placeholder="Quality name"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Photo:
+            </label>
+            <div className="flex items-center gap-3">
+              <input
+                type="file"
+                id="quality-photo"
+                className="hidden"
+                onChange={handleFileChange}
+                accept="image/*"
+              />
+              <label
+                htmlFor="quality-photo"
+                className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-50 transition-colors"
+              >
+                Choose file
+              </label>
+              <span className="text-sm text-gray-500">
+                {qualityFormData.picture ? qualityFormData.picture.name : (qualityFormData.pictureUrl ? "Existing photo" : "No file chosen")}
+              </span>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Description:
+            </label>
+            <textarea
+              name="description"
+              value={qualityFormData.description}
+              onChange={handleQualityFormChange}
+              placeholder="Item Description"
+              rows={3}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Description CN:
+            </label>
+            <textarea
+              name="descriptionCN"
+              value={qualityFormData.descriptionCN}
+              onChange={handleQualityFormChange}
+              placeholder="Item Description in CN"
+              rows={3}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary"
+            />
+          </div>
+        </div>
+      </CustomModal>
     </div>
   );
 };

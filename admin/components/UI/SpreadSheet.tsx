@@ -18,6 +18,7 @@ interface SpreadSheetProps {
     totalQty?: number;
     totalPrice?: number;
     totalCols?: TotalCol[];
+    loading?: boolean;
 }
 
 const SpreadSheet: React.FC<SpreadSheetProps> = ({
@@ -27,14 +28,15 @@ const SpreadSheet: React.FC<SpreadSheetProps> = ({
     totalLabel = "Grand Total",
     totalQty,
     totalPrice,
-    totalCols
+    totalCols,
+    loading = false
 }) => {
     return (
         <div className="bg-[#2D3748] rounded-md overflow-hidden shadow-lg mb-4 border border-[#4A5568]">
             <DataTable
                 data={data}
                 columns={columns}
-                loading={false}
+                loading={loading}
                 emptyMessage="No items found"
                 getRowClassName={() => "bg-[#2D3748] text-gray-200 border-b border-[#4A5568] hover:bg-[#3A4A63] transition-colors"}
             />

@@ -76,11 +76,11 @@ export interface VariationValue {
 
 export interface QualityCriterion {
   id: number;
-  item_id: number;
+  itemId: number;
   name: string;
   picture: string | null;
   description: string | null;
-  description_cn: string | null;
+  descriptionCN: string | null;
   created_at: Date;
   updated_at: Date;
 }
@@ -107,6 +107,7 @@ export interface ItemDetails {
     priceRMB: number;
     isEURSpecial: boolean;
     isRMBSpecial: boolean;
+    isDimensionSpecial: boolean;
   };
   dimensions: {
     isbn: string;
@@ -144,6 +145,18 @@ export interface ItemDetails {
     isNAO: boolean;
     buffer: string;
     isSnSI: boolean;
+    foq: string;
+    rmbPrice: string;
+    isDimensionSpecial: boolean;
+  };
+  supplierItem: {
+    priceRMB: string;
+    isPO: string;
+    moq: string;
+    interval: string;
+    leadTime: string;
+    noteCN: string;
+    url: string;
   };
   qualityCriteria: QualityCriterion[];
   attachments: any[];
