@@ -18,6 +18,7 @@ export type DataTableProps<T> = {
     getRowClassName?: (row: T, index: number) => string;
     renderRowDetails?: (row: T, index: number) => React.ReactNode;
     expandedRowId?: string | number | null;
+    onRowClick?: (row: T, index: number) => void;
 };
 
 export function DataTable<T>({
@@ -28,7 +29,8 @@ export function DataTable<T>({
     showTotals = false,
     getRowClassName,
     renderRowDetails,
-    expandedRowId
+    expandedRowId,
+    onRowClick
 }: DataTableProps<T>) {
 
 
@@ -84,7 +86,8 @@ export function DataTable<T>({
                             return (
                                 <React.Fragment key={(row as any).id || (row as any)._id || idx}>
                                     <tr
-                                        className={`hover:bg-gray-50 transition-colors ${getRowClassName ? getRowClassName(row, idx) : ""}`}
+                                        className={`hover:bg-gray-50 transition-colors ${getRowClassName ? getRowClassName(row, idx) : ""} ${onRowClick ? "cursor-pointer" : ""}`}
+                                        onClick={() => onRowClick && onRowClick(row, idx)}
                                     >
                                         {columns.map((c, i) => (
                                             <td

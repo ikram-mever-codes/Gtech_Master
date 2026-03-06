@@ -7,7 +7,7 @@ interface CustomModalProps {
     title: string;
     children: ReactNode;
     footer?: ReactNode;
-    width?: string; // Flexible width like 'max-w-md', 'max-w-lg', etc.
+    width?: string;
 }
 
 const CustomModal: React.FC<CustomModalProps> = ({
@@ -26,7 +26,6 @@ const CustomModal: React.FC<CustomModalProps> = ({
                 className={`bg-white rounded-2xl shadow-2xl w-full ${width} transform transition-all duration-300 scale-100 border border-gray-100 overflow-hidden`}
                 onClick={(e) => e.stopPropagation()}
             >
-                {/* Header */}
                 <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-white">
                     <h3 className="text-lg font-bold text-gray-900 tracking-tight">
                         {title}
@@ -39,12 +38,10 @@ const CustomModal: React.FC<CustomModalProps> = ({
                     </button>
                 </div>
 
-                {/* Content */}
                 <div className="px-6 py-6 max-h-[80vh] overflow-y-auto">
                     {children}
                 </div>
 
-                {/* Footer */}
                 {footer && (
                     <div className="px-6 py-4 border-t border-gray-100 bg-gray-50/50 flex justify-end items-center gap-3">
                         {footer}

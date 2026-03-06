@@ -4,8 +4,6 @@ import { api, handleApiError } from "../utils/api";
 import { loadingStyles, successStyles } from "@/utils/constants";
 import type { ResponseInterface } from "@/utils/interfaces";
 
-// -------------------- Types (frontend) --------------------
-
 export type OrderItemLine = {
   id?: number;
   order_id?: number;
@@ -206,10 +204,8 @@ export const downloadItemLabel = async (itemId: number | string) => {
       responseType: "blob",
     });
 
-    // Create a blob from the response data
     const file = new Blob([response.data], { type: "application/pdf" });
 
-    // Create a link and trigger click to download/open
     const fileURL = URL.createObjectURL(file);
     const link = document.createElement("a");
     link.href = fileURL;
@@ -217,7 +213,6 @@ export const downloadItemLabel = async (itemId: number | string) => {
     document.body.appendChild(link);
     link.click();
 
-    // Cleanup
     setTimeout(() => {
       document.body.removeChild(link);
       URL.revokeObjectURL(fileURL);
@@ -228,5 +223,19 @@ export const downloadItemLabel = async (itemId: number | string) => {
   } catch (error) {
     toast.dismiss();
     handleApiError(error, "Failed to generate label");
+  }
+};
+
+export const syncOrders = async () => {
+  try {
+    toast.loading("Syncing orders with ERP...", loadingStyles);
+    const response = await api.get("http://localhost:1000/api/v1/etl/sync-orders");
+    toast.dismiss();
+    toast.success("Orders synced successfully!", successStyles);
+    return response;
+  } catch (error) {
+    toast.dismiss();
+    handleApiError(error, "Sync failed");
+    throw error;
   }
 };
