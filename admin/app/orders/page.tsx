@@ -25,7 +25,7 @@ import {
   PrinterIcon,
   ScissorsIcon,
   ArrowRightCircleIcon,
-  CheckCircleIcon,
+  ChevronDownIcon,
 } from "@heroicons/react/24/outline";
 import { toast } from "react-hot-toast";
 import {
@@ -760,9 +760,12 @@ const OrderPage = () => {
     status: "",
   });
 
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [targetCargoId, setTargetCargoId] = useState("");
   const [selectedItemId, setSelectedItemId] = useState<string>("");
   const [orderItems, setOrderItems] = useState<OrderItemRow[]>([]);
   const [nsoSearch, setNsoSearch] = useState("");
+  const [expandedNsoId, setExpandedNsoId] = useState<string | null>(null);
 
   const [isEditQtyModalOpen, setIsEditQtyModalOpen] = useState(false);
   const [editQtyItem, setEditQtyItem] = useState<any>(null);
@@ -774,7 +777,6 @@ const OrderPage = () => {
   const [showSPModal, setShowSPModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState<any>(null);
   const [splitQty, setSplitQty] = useState<number>(0);
-  const [targetCargoId, setTargetCargoId] = useState<string>("");
 
   const itemById = useMemo(() => {
     const map = new Map<string, Item>();
@@ -898,8 +900,8 @@ const OrderPage = () => {
 
   const nsoGroups = useMemo(() => {
     const groups = {
-      express: new Map<number, any>(),
-      normal: new Map<number, any>(),
+      express: new Map<string, any>(),
+      normal: new Map<string, any>(),
     };
 
     orders.forEach((o: any) => {
@@ -908,15 +910,20 @@ const OrderPage = () => {
 
       (o.items || []).forEach((item: any) => {
         if (item.supplier_order_id) return;
+        if (item.status && item.status.toUpperCase() !== "NSO") return;
         const itemDetails = itemById.get(String(item.item_id));
         const sId = o.supplier_id || itemDetails?.supplier_id || 0;
 
         const sid = Number(sId);
-        if (!targetMap.has(sid)) {
-          targetMap.set(sid, {
+        const catId = Number(o.category_id || 0);
+        const groupKey = `${sid}_${catId}`;
+
+        if (!targetMap.has(groupKey)) {
+          targetMap.set(groupKey, {
+            id: groupKey,
             supplier_id: sid,
             supplier_name: sid === 0 ? "Unassigned" : getSupplierName(sid),
-            order_type: getCategoryName(o.category_id) || "Taobao",
+            order_type: getCategoryName(o.category_id) || (o.category_id ? `Imported ${o.category_id}` : "Taobao"),
             category_id: o.category_id,
             count: 0,
             qty: 0,
@@ -924,10 +931,10 @@ const OrderPage = () => {
           });
         }
 
-        const g = targetMap.get(sid);
+        const g = targetMap.get(groupKey);
         g.count += 1;
         g.qty += Number(item.qty || 0);
-        g.items.push(item);
+        g.items.push({ ...item, _order_no: o.order_no });
       });
     });
 
@@ -1723,135 +1730,184 @@ const OrderPage = () => {
                     />
                   </div>
                 </div>
-                <div className="mb-10">
-                  <h2 className="text-lg font-bold text-gray-800 mb-4 px-2">
-                    Express Orders
-                  </h2>
-                  <DataTable
-                    data={nsoGroups.express}
-                    columns={[
-                      {
-                        header: "SupplierID",
-                        width: "120px",
-                        align: "center",
-                        render: (row) => (
-                          <div className="flex items-center justify-center gap-1 group cursor-pointer">
-                            <div className="bg-[#475569] text-white rounded px-3 py-1.5 flex items-center gap-4 text-xs font-bold w-20 justify-between shadow-md">
-                              {row.supplier_id}
-                              <div className="bg-white rounded-full p-0.5">
-                                <ArrowRightIcon className="h-2 w-2 text-[#475569]" />
-                              </div>
-                            </div>
-                          </div>
-                        ),
-                      },
-                      {
-                        header: "Supplier name",
-                        render: (row) => row.supplier_name,
-                        align: "center",
-                      },
-                      {
-                        header: "Order Type",
-                        render: (row) => row.order_type,
-                        align: "center",
-                      },
-                      {
-                        header: "Count",
-                        render: (row) => row.count,
-                        align: "center",
-                      },
-                      {
-                        header: "QTY",
-                        render: (row) => row.qty,
-                        align: "center",
-                      },
-                      {
-                        header: "Actions",
-                        align: "center",
-                        render: (row) => (
-                          <div className="flex justify-center">
-                            <button
-                              onClick={() =>
-                                handleCreateSupplierOrderFromNSO(row)
-                              }
-                              className="bg-[#059669] text-white px-4 py-2 rounded-[4px] flex items-center gap-2 text-xs font-bold hover:bg-green-700 transition shadow-md"
-                            >
-                              <PlusCircleIcon className="h-5 w-5" />
-                              Supplier order
-                            </button>
-                          </div>
-                        ),
-                      },
-                    ]}
-                    loading={loadingOrders}
-                    emptyMessage="No Express NSOs found"
-                    getRowClassName={() => "bg-red-50"}
-                  />
-                </div>
-                <div>
-                  <h2 className="text-lg font-bold text-gray-800 mb-4 px-2">
-                    Normal Orders
-                  </h2>
-                  <DataTable
-                    data={nsoGroups.normal}
-                    columns={[
-                      {
-                        header: "SupplierID",
-                        width: "120px",
-                        align: "center",
-                        render: (row) => (
-                          <div className="flex items-center justify-center gap-1 group cursor-pointer">
-                            <div className="bg-[#475569] text-white rounded px-3 py-1.5 flex items-center gap-4 text-xs font-bold w-20 justify-between shadow-md">
-                              {row.supplier_id}
-                              <div className="bg-white rounded-full p-0.5">
-                                <ArrowRightIcon className="h-2 w-2 text-[#475569]" />
-                              </div>
-                            </div>
-                          </div>
-                        ),
-                      },
-                      {
-                        header: "Supplier",
-                        render: (row) => row.supplier_name,
-                        align: "center",
-                      },
-                      {
-                        header: "Order Type",
-                        render: (row) => row.order_type,
-                        align: "center",
-                      },
-                      {
-                        header: "Count",
-                        render: (row) => row.count,
-                        align: "center",
-                      },
-                      {
-                        header: "QTY",
-                        render: (row) => row.qty,
-                        align: "center",
-                      },
-                      {
-                        header: "Actions",
-                        align: "center",
-                        render: (row) => (
-                          <div className="flex justify-center">
-                            <button
-                              onClick={() =>
-                                handleCreateSupplierOrderFromNSO(row)
-                              }
-                              className="bg-[#059669] text-white px-4 py-2 rounded-[4px] flex items-center gap-2 text-xs font-bold hover:bg-green-700 transition shadow-md"
-                            >
-                              <PlusCircleIcon className="h-5 w-5" />
-                              Supplier order
-                            </button>
-                          </div>
-                        ),
-                      },
-                    ]}
-                    loading={loadingOrders}
-                    emptyMessage="No Normal NSOs found"
-                  />
-                </div>
+                {(() => {
+                  const renderNsoItemDetails = (row: any) => (
+                    <div className="p-4 bg-white border border-gray-100 rounded-lg shadow-inner m-2">
+                      <h4 className="font-bold text-gray-700 mb-3 ml-1 text-sm uppercase">Order Items in this Group (Total: {row.count}):</h4>
+                      <div className="overflow-x-auto rounded-lg border border-gray-200">
+                        <table className="w-full text-xs text-left">
+                          <thead className="bg-gray-100 text-gray-500 font-semibold uppercase">
+                            <tr>
+                              <th className="px-3 py-2 border-b">Order No</th>
+                              <th className="px-3 py-2 border-b">EAN</th>
+                              <th className="px-3 py-2 border-b">Item Name</th>
+                              <th className="px-3 py-2 border-b">Remark</th>
+                              <th className="px-3 py-2 border-b text-center">Qty</th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white">
+                            {row.items.map((it: any, idx: number) => {
+                              const d = itemById.get(String(it.item_id));
+                              const name = d?.item_name || d?.name || it.item_name || "Unknown";
+                              const ean = d?.ean || it.ean || "-";
+                              return (
+                                <tr key={it.id || idx} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+                                  <td className="px-3 py-2 font-bold text-blue-600">{it._order_no || "-"}</td>
+                                  <td className="px-3 py-2 text-gray-600">{ean}</td>
+                                  <td className="px-3 py-2 font-medium text-gray-900">{name}</td>
+                                  <td className="px-3 py-2 text-gray-500 italic">{it.remark_de || it.remarks_cn || "-"}</td>
+                                  <td className="px-3 py-2 font-bold text-center">{it.qty}</td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  );
+
+                  return (
+                    <>
+                      <div className="mb-10">
+                        <h2 className="text-lg font-bold text-gray-800 mb-4 px-2">
+                          Express Orders
+                        </h2>
+                        <DataTable
+                          data={nsoGroups.express}
+                          columns={[
+                            {
+                              header: "SupplierID",
+                              width: "120px",
+                              align: "center",
+                              render: (row) => (
+                                <div className="flex items-center justify-center gap-1 group cursor-pointer">
+                                  <div className="bg-[#475569] text-white rounded px-3 py-1.5 flex items-center gap-4 text-xs font-bold w-20 justify-between shadow-md">
+                                    {row.supplier_id}
+                                    <div className="bg-white rounded-full p-0.5">
+                                      <ChevronDownIcon className={`h-3 w-3 text-[#475569] transition-transform ${expandedNsoId === row.id ? 'rotate-180' : ''}`} />
+                                    </div>
+                                  </div>
+                                </div>
+                              ),
+                            },
+                            {
+                              header: "Supplier name",
+                              render: (row) => row.supplier_name,
+                              align: "center",
+                            },
+                            {
+                              header: "Order Type",
+                              render: (row) => row.order_type,
+                              align: "center",
+                            },
+                            {
+                              header: "Count",
+                              render: (row) => row.count,
+                              align: "center",
+                            },
+                            {
+                              header: "QTY",
+                              render: (row) => row.qty,
+                              align: "center",
+                            },
+                            {
+                              header: "Actions",
+                              align: "center",
+                              render: (row) => (
+                                <div className="flex justify-center">
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleCreateSupplierOrderFromNSO(row);
+                                    }}
+                                    className="bg-[#059669] text-white px-4 py-2 rounded-[4px] flex items-center gap-2 text-xs font-bold hover:bg-green-700 transition shadow-md"
+                                  >
+                                    <PlusCircleIcon className="h-5 w-5" />
+                                    Supplier order
+                                  </button>
+                                </div>
+                              ),
+                            },
+                          ]}
+                          loading={loadingOrders}
+                          emptyMessage="No Express NSOs found"
+                          getRowClassName={() => "bg-red-50"}
+                          expandedRowId={expandedNsoId}
+                          onRowClick={(row) => setExpandedNsoId(expandedNsoId === row.id ? null : row.id)}
+                          renderRowDetails={renderNsoItemDetails}
+                        />
+                      </div>
+                      <div>
+                        <h2 className="text-lg font-bold text-gray-800 mb-4 px-2">
+                          Normal Orders
+                        </h2>
+                        <DataTable
+                          data={nsoGroups.normal}
+                          columns={[
+                            {
+                              header: "SupplierID",
+                              width: "120px",
+                              align: "center",
+                              render: (row) => (
+                                <div className="flex items-center justify-center gap-1 group cursor-pointer">
+                                  <div className="bg-[#475569] text-white rounded px-3 py-1.5 flex items-center gap-4 text-xs font-bold w-20 justify-between shadow-md">
+                                    {row.supplier_id}
+                                    <div className="bg-white rounded-full p-0.5">
+                                      <ChevronDownIcon className={`h-3 w-3 text-[#475569] transition-transform ${expandedNsoId === row.id ? 'rotate-180' : ''}`} />
+                                    </div>
+                                  </div>
+                                </div>
+                              ),
+                            },
+                            {
+                              header: "Supplier",
+                              render: (row) => row.supplier_name,
+                              align: "center",
+                            },
+                            {
+                              header: "Order Type",
+                              render: (row) => row.order_type,
+                              align: "center",
+                            },
+                            {
+                              header: "Count",
+                              render: (row) => row.count,
+                              align: "center",
+                            },
+                            {
+                              header: "QTY",
+                              render: (row) => row.qty,
+                              align: "center",
+                            },
+                            {
+                              header: "Actions",
+                              align: "center",
+                              render: (row) => (
+                                <div className="flex justify-center">
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleCreateSupplierOrderFromNSO(row);
+                                    }}
+                                    className="bg-[#059669] text-white px-4 py-2 rounded-[4px] flex items-center gap-2 text-xs font-bold hover:bg-green-700 transition shadow-md"
+                                  >
+                                    <PlusCircleIcon className="h-5 w-5" />
+                                    Supplier order
+                                  </button>
+                                </div>
+                              ),
+                            },
+                          ]}
+                          loading={loadingOrders}
+                          emptyMessage="No Normal NSOs found"
+                          expandedRowId={expandedNsoId}
+                          onRowClick={(row) => setExpandedNsoId(expandedNsoId === row.id ? null : row.id)}
+                          renderRowDetails={renderNsoItemDetails}
+                        />
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
             ) : activeTab === "supplier_orders" ? (
               <div className="p-4 bg-gray-50/30 min-h-[600px]">
@@ -2755,7 +2811,7 @@ const OrderPage = () => {
             )}
           </div>
         </div>
-      </div>
+      </div >
 
       {showReassignModal && reassignOrder && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-[60]">
@@ -2814,531 +2870,544 @@ const OrderPage = () => {
             </div>
           </div>
         </div>
-      )}
+      )
+      }
 
-      {showSupplierConfirm && pendingNsoGroup && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70]">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 border border-gray-100">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="bg-green-100 rounded-full p-2">
-                <PlusCircleIcon className="h-6 w-6 text-green-600" />
+      {
+        showSupplierConfirm && pendingNsoGroup && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70]">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 border border-gray-100">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="bg-green-100 rounded-full p-2">
+                  <PlusCircleIcon className="h-6 w-6 text-green-600" />
+                </div>
+                <h3 className="text-lg font-bold text-gray-900">
+                  Create Supplier Order
+                </h3>
               </div>
-              <h3 className="text-lg font-bold text-gray-900">
-                Create Supplier Order
-              </h3>
-            </div>
-            <p className="text-sm text-gray-600 mb-2">
-              You are about to create a supplier order for:
-            </p>
-            <div className="bg-gray-50 rounded-xl p-3 mb-5 space-y-1 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-500">Supplier</span>
-                <span className="font-semibold text-gray-800">
-                  {pendingNsoGroup.supplier_name}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">Items</span>
-                <span className="font-semibold text-gray-800">
-                  {pendingNsoGroup.count} item(s)
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">Total Qty</span>
-                <span className="font-semibold text-gray-800">
-                  {pendingNsoGroup.qty}
-                </span>
-              </div>
-            </div>
-            <p className="text-xs text-amber-600 bg-amber-50 rounded-[4px] px-3 py-2 mb-5">
-              ⚠ These items will be moved out of NSO and linked to the new
-              supplier order.
-            </p>
-            <div className="flex gap-3 justify-end">
-              <button
-                onClick={() => {
-                  setShowSupplierConfirm(false);
-                  setPendingNsoGroup(null);
-                }}
-                className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-[4px] hover:bg-gray-200 transition font-medium"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={confirmCreateSupplierOrder}
-                className="px-5 py-2 text-sm bg-[#059669] text-white rounded-[4px] hover:bg-green-700 transition font-bold flex items-center gap-2"
-              >
-                <PlusCircleIcon className="h-4 w-4" />
-                Confirm
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showViewModal && viewOrder && (
-        <CustomModal
-          isOpen={showViewModal}
-          onClose={closeView}
-          title={`Order ${viewOrder.order_no}`}
-          width="max-w-4xl"
-          footer={
-            <button
-              onClick={closeView}
-              className="px-6 py-2 text-sm bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-all font-bold"
-            >
-              Close
-            </button>
-          }
-        >
-          <div className="space-y-6">
-            <div>
-              <p className="text-sm font-semibold text-gray-500">
-                Status: {viewOrder.status || "20"}
+              <p className="text-sm text-gray-600 mb-2">
+                You are about to create a supplier order for:
               </p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-1">
-                <label className="text-sm font-bold text-gray-400 block uppercase tracking-wide">
-                  Category
-                </label>
-                <p className="text-gray-900 font-bold">
-                  {getCategoryName(viewOrder.category_id) || "Imported 26"}
-                </p>
+              <div className="bg-gray-50 rounded-xl p-3 mb-5 space-y-1 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Supplier</span>
+                  <span className="font-semibold text-gray-800">
+                    {pendingNsoGroup.supplier_name}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Items</span>
+                  <span className="font-semibold text-gray-800">
+                    {pendingNsoGroup.count} item(s)
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Total Qty</span>
+                  <span className="font-semibold text-gray-800">
+                    {pendingNsoGroup.qty}
+                  </span>
+                </div>
               </div>
-              <div className="space-y-1">
-                <label className="text-sm font-bold text-gray-400 block uppercase tracking-wide">
-                  Customer
-                </label>
-                <p className="text-gray-900 font-bold">
-                  {viewOrder.customer_id != null ? getCustomerName(viewOrder.customer_id) : "-"}
-                </p>
-              </div>
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-sm font-bold text-gray-400 block uppercase tracking-wide">
-                Comment
-              </label>
-              <p className="text-gray-800 text-sm font-medium leading-relaxed">
-                {viewOrder.comment || "-"}
+              <p className="text-xs text-amber-600 bg-amber-50 rounded-[4px] px-3 py-2 mb-5">
+                ⚠ These items will be moved out of NSO and linked to the new
+                supplier order.
               </p>
-            </div>
-
-            <div className="mt-8">
-              <DataTable
-                data={viewItems}
-                loading={false}
-                emptyMessage="No items found in this order"
-                columns={[
-                  {
-                    header: "EAN",
-                    width: "120px",
-                    render: (row) => <span className="text-blue-600 font-semibold">{row.ean || "-"}</span>,
-                    align: "center",
-                  },
-                  {
-                    header: "ItemName shown",
-                    render: (row) => (
-                      <div className="font-bold text-gray-900 line-clamp-2 leading-tight">
-                        {row.itemName}
-                      </div>
-                    ),
-                  },
-                  {
-                    header: "3-level remark (same as in LabelPrint View)",
-                    render: (row) => (
-                      <div className="text-xs text-gray-500 font-medium italic space-y-0.5">
-                        {row.remarks_cn && <div className="text-red-600">CN: {row.remarks_cn}</div>}
-                        {row.remark_de && <div>DE: {row.remark_de}</div>}
-                        {!row.remarks_cn && !row.remark_de && <span className="text-gray-300">-</span>}
-                      </div>
-                    ),
-                  },
-                  {
-                    header: "Status OrderItem",
-                    width: "120px",
-                    render: (row) => (
-                      <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${row.status === 'NSO' ? 'bg-amber-100 text-amber-700' :
-                        row.status === 'SO' ? 'bg-blue-100 text-blue-700' :
-                          'bg-green-100 text-green-700'
-                        }`}>
-                        {row.status || "NSO"}
-                      </span>
-                    ),
-                    align: "center",
-                  }
-                ]}
-              />
-            </div>
-          </div>
-        </CustomModal>
-      )}
-
-      {showModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-bold text-gray-900">
-                  {mode === "convert"
-                    ? "CONVERT ORDER"
-                    : mode === "edit"
-                      ? "Edit Order"
-                      : isTab2
-                        ? "Create Customer Order"
-                        : "Create New Order"}
-                </h2>
-
+              <div className="flex gap-3 justify-end">
                 <button
-                  onClick={closeModal}
-                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                  onClick={() => {
+                    setShowSupplierConfirm(false);
+                    setPendingNsoGroup(null);
+                  }}
+                  className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-[4px] hover:bg-gray-200 transition font-medium"
                 >
-                  <XMarkIcon className="h-5 w-5" />
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmCreateSupplierOrder}
+                  className="px-5 py-2 text-sm bg-[#059669] text-white rounded-[4px] hover:bg-green-700 transition font-bold flex items-center gap-2"
+                >
+                  <PlusCircleIcon className="h-4 w-4" />
+                  Confirm
                 </button>
               </div>
+            </div>
+          </div>
+        )
+      }
 
-              {isConvertMode && (
-                <div className="mb-4 rounded-[4px] border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-                  <b>Note</b>. All other fields are locked. Only <b>QTY</b> and{" "}
-                  <b>Item remark</b> is editable.
-                </div>
-              )}
+      {
+        showViewModal && viewOrder && (
+          <CustomModal
+            isOpen={showViewModal}
+            onClose={closeView}
+            title={`Order ${viewOrder.order_no}`}
+            width="max-w-4xl"
+            footer={
+              <button
+                onClick={closeView}
+                className="px-6 py-2 text-sm bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-all font-bold"
+              >
+                Close
+              </button>
+            }
+          >
+            <div className="space-y-6">
+              <div>
+                <p className="text-sm font-semibold text-gray-500">
+                  Status: {viewOrder.status || "20"}
+                </p>
+              </div>
 
-              <div className="space-y-4">
-                <div className="flex gap-4">
-                  <div className="flex-1">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Select Category:
-                    </label>
-                    <select
-                      value={form.category_id}
-                      onChange={(e) => handleCategoryChange(e.target.value)}
-                      disabled={lockAllExceptQty}
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:bg-gray-50"
-                    >
-                      <option value="">Select Category</option>
-                      {categories.map((cat) => (
-                        <option key={cat.id} value={String(cat.id)}>
-                          {cat.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="flex-1">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      {isTab1 ? "Select Supplier:" : "Select Customer:"}
-                    </label>
-                    {isTab1 ? (
-                      <select
-                        value={form.supplier_id}
-                        onChange={(e) => handleSupplierChange(e.target.value)}
-                        disabled={lockAllExceptQty}
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:bg-gray-50"
-                      >
-                        <option value="">Select Supplier</option>
-                        {suppliers.map((s) => (
-                          <option key={s.id} value={String(s.id)}>
-                            {s.company_name || s.name || "Unnamed Supplier"}
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      <select
-                        value={form.customer_id}
-                        onChange={(e) => handleCustomerChange(e.target.value)}
-                        disabled={lockAllExceptQty}
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:bg-gray-50"
-                      >
-                        <option value="">Select Customer</option>
-                        {customers.map((customer) => (
-                          <option key={customer.id} value={String(customer.id)}>
-                            {customer.companyName}
-                          </option>
-                        ))}
-                      </select>
-                    )}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Select Item then quantity:
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-1">
+                  <label className="text-sm font-bold text-gray-400 block uppercase tracking-wide">
+                    Category
                   </label>
-                  <ItemSelectorWithQuantity
-                    items={effectiveItems}
-                    selectedItemId={selectedItemId}
-                    onItemChange={setSelectedItemId}
-                    onAdd={handleAddItemToOrder}
-                    disabled={lockAllExceptQty || loadingItems}
-                  />
+                  <p className="text-gray-900 font-bold">
+                    {getCategoryName(viewOrder.category_id) || "Imported 26"}
+                  </p>
                 </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Comment:
+                <div className="space-y-1">
+                  <label className="text-sm font-bold text-gray-400 block uppercase tracking-wide">
+                    Customer
                   </label>
-                  <textarea
-                    value={form.comment}
-                    onChange={(e) =>
-                      setForm((prev) => ({ ...prev, comment: e.target.value }))
-                    }
-                    disabled={lockAllExceptQty}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:bg-gray-50"
-                    placeholder="Enter order comment..."
-                    rows={3}
-                  />
+                  <p className="text-gray-900 font-bold">
+                    {viewOrder.customer_id != null ? getCustomerName(viewOrder.customer_id) : "-"}
+                  </p>
                 </div>
+              </div>
 
-                {orderItems.length > 0 && (
-                  <div className="mt-3 overflow-x-auto">
-                    <table className="min-w-full bg-white border border-gray-200 rounded-[4px] shadow-md">
-                      <thead className="bg-gray-100">
-                        <tr>
-                          <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-b">
-                            ID
-                          </th>
-                          <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-b">
-                            Item name
-                          </th>
-                          <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-b">
-                            Qty
-                          </th>
-                          <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-b">
-                            Item remark
-                          </th>
-                          <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-b">
-                            Price
-                          </th>
-                          <th className="px-4 py-2 text-center text-sm font-medium text-gray-700 border-b">
-                            Action
-                          </th>
-                        </tr>
-                      </thead>
+              <div className="space-y-1">
+                <label className="text-sm font-bold text-gray-400 block uppercase tracking-wide">
+                  Comment
+                </label>
+                <p className="text-gray-800 text-sm font-medium leading-relaxed">
+                  {viewOrder.comment || "-"}
+                </p>
+              </div>
 
-                      <tbody>
-                        {orderItems.map((row) => (
-                          <tr key={row.item_id} className="hover:bg-gray-50">
-                            <td className="px-4 py-2 text-sm text-gray-700 border-b">
-                              {row.item_id}
-                            </td>
-                            <td className="px-4 py-2 text-sm text-gray-700 border-b">
-                              {row.itemName}
-                            </td>
-
-                            <td className="px-4 py-2 text-sm text-gray-700 border-b">
-                              <input
-                                type="number"
-                                min={1}
-                                value={row.qty}
-                                onChange={(e) =>
-                                  handleUpdateOrderItemQty(
-                                    row.item_id,
-                                    Number(e.target.value),
-                                  )
-                                }
-                                className="w-20 px-2 py-1 text-sm border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500 focus:border-transparent"
-                              />
-                            </td>
-
-                            <td className="px-4 py-2 text-sm text-gray-700 border-b">
-                              <input
-                                type="text"
-                                value={row.remark_de}
-                                onChange={(e) =>
-                                  handleUpdateOrderItemRemark(
-                                    row.item_id,
-                                    String(e.target.value),
-                                  )
-                                }
-                                className="w-full px-2 py-1 text-sm border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:bg-gray-50"
-                              />
-                            </td>
-
-                            <td className="px-4 py-2 text-sm text-gray-700 border-b whitespace-nowrap">
-                              {row.currency || "CNY"} {row.price || 0}
-                            </td>
-
-                            <td className="px-4 py-2 text-sm text-gray-700 border-b text-center">
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  handleRemoveOrderItem(row.item_id)
-                                }
-                                disabled={lockAllExceptQty}
-                                className="inline-flex items-center gap-1 px-3 py-1.5 text-sm bg-red-600 text-white rounded-[4px] hover:bg-red-500 disabled:opacity-50"
-                              >
-                                <TrashIcon className="h-4 w-4" />
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-
-                <div className="flex justify-end gap-2 pt-4">
-                  <button
-                    onClick={closeModal}
-                    className="px-4 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-[4px] hover:bg-gray-50 transition-all"
-                  >
-                    Cancel
-                  </button>
-
-                  <CustomButton
-                    gradient={true}
-                    disabled={!canSubmit}
-                    onClick={
-                      mode === "convert"
-                        ? handleConvertOrder
-                        : mode === "edit"
-                          ? handleUpdateOrder
-                          : handleCreateOrder
+              <div className="mt-8">
+                <DataTable
+                  data={viewItems}
+                  loading={false}
+                  emptyMessage="No items found in this order"
+                  columns={[
+                    {
+                      header: "EAN",
+                      width: "120px",
+                      render: (row) => <span className="text-blue-600 font-semibold">{row.ean || "-"}</span>,
+                      align: "center",
+                    },
+                    {
+                      header: "ItemName shown",
+                      render: (row) => (
+                        <div className="font-bold text-gray-900 line-clamp-2 leading-tight">
+                          {row.itemName}
+                        </div>
+                      ),
+                    },
+                    {
+                      header: "3-level remark (same as in LabelPrint View)",
+                      render: (row) => (
+                        <div className="text-xs text-gray-500 font-medium italic space-y-0.5">
+                          {row.remarks_cn && <div className="text-red-600">CN: {row.remarks_cn}</div>}
+                          {row.remark_de && <div>DE: {row.remark_de}</div>}
+                          {!row.remarks_cn && !row.remark_de && <span className="text-gray-300">-</span>}
+                        </div>
+                      ),
+                    },
+                    {
+                      header: "Status OrderItem",
+                      width: "120px",
+                      render: (row) => (
+                        <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${row.status === 'NSO' ? 'bg-amber-100 text-amber-700' :
+                          row.status === 'SO' ? 'bg-blue-100 text-blue-700' :
+                            'bg-green-100 text-green-700'
+                          }`}>
+                          {row.status || "NSO"}
+                        </span>
+                      ),
+                      align: "center",
                     }
-                    className="px-6 py-2 text-sm bg-[#059669] text-white rounded-[4px] hover:bg-green-700 transition-all shadow-md font-bold disabled:opacity-50"
-                  >
+                  ]}
+                />
+              </div>
+            </div>
+          </CustomModal>
+        )
+      }
+
+      {
+        showModal && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-2xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-xl font-bold text-gray-900">
                     {mode === "convert"
                       ? "CONVERT ORDER"
                       : mode === "edit"
-                        ? "Update Order"
-                        : "Create Order"}
-                  </CustomButton>
+                        ? "Edit Order"
+                        : isTab2
+                          ? "Create Customer Order"
+                          : "Create New Order"}
+                  </h2>
+
+                  <button
+                    onClick={closeModal}
+                    className="text-gray-400 hover:text-gray-600 transition-colors"
+                  >
+                    <XMarkIcon className="h-5 w-5" />
+                  </button>
+                </div>
+
+                {isConvertMode && (
+                  <div className="mb-4 rounded-[4px] border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                    <b>Note</b>. All other fields are locked. Only <b>QTY</b> and{" "}
+                    <b>Item remark</b> is editable.
+                  </div>
+                )}
+
+                <div className="space-y-4">
+                  <div className="flex gap-4">
+                    <div className="flex-1">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Select Category:
+                      </label>
+                      <select
+                        value={form.category_id}
+                        onChange={(e) => handleCategoryChange(e.target.value)}
+                        disabled={lockAllExceptQty}
+                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:bg-gray-50"
+                      >
+                        <option value="">Select Category</option>
+                        {categories.map((cat) => (
+                          <option key={cat.id} value={String(cat.id)}>
+                            {cat.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="flex-1">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        {isTab1 ? "Select Supplier:" : "Select Customer:"}
+                      </label>
+                      {isTab1 ? (
+                        <select
+                          value={form.supplier_id}
+                          onChange={(e) => handleSupplierChange(e.target.value)}
+                          disabled={lockAllExceptQty}
+                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:bg-gray-50"
+                        >
+                          <option value="">Select Supplier</option>
+                          {suppliers.map((s) => (
+                            <option key={s.id} value={String(s.id)}>
+                              {s.company_name || s.name || "Unnamed Supplier"}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <select
+                          value={form.customer_id}
+                          onChange={(e) => handleCustomerChange(e.target.value)}
+                          disabled={lockAllExceptQty}
+                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:bg-gray-50"
+                        >
+                          <option value="">Select Customer</option>
+                          {customers.map((customer) => (
+                            <option key={customer.id} value={String(customer.id)}>
+                              {customer.companyName}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Select Item then quantity:
+                    </label>
+                    <ItemSelectorWithQuantity
+                      items={effectiveItems}
+                      selectedItemId={selectedItemId}
+                      onItemChange={setSelectedItemId}
+                      onAdd={handleAddItemToOrder}
+                      disabled={lockAllExceptQty || loadingItems}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Comment:
+                    </label>
+                    <textarea
+                      value={form.comment}
+                      onChange={(e) =>
+                        setForm((prev) => ({ ...prev, comment: e.target.value }))
+                      }
+                      disabled={lockAllExceptQty}
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:bg-gray-50"
+                      placeholder="Enter order comment..."
+                      rows={3}
+                    />
+                  </div>
+
+                  {orderItems.length > 0 && (
+                    <div className="mt-3 overflow-x-auto">
+                      <table className="min-w-full bg-white border border-gray-200 rounded-[4px] shadow-md">
+                        <thead className="bg-gray-100">
+                          <tr>
+                            <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-b">
+                              ID
+                            </th>
+                            <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-b">
+                              Item name
+                            </th>
+                            <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-b">
+                              Qty
+                            </th>
+                            <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-b">
+                              Item remark
+                            </th>
+                            <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-b">
+                              Price
+                            </th>
+                            <th className="px-4 py-2 text-center text-sm font-medium text-gray-700 border-b">
+                              Action
+                            </th>
+                          </tr>
+                        </thead>
+
+                        <tbody>
+                          {orderItems.map((row) => (
+                            <tr key={row.item_id} className="hover:bg-gray-50">
+                              <td className="px-4 py-2 text-sm text-gray-700 border-b">
+                                {row.item_id}
+                              </td>
+                              <td className="px-4 py-2 text-sm text-gray-700 border-b">
+                                {row.itemName}
+                              </td>
+
+                              <td className="px-4 py-2 text-sm text-gray-700 border-b">
+                                <input
+                                  type="number"
+                                  min={1}
+                                  value={row.qty}
+                                  onChange={(e) =>
+                                    handleUpdateOrderItemQty(
+                                      row.item_id,
+                                      Number(e.target.value),
+                                    )
+                                  }
+                                  className="w-20 px-2 py-1 text-sm border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500 focus:border-transparent"
+                                />
+                              </td>
+
+                              <td className="px-4 py-2 text-sm text-gray-700 border-b">
+                                <input
+                                  type="text"
+                                  value={row.remark_de}
+                                  onChange={(e) =>
+                                    handleUpdateOrderItemRemark(
+                                      row.item_id,
+                                      String(e.target.value),
+                                    )
+                                  }
+                                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:bg-gray-50"
+                                />
+                              </td>
+
+                              <td className="px-4 py-2 text-sm text-gray-700 border-b whitespace-nowrap">
+                                {row.currency || "CNY"} {row.price || 0}
+                              </td>
+
+                              <td className="px-4 py-2 text-sm text-gray-700 border-b text-center">
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleRemoveOrderItem(row.item_id)
+                                  }
+                                  disabled={lockAllExceptQty}
+                                  className="inline-flex items-center gap-1 px-3 py-1.5 text-sm bg-red-600 text-white rounded-[4px] hover:bg-red-500 disabled:opacity-50"
+                                >
+                                  <TrashIcon className="h-4 w-4" />
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+
+                  <div className="flex justify-end gap-2 pt-4">
+                    <button
+                      onClick={closeModal}
+                      className="px-4 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-[4px] hover:bg-gray-50 transition-all"
+                    >
+                      Cancel
+                    </button>
+
+                    <CustomButton
+                      gradient={true}
+                      disabled={!canSubmit}
+                      onClick={
+                        mode === "convert"
+                          ? handleConvertOrder
+                          : mode === "edit"
+                            ? handleUpdateOrder
+                            : handleCreateOrder
+                      }
+                      className="px-6 py-2 text-sm bg-[#059669] text-white rounded-[4px] hover:bg-green-700 transition-all shadow-md font-bold disabled:opacity-50"
+                    >
+                      {mode === "convert"
+                        ? "CONVERT ORDER"
+                        : mode === "edit"
+                          ? "Update Order"
+                          : "Create Order"}
+                    </CustomButton>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
-      {isEditQtyModalOpen && editQtyItem && (
-        <CustomModal
-          isOpen={isEditQtyModalOpen}
-          onClose={() => setIsEditQtyModalOpen(false)}
-          title={`Update QTY QtyLabel (ID: ${editQtyItem.id})`}
-          width="max-w-md"
-          footer={
-            <button
-              onClick={saveQtyChanges}
-              className="bg-[#059669] hover:bg-green-700 text-white px-6 py-2 rounded-xl font-bold transition-all shadow-lg active:scale-95"
-            >
-              Save QTY changes
-            </button>
-          }
-        >
-          <div className="space-y-6">
-            <div>
-              <label className="block text-sm font-bold text-gray-700 mb-2">
-                New QTY:
-              </label>
-              <input
-                type="number"
-                value={newQty}
-                onChange={(e) => setNewQty(e.target.value)}
-                className="w-full px-4 py-3 border-2 border-gray-100 rounded-xl focus:ring-2 focus:ring-[#059669] focus:border-transparent outline-none transition-all font-medium text-lg text-gray-800"
-                placeholder="Enter new quantity..."
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-bold text-gray-700 mb-2">
-                Enter Remarks RemarkCN:
-              </label>
-              <textarea
-                value={newRemarkCN}
-                onChange={(e) => setNewRemarkCN(e.target.value)}
-                rows={4}
-                className="w-full px-4 py-3 border-2 border-gray-100 rounded-xl focus:ring-2 focus:ring-[#059669] focus:border-transparent outline-none transition-all font-medium text-gray-600 resize-none"
-                placeholder="Enter Chinese remarks..."
-              />
-            </div>
-          </div>
-        </CustomModal>
-      )}
-      {showREModal && selectedItem && (
-        <CustomModal
-          isOpen={showREModal}
-          onClose={() => setShowREModal(false)}
-          title={`Reassign Item ${selectedItem.id}`}
-        >
-          <div className="p-4 space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Select Cargo
-              </label>
-              <select
-                value={targetCargoId}
-                onChange={(e) => setTargetCargoId(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-[#059669]"
-              >
-                <option value="">-- Choose Cargo --</option>
-                {cargos.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.cargo_no}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="flex justify-end gap-2 mt-6">
+        )
+      }
+      {
+        isEditQtyModalOpen && editQtyItem && (
+          <CustomModal
+            isOpen={isEditQtyModalOpen}
+            onClose={() => setIsEditQtyModalOpen(false)}
+            title={`Update QTY QtyLabel (ID: ${editQtyItem.id})`}
+            width="max-w-md"
+            footer={
               <button
-                onClick={() => setShowREModal(false)}
-                className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg"
+                onClick={saveQtyChanges}
+                className="bg-[#059669] hover:bg-green-700 text-white px-6 py-2 rounded-xl font-bold transition-all shadow-lg active:scale-95"
               >
-                Cancel
+                Save QTY changes
               </button>
-              <button
-                onClick={handleReassignItemAction}
-                disabled={!targetCargoId}
-                className="px-4 py-2 text-sm bg-[#059669] text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
-              >
-                Reassign
-              </button>
+            }
+          >
+            <div className="space-y-6">
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">
+                  New QTY:
+                </label>
+                <input
+                  type="number"
+                  value={newQty}
+                  onChange={(e) => setNewQty(e.target.value)}
+                  className="w-full px-4 py-3 border-2 border-gray-100 rounded-xl focus:ring-2 focus:ring-[#059669] focus:border-transparent outline-none transition-all font-medium text-lg text-gray-800"
+                  placeholder="Enter new quantity..."
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">
+                  Enter Remarks RemarkCN:
+                </label>
+                <textarea
+                  value={newRemarkCN}
+                  onChange={(e) => setNewRemarkCN(e.target.value)}
+                  rows={4}
+                  className="w-full px-4 py-3 border-2 border-gray-100 rounded-xl focus:ring-2 focus:ring-[#059669] focus:border-transparent outline-none transition-all font-medium text-gray-600 resize-none"
+                  placeholder="Enter Chinese remarks..."
+                />
+              </div>
             </div>
-          </div>
-        </CustomModal>
-      )}
+          </CustomModal>
+        )
+      }
+      {
+        showREModal && selectedItem && (
+          <CustomModal
+            isOpen={showREModal}
+            onClose={() => setShowREModal(false)}
+            title={`Reassign Item ${selectedItem.id}`}
+          >
+            <div className="p-4 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Select Cargo
+                </label>
+                <select
+                  value={targetCargoId}
+                  onChange={(e) => setTargetCargoId(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-[#059669]"
+                >
+                  <option value="">-- Choose Cargo --</option>
+                  {cargos.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.cargo_no}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex justify-end gap-2 mt-6">
+                <button
+                  onClick={() => setShowREModal(false)}
+                  className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleReassignItemAction}
+                  disabled={!targetCargoId}
+                  className="px-4 py-2 text-sm bg-[#059669] text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+                >
+                  Reassign
+                </button>
+              </div>
+            </div>
+          </CustomModal>
+        )
+      }
 
-      {showSPModal && selectedItem && (
-        <CustomModal
-          isOpen={showSPModal}
-          onClose={() => setShowSPModal(false)}
-          title={`Split Item ${selectedItem.id}`}
-        >
-          <div className="p-4 space-y-4">
-            <p className="text-sm text-gray-600">
-              Current Qty: <span className="font-bold">{selectedItem.qty}</span>
-            </p>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Split Quantity (amount to move to new row)
-              </label>
-              <input
-                type="number"
-                value={splitQty}
-                onChange={(e) => setSplitQty(Number(e.target.value))}
-                min={1}
-                max={selectedItem.qty - 1}
-                className="w-full border border-gray-300 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-orange-500"
-              />
+      {
+        showSPModal && selectedItem && (
+          <CustomModal
+            isOpen={showSPModal}
+            onClose={() => setShowSPModal(false)}
+            title={`Split Item ${selectedItem.id}`}
+          >
+            <div className="p-4 space-y-4">
+              <p className="text-sm text-gray-600">
+                Current Qty: <span className="font-bold">{selectedItem.qty}</span>
+              </p>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Split Quantity (amount to move to new row)
+                </label>
+                <input
+                  type="number"
+                  value={splitQty}
+                  onChange={(e) => setSplitQty(Number(e.target.value))}
+                  min={1}
+                  max={selectedItem.qty - 1}
+                  className="w-full border border-gray-300 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-orange-500"
+                />
+              </div>
+              <div className="flex justify-end gap-2 mt-6">
+                <button
+                  onClick={() => setShowSPModal(false)}
+                  className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSplitItemAction}
+                  disabled={splitQty <= 0 || splitQty >= selectedItem.qty}
+                  className="px-4 py-2 text-sm bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50"
+                >
+                  Split Now
+                </button>
+              </div>
             </div>
-            <div className="flex justify-end gap-2 mt-6">
-              <button
-                onClick={() => setShowSPModal(false)}
-                className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSplitItemAction}
-                disabled={splitQty <= 0 || splitQty >= selectedItem.qty}
-                className="px-4 py-2 text-sm bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50"
-              >
-                Split Now
-              </button>
-            </div>
-          </div>
-        </CustomModal>
-      )}
+          </CustomModal>
+        )
+      }
     </>
   );
 };
