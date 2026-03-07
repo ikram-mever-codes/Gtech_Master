@@ -473,12 +473,17 @@ export const generateLabelPDF = async (
       where: { id: Number(itemId) },
       relations: ["item"],
     });
+
     if (!item) return next(new ErrorHandler("Item not found", 404));
 
     const order = await orderRepo.findOne({ where: { id: item.order_id } });
 
-    // Dimension: 350 x 136
-    const doc = new PDFDocument({ size: [350, 136], margin: 0 });
+    /**
+     * DIMENSIONS (300 DPI Calibration):
+     * Width: 1050px / 300 * 72 = 252pt
+     * Height: 425px / 300 * 72 = 102pt
+     */
+    const doc = new PDFDocument({ size: [252, 102], margin: 0 });
     const logoPath = path.join(__dirname, "../../public/logo.png");
 
     res.setHeader("Content-Type", "application/pdf");
@@ -489,85 +494,96 @@ export const generateLabelPDF = async (
     doc.pipe(res);
 
     // --- Layout Constants ---
-    // colA is the label start.
-    // valColA is shifted right so the value starts under the 'W' of 'ItemNoW'
-    const colA = 20;
-    const valColA = 25;
+    const colA = 12; // Label "ItemNoW" start
+    const valColA = 16; // Values (ID, Name, Remarks) start under the 'W'
+    const colB = 85; // Order No Column
+    const colD = 180; // Qty Column (Pushed right to avoid overlap)
+    const colLogo = 205; // Logo position
 
-    const colB = 125;
-    const colD = 210;
-    const colLogo = 275; // Moved further right (from 250 to 275)
+    const row1LabelY = 10;
+    const row1ValueY = 22; // Vertical space between label and value
 
-    const row1LabelY = 15;
-    const row1ValueY = 28; // Added vertical spacing between label and value
-
-    // 1. TOP ROW: Labels
-    doc.fillColor("black").font("Helvetica-Oblique").fontSize(7.5);
+    // 1. TOP ROW: Labels (Italicized)
+    doc.fillColor("black").font("Helvetica-Oblique").fontSize(6.5);
     doc.text("ItemNoW", colA, row1LabelY);
     doc.text("Order No / Qty", colB, row1LabelY);
     doc.text("Qty", colD, row1LabelY);
 
-    // 2. TOP ROW: Values (Now aligned to valColA and with more Y spacing)
-    doc.font("Helvetica-Bold").fontSize(17);
-    doc.text(
-      item?.item?.ItemID_DE?.toString() || "H012-05",
-      valColA,
-      row1ValueY,
-    );
-    doc.text(order?.order_no || "S2108", colB, row1ValueY);
-    doc.text(`${item.qty || 15}`, colD, row1ValueY);
+    // 2. TOP ROW: Values (Bold)
+    doc.font("Helvetica-Bold").fontSize(14);
 
-    // 3. SECTION C: The /20 split (Added spacing to match new row1ValueY)
+    // Item ID (aligned to valColA)
+    const itemID = item?.item?.ItemID_DE?.toString() || "N/A";
+    doc.text(itemID, valColA, row1ValueY);
+
+    // Order Number
+    const orderNo = order?.order_no || "N/A";
+    doc.text(orderNo, colB, row1ValueY);
+
+    // Main Quantity
+    doc.text(`${item.qty || 0}`, colD, row1ValueY);
+
+    // 3. SECTION C: Dynamic Split QTY (The "/20" part)
+    // Measures the Order No to place the split text immediately after it
+    const orderNoWidth = doc.widthOfString(orderNo);
     doc
       .font("Helvetica")
-      .fontSize(11)
-      .text(`/${item.qty_split || 20}`, colB + 48, row1ValueY + 12);
+      .fontSize(9)
+      .text(`/${item.qty_label}`, colB + orderNoWidth + 2, row1ValueY + 4);
 
-    // 4. LOGO (Moved more to the right)
+    // 4. LOGO
     try {
-      doc.image(logoPath, colLogo, 10, { width: 60 });
+      doc.image(logoPath, colLogo, 8, { width: 40 });
     } catch (e) {
-      console.error("Logo missing");
+      console.error("Logo missing at path:", logoPath);
     }
 
-    // 5. SECTION E: Description (Value starts under the 'W' alignment)
-    doc.font("Helvetica").fontSize(10).fillColor("#222222");
-    const description =
-      item.item.item_name ||
-      "Toothed Belt GT2-140-6: profile GT2, length 140mm, width 6mm";
-    doc.text(description, valColA, 62, { width: 300 });
+    // 5. SECTION E: Item Description (Aligned to valColA)
+    doc.font("Helvetica").fontSize(8).fillColor("#222222");
+    const description = item.item?.item_name || "No description available";
+    doc.text(description, valColA, 42, {
+      width: 180,
+      height: 20,
+      lineBreak: true,
+    });
 
-    // 6. SECTION F & G: Remarks (Aligned to valColA)
-    const bottomSectionY = 85;
+    // 6. SECTION F & G: Remarks
+    const bottomSectionY = 68;
+
+    // Chinese Remark
     doc
       .font("Helvetica-Oblique")
-      .fontSize(7.5)
+      .fontSize(6.5)
       .text("RemarkCN", colA, bottomSectionY);
     doc
       .font("Helvetica")
-      .fontSize(13)
-      .text(item.remarks_cn || "no problem", valColA, bottomSectionY + 12);
+      .fontSize(10)
+      .text(item.remarks_cn || "/", valColA, bottomSectionY + 8);
 
+    // Warehouse Remark Label
     doc
       .font("Helvetica-Oblique")
-      .fontSize(7.5)
-      .text("RemarkW", colA, bottomSectionY + 32);
+      .fontSize(6.5)
+      .text("RemarkW", colA, bottomSectionY + 22);
 
-    // 7. SECTION H: Barcode (Increased textgaps for more vertical spacing)
-    const barcodeValue = item.ref_no || "4283230040725";
-    const barcodeBuffer = await bwipjs.toBuffer({
-      bcid: "code128",
-      text: barcodeValue,
-      scale: 3,
-      height: 12,
-      includetext: true,
-      textsize: 11,
-      textgaps: 4,
-      textxalign: "center",
-    });
+    // 7. SECTION H: Barcode (Bottom Right)
+    const barcodeValue = item.item.ean?.toString() || "";
+    try {
+      const barcodeBuffer = await bwipjs.toBuffer({
+        bcid: "code128",
+        text: barcodeValue,
+        scale: 2,
+        height: 10,
+        includetext: true,
+        textsize: 10,
+        textgaps: 4, // Increased vertical spacing between bars and EAN text
+        textxalign: "center",
+      });
 
-    // Final Positioning
-    doc.image(barcodeBuffer, 195, 75, { width: 140 });
+      doc.image(barcodeBuffer, 145, 62, { width: 100 });
+    } catch (barcodeErr) {
+      console.error("Barcode generation failed:", barcodeErr);
+    }
 
     doc.end();
   } catch (error) {
