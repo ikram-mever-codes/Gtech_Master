@@ -65,10 +65,11 @@ export class Invoice {
 
   @ManyToOne(
     () => Customer,
-    (customer) => customer.starCustomerDetails?.invoices
+    (customer) => customer.starCustomerDetails?.invoices,
+    { nullable: true }
   )
   @JoinColumn()
-  customer!: Customer;
+  customer?: Customer | null;
 
   @OneToMany(() => InvoiceItem, (item) => item.invoice, { cascade: true })
   items!: InvoiceItem[];

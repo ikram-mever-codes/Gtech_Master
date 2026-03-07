@@ -24,20 +24,19 @@ const generateInvoicesForOrders = async (orderIds: number[]) => {
                 continue;
             }
 
-            // Delete existing invoice for this order_no to regenerate fresh
             const existingInvoice = await invoiceRepo.findOne({ where: { orderNumber: order.order_no } });
             if (existingInvoice) {
                 await invoiceItemRepo.delete({ invoice: { id: existingInvoice.id } });
                 await invoiceRepo.remove(existingInvoice);
             }
-
             let customer = null;
             if (order.customer_id) {
                 customer = await customerRepo.findOne({ where: { id: order.customer_id as string } });
-            }
-            if (!customer) {
-                console.warn(`[Invoice] Order ${order.order_no} has no customer (customer_id=${order.customer_id}), skipping invoice generation.`);
-                continue;
+                if (!customer) {
+                    console.warn(`[Invoice] customer_id=${order.customer_id} not found in DB for order ${order.order_no}, proceeding without customer.`);
+                }
+            } else {
+                console.info(`[Invoice] Order ${order.order_no} has no customer_id (ETL order), creating invoice without customer.`);
             }
 
             const orderItems = await orderItemRepo.find({
@@ -54,12 +53,11 @@ const generateInvoicesForOrders = async (orderIds: number[]) => {
             let taxAmount = 0;
             let grossTotal = 0;
 
-            // First save the invoice without items
             const invoice = invoiceRepo.create({
                 invoiceNumber: `INV-${Date.now().toString().slice(-6)}-${order.id}`,
                 orderNumber: order.order_no,
                 invoiceDate: new Date(),
-                deliveryDate: new Date(),
+                deliveryDate: order.date_delivery ? new Date(order.date_delivery) : new Date(),
                 netTotal: 0,
                 taxAmount: 0,
                 grossTotal: 0,
@@ -67,7 +65,7 @@ const generateInvoicesForOrders = async (orderIds: number[]) => {
                 outstandingAmount: 0,
                 paymentMethod: "Bank Transfer",
                 shippingMethod: "Standard",
-                customer: customer,
+                ...(customer ? { customer } : {}),
                 status: "draft",
             });
             const savedInvoice = await invoiceRepo.save(invoice);
@@ -99,14 +97,13 @@ const generateInvoicesForOrders = async (orderIds: number[]) => {
             }
             await invoiceItemRepo.save(invoiceItemEntities);
 
-            // Update totals on the invoice
             savedInvoice.netTotal = netTotal;
             savedInvoice.taxAmount = taxAmount;
             savedInvoice.grossTotal = grossTotal;
             savedInvoice.outstandingAmount = grossTotal;
             await invoiceRepo.save(savedInvoice);
 
-            console.log(`[Invoice] Created invoice ${savedInvoice.invoiceNumber} for order ${order.order_no}`);
+            console.log(`[Invoice] Created invoice ${savedInvoice.invoiceNumber} for order ${order.order_no}${customer ? '' : ' (no customer)'}`);
         }
     } catch (e) {
         console.error("Failed to generate invoices for orders", e);

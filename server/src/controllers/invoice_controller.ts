@@ -154,14 +154,14 @@ export class InvoiceController {
         yPos += 20;
         doc.fontSize(12).font("Helvetica-Bold");
         doc.fillColor("#000000");
-        doc.text(invoice.customer.companyName || "", leftAlignX, yPos);
+        doc.text(invoice.customer?.companyName || "Internal / ETL Order", leftAlignX, yPos);
 
         yPos += 15;
         doc.fontSize(10).font("Helvetica");
-        doc.text(invoice.customer.addressLine1 || "", leftAlignX, yPos);
+        doc.text(invoice.customer?.addressLine1 || "", leftAlignX, yPos);
         yPos += 12;
         doc.text(
-          `${invoice.customer.postalCode || ""} ${invoice.customer.city || ""
+          `${invoice.customer?.postalCode || ""} ${invoice.customer?.city || ""
             }`.trim(),
           leftAlignX,
           yPos
@@ -192,7 +192,7 @@ export class InvoiceController {
             "Lieferdatum",
             new Date(invoice.deliveryDate).toLocaleDateString("de-DE"),
           ],
-          ["Kundennr.", invoice.customer.id?.substring(0, 8) || "N/A"],
+          ["Kundennr.", invoice.customer?.id?.substring(0, 8) || "N/A"],
         ];
 
         invoiceDetails.forEach((detail, index) => {
@@ -369,7 +369,7 @@ export class InvoiceController {
         yPos += 40;
         doc.fontSize(10).font("Helvetica");
 
-        if (invoice.customer.taxNumber) {
+        if (invoice.customer?.taxNumber) {
           doc.text(
             `Ihre USt-IdNr: ${invoice.customer.taxNumber}`,
             leftAlignX,
