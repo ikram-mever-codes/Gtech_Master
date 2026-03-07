@@ -579,15 +579,6 @@ const InvoiceListPage: React.FC = () => {
               />
               {loading ? "Loading..." : "Refresh"}
             </button>
-            <button
-              onClick={() => {
-                router.push("/invoices/new");
-              }}
-              className="px-6 py-2.5 bg-[#8CC21B] text-white rounded-[4px] font-medium hover:bg-[#8CC21B]/90 transition-all flex items-center gap-2"
-            >
-              <Plus className="w-4 h-4" />
-              New Invoice
-            </button>
           </div>
         </div>
 
