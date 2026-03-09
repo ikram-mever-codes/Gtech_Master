@@ -8,12 +8,13 @@ const order_controller_1 = require("../controllers/order_controller");
 const authorized_1 = require("../middlewares/authorized");
 const users_1 = require("../models/users");
 const router = express_1.default.Router();
-// Apply authentication to all order routes
 router.use(authorized_1.authenticateUser);
-// Order Routes - Restricted to Admin and Sales
 router.post("/", (0, authorized_1.authorize)(users_1.UserRole.SALES), order_controller_1.createOrder);
 router.get("/", (0, authorized_1.authorize)(users_1.UserRole.SALES), order_controller_1.getAllOrders);
+router.get("/item/:itemId/label", (0, authorized_1.authorize)(users_1.UserRole.SALES), order_controller_1.generateLabelPDF);
 router.get("/:orderId", (0, authorized_1.authorize)(users_1.UserRole.SALES), order_controller_1.getOrderById);
 router.put("/:orderId", (0, authorized_1.authorize)(users_1.UserRole.SALES), order_controller_1.updateOrder);
 router.delete("/:orderId", (0, authorized_1.authorize)(users_1.UserRole.SALES), order_controller_1.deleteOrder);
+router.put("/items/:id/status", (0, authorized_1.authorize)(users_1.UserRole.SALES), order_controller_1.updateOrderItemStatus);
+router.post("/items/:id/split", (0, authorized_1.authorize)(users_1.UserRole.SALES), order_controller_1.splitOrderItem);
 exports.default = router;

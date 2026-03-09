@@ -12,7 +12,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.bulkUpsertTarics = exports.getTaricStatistics = exports.searchTarics = exports.deleteTaric = exports.updateTaric = exports.createTaric = exports.getTaricById = exports.getAllTarics = exports.deleteQualityCriterion = exports.updateQualityCriterion = exports.createQualityCriterion = exports.getItemQualityCriteria = exports.updateItemVariations = exports.getItemVariations = exports.updateWarehouseStock = exports.getWarehouseItems = exports.searchParents = exports.deleteParent = exports.updateParent = exports.createParent = exports.getParentById = exports.getParents = exports.searchItems = exports.getItemStatistics = exports.bulkUpdateItems = exports.toggleItemStatus = exports.deleteItem = exports.updateItem = exports.createItem = exports.getItemById = exports.getItems = void 0;
+exports.exportItemsToCSV = exports.bulkUpsertTarics = exports.getTaricStatistics = exports.searchTarics = exports.deleteTaric = exports.updateTaric = exports.createTaric = exports.getTaricById = exports.getAllTarics = exports.deleteQualityCriterion = exports.updateQualityCriterion = exports.createQualityCriterion = exports.getItemQualityCriteria = exports.updateItemVariations = exports.getItemVariations = exports.updateWarehouseStock = exports.getWarehouseItems = exports.searchParents = exports.deleteParent = exports.updateParent = exports.createParent = exports.getParentById = exports.getParents = exports.searchItems = exports.getItemStatistics = exports.bulkUpdateItems = exports.toggleItemStatus = exports.deleteItem = exports.updateItem = exports.createItem = exports.getItemById = exports.getItems = void 0;
 const database_1 = require("../config/database");
 const items_1 = require("../models/items");
 const parents_1 = require("../models/parents");
@@ -23,6 +23,7 @@ const warehouse_items_1 = require("../models/warehouse_items");
 const order_items_1 = require("../models/order_items");
 const item_qualities_1 = require("../models/item_qualities");
 const suppliers_1 = require("../models/suppliers");
+const supplier_items_1 = require("../models/supplier_items");
 const typeorm_1 = require("typeorm");
 const errorHandler_1 = __importDefault(require("../utils/errorHandler"));
 const misDb_1 = require("../config/misDb");
@@ -110,7 +111,7 @@ const getItems = (req, res, next) => __awaiter(void 0, void 0, void 0, function*
 });
 exports.getItems = getItems;
 const getItemById = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14, _15;
     try {
         const { id } = req.params;
         if (!id) {
@@ -121,6 +122,7 @@ const getItemById = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
         const variationRepository = database_1.AppDataSource.getRepository(variation_values_1.VariationValue);
         const qualityRepository = database_1.AppDataSource.getRepository(item_qualities_1.ItemQuality);
         const orderItemRepository = database_1.AppDataSource.getRepository(order_items_1.OrderItem);
+        const supplierItemRepository = database_1.AppDataSource.getRepository(supplier_items_1.SupplierItem);
         const item = yield itemRepository.findOne({
             where: { id: parseInt(id) },
             relations: ["parent", "taric", "category", "supplier"],
@@ -135,6 +137,9 @@ const getItemById = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
             where: { item_id: parseInt(id) },
         });
         const qualityCriteria = yield qualityRepository.find({
+            where: { item_id: parseInt(id) },
+        });
+        const supplierItem = yield supplierItemRepository.findOne({
             where: { item_id: parseInt(id) },
         });
         // const orderItems = await orderItemRepository.find({
@@ -162,8 +167,9 @@ const getItemById = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
                 isSpecialItem: ((_j = item.parent) === null || _j === void 0 ? void 0 : _j.is_NwV) === "Y",
                 priceEUR: 0,
                 priceRMB: 0,
-                isEURSpecial: item.is_eur_special === "Y",
-                isRMBSpecial: item.is_rmb_special === "Y",
+                isEURSpecial: item.is_eur_special || "N",
+                isRMBSpecial: item.is_rmb_special || "N",
+                isDimensionSpecial: item.is_dimension_special || "N",
             },
             dimensions: {
                 isbn: ((_k = item.ISBN) === null || _k === void 0 ? void 0 : _k.toString()) || "1",
@@ -195,8 +201,8 @@ const getItemById = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
                 er: ((_y = item.effort_rating) === null || _y === void 0 ? void 0 : _y.toString()) || "0",
                 isMeter: item.is_meter_item === 1,
                 isPU: item.is_pu_item === 1,
-                isNPR: item.is_npr === "Y",
-                isNew: item.is_new === "Y",
+                isNPR: item.is_npr || "N",
+                isNew: item.is_new || "N",
                 warehouseItem: ((_0 = (_z = warehouseItems[0]) === null || _z === void 0 ? void 0 : _z.id) === null || _0 === void 0 ? void 0 : _0.toString()) || "",
                 idDE: ((_1 = item.ItemID_DE) === null || _1 === void 0 ? void 0 : _1.toString()) || "",
                 noDE: item.parent_no_de || "",
@@ -214,11 +220,12 @@ const getItemById = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
                 foq: ((_10 = item.FOQ) === null || _10 === void 0 ? void 0 : _10.toString()) || "0",
                 fsq: ((_11 = item.FSQ) === null || _11 === void 0 ? void 0 : _11.toString()) || "0",
                 rmbPrice: ((_12 = item.RMB_Price) === null || _12 === void 0 ? void 0 : _12.toString()) || "0",
-                isDimensionSpecial: item.is_dimension_special === "Y",
+                isDimensionSpecial: item.is_dimension_special || "N",
                 suppCat: item.supp_cat || "",
             },
             qualityCriteria: qualityCriteria.map((qc) => ({
                 id: qc.id,
+                itemId: qc.item_id,
                 name: qc.name || "",
                 picture: qc.picture || "",
                 description: qc.description || "",
@@ -228,6 +235,23 @@ const getItemById = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
             pictures: {
                 shopPicture: item.photo || "",
                 ebayPictures: item.pix_path_eBay || "",
+            },
+            supplierItem: supplierItem ? {
+                priceRMB: ((_13 = supplierItem.price_rmb) === null || _13 === void 0 ? void 0 : _13.toString()) || "0",
+                isPO: supplierItem.is_po || "No",
+                moq: ((_14 = supplierItem.moq) === null || _14 === void 0 ? void 0 : _14.toString()) || "0",
+                interval: ((_15 = supplierItem.oi) === null || _15 === void 0 ? void 0 : _15.toString()) || "0",
+                leadTime: supplierItem.lead_time || "",
+                noteCN: supplierItem.note_cn || "",
+                url: supplierItem.url || "",
+            } : {
+                priceRMB: "0",
+                isPO: "No",
+                moq: "0",
+                interval: "0",
+                leadTime: "",
+                noteCN: "",
+                url: "",
             },
             nprRemarks: item.npr_remark || "",
         };
@@ -249,7 +273,7 @@ const createItem = (req, res, next) => __awaiter(void 0, void 0, void 0, functio
         const parentRepository = database_1.AppDataSource.getRepository(parents_1.Parent);
         const taricRepository = database_1.AppDataSource.getRepository(tarics_1.Taric);
         const categoryRepository = database_1.AppDataSource.getRepository(categories_1.Category);
-        const { item_name, item_name_cn, ean, parent_id, taric_id, cat_id, weight, length, width, height, supplier_id, remark, model, isActive = "Y", is_qty_dividable = "Y", is_npr = "N", is_eur_special = "N", is_rmb_special = "N", painPoints = [], } = req.body;
+        const { item_name, item_name_cn, ean, parent_id, taric_id, cat_id, weight, length, width, height, supplier_id, remark, model, RMB_Price, price, currency, isActive = "Y", is_qty_dividable = "Y", is_npr = "N", is_eur_special = "N", is_rmb_special = "N", painPoints = [], } = req.body;
         if (!item_name || !parent_id) {
             return next(new errorHandler_1.default("Item name and parent ID are required", 400));
         }
@@ -298,6 +322,9 @@ const createItem = (req, res, next) => __awaiter(void 0, void 0, void 0, functio
             height: height ? parseFloat(height) : null,
             remark,
             model,
+            RMB_Price: RMB_Price ? parseFloat(RMB_Price) : null,
+            price: price ? parseFloat(price) : null,
+            currency,
             isActive,
             is_qty_dividable,
             is_npr,
@@ -344,6 +371,8 @@ const updateItem = (req, res, next) => __awaiter(void 0, void 0, void 0, functio
     try {
         const { id } = req.params;
         const itemRepository = database_1.AppDataSource.getRepository(items_1.Item);
+        const supplierItemRepository = database_1.AppDataSource.getRepository(supplier_items_1.SupplierItem);
+        const warehouseRepository = database_1.AppDataSource.getRepository(warehouse_items_1.WarehouseItem);
         if (!id) {
             return next(new errorHandler_1.default("Item ID is required", 400));
         }
@@ -407,6 +436,46 @@ const updateItem = (req, res, next) => __awaiter(void 0, void 0, void 0, functio
         });
         item.updated_at = new Date();
         yield itemRepository.save(item);
+        const supplierItemData = req.body.supplierItem;
+        if (supplierItemData) {
+            const supplierItem = yield supplierItemRepository.findOne({ where: { item_id: item.id } });
+            if (supplierItem) {
+                if (supplierItemData.price_rmb !== undefined)
+                    supplierItem.price_rmb = parseFloat(supplierItemData.price_rmb);
+                if (supplierItemData.is_po !== undefined)
+                    supplierItem.is_po = supplierItemData.is_po;
+                if (supplierItemData.moq !== undefined)
+                    supplierItem.moq = parseInt(supplierItemData.moq);
+                if (supplierItemData.oi !== undefined)
+                    supplierItem.oi = parseInt(supplierItemData.oi);
+                if (supplierItemData.lead_time !== undefined)
+                    supplierItem.lead_time = supplierItemData.lead_time;
+                if (supplierItemData.note_cn !== undefined)
+                    supplierItem.note_cn = supplierItemData.note_cn;
+                if (supplierItemData.url !== undefined)
+                    supplierItem.url = supplierItemData.url;
+                yield supplierItemRepository.save(supplierItem);
+            }
+        }
+        const warehouseItemData = req.body.warehouseItemData;
+        if (warehouseItemData) {
+            const warehouseItem = yield warehouseRepository.findOne({ where: { item_id: item.id } });
+            if (warehouseItem) {
+                if (warehouseItemData.is_stock_item !== undefined)
+                    warehouseItem.is_stock_item = warehouseItemData.is_stock_item;
+                if (warehouseItemData.is_active !== undefined)
+                    warehouseItem.is_active = warehouseItemData.is_active;
+                if (warehouseItemData.msq !== undefined)
+                    warehouseItem.msq = parseFloat(warehouseItemData.msq);
+                if (warehouseItemData.is_no_auto_order !== undefined)
+                    warehouseItem.is_no_auto_order = warehouseItemData.is_no_auto_order;
+                if (warehouseItemData.buffer !== undefined)
+                    warehouseItem.buffer = parseInt(warehouseItemData.buffer);
+                if (warehouseItemData.is_SnSI !== undefined)
+                    warehouseItem.is_SnSI = warehouseItemData.is_SnSI;
+                yield warehouseRepository.save(warehouseItem);
+            }
+        }
         return res.status(200).json({
             success: true,
             message: "Item updated successfully",
@@ -1419,10 +1488,11 @@ const syncTaricToMIS = (taricData, operation) => __awaiter(void 0, void 0, void 
         if (operation === "create") {
             const query = `
         INSERT INTO tarics   
-        (code, reguler_artikel, duty_rate, name_de, description_de, name_en, description_en, name_cn, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (id, code, reguler_artikel, duty_rate, name_de, description_de, name_en, description_en, name_cn, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `;
             yield connection.execute(query, [
+                convertUndefinedToNull(taricData.id),
                 convertUndefinedToNull(taricData.code),
                 convertUndefinedToNull(taricData.reguler_artikel) || "Y",
                 convertUndefinedToNull(taricData.duty_rate) || 0,
@@ -1437,7 +1507,7 @@ const syncTaricToMIS = (taricData, operation) => __awaiter(void 0, void 0, void 
         }
         else if (operation === "update") {
             const query = `
-        UPDATE taric SET
+        UPDATE tarics SET
           code = ?,
           reguler_artikel = ?,
           duty_rate = ?,
@@ -1470,7 +1540,8 @@ const syncTaricToMIS = (taricData, operation) => __awaiter(void 0, void 0, void 
     }
     catch (error) {
         console.error("Error syncing to MIS database:", error);
-        throw new Error(`Failed to sync TARIC to MIS: ${error.message}`);
+        const errorMessage = (error === null || error === void 0 ? void 0 : error.message) || (error === null || error === void 0 ? void 0 : error.code) || JSON.stringify(error) || "Unknown MySQL error";
+        throw new Error(`Failed to sync TARIC to MIS: ${errorMessage}`);
     }
     finally {
         if (connection) {
@@ -1793,3 +1864,238 @@ const bulkUpsertTarics = (req, res, next) => __awaiter(void 0, void 0, void 0, f
     }
 });
 exports.bulkUpsertTarics = bulkUpsertTarics;
+const exportItemsToCSV = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m;
+    try {
+        const itemRepository = database_1.AppDataSource.getRepository(items_1.Item);
+        const warehouseRepository = database_1.AppDataSource.getRepository(warehouse_items_1.WarehouseItem);
+        const variationRepository = database_1.AppDataSource.getRepository(variation_values_1.VariationValue);
+        const items = yield itemRepository.find({
+            relations: ["parent", "taric", "category"],
+            order: {
+                id: "ASC",
+            },
+        });
+        const formatDate = (date) => {
+            if (!date)
+                return "";
+            const d = new Date(date);
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}:${String(d.getSeconds()).padStart(2, "0")}`;
+        };
+        const getWarehouseData = (itemId) => __awaiter(void 0, void 0, void 0, function* () {
+            const warehouseItems = yield warehouseRepository.find({
+                where: { item_id: itemId },
+            });
+            return warehouseItems[0] || null;
+        });
+        const getVariationValues = (itemId) => __awaiter(void 0, void 0, void 0, function* () {
+            const variations = yield variationRepository.find({
+                where: { item_id: itemId },
+            });
+            return variations[0] || null;
+        });
+        const getPriceColumns = (item) => {
+            const basePrice = item.RMB_Price || 0;
+            const priceLevels = [1, 2, 5, 10, 25, 50, 100, 200, 500, 1000, 2000];
+            return priceLevels.map((level) => {
+                let discount = 0;
+                if (level >= 1000)
+                    discount = 0.3;
+                else if (level >= 500)
+                    discount = 0.25;
+                else if (level >= 200)
+                    discount = 0.2;
+                else if (level >= 100)
+                    discount = 0.15;
+                else if (level >= 50)
+                    discount = 0.1;
+                else if (level >= 25)
+                    discount = 0.05;
+                const price = basePrice * (1 - discount);
+                return price.toFixed(2).replace(".", ",");
+            });
+        };
+        const headers = [
+            "Timestamp",
+            "EAN",
+            "Parent No DE",
+            "Item No DE",
+            "Sup_cat",
+            "Item Name DE",
+            "Variation DE 1",
+            "Value DE",
+            "Variation DE 2",
+            "Value DE 2",
+            "Variation DE 3",
+            "Value DE 3",
+            "Item Name EN",
+            "Item Name",
+            "Variation EN 1",
+            "Value EN",
+            "Variation EN 2",
+            "Value EN 2",
+            "Variation EN 3",
+            "Value EN 3",
+            "Code",
+            "ISBN",
+            "Width",
+            "Height",
+            "Length",
+            "Weight",
+            "Shipping Weight",
+            "Shipping Class",
+            "Is Qty Dividable",
+            "Is Stock Item",
+            "FOQ",
+            "FSQ",
+            "MSQ",
+            "MOQ Result",
+            "Interval",
+            "Buffer Result",
+            "Price RMB",
+            "Y/N",
+            "Many Components",
+            "Effort Rating",
+            "EK Net",
+            "Item Volume (dm³)",
+            "Freight Costs Volume",
+            "Freight Costs Weight",
+            "Freight Costs",
+            "Import Duty Charge (EUR)",
+            "SP_eBay",
+            "SP_DE_NET_1",
+            "SP_DE_NET_2",
+            "SP_DE_NET_5",
+            "SP_DE_NET_10",
+            "SP_DE_NET_25",
+            "SP_DE_NET_50",
+            "SP_DE_NET_100",
+            "SP_DE_NET_200",
+            "SP_DE_NET_500",
+            "SP_DE_NET_1000",
+            "SP_DE_NET_2000",
+            "BulkQty_2",
+            "BulkQty_5",
+            "BulkQty_10",
+            "BulkQty_25",
+            "BulkQty_50",
+            "BulkQty_100",
+            "BulkQty_200",
+            "BulkQty_500",
+            "BulkQty_1000",
+            "BulkQty_2000",
+            "USt %",
+            "Dummy-Bild01",
+            "Image Path EAN",
+            "Image Path eBay",
+            "Max Quantity",
+        ];
+        const csvRows = [];
+        csvRows.push(headers.join(";"));
+        for (const item of items) {
+            try {
+                const warehouseData = yield getWarehouseData(item.id);
+                const variationData = yield getVariationValues(item.id);
+                const priceColumns = getPriceColumns(item);
+                const parent = item.parent;
+                const volume = ((item.length || 0) * (item.width || 0) * (item.height || 0)) / 1000;
+                const bulkQuantities = [2, 5, 10, 25, 50, 100, 200, 500, 1000, 2000];
+                const rowData = [
+                    formatDate(item.updated_at || item.created_at || new Date()),
+                    ((_a = item.ean) === null || _a === void 0 ? void 0 : _a.toString()) || "",
+                    (parent === null || parent === void 0 ? void 0 : parent.de_no) || "NONE",
+                    ((_b = item.ItemID_DE) === null || _b === void 0 ? void 0 : _b.toString()) || item.id.toString(),
+                    item.supp_cat || ((_c = item.category) === null || _c === void 0 ? void 0 : _c.name) || "STD",
+                    item.item_name || (parent === null || parent === void 0 ? void 0 : parent.name_de) || "",
+                    (parent === null || parent === void 0 ? void 0 : parent.var_de_1) || "",
+                    (variationData === null || variationData === void 0 ? void 0 : variationData.value_de) || "",
+                    (parent === null || parent === void 0 ? void 0 : parent.var_de_2) || "",
+                    (variationData === null || variationData === void 0 ? void 0 : variationData.value_de_2) || "",
+                    (parent === null || parent === void 0 ? void 0 : parent.var_de_3) || "",
+                    (variationData === null || variationData === void 0 ? void 0 : variationData.value_de_3) || "",
+                    item.item_name_cn || (parent === null || parent === void 0 ? void 0 : parent.name_en) || "",
+                    item.item_name || (parent === null || parent === void 0 ? void 0 : parent.name_en) || "",
+                    (parent === null || parent === void 0 ? void 0 : parent.var_en_1) || "",
+                    (variationData === null || variationData === void 0 ? void 0 : variationData.value_en) || "",
+                    (parent === null || parent === void 0 ? void 0 : parent.var_en_2) || "",
+                    (variationData === null || variationData === void 0 ? void 0 : variationData.value_en_2) || "",
+                    (parent === null || parent === void 0 ? void 0 : parent.var_en_3) || "",
+                    (variationData === null || variationData === void 0 ? void 0 : variationData.value_en_3) || "",
+                    ((_d = item.taric) === null || _d === void 0 ? void 0 : _d.code) || "",
+                    ((_e = item.ISBN) === null || _e === void 0 ? void 0 : _e.toString()) || "0",
+                    (item.width || 0).toFixed(1).replace(".", ","),
+                    (item.height || 0).toFixed(1).replace(".", ","),
+                    (item.length || 0).toFixed(1).replace(".", ","),
+                    (item.weight || 0).toFixed(2).replace(".", ","),
+                    (item.weight || 0).toFixed(4).replace(".", ","),
+                    (warehouseData === null || warehouseData === void 0 ? void 0 : warehouseData.ship_class) || "1",
+                    item.is_qty_dividable || "Y",
+                    (warehouseData === null || warehouseData === void 0 ? void 0 : warehouseData.is_stock_item) || "N",
+                    ((_f = item.FOQ) === null || _f === void 0 ? void 0 : _f.toString()) || "0",
+                    ((_g = item.FSQ) === null || _g === void 0 ? void 0 : _g.toString()) || "0",
+                    ((_h = warehouseData === null || warehouseData === void 0 ? void 0 : warehouseData.msq) === null || _h === void 0 ? void 0 : _h.toString()) || "0",
+                    "0",
+                    "0",
+                    ((_j = warehouseData === null || warehouseData === void 0 ? void 0 : warehouseData.buffer) === null || _j === void 0 ? void 0 : _j.toString()) || "0",
+                    Number(item.RMB_Price || 0)
+                        .toFixed(2)
+                        .replace(".", ","),
+                    "Y",
+                    ((_k = item.many_components) === null || _k === void 0 ? void 0 : _k.toString()) || "1",
+                    ((_l = item.effort_rating) === null || _l === void 0 ? void 0 : _l.toString()) || "3",
+                    Number(item.RMB_Price || 0)
+                        .toFixed(2)
+                        .replace(".", ","),
+                    volume.toFixed(2).replace(".", ","),
+                    "0,00",
+                    "0,00",
+                    "0,00",
+                    "0,00",
+                    Number(item.RMB_Price || 0)
+                        .toFixed(2)
+                        .replace(".", ","),
+                    ...priceColumns,
+                    ...bulkQuantities.map((qty) => qty.toString()),
+                    "19",
+                    ((_m = item.photo) === null || _m === void 0 ? void 0 : _m.split("\\").pop()) || "DummyPicture.jpg",
+                    item.pix_path || "",
+                    item.pix_path_eBay || "",
+                    "10000",
+                ];
+                if (rowData.length !== headers.length) {
+                    console.warn(`Row data length mismatch for item ${item.id}: ${rowData.length} vs ${headers.length}`);
+                }
+                const formattedRow = rowData.map((value) => {
+                    if (value === null || value === undefined)
+                        return "";
+                    const stringValue = value.toString();
+                    if (stringValue.includes(";") ||
+                        stringValue.includes("\n") ||
+                        stringValue.includes('"')) {
+                        return `"${stringValue.replace(/"/g, '""')}"`;
+                    }
+                    return stringValue;
+                });
+                csvRows.push(formattedRow.join(";"));
+            }
+            catch (itemError) {
+                console.error(`Error processing item ${item.id}:`, itemError);
+            }
+        }
+        const csvContent = csvRows.join("\n");
+        res.setHeader("Content-Type", "text/csv; charset=utf-8");
+        res.setHeader("Content-Disposition", "attachment; filename=updated_Item_List.csv");
+        res.setHeader("Content-Length", Buffer.byteLength(csvContent, "utf8"));
+        res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+        res.setHeader("Pragma", "no-cache");
+        res.setHeader("Expires", "0");
+        res.setHeader("X-Content-Type-Options", "nosniff");
+        const bom = "\uFEFF";
+        return res.status(200).send(bom + csvContent);
+    }
+    catch (error) {
+        console.error("Error exporting CSV:", error);
+        return next(error);
+    }
+});
+exports.exportItemsToCSV = exportItemsToCSV;

@@ -63,6 +63,14 @@ __decorate([
     __metadata("design:type", Number)
 ], OrderItem.prototype, "eur_special_price", void 0);
 __decorate([
+    (0, typeorm_1.Column)({ type: "decimal", precision: 10, scale: 2, nullable: true }),
+    __metadata("design:type", Number)
+], OrderItem.prototype, "price", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "varchar", length: 10, nullable: true }),
+    __metadata("design:type", String)
+], OrderItem.prototype, "currency", void 0);
+__decorate([
     (0, typeorm_1.Column)({ type: "int", nullable: true }),
     __metadata("design:type", Number)
 ], OrderItem.prototype, "taric_id", void 0);

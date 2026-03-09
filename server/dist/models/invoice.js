@@ -76,9 +76,17 @@ __decorate([
     __metadata("design:type", String)
 ], Invoice.prototype, "notes", void 0);
 __decorate([
-    (0, typeorm_1.ManyToOne)(() => customers_1.Customer, (customer) => { var _a; return (_a = customer.starCustomerDetails) === null || _a === void 0 ? void 0 : _a.invoices; }),
+    (0, typeorm_1.Column)({ type: "varchar", default: "draft" }),
+    __metadata("design:type", String)
+], Invoice.prototype, "status", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ nullable: true }),
+    __metadata("design:type", Date)
+], Invoice.prototype, "closedAt", void 0);
+__decorate([
+    (0, typeorm_1.ManyToOne)(() => customers_1.Customer, (customer) => { var _a; return (_a = customer.starCustomerDetails) === null || _a === void 0 ? void 0 : _a.invoices; }, { nullable: true }),
     (0, typeorm_1.JoinColumn)(),
-    __metadata("design:type", customers_1.Customer)
+    __metadata("design:type", Object)
 ], Invoice.prototype, "customer", void 0);
 __decorate([
     (0, typeorm_1.OneToMany)(() => InvoiceItem, (item) => item.invoice, { cascade: true }),

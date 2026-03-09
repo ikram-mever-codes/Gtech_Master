@@ -24,7 +24,6 @@ const migrateExistingCustomers = () => __awaiter(void 0, void 0, void 0, functio
         yield database_1.AppDataSource.initialize();
         const customerRepository = database_1.AppDataSource.getRepository(customers_1.Customer);
         const starCustomerDetailsRepository = database_1.AppDataSource.getRepository(star_customer_details_1.StarCustomerDetails);
-        // Get all existing customers WITHOUT invalid relations
         const existingCustomers = yield customerRepository.find();
         console.log(`Found ${existingCustomers.length} customers to migrate`);
         let migratedCount = 0;
@@ -32,7 +31,6 @@ const migrateExistingCustomers = () => __awaiter(void 0, void 0, void 0, functio
         for (const customer of existingCustomers) {
             try {
                 console.log(`Migrating customer: ${customer.companyName} (${customer.id})`);
-                // Check if customer already has starCustomerDetails
                 const existingStarDetails = yield starCustomerDetailsRepository.findOne({
                     where: { customer: { id: customer.id } },
                 });
@@ -40,7 +38,6 @@ const migrateExistingCustomers = () => __awaiter(void 0, void 0, void 0, functio
                     console.log(`Customer ${customer.companyName} already migrated, skipping...`);
                     continue;
                 }
-                // Handle missing password - generate a temporary one
                 let password = customer.password;
                 let shouldNotifyPassword = false;
                 if (!password) {
@@ -48,9 +45,7 @@ const migrateExistingCustomers = () => __awaiter(void 0, void 0, void 0, functio
                     const tempPassword = crypto_1.default.randomBytes(8).toString("hex");
                     password = yield bcryptjs_1.default.hash(tempPassword, 10);
                     shouldNotifyPassword = true;
-                    // In a real scenario, you'd want to email this temp password to the customer
                 }
-                // Create starCustomerDetails from existing customer data
                 const starCustomerDetails = starCustomerDetailsRepository.create({
                     customer: customer,
                     taxNumber: customer.taxNumber || "",
@@ -71,16 +66,13 @@ const migrateExistingCustomers = () => __awaiter(void 0, void 0, void 0, functio
                     resetPasswordToken: customer.resetPasswordToken,
                     resetPasswordExp: customer.resetPasswordExp,
                 });
-                // Save star customer details
                 yield starCustomerDetailsRepository.save(starCustomerDetails);
-                // Update customer stage based on existing data
                 if (customer.accountVerificationStatus === "verified") {
                     customer.stage = "star_customer";
                 }
                 else {
                     customer.stage = "business";
                 }
-                // Link the starCustomerDetails to customer
                 customer.starCustomerDetails = starCustomerDetails;
                 yield customerRepository.save(customer);
                 migratedCount++;
@@ -113,7 +105,6 @@ const migrateExistingCustomers = () => __awaiter(void 0, void 0, void 0, functio
     }
 });
 exports.migrateExistingCustomers = migrateExistingCustomers;
-// Run migration if called directly
 if (require.main === module) {
     (0, exports.migrateExistingCustomers)();
 }
