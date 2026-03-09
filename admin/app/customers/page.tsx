@@ -72,6 +72,7 @@ import {
   deleteCustomer,
   getAllCustomers,
   updateCustomerStatus,
+  CustomerData
 } from "@/api/customers";
 import { CustomerVerificationStatus } from "@/utils/interfaces";
 import { successStyles } from "@/utils/constants";
@@ -84,7 +85,7 @@ const CustomersPage = () => {
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(
     null
   );
-  const [customers, setCustomers] = useState<any[]>([]);
+  const [customers, setCustomers] = useState<CustomerData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -115,6 +116,8 @@ const CustomersPage = () => {
           setCustomers(response.data);
         } else if (response.data.businesses && Array.isArray(response.data.businesses)) {
           setCustomers(response.data.businesses);
+        } else if (response.data.customers && Array.isArray(response.data.customers)) {
+          setCustomers(response.data.customers);
         } else {
           setCustomers([]);
         }

@@ -910,7 +910,11 @@ const OrderPage = () => {
 
       (o.items || []).forEach((item: any) => {
         if (item.supplier_order_id) return;
-        if (item.status && item.status.toUpperCase() !== "NSO") return;
+        const rawStatus = (item.status || "").trim().toUpperCase();
+        if (rawStatus && rawStatus !== "NSO" && rawStatus !== "SO") return;
+        // If it has a status that is not NSO/SO, we skip it.
+        // If it has NO status, we keep it (it needs a supplier order).
+        // If it has NSO or SO, we keep it.
         const itemDetails = itemById.get(String(item.item_id));
         const sId = o.supplier_id || itemDetails?.supplier_id || 0;
 

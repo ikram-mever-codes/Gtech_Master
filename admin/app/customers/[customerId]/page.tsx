@@ -72,11 +72,11 @@ import {
   deleteCustomer,
   getAllCustomers,
   updateCustomerStatus,
+  CustomerData
 } from "@/api/customers";
 import { CustomerVerificationStatus } from "@/utils/interfaces";
 import { successStyles } from "@/utils/constants";
 
-// Main customer page component
 const CustomersPage = () => {
   const muiTheme = useTheme();
   const router = useRouter();
@@ -85,7 +85,7 @@ const CustomersPage = () => {
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(
     null
   );
-  const [customers, setCustomers] = useState([]);
+  const [customers, setCustomers] = useState<CustomerData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -98,7 +98,6 @@ const CustomersPage = () => {
     severity: "success" as "success" | "error" | "info" | "warning",
   });
 
-  // Dialog states
   const [approveDialogOpen, setApproveDialogOpen] = useState(false);
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -106,14 +105,21 @@ const CustomersPage = () => {
   const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
   const [newStatus, setNewStatus] = useState<any>("");
 
-  // Function to fetch customers
   const fetchCustomers = async () => {
     setLoading(true);
     setError(null);
     try {
       const response = await getAllCustomers();
       if (response && response.data) {
-        setCustomers(response.data);
+        if (Array.isArray(response.data)) {
+          setCustomers(response.data);
+        } else if (response.data.businesses && Array.isArray(response.data.businesses)) {
+          setCustomers(response.data.businesses);
+        } else if (response.data.customers && Array.isArray(response.data.customers)) {
+          setCustomers(response.data.customers);
+        } else {
+          setCustomers([]);
+        }
       } else {
         setCustomers([]);
         setError("No data received from server");

@@ -126,12 +126,17 @@ const InvoiceGenerator: React.FC = () => {
     try {
       setLoadingCustomers(true);
       const response = await getAllCustomers();
-      if (response && response.data && Array.isArray(response.data.businesses)) {
-        setCustomers(response.data.businesses);
-        setFilteredCustomers(response.data.businesses);
-      } else if (response && Array.isArray(response.data)) {
-        setCustomers(response.data);
-        setFilteredCustomers(response.data);
+      if (response && response.data) {
+        if (Array.isArray(response.data.businesses)) {
+          setCustomers(response.data.businesses);
+          setFilteredCustomers(response.data.businesses);
+        } else if (Array.isArray(response.data.customers)) {
+          setCustomers(response.data.customers);
+          setFilteredCustomers(response.data.customers);
+        } else if (Array.isArray(response.data)) {
+          setCustomers(response.data);
+          setFilteredCustomers(response.data);
+        }
       }
     } catch (error) {
       console.error("Failed to load customers:", error);

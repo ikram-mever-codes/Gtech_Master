@@ -44,9 +44,10 @@ import PageHeader from "@/components/UI/PageHeader";
 import Link from "next/link";
 import CargosTab from "@/components/cargos/CargosTab";
 import CargoTypesTab from "@/components/cargos/CargoTypesTab";
-import { getAllCustomers, CustomerData as APICustomerData } from "@/api/customers";
+import { getAllCustomers, CustomerData as APICustomerData, updateCustomerProfile } from "@/api/customers";
 import { updateOrderItemStatus, splitOrderItem } from "@/api/orders";
 import { getAllCargos, CargoType } from "@/api/cargos";
+import BillToShipToForm, { BillToShipToData } from "@/components/General/BillToShipToForm";
 import { toast } from "react-hot-toast";
 import CustomModal from "@/components/UI/CustomModal";
 import { Pencil, Scissors, MoveRight } from "lucide-react";
@@ -151,6 +152,9 @@ const InvoiceListPage: React.FC = () => {
   const [splitQty, setSplitQty] = useState<number>(0);
   const [newQty, setNewQty] = useState<number>(0);
   const [targetCargoId, setTargetCargoId] = useState<string>("");
+  const [showBTSTModal, setShowBTSTModal] = useState(false);
+  const [selectedCustomerForEdit, setSelectedCustomerForEdit] = useState<any>(null);
+  const [btstFormData, setBtstFormData] = useState<Partial<BillToShipToData>>({});
 
   const toggleExpansion = async (id: string, type: 'taric' | 'items') => {
     const currentState = expandedStates[id] || {};
@@ -308,6 +312,54 @@ const InvoiceListPage: React.FC = () => {
       </html>
     `);
     printWindow.document.close();
+  };
+
+  const handleOpenBTSTModal = (customer: any) => {
+    setSelectedCustomerForEdit(customer);
+    setBtstFormData({
+      customer_type: customer.customer_type || "Other Customer",
+      bill_to_company_name: customer.bill_to_company_name || customer.legalName || customer.companyName || "",
+      bill_to_display_name: customer.bill_to_display_name || "GTech",
+      bill_to_phone_no: customer.bill_to_phone_no || customer.contactPhoneNumber || "",
+      bill_to_tax_no: customer.bill_to_tax_no || customer.taxNumber || "",
+      bill_to_email: customer.bill_to_email || customer.email || "",
+      bill_to_website: customer.bill_to_website || "-",
+      bill_to_contact_person: customer.bill_to_contact_person || "-",
+      bill_to_contact_phone: customer.bill_to_contact_phone || "-",
+      bill_to_contact_mobile: customer.bill_to_contact_mobile || "-",
+      bill_to_contact_email: customer.bill_to_contact_email || "-",
+      bill_to_country: customer.bill_to_country || customer.country || "",
+      bill_to_city: customer.bill_to_city || customer.city || "",
+      bill_to_postal_code: customer.bill_to_postal_code || customer.postalCode || "",
+      bill_to_full_address: customer.bill_to_full_address || customer.addressLine1 || "",
+      ship_to_company_name: customer.ship_to_company_name || customer.companyName || "",
+      ship_to_display_name: customer.ship_to_display_name || customer.companyName || "",
+      ship_to_contact_person: customer.ship_to_contact_person || "-",
+      ship_to_contact_phone: customer.ship_to_contact_phone || customer.contactPhoneNumber || "",
+      ship_to_country: customer.ship_to_country || customer.deliveryCountry || customer.country || "",
+      ship_to_city: customer.ship_to_city || customer.deliveryCity || customer.city || "",
+      ship_to_postal_code: customer.ship_to_postal_code || customer.deliveryPostalCode || customer.postalCode || "",
+      ship_to_full_address: customer.ship_to_full_address || customer.deliveryAddressLine1 || customer.addressLine1 || "",
+      ship_to_remarks: customer.ship_to_remarks || "",
+    });
+    setShowBTSTModal(true);
+  };
+
+  const handleSaveBTST = async () => {
+    if (!selectedCustomerForEdit) return;
+    try {
+      const payload = {
+        ...selectedCustomerForEdit,
+        ...btstFormData,
+      };
+      const res = await updateCustomerProfile(payload);
+      if (res?.success) {
+        setShowBTSTModal(false);
+        fetchCustomers();
+      }
+    } catch (error) {
+      console.error("Failed to update billto/shipto:", error);
+    }
   };
 
   useEffect(() => {
@@ -1279,7 +1331,7 @@ const InvoiceListPage: React.FC = () => {
                         <td className="py-4 px-4">
                           <div className="flex justify-center">
                             <button
-                              onClick={() => router.push(`/customers/${customer.id}`)}
+                              onClick={() => handleOpenBTSTModal(customer)}
                               className="px-3.5 py-1.5 bg-[#059669] text-white text-[10px] font-bold rounded-[4px] hover:bg-green-600 transition-all shadow-md"
                             >
                               EDIT
@@ -1400,6 +1452,42 @@ const InvoiceListPage: React.FC = () => {
                 </button>
               </div>
             </div>
+          </CustomModal>
+        )}
+        {showBTSTModal && (
+          <CustomModal
+            isOpen={showBTSTModal}
+            onClose={() => setShowBTSTModal(false)}
+            title="Update Bill To / Ship To Details"
+            width="max-w-5xl"
+            footer={
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setShowBTSTModal(false)}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-[4px] transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveBTST}
+                  className="px-6 py-2 text-sm bg-[#8CC21B] text-white rounded-[4px] hover:bg-opacity-90 font-bold transition-all shadow-sm"
+                >
+                  Save Changes
+                </button>
+              </div>
+            }
+          >
+            <BillToShipToForm
+              data={btstFormData}
+              isEditEnabled={true}
+              selectedCustomer={selectedCustomerForEdit}
+              onChange={(field, value) =>
+                setBtstFormData((prev) => ({ ...prev, [field]: value }))
+              }
+              onBatchChange={(updates) =>
+                setBtstFormData((prev) => ({ ...prev, ...updates }))
+              }
+            />
           </CustomModal>
         )}
       </div>
