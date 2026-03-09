@@ -28,6 +28,7 @@ import {
   deleteQualityCriterion,
   ItemDetails,
 } from "@/api/items";
+import { getAllSuppliers, Supplier } from "@/api/suppliers";
 import { uploadFile } from "@/api/library";
 import CustomModal from "@/components/UI/CustomModal";
 import { loadingStyles, successStyles, errorStyles } from "@/utils/constants";
@@ -219,6 +220,10 @@ const ItemDetailsPage = () => {
     picture: null as File | null,
     pictureUrl: "",
   });
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [supplierSearch, setSupplierSearch] = useState("");
+  const [supplierDropdownOpen, setSupplierDropdownOpen] = useState(false);
+  const [suppliersLoading, setSuppliersLoading] = useState(false);
 
   const handleOpenQualityModal = (quality: any = null) => {
     if (quality) {
@@ -285,8 +290,6 @@ const ItemDetailsPage = () => {
       } else {
         await createQualityCriterion(itemId, payload);
       }
-
-      // Refresh data
       const qualityResponse = await getItemQualityCriteria(itemId);
       setQualityCriteria(qualityResponse.data || []);
       handleCloseQualityModal();
@@ -416,6 +419,7 @@ const ItemDetailsPage = () => {
         is_rmb_special: updatedData.parent?.isRMBSpecial ? "Y" : "N",
         is_new: updatedData.others?.isNew ? "Y" : "N",
         is_npr: updatedData.others?.isNPR ? "Y" : "N",
+        supplier_id: updatedData.supplier_id ?? null,
 
         supplierItem: {
           price_rmb: toNum(updatedData.supplierItem?.priceRMB),
@@ -1049,20 +1053,137 @@ const ItemDetailsPage = () => {
               </div>
 
               <div className="mt-8 pt-6 border-t border-gray-100">
-                <InfoRow label="Supplier Name" value={itemData.supplier_name || "No supplier assigned"} />
-                {itemData.supplier_id && (
-                  <div className="mt-4 p-4 bg-gray-50 rounded-lg max-w-md">
-                    <p className="text-sm text-gray-600 mb-2">
-                      Supplier ID: {itemData.supplier_id}
-                    </p>
-                    <button
-                      onClick={() => router.push("/suppliers")}
-                      className="text-[#8CC21B] hover:text-[#7ab318] text-sm font-medium flex items-center gap-1"
-                    >
-                      View All Suppliers
-                      <ChevronRightIcon className="h-4 w-4" />
-                    </button>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 py-3 border-b border-gray-100">
+                  <div className="text-sm font-medium text-gray-700">Supplier Name</div>
+                  <div className="md:col-span-2">
+                    {editMode ? (
+                      <div className="relative max-w-md">
+                        <div
+                          className="flex items-center gap-2 w-full px-3 py-2 border border-gray-300 rounded-md bg-white cursor-pointer"
+                          onClick={async () => {
+                            if (!supplierDropdownOpen) {
+                              if (suppliers.length === 0) {
+                                setSuppliersLoading(true);
+                                try {
+                                  const res = await getAllSuppliers({ limit: 1000 });
+                                  const list: Supplier[] = Array.isArray(res?.data)
+                                    ? res.data
+                                    : Array.isArray((res as any)?.data?.suppliers)
+                                      ? (res as any).data.suppliers
+                                      : [];
+                                  setSuppliers(list);
+                                } catch {
+                                  toast.error("Failed to load suppliers");
+                                } finally {
+                                  setSuppliersLoading(false);
+                                }
+                              }
+                              setSupplierSearch(itemData.supplier_name || "");
+                              setSupplierDropdownOpen(true);
+                            } else {
+                              setSupplierDropdownOpen(false);
+                            }
+                          }}
+                        >
+                          <MagnifyingGlassIcon className="h-4 w-4 text-gray-400 shrink-0" />
+                          <span className={itemData.supplier_name ? "text-gray-900" : "text-gray-400"}>
+                            {itemData.supplier_name || "Click to assign supplier..."}
+                          </span>
+                          {itemData.supplier_id && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setItemData({ ...itemData, supplier_id: null, supplier_name: null });
+                                setSupplierDropdownOpen(false);
+                              }}
+                              className="ml-auto text-gray-400 hover:text-red-500 transition-colors"
+                              title="Clear supplier"
+                            >
+                              ✕
+                            </button>
+                          )}
+                        </div>
+                        {supplierDropdownOpen && (
+                          <div className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-xl max-h-72 flex flex-col">
+                            <div className="p-2 border-b border-gray-100">
+                              <input
+                                autoFocus
+                                type="text"
+                                placeholder="Search suppliers..."
+                                value={supplierSearch}
+                                onChange={(e) => setSupplierSearch(e.target.value)}
+                                onClick={(e) => e.stopPropagation()}
+                                className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/40"
+                              />
+                            </div>
+                            <ul className="overflow-y-auto flex-1">
+                              {suppliersLoading ? (
+                                <li className="px-4 py-3 text-sm text-gray-500 flex items-center gap-2">
+                                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-gray-300 border-t-primary" />
+                                  Loading suppliers...
+                                </li>
+                              ) : (
+                                suppliers
+                                  .filter((s) => {
+                                    const q = supplierSearch.toLowerCase();
+                                    return (
+                                      !q ||
+                                      (s.name || "").toLowerCase().includes(q) ||
+                                      (s.company_name || "").toLowerCase().includes(q)
+                                    );
+                                  })
+                                  .map((s) => (
+                                    <li
+                                      key={s.id}
+                                      onClick={() => {
+                                        setItemData({
+                                          ...itemData,
+                                          supplier_id: s.id,
+                                          supplier_name: s.name || s.company_name || `Supplier #${s.id}`,
+                                        });
+                                        setSupplierDropdownOpen(false);
+                                        setSupplierSearch("");
+                                      }}
+                                      className={`px-4 py-2.5 text-sm cursor-pointer hover:bg-[#8CC21B]/10 transition-colors flex flex-col ${itemData.supplier_id === s.id ? "bg-[#8CC21B]/10 font-medium" : ""
+                                        }`}
+                                    >
+                                      <span className="text-gray-900">{s.name || s.company_name || `—`}</span>
+                                      {s.company_name && s.name && (
+                                        <span className="text-xs text-gray-400">{s.company_name}</span>
+                                      )}
+                                    </li>
+                                  ))
+                              )}
+                              {!suppliersLoading && suppliers.filter((s) => {
+                                const q = supplierSearch.toLowerCase();
+                                return !q || (s.name || "").toLowerCase().includes(q) || (s.company_name || "").toLowerCase().includes(q);
+                              }).length === 0 && (
+                                  <li className="px-4 py-3 text-sm text-gray-400 italic">No suppliers found</li>
+                                )}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-3">
+                        <span className="text-gray-900">
+                          {itemData.supplier_name || "No supplier assigned"}
+                        </span>
+                        {itemData.supplier_id && (
+                          <button
+                            onClick={() => router.push("/suppliers")}
+                            className="text-[#8CC21B] hover:text-[#7ab318] text-xs font-medium flex items-center gap-1"
+                          >
+                            View Suppliers
+                            <ChevronRightIcon className="h-3 w-3" />
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
+                </div>
+                {itemData.supplier_id && (
+                  <p className="mt-2 text-xs text-gray-400">Supplier ID: {itemData.supplier_id}</p>
                 )}
               </div>
             </div>

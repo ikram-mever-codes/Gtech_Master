@@ -932,11 +932,6 @@ const ItemsManagementPage: React.FC = () => {
               </div>
             </td>
             <td className="px-4 py-3">
-              <div className="text-sm text-gray-900">
-                {item.supplier_name || "-"}
-              </div>
-            </td>
-            <td className="px-4 py-3">
               <span
                 className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusBadgeColor(
                   item.is_active,
@@ -1510,6 +1505,11 @@ const ItemsManagementPage: React.FC = () => {
                       className="w-full px-3 py-2 border border-gray-300 rounded-md"
                     >
                       <option value="">All Categories</option>
+                      {categories.map((cat: any) => (
+                        <option key={cat.id} value={cat.id}>
+                          {cat.name}
+                        </option>
+                      ))}
                     </select>
                   </div>
                   <div className="md:col-span-2 flex items-end">

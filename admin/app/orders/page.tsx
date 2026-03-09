@@ -464,8 +464,8 @@ function OrdersTable({
     },
     {
       header: "Cargo",
-      width: "55px",
-      render: (row) => row.cargo_id ?? "-",
+      width: "65px",
+      render: (row) => row.cargo?.cargo_no || row.cargo_id || "-",
       align: "center",
     },
     {
@@ -480,27 +480,48 @@ function OrdersTable({
     },
     {
       header: "Created",
-      width: "65px",
-      render: (row) =>
-        row.date_created ||
-        (row.created_at
-          ? new Date(row.created_at).toLocaleDateString("en-GB", {
-            day: "2-digit",
-            month: "2-digit",
-          })
-          : "-"),
+      width: "60px",
+      render: (row) => {
+        const d = row.created_at || row.date_created;
+        if (!d) return "-";
+        const date = new Date(d);
+        if (isNaN(date.getTime())) return String(d);
+        return date.toLocaleDateString("de-DE", {
+          day: "2-digit",
+          month: "2-digit",
+          year: date.getFullYear() === new Date().getFullYear() ? undefined : "numeric",
+        });
+      },
       align: "center",
     },
     {
       header: "Emailed",
-      width: "65px",
-      render: (row) => row.date_emailed || "-",
+      width: "60px",
+      render: (row) => {
+        if (!row.date_emailed) return "-";
+        const date = new Date(row.date_emailed);
+        if (isNaN(date.getTime())) return String(row.date_emailed);
+        return date.toLocaleDateString("de-DE", {
+          day: "2-digit",
+          month: "2-digit",
+          year: date.getFullYear() === new Date().getFullYear() ? undefined : "numeric",
+        });
+      },
       align: "center",
     },
     {
       header: "Delivery",
-      width: "65px",
-      render: (row) => row.date_delivery || "-",
+      width: "60px",
+      render: (row) => {
+        if (!row.date_delivery) return "-";
+        const date = new Date(row.date_delivery);
+        if (isNaN(date.getTime())) return String(row.date_delivery);
+        return date.toLocaleDateString("de-DE", {
+          day: "2-digit",
+          month: "2-digit",
+          year: date.getFullYear() === new Date().getFullYear() ? undefined : "numeric",
+        });
+      },
       align: "center",
     },
     {
@@ -1116,7 +1137,16 @@ const OrderPage = () => {
     try {
       const response = await getAllCustomers();
       const data = response?.data ?? response;
-      const arr = Array.isArray(data) ? data : data?.customers || [];
+      let arr = [];
+      if (Array.isArray(data)) {
+        arr = data;
+      } else if (data?.businesses && Array.isArray(data.businesses)) {
+        arr = data.businesses;
+      } else if (data?.customers && Array.isArray(data.customers)) {
+        arr = data.customers;
+      } else if (data?.data && Array.isArray(data.data)) {
+        arr = data.data;
+      }
       setCustomers(arr);
     } catch (error) {
       console.error("Error fetching customers:", error);
@@ -1176,8 +1206,16 @@ const OrderPage = () => {
     setLoadingOrders(true);
     try {
       const response = await getAllOrders(filters);
-      if (response?.success) setOrders(response.data);
-      else if (response?.data) setOrders(response.data);
+      if (response?.success || response?.data) {
+        const data = response.data || [];
+        const sorted = [...data].sort((a: any, b: any) => {
+          const dateA = new Date(a.created_at || a.date_created || 0).getTime();
+          const dateB = new Date(b.created_at || b.date_created || 0).getTime();
+          if (dateB !== dateA) return dateB - dateA;
+          return Number(b.id) - Number(a.id);
+        });
+        setOrders(sorted);
+      }
     } catch (error) {
       console.error("Error fetching Orders:", error);
       toast.error("Failed to fetch orders");
@@ -1222,7 +1260,11 @@ const OrderPage = () => {
       const res: any = await getAllSupplierOrders({
         search: supplierOrderSearch,
       });
-      if (res.success) setSupplierOrdersList(res.data);
+      if (res.success || res.data) {
+        const data = res.data || [];
+        const sorted = [...data].sort((a: any, b: any) => Number(b.id) - Number(a.id));
+        setSupplierOrdersList(sorted);
+      }
     } catch (e) {
       console.error(e);
     } finally {
@@ -1447,6 +1489,11 @@ const OrderPage = () => {
     try {
       const detailRes: any = await getOrderById(order.id);
       const detail = detailRes?.data ?? detailRes;
+
+      if (detail && detail.id) {
+        setViewOrder(detail);
+      }
+
       const lines = detail?.items ?? detail?.data?.items ?? [];
 
       if (Array.isArray(lines)) {
@@ -2360,11 +2407,14 @@ const OrderPage = () => {
                     {
                       header: "Date created",
                       width: "100px",
-                      render: (row) =>
-                        new Date(row.created_at).toLocaleDateString(undefined, {
+                      render: (row) => {
+                        const date = new Date(row.created_at);
+                        return date.toLocaleDateString("de-DE", {
                           day: "2-digit",
                           month: "2-digit",
-                        }),
+                          year: date.getFullYear() === new Date().getFullYear() ? undefined : "numeric",
+                        });
+                      },
                       align: "center",
                     },
                     {
@@ -2973,7 +3023,20 @@ const OrderPage = () => {
                     Customer
                   </label>
                   <p className="text-gray-900 font-bold">
-                    {viewOrder.customer_id != null ? getCustomerName(viewOrder.customer_id) : "-"}
+                    {(() => {
+                      const cargo = viewOrder.cargo;
+
+                      const customerId = cargo?.customer_id || viewOrder.customer_id;
+                      const customerName = customerId && customerId !== "0" && customerId !== 0
+                        ? getCustomerName(customerId)
+                        : "-";
+
+                      if (cargo && cargo.id) {
+                        return customerName;
+                      }
+
+                      return customerName;
+                    })()}
                   </p>
                 </div>
               </div>
@@ -3000,7 +3063,7 @@ const OrderPage = () => {
                       align: "center",
                     },
                     {
-                      header: "ItemName shown",
+                      header: "ItemName",
                       render: (row) => (
                         <div className="font-bold text-gray-900 line-clamp-2 leading-tight">
                           {row.itemName}
@@ -3008,7 +3071,7 @@ const OrderPage = () => {
                       ),
                     },
                     {
-                      header: "3-level remark (same as in LabelPrint View)",
+                      header: "3-level remark",
                       render: (row) => (
                         <div className="text-xs text-gray-500 font-medium italic space-y-0.5">
                           {row.remarks_cn && <div className="text-red-600">CN: {row.remarks_cn}</div>}
