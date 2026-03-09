@@ -489,7 +489,10 @@ function OrdersTable({
         return date.toLocaleDateString("de-DE", {
           day: "2-digit",
           month: "2-digit",
-          year: date.getFullYear() === new Date().getFullYear() ? undefined : "numeric",
+          year:
+            date.getFullYear() === new Date().getFullYear()
+              ? undefined
+              : "numeric",
         });
       },
       align: "center",
@@ -504,7 +507,10 @@ function OrdersTable({
         return date.toLocaleDateString("de-DE", {
           day: "2-digit",
           month: "2-digit",
-          year: date.getFullYear() === new Date().getFullYear() ? undefined : "numeric",
+          year:
+            date.getFullYear() === new Date().getFullYear()
+              ? undefined
+              : "numeric",
         });
       },
       align: "center",
@@ -519,7 +525,10 @@ function OrdersTable({
         return date.toLocaleDateString("de-DE", {
           day: "2-digit",
           month: "2-digit",
-          year: date.getFullYear() === new Date().getFullYear() ? undefined : "numeric",
+          year:
+            date.getFullYear() === new Date().getFullYear()
+              ? undefined
+              : "numeric",
         });
       },
       align: "center",
@@ -703,7 +712,10 @@ function OrdersTable({
       onRowClick={(row) => {
         console.log("Row clicked:", row);
         if (isOrderItems) {
-          const targetOrder = row.parentOrder || { id: row.order_id, order_no: row.order_no };
+          const targetOrder = row.parentOrder || {
+            id: row.order_id,
+            order_no: row.order_no,
+          };
           if (targetOrder && (targetOrder.id || targetOrder.order_id)) {
             onView(targetOrder);
           } else {
@@ -925,10 +937,10 @@ const OrderPage = () => {
       normal: new Map<string, any>(),
     };
 
+    console.log(orders);
     orders.forEach((o: any) => {
       const isExpress = (o.comment || "").toLowerCase().includes("express");
       const targetMap = isExpress ? groups.express : groups.normal;
-
       (o.items || []).forEach((item: any) => {
         if (item.supplier_order_id) return;
         const rawStatus = (item.status || "").trim().toUpperCase();
@@ -945,7 +957,9 @@ const OrderPage = () => {
             id: groupKey,
             supplier_id: sid,
             supplier_name: sid === 0 ? "Unassigned" : getSupplierName(sid),
-            order_type: getCategoryName(o.category_id) || (o.category_id ? `Imported ${o.category_id}` : "Taobao"),
+            order_type:
+              getCategoryName(o.category_id) ||
+              (o.category_id ? `Imported ${o.category_id}` : "Taobao"),
             category_id: o.category_id,
             count: 0,
             qty: 0,
@@ -1262,7 +1276,9 @@ const OrderPage = () => {
       });
       if (res.success || res.data) {
         const data = res.data || [];
-        const sorted = [...data].sort((a: any, b: any) => Number(b.id) - Number(a.id));
+        const sorted = [...data].sort(
+          (a: any, b: any) => Number(b.id) - Number(a.id),
+        );
         setSupplierOrdersList(sorted);
       }
     } catch (e) {
@@ -1503,7 +1519,8 @@ const OrderPage = () => {
             const item = itemById.get(id);
             return {
               item_id: id,
-              itemName: item?.item_name || item?.name || l.item_name || "Unknown item",
+              itemName:
+                item?.item_name || item?.name || l.item_name || "Unknown item",
               qty: Number(l.qty ?? 1),
               qty_label: l.qty_label,
               remark_de: String(l.remark_de ?? ""),
@@ -1743,10 +1760,11 @@ const OrderPage = () => {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`py-3 px-1 border-b-2 font-medium text-sm ${activeTab === tab.id
-                    ? "border-gray-600 text-gray-900"
-                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                    }`}
+                  className={`py-3 px-1 border-b-2 font-medium text-sm ${
+                    activeTab === tab.id
+                      ? "border-gray-600 text-gray-900"
+                      : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                  }`}
                 >
                   {tab.label}
                 </button>
@@ -1781,7 +1799,9 @@ const OrderPage = () => {
                 {(() => {
                   const renderNsoItemDetails = (row: any) => (
                     <div className="p-4 bg-white border border-gray-100 rounded-lg shadow-inner m-2">
-                      <h4 className="font-bold text-gray-700 mb-3 ml-1 text-sm uppercase">Order Items in this Group (Total: {row.count}):</h4>
+                      <h4 className="font-bold text-gray-700 mb-3 ml-1 text-sm uppercase">
+                        Order Items in this Group (Total: {row.count}):
+                      </h4>
                       <div className="overflow-x-auto rounded-lg border border-gray-200">
                         <table className="w-full text-xs text-left">
                           <thead className="bg-gray-100 text-gray-500 font-semibold uppercase">
@@ -1790,21 +1810,40 @@ const OrderPage = () => {
                               <th className="px-3 py-2 border-b">EAN</th>
                               <th className="px-3 py-2 border-b">Item Name</th>
                               <th className="px-3 py-2 border-b">Remark</th>
-                              <th className="px-3 py-2 border-b text-center">Qty</th>
+                              <th className="px-3 py-2 border-b text-center">
+                                Qty
+                              </th>
                             </tr>
                           </thead>
                           <tbody className="bg-white">
                             {row.items.map((it: any, idx: number) => {
                               const d = itemById.get(String(it.item_id));
-                              const name = d?.item_name || d?.name || it.item_name || "Unknown";
+                              const name =
+                                d?.item_name ||
+                                d?.name ||
+                                it.item_name ||
+                                "Unknown";
                               const ean = d?.ean || it.ean || "-";
                               return (
-                                <tr key={it.id || idx} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
-                                  <td className="px-3 py-2 font-bold text-blue-600">{it._order_no || "-"}</td>
-                                  <td className="px-3 py-2 text-gray-600">{ean}</td>
-                                  <td className="px-3 py-2 font-medium text-gray-900">{name}</td>
-                                  <td className="px-3 py-2 text-gray-500 italic">{it.remark_de || it.remarks_cn || "-"}</td>
-                                  <td className="px-3 py-2 font-bold text-center">{it.qty}</td>
+                                <tr
+                                  key={it.id || idx}
+                                  className="border-b border-gray-50 hover:bg-gray-50 transition-colors"
+                                >
+                                  <td className="px-3 py-2 font-bold text-blue-600">
+                                    {it._order_no || "-"}
+                                  </td>
+                                  <td className="px-3 py-2 text-gray-600">
+                                    {ean}
+                                  </td>
+                                  <td className="px-3 py-2 font-medium text-gray-900">
+                                    {name}
+                                  </td>
+                                  <td className="px-3 py-2 text-gray-500 italic">
+                                    {it.remark_de || it.remarks_cn || "-"}
+                                  </td>
+                                  <td className="px-3 py-2 font-bold text-center">
+                                    {it.qty}
+                                  </td>
                                 </tr>
                               );
                             })}
@@ -1832,7 +1871,9 @@ const OrderPage = () => {
                                   <div className="bg-[#475569] text-white rounded px-3 py-1.5 flex items-center gap-4 text-xs font-bold w-20 justify-between shadow-md">
                                     {row.supplier_id}
                                     <div className="bg-white rounded-full p-0.5">
-                                      <ChevronDownIcon className={`h-3 w-3 text-[#475569] transition-transform ${expandedNsoId === row.id ? 'rotate-180' : ''}`} />
+                                      <ChevronDownIcon
+                                        className={`h-3 w-3 text-[#475569] transition-transform ${expandedNsoId === row.id ? "rotate-180" : ""}`}
+                                      />
                                     </div>
                                   </div>
                                 </div>
@@ -1881,7 +1922,11 @@ const OrderPage = () => {
                           emptyMessage="No Express NSOs found"
                           getRowClassName={() => "bg-red-50"}
                           expandedRowId={expandedNsoId}
-                          onRowClick={(row) => setExpandedNsoId(expandedNsoId === row.id ? null : row.id)}
+                          onRowClick={(row) =>
+                            setExpandedNsoId(
+                              expandedNsoId === row.id ? null : row.id,
+                            )
+                          }
                           renderRowDetails={renderNsoItemDetails}
                         />
                       </div>
@@ -1901,7 +1946,9 @@ const OrderPage = () => {
                                   <div className="bg-[#475569] text-white rounded px-3 py-1.5 flex items-center gap-4 text-xs font-bold w-20 justify-between shadow-md">
                                     {row.supplier_id}
                                     <div className="bg-white rounded-full p-0.5">
-                                      <ChevronDownIcon className={`h-3 w-3 text-[#475569] transition-transform ${expandedNsoId === row.id ? 'rotate-180' : ''}`} />
+                                      <ChevronDownIcon
+                                        className={`h-3 w-3 text-[#475569] transition-transform ${expandedNsoId === row.id ? "rotate-180" : ""}`}
+                                      />
                                     </div>
                                   </div>
                                 </div>
@@ -1949,7 +1996,11 @@ const OrderPage = () => {
                           loading={loadingOrders}
                           emptyMessage="No Normal NSOs found"
                           expandedRowId={expandedNsoId}
-                          onRowClick={(row) => setExpandedNsoId(expandedNsoId === row.id ? null : row.id)}
+                          onRowClick={(row) =>
+                            setExpandedNsoId(
+                              expandedNsoId === row.id ? null : row.id,
+                            )
+                          }
                           renderRowDetails={renderNsoItemDetails}
                         />
                       </div>
@@ -2412,7 +2463,10 @@ const OrderPage = () => {
                         return date.toLocaleDateString("de-DE", {
                           day: "2-digit",
                           month: "2-digit",
-                          year: date.getFullYear() === new Date().getFullYear() ? undefined : "numeric",
+                          year:
+                            date.getFullYear() === new Date().getFullYear()
+                              ? undefined
+                              : "numeric",
                         });
                       },
                       align: "center",
@@ -2862,7 +2916,7 @@ const OrderPage = () => {
             )}
           </div>
         </div>
-      </div >
+      </div>
 
       {showReassignModal && reassignOrder && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-[60]">
@@ -2921,557 +2975,561 @@ const OrderPage = () => {
             </div>
           </div>
         </div>
-      )
-      }
+      )}
 
-      {
-        showSupplierConfirm && pendingNsoGroup && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70]">
-            <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 border border-gray-100">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="bg-green-100 rounded-full p-2">
-                  <PlusCircleIcon className="h-6 w-6 text-green-600" />
-                </div>
-                <h3 className="text-lg font-bold text-gray-900">
-                  Create Supplier Order
-                </h3>
+      {showSupplierConfirm && pendingNsoGroup && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70]">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 border border-gray-100">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="bg-green-100 rounded-full p-2">
+                <PlusCircleIcon className="h-6 w-6 text-green-600" />
               </div>
-              <p className="text-sm text-gray-600 mb-2">
-                You are about to create a supplier order for:
-              </p>
-              <div className="bg-gray-50 rounded-xl p-3 mb-5 space-y-1 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Supplier</span>
-                  <span className="font-semibold text-gray-800">
-                    {pendingNsoGroup.supplier_name}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Items</span>
-                  <span className="font-semibold text-gray-800">
-                    {pendingNsoGroup.count} item(s)
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Total Qty</span>
-                  <span className="font-semibold text-gray-800">
-                    {pendingNsoGroup.qty}
-                  </span>
-                </div>
+              <h3 className="text-lg font-bold text-gray-900">
+                Create Supplier Order
+              </h3>
+            </div>
+            <p className="text-sm text-gray-600 mb-2">
+              You are about to create a supplier order for:
+            </p>
+            <div className="bg-gray-50 rounded-xl p-3 mb-5 space-y-1 text-sm">
+              <div className="flex justify-between">
+                <span className="text-gray-500">Supplier</span>
+                <span className="font-semibold text-gray-800">
+                  {pendingNsoGroup.supplier_name}
+                </span>
               </div>
-              <p className="text-xs text-amber-600 bg-amber-50 rounded-[4px] px-3 py-2 mb-5">
-                ⚠ These items will be moved out of NSO and linked to the new
-                supplier order.
-              </p>
-              <div className="flex gap-3 justify-end">
-                <button
-                  onClick={() => {
-                    setShowSupplierConfirm(false);
-                    setPendingNsoGroup(null);
-                  }}
-                  className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-[4px] hover:bg-gray-200 transition font-medium"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={confirmCreateSupplierOrder}
-                  className="px-5 py-2 text-sm bg-[#059669] text-white rounded-[4px] hover:bg-green-700 transition font-bold flex items-center gap-2"
-                >
-                  <PlusCircleIcon className="h-4 w-4" />
-                  Confirm
-                </button>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Items</span>
+                <span className="font-semibold text-gray-800">
+                  {pendingNsoGroup.count} item(s)
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Total Qty</span>
+                <span className="font-semibold text-gray-800">
+                  {pendingNsoGroup.qty}
+                </span>
               </div>
             </div>
-          </div>
-        )
-      }
-
-      {
-        showViewModal && viewOrder && (
-          <CustomModal
-            isOpen={showViewModal}
-            onClose={closeView}
-            title={`Order ${viewOrder.order_no}`}
-            width="max-w-4xl"
-            footer={
+            <p className="text-xs text-amber-600 bg-amber-50 rounded-[4px] px-3 py-2 mb-5">
+              ⚠ These items will be moved out of NSO and linked to the new
+              supplier order.
+            </p>
+            <div className="flex gap-3 justify-end">
               <button
-                onClick={closeView}
-                className="px-6 py-2 text-sm bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-all font-bold"
+                onClick={() => {
+                  setShowSupplierConfirm(false);
+                  setPendingNsoGroup(null);
+                }}
+                className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-[4px] hover:bg-gray-200 transition font-medium"
               >
-                Close
+                Cancel
               </button>
-            }
-          >
-            <div className="space-y-6">
-              <div>
-                <p className="text-sm font-semibold text-gray-500">
-                  Status: {viewOrder.status || "20"}
+              <button
+                onClick={confirmCreateSupplierOrder}
+                className="px-5 py-2 text-sm bg-[#059669] text-white rounded-[4px] hover:bg-green-700 transition font-bold flex items-center gap-2"
+              >
+                <PlusCircleIcon className="h-4 w-4" />
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showViewModal && viewOrder && (
+        <CustomModal
+          isOpen={showViewModal}
+          onClose={closeView}
+          title={`Order ${viewOrder.order_no}`}
+          width="max-w-4xl"
+          footer={
+            <button
+              onClick={closeView}
+              className="px-6 py-2 text-sm bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-all font-bold"
+            >
+              Close
+            </button>
+          }
+        >
+          <div className="space-y-6">
+            <div>
+              <p className="text-sm font-semibold text-gray-500">
+                Status: {viewOrder.status || "20"}
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-1">
+                <label className="text-sm font-bold text-gray-400 block uppercase tracking-wide">
+                  Category
+                </label>
+                <p className="text-gray-900 font-bold">
+                  {getCategoryName(viewOrder.category_id) || "Imported 26"}
                 </p>
               </div>
+              <div className="space-y-1">
+                <label className="text-sm font-bold text-gray-400 block uppercase tracking-wide">
+                  Customer
+                </label>
+                <p className="text-gray-900 font-bold">
+                  {(() => {
+                    const cargo = viewOrder.cargo;
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-1">
-                  <label className="text-sm font-bold text-gray-400 block uppercase tracking-wide">
-                    Category
-                  </label>
-                  <p className="text-gray-900 font-bold">
-                    {getCategoryName(viewOrder.category_id) || "Imported 26"}
-                  </p>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-sm font-bold text-gray-400 block uppercase tracking-wide">
-                    Customer
-                  </label>
-                  <p className="text-gray-900 font-bold">
-                    {(() => {
-                      const cargo = viewOrder.cargo;
-
-                      const customerId = cargo?.customer_id || viewOrder.customer_id;
-                      const customerName = customerId && customerId !== "0" && customerId !== 0
+                    const customerId =
+                      cargo?.customer_id || viewOrder.customer_id;
+                    const customerName =
+                      customerId && customerId !== "0" && customerId !== 0
                         ? getCustomerName(customerId)
                         : "-";
 
-                      if (cargo && cargo.id) {
-                        return customerName;
-                      }
-
+                    if (cargo && cargo.id) {
                       return customerName;
-                    })()}
-                  </p>
-                </div>
-              </div>
+                    }
 
-              <div className="space-y-1">
-                <label className="text-sm font-bold text-gray-400 block uppercase tracking-wide">
-                  Comment
-                </label>
-                <p className="text-gray-800 text-sm font-medium leading-relaxed">
-                  {viewOrder.comment || "-"}
+                    return customerName;
+                  })()}
                 </p>
               </div>
-
-              <div className="mt-8">
-                <DataTable
-                  data={viewItems}
-                  loading={false}
-                  emptyMessage="No items found in this order"
-                  columns={[
-                    {
-                      header: "EAN",
-                      width: "120px",
-                      render: (row) => <span className="text-blue-600 font-semibold">{row.ean || "-"}</span>,
-                      align: "center",
-                    },
-                    {
-                      header: "ItemName",
-                      render: (row) => (
-                        <div className="font-bold text-gray-900 line-clamp-2 leading-tight">
-                          {row.itemName}
-                        </div>
-                      ),
-                    },
-                    {
-                      header: "3-level remark",
-                      render: (row) => (
-                        <div className="text-xs text-gray-500 font-medium italic space-y-0.5">
-                          {row.remarks_cn && <div className="text-red-600">CN: {row.remarks_cn}</div>}
-                          {row.remark_de && <div>DE: {row.remark_de}</div>}
-                          {!row.remarks_cn && !row.remark_de && <span className="text-gray-300">-</span>}
-                        </div>
-                      ),
-                    },
-                    {
-                      header: "Status OrderItem",
-                      width: "120px",
-                      render: (row) => (
-                        <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${row.status === 'NSO' ? 'bg-amber-100 text-amber-700' :
-                          row.status === 'SO' ? 'bg-blue-100 text-blue-700' :
-                            'bg-green-100 text-green-700'
-                          }`}>
-                          {row.status || "NSO"}
-                        </span>
-                      ),
-                      align: "center",
-                    }
-                  ]}
-                />
-              </div>
             </div>
-          </CustomModal>
-        )
-      }
 
-      {
-        showModal && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-2xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-              <div className="p-6">
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-xl font-bold text-gray-900">
-                    {mode === "convert"
-                      ? "CONVERT ORDER"
-                      : mode === "edit"
-                        ? "Edit Order"
-                        : isTab2
-                          ? "Create Customer Order"
-                          : "Create New Order"}
-                  </h2>
+            <div className="space-y-1">
+              <label className="text-sm font-bold text-gray-400 block uppercase tracking-wide">
+                Comment
+              </label>
+              <p className="text-gray-800 text-sm font-medium leading-relaxed">
+                {viewOrder.comment || "-"}
+              </p>
+            </div>
 
-                  <button
-                    onClick={closeModal}
-                    className="text-gray-400 hover:text-gray-600 transition-colors"
-                  >
-                    <XMarkIcon className="h-5 w-5" />
-                  </button>
+            <div className="mt-8">
+              <DataTable
+                data={viewItems}
+                loading={false}
+                emptyMessage="No items found in this order"
+                columns={[
+                  {
+                    header: "EAN",
+                    width: "120px",
+                    render: (row) => (
+                      <span className="text-blue-600 font-semibold">
+                        {row.ean || "-"}
+                      </span>
+                    ),
+                    align: "center",
+                  },
+                  {
+                    header: "ItemName",
+                    render: (row) => (
+                      <div className="font-bold text-gray-900 line-clamp-2 leading-tight">
+                        {row.itemName}
+                      </div>
+                    ),
+                  },
+                  {
+                    header: "3-level remark",
+                    render: (row) => (
+                      <div className="text-xs text-gray-500 font-medium italic space-y-0.5">
+                        {row.remarks_cn && (
+                          <div className="text-red-600">
+                            CN: {row.remarks_cn}
+                          </div>
+                        )}
+                        {row.remark_de && <div>DE: {row.remark_de}</div>}
+                        {!row.remarks_cn && !row.remark_de && (
+                          <span className="text-gray-300">-</span>
+                        )}
+                      </div>
+                    ),
+                  },
+                  {
+                    header: "Status OrderItem",
+                    width: "120px",
+                    render: (row) => (
+                      <span
+                        className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                          row.status === "NSO"
+                            ? "bg-amber-100 text-amber-700"
+                            : row.status === "SO"
+                              ? "bg-blue-100 text-blue-700"
+                              : "bg-green-100 text-green-700"
+                        }`}
+                      >
+                        {row.status || "NSO"}
+                      </span>
+                    ),
+                    align: "center",
+                  },
+                ]}
+              />
+            </div>
+          </div>
+        </CustomModal>
+      )}
+
+      {showModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-bold text-gray-900">
+                  {mode === "convert"
+                    ? "CONVERT ORDER"
+                    : mode === "edit"
+                      ? "Edit Order"
+                      : isTab2
+                        ? "Create Customer Order"
+                        : "Create New Order"}
+                </h2>
+
+                <button
+                  onClick={closeModal}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <XMarkIcon className="h-5 w-5" />
+                </button>
+              </div>
+
+              {isConvertMode && (
+                <div className="mb-4 rounded-[4px] border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                  <b>Note</b>. All other fields are locked. Only <b>QTY</b> and{" "}
+                  <b>Item remark</b> is editable.
                 </div>
+              )}
 
-                {isConvertMode && (
-                  <div className="mb-4 rounded-[4px] border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-                    <b>Note</b>. All other fields are locked. Only <b>QTY</b> and{" "}
-                    <b>Item remark</b> is editable.
+              <div className="space-y-4">
+                <div className="flex gap-4">
+                  <div className="flex-1">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Select Category:
+                    </label>
+                    <select
+                      value={form.category_id}
+                      onChange={(e) => handleCategoryChange(e.target.value)}
+                      disabled={lockAllExceptQty}
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:bg-gray-50"
+                    >
+                      <option value="">Select Category</option>
+                      {categories.map((cat) => (
+                        <option key={cat.id} value={String(cat.id)}>
+                          {cat.name}
+                        </option>
+                      ))}
+                    </select>
                   </div>
-                )}
 
-                <div className="space-y-4">
-                  <div className="flex gap-4">
-                    <div className="flex-1">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Select Category:
-                      </label>
+                  <div className="flex-1">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      {isTab1 ? "Select Supplier:" : "Select Customer:"}
+                    </label>
+                    {isTab1 ? (
                       <select
-                        value={form.category_id}
-                        onChange={(e) => handleCategoryChange(e.target.value)}
+                        value={form.supplier_id}
+                        onChange={(e) => handleSupplierChange(e.target.value)}
                         disabled={lockAllExceptQty}
                         className="w-full px-3 py-2 text-sm border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:bg-gray-50"
                       >
-                        <option value="">Select Category</option>
-                        {categories.map((cat) => (
-                          <option key={cat.id} value={String(cat.id)}>
-                            {cat.name}
+                        <option value="">Select Supplier</option>
+                        {suppliers.map((s) => (
+                          <option key={s.id} value={String(s.id)}>
+                            {s.company_name || s.name || "Unnamed Supplier"}
                           </option>
                         ))}
                       </select>
-                    </div>
-
-                    <div className="flex-1">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        {isTab1 ? "Select Supplier:" : "Select Customer:"}
-                      </label>
-                      {isTab1 ? (
-                        <select
-                          value={form.supplier_id}
-                          onChange={(e) => handleSupplierChange(e.target.value)}
-                          disabled={lockAllExceptQty}
-                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:bg-gray-50"
-                        >
-                          <option value="">Select Supplier</option>
-                          {suppliers.map((s) => (
-                            <option key={s.id} value={String(s.id)}>
-                              {s.company_name || s.name || "Unnamed Supplier"}
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
-                        <select
-                          value={form.customer_id}
-                          onChange={(e) => handleCustomerChange(e.target.value)}
-                          disabled={lockAllExceptQty}
-                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:bg-gray-50"
-                        >
-                          <option value="">Select Customer</option>
-                          {customers.map((customer) => (
-                            <option key={customer.id} value={String(customer.id)}>
-                              {customer.companyName}
-                            </option>
-                          ))}
-                        </select>
-                      )}
-                    </div>
+                    ) : (
+                      <select
+                        value={form.customer_id}
+                        onChange={(e) => handleCustomerChange(e.target.value)}
+                        disabled={lockAllExceptQty}
+                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:bg-gray-50"
+                      >
+                        <option value="">Select Customer</option>
+                        {customers.map((customer) => (
+                          <option key={customer.id} value={String(customer.id)}>
+                            {customer.companyName}
+                          </option>
+                        ))}
+                      </select>
+                    )}
                   </div>
+                </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Select Item then quantity:
-                    </label>
-                    <ItemSelectorWithQuantity
-                      items={effectiveItems}
-                      selectedItemId={selectedItemId}
-                      onItemChange={setSelectedItemId}
-                      onAdd={handleAddItemToOrder}
-                      disabled={lockAllExceptQty || loadingItems}
-                    />
-                  </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Select Item then quantity:
+                  </label>
+                  <ItemSelectorWithQuantity
+                    items={effectiveItems}
+                    selectedItemId={selectedItemId}
+                    onItemChange={setSelectedItemId}
+                    onAdd={handleAddItemToOrder}
+                    disabled={lockAllExceptQty || loadingItems}
+                  />
+                </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Comment:
-                    </label>
-                    <textarea
-                      value={form.comment}
-                      onChange={(e) =>
-                        setForm((prev) => ({ ...prev, comment: e.target.value }))
-                      }
-                      disabled={lockAllExceptQty}
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:bg-gray-50"
-                      placeholder="Enter order comment..."
-                      rows={3}
-                    />
-                  </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Comment:
+                  </label>
+                  <textarea
+                    value={form.comment}
+                    onChange={(e) =>
+                      setForm((prev) => ({ ...prev, comment: e.target.value }))
+                    }
+                    disabled={lockAllExceptQty}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:bg-gray-50"
+                    placeholder="Enter order comment..."
+                    rows={3}
+                  />
+                </div>
 
-                  {orderItems.length > 0 && (
-                    <div className="mt-3 overflow-x-auto">
-                      <table className="min-w-full bg-white border border-gray-200 rounded-[4px] shadow-md">
-                        <thead className="bg-gray-100">
-                          <tr>
-                            <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-b">
-                              ID
-                            </th>
-                            <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-b">
-                              Item name
-                            </th>
-                            <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-b">
-                              Qty
-                            </th>
-                            <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-b">
-                              Item remark
-                            </th>
-                            <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-b">
-                              Price
-                            </th>
-                            <th className="px-4 py-2 text-center text-sm font-medium text-gray-700 border-b">
-                              Action
-                            </th>
+                {orderItems.length > 0 && (
+                  <div className="mt-3 overflow-x-auto">
+                    <table className="min-w-full bg-white border border-gray-200 rounded-[4px] shadow-md">
+                      <thead className="bg-gray-100">
+                        <tr>
+                          <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-b">
+                            ID
+                          </th>
+                          <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-b">
+                            Item name
+                          </th>
+                          <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-b">
+                            Qty
+                          </th>
+                          <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-b">
+                            Item remark
+                          </th>
+                          <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-b">
+                            Price
+                          </th>
+                          <th className="px-4 py-2 text-center text-sm font-medium text-gray-700 border-b">
+                            Action
+                          </th>
+                        </tr>
+                      </thead>
+
+                      <tbody>
+                        {orderItems.map((row) => (
+                          <tr key={row.item_id} className="hover:bg-gray-50">
+                            <td className="px-4 py-2 text-sm text-gray-700 border-b">
+                              {row.item_id}
+                            </td>
+                            <td className="px-4 py-2 text-sm text-gray-700 border-b">
+                              {row.itemName}
+                            </td>
+
+                            <td className="px-4 py-2 text-sm text-gray-700 border-b">
+                              <input
+                                type="number"
+                                min={1}
+                                value={row.qty}
+                                onChange={(e) =>
+                                  handleUpdateOrderItemQty(
+                                    row.item_id,
+                                    Number(e.target.value),
+                                  )
+                                }
+                                className="w-20 px-2 py-1 text-sm border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500 focus:border-transparent"
+                              />
+                            </td>
+
+                            <td className="px-4 py-2 text-sm text-gray-700 border-b">
+                              <input
+                                type="text"
+                                value={row.remark_de}
+                                onChange={(e) =>
+                                  handleUpdateOrderItemRemark(
+                                    row.item_id,
+                                    String(e.target.value),
+                                  )
+                                }
+                                className="w-full px-2 py-1 text-sm border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:bg-gray-50"
+                              />
+                            </td>
+
+                            <td className="px-4 py-2 text-sm text-gray-700 border-b whitespace-nowrap">
+                              {row.currency || "CNY"} {row.price || 0}
+                            </td>
+
+                            <td className="px-4 py-2 text-sm text-gray-700 border-b text-center">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleRemoveOrderItem(row.item_id)
+                                }
+                                disabled={lockAllExceptQty}
+                                className="inline-flex items-center gap-1 px-3 py-1.5 text-sm bg-red-600 text-white rounded-[4px] hover:bg-red-500 disabled:opacity-50"
+                              >
+                                <TrashIcon className="h-4 w-4" />
+                              </button>
+                            </td>
                           </tr>
-                        </thead>
-
-                        <tbody>
-                          {orderItems.map((row) => (
-                            <tr key={row.item_id} className="hover:bg-gray-50">
-                              <td className="px-4 py-2 text-sm text-gray-700 border-b">
-                                {row.item_id}
-                              </td>
-                              <td className="px-4 py-2 text-sm text-gray-700 border-b">
-                                {row.itemName}
-                              </td>
-
-                              <td className="px-4 py-2 text-sm text-gray-700 border-b">
-                                <input
-                                  type="number"
-                                  min={1}
-                                  value={row.qty}
-                                  onChange={(e) =>
-                                    handleUpdateOrderItemQty(
-                                      row.item_id,
-                                      Number(e.target.value),
-                                    )
-                                  }
-                                  className="w-20 px-2 py-1 text-sm border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500 focus:border-transparent"
-                                />
-                              </td>
-
-                              <td className="px-4 py-2 text-sm text-gray-700 border-b">
-                                <input
-                                  type="text"
-                                  value={row.remark_de}
-                                  onChange={(e) =>
-                                    handleUpdateOrderItemRemark(
-                                      row.item_id,
-                                      String(e.target.value),
-                                    )
-                                  }
-                                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:bg-gray-50"
-                                />
-                              </td>
-
-                              <td className="px-4 py-2 text-sm text-gray-700 border-b whitespace-nowrap">
-                                {row.currency || "CNY"} {row.price || 0}
-                              </td>
-
-                              <td className="px-4 py-2 text-sm text-gray-700 border-b text-center">
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    handleRemoveOrderItem(row.item_id)
-                                  }
-                                  disabled={lockAllExceptQty}
-                                  className="inline-flex items-center gap-1 px-3 py-1.5 text-sm bg-red-600 text-white rounded-[4px] hover:bg-red-500 disabled:opacity-50"
-                                >
-                                  <TrashIcon className="h-4 w-4" />
-                                </button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-
-                  <div className="flex justify-end gap-2 pt-4">
-                    <button
-                      onClick={closeModal}
-                      className="px-4 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-[4px] hover:bg-gray-50 transition-all"
-                    >
-                      Cancel
-                    </button>
-
-                    <CustomButton
-                      gradient={true}
-                      disabled={!canSubmit}
-                      onClick={
-                        mode === "convert"
-                          ? handleConvertOrder
-                          : mode === "edit"
-                            ? handleUpdateOrder
-                            : handleCreateOrder
-                      }
-                      className="px-6 py-2 text-sm bg-[#059669] text-white rounded-[4px] hover:bg-green-700 transition-all shadow-md font-bold disabled:opacity-50"
-                    >
-                      {mode === "convert"
-                        ? "CONVERT ORDER"
-                        : mode === "edit"
-                          ? "Update Order"
-                          : "Create Order"}
-                    </CustomButton>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
+                )}
+
+                <div className="flex justify-end gap-2 pt-4">
+                  <button
+                    onClick={closeModal}
+                    className="px-4 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-[4px] hover:bg-gray-50 transition-all"
+                  >
+                    Cancel
+                  </button>
+
+                  <CustomButton
+                    gradient={true}
+                    disabled={!canSubmit}
+                    onClick={
+                      mode === "convert"
+                        ? handleConvertOrder
+                        : mode === "edit"
+                          ? handleUpdateOrder
+                          : handleCreateOrder
+                    }
+                    className="px-6 py-2 text-sm bg-[#059669] text-white rounded-[4px] hover:bg-green-700 transition-all shadow-md font-bold disabled:opacity-50"
+                  >
+                    {mode === "convert"
+                      ? "CONVERT ORDER"
+                      : mode === "edit"
+                        ? "Update Order"
+                        : "Create Order"}
+                  </CustomButton>
                 </div>
               </div>
             </div>
           </div>
-        )
-      }
-      {
-        isEditQtyModalOpen && editQtyItem && (
-          <CustomModal
-            isOpen={isEditQtyModalOpen}
-            onClose={() => setIsEditQtyModalOpen(false)}
-            title={`Update QTY QtyLabel (ID: ${editQtyItem.id})`}
-            width="max-w-md"
-            footer={
-              <button
-                onClick={saveQtyChanges}
-                className="bg-[#059669] hover:bg-green-700 text-white px-6 py-2 rounded-xl font-bold transition-all shadow-lg active:scale-95"
+        </div>
+      )}
+      {isEditQtyModalOpen && editQtyItem && (
+        <CustomModal
+          isOpen={isEditQtyModalOpen}
+          onClose={() => setIsEditQtyModalOpen(false)}
+          title={`Update QTY QtyLabel (ID: ${editQtyItem.id})`}
+          width="max-w-md"
+          footer={
+            <button
+              onClick={saveQtyChanges}
+              className="bg-[#059669] hover:bg-green-700 text-white px-6 py-2 rounded-xl font-bold transition-all shadow-lg active:scale-95"
+            >
+              Save QTY changes
+            </button>
+          }
+        >
+          <div className="space-y-6">
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">
+                New QTY:
+              </label>
+              <input
+                type="number"
+                value={newQty}
+                onChange={(e) => setNewQty(e.target.value)}
+                className="w-full px-4 py-3 border-2 border-gray-100 rounded-xl focus:ring-2 focus:ring-[#059669] focus:border-transparent outline-none transition-all font-medium text-lg text-gray-800"
+                placeholder="Enter new quantity..."
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">
+                Enter Remarks RemarkCN:
+              </label>
+              <textarea
+                value={newRemarkCN}
+                onChange={(e) => setNewRemarkCN(e.target.value)}
+                rows={4}
+                className="w-full px-4 py-3 border-2 border-gray-100 rounded-xl focus:ring-2 focus:ring-[#059669] focus:border-transparent outline-none transition-all font-medium text-gray-600 resize-none"
+                placeholder="Enter Chinese remarks..."
+              />
+            </div>
+          </div>
+        </CustomModal>
+      )}
+      {showREModal && selectedItem && (
+        <CustomModal
+          isOpen={showREModal}
+          onClose={() => setShowREModal(false)}
+          title={`Reassign Item ${selectedItem.id}`}
+        >
+          <div className="p-4 space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Select Cargo
+              </label>
+              <select
+                value={targetCargoId}
+                onChange={(e) => setTargetCargoId(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-[#059669]"
               >
-                Save QTY changes
+                <option value="">-- Choose Cargo --</option>
+                {cargos.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.cargo_no}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex justify-end gap-2 mt-6">
+              <button
+                onClick={() => setShowREModal(false)}
+                className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg"
+              >
+                Cancel
               </button>
-            }
-          >
-            <div className="space-y-6">
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">
-                  New QTY:
-                </label>
-                <input
-                  type="number"
-                  value={newQty}
-                  onChange={(e) => setNewQty(e.target.value)}
-                  className="w-full px-4 py-3 border-2 border-gray-100 rounded-xl focus:ring-2 focus:ring-[#059669] focus:border-transparent outline-none transition-all font-medium text-lg text-gray-800"
-                  placeholder="Enter new quantity..."
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">
-                  Enter Remarks RemarkCN:
-                </label>
-                <textarea
-                  value={newRemarkCN}
-                  onChange={(e) => setNewRemarkCN(e.target.value)}
-                  rows={4}
-                  className="w-full px-4 py-3 border-2 border-gray-100 rounded-xl focus:ring-2 focus:ring-[#059669] focus:border-transparent outline-none transition-all font-medium text-gray-600 resize-none"
-                  placeholder="Enter Chinese remarks..."
-                />
-              </div>
+              <button
+                onClick={handleReassignItemAction}
+                disabled={!targetCargoId}
+                className="px-4 py-2 text-sm bg-[#059669] text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+              >
+                Reassign
+              </button>
             </div>
-          </CustomModal>
-        )
-      }
-      {
-        showREModal && selectedItem && (
-          <CustomModal
-            isOpen={showREModal}
-            onClose={() => setShowREModal(false)}
-            title={`Reassign Item ${selectedItem.id}`}
-          >
-            <div className="p-4 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Select Cargo
-                </label>
-                <select
-                  value={targetCargoId}
-                  onChange={(e) => setTargetCargoId(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-[#059669]"
-                >
-                  <option value="">-- Choose Cargo --</option>
-                  {cargos.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.cargo_no}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="flex justify-end gap-2 mt-6">
-                <button
-                  onClick={() => setShowREModal(false)}
-                  className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleReassignItemAction}
-                  disabled={!targetCargoId}
-                  className="px-4 py-2 text-sm bg-[#059669] text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
-                >
-                  Reassign
-                </button>
-              </div>
-            </div>
-          </CustomModal>
-        )
-      }
+          </div>
+        </CustomModal>
+      )}
 
-      {
-        showSPModal && selectedItem && (
-          <CustomModal
-            isOpen={showSPModal}
-            onClose={() => setShowSPModal(false)}
-            title={`Split Item ${selectedItem.id}`}
-          >
-            <div className="p-4 space-y-4">
-              <p className="text-sm text-gray-600">
-                Current Qty: <span className="font-bold">{selectedItem.qty}</span>
-              </p>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Split Quantity (amount to move to new row)
-                </label>
-                <input
-                  type="number"
-                  value={splitQty}
-                  onChange={(e) => setSplitQty(Number(e.target.value))}
-                  min={1}
-                  max={selectedItem.qty - 1}
-                  className="w-full border border-gray-300 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-orange-500"
-                />
-              </div>
-              <div className="flex justify-end gap-2 mt-6">
-                <button
-                  onClick={() => setShowSPModal(false)}
-                  className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleSplitItemAction}
-                  disabled={splitQty <= 0 || splitQty >= selectedItem.qty}
-                  className="px-4 py-2 text-sm bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50"
-                >
-                  Split Now
-                </button>
-              </div>
+      {showSPModal && selectedItem && (
+        <CustomModal
+          isOpen={showSPModal}
+          onClose={() => setShowSPModal(false)}
+          title={`Split Item ${selectedItem.id}`}
+        >
+          <div className="p-4 space-y-4">
+            <p className="text-sm text-gray-600">
+              Current Qty: <span className="font-bold">{selectedItem.qty}</span>
+            </p>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Split Quantity (amount to move to new row)
+              </label>
+              <input
+                type="number"
+                value={splitQty}
+                onChange={(e) => setSplitQty(Number(e.target.value))}
+                min={1}
+                max={selectedItem.qty - 1}
+                className="w-full border border-gray-300 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-orange-500"
+              />
             </div>
-          </CustomModal>
-        )
-      }
+            <div className="flex justify-end gap-2 mt-6">
+              <button
+                onClick={() => setShowSPModal(false)}
+                className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSplitItemAction}
+                disabled={splitQty <= 0 || splitQty >= selectedItem.qty}
+                className="px-4 py-2 text-sm bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50"
+              >
+                Split Now
+              </button>
+            </div>
+          </div>
+        </CustomModal>
+      )}
     </>
   );
 };

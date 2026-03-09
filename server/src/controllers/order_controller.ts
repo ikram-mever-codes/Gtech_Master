@@ -7,7 +7,7 @@ import { AppDataSource } from "../config/database";
 import { Order } from "../models/orders";
 import { OrderItem } from "../models/order_items";
 import { Item } from "../models/items";
-
+import { stat } from "fs";
 
 const padorder_no = (n: number) => `MA${String(n).padStart(4, "0")}`;
 
@@ -136,12 +136,12 @@ export const createOrder = async (
   } catch (error) {
     try {
       await queryRunner.rollbackTransaction();
-    } catch { }
+    } catch {}
     return next(error);
   } finally {
     try {
       await queryRunner.release();
-    } catch { }
+    } catch {}
   }
 };
 
@@ -284,12 +284,12 @@ export const updateOrder = async (
   } catch (error) {
     try {
       await queryRunner.rollbackTransaction();
-    } catch { }
+    } catch {}
     return next(error);
   } finally {
     try {
       await queryRunner.release();
-    } catch { }
+    } catch {}
   }
 };
 
@@ -342,7 +342,8 @@ export const getAllOrders = async (
           item_id: oi.item_id || itemDetails?.id,
           ean: itemDetails?.ean || "-",
           item_name:
-            itemDetails?.item_name || (oi?.ItemID_DE ? `Unknown (DE: ${oi.ItemID_DE})` : "Unknown Item"),
+            itemDetails?.item_name ||
+            (oi?.ItemID_DE ? `Unknown (DE: ${oi.ItemID_DE})` : "Unknown Item"),
           model: itemDetails?.model || "-",
           price: oi.price || itemDetails?.price || 0,
           currency: oi.currency || itemDetails?.currency || "CNY",
@@ -381,6 +382,7 @@ export const getOrderById = async (
 
     const lines = await orderItemsRepository.find({
       where: { order_id: order.id as any } as any,
+      relations: ["item"],
     });
     return res.status(200).json({
       success: true,
@@ -400,6 +402,9 @@ export const getOrderById = async (
           order_id: oi.order_id,
           item_id: oi.item_id,
           qty: oi.qty,
+          ean: oi.item?.ean || "-",
+          status: oi.status,
+          item_name: oi.item?.item_name || "Unknown Item",
           remark_de: oi.remark_de,
           price: oi.price,
           currency: oi.currency,
@@ -451,12 +456,12 @@ export const deleteOrder = async (
   } catch (error) {
     try {
       await queryRunner.rollbackTransaction();
-    } catch { }
+    } catch {}
     return next(error);
   } finally {
     try {
       await queryRunner.release();
-    } catch { }
+    } catch {}
   }
 };
 
