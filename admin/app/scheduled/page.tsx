@@ -2241,7 +2241,6 @@ const AdminAllItemsPage = () => {
           })
         );
 
-        // Make API call in background
         await updateListItemDeliveryInfo(itemId, { ...deliveryData, period });
       } catch (error) {
         console.error("Failed to update delivery:", error);
@@ -2251,7 +2250,6 @@ const AdminAllItemsPage = () => {
     []
   );
 
-  // Handle acknowledge field changes
   const handleAcknowledgeField = async (
     listId: string,
     itemId: string,
@@ -2260,7 +2258,6 @@ const AdminAllItemsPage = () => {
     try {
       await acknowledgeItemFieldChanges(listId, itemId, fields);
 
-      // Optimistically update the state
       setAllItems((prev) =>
         prev.map((item) => {
           if (item.id === itemId) {
@@ -2291,34 +2288,25 @@ const AdminAllItemsPage = () => {
     } catch (error) {
       console.error("Failed to acknowledge field:", error);
       toast.error("Failed to acknowledge field");
-      // Reload data on error
       await loadAllItems();
     }
   };
-
-  // Handle opening activity logs for specific item
   const handleOpenItemActivityLogs = (item: any) => {
     setSelectedItemForLogs(item);
     setActivityLogsDialog(true);
   };
 
-  // Handle switching to main activity tab from item dialog
   const handleSwitchToMainActivityTab = () => {
     setActivityLogsDialog(false);
-    setCurrentTab(1); // Switch to activity logs tab
+    setCurrentTab(1);
   };
-
-  // Filter items based on search term, customer, and list
   const filteredItems = useMemo(() => {
     let filtered = allItems;
 
-    // Always sort by createdAt first (newest first) before applying filters
     filtered = [...filtered].sort(
       (a: any, b: any) =>
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     );
-
-    // Filter by search term
     if (searchTerm && currentTab === 0) {
       filtered = filtered.filter(
         (item: any) =>
@@ -2327,19 +2315,15 @@ const AdminAllItemsPage = () => {
       );
     }
 
-    // Filter by customer
     if (selectedCustomer) {
       filtered = filtered.filter(
         (item: any) => item.customerId === selectedCustomer
       );
     }
 
-    // Filter by list
     if (selectedList) {
       filtered = filtered.filter((item: any) => item.listId === selectedList);
     }
-
-    // Filter by changes only
     if (showOnlyChanges) {
       filtered = filtered.filter(
         (item: any) =>
@@ -2357,12 +2341,10 @@ const AdminAllItemsPage = () => {
     currentTab,
   ]);
 
-  // Get available lists for selected customer
   const availableLists = useMemo(() => {
     if (!selectedCustomer) return lists;
     return lists.filter((list) => list.customerId === selectedCustomer);
   }, [lists, selectedCustomer]);
-  // Enhanced function to extract unique cargo numbers with proper ETA sorting
   function extractUniqueCargos(items: any[]): {
     sortedCargos: string[];
     cargoDataMap: Map<
@@ -2387,20 +2369,16 @@ const AdminAllItemsPage = () => {
       }
     >();
 
-    // Utility function to parse ETA dates for proper sorting
     function parseEtaForSorting(etaDate: any): number {
-      if (!etaDate) return Number.MAX_SAFE_INTEGER; // Put items without ETA at the end
+      if (!etaDate) return Number.MAX_SAFE_INTEGER;
 
       try {
-        // Handle different date formats
         if (typeof etaDate === "string") {
-          // Try parsing as ISO string first
           const isoDate = new Date(etaDate);
           if (!isNaN(isoDate.getTime())) {
             return isoDate.getTime();
           }
 
-          // Try parsing German date format (DD.MM.YYYY)
           const germanFormatMatch = etaDate.match(
             /(\d{1,2})\.(\d{1,2})\.(\d{4})/
           );
@@ -2414,17 +2392,14 @@ const AdminAllItemsPage = () => {
             return date.getTime();
           }
 
-          // Try parsing other common formats
           const date = new Date(etaDate);
           if (!isNaN(date.getTime())) {
             return date.getTime();
           }
         } else if (typeof etaDate === "number") {
-          // Assume it's already a timestamp
           return etaDate;
         }
 
-        // If all parsing fails, put at the end
         return Number.MAX_SAFE_INTEGER;
       } catch (error) {
         console.warn("Failed to parse ETA date:", etaDate, error);
@@ -2439,7 +2414,6 @@ const AdminAllItemsPage = () => {
             if (deliveryDetails?.cargoNo) {
               const cargoNo = String(deliveryDetails.cargoNo).trim();
 
-              // Skip invalid cargo numbers
               if (
                 !cargoNo ||
                 cargoNo === "null" ||
@@ -2451,7 +2425,6 @@ const AdminAllItemsPage = () => {
 
               const parsedEta = parseEtaForSorting(deliveryDetails.eta);
 
-              // If cargo doesn't exist or current ETA is earlier, update it
               if (!cargoMap.has(cargoNo)) {
                 cargoMap.set(cargoNo, {
                   period: period,
@@ -2461,7 +2434,6 @@ const AdminAllItemsPage = () => {
                   parsedEta: parsedEta,
                 });
               } else {
-                // Update if this instance has an earlier ETA
                 const existing = cargoMap.get(cargoNo)!;
                 if (parsedEta < existing.parsedEta) {
                   cargoMap.set(cargoNo, {
@@ -2479,18 +2451,14 @@ const AdminAllItemsPage = () => {
       }
     });
 
-    // Sort cargo numbers by parsed ETA, then alphabetically
     const sortedCargos = Array.from(cargoMap.keys()).sort((a, b) => {
       const dataA = cargoMap.get(a)!;
       const dataB = cargoMap.get(b)!;
-
-      // Sort by parsed ETA first
       const etaComparison = dataA.parsedEta - dataB.parsedEta;
       if (etaComparison !== 0) {
         return etaComparison;
       }
 
-      // If same ETA, sort alphabetically by cargo number
       return a.localeCompare(b);
     });
 
@@ -2500,7 +2468,6 @@ const AdminAllItemsPage = () => {
     };
   }
 
-  // Utility function to format ETA dates for display
   function formatEta(etaDate: any) {
     if (!etaDate) return null;
     const now = new Date();
@@ -2519,7 +2486,6 @@ const AdminAllItemsPage = () => {
     }
   }
 
-  // Enhanced function to format cargo column labels with proper ETA display
   function formatCargoColumnLabel(
     cargoNo: string,
     period: string,
@@ -2529,21 +2495,16 @@ const AdminAllItemsPage = () => {
   ): string {
     let label = "";
 
-    // Add cargo type if available
     if (cargoType) {
       label += cargoType;
     }
-
-    // Add cargo number in parentheses
     if (cargoNo) {
-      // Add space if cargo type exists
       if (cargoType) {
         label += ` `;
       }
       label += `(${cargoNo})`;
     }
 
-    // If neither cargo type nor number exists, return a fallback
     if (!cargoType && !cargoNo) {
       label = "No Cargo";
     }
@@ -3662,10 +3623,8 @@ const AdminAllItemsPage = () => {
             </Box>
           </TabPanel>
 
-          {/* Tab Panel 1: Activity Logs */}
           <TabPanel value={currentTab} index={1}>
             <Box sx={{ p: 3 }}>
-              {/* Activity Logs Action Bar */}
               <Box
                 sx={{ display: "flex", justifyContent: "space-between", mb: 2 }}
               >
@@ -3707,7 +3666,6 @@ const AdminAllItemsPage = () => {
                 </CustomButton>
               </Box>
 
-              {/* Activity Logs Content */}
               <Box
                 sx={{
                   height: "600px",

@@ -116,6 +116,8 @@ type OrderItemRow = {
   price?: number;
   currency?: string;
   item?: any;
+  supplier_id?: string;
+  customer_id?: string;
 };
 
 type Mode = "create" | "edit" | "convert";
@@ -285,9 +287,9 @@ function OrdersTable({
     },
     {
       header: "Item name",
-      width: "150px",
+      width: "120px",
       render: (row) => (
-        <div className="truncate" title={row.item?.item_name || row.item?.name}>
+        <div className="line-clamp-2 leading-tight" title={row.item?.item_name || row.item?.name}>
           {row.item?.item_name || row.item?.name || "Unknown"}
         </div>
       ),
@@ -319,13 +321,17 @@ function OrdersTable({
     {
       header: "Supplier",
       width: "100px",
-      render: (row) => (
-        <div className="truncate">
-          {row.supplier_id
-            ? getSupplierName?.(row.supplier_id)
-            : getCategoryName(row.category_id)}
-        </div>
-      ),
+      render: (row) => {
+        const sid = row.supplier_id || row.item?.supplier_id;
+        const sname = (sid ? getSupplierName?.(sid) : null) || row.supplier_name || row.item?.supplier_name;
+        return (
+          <div className="truncate">
+            {sname && sname !== "Unassigned"
+              ? sname
+              : getCategoryName(row.category_id || row.item?.cat_id) || "-"}
+          </div>
+        );
+      },
     },
     { header: "Order No.", width: "80px", render: (row) => row.order_no },
     {
@@ -482,25 +488,39 @@ function OrdersTable({
       header: "Created",
       width: "65px",
       render: (row) =>
-        row.date_created ||
-        (row.created_at
-          ? new Date(row.created_at).toLocaleDateString("en-GB", {
+        row.created_at
+          ? new Intl.DateTimeFormat("de-DE", {
             day: "2-digit",
             month: "2-digit",
-          })
-          : "-"),
+            year: "numeric",
+          }).format(new Date(row.created_at))
+          : "-",
       align: "center",
     },
     {
       header: "Emailed",
       width: "65px",
-      render: (row) => row.date_emailed || "-",
+      render: (row) =>
+        row.date_emailed && row.date_emailed !== "-"
+          ? new Intl.DateTimeFormat("de-DE", {
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+          }).format(new Date(row.date_emailed))
+          : "-",
       align: "center",
     },
     {
       header: "Delivery",
       width: "65px",
-      render: (row) => row.date_delivery || "-",
+      render: (row) =>
+        row.date_delivery && row.date_delivery !== "-"
+          ? new Intl.DateTimeFormat("de-DE", {
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+          }).format(new Date(row.date_delivery))
+          : "-",
       align: "center",
     },
     {
@@ -1456,15 +1476,15 @@ const OrderPage = () => {
             const item = itemById.get(id);
             return {
               item_id: id,
-              itemName: item?.item_name || item?.name || l.item_name || "Unknown item",
+              itemName: l.itemName || item?.item_name || item?.name || "Unknown item",
               qty: Number(l.qty ?? 1),
               qty_label: l.qty_label,
               remark_de: String(l.remark_de ?? ""),
               remarks_cn: String(l.remarks_cn ?? ""),
               remark_en: String(l.remark_en ?? ""),
-              ean: item?.ean || l.ean || "-",
+              ean: l.ean || item?.ean || "-",
               status: l.status || "NSO",
-              item: item || l.item || null,
+              item: l.item || item || null,
             };
           }),
         );
@@ -1741,7 +1761,7 @@ const OrderPage = () => {
                             <tr>
                               <th className="px-3 py-2 border-b">Order No</th>
                               <th className="px-3 py-2 border-b">EAN</th>
-                              <th className="px-3 py-2 border-b">Item Name</th>
+                              <th className="px-3 py-2 border-b w-[120px]">Item Name</th>
                               <th className="px-3 py-2 border-b">Remark</th>
                               <th className="px-3 py-2 border-b text-center">Qty</th>
                             </tr>
@@ -1755,7 +1775,7 @@ const OrderPage = () => {
                                 <tr key={it.id || idx} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
                                   <td className="px-3 py-2 font-bold text-blue-600">{it._order_no || "-"}</td>
                                   <td className="px-3 py-2 text-gray-600">{ean}</td>
-                                  <td className="px-3 py-2 font-medium text-gray-900">{name}</td>
+                                  <td className="px-3 py-2 font-medium text-gray-900 line-clamp-2 leading-tight max-w-[120px]">{name}</td>
                                   <td className="px-3 py-2 text-gray-500 italic">{it.remark_de || it.remarks_cn || "-"}</td>
                                   <td className="px-3 py-2 font-bold text-center">{it.qty}</td>
                                 </tr>
@@ -1989,8 +2009,9 @@ const OrderPage = () => {
                             },
                             {
                               header: "Item Name",
+                              width: "120px",
                               render: (item: any) => (
-                                <div className="text-[10px] leading-tight font-semibold text-gray-800 break-words max-w-[180px]">
+                                <div className="text-[10px] leading-tight font-semibold text-gray-800 line-clamp-2">
                                   {item.item?.item_name ||
                                     itemById.get(String(item.item_id))
                                       ?.item_name ||
@@ -2416,9 +2437,10 @@ const OrderPage = () => {
                       },
                       {
                         header: "Item name",
+                        width: "120px",
                         render: (row) => (
                           <div
-                            className="truncate max-w-[200px]"
+                            className="line-clamp-2 leading-tight"
                             title={
                               row.item?.item_name ||
                               itemById.get(String(row.item_id))?.item_name
@@ -2529,9 +2551,10 @@ const OrderPage = () => {
                       },
                       {
                         header: "Item Name",
+                        width: "120px",
                         render: (row) => (
                           <div
-                            className="truncate max-w-[200px]"
+                            className="line-clamp-2 leading-tight"
                             title={
                               row.item?.item_name ||
                               itemById.get(String(row.item_id))?.item_name
@@ -2672,9 +2695,10 @@ const OrderPage = () => {
                       },
                       {
                         header: "Item Name",
+                        width: "120px",
                         render: (row) => (
                           <div
-                            className="font-semibold text-gray-800 line-clamp-2"
+                            className="font-semibold text-gray-800 line-clamp-2 leading-tight"
                             title={row.item?.item_name || row.item?.name}
                           >
                             {row.item?.item_name || row.item?.name || "Unknown"}
@@ -2965,7 +2989,7 @@ const OrderPage = () => {
                     Category
                   </label>
                   <p className="text-gray-900 font-bold">
-                    {getCategoryName(viewOrder.category_id) || "Imported 26"}
+                    {(viewOrder as any).category_name || getCategoryName(viewOrder.category_id) || "-"}
                   </p>
                 </div>
                 <div className="space-y-1">
@@ -2973,7 +2997,15 @@ const OrderPage = () => {
                     Customer
                   </label>
                   <p className="text-gray-900 font-bold">
-                    {viewOrder.customer_id != null ? getCustomerName(viewOrder.customer_id) : "-"}
+                    {(viewOrder as any).customer_name || "-"}
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-sm font-bold text-gray-400 block uppercase tracking-wide">
+                    Supplier
+                  </label>
+                  <p className="text-gray-900 font-bold">
+                    {(viewOrder as any).supplier_name || "-"}
                   </p>
                 </div>
               </div>
@@ -3000,7 +3032,8 @@ const OrderPage = () => {
                       align: "center",
                     },
                     {
-                      header: "ItemName shown",
+                      header: "Item Name",
+                      width: "120px",
                       render: (row) => (
                         <div className="font-bold text-gray-900 line-clamp-2 leading-tight">
                           {row.itemName}
@@ -3008,7 +3041,7 @@ const OrderPage = () => {
                       ),
                     },
                     {
-                      header: "3-level remark (same as in LabelPrint View)",
+                      header: "3-level remark",
                       render: (row) => (
                         <div className="text-xs text-gray-500 font-medium italic space-y-0.5">
                           {row.remarks_cn && <div className="text-red-600">CN: {row.remarks_cn}</div>}
@@ -3018,7 +3051,7 @@ const OrderPage = () => {
                       ),
                     },
                     {
-                      header: "Status OrderItem",
+                      header: "Status",
                       width: "120px",
                       render: (row) => (
                         <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${row.status === 'NSO' ? 'bg-amber-100 text-amber-700' :
@@ -3163,7 +3196,7 @@ const OrderPage = () => {
                             <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-b">
                               ID
                             </th>
-                            <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-b">
+                            <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-b w-[120px]">
                               Item name
                             </th>
                             <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-b">
@@ -3188,7 +3221,9 @@ const OrderPage = () => {
                                 {row.item_id}
                               </td>
                               <td className="px-4 py-2 text-sm text-gray-700 border-b">
-                                {row.itemName}
+                                <div className="line-clamp-2 leading-tight max-w-[120px]">
+                                  {row.itemName}
+                                </div>
                               </td>
 
                               <td className="px-4 py-2 text-sm text-gray-700 border-b">

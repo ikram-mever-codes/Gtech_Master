@@ -270,7 +270,7 @@ const CargosTab: React.FC<CargosTabProps> = ({ customers: externalCustomers }) =
         () =>
             customers.map((c) => ({
                 value: String(c.id),
-                label: `${c.id} - ${c.companyName} - ${c.deliveryCity || c.city || "-"}`,
+                label: c.companyName || "-",
             })),
         [customers]
     );
@@ -806,7 +806,7 @@ const CargosTab: React.FC<CargosTabProps> = ({ customers: externalCustomers }) =
 
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                                            Customer (ID - BillTo - ShipTo)
+                                            Customer
                                         </label>
                                         <Select
                                             className="text-sm"
@@ -823,7 +823,6 @@ const CargosTab: React.FC<CargosTabProps> = ({ customers: externalCustomers }) =
                                             isDisabled={!isEditEnabled}
                                         />
                                     </div>
-
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-1.5">
                                             Pickup Date

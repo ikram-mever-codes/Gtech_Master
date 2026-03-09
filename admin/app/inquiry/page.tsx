@@ -751,8 +751,7 @@ const CombinedInquiriesPageContent = () => {
       fetchInquiries();
     } catch (error) {
       console.error(
-        `Error ${
-          inquiryModalMode === "edit" ? "updating" : "creating"
+        `Error ${inquiryModalMode === "edit" ? "updating" : "creating"
         } inquiry:`,
         error,
       );
@@ -1230,9 +1229,8 @@ const CombinedInquiriesPageContent = () => {
 
   const formatTaricDisplay = (taric: any) => {
     if (!taric) return "";
-    return `${taric.id} - ${taric.code || "No code"} - ${
-      taric.name_de || taric.name_en || taric.name_cn || "No name"
-    }`;
+    return `${taric.id} - ${taric.code || "No code"} - ${taric.name_de || taric.name_en || taric.name_cn || "No name"
+      }`;
   };
 
   const getConversionFormFieldsWithOptions = () => {
@@ -1795,11 +1793,10 @@ const CombinedInquiriesPageContent = () => {
                                 e.stopPropagation();
                                 toggleInquiryRequests(inquiry.id);
                               }}
-                              className={`px-2 py-1 text-xs rounded-lg transition-all flex items-center gap-1 ${
-                                expandedInquiryIds.has(inquiry.id)
-                                  ? "bg-blue-100 text-blue-800"
-                                  : "bg-blue-500 text-white hover:bg-blue-600"
-                              }`}
+                              className={`px-2 py-1 text-xs rounded-lg transition-all flex items-center gap-1 ${expandedInquiryIds.has(inquiry.id)
+                                ? "bg-blue-100 text-blue-800"
+                                : "bg-blue-500 text-white hover:bg-blue-600"
+                                }`}
                             >
                               {expandedInquiryIds.has(inquiry.id) ? (
                                 <EyeSlashIcon className="h-3 w-3" />
@@ -1883,11 +1880,10 @@ const CombinedInquiriesPageContent = () => {
                                     {inquiry.requests.map((request: any) => (
                                       <tr
                                         key={request.id}
-                                        className={`hover:bg-gray-50/50 transition-colors ${
-                                          request.priority === "High"
-                                            ? "bg-red-50/50"
-                                            : ""
-                                        }`}
+                                        className={`hover:bg-gray-50/50 transition-colors ${request.priority === "High"
+                                          ? "bg-red-50/50"
+                                          : ""
+                                          }`}
                                       >
                                         <td className="px-4 py-3">
                                           <div className="w-[8rem]">
@@ -2069,11 +2065,10 @@ const CombinedInquiriesPageContent = () => {
                       <button
                         key={pageNum}
                         onClick={() => setInquiryCurrentPage(pageNum)}
-                        className={`px-2 py-1 text-sm rounded-lg transition-all ${
-                          inquiryCurrentPage === pageNum
-                            ? "bg-gray-600 text-white"
-                            : "bg-white/80 backdrop-blur-sm border border-gray-300/80 hover:bg-white/60"
-                        }`}
+                        className={`px-2 py-1 text-sm rounded-lg transition-all ${inquiryCurrentPage === pageNum
+                          ? "bg-gray-600 text-white"
+                          : "bg-white/80 backdrop-blur-sm border border-gray-300/80 hover:bg-white/60"
+                          }`}
                       >
                         {pageNum}
                       </button>
@@ -2084,11 +2079,10 @@ const CombinedInquiriesPageContent = () => {
                       <span className="px-1 text-gray-500">...</span>
                       <button
                         onClick={() => setInquiryCurrentPage(inquiryTotalPages)}
-                        className={`px-2 py-1 text-sm rounded-lg transition-all ${
-                          inquiryCurrentPage === inquiryTotalPages
-                            ? "bg-gray-600 text-white"
-                            : "bg-white/80 backdrop-blur-sm border border-gray-300/80 hover:bg-white/60"
-                        }`}
+                        className={`px-2 py-1 text-sm rounded-lg transition-all ${inquiryCurrentPage === inquiryTotalPages
+                          ? "bg-gray-600 text-white"
+                          : "bg-white/80 backdrop-blur-sm border border-gray-300/80 hover:bg-white/60"
+                          }`}
                       >
                         {inquiryTotalPages}
                       </button>
@@ -2144,15 +2138,13 @@ const CombinedInquiriesPageContent = () => {
                     </span>
                     <button
                       type="button"
-                      className={`${
-                        editModeEnabled ? "bg-gray-600" : "bg-gray-200"
-                      } relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2`}
+                      className={`${editModeEnabled ? "bg-gray-600" : "bg-gray-200"
+                        } relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2`}
                       onClick={() => setEditModeEnabled(!editModeEnabled)}
                     >
                       <span
-                        className={`${
-                          editModeEnabled ? "translate-x-4" : "translate-x-0"
-                        } pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out`}
+                        className={`${editModeEnabled ? "translate-x-4" : "translate-x-0"
+                          } pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out`}
                       />
                     </button>
                   </div>
@@ -2161,11 +2153,10 @@ const CombinedInquiriesPageContent = () => {
 
               <div className="space-y-6">
                 <div
-                  className={`rounded-xl p-4 -mx-4 transition-colors duration-300 ${
-                    inquiryFormData.isAssembly
-                      ? "bg-red-50 border border-red-200/70"
-                      : "bg-transparent"
-                  }`}
+                  className={`rounded-xl p-4 -mx-4 transition-colors duration-300 ${inquiryFormData.isAssembly
+                    ? "bg-red-50 border border-red-200/70"
+                    : "bg-transparent"
+                    }`}
                 >
                   <div>
                     <h3 className="text-lg font-semibold text-gray-900 mb-3">
@@ -2803,11 +2794,10 @@ const CombinedInquiriesPageContent = () => {
                 </div>
 
                 <div
-                  className={`rounded-xl p-4 -mx-4 transition-colors duration-300 ${
-                    inquiryFormData.isAssembly
-                      ? "bg-green-50 border border-green-200/70 mt-2"
-                      : "bg-transparent"
-                  }`}
+                  className={`rounded-xl p-4 -mx-4 transition-colors duration-300 ${inquiryFormData.isAssembly
+                    ? "bg-green-50 border border-green-200/70 mt-2"
+                    : "bg-transparent"
+                    }`}
                 >
                   <div>
                     <div className="flex items-center justify-between mb-3">
@@ -2839,15 +2829,14 @@ const CombinedInquiriesPageContent = () => {
                           <button
                             type="button"
                             onClick={() => toggleRequestExpansion(index)}
-                            className={`w-full px-3 py-2 flex items-center justify-between text-left transition-colors ${
-                              expandedRequestIndex === index
-                                ? inquiryFormData.isAssembly
-                                  ? "bg-green-100"
-                                  : "bg-gray-100"
-                                : inquiryFormData.isAssembly
-                                  ? "bg-green-50 hover:bg-green-100"
-                                  : "bg-gray-50 hover:bg-gray-100"
-                            }`}
+                            className={`w-full px-3 py-2 flex items-center justify-between text-left transition-colors ${expandedRequestIndex === index
+                              ? inquiryFormData.isAssembly
+                                ? "bg-green-100"
+                                : "bg-gray-100"
+                              : inquiryFormData.isAssembly
+                                ? "bg-green-50 hover:bg-green-100"
+                                : "bg-gray-50 hover:bg-gray-100"
+                              }`}
                           >
                             <div className="flex items-center gap-2">
                               {expandedRequestIndex === index ? (
@@ -3168,7 +3157,7 @@ const CombinedInquiriesPageContent = () => {
                                           index,
                                           "weight",
                                           parseFloat(e.target.value) ||
-                                            undefined,
+                                          undefined,
                                         )
                                       }
                                       disabled={
@@ -3191,7 +3180,7 @@ const CombinedInquiriesPageContent = () => {
                                           index,
                                           "length",
                                           parseFloat(e.target.value) ||
-                                            undefined,
+                                          undefined,
                                         )
                                       }
                                       disabled={
@@ -3214,7 +3203,7 @@ const CombinedInquiriesPageContent = () => {
                                           index,
                                           "width",
                                           parseFloat(e.target.value) ||
-                                            undefined,
+                                          undefined,
                                         )
                                       }
                                       disabled={
@@ -3237,7 +3226,7 @@ const CombinedInquiriesPageContent = () => {
                                           index,
                                           "height",
                                           parseFloat(e.target.value) ||
-                                            undefined,
+                                          undefined,
                                         )
                                       }
                                       disabled={
@@ -3467,23 +3456,23 @@ const CombinedInquiriesPageContent = () => {
                   </button>
                   {(inquiryModalMode === "create" ||
                     (inquiryModalMode === "edit" && editModeEnabled)) && (
-                    <CustomButton
-                      gradient={true}
-                      onClick={handleInquirySubmit}
-                      disabled={
-                        !inquiryFormData.name ||
-                        !inquiryFormData.customerId ||
-                        !inquiryRequests.some(
-                          (req) => req.itemName && req.qty >= 1,
-                        )
-                      }
-                      className="px-3 py-2 text-xs bg-gray-600/90 backdrop-blur-sm text-white rounded hover:bg-gray-700/90 transition-all disabled:opacity-50"
-                    >
-                      {inquiryModalMode === "edit"
-                        ? "Update Inquiry"
-                        : "Create Inquiry"}
-                    </CustomButton>
-                  )}
+                      <CustomButton
+                        gradient={true}
+                        onClick={handleInquirySubmit}
+                        disabled={
+                          !inquiryFormData.name ||
+                          !inquiryFormData.customerId ||
+                          !inquiryRequests.some(
+                            (req) => req.itemName && req.qty >= 1,
+                          )
+                        }
+                        className="px-3 py-2 text-xs bg-gray-600/90 backdrop-blur-sm text-white rounded hover:bg-gray-700/90 transition-all disabled:opacity-50"
+                      >
+                        {inquiryModalMode === "edit"
+                          ? "Update Inquiry"
+                          : "Create Inquiry"}
+                      </CustomButton>
+                    )}
                 </div>
               </div>
             </div>
@@ -3546,21 +3535,21 @@ const CombinedInquiriesPageContent = () => {
                       conversionInquiryData.width ||
                       conversionInquiryData.height ||
                       conversionInquiryData.length) && (
-                      <div className="col-span-2">
-                        <span className="text-gray-600">Dimensions:</span>
-                        <span className="ml-2">
-                          {conversionInquiryData.weight &&
-                            `${conversionInquiryData.weight}kg `}
-                          {conversionInquiryData.length &&
-                            `${conversionInquiryData.length}×`}
-                          {conversionInquiryData.width &&
-                            `${conversionInquiryData.width}×`}
-                          {conversionInquiryData.height &&
-                            `${conversionInquiryData.height}`}
-                          cm
-                        </span>
-                      </div>
-                    )}
+                        <div className="col-span-2">
+                          <span className="text-gray-600">Dimensions:</span>
+                          <span className="ml-2">
+                            {conversionInquiryData.weight &&
+                              `${conversionInquiryData.weight}kg `}
+                            {conversionInquiryData.length &&
+                              `${conversionInquiryData.length}×`}
+                            {conversionInquiryData.width &&
+                              `${conversionInquiryData.width}×`}
+                            {conversionInquiryData.height &&
+                              `${conversionInquiryData.height}`}
+                            cm
+                          </span>
+                        </div>
+                      )}
                   </div>
                 )}
                 {conversionType === "request" && conversionRequestData && (
@@ -3597,21 +3586,21 @@ const CombinedInquiriesPageContent = () => {
                       conversionRequestData.width ||
                       conversionRequestData.height ||
                       conversionRequestData.length) && (
-                      <div className="col-span-2">
-                        <span className="text-gray-600">Dimensions:</span>
-                        <span className="ml-2">
-                          {conversionRequestData.weight &&
-                            `${conversionRequestData.weight}kg `}
-                          {conversionRequestData.length &&
-                            `${conversionRequestData.length}×`}
-                          {conversionRequestData.width &&
-                            `${conversionRequestData.width}×`}
-                          {conversionRequestData.height &&
-                            `${conversionRequestData.height}`}
-                          cm
-                        </span>
-                      </div>
-                    )}
+                        <div className="col-span-2">
+                          <span className="text-gray-600">Dimensions:</span>
+                          <span className="ml-2">
+                            {conversionRequestData.weight &&
+                              `${conversionRequestData.weight}kg `}
+                            {conversionRequestData.length &&
+                              `${conversionRequestData.length}×`}
+                            {conversionRequestData.width &&
+                              `${conversionRequestData.width}×`}
+                            {conversionRequestData.height &&
+                              `${conversionRequestData.height}`}
+                            cm
+                          </span>
+                        </div>
+                      )}
                   </div>
                 )}
               </div>
@@ -3743,11 +3732,10 @@ const CombinedInquiriesPageContent = () => {
                                   : e.target.value,
                             })
                           }
-                          className={`w-full px-3 py-2 text-sm border ${
-                            field.required && !conversionFormData[field.name]
-                              ? "border-red-300"
-                              : "border-gray-300/80"
-                          } bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all`}
+                          className={`w-full px-3 py-2 text-sm border ${field.required && !conversionFormData[field.name]
+                            ? "border-red-300"
+                            : "border-gray-300/80"
+                            } bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all`}
                           placeholder={field.placeholder}
                           min={field.min}
                           step={field.step}
@@ -3756,9 +3744,8 @@ const CombinedInquiriesPageContent = () => {
                       )}
                       {field.description && (
                         <p
-                          className={`text-xs mt-1 ${
-                            field.required ? "text-red-600" : "text-gray-500"
-                          }`}
+                          className={`text-xs mt-1 ${field.required ? "text-red-600" : "text-gray-500"
+                            }`}
                         >
                           {field.description}
                         </p>

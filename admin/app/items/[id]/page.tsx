@@ -28,6 +28,7 @@ import {
   deleteQualityCriterion,
   ItemDetails,
 } from "@/api/items";
+import { getAllSuppliers, Supplier } from "@/api/suppliers";
 import { uploadFile } from "@/api/library";
 import CustomModal from "@/components/UI/CustomModal";
 import { loadingStyles, successStyles, errorStyles } from "@/utils/constants";
@@ -219,6 +220,7 @@ const ItemDetailsPage = () => {
     picture: null as File | null,
     pictureUrl: "",
   });
+  const [allSuppliers, setAllSuppliers] = useState<Supplier[]>([]);
 
   const handleOpenQualityModal = (quality: any = null) => {
     if (quality) {
@@ -323,12 +325,15 @@ const ItemDetailsPage = () => {
       setLoading(true);
       try {
         const itemId = parseInt(id as string);
-        const [itemResponse, variationsResponse, qualityResponse] =
+        const [itemResponse, variationsResponse, qualityResponse, suppliersRes]: any =
           await Promise.all([
             getItemById(itemId),
             getItemVariations(itemId),
             getItemQualityCriteria(itemId),
+            getAllSuppliers({ limit: 1000 })
           ]);
+
+        if (suppliersRes?.data) setAllSuppliers(suppliersRes.data);
 
         const rawItem = itemResponse.data;
         const toBool = (val: any) => val === "Y" || val === "Yes" || val === true || val === 1 || val === "1";
@@ -416,6 +421,7 @@ const ItemDetailsPage = () => {
         is_rmb_special: updatedData.parent?.isRMBSpecial ? "Y" : "N",
         is_new: updatedData.others?.isNew ? "Y" : "N",
         is_npr: updatedData.others?.isNPR ? "Y" : "N",
+        supplier_id: toInt(updatedData.supplier_id),
 
         supplierItem: {
           price_rmb: toNum(updatedData.supplierItem?.priceRMB),
@@ -1049,8 +1055,22 @@ const ItemDetailsPage = () => {
               </div>
 
               <div className="mt-8 pt-6 border-t border-gray-100">
-                <InfoRow label="Supplier Name" value={itemData.supplier_name || "No supplier assigned"} />
-                {itemData.supplier_id && (
+                <SelectInfoRow
+                  label="Supplier Name"
+                  value={String(itemData.supplier_id || "")}
+                  field="supplier_id"
+                  editMode={editMode}
+                  itemData={itemData}
+                  setItemData={setItemData}
+                  options={[
+                    { label: "No supplier assigned", value: "" },
+                    ...allSuppliers.map(s => ({
+                      label: s.company_name || s.name || `Supplier ${s.id}`,
+                      value: String(s.id)
+                    }))
+                  ]}
+                />
+                {!editMode && itemData.supplier_id && (
                   <div className="mt-4 p-4 bg-gray-50 rounded-lg max-w-md">
                     <p className="text-sm text-gray-600 mb-2">
                       Supplier ID: {itemData.supplier_id}

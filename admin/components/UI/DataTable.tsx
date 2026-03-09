@@ -19,6 +19,9 @@ export type DataTableProps<T> = {
     renderRowDetails?: (row: T, index: number) => React.ReactNode;
     expandedRowId?: string | number | null;
     onRowClick?: (row: T, index: number) => void;
+    headerClassName?: string;
+    thClassName?: string;
+    tdClassName?: string;
 };
 
 export function DataTable<T>({
@@ -30,19 +33,21 @@ export function DataTable<T>({
     getRowClassName,
     renderRowDetails,
     expandedRowId,
-    onRowClick
+    onRowClick,
+    headerClassName,
+    thClassName,
+    tdClassName
 }: DataTableProps<T>) {
-
 
     return (
         <div className="overflow-x-auto rounded-lg border border-gray-200 shadow-sm">
             <table className="w-full border-collapse">
-                <thead className="bg-gray-50 border-b border-gray-200">
+                <thead className={headerClassName || "bg-gray-50 border-b border-gray-200"}>
                     <tr>
                         {columns.map((c, i) => (
                             <th
                                 key={i}
-                                className={`px-2 py-2 text-${c.align || "left"} text-[10px] font-bold text-gray-600 uppercase tracking-tight border border-gray-200`}
+                                className={thClassName || `px-2 py-2 text-${c.align || "left"} text-[10px] font-bold text-gray-600 uppercase tracking-tight border border-gray-200`}
                                 style={c.width ? { width: c.width, minWidth: c.width } : {}}
                             >
                                 {c.header}
@@ -92,7 +97,7 @@ export function DataTable<T>({
                                         {columns.map((c, i) => (
                                             <td
                                                 key={i}
-                                                className={`px-2 py-1.5 text-${c.align || "left"} border border-gray-200 text-[11px] leading-tight`}
+                                                className={tdClassName || `px-2 py-1.5 text-${c.align || "left"} border border-gray-200 text-[11px] leading-tight`}
                                                 style={c.width ? { width: c.width, minWidth: c.width } : {}}
                                             >
                                                 {c.render(row, idx)}
