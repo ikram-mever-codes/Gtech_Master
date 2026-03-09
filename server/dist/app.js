@@ -3,6 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.initializeCronJobs = void 0;
 const express_1 = __importDefault(require("express"));
 const errorMiddleware_1 = __importDefault(require("./middlewares/errorMiddleware"));
 const cors_1 = __importDefault(require("cors"));
@@ -15,7 +16,6 @@ const contact_routes_1 = __importDefault(require("./routes/contact_routes"));
 const invoice_routes_1 = __importDefault(require("./routes/invoice_routes"));
 const requested_item_routes_1 = __importDefault(require("./routes/requested_item_routes"));
 const cronRoutes_1 = __importDefault(require("./routes/cronRoutes"));
-const database_1 = require("./config/database");
 const item_routes_1 = __importDefault(require("./routes/item_routes"));
 const cronJob_1 = require("./services/cronJob");
 const bussiness_routes_1 = __importDefault(require("./routes/bussiness_routes"));
@@ -27,6 +27,7 @@ const qtyRoutes_1 = __importDefault(require("./routes/qtyRoutes"));
 const supplier_routes_1 = __importDefault(require("./routes/supplier_routes"));
 const cargo_routes_1 = __importDefault(require("./routes/cargo_routes"));
 const cargo_type_routes_1 = __importDefault(require("./routes/cargo_type_routes"));
+const etl_routes_1 = __importDefault(require("./routes/etl_routes"));
 const supplier_order_routes_1 = __importDefault(require("./routes/supplier_order_routes"));
 const app = (0, express_1.default)();
 const corsOptions = {
@@ -39,7 +40,13 @@ const corsOptions = {
     ],
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
-    allowedHeaders: ["Content-Type", "Authorization", "Cache-Control", "Pragma", "Expires"],
+    allowedHeaders: [
+        "Content-Type",
+        "Authorization",
+        "Cache-Control",
+        "Pragma",
+        "Expires",
+    ],
 };
 app.use(express_1.default.json());
 app.use((0, cookie_parser_1.default)());
@@ -62,6 +69,7 @@ app.use("/api/v1/categories", qtyRoutes_1.default);
 app.use("/api/v1/suppliers", supplier_routes_1.default);
 app.use("/api/v1/cargos", cargo_routes_1.default);
 app.use("/api/v1/cargo-types", cargo_type_routes_1.default);
+app.use("/api/v1/etl", etl_routes_1.default);
 app.use("/api/v1/supplier-orders", supplier_order_routes_1.default);
 const __uploads_dirname = path_1.default.resolve();
 app.use("/uploads", express_1.default.static(path_1.default.join(__uploads_dirname, "/uploads")));
@@ -77,12 +85,7 @@ const initializeCronJobs = () => {
         console.log("⏹️ Cron jobs disabled in development mode");
     }
 };
-database_1.AppDataSource.initialize()
-    .then(() => {
-    console.log("📦 Database connected");
-    initializeCronJobs();
-})
-    .catch((error) => console.log("Database connection error:", error));
+exports.initializeCronJobs = initializeCronJobs;
 app.use((req, res, next) => {
     res.status(404).json({ message: "Resource Not Found!" });
 });

@@ -12,4 +12,7 @@ router.delete("/:id", (0, authorized_1.authorize)(users_1.UserRole.SALES), invoi
 router.get("/", (0, authorized_1.authorize)(users_1.UserRole.SALES), invoice_controller_1.InvoiceController.getAllInvoices);
 router.get("/:id", (0, authorized_1.authorize)(users_1.UserRole.SALES), invoice_controller_1.InvoiceController.getInvoiceById);
 router.get("/customer/:customerId", (0, authorized_1.authorize)(users_1.UserRole.SALES), invoice_controller_1.InvoiceController.getInvoicesByCustomer);
+router.get("/:id/expanded", (0, authorized_1.authorize)(users_1.UserRole.SALES), invoice_controller_1.InvoiceController.getInvoiceExpandedDetails);
+router.patch("/:id/paid", (0, authorized_1.authorize)(users_1.UserRole.SALES), invoice_controller_1.InvoiceController.markAsPaid);
+router.patch("/:id/cancel", (0, authorized_1.authorize)(users_1.UserRole.SALES), invoice_controller_1.InvoiceController.cancelInvoice);
 exports.default = router;

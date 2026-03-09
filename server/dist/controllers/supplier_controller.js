@@ -25,6 +25,7 @@ const database_1 = require("../config/database");
 const suppliers_1 = require("../models/suppliers");
 const supplier_items_1 = require("../models/supplier_items");
 const typeorm_1 = require("typeorm");
+const items_1 = require("../models/items");
 const getAllSuppliers = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const supplierRepo = database_1.AppDataSource.getRepository(suppliers_1.Supplier);
@@ -169,14 +170,31 @@ exports.deleteSupplier = deleteSupplier;
 const getSupplierItems = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { id } = req.params;
+        const supplierId = Number(id);
         const supplierItemRepo = database_1.AppDataSource.getRepository(supplier_items_1.SupplierItem);
+        const itemRepo = database_1.AppDataSource.getRepository(items_1.Item);
+        // Fetch items from the junction table
         const supplierItems = yield supplierItemRepo.find({
-            where: { supplier_id: Number(id) },
+            where: { supplier_id: supplierId },
             relations: ["item"]
         });
-        const items = supplierItems
-            .filter((si) => si.item)
-            .map((si) => si.item);
+        // Fetch items from the main Item table where supplier_id matches
+        const itemsFromMainTable = yield itemRepo.find({
+            where: { supplier_id: supplierId }
+        });
+        // Use a Map to deduplicate items by their ID
+        const itemMap = new Map();
+        // Add items from the junction table
+        supplierItems.forEach(si => {
+            if (si.item) {
+                itemMap.set(si.item.id, si.item);
+            }
+        });
+        // Add items from the main Item table (overwriting if already present)
+        itemsFromMainTable.forEach(item => {
+            itemMap.set(item.id, item);
+        });
+        const items = Array.from(itemMap.values());
         res.status(200).json({
             success: true,
             data: items,

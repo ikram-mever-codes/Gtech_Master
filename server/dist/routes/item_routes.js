@@ -23,6 +23,7 @@ const router = express_1.default.Router();
 router.use(authorized_1.authenticateUser);
 router.use((0, authorized_1.authorize)(users_1.UserRole.ADMIN, users_1.UserRole.SALES, users_1.UserRole.PURCHASING));
 router.get("/", items_controller_1.getItems);
+router.get("/export/csv", items_controller_1.exportItemsToCSV);
 router.get("/:id", items_controller_1.getItemById);
 router.post("/", items_controller_1.createItem);
 router.put("/:id", items_controller_1.updateItem);
@@ -42,7 +43,9 @@ router.get("/parents/simple", (req, res) => __awaiter(void 0, void 0, void 0, fu
     }
     catch (error) {
         console.error(error);
-        res.status(500).json({ success: false, message: "Failed to fetch parents" });
+        res
+            .status(500)
+            .json({ success: false, message: "Failed to fetch parents" });
     }
 }));
 router.get("/parents/items", items_controller_1.getParents);

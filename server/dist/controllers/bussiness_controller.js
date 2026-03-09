@@ -334,7 +334,6 @@ const bulkImportBusinesses = (req, res, next) => __awaiter(void 0, void 0, void 
                     try {
                         const savedChunk = yield customerRepository.save(chunk);
                         savedCustomers.push(...savedChunk);
-                        // Add saved businesses to results
                         savedChunk.forEach((customer) => {
                             var _a;
                             results.importedBusinesses.push({
@@ -437,28 +436,11 @@ const generateTempPassword = () => {
 const createBusiness = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b, _c, _d, _e, _f;
     try {
-        const { 
-        // Names from frontend - PROPER MAPPING
-        displayName, // Frontend display name -> maps to DB companyName (what customers see)
-        companyName, // Frontend legal name -> maps to DB legalName (legal registered name)
-        name, // Legacy support
-        // Address fields
-        address, website, description, city, state, country = "Germany", postalCode, latitude, longitude, 
-        // Contact fields
-        phoneNumber, email, contactEmail, contactPhoneNumber, 
-        // Business metadata
-        googleMapsUrl, reviewCount, category, additionalCategories, socialMedia, source = exports.BUSINESS_SOURCE.MANUAL, isDeviceMaker, starBusinessDetails, 
-        // Star Customer specific fields
-        isStarCustomer, starCustomerEmail, } = req.body;
-        // Get current user from request
+        const { displayName, companyName, name, address, website, description, city, state, country = "Germany", postalCode, latitude, longitude, phoneNumber, email, contactEmail, contactPhoneNumber, googleMapsUrl, reviewCount, category, additionalCategories, socialMedia, source = exports.BUSINESS_SOURCE.MANUAL, isDeviceMaker, starBusinessDetails, isStarCustomer, starCustomerEmail, } = req.body;
         const user = req.user;
-        // FIELD MAPPING: Frontend to Database
-        // displayName (frontend) -> companyName (DB) - this is what customers see
-        const dbCompanyName = displayName || name; // fallback to name for backward compatibility
-        // companyName (frontend) -> legalName (DB) - this is the legal registered name
+        const dbCompanyName = displayName || name;
         const dbLegalName = companyName;
         const finalEmail = email;
-        // Required field validation
         if (!dbCompanyName) {
             return next(new errorHandler_1.default("Business display name is required", 400));
         }
@@ -477,7 +459,6 @@ const createBusiness = (req, res, next) => __awaiter(void 0, void 0, void 0, fun
         if (!isDeviceMaker || !["Yes", "No", "Unsure"].includes(isDeviceMaker)) {
             return next(new errorHandler_1.default("Please specify if this is a device maker (Yes/No/Unsure)", 400));
         }
-        // Star Customer validation
         if (isStarCustomer && isDeviceMaker !== "Yes") {
             return next(new errorHandler_1.default("Star Customer can only be created when device maker is Yes", 400));
         }
@@ -489,9 +470,7 @@ const createBusiness = (req, res, next) => __awaiter(void 0, void 0, void 0, fun
         const starBusinessDetailsRepository = database_1.AppDataSource.getRepository(star_business_details_1.StarBusinessDetails);
         const starCustomerDetailsRepository = database_1.AppDataSource.getRepository(star_customer_details_1.StarCustomerDetails);
         const listRepository = database_1.AppDataSource.getRepository(list_1.List);
-        // Normalize website for comparison
         const normalizedWebsite = website ? normalizeWebsite(website) : null;
-        // Check for duplicate website
         if (normalizedWebsite) {
             const existingBusinessWithWebsite = yield businessDetailsRepository
                 .createQueryBuilder("businessDetails")
@@ -504,7 +483,6 @@ const createBusiness = (req, res, next) => __awaiter(void 0, void 0, void 0, fun
                 return next(new errorHandler_1.default("A business with this website already exists", 400));
             }
         }
-        // Check for duplicate display name (stored in companyName field)
         const trimmedDisplayName = dbCompanyName.trim();
         const existingCustomerWithName = yield customerRepository
             .createQueryBuilder("customer")
@@ -515,7 +493,6 @@ const createBusiness = (req, res, next) => __awaiter(void 0, void 0, void 0, fun
         if (existingCustomerWithName) {
             return next(new errorHandler_1.default("A business with this display name already exists", 400));
         }
-        // Check for duplicate email
         const emailToCheck = isStarCustomer ? starCustomerEmail : finalEmail;
         if (emailToCheck) {
             const existingCustomerWithEmail = yield customerRepository.findOne({
@@ -525,27 +502,19 @@ const createBusiness = (req, res, next) => __awaiter(void 0, void 0, void 0, fun
                 return next(new errorHandler_1.default("A business with this email already exists", 400));
             }
         }
-        // AUTOMATIC STAGE DETERMINATION LOGIC
-        // Check if conditions are met for automatic star_business stage
         const shouldBeStarBusiness = isDeviceMaker === "Yes" &&
             (starBusinessDetails === null || starBusinessDetails === void 0 ? void 0 : starBusinessDetails.inSeries) === true &&
             (starBusinessDetails === null || starBusinessDetails === void 0 ? void 0 : starBusinessDetails.madeIn);
-        // Use transaction to ensure all entities are created together
         const result = yield database_1.AppDataSource.transaction((transactionalEntityManager) => __awaiter(void 0, void 0, void 0, function* () {
-            // Create Customer entity with PROPER FIELD MAPPING
             const customer = new customers_1.Customer();
-            // IMPORTANT: displayName from frontend goes to companyName in DB
             customer.companyName = trimmedDisplayName;
-            // IMPORTANT: companyName from frontend goes to legalName in DB
             customer.legalName = dbLegalName ? dbLegalName.trim() : undefined;
-            // Set customer stage and email - UPDATED LOGIC
             if (isStarCustomer) {
                 customer.stage = "star_customer";
                 customer.email = starCustomerEmail.trim().toLowerCase();
                 customer.contactEmail = starCustomerEmail.trim().toLowerCase();
             }
             else if (shouldBeStarBusiness) {
-                // AUTOMATIC PROMOTION TO STAR BUSINESS
                 customer.stage = "star_business";
                 customer.email = finalEmail
                     ? finalEmail.trim().toLowerCase()
@@ -583,9 +552,7 @@ const createBusiness = (req, res, next) => __awaiter(void 0, void 0, void 0, fun
                 : phoneNumber
                     ? phoneNumber.trim()
                     : undefined;
-            // Save customer first
             const savedCustomer = yield transactionalEntityManager.save(customers_1.Customer, customer);
-            // Create BusinessDetails
             const businessDetails = new business_details_1.BusinessDetails();
             businessDetails.businessSource = source;
             businessDetails.isDeviceMaker = isDeviceMaker;
@@ -629,22 +596,18 @@ const createBusiness = (req, res, next) => __awaiter(void 0, void 0, void 0, fun
                 const savedStarBusiness = yield transactionalEntityManager.save(star_business_details_1.StarBusinessDetails, starBusiness);
                 savedCustomer.starBusinessDetails = savedStarBusiness;
             }
-            // Create StarCustomerDetails if this is a star customer
             let tempPassword;
             let defaultList;
             if (isStarCustomer) {
                 const starCustomer = new star_customer_details_1.StarCustomerDetails();
-                // Generate temporary password
                 tempPassword = generateTempPassword();
                 starCustomer.password = yield bcryptjs_1.default.hash(tempPassword, 10);
-                // Set delivery address from business details
                 starCustomer.deliveryPostalCode = businessDetails.postalCode || "";
                 starCustomer.deliveryCity = businessDetails.city || "";
                 starCustomer.deliveryCountry = businessDetails.country || "Germany";
                 starCustomer.customer = savedCustomer;
                 const savedStarCustomer = yield transactionalEntityManager.save(star_customer_details_1.StarCustomerDetails, starCustomer);
                 savedCustomer.starCustomerDetails = savedStarCustomer;
-                // Create default list for star customer
                 defaultList = new list_1.List();
                 defaultList.name = `Default`;
                 defaultList.description = `Default list for ${savedCustomer.companyName}`;
@@ -652,7 +615,6 @@ const createBusiness = (req, res, next) => __awaiter(void 0, void 0, void 0, fun
                 defaultList.status = list_1.LIST_STATUS.ACTIVE;
                 defaultList = yield transactionalEntityManager.save(list_1.List, defaultList);
             }
-            // Update customer with relationships
             savedCustomer.businessDetails = savedBusinessDetails;
             yield transactionalEntityManager.save(customers_1.Customer, savedCustomer);
             return {
@@ -660,11 +622,10 @@ const createBusiness = (req, res, next) => __awaiter(void 0, void 0, void 0, fun
                 businessDetails: savedBusinessDetails,
                 tempPassword,
                 defaultList,
-                shouldBeStarBusiness, // Return this flag for response message
+                shouldBeStarBusiness,
             };
         }));
         const { customer, businessDetails, tempPassword, defaultList } = result;
-        // Send email if this is a star customer - USING ALISHA'S PROPOSED TEXT
         if (isStarCustomer && tempPassword) {
             const loginLink = `${process.env.STAR_URL}/login`;
             const portalLink = "https://stars.gtech.de/potis";
@@ -691,7 +652,6 @@ const createBusiness = (req, res, next) => __awaiter(void 0, void 0, void 0, fun
                 html: message,
             });
         }
-        // Fetch complete customer with all relations
         const finalCustomer = yield customerRepository.findOne({
             where: { id: customer.id },
             relations: [
@@ -704,16 +664,7 @@ const createBusiness = (req, res, next) => __awaiter(void 0, void 0, void 0, fun
         if (!finalCustomer) {
             return next(new errorHandler_1.default("Business not found after creation", 404));
         }
-        // RETURN RESPONSE WITH PROPER FIELD MAPPING
-        const businessResponse = Object.assign(Object.assign({ id: finalCustomer.id, 
-            // IMPORTANT: Map DB fields back to frontend expected fields
-            displayName: finalCustomer.companyName, companyName: finalCustomer.legalName, 
-            // Legacy field support
-            name: finalCustomer.companyName, legalName: finalCustomer.legalName, 
-            // Contact information
-            email: finalCustomer.email, contactEmail: finalCustomer.contactEmail, contactPhoneNumber: finalCustomer.contactPhoneNumber, stage: finalCustomer.stage }, finalCustomer.businessDetails), { 
-            // Star business details if present
-            starBusinessDetails: finalCustomer.starBusinessDetails
+        const businessResponse = Object.assign(Object.assign({ id: finalCustomer.id, displayName: finalCustomer.companyName, companyName: finalCustomer.legalName, name: finalCustomer.companyName, legalName: finalCustomer.legalName, email: finalCustomer.email, contactEmail: finalCustomer.contactEmail, contactPhoneNumber: finalCustomer.contactPhoneNumber, stage: finalCustomer.stage }, finalCustomer.businessDetails), { starBusinessDetails: finalCustomer.starBusinessDetails
                 ? {
                     inSeries: finalCustomer.starBusinessDetails.inSeries,
                     madeIn: finalCustomer.starBusinessDetails.madeIn,
@@ -728,16 +679,12 @@ const createBusiness = (req, res, next) => __awaiter(void 0, void 0, void 0, fun
                         }
                         : undefined,
                 }
-                : undefined, 
-            // Default list if created
-            defaultList: defaultList
+                : undefined, defaultList: defaultList
                 ? {
                     id: defaultList.id,
                     name: defaultList.name,
                 }
-                : undefined, 
-            // Backward compatibility fields
-            website: (_a = finalCustomer.businessDetails) === null || _a === void 0 ? void 0 : _a.website, hasWebsite: !!((_b = finalCustomer.businessDetails) === null || _b === void 0 ? void 0 : _b.website), phoneNumber: (_c = finalCustomer.businessDetails) === null || _c === void 0 ? void 0 : _c.contactPhone, businessEmail: (_d = finalCustomer.businessDetails) === null || _d === void 0 ? void 0 : _d.email, status: exports.BUSINESS_STATUS.ACTIVE, source: (_e = finalCustomer.businessDetails) === null || _e === void 0 ? void 0 : _e.businessSource, isDeviceMaker: (_f = finalCustomer.businessDetails) === null || _f === void 0 ? void 0 : _f.isDeviceMaker, isStarCustomer: !!finalCustomer.starCustomerDetails, createdAt: finalCustomer.createdAt, updatedAt: finalCustomer.updatedAt });
+                : undefined, website: (_a = finalCustomer.businessDetails) === null || _a === void 0 ? void 0 : _a.website, hasWebsite: !!((_b = finalCustomer.businessDetails) === null || _b === void 0 ? void 0 : _b.website), phoneNumber: (_c = finalCustomer.businessDetails) === null || _c === void 0 ? void 0 : _c.contactPhone, businessEmail: (_d = finalCustomer.businessDetails) === null || _d === void 0 ? void 0 : _d.email, status: exports.BUSINESS_STATUS.ACTIVE, source: (_e = finalCustomer.businessDetails) === null || _e === void 0 ? void 0 : _e.businessSource, isDeviceMaker: (_f = finalCustomer.businessDetails) === null || _f === void 0 ? void 0 : _f.isDeviceMaker, isStarCustomer: !!finalCustomer.starCustomerDetails, createdAt: finalCustomer.createdAt, updatedAt: finalCustomer.updatedAt });
         let successMessage = "Business created successfully";
         if (isStarCustomer) {
             successMessage =
@@ -774,7 +721,6 @@ const updateBusiness = (req, res, next) => __awaiter(void 0, void 0, void 0, fun
         const starBusinessDetailsRepository = database_1.AppDataSource.getRepository(star_business_details_1.StarBusinessDetails);
         const starCustomerDetailsRepository = database_1.AppDataSource.getRepository(star_customer_details_1.StarCustomerDetails);
         const listRepository = database_1.AppDataSource.getRepository(list_1.List);
-        // Fetch existing customer with all relations
         const customer = yield customerRepository.findOne({
             where: { id },
             relations: [
@@ -788,18 +734,13 @@ const updateBusiness = (req, res, next) => __awaiter(void 0, void 0, void 0, fun
         if (!customer) {
             return next(new errorHandler_1.default("Business not found", 404));
         }
-        // Check if device maker status is changing
         const currentIsDeviceMaker = (_a = customer.businessDetails) === null || _a === void 0 ? void 0 : _a.isDeviceMaker;
         const isDeviceMakerChanged = isDeviceMaker !== undefined && isDeviceMaker !== currentIsDeviceMaker;
-        // Check if star customer status is changing
         const currentIsStarCustomer = !!customer.starCustomerDetails;
         const isStarCustomerChanged = isStarCustomer !== undefined && isStarCustomer !== currentIsStarCustomer;
-        // AUTOMATIC STAGE DETERMINATION LOGIC FOR UPDATE
-        // Check if conditions are met for automatic star_business stage
         const shouldBeStarBusiness = (isDeviceMaker === "Yes" || currentIsDeviceMaker === "Yes") &&
             (starBusinessDetails === null || starBusinessDetails === void 0 ? void 0 : starBusinessDetails.inSeries) === true &&
             (starBusinessDetails === null || starBusinessDetails === void 0 ? void 0 : starBusinessDetails.madeIn);
-        // Validate star customer requirements
         if (isStarCustomer &&
             isDeviceMaker !== "Yes" &&
             ((_b = customer.businessDetails) === null || _b === void 0 ? void 0 : _b.isDeviceMaker) !== "Yes") {
@@ -808,7 +749,6 @@ const updateBusiness = (req, res, next) => __awaiter(void 0, void 0, void 0, fun
         if (isStarCustomer && !currentIsStarCustomer && !starCustomerEmail) {
             return next(new errorHandler_1.default("Email is required for Star Customer account", 400));
         }
-        // Check for duplicate email if updating
         const emailToCheck = isStarCustomer ? starCustomerEmail : updateData.email;
         if (emailToCheck && emailToCheck !== customer.email) {
             const existingCustomer = yield customerRepository.findOne({
@@ -818,16 +758,12 @@ const updateBusiness = (req, res, next) => __awaiter(void 0, void 0, void 0, fun
                 return next(new errorHandler_1.default("A business with this email already exists", 400));
             }
         }
-        // Update in transaction
         const result = yield database_1.AppDataSource.transaction((transactionalEntityManager) => __awaiter(void 0, void 0, void 0, function* () {
             var _a;
-            // Update Customer entity with PROPER FIELD MAPPING
             if (displayName !== undefined) {
-                // IMPORTANT: displayName from frontend goes to companyName in DB
                 customer.companyName = displayName.trim();
             }
             if (name !== undefined) {
-                // IMPORTANT: companyName from frontend goes to legalName in DB
                 customer.legalName = name.trim();
             }
             if (contactEmail !== undefined) {
@@ -836,10 +772,8 @@ const updateBusiness = (req, res, next) => __awaiter(void 0, void 0, void 0, fun
             if (contactPhoneNumber !== undefined) {
                 customer.contactPhoneNumber = contactPhoneNumber.trim();
             }
-            // Update BusinessDetails
             if (customer.businessDetails) {
                 const businessDetails = customer.businessDetails;
-                // Update fields from updateData
                 if (updateData.address !== undefined)
                     businessDetails.address = updateData.address.trim();
                 if (updateData.website !== undefined) {
@@ -1280,6 +1214,7 @@ const getAllBusinesses = (req, res, next) => __awaiter(void 0, void 0, void 0, f
             success: true,
             data: {
                 businesses,
+                customers: businesses,
                 pagination: {
                     page: pageNum,
                     limit: limitNum,

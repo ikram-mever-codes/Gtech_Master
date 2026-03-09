@@ -1831,11 +1831,12 @@ const syncTaricToMIS = async (
     if (operation === "create") {
       const query = `
         INSERT INTO tarics   
-        (code, reguler_artikel, duty_rate, name_de, description_de, name_en, description_en, name_cn, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (id, code, reguler_artikel, duty_rate, name_de, description_de, name_en, description_en, name_cn, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `;
 
       await connection.execute(query, [
+        convertUndefinedToNull(taricData.id),
         convertUndefinedToNull(taricData.code),
         convertUndefinedToNull(taricData.reguler_artikel) || "Y",
         convertUndefinedToNull(taricData.duty_rate) || 0,
@@ -1849,7 +1850,7 @@ const syncTaricToMIS = async (
       ]);
     } else if (operation === "update") {
       const query = `
-        UPDATE taric SET
+        UPDATE tarics SET
           code = ?,
           reguler_artikel = ?,
           duty_rate = ?,
@@ -1881,7 +1882,8 @@ const syncTaricToMIS = async (
     }
   } catch (error: any) {
     console.error("Error syncing to MIS database:", error);
-    throw new Error(`Failed to sync TARIC to MIS: ${error.message}`);
+    const errorMessage = error?.message || error?.code || JSON.stringify(error) || "Unknown MySQL error";
+    throw new Error(`Failed to sync TARIC to MIS: ${errorMessage}`);
   } finally {
     if (connection) {
       connection.release();

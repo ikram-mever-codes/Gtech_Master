@@ -24,8 +24,92 @@ exports.getCargoOrders = exports.removeOrderFromCargo = exports.assignOrdersToCa
 const database_1 = require("../config/database");
 const cargos_1 = require("../models/cargos");
 const cargo_orders_1 = require("../models/cargo_orders");
+const orders_1 = require("../models/orders");
 const order_items_1 = require("../models/order_items");
+const invoice_1 = require("../models/invoice");
+const customers_1 = require("../models/customers");
 const typeorm_1 = require("typeorm");
+const generateInvoicesForOrders = (orderIds) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b, _c, _d, _e, _f, _g, _h;
+    if (!orderIds || orderIds.length === 0)
+        return;
+    try {
+        const orderRepo = database_1.AppDataSource.getRepository(orders_1.Order);
+        const orderItemRepo = database_1.AppDataSource.getRepository(order_items_1.OrderItem);
+        const invoiceRepo = database_1.AppDataSource.getRepository(invoice_1.Invoice);
+        const invoiceItemRepo = database_1.AppDataSource.getRepository(invoice_1.InvoiceItem);
+        const customerRepo = database_1.AppDataSource.getRepository(customers_1.Customer);
+        for (const orderId of orderIds) {
+            const order = yield orderRepo.findOne({ where: { id: orderId } });
+            if (!order) {
+                console.warn(`[Invoice] Order ${orderId} not found, skipping.`);
+                continue;
+            }
+            const existingInvoice = yield invoiceRepo.findOne({ where: { orderNumber: order.order_no } });
+            if (existingInvoice) {
+                yield invoiceItemRepo.delete({ invoice: { id: existingInvoice.id } });
+                yield invoiceRepo.remove(existingInvoice);
+            }
+            let customer = null;
+            if (order.customer_id) {
+                customer = yield customerRepo.findOne({ where: { id: order.customer_id } });
+                if (!customer) {
+                    console.warn(`[Invoice] customer_id=${order.customer_id} not found in DB for order ${order.order_no}, proceeding without customer.`);
+                }
+            }
+            else {
+                console.info(`[Invoice] Order ${order.order_no} has no customer_id (ETL order), creating invoice without customer.`);
+            }
+            const orderItems = yield orderItemRepo.find({
+                where: { order_id: order.id },
+                relations: ["item", "item.taric"]
+            });
+            if (orderItems.length === 0) {
+                console.warn(`[Invoice] Order ${order.order_no} has no items, skipping.`);
+                continue;
+            }
+            let netTotal = 0;
+            let taxAmount = 0;
+            let grossTotal = 0;
+            const invoice = invoiceRepo.create(Object.assign(Object.assign({ invoiceNumber: `INV-${Date.now().toString().slice(-6)}-${order.id}`, orderNumber: order.order_no, invoiceDate: new Date(), deliveryDate: order.date_delivery ? new Date(order.date_delivery) : new Date(), netTotal: 0, taxAmount: 0, grossTotal: 0, paidAmount: 0, outstandingAmount: 0, paymentMethod: "Bank Transfer", shippingMethod: "Standard" }, (customer ? { customer } : {})), { status: "draft" }));
+            const savedInvoice = yield invoiceRepo.save(invoice);
+            const invoiceItemEntities = [];
+            for (const oi of orderItems) {
+                const quantity = oi.qty || 1;
+                const unitPrice = oi.price || oi.rmb_special_price || 0;
+                const netPrice = quantity * unitPrice;
+                const itemTaxRate = ((_b = (_a = oi.item) === null || _a === void 0 ? void 0 : _a.taric) === null || _b === void 0 ? void 0 : _b.duty_rate) ? Number(oi.item.taric.duty_rate) : 19;
+                const itemTax = (netPrice * itemTaxRate) / 100;
+                const grossPrice = netPrice + itemTax;
+                netTotal += netPrice;
+                taxAmount += itemTax;
+                grossTotal += grossPrice;
+                const invItem = invoiceItemRepo.create({
+                    quantity,
+                    articleNumber: ((_d = (_c = oi.item) === null || _c === void 0 ? void 0 : _c.ean) === null || _d === void 0 ? void 0 : _d.toString()) || ((_e = oi.item) === null || _e === void 0 ? void 0 : _e.model) || ((_g = (_f = oi.item) === null || _f === void 0 ? void 0 : _f.ItemID_DE) === null || _g === void 0 ? void 0 : _g.toString()) || "Unknown",
+                    description: ((_h = oi.item) === null || _h === void 0 ? void 0 : _h.item_name) || "Unknown Item",
+                    unitPrice,
+                    netPrice,
+                    taxRate: itemTaxRate,
+                    taxAmount: itemTax,
+                    grossPrice,
+                    invoice: savedInvoice,
+                });
+                invoiceItemEntities.push(invItem);
+            }
+            yield invoiceItemRepo.save(invoiceItemEntities);
+            savedInvoice.netTotal = netTotal;
+            savedInvoice.taxAmount = taxAmount;
+            savedInvoice.grossTotal = grossTotal;
+            savedInvoice.outstandingAmount = grossTotal;
+            yield invoiceRepo.save(savedInvoice);
+            console.log(`[Invoice] Created invoice ${savedInvoice.invoiceNumber} for order ${order.order_no}${customer ? '' : ' (no customer)'}`);
+        }
+    }
+    catch (e) {
+        console.error("Failed to generate invoices for orders", e);
+    }
+});
 const getAllCargos = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const cargoRepo = database_1.AppDataSource.getRepository(cargos_1.Cargo);
@@ -108,6 +192,7 @@ const createCargo = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
                 order_id: orderId,
             }));
             yield cargoOrderRepo.save(cargoOrderEntries);
+            yield generateInvoicesForOrders(orders);
         }
         res.status(201).json({
             success: true,
@@ -147,6 +232,7 @@ const updateCargo = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
                     order_id: orderId,
                 }));
                 yield cargoOrderRepo.save(cargoOrderEntries);
+                yield generateInvoicesForOrders(orders);
             }
         }
         res.status(200).json({
@@ -193,8 +279,9 @@ const assignOrdersToCargo = (req, res, next) => __awaiter(void 0, void 0, void 0
     try {
         const { id } = req.params;
         const { orderIds } = req.body;
-        if (!Array.isArray(orderIds) || orderIds.length === 0) {
-            res.status(400).json({ success: false, message: "orderIds array is required" });
+        const validOrderIds = orderIds.filter(id => Boolean(id) && !isNaN(Number(id))).map(id => Number(id));
+        if (validOrderIds.length === 0) {
+            res.status(400).json({ success: false, message: "No valid orderIds provided" });
             return;
         }
         const cargoRepo = database_1.AppDataSource.getRepository(cargos_1.Cargo);
@@ -215,6 +302,16 @@ const assignOrdersToCargo = (req, res, next) => __awaiter(void 0, void 0, void 0
         if (newEntries.length > 0) {
             yield cargoOrderRepo.save(newEntries);
         }
+        const orderItemRepo = database_1.AppDataSource.getRepository(order_items_1.OrderItem);
+        if (validOrderIds.length > 0) {
+            yield orderItemRepo
+                .createQueryBuilder()
+                .update(order_items_1.OrderItem)
+                .set({ cargo_id: cargo.id })
+                .where("order_id IN (:...validOrderIds)", { validOrderIds })
+                .execute();
+        }
+        yield generateInvoicesForOrders(validOrderIds);
         res.status(200).json({
             success: true,
             message: `Assigned ${newEntries.length} order(s) to cargo`,
@@ -258,7 +355,6 @@ const getCargoOrders = (req, res, next) => __awaiter(void 0, void 0, void 0, fun
             where: { cargo_id: Number(id) },
             relations: ["order"],
         });
-        // Get order items for these orders
         const orderIds = cargoOrders.map((co) => co.order_id);
         let orderItems = [];
         if (orderIds.length > 0) {
