@@ -41,7 +41,7 @@ const createSupplierOrder = (req, res, next) => __awaiter(void 0, void 0, void 0
             updated_at: new Date(),
         });
         yield supplierOrderRepo.save(supplierOrder);
-        yield orderItemsRepo.update({ id: (0, typeorm_1.In)(item_ids.map(Number)) }, { supplier_order_id: supplierOrder.id });
+        yield orderItemsRepo.update({ id: (0, typeorm_1.In)(item_ids.map(Number)) }, { supplier_order_id: supplierOrder.id, status: "SO" });
         yield queryRunner.commitTransaction();
         return res.status(201).json({
             success: true,

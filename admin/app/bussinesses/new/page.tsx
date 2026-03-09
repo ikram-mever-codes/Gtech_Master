@@ -68,7 +68,6 @@ interface ExtendedBusinessCreatePayload extends BusinessCreatePayload {
   check_timestamp?: string;
 }
 
-// Interface for list data
 interface CustomerList {
   id: string;
   name: string;
@@ -94,7 +93,6 @@ const AddEditBusinessManual: React.FC = () => {
   const [isStarBusinessOpen, setIsStarBusinessOpen] = useState(false);
   const [isStarCustomer, setIsStarCustomer] = useState(false);
 
-  // New state for lists management
   const [customerLists, setCustomerLists] = useState<CustomerList[]>([]);
   const [loadingLists, setLoadingLists] = useState(false);
   const [expandedLists, setExpandedLists] = useState<Set<string>>(new Set());
@@ -152,7 +150,6 @@ const AddEditBusinessManual: React.FC = () => {
     },
   });
 
-  // Auto-open sections in view mode
   useEffect(() => {
     if (isViewMode) {
       setIsExtraInfoOpen(true);
@@ -162,12 +159,10 @@ const AddEditBusinessManual: React.FC = () => {
     }
   }, [isViewMode, formData.isDeviceMaker, formData.starBusinessDetails]);
 
-  // Auto-open Star Business Details when device maker is Yes (edit mode)
   useEffect(() => {
     if (!isViewMode && formData.isDeviceMaker === "Yes") {
       setIsStarBusinessOpen(true);
     } else if (!isViewMode) {
-      // Reset star customer when device maker is not Yes
       setIsStarCustomer(false);
       setFormData((prev) => ({
         ...prev,
@@ -177,19 +172,15 @@ const AddEditBusinessManual: React.FC = () => {
     }
   }, [formData.isDeviceMaker, isViewMode]);
 
-  // Update formData when star customer toggle changes
   useEffect(() => {
     setFormData((prev) => ({ ...prev, isStarCustomer: isStarCustomer }));
   }, [isStarCustomer]);
-
-  // Fetch business data if in edit or view mode
   useEffect(() => {
     if ((isEditMode || isViewMode) && businessId) {
       fetchBusinessData();
     }
   }, [businessId, isEditMode, isViewMode]);
 
-  // Fetch customer lists when business is a star customer
   useEffect(() => {
     if ((isEditMode || isViewMode) && businessId && isStarCustomer) {
       fetchCustomerLists();
@@ -201,11 +192,9 @@ const AddEditBusinessManual: React.FC = () => {
       setIsLoading(true);
       const businessData = await getBusinessById(businessId);
 
-      // Check if this is a star customer
       const isStarCustomerBusiness = businessData.stage === "star_customer";
       setIsStarCustomer(isStarCustomerBusiness);
 
-      // Map the business data to form structure
       setFormData({
         name: businessData.companyName || businessData.name || "",
         address:
@@ -289,7 +278,6 @@ const AddEditBusinessManual: React.FC = () => {
         },
       });
 
-      // Auto-open sections if there's data (for edit mode)
       if (!isViewMode) {
         if (
           businessData.businessDetails?.description ||
@@ -299,7 +287,6 @@ const AddEditBusinessManual: React.FC = () => {
           setIsExtraInfoOpen(true);
         }
 
-        // Auto-open Star Business Details if it's a device maker with star details
         if (
           businessData.isDeviceMaker === "Yes" &&
           businessData.starBusinessDetails
@@ -322,7 +309,6 @@ const AddEditBusinessManual: React.FC = () => {
       const lists = await getCustomerLists(businessId);
       setCustomerLists(lists);
 
-      // Auto-open lists section if there are lists
       if (lists.length > 0) {
         setIsListsSectionOpen(true);
       }
@@ -347,10 +333,8 @@ const AddEditBusinessManual: React.FC = () => {
       await deleteList(listId);
       toast.success(`List "${listName}" deleted successfully`);
 
-      // Remove the list from local state
       setCustomerLists((prev) => prev.filter((list) => list.id !== listId));
 
-      // Remove from expanded lists if it was expanded
       const newExpanded = new Set(expandedLists);
       newExpanded.delete(listId);
       setExpandedLists(newExpanded);
@@ -419,7 +403,6 @@ const AddEditBusinessManual: React.FC = () => {
   const validateForm = (): boolean => {
     const errors: FormErrors = {};
 
-    // Required fields validation
     if (!formData.name || !formData.name.trim()) {
       errors.name = "Customer name is required";
     }
@@ -430,7 +413,6 @@ const AddEditBusinessManual: React.FC = () => {
       errors.city = "City is required";
     }
 
-    // Check website
     if (!formData.website || !formData.website.trim()) {
       errors.website = "Website is required";
     } else if (!isValidUrl(formData.website.trim())) {
@@ -449,7 +431,6 @@ const AddEditBusinessManual: React.FC = () => {
       errors.isDeviceMaker = "Please select if this is a device maker";
     }
 
-    // Star Customer email validation
     if (isStarCustomer) {
       if (!formData.starCustomerEmail || !formData.starCustomerEmail.trim()) {
         errors.starCustomerEmail = "Email is required for Star Customer";
@@ -458,7 +439,6 @@ const AddEditBusinessManual: React.FC = () => {
       }
     }
 
-    // Optional fields validation
     if (
       formData.email &&
       formData.email.trim() &&
@@ -597,19 +577,16 @@ const AddEditBusinessManual: React.FC = () => {
 
     setIsSubmitting(true);
     try {
-      // Clean up the data before submission
       const cleanedData: BusinessCreatePayload = {
         ...formData,
         latitude: formData.latitude || undefined,
         longitude: formData.longitude || undefined,
         reviewCount: formData.reviewCount || undefined,
         averageRating: formData.averageRating || undefined,
-        // Include star business details only if device maker is Yes
         starBusinessDetails:
           formData.isDeviceMaker === "Yes"
             ? formData.starBusinessDetails
             : undefined,
-        // Include star customer info
         isStarCustomer: isStarCustomer,
         starCustomerEmail: isStarCustomer
           ? formData.starCustomerEmail
@@ -622,7 +599,6 @@ const AddEditBusinessManual: React.FC = () => {
         const response = await createBusiness(cleanedData);
         handleReset();
         if (response?.id) {
-          // Optionally redirect to the business page
         } else {
           window.scrollTo({ top: 0, behavior: "smooth" });
         }
@@ -697,13 +673,10 @@ const AddEditBusinessManual: React.FC = () => {
   };
 
   const handleEditClick = () => {
-    // Remove view parameter and redirect to edit mode
     const newParams = new URLSearchParams(params.toString());
     newParams.delete("view");
     router.push(`/bussinesses/new?businessId=${businessId}`);
   };
-
-  // Helper function to format date and time
   const formatDateTime = (dateString: string | undefined) => {
     if (!dateString) return "-";
     const date = new Date(dateString);
@@ -716,7 +689,6 @@ const AddEditBusinessManual: React.FC = () => {
     });
   };
 
-  // Updated Helper function to render form fields based on view/edit mode
   const renderField = (
     label: string,
     value: any,
@@ -730,14 +702,12 @@ const AddEditBusinessManual: React.FC = () => {
     customOnChange?: (field: string, value: any) => void
   ) => {
     if (isViewMode || readOnly) {
-      // Determine display value for view mode
       let displayValue = "-";
       if (selectOptions) {
         if (Array.isArray(selectOptions) && selectOptions.length > 0) {
           if (typeof selectOptions[0] === "string") {
             displayValue = value || "-";
           } else {
-            // It's an array of objects
             const found: any = selectOptions.find(
               (opt: any) => opt.value === value
             );
@@ -771,14 +741,12 @@ const AddEditBusinessManual: React.FC = () => {
       );
     }
 
-    // Edit/Create mode rendering
     if (selectOptions) {
       const isStringArray =
         Array.isArray(selectOptions) &&
         selectOptions.length > 0 &&
         typeof selectOptions[0] === "string";
 
-      // Use custom onChange if provided, otherwise use handleInputChange
       const onChangeHandler = customOnChange || handleInputChange;
 
       return (
@@ -896,7 +864,6 @@ const AddEditBusinessManual: React.FC = () => {
             </div>
           </div>
           <div className="flex items-center gap-4">
-            {/* Edit Button in View Mode */}
             {isViewMode && (
               <CustomButton
                 variant="contained"
@@ -906,9 +873,6 @@ const AddEditBusinessManual: React.FC = () => {
                 Edit Business
               </CustomButton>
             )}
-            {/* Star Customer Toggle - Only show when device maker is Yes and not in view mode */}
-
-            {/* Show Star Customer Badge in View Mode */}
             {isViewMode && isStarCustomer && (
               <div className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-yellow-50 to-orange-50 rounded-lg border border-yellow-200">
                 <StarIcon className="w-5 h-5 text-yellow-600" />
@@ -931,9 +895,7 @@ const AddEditBusinessManual: React.FC = () => {
           </div>
         </div>
 
-        {/* Form Content */}
         <form onSubmit={handleSubmit} className="space-y-8">
-          {/* Required Fields Section */}
           <div className={`rounded-xl ${isViewMode ? "" : "p-8"}`}>
             <div className="flex items-center gap-3 mb-6">
               <ExclamationTriangleIcon className="w-6 h-6" />
@@ -1117,8 +1079,8 @@ const AddEditBusinessManual: React.FC = () => {
 
               <div
                 className={`overflow-hidden transition-all duration-300 ${isStarBusinessOpen || isViewMode
-                    ? "max-h-[1500px]"
-                    : "max-h-0"
+                  ? "max-h-[1500px]"
+                  : "max-h-0"
                   }`}
               >
                 <div
@@ -1176,8 +1138,8 @@ const AddEditBusinessManual: React.FC = () => {
                             handleStarBusinessChange("device", e.target.value)
                           }
                           className={`w-full pl-10 pr-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all ${formErrors["starBusinessDetails.device"]
-                              ? "border-red-500"
-                              : "border-gray-200"
+                            ? "border-red-500"
+                            : "border-gray-200"
                             }`}
                           placeholder="Enter device information"
                           disabled={isViewMode}
@@ -1402,8 +1364,8 @@ const AddEditBusinessManual: React.FC = () => {
 
               <div
                 className={`overflow-hidden transition-all duration-300 ${isListsSectionOpen || isViewMode
-                    ? "max-h-[2000px]"
-                    : "max-h-0"
+                  ? "max-h-[2000px]"
+                  : "max-h-0"
                   }`}
               >
                 <div
@@ -1498,10 +1460,10 @@ const AddEditBusinessManual: React.FC = () => {
                                   </p>
                                   <span
                                     className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${list.status === "active"
-                                        ? "bg-green-100 text-green-800"
-                                        : list.status === "disabled"
-                                          ? "bg-red-100 text-red-800"
-                                          : "bg-gray-100 text-gray-800"
+                                      ? "bg-green-100 text-green-800"
+                                      : list.status === "disabled"
+                                        ? "bg-red-100 text-red-800"
+                                        : "bg-gray-100 text-gray-800"
                                       }`}
                                   >
                                     {list.status}

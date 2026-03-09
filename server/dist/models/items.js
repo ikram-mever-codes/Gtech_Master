@@ -108,6 +108,14 @@ __decorate([
     __metadata("design:type", Number)
 ], Item.prototype, "RMB_Price", void 0);
 __decorate([
+    (0, typeorm_1.Column)({ type: "decimal", precision: 10, scale: 2, nullable: true }),
+    __metadata("design:type", Number)
+], Item.prototype, "price", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "varchar", length: 10, nullable: true }),
+    __metadata("design:type", String)
+], Item.prototype, "currency", void 0);
+__decorate([
     (0, typeorm_1.Column)({ type: "varchar", length: 255, nullable: true }),
     __metadata("design:type", String)
 ], Item.prototype, "photo", void 0);
@@ -204,7 +212,7 @@ __decorate([
     __metadata("design:type", Object)
 ], Item.prototype, "supplier", void 0);
 __decorate([
-    (0, typeorm_1.OneToMany)(() => order_items_1.OrderItem, orderItem => orderItem.item),
+    (0, typeorm_1.OneToMany)(() => order_items_1.OrderItem, (orderItem) => orderItem.item),
     __metadata("design:type", Array)
 ], Item.prototype, "orderItems", void 0);
 exports.Item = Item = __decorate([
