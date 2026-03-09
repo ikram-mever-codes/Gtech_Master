@@ -306,6 +306,7 @@ export const getAllOrders = async (
       .createQueryBuilder("o")
       .leftJoinAndSelect("o.orderItems", "oi")
       .leftJoinAndSelect("oi.item", "item")
+      .leftJoinAndSelect("o.cargo", "cargo")
       .orderBy("o.created_at", "DESC")
       .addOrderBy("o.id", "DESC")
       .addOrderBy("oi.id", "ASC");
@@ -321,7 +322,17 @@ export const getAllOrders = async (
 
     const orders = await qb.getMany();
     const mappedOrders = orders.map((order) => ({
-      ...order,
+      id: order.id,
+      order_no: order.order_no,
+      category_id: order.category_id,
+      customer_id: order.customer_id,
+      supplier_id: order.supplier_id,
+      cargo_id: order.cargo_id,
+      status: order.status,
+      comment: order.comment,
+      created_at: order.created_at,
+      updated_at: order.updated_at,
+      cargo: order.cargo,
       items: (order.orderItems || []).map((oi) => {
         const itemDetails = oi.item;
 
@@ -338,7 +349,6 @@ export const getAllOrders = async (
           item: itemDetails,
         };
       }),
-      orderItems: undefined,
     }));
 
     return res.status(200).json({
@@ -365,6 +375,7 @@ export const getOrderById = async (
 
     const order = await orderRepository.findOne({
       where: { id: Number(orderId) },
+      relations: ["cargo"],
     });
     if (!order) return next(new ErrorHandler("Order not found", 404));
 
@@ -383,6 +394,7 @@ export const getOrderById = async (
         comment: order.comment,
         created_at: order.created_at,
         updated_at: order.updated_at,
+        cargo: order.cargo,
         items: lines.map((oi: any) => ({
           id: oi.id,
           order_id: oi.order_id,

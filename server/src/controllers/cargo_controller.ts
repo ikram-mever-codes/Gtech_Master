@@ -345,12 +345,23 @@ export const assignOrdersToCargo = async (req: Request, res: Response, next: Nex
         }
 
         const orderItemRepo = AppDataSource.getRepository(OrderItem);
+        const orderRepo = AppDataSource.getRepository(Order);
+
         if (validOrderIds.length > 0) {
+            // Update OrderItems
             await orderItemRepo
                 .createQueryBuilder()
                 .update(OrderItem)
                 .set({ cargo_id: cargo.id })
                 .where("order_id IN (:...validOrderIds)", { validOrderIds })
+                .execute();
+
+            // Also update Orders
+            await orderRepo
+                .createQueryBuilder()
+                .update(Order)
+                .set({ cargo_id: cargo.id })
+                .where("id IN (:...validOrderIds)", { validOrderIds })
                 .execute();
         }
 
