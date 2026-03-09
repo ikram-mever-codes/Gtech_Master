@@ -194,11 +194,6 @@ export interface StatisticsResponse {
   };
 }
 
-// ============================================
-// ITEM API FUNCTIONS
-// ============================================
-
-// Get all items with pagination and filters
 export const getItems = async (params?: {
   page?: number;
   limit?: number;
@@ -222,7 +217,6 @@ export const getItems = async (params?: {
   }
 };
 
-// Get item by ID
 export const getItemById = async (id: number) => {
   try {
     const response: ResponseInterface = await api.get(`/items/${id}`);
@@ -233,7 +227,6 @@ export const getItemById = async (id: number) => {
   }
 };
 
-// Get item by Category ID
 export const getItemByCategory = async (categoryId: number) => {
   try {
     const response: ResponseInterface = await api.get(`/items/${categoryId}`);
@@ -244,7 +237,6 @@ export const getItemByCategory = async (categoryId: number) => {
   }
 };
 
-// Create new item
 export const createItem = async (itemData: {
   item_name: string;
   item_name_cn?: string;
@@ -276,7 +268,6 @@ export const createItem = async (itemData: {
   }
 };
 
-// Update item
 export const updateItem = async (
   id: number,
   itemData: Partial<{
@@ -331,7 +322,6 @@ export const updateItem = async (
   }
 };
 
-// Delete item
 export const deleteItem = async (id: number) => {
   try {
     toast.loading("Deleting item...", loadingStyles);
@@ -345,7 +335,6 @@ export const deleteItem = async (id: number) => {
   }
 };
 
-// Toggle item status
 export const toggleItemStatus = async (id: number, isActive: boolean) => {
   try {
     toast.loading("Updating status...", loadingStyles);
@@ -364,7 +353,6 @@ export const toggleItemStatus = async (id: number, isActive: boolean) => {
   }
 };
 
-// Bulk update items
 export const bulkUpdateItems = async (
   ids: number[],
   updates: Record<string, any>,
@@ -384,7 +372,6 @@ export const bulkUpdateItems = async (
   }
 };
 
-// Get item statistics
 export const getItemStatistics = async () => {
   try {
     const response: ResponseInterface = await api.get(
@@ -397,7 +384,6 @@ export const getItemStatistics = async () => {
   }
 };
 
-// Search items
 export const searchItems = async (query: string, limit: number = 10) => {
   try {
     const response: ResponseInterface = await api.get(
@@ -494,7 +480,6 @@ export interface TaricStatistics {
   };
 }
 
-// Get all tarics with pagination and filters
 export const getAllTarics = async (params?: {
   page?: number;
   limit?: number;
@@ -515,7 +500,6 @@ export const getAllTarics = async (params?: {
   }
 };
 
-// Get taric by ID
 export const getTaricById = async (id: number) => {
   try {
     const response: ResponseInterface = await api.get(`/items/tarics/${id}`);
@@ -526,7 +510,6 @@ export const getTaricById = async (id: number) => {
   }
 };
 
-// Create new taric
 export const createTaric = async (taricData: {
   code: string;
   name_de?: string;
@@ -549,7 +532,6 @@ export const createTaric = async (taricData: {
   }
 };
 
-// Update taric
 export const updateTaric = async (
   id: number,
   taricData: Partial<{
@@ -575,7 +557,6 @@ export const updateTaric = async (
   }
 };
 
-// Delete taric
 export const deleteTaric = async (id: number) => {
   try {
     toast.loading("Deleting TARIC...", loadingStyles);
@@ -589,7 +570,6 @@ export const deleteTaric = async (id: number) => {
   }
 };
 
-// Search tarics by code or name
 export const searchTarics = async (query: string, limit: number = 20) => {
   try {
     const response: ResponseInterface = await api.get(
@@ -605,7 +585,6 @@ export const searchTarics = async (query: string, limit: number = 20) => {
   }
 };
 
-// Get taric statistics
 export const getTaricStatistics = async () => {
   try {
     const response: ResponseInterface = await api.get(
@@ -618,7 +597,6 @@ export const getTaricStatistics = async () => {
   }
 };
 
-// Bulk create/update tarics
 export const bulkUpsertTarics = async (
   tarics: Array<{
     code: string;
@@ -643,12 +621,11 @@ export const bulkUpsertTarics = async (
   }
 };
 
-// Get all tarics (simple list for dropdowns)
 export const getAllTaricsSimple = async () => {
   try {
     const response = await api.get("/items/tarics", {
       params: {
-        limit: 10000, // Get all tarics
+        limit: 10000,
         sortBy: "code",
         sortOrder: "ASC",
       },
@@ -659,11 +636,7 @@ export const getAllTaricsSimple = async () => {
     throw error;
   }
 };
-// ============================================
-// PARENT API FUNCTIONS
-// ============================================
 
-// Get all parents with pagination and filters
 export const getParents = async (params?: {
   page?: number;
   limit?: number;
@@ -685,7 +658,6 @@ export const getParents = async (params?: {
   }
 };
 
-// Get parent by ID
 export const getParentById = async (id: number) => {
   try {
     const response = await api.get(`/items/parents/${id}`);
@@ -696,7 +668,6 @@ export const getParentById = async (id: number) => {
   }
 };
 
-// Create new parent
 export const createParent = async (parentData: {
   de_no: string;
   name_de: string;
@@ -723,7 +694,6 @@ export const createParent = async (parentData: {
   }
 };
 
-// Update parent
 export const updateParent = async (
   id: number,
   parentData: Partial<{
@@ -757,7 +727,6 @@ export const updateParent = async (
   }
 };
 
-// Delete parent
 export const deleteParent = async (id: number) => {
   try {
     toast.loading("Deleting parent...", loadingStyles);
@@ -771,7 +740,6 @@ export const deleteParent = async (id: number) => {
   }
 };
 
-// Search parents
 export const searchParents = async (query: string, limit: number = 10) => {
   try {
     const response: ResponseInterface = await api.get(
@@ -805,7 +773,6 @@ export const getWarehouseItems = async (params?: {
   }
 };
 
-// Update warehouse stock
 export const updateWarehouseStock = async (
   id: number,
   stockData: {
@@ -827,11 +794,6 @@ export const updateWarehouseStock = async (
   }
 };
 
-// ============================================
-// VARIATION API FUNCTIONS
-// ============================================
-
-// Get item variations
 export const getItemVariations = async (itemId: number) => {
   try {
     const response = await api.get(`/items/${itemId}/variations`);
@@ -842,7 +804,6 @@ export const getItemVariations = async (itemId: number) => {
   }
 };
 
-// Update item variations
 export const updateItemVariations = async (
   itemId: number,
   variations: Array<{
@@ -866,11 +827,6 @@ export const updateItemVariations = async (
   }
 };
 
-// ============================================
-// QUALITY CRITERIA API FUNCTIONS
-// ============================================
-
-// Get item quality criteria
 export const getItemQualityCriteria = async (itemId: number) => {
   try {
     const response = await api.get(`/items/${itemId}/quality`);
@@ -881,7 +837,6 @@ export const getItemQualityCriteria = async (itemId: number) => {
   }
 };
 
-// Create quality criterion
 export const createQualityCriterion = async (
   itemId: number,
   criterionData: {
@@ -903,7 +858,6 @@ export const createQualityCriterion = async (
   }
 };
 
-// Update quality criterion
 export const updateQualityCriterion = async (
   id: number,
   criterionData: Partial<{
@@ -925,7 +879,6 @@ export const updateQualityCriterion = async (
   }
 };
 
-// Delete quality criterion
 export const deleteQualityCriterion = async (id: number) => {
   try {
     toast.loading("Deleting quality criterion...", loadingStyles);

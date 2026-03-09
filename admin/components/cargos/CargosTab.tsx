@@ -37,16 +37,21 @@ import { getAllCargoTypes, CargoTypeObj } from "@/api/cargo_types";
 type Customer = {
     id: string | number;
     companyName: string;
-    deliveryCity?: string;
-    deliveryCountry?: string;
+    legalName?: string;
+    email?: string;
+    contactEmail?: string;
+    contactPhoneNumber?: string;
+    taxNumber?: string;
+    addressLine1?: string;
+    addressLine2?: string;
     city?: string;
     country?: string;
-    addressLine1?: string;
-    contactEmail?: string;
-    email?: string;
-    legalName?: string;
-    contactPhoneNumber?: string;
+    postalCode?: string;
     deliveryAddressLine1?: string;
+    deliveryAddressLine2?: string;
+    deliveryCity?: string;
+    deliveryCountry?: string;
+    deliveryPostalCode?: string;
 };
 
 interface CargosTabProps {
@@ -198,7 +203,14 @@ const CargosTab: React.FC<CargosTabProps> = ({ customers: externalCustomers }) =
         try {
             const response = await getAllCustomers();
             const data = response?.data ?? response;
-            const arr = Array.isArray(data) ? data : data?.customers || [];
+            let arr = [];
+            if (Array.isArray(data)) {
+                arr = data;
+            } else if (data?.businesses && Array.isArray(data.businesses)) {
+                arr = data.businesses;
+            } else if (data?.customers && Array.isArray(data.customers)) {
+                arr = data.customers;
+            }
             setCustomers(arr);
         } catch (e) {
             console.error("Error fetching customers:", e);
@@ -382,8 +394,17 @@ const CargosTab: React.FC<CargosTabProps> = ({ customers: externalCustomers }) =
     const handleSubmit = async () => {
         try {
             setLoading(true);
+            const cleanFormData = { ...formData };
+            const dateFields = ["pickup_date", "dep_date", "eta", "shipped_at"] as const;
+
+            dateFields.forEach(field => {
+                if (cleanFormData[field] === "") {
+                    cleanFormData[field] = null as any;
+                }
+            });
+
             const payload: any = {
-                ...formData,
+                ...cleanFormData,
                 orders: assignedOrderIds,
             };
 
