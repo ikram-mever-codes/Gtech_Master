@@ -7,6 +7,7 @@ import {
   OneToMany,
   OneToOne,
   JoinColumn,
+  AfterLoad,
 } from "typeorm";
 import { Invoice } from "./invoice";
 import { BusinessDetails } from "./business_details";
@@ -44,6 +45,24 @@ export class Customer {
   @Column({ nullable: true })
   contactPhoneNumber!: string;
 
+  @Column({ nullable: true })
+  taxNumber?: string;
+
+  @Column({ nullable: true })
+  addressLine1?: string;
+
+  @Column({ nullable: true })
+  addressLine2?: string;
+
+  @Column({ nullable: true })
+  city?: string;
+
+  @Column({ nullable: true })
+  postalCode?: string;
+
+  @Column({ nullable: true })
+  country?: string;
+
   @OneToOne(() => BusinessDetails, { nullable: true, cascade: true })
   @JoinColumn()
   businessDetails?: BusinessDetails;
@@ -64,6 +83,25 @@ export class Customer {
 
   @UpdateDateColumn()
   updatedAt!: Date;
+  @AfterLoad()
+  populateDetails() {
+    if (this.businessDetails) {
+      this.city = this.city || this.businessDetails.city;
+      this.postalCode = this.postalCode || this.businessDetails.postalCode;
+      this.addressLine1 = this.addressLine1 || this.businessDetails.address;
+      this.country = this.country || this.businessDetails.country;
+    }
+    if (this.starCustomerDetails) {
+      this.city = this.city || this.starCustomerDetails.deliveryCity;
+      this.postalCode =
+        this.postalCode || this.starCustomerDetails.deliveryPostalCode;
+      this.addressLine1 =
+        this.addressLine1 || this.starCustomerDetails.deliveryAddressLine1;
+      this.country =
+        this.country || this.starCustomerDetails.deliveryCountry;
+      this.taxNumber = this.taxNumber || this.starCustomerDetails.taxNumber;
+    }
+  }
 
   constructor(partial?: Partial<Customer>) {
     if (partial) {

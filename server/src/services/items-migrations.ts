@@ -134,10 +134,11 @@ class MySQLToPostgresMigrator {
   private mysqlPool: mysql.Pool;
   private batchSize: number = 100;
 
-  // Store ID mappings between MySQL and PostgreSQL
   private itemIdMap = new Map<number, number>();
+  private itemIdMapByDE = new Map<number, number>();
   private categoryIdMap = new Map<number, number>();
-  private orderIdMap = new Map<number, number>(); // Add this for order references
+  private orderIdMap = new Map<number, number>();
+  private orderNoMap = new Map<string, number>();
 
   constructor() {
     this.mysqlPool = mysql.createPool(dbConfig);
@@ -147,23 +148,19 @@ class MySQLToPostgresMigrator {
     try {
       console.log("🚀 Starting migration from MySQL to PostgreSQL...");
 
-      // Initialize TypeORM connection
       if (!AppDataSource.isInitialized) {
         await AppDataSource.initialize();
         console.log("✅ PostgreSQL connection initialized");
       }
-
-      // Clear existing data and disable foreign key checks
       await this.clearExistingData(true);
 
-      // Migrate in proper order - referenced tables first
       console.log("\n📊 Migrating referenced tables first...");
       await this.migrateCategories();
       await this.migrateSuppliers();
       await this.migrateTarics();
       await this.migrateParents();
       await this.migrateItems();
-      await this.migrateOrders(); // Need to migrate orders before order_items
+      await this.migrateOrders();
 
       console.log("\n📊 Migrating dependent tables...");
       await this.migrateWarehouseItems();
@@ -172,7 +169,6 @@ class MySQLToPostgresMigrator {
       await this.migrateOrderItems();
       await this.migrateSupplierItems();
 
-      // Re-enable foreign key checks at the end
       await this.enableForeignKeys();
 
       console.log("\n🎉 Migration completed successfully!");
@@ -191,10 +187,8 @@ class MySQLToPostgresMigrator {
     try {
       await queryRunner.connect();
 
-      // Disable foreign key checks
       await queryRunner.query('SET session_replication_role = "replica"');
 
-      // Clear tables in reverse order (child tables first)
       await queryRunner.query("DELETE FROM supplier_item");
       await queryRunner.query("DELETE FROM order_item");
       await queryRunner.query("DELETE FROM item_quality");
@@ -478,7 +472,6 @@ class MySQLToPostgresMigrator {
       await this.processInBatches(
         parents,
         async (row) => {
-          // Handle foreign keys - set to null if 0 or invalid
           const taricId = DataSanitizer.sanitizeNumber(row.taric_id);
           const supplierId = DataSanitizer.sanitizeNumber(row.supplier_id);
 
@@ -552,6 +545,7 @@ class MySQLToPostgresMigrator {
       const itemRepository: any = AppDataSource.getRepository(Item);
       const items = rows as any[];
       this.itemIdMap.clear();
+      this.itemIdMapByDE.clear();
 
       let successCount = 0;
       let errorCount = 0;
@@ -563,12 +557,9 @@ class MySQLToPostgresMigrator {
           try {
             const mysqlId = DataSanitizer.sanitizeNumber(row.id);
 
-            // Handle ALL foreign keys properly
             const parentId = DataSanitizer.sanitizeNumber(row.parent_id);
             const taricId = DataSanitizer.sanitizeNumber(row.taric_id);
             const catId = DataSanitizer.sanitizeNumber(row.cat_id);
-
-            // Check if category exists in our map
             const finalCatId =
               catId > 0 && this.categoryIdMap.has(catId) ? catId : null;
             const finalParentId = parentId > 0 ? parentId : null;
@@ -659,6 +650,10 @@ class MySQLToPostgresMigrator {
 
             const savedItem: any = await itemRepository.save(item);
             this.itemIdMap.set(mysqlId, savedItem.id);
+            const itemIdDE = DataSanitizer.sanitizeNumber(row.ItemID_DE);
+            if (itemIdDE > 0) {
+              this.itemIdMapByDE.set(itemIdDE, savedItem.id);
+            }
             successCount++;
           } catch (error: any) {
             errorCount++;
@@ -666,8 +661,6 @@ class MySQLToPostgresMigrator {
               console.log(
                 `   FK Error on item ${row.id}: Setting cat_id to null`
               );
-
-              // Try again with cat_id set to null
               try {
                 const mysqlId = DataSanitizer.sanitizeNumber(row.id);
                 const parentId = DataSanitizer.sanitizeNumber(row.parent_id);
@@ -716,7 +709,7 @@ class MySQLToPostgresMigrator {
                     "Y"
                   ),
                   ISBN: DataSanitizer.sanitizeNumber(row.ISBN, 0),
-                  cat_id: null, // FORCE NULL
+                  cat_id: null,
                   remark: DataSanitizer.sanitizeString(row.remark, 1000, ""),
                   RMB_Price: DataSanitizer.sanitizeDecimalWithScale(
                     row.RMB_Price,
@@ -817,6 +810,7 @@ class MySQLToPostgresMigrator {
       const orderRepository: any = AppDataSource.getRepository(Order);
       const orders = rows as any[];
       this.orderIdMap.clear();
+      this.orderNoMap.clear();
 
       await this.processInBatches(
         orders,
@@ -850,8 +844,11 @@ class MySQLToPostgresMigrator {
               DataSanitizer.sanitizeDate(row.updated_at) || new Date(),
           });
 
-          await orderRepository.save(order);
-          this.orderIdMap.set(mysqlId, mysqlId);
+          const savedOrder: any = await orderRepository.save(order);
+          this.orderIdMap.set(mysqlId, savedOrder.id);
+          if (row.order_no) {
+            this.orderNoMap.set(String(row.order_no).trim(), savedOrder.id);
+          }
         },
         "orders"
       );
@@ -898,15 +895,14 @@ class MySQLToPostgresMigrator {
               continue;
             }
 
-            // Handle ALL foreign keys - force category_id to null to avoid FK errors
             const categoryId = DataSanitizer.sanitizeNumber(row.category_id);
-            const finalCategoryId = null; // Force null for all warehouse items
+            const finalCategoryId = null;
 
             const warehouseItem = warehouseItemRepository.create({
               id: DataSanitizer.sanitizeNumber(row.id),
               item_id: postgresItemId,
               ItemID_DE: DataSanitizer.sanitizeNumber(row.ItemID_DE),
-              category_id: finalCategoryId, // Always null to avoid FK errors
+              category_id: finalCategoryId,
               ean: DataSanitizer.sanitizeEAN(row.ean),
               item_no_de: DataSanitizer.sanitizeString(row.item_no_de, 100, ""),
               item_name_de: DataSanitizer.sanitizeString(
@@ -956,7 +952,6 @@ class MySQLToPostgresMigrator {
             console.log(
               `   Error on warehouse item ${row.id}: ${error.message}`
             );
-            // Skip warehouse items that fail - they might have other FK constraints
           }
         }
       }
@@ -1135,27 +1130,34 @@ class MySQLToPostgresMigrator {
 
         for (const row of batch) {
           try {
-            const mysqlItemId = DataSanitizer.sanitizeNumber(row.ItemID_DE);
-            const postgresItemId = this.itemIdMap.get(mysqlItemId);
+            const mysqlItemIdDE = DataSanitizer.sanitizeNumber(row.ItemID_DE);
+
+            let postgresItemId =
+              this.itemIdMapByDE.get(mysqlItemIdDE) ??
+              this.itemIdMap.get(mysqlItemIdDE) ??
+              null;
 
             if (!postgresItemId) {
-              skippedCount++;
-              console.log(
-                `   Skipping order item ${row.id}: Item ${mysqlItemId} not found`
-              );
-              continue;
+              // Try one more thing: direct query for safety if map failed (slower but identifies issue)
+              const itemRepo = AppDataSource.getRepository(Item);
+              const dbItem = await itemRepo.findOne({ where: { ItemID_DE: mysqlItemIdDE } });
+              if (dbItem) {
+                postgresItemId = dbItem.id;
+              } else {
+                console.log(
+                  `   Warning: order item ${row.id} references ItemID_DE=${mysqlItemIdDE} which was not found in Postgres — inserting with item_id=null`
+                );
+              }
             }
-
-            // Handle order_id foreign key - check if order exists
-            const orderId = DataSanitizer.sanitizeNumber(row.order_no);
-            const finalOrderId =
-              orderId > 0 && this.orderIdMap.has(orderId) ? orderId : null;
+            const mysqlOrderNo = DataSanitizer.sanitizeString(row.order_no);
+            const postgresOrderId = this.orderNoMap.get(mysqlOrderNo) || null;
 
             const orderItem = orderItemRepository.create({
               id: DataSanitizer.sanitizeNumber(row.id),
               master_id: DataSanitizer.sanitizeString(row.master_id, 25, ""),
-              ItemID_DE: postgresItemId,
-              order_id: finalOrderId,
+              item_id: postgresItemId,
+              ItemID_DE: mysqlItemIdDE,
+              order_id: postgresOrderId,
               qty: DataSanitizer.sanitizeNumber(row.qty),
               remark_de: DataSanitizer.sanitizeString(
                 row.remark_de,
@@ -1175,15 +1177,13 @@ class MySQLToPostgresMigrator {
             errorCount++;
             console.log(`   Error on order item ${row.id}: ${error.message}`);
 
-            // If it's a foreign key error, try with null order_id
             if (error.message.includes("foreign key constraint")) {
               try {
-                const mysqlItemId = DataSanitizer.sanitizeNumber(row.ItemID_DE);
-                const postgresItemId = this.itemIdMap.get(mysqlItemId);
-
-                if (!postgresItemId) {
-                  continue;
-                }
+                const retryItemIdDE = DataSanitizer.sanitizeNumber(row.ItemID_DE);
+                const retryItemId =
+                  this.itemIdMapByDE.get(retryItemIdDE) ??
+                  this.itemIdMap.get(retryItemIdDE) ??
+                  null;
 
                 const orderItem = orderItemRepository.create({
                   id: DataSanitizer.sanitizeNumber(row.id),
@@ -1192,8 +1192,9 @@ class MySQLToPostgresMigrator {
                     25,
                     ""
                   ),
-                  ItemID_DE: postgresItemId,
-                  order_id: null, // Force null
+                  item_id: retryItemId,
+                  ItemID_DE: retryItemIdDE,
+                  order_id: null,
                   qty: DataSanitizer.sanitizeNumber(row.qty),
                   remark_de: DataSanitizer.sanitizeString(
                     row.remark_de,
@@ -1267,7 +1268,6 @@ class MySQLToPostgresMigrator {
               continue;
             }
 
-            // Handle supplier_id foreign key - set to null if 0 or invalid
             const supplierId = DataSanitizer.sanitizeNumber(row.supplier_id);
             const finalSupplierId = supplierId > 0 ? supplierId : null;
 
@@ -1295,6 +1295,13 @@ class MySQLToPostgresMigrator {
             });
 
             await supplierItemRepository.save(supplierItem);
+
+            // Sync supplier_id to the Item table if this is the default supplier
+            if (supplierItem.is_default === "Y" && finalSupplierId) {
+              const itemRepo = AppDataSource.getRepository(Item);
+              await itemRepo.update(postgresItemId, { supplier_id: finalSupplierId });
+            }
+
             successCount++;
           } catch (error: any) {
             errorCount++;
@@ -1302,7 +1309,6 @@ class MySQLToPostgresMigrator {
               `   Error on supplier item ${row.id}: ${error.message}`
             );
 
-            // If it's a foreign key error, try with null supplier_id
             if (error.message.includes("foreign key constraint")) {
               try {
                 const mysqlItemId = DataSanitizer.sanitizeNumber(row.item_id);
@@ -1315,7 +1321,7 @@ class MySQLToPostgresMigrator {
                 const supplierItem = supplierItemRepository.create({
                   id: DataSanitizer.sanitizeNumber(row.id),
                   item_id: postgresItemId,
-                  supplier_id: null, // Force null
+                  supplier_id: null,
                   is_default: DataSanitizer.sanitizeBoolean(
                     row.is_default,
                     ["Y", "y", "1", "true"],
@@ -1364,8 +1370,6 @@ class MySQLToPostgresMigrator {
     }
   }
 }
-
-// Migration runner
 async function runMigration() {
   const migrator = new MySQLToPostgresMigrator();
 
@@ -1378,6 +1382,4 @@ async function runMigration() {
     process.exit(1);
   }
 }
-
-// Run the migration
 runMigration().catch(console.error);

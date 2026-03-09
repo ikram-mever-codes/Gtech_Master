@@ -10,6 +10,8 @@ import { Order } from "../models/orders";
 import { OrderItem } from "../models/order_items";
 import { Item } from "../models/items";
 import { Taric } from "../models/tarics";
+import { CargoOrder } from "../models/cargo_orders";
+import { In } from "typeorm";
 
 export class InvoiceController {
   static createInvoice = async (
@@ -581,10 +583,97 @@ export class InvoiceController {
 
     try {
       const invoices = await invoiceRepository.find({
-        relations: ["customer", "items"],
+        relations: ["customer", "customer.businessDetails", "customer.starCustomerDetails", "items"],
         order: { invoiceDate: "DESC" },
       });
-      return res.status(200).json({ success: true, data: invoices });
+
+      const orderNumbers = invoices.map((i) => i.orderNumber).filter(Boolean);
+      const orders = await AppDataSource.getRepository(Order).find({
+        where: { order_no: In(orderNumbers) },
+      });
+
+      const orderIds = orders.map((o) => o.id);
+      const orderToCargoMap = new Map();
+
+      if (orderIds.length > 0) {
+        const cargoOrders = await AppDataSource.getRepository(CargoOrder).find({
+          where: { order_id: In(orderIds) },
+          relations: ["cargo", "order", "cargo.customer"],
+        });
+        cargoOrders.forEach((co) => {
+          if (co.cargo && co.order) {
+            orderToCargoMap.set(co.order.order_no, co.cargo);
+          }
+        });
+      }
+
+      const orderItemsRaw = await AppDataSource.manager.query(`
+        SELECT order_id, cargo_id, SUM(qty) as total_qty, COUNT(id) as count_items
+        FROM order_items
+        GROUP BY order_id, cargo_id
+      `);
+
+      const orderItemSummaryByOrderId = new Map();
+      const orderItemSummaryByCargoId = new Map();
+      orderItemsRaw.forEach((row: any) => {
+        if (row.order_id) {
+          orderItemSummaryByOrderId.set(row.order_id, {
+            total_qty: Number(row.total_qty),
+            count_items: Number(row.count_items)
+          });
+        }
+        if (row.cargo_id) {
+          orderItemSummaryByCargoId.set(row.cargo_id, {
+            total_qty: Number(row.total_qty),
+            count_items: Number(row.count_items)
+          });
+        }
+      });
+
+      const orderIdMap = new Map();
+      orders.forEach(o => orderIdMap.set(o.order_no, o.id));
+
+      const data = invoices.map((inv) => {
+        const cargo = orderToCargoMap.get(inv.orderNumber);
+
+        let customItemCount = 0;
+        let customTotalQty = 0;
+
+        if (cargo && orderItemSummaryByCargoId.has(cargo.id)) {
+          const stats = orderItemSummaryByCargoId.get(cargo.id);
+          customItemCount = stats.count_items;
+          customTotalQty = stats.total_qty;
+        } else if (inv.orderNumber && orderIdMap.has(inv.orderNumber)) {
+          const orderId = orderIdMap.get(inv.orderNumber);
+          if (orderItemSummaryByOrderId.has(orderId)) {
+            const stats = orderItemSummaryByOrderId.get(orderId);
+            customItemCount = stats.count_items;
+            customTotalQty = stats.total_qty;
+          }
+        }
+
+        return {
+          ...inv,
+          bill_to:
+            cargo?.bill_to_display_name ||
+            cargo?.bill_to_company_name ||
+            cargo?.customer?.companyName ||
+            cargo?.customer?.legalName ||
+            inv.customer?.companyName ||
+            "N/A",
+          ship_to:
+            cargo?.ship_to_display_name ||
+            cargo?.ship_to_city ||
+            cargo?.customer?.city ||
+            cargo?.customer?.deliveryCity ||
+            inv.customer?.city ||
+            "-",
+          customItemCount,
+          customTotalQty
+        };
+      });
+
+      return res.status(200).json({ success: true, data });
     } catch (error) {
       console.error(error);
       return next(error);
@@ -696,13 +785,14 @@ export class InvoiceController {
             dutyRate: taric?.duty_rate || 0,
             totalQty: 0,
             totalPrice: 0,
-            unitPrice: item?.RMB_Price || 0,
+            unitPrice: oi?.eur_special_price || oi?.price || item?.price || 0,
           });
         }
 
         const group = taricGroupsMap.get(taricId);
         group.totalQty += oi.qty || 0;
-        group.totalPrice += (oi.qty || 0) * (item?.RMB_Price || 0);
+        const currentPrice = oi?.eur_special_price || oi?.price || item?.price || 0;
+        group.totalPrice += (oi.qty || 0) * (Number(currentPrice) || 0);
       });
 
       const taricGroups = Array.from(taricGroupsMap.values());
@@ -711,11 +801,19 @@ export class InvoiceController {
         success: true,
         data: {
           invoice,
-          detailedItems: orderItems.map((oi: any) => ({
-            ...oi,
-            v: (oi.item?.length * oi.item?.width * oi.item?.height) / 1000 || 0,
-            w: oi.item?.weight || 0,
-          })),
+          detailedItems: orderItems
+            .map((oi: any) => ({
+              ...oi,
+              v:
+                (oi.item?.length * oi.item?.width * oi.item?.height) / 1000 ||
+                0,
+              w: oi.item?.weight || 0,
+            }))
+            .sort((a, b) => {
+              const codeA = a.item?.taric?.code || "";
+              const codeB = b.item?.taric?.code || "";
+              return codeA.localeCompare(codeB);
+            }),
           taricGroups,
         },
       });
