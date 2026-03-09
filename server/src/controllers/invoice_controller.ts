@@ -172,11 +172,9 @@ export class InvoiceController {
 
         doc.lineWidth(0.3);
         doc.rect(rightAlignX, boxY, boxWidth, boxHeight).stroke("#CCCCCC");
-
         doc
           .rect(rightAlignX, boxY, boxWidth, 30)
           .fillAndStroke("#CCCCCC", "#CCCCCC");
-
         doc.fontSize(15).font("Helvetica-Bold");
         doc.fillColor("#000000");
         doc.text("Rechnung", rightAlignX + 5, boxY + 8);

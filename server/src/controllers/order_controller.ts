@@ -7,7 +7,7 @@ import { AppDataSource } from "../config/database";
 import { Order } from "../models/orders";
 import { OrderItem } from "../models/order_items";
 import { Item } from "../models/items";
-import { Like } from "typeorm";
+
 
 const padorder_no = (n: number) => `MA${String(n).padStart(4, "0")}`;
 
@@ -136,12 +136,12 @@ export const createOrder = async (
   } catch (error) {
     try {
       await queryRunner.rollbackTransaction();
-    } catch {}
+    } catch { }
     return next(error);
   } finally {
     try {
       await queryRunner.release();
-    } catch {}
+    } catch { }
   }
 };
 
@@ -284,12 +284,12 @@ export const updateOrder = async (
   } catch (error) {
     try {
       await queryRunner.rollbackTransaction();
-    } catch {}
+    } catch { }
     return next(error);
   } finally {
     try {
       await queryRunner.release();
-    } catch {}
+    } catch { }
   }
 };
 
@@ -302,53 +302,42 @@ export const getAllOrders = async (
     const orderRepo = AppDataSource.getRepository(Order);
     const { search = "", status = "" } = (req.query || {}) as any;
 
-    // Build the find options
-    const orders = await orderRepo.find({
-      where: search
-        ? [
-            { order_no: Like(`%${search}%`), ...(status && { status }) },
-            { comment: Like(`%${search}%`), ...(status && { status }) },
-          ]
-        : status
-          ? { status }
-          : {},
+    const qb = orderRepo
+      .createQueryBuilder("o")
+      .leftJoinAndSelect("o.orderItems", "oi")
+      .leftJoinAndSelect("oi.item", "item")
+      .orderBy("o.created_at", "DESC")
+      .addOrderBy("o.id", "DESC")
+      .addOrderBy("oi.id", "ASC");
 
-      // THIS IS THE KEY: Deep nesting to get Item inside OrderItem
-      relations: ["orderItems", "orderItems.item"],
+    if (search) {
+      qb.where("(o.order_no LIKE :search OR o.comment LIKE :search)", {
+        search: `%${search}%`,
+      });
+      if (status) qb.andWhere("o.status = :status", { status });
+    } else if (status) {
+      qb.where("o.status = :status", { status });
+    }
 
-      order: {
-        id: "DESC",
-        // @ts-ignore - TypeORM supports nested ordering in find options
-        orderItems: {
-          id: "ASC",
-        },
-      },
-    });
-
-    // Format data for frontend to prevent "Unknown" or "-"
+    const orders = await qb.getMany();
     const mappedOrders = orders.map((order) => ({
       ...order,
-      // Map 'orderItems' (DB name) to 'items' (Frontend name)
       items: (order.orderItems || []).map((oi) => {
-        // Access the nested item relation
         const itemDetails = oi.item;
 
         return {
           ...oi,
           ItemID_DE: oi?.ItemID_DE || "-",
           item_id: oi.item_id || itemDetails?.id,
-          // Pre-formatted fields so frontend doesn't need complex logic
           ean: itemDetails?.ean || "-",
           item_name:
-            itemDetails?.item_name || itemDetails?.item_name || "Unknown Item",
+            itemDetails?.item_name || (oi?.ItemID_DE ? `Unknown (DE: ${oi.ItemID_DE})` : "Unknown Item"),
           model: itemDetails?.model || "-",
-          // Ensure price/currency from Item is available if missing on OrderItem
           price: oi.price || itemDetails?.price || 0,
           currency: oi.currency || itemDetails?.currency || "CNY",
-          item: itemDetails, // Keep raw relation data if needed
+          item: itemDetails,
         };
       }),
-      // Remove original array to keep payload clean
       orderItems: undefined,
     }));
 
@@ -450,12 +439,12 @@ export const deleteOrder = async (
   } catch (error) {
     try {
       await queryRunner.rollbackTransaction();
-    } catch {}
+    } catch { }
     return next(error);
   } finally {
     try {
       await queryRunner.release();
-    } catch {}
+    } catch { }
   }
 };
 
@@ -478,11 +467,6 @@ export const generateLabelPDF = async (
 
     const order = await orderRepo.findOne({ where: { id: item.order_id } });
 
-    /**
-     * DIMENSIONS (300 DPI Calibration):
-     * Width: 1050px / 300 * 72 = 252pt
-     * Height: 425px / 300 * 72 = 102pt
-     */
     const doc = new PDFDocument({ size: [252, 102], margin: 0 });
     const logoPath = path.join(__dirname, "../../public/logo.png");
 
@@ -493,52 +477,41 @@ export const generateLabelPDF = async (
     );
     doc.pipe(res);
 
-    // --- Layout Constants ---
-    const colA = 12; // Label "ItemNoW" start
-    const valColA = 16; // Values (ID, Name, Remarks) start under the 'W'
-    const colB = 85; // Order No Column
-    const colD = 180; // Qty Column (Pushed right to avoid overlap)
-    const colLogo = 205; // Logo position
+    const colA = 12;
+    const valColA = 16;
+    const colB = 85;
+    const colD = 180;
+    const colLogo = 205;
 
     const row1LabelY = 10;
-    const row1ValueY = 22; // Vertical space between label and value
+    const row1ValueY = 22;
 
-    // 1. TOP ROW: Labels (Italicized)
     doc.fillColor("black").font("Helvetica-Oblique").fontSize(6.5);
     doc.text("ItemNoW", colA, row1LabelY);
     doc.text("Order No / Qty", colB, row1LabelY);
     doc.text("Qty", colD, row1LabelY);
 
-    // 2. TOP ROW: Values (Bold)
     doc.font("Helvetica-Bold").fontSize(14);
 
-    // Item ID (aligned to valColA)
     const itemID = item?.item?.ItemID_DE?.toString() || "N/A";
     doc.text(itemID, valColA, row1ValueY);
 
-    // Order Number
     const orderNo = order?.order_no || "N/A";
     doc.text(orderNo, colB, row1ValueY);
 
-    // Main Quantity
     doc.text(`${item.qty || 0}`, colD, row1ValueY);
-
-    // 3. SECTION C: Dynamic Split QTY (The "/20" part)
-    // Measures the Order No to place the split text immediately after it
     const orderNoWidth = doc.widthOfString(orderNo);
     doc
       .font("Helvetica")
       .fontSize(9)
       .text(`/${item.qty_label}`, colB + orderNoWidth + 2, row1ValueY + 4);
 
-    // 4. LOGO
     try {
       doc.image(logoPath, colLogo, 8, { width: 40 });
     } catch (e) {
       console.error("Logo missing at path:", logoPath);
     }
 
-    // 5. SECTION E: Item Description (Aligned to valColA)
     doc.font("Helvetica").fontSize(8).fillColor("#222222");
     const description = item.item?.item_name || "No description available";
     doc.text(description, valColA, 42, {
@@ -547,10 +520,8 @@ export const generateLabelPDF = async (
       lineBreak: true,
     });
 
-    // 6. SECTION F & G: Remarks
     const bottomSectionY = 68;
 
-    // Chinese Remark
     doc
       .font("Helvetica-Oblique")
       .fontSize(6.5)
@@ -560,13 +531,11 @@ export const generateLabelPDF = async (
       .fontSize(10)
       .text(item.remarks_cn || "/", valColA, bottomSectionY + 8);
 
-    // Warehouse Remark Label
     doc
       .font("Helvetica-Oblique")
       .fontSize(6.5)
       .text("RemarkW", colA, bottomSectionY + 22);
 
-    // 7. SECTION H: Barcode (Bottom Right)
     const barcodeValue = item.item.ean?.toString() || "";
     try {
       const barcodeBuffer = await bwipjs.toBuffer({
@@ -576,7 +545,7 @@ export const generateLabelPDF = async (
         height: 10,
         includetext: true,
         textsize: 10,
-        textgaps: 4, // Increased vertical spacing between bars and EAN text
+        textgaps: 4,
         textxalign: "center",
       });
 
