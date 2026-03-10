@@ -3108,19 +3108,35 @@ const OrderPage = () => {
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Select Category:
                       </label>
-                      <select
-                        value={form.category_id}
-                        onChange={(e) => handleCategoryChange(e.target.value)}
-                        disabled={lockAllExceptQty}
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:bg-gray-50"
-                      >
-                        <option value="">Select Category</option>
-                        {categories.map((cat) => (
-                          <option key={cat.id} value={String(cat.id)}>
-                            {cat.name}
-                          </option>
-                        ))}
-                      </select>
+                      <Select
+                        options={categories.map((cat) => ({
+                          value: String(cat.id),
+                          label: cat.name || `Category ${cat.id}`,
+                        }))}
+                        value={
+                          form.category_id
+                            ? {
+                              value: form.category_id,
+                              label:
+                                categories.find(
+                                  (c) => String(c.id) === form.category_id
+                                )?.name || "Unknown Category",
+                            }
+                            : null
+                        }
+                        onChange={(option) =>
+                          handleCategoryChange(option ? option.value : "")
+                        }
+                        isDisabled={lockAllExceptQty}
+                        isClearable
+                        isSearchable
+                        placeholder="Select Category..."
+                        className="text-sm"
+                        classNames={{
+                          control: () =>
+                            "border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500",
+                        }}
+                      />
                     </div>
 
                     <div className="flex-1">
@@ -3128,33 +3144,69 @@ const OrderPage = () => {
                         {isTab1 ? "Select Supplier:" : "Select Customer:"}
                       </label>
                       {isTab1 ? (
-                        <select
-                          value={form.supplier_id}
-                          onChange={(e) => handleSupplierChange(e.target.value)}
-                          disabled={lockAllExceptQty}
-                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:bg-gray-50"
-                        >
-                          <option value="">Select Supplier</option>
-                          {suppliers.map((s) => (
-                            <option key={s.id} value={String(s.id)}>
-                              {s.company_name || s.name || "Unnamed Supplier"}
-                            </option>
-                          ))}
-                        </select>
+                        <Select
+                          options={suppliers.map((s) => ({
+                            value: String(s.id),
+                            label: s.company_name || s.name || "Unnamed Supplier",
+                          }))}
+                          value={
+                            form.supplier_id
+                              ? {
+                                value: form.supplier_id,
+                                label:
+                                  suppliers.find(
+                                    (s) => String(s.id) === form.supplier_id
+                                  )?.company_name ||
+                                  suppliers.find(
+                                    (s) => String(s.id) === form.supplier_id
+                                  )?.name ||
+                                  "Unknown Supplier",
+                              }
+                              : null
+                          }
+                          onChange={(option) =>
+                            handleSupplierChange(option ? option.value : "")
+                          }
+                          isDisabled={lockAllExceptQty}
+                          isClearable
+                          isSearchable
+                          placeholder="Select Supplier..."
+                          className="text-sm"
+                          classNames={{
+                            control: () =>
+                              "border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500",
+                          }}
+                        />
                       ) : (
-                        <select
-                          value={form.customer_id}
-                          onChange={(e) => handleCustomerChange(e.target.value)}
-                          disabled={lockAllExceptQty}
-                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:bg-gray-50"
-                        >
-                          <option value="">Select Customer</option>
-                          {customers.map((customer) => (
-                            <option key={customer.id} value={String(customer.id)}>
-                              {customer.companyName}
-                            </option>
-                          ))}
-                        </select>
+                        <Select
+                          options={customers.map((c) => ({
+                            value: String(c.id),
+                            label: c.companyName || "Unnamed Customer",
+                          }))}
+                          value={
+                            form.customer_id
+                              ? {
+                                value: form.customer_id,
+                                label:
+                                  customers.find(
+                                    (c) => String(c.id) === form.customer_id
+                                  )?.companyName || "Unknown Customer",
+                              }
+                              : null
+                          }
+                          onChange={(option) =>
+                            handleCustomerChange(option ? option.value : "")
+                          }
+                          isDisabled={lockAllExceptQty}
+                          isClearable
+                          isSearchable
+                          placeholder="Select Customer..."
+                          className="text-sm"
+                          classNames={{
+                            control: () =>
+                              "border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500",
+                          }}
+                        />
                       )}
                     </div>
                   </div>
