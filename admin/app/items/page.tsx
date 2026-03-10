@@ -24,6 +24,7 @@ import PageHeader from "@/components/UI/PageHeader";
 import { EditIcon, EyeIcon, Plus, Package, LinkIcon } from "lucide-react";
 import { Delete, Sync } from "@mui/icons-material";
 import { toast } from "react-hot-toast";
+import ReactSelect from "react-select";
 
 import {
   getItems,
@@ -1906,94 +1907,129 @@ const ItemsManagementPage: React.FC = () => {
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Parent *
                   </label>
-                  <select
-                    value={itemFormData.parent_id || 0}
-                    onChange={(e) =>
+                  <ReactSelect
+                    options={parents?.map((parent) => ({
+                      value: parent.id,
+                      label: `${parent.name_de} (${parent.de_no})`,
+                    })) || []}
+                    value={
+                      itemFormData.parent_id
+                        ? {
+                          value: itemFormData.parent_id,
+                          label: (() => {
+                            const p = parents?.find((x) => x.id === itemFormData.parent_id);
+                            return p ? `${p.name_de} (${p.de_no})` : "Unknown";
+                          })(),
+                        }
+                        : null
+                    }
+                    onChange={(opt) =>
                       setItemFormData({
                         ...itemFormData,
-                        parent_id: Number(e.target.value),
+                        parent_id: opt ? opt.value : 0,
                       })
                     }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                  >
-                    <option value="0">Select Parent</option>
-                    {parents &&
-                      parents.map((parent) => (
-                        <option key={parent.id} value={parent.id}>
-                          {parent.name_de} ({parent.de_no})
-                        </option>
-                      ))}
-                  </select>
+                    isClearable
+                    isSearchable
+                    placeholder="Select Parent..."
+                    className="text-sm"
+                  />
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     TARIC
                   </label>
-                  <select
-                    value={itemFormData.taric_id}
-                    onChange={(e) =>
+                  <ReactSelect
+                    options={tarics?.map((taric) => ({
+                      value: taric.id,
+                      label: `${taric.code} - ${taric.name_de}`,
+                    })) || []}
+                    value={
+                      itemFormData.taric_id
+                        ? {
+                          value: itemFormData.taric_id,
+                          label: (() => {
+                            const t = tarics?.find((x) => x.id === itemFormData.taric_id);
+                            return t ? `${t.code} - ${t.name_de}` : "Unknown";
+                          })(),
+                        }
+                        : null
+                    }
+                    onChange={(opt) =>
                       setItemFormData({
                         ...itemFormData,
-                        taric_id: Number(e.target.value),
+                        taric_id: opt ? opt.value : 0,
                       })
                     }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                  >
-                    <option value="">Select a Taric</option>
-                    {tarics?.map((taric) => (
-                      <option key={taric.id} value={taric.id}>
-                        {taric.code} - {taric.name_de}
-                      </option>
-                    ))}
-                  </select>
+                    isClearable
+                    isSearchable
+                    placeholder="Select a Taric..."
+                    className="text-sm"
+                  />
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Category
                   </label>
-                  <select
-                    value={itemFormData.cat_id}
-                    onChange={(e) =>
+                  <ReactSelect
+                    options={categories?.map((cat) => ({
+                      value: cat.id,
+                      label: cat.name,
+                    })) || []}
+                    value={
+                      itemFormData.cat_id
+                        ? {
+                          value: itemFormData.cat_id,
+                          label: categories?.find((x) => x.id === itemFormData.cat_id)?.name || "Unknown",
+                        }
+                        : null
+                    }
+                    onChange={(opt) =>
                       setItemFormData({
                         ...itemFormData,
-                        cat_id: Number(e.target.value),
+                        cat_id: opt ? opt.value : 0,
                       })
                     }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                  >
-                    <option value="0">Select Category</option>
-                    {categories &&
-                      categories.map((cat) => (
-                        <option key={cat.id} value={cat.id}>
-                          {cat.name}
-                        </option>
-                      ))}
-                  </select>
+                    isClearable
+                    isSearchable
+                    placeholder="Select Category..."
+                    className="text-sm"
+                  />
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Supplier *
                   </label>
-                  <select
-                    value={itemFormData.supplier_id}
-                    onChange={(e) =>
+                  <ReactSelect
+                    options={suppliers?.map((s) => ({
+                      value: s.id,
+                      label: s.company_name || s.name || "Unnamed Supplier",
+                    })) || []}
+                    value={
+                      itemFormData.supplier_id
+                        ? {
+                          value: itemFormData.supplier_id,
+                          label: (() => {
+                            const s = suppliers?.find((x) => x.id === itemFormData.supplier_id);
+                            return s ? (s.company_name || s.name || "Unnamed") : "Unknown";
+                          })(),
+                        }
+                        : null
+                    }
+                    onChange={(opt) =>
                       setItemFormData({
                         ...itemFormData,
-                        supplier_id: Number(e.target.value),
+                        supplier_id: opt ? opt.value : 0,
                       })
                     }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                  >
-                    <option value="0">Select Supplier</option>
-                    {suppliers && suppliers.map((supplier) => (
-                      <option key={supplier.id} value={supplier.id}>
-                        {supplier.name}
-                      </option>
-                    ))}
-                  </select>
+                    isClearable
+                    isSearchable
+                    placeholder="Select Supplier..."
+                    className="text-sm"
+                  />
                 </div>
 
                 <div>
@@ -2100,7 +2136,7 @@ const ItemsManagementPage: React.FC = () => {
                     onChange={(e) =>
                       setItemFormData({
                         ...itemFormData,
-                        price: parseFloat(e.target.value),
+                        price: e.target.value === "" ? 0 : parseFloat(e.target.value),
                       })
                     }
                     className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-all"
@@ -2113,21 +2149,34 @@ const ItemsManagementPage: React.FC = () => {
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Currency
                   </label>
-                  <select
-                    value={itemFormData.currency}
-                    onChange={(e) =>
+                  <ReactSelect
+                    options={[
+                      { value: "CNY", label: "CNY (¥)" },
+                      { value: "EUR", label: "EUR (€)" },
+                      { value: "USD", label: "USD ($)" },
+                      { value: "GBP", label: "GBP (£)" },
+                    ]}
+                    value={{
+                      value: itemFormData.currency,
+                      label: (() => {
+                        switch (itemFormData.currency) {
+                          case "CNY": return "CNY (¥)";
+                          case "EUR": return "EUR (€)";
+                          case "USD": return "USD ($)";
+                          case "GBP": return "GBP (£)";
+                          default: return itemFormData.currency;
+                        }
+                      })()
+                    }}
+                    onChange={(opt) =>
                       setItemFormData({
                         ...itemFormData,
-                        currency: e.target.value,
+                        currency: opt ? opt.value : "CNY",
                       })
                     }
-                    className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-all bg-white"
-                  >
-                    <option value="CNY">CNY (¥)</option>
-                    <option value="EUR">EUR (€)</option>
-                    <option value="USD">USD ($)</option>
-                    <option value="GBP">GBP (£)</option>
-                  </select>
+                    className="text-sm"
+                    placeholder="Select Currency..."
+                  />
                 </div>
 
                 <div className="md:col-span-2">

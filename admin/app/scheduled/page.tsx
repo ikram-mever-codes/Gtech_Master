@@ -2078,13 +2078,11 @@ const AdminAllItemsPage = () => {
           }
         });
 
-        // Fetch all customers to ensure we have a complete list for the dropdown
         try {
           const allCustomersResponse = await getAllCustomers();
           if (allCustomersResponse && allCustomersResponse.data) {
-            const allCustomers = allCustomersResponse.data;
+            const allCustomers = Array.isArray(allCustomersResponse.data) ? allCustomersResponse.data : allCustomersResponse.data?.customers || [];
 
-            // Merge customers from lists with all customers to ensure we have everyone
             allCustomers.forEach((customer: any) => {
               if (!uniqueCustomers.find((c) => c.id === customer.id)) {
                 uniqueCustomers.push({
@@ -2105,11 +2103,11 @@ const AdminAllItemsPage = () => {
         setCustomers(uniqueCustomers);
         setLists(allListsData);
       } else {
-        // If no lists found, still try to fetch customers
         try {
           const allCustomersResponse = await getAllCustomers();
           if (allCustomersResponse && allCustomersResponse.data) {
-            const formattedCustomers = allCustomersResponse.data.map((customer: any) => ({
+            const allCustomersArr = Array.isArray(allCustomersResponse.data) ? allCustomersResponse.data : allCustomersResponse.data?.customers || [];
+            const formattedCustomers = allCustomersArr.map((customer: any) => ({
               id: customer.id,
               name: customer.companyName || customer.legalName,
               companyName: customer.companyName || customer.legalName,
