@@ -116,6 +116,8 @@ type OrderItemRow = {
   price?: number;
   currency?: string;
   item?: any;
+  supplier_id?: string;
+  customer_id?: string;
 };
 
 type Mode = "create" | "edit" | "convert";
@@ -285,9 +287,12 @@ function OrdersTable({
     },
     {
       header: "Item name",
-      width: "150px",
+      width: "120px",
       render: (row) => (
-        <div className="truncate" title={row.item?.item_name || row.item?.name}>
+        <div
+          className="line-clamp-2 leading-tight"
+          title={row.item?.item_name || row.item?.name}
+        >
           {row.item?.item_name || row.item?.name || "Unknown"}
         </div>
       ),
@@ -319,13 +324,20 @@ function OrdersTable({
     {
       header: "Supplier",
       width: "100px",
-      render: (row) => (
-        <div className="truncate">
-          {row.supplier_id
-            ? getSupplierName?.(row.supplier_id)
-            : getCategoryName(row.category_id)}
-        </div>
-      ),
+      render: (row) => {
+        const sid = row.supplier_id || row.item?.supplier_id;
+        const sname =
+          (sid ? getSupplierName?.(sid) : null) ||
+          row.supplier_name ||
+          row.item?.supplier_name;
+        return (
+          <div className="truncate">
+            {sname && sname !== "Unassigned"
+              ? sname
+              : getCategoryName(row.category_id || row.item?.cat_id) || "-"}
+          </div>
+        );
+      },
     },
     { header: "Order No.", width: "80px", render: (row) => row.order_no },
     {
@@ -464,8 +476,8 @@ function OrdersTable({
     },
     {
       header: "Cargo",
-      width: "65px",
-      render: (row) => row.cargo?.cargo_no || row.cargo_id || "-",
+      width: "55px",
+      render: (row) => row.cargo_id ?? "-",
       align: "center",
     },
     {
@@ -480,57 +492,41 @@ function OrdersTable({
     },
     {
       header: "Created",
-      width: "60px",
-      render: (row) => {
-        const d = row.created_at || row.date_created;
-        if (!d) return "-";
-        const date = new Date(d);
-        if (isNaN(date.getTime())) return String(d);
-        return date.toLocaleDateString("de-DE", {
-          day: "2-digit",
-          month: "2-digit",
-          year:
-            date.getFullYear() === new Date().getFullYear()
-              ? undefined
-              : "numeric",
-        });
-      },
+      width: "65px",
+      render: (row) =>
+        row.created_at
+          ? new Intl.DateTimeFormat("de-DE", {
+              day: "2-digit",
+              month: "2-digit",
+              year: "numeric",
+            }).format(new Date(row.created_at))
+          : "-",
       align: "center",
     },
     {
       header: "Emailed",
-      width: "60px",
-      render: (row) => {
-        if (!row.date_emailed) return "-";
-        const date = new Date(row.date_emailed);
-        if (isNaN(date.getTime())) return String(row.date_emailed);
-        return date.toLocaleDateString("de-DE", {
-          day: "2-digit",
-          month: "2-digit",
-          year:
-            date.getFullYear() === new Date().getFullYear()
-              ? undefined
-              : "numeric",
-        });
-      },
+      width: "65px",
+      render: (row) =>
+        row.date_emailed && row.date_emailed !== "-"
+          ? new Intl.DateTimeFormat("de-DE", {
+              day: "2-digit",
+              month: "2-digit",
+              year: "numeric",
+            }).format(new Date(row.date_emailed))
+          : "-",
       align: "center",
     },
     {
       header: "Delivery",
-      width: "60px",
-      render: (row) => {
-        if (!row.date_delivery) return "-";
-        const date = new Date(row.date_delivery);
-        if (isNaN(date.getTime())) return String(row.date_delivery);
-        return date.toLocaleDateString("de-DE", {
-          day: "2-digit",
-          month: "2-digit",
-          year:
-            date.getFullYear() === new Date().getFullYear()
-              ? undefined
-              : "numeric",
-        });
-      },
+      width: "65px",
+      render: (row) =>
+        row.date_delivery && row.date_delivery !== "-"
+          ? new Intl.DateTimeFormat("de-DE", {
+              day: "2-digit",
+              month: "2-digit",
+              year: "numeric",
+            }).format(new Date(row.date_delivery))
+          : "-",
       align: "center",
     },
     {
@@ -937,10 +933,10 @@ const OrderPage = () => {
       normal: new Map<string, any>(),
     };
 
-    console.log(orders);
     orders.forEach((o: any) => {
       const isExpress = (o.comment || "").toLowerCase().includes("express");
       const targetMap = isExpress ? groups.express : groups.normal;
+
       (o.items || []).forEach((item: any) => {
         if (item.supplier_order_id) return;
         const rawStatus = (item.status || "").trim().toUpperCase();
@@ -1151,16 +1147,7 @@ const OrderPage = () => {
     try {
       const response = await getAllCustomers();
       const data = response?.data ?? response;
-      let arr = [];
-      if (Array.isArray(data)) {
-        arr = data;
-      } else if (data?.businesses && Array.isArray(data.businesses)) {
-        arr = data.businesses;
-      } else if (data?.customers && Array.isArray(data.customers)) {
-        arr = data.customers;
-      } else if (data?.data && Array.isArray(data.data)) {
-        arr = data.data;
-      }
+      const arr = Array.isArray(data) ? data : data?.customers || [];
       setCustomers(arr);
     } catch (error) {
       console.error("Error fetching customers:", error);
@@ -1220,16 +1207,8 @@ const OrderPage = () => {
     setLoadingOrders(true);
     try {
       const response = await getAllOrders(filters);
-      if (response?.success || response?.data) {
-        const data = response.data || [];
-        const sorted = [...data].sort((a: any, b: any) => {
-          const dateA = new Date(a.created_at || a.date_created || 0).getTime();
-          const dateB = new Date(b.created_at || b.date_created || 0).getTime();
-          if (dateB !== dateA) return dateB - dateA;
-          return Number(b.id) - Number(a.id);
-        });
-        setOrders(sorted);
-      }
+      if (response?.success) setOrders(response.data);
+      else if (response?.data) setOrders(response.data);
     } catch (error) {
       console.error("Error fetching Orders:", error);
       toast.error("Failed to fetch orders");
@@ -1274,13 +1253,7 @@ const OrderPage = () => {
       const res: any = await getAllSupplierOrders({
         search: supplierOrderSearch,
       });
-      if (res.success || res.data) {
-        const data = res.data || [];
-        const sorted = [...data].sort(
-          (a: any, b: any) => Number(b.id) - Number(a.id),
-        );
-        setSupplierOrdersList(sorted);
-      }
+      if (res.success) setSupplierOrdersList(res.data);
     } catch (e) {
       console.error(e);
     } finally {
@@ -1505,11 +1478,6 @@ const OrderPage = () => {
     try {
       const detailRes: any = await getOrderById(order.id);
       const detail = detailRes?.data ?? detailRes;
-
-      if (detail && detail.id) {
-        setViewOrder(detail);
-      }
-
       const lines = detail?.items ?? detail?.data?.items ?? [];
 
       if (Array.isArray(lines)) {
@@ -1520,15 +1488,15 @@ const OrderPage = () => {
             return {
               item_id: id,
               itemName:
-                item?.item_name || item?.name || l.item_name || "Unknown item",
+                l.itemName || item?.item_name || item?.name || "Unknown item",
               qty: Number(l.qty ?? 1),
               qty_label: l.qty_label,
               remark_de: String(l.remark_de ?? ""),
               remarks_cn: String(l.remarks_cn ?? ""),
               remark_en: String(l.remark_en ?? ""),
-              ean: item?.ean || l.ean || "-",
+              ean: l.ean || item?.ean || "-",
               status: l.status || "NSO",
-              item: item || l.item || null,
+              item: l.item || item || null,
             };
           }),
         );
@@ -1808,7 +1776,9 @@ const OrderPage = () => {
                             <tr>
                               <th className="px-3 py-2 border-b">Order No</th>
                               <th className="px-3 py-2 border-b">EAN</th>
-                              <th className="px-3 py-2 border-b">Item Name</th>
+                              <th className="px-3 py-2 border-b w-[120px]">
+                                Item Name
+                              </th>
                               <th className="px-3 py-2 border-b">Remark</th>
                               <th className="px-3 py-2 border-b text-center">
                                 Qty
@@ -1835,7 +1805,7 @@ const OrderPage = () => {
                                   <td className="px-3 py-2 text-gray-600">
                                     {ean}
                                   </td>
-                                  <td className="px-3 py-2 font-medium text-gray-900">
+                                  <td className="px-3 py-2 font-medium text-gray-900 line-clamp-2 leading-tight max-w-[120px]">
                                     {name}
                                   </td>
                                   <td className="px-3 py-2 text-gray-500 italic">
@@ -2087,8 +2057,9 @@ const OrderPage = () => {
                             },
                             {
                               header: "Item Name",
+                              width: "120px",
                               render: (item: any) => (
-                                <div className="text-[10px] leading-tight font-semibold text-gray-800 break-words max-w-[180px]">
+                                <div className="text-[10px] leading-tight font-semibold text-gray-800 line-clamp-2">
                                   {item.item?.item_name ||
                                     itemById.get(String(item.item_id))
                                       ?.item_name ||
@@ -2458,17 +2429,11 @@ const OrderPage = () => {
                     {
                       header: "Date created",
                       width: "100px",
-                      render: (row) => {
-                        const date = new Date(row.created_at);
-                        return date.toLocaleDateString("de-DE", {
+                      render: (row) =>
+                        new Date(row.created_at).toLocaleDateString(undefined, {
                           day: "2-digit",
                           month: "2-digit",
-                          year:
-                            date.getFullYear() === new Date().getFullYear()
-                              ? undefined
-                              : "numeric",
-                        });
-                      },
+                        }),
                       align: "center",
                     },
                     {
@@ -2520,9 +2485,10 @@ const OrderPage = () => {
                       },
                       {
                         header: "Item name",
+                        width: "120px",
                         render: (row) => (
                           <div
-                            className="truncate max-w-[200px]"
+                            className="line-clamp-2 leading-tight"
                             title={
                               row.item?.item_name ||
                               itemById.get(String(row.item_id))?.item_name
@@ -2633,9 +2599,10 @@ const OrderPage = () => {
                       },
                       {
                         header: "Item Name",
+                        width: "120px",
                         render: (row) => (
                           <div
-                            className="truncate max-w-[200px]"
+                            className="line-clamp-2 leading-tight"
                             title={
                               row.item?.item_name ||
                               itemById.get(String(row.item_id))?.item_name
@@ -2776,9 +2743,10 @@ const OrderPage = () => {
                       },
                       {
                         header: "Item Name",
+                        width: "120px",
                         render: (row) => (
                           <div
-                            className="font-semibold text-gray-800 line-clamp-2"
+                            className="font-semibold text-gray-800 line-clamp-2 leading-tight"
                             title={row.item?.item_name || row.item?.name}
                           >
                             {row.item?.item_name || row.item?.name || "Unknown"}
@@ -3065,7 +3033,9 @@ const OrderPage = () => {
                   Category
                 </label>
                 <p className="text-gray-900 font-bold">
-                  {getCategoryName(viewOrder.category_id) || "Imported 26"}
+                  {(viewOrder as any).category_name ||
+                    getCategoryName(viewOrder.category_id) ||
+                    "-"}
                 </p>
               </div>
               <div className="space-y-1">
@@ -3073,22 +3043,15 @@ const OrderPage = () => {
                   Customer
                 </label>
                 <p className="text-gray-900 font-bold">
-                  {(() => {
-                    const cargo = viewOrder.cargo;
-
-                    const customerId =
-                      cargo?.customer_id || viewOrder.customer_id;
-                    const customerName =
-                      customerId && customerId !== "0" && customerId !== 0
-                        ? getCustomerName(customerId)
-                        : "-";
-
-                    if (cargo && cargo.id) {
-                      return customerName;
-                    }
-
-                    return customerName;
-                  })()}
+                  {(viewOrder as any).customer_name || "-"}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm font-bold text-gray-400 block uppercase tracking-wide">
+                  Supplier
+                </label>
+                <p className="text-gray-900 font-bold">
+                  {(viewOrder as any).supplier_name || "-"}
                 </p>
               </div>
             </div>
@@ -3119,7 +3082,8 @@ const OrderPage = () => {
                     align: "center",
                   },
                   {
-                    header: "ItemName",
+                    header: "Item Name",
+                    width: "120px",
                     render: (row) => (
                       <div className="font-bold text-gray-900 line-clamp-2 leading-tight">
                         {row.itemName}
@@ -3143,7 +3107,7 @@ const OrderPage = () => {
                     ),
                   },
                   {
-                    header: "Status OrderItem",
+                    header: "Status",
                     width: "120px",
                     render: (row) => (
                       <span
@@ -3291,7 +3255,7 @@ const OrderPage = () => {
                           <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-b">
                             ID
                           </th>
-                          <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-b">
+                          <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-b w-[120px]">
                             Item name
                           </th>
                           <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-b">
@@ -3316,7 +3280,9 @@ const OrderPage = () => {
                               {row.item_id}
                             </td>
                             <td className="px-4 py-2 text-sm text-gray-700 border-b">
-                              {row.itemName}
+                              <div className="line-clamp-2 leading-tight max-w-[120px]">
+                                {row.itemName}
+                              </div>
                             </td>
 
                             <td className="px-4 py-2 text-sm text-gray-700 border-b">

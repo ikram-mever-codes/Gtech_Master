@@ -65,7 +65,7 @@ export class Invoice {
 
   @ManyToOne(
     () => Customer,
-    (customer) => customer.starCustomerDetails?.invoices,
+    (customer) => customer.invoices,
     { nullable: true }
   )
   @JoinColumn()

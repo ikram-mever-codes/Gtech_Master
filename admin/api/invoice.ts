@@ -183,10 +183,10 @@ export const cancelInvoice = async (invoiceId: string) => {
     throw error;
   }
 };
-export const getExpandedInvoiceDetails = async (id: string) => {
+export const getExpandedInvoiceDetails = async (id: string): Promise<any> => {
   try {
     const response = await api.get(`/invoices/${id}/expanded`);
-    return response.data;
+    return response;
   } catch (error) {
     console.error("Error fetching expanded invoice details:", error);
     throw error;

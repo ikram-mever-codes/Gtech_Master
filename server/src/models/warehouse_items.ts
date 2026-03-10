@@ -12,7 +12,7 @@ import {
 import { Item } from "./items";
 import { Category } from "./categories";
 
-@Entity()
+@Entity("warehouse_items")
 export class WarehouseItem {
   @PrimaryColumn()
   id!: number;

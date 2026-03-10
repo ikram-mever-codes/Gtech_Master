@@ -32,34 +32,37 @@ const SpreadSheet: React.FC<SpreadSheetProps> = ({
     loading = false
 }) => {
     return (
-        <div className="bg-[#2D3748] rounded-md overflow-hidden shadow-lg mb-4 border border-[#4A5568]">
+        <div className="bg-white rounded-[4px] overflow-hidden shadow-sm mb-4 border border-gray-200 [&_th]:!text-white [&_th]:!border-r-[#4A5568]">
             <DataTable
                 data={data}
                 columns={columns}
                 loading={loading}
                 emptyMessage="No items found"
-                getRowClassName={() => "bg-[#2D3748] text-gray-200 border-b border-[#4A5568] hover:bg-[#3A4A63] transition-colors"}
+                headerClassName="bg-[#343A40] border-b border-gray-300"
+                getRowClassName={(row, idx) => `text-[#212529] font-medium transition-colors border-b border-gray-200 ${idx % 2 === 0 ? 'bg-[#EAF5E5] hover:bg-[#D4EDDA]' : 'bg-white hover:bg-gray-50'}`}
             />
             {showTotals && (
-                <div className="bg-[#2D3748] px-4 py-3 flex justify-between items-center border-t-2 border-[#8CC21B]/30 text-xs font-bold text-white">
+                <div className="bg-[#343A40] px-4 py-3 flex justify-between items-center border-t border-gray-600 text-[11px] font-bold text-white">
                     {totalCols ? (
-                        totalCols.map((col, idx) => (
-                            <div
-                                key={idx}
-                                style={{ width: col.width || "auto" }}
-                                className={`flex-1 ${col.align === 'center' ? 'text-center' : col.align === 'right' ? 'text-right' : 'text-left'}`}
-                            >
-                                {col.label && <span className="text-gray-400 mr-2">{col.label}:</span>}
-                                {col.value}
-                            </div>
-                        ))
+                        <div className="flex w-full">
+                            {totalCols.map((col, idx) => (
+                                <div
+                                    key={idx}
+                                    style={{ width: col.width || "auto" }}
+                                    className={`flex-none ${col.align === 'center' ? 'text-center' : col.align === 'right' ? 'text-right' : 'text-left'}`}
+                                >
+                                    {col.label && <span className="text-gray-300 mr-2">{col.label}:</span>}
+                                    {col.value}
+                                </div>
+                            ))}
+                        </div>
                     ) : (
-                        <>
-                            <div className="flex-1 text-[#8CC21B]">{totalLabel}</div>
-                            <div className="w-[100px] text-center border-x border-gray-600 px-2">Qty: {totalQty}</div>
-                            <div className="w-[120px] text-right text-[#8CC21B]">€{totalPrice?.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+                        <div className="flex w-full">
+                            <div className="flex-1">{totalLabel}</div>
+                            <div className="w-[100px] text-center border-x border-gray-500 px-2">{totalQty}</div>
+                            <div className="w-[120px] text-left px-2">€{totalPrice?.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
                             <div className="w-[100px]"></div>
-                        </>
+                        </div>
                     )}
                 </div>
             )}

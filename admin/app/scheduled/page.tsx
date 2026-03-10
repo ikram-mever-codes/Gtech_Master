@@ -210,7 +210,9 @@ function AddItemDialog({
   const selectedList =
     availableLists.find((l: any) => l.id === selectedListId) || null;
 
+  // Temporary fallback until API is fixed
   const fallbackSearch = async (query: string) => {
+    // Return empty array or mock data
     return [];
   };
 
@@ -274,6 +276,7 @@ function AddItemDialog({
       const response = await addItemToList(selectedListId, itemData);
 
       if (onAddItem) {
+        // Call the onAddItem callback to update state optimistically
         onAddItem(response);
       }
 
@@ -620,7 +623,7 @@ const FieldHighlight = ({
         borderRadius: 1,
         width: "100%",
         backgroundColor: hasChanges
-          ? alpha("#ff1744", 0.15)
+          ? alpha("#ff1744", 0.15) // Red background for unacknowledged changes
           : "transparent",
         border: hasChanges
           ? `2px solid ${alpha("#ff1744", 0.5)}`
@@ -718,6 +721,7 @@ const FieldHighlight = ({
   );
 };
 
+// Item Activity Logs Dialog Component
 function ItemActivityLogsDialog({
   open,
   onClose,
@@ -734,6 +738,7 @@ function ItemActivityLogsDialog({
   const theme = useTheme();
 
   const itemLogs = useMemo(() => {
+    // Filter logs for the specific item and sort by timestamp (newest first)
     return activityLogs
       .filter((log) => log.itemId === item?.id)
       .sort(
@@ -743,6 +748,7 @@ function ItemActivityLogsDialog({
   }, [activityLogs, item]);
 
   const formatLogDescription = (log: any) => {
+    // Use the pre-formatted message from the ActivityLog interface
     return log.message;
   };
 
@@ -845,6 +851,7 @@ function ItemActivityLogsDialog({
   );
 }
 
+// Tab Panel Component
 interface TabPanelProps {
   children?: React.ReactNode;
   index: number;
@@ -867,10 +874,13 @@ function TabPanel(props: TabPanelProps) {
   );
 }
 
+// Activity Log Card Component
 function ActivityLogCard({ log, customerName, listName }: any) {
   const theme = useTheme();
 
   const getActionIcon = () => {
+    // Since the schema uses a pre-formatted message, we use a generic icon
+    // Adjust based on userRole for visual distinction
     return log.userRole === "admin" ? (
       <CheckCircle sx={{ color: "primary.main", fontSize: 18 }} />
     ) : (
@@ -1025,12 +1035,14 @@ const DELIVERY_STATUS_CONFIG: any = {
   },
 };
 
+// Fixed DeliveryCell component with proper props
 function DeliveryCell({
   row,
   cargoNo,
   onUpdateDelivery,
   onAcknowledgeField,
 }: any) {
+  // Find the delivery for this specific cargo number
   const getDeliveryForCargo = () => {
     if (!row.deliveries) return null;
 
@@ -1240,6 +1252,7 @@ function EditableQuantityCell({ row, onUpdateItem, onAcknowledgeField }: any) {
   const [value, setValue] = useState(row.quantity || 0);
   const [saving, setSaving] = useState(false);
 
+  // Check if this specific field has unacknowledged changes
   const hasUnacknowledgedChanges =
     row.unacknowledgedFields?.includes("quantity") ||
     row.pendingChanges?.some(
@@ -1256,6 +1269,7 @@ function EditableQuantityCell({ row, onUpdateItem, onAcknowledgeField }: any) {
       setSaving(true);
       await updateListItem(row.id, { quantity: Number(value) });
 
+      // Update state optimistically
       if (onUpdateItem) {
         onUpdateItem(row.id, { quantity: Number(value) });
       }
@@ -1380,6 +1394,7 @@ function EditableQuantityCell({ row, onUpdateItem, onAcknowledgeField }: any) {
   );
 }
 
+// Enhanced Editable Comment Cell with dedicated comment update endpoint
 function EditableCommentCell({ row, onUpdateItem, onAcknowledgeField }: any) {
   const [isEditing, setIsEditing] = useState(false);
   const [value, setValue] = useState(row.comment || "");
@@ -1400,6 +1415,8 @@ function EditableCommentCell({ row, onUpdateItem, onAcknowledgeField }: any) {
     try {
       setSaving(true);
       await updateListItemComment(row.id, { comment: value });
+
+      // Update state optimistically
       if (onUpdateItem) {
         onUpdateItem(row.id, { comment: value });
       }
@@ -1528,6 +1545,7 @@ function EditableCommentCell({ row, onUpdateItem, onAcknowledgeField }: any) {
   );
 }
 
+// Enhanced Editable Interval Cell with change highlighting
 function EditableIntervalCell({ row, onUpdateItem, onAcknowledgeField }: any) {
   const [isEditing, setIsEditing] = useState(false);
   const [value, setValue] = useState(row.interval || "monthly");
@@ -1548,6 +1566,8 @@ function EditableIntervalCell({ row, onUpdateItem, onAcknowledgeField }: any) {
     try {
       setSaving(true);
       await updateListItem(row.id, { interval: newValue });
+
+      // Update state optimistically
       if (onUpdateItem) {
         onUpdateItem(row.id, { interval: newValue });
       }
@@ -1771,6 +1791,7 @@ function CreateListDialog({
 
       <DialogContent sx={{ p: 3 }}>
         <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
+          {/* Customer Selection */}
           <FormControl fullWidth>
             <InputLabel>Select Customer *</InputLabel>
             <Select
@@ -1792,6 +1813,7 @@ function CreateListDialog({
             </Select>
           </FormControl>
 
+          {/* List Name */}
           <TextField
             label="List Name *"
             value={listName}
@@ -1809,6 +1831,7 @@ function CreateListDialog({
             }}
           />
 
+          {/* Description */}
           <TextField
             label="Description"
             value={description}
@@ -1830,6 +1853,7 @@ function CreateListDialog({
             }}
           />
 
+          {/* Selected Customer Preview */}
           {selectedCustomer && (
             <Card
               sx={{
@@ -1893,9 +1917,11 @@ function CreateListDialog({
   );
 }
 
+// Main Admin All Items Page Component
 const AdminAllItemsPage = () => {
   const router = useRouter();
 
+  // State management
   const [createListDialog, setCreateListDialog] = useState(false);
   const [allItems, setAllItems] = useState<any[]>([]);
   const [allActivityLogs, setAllActivityLogs] = useState<any[]>([]);
@@ -1910,14 +1936,17 @@ const AdminAllItemsPage = () => {
   const [bulkAcknowledging, setBulkAcknowledging] = useState(false);
   const [currentTab, setCurrentTab] = useState(0);
   const { user } = useSelector((state: RootState) => state.user);
+  // Activity logs dialog state
   const [activityLogsDialog, setActivityLogsDialog] = useState(false);
   const [selectedItemForLogs, setSelectedItemForLogs] = useState<any>(null);
 
+  // Filter states
   const [selectedCustomer, setSelectedCustomer] = useState<string>("");
   const [selectedList, setSelectedList] = useState<string>("");
   const [customers, setCustomers] = useState<any[]>([]);
   const [lists, setLists] = useState<any[]>([]);
 
+  // Count items with unacknowledged changes
   const itemsWithChanges = useMemo(() => {
     return allItems.filter(
       (item: any) =>
@@ -1930,17 +1959,22 @@ const AdminAllItemsPage = () => {
     return extractUniqueCargos(allItems);
   }, [allItems]);
 
+  // Filter activity logs based o n current filters
   const filteredActivityLogs = useMemo(() => {
     let filtered = allActivityLogs;
+    // Filter by customer
     if (selectedCustomer) {
       filtered = filtered.filter(
         (log: any) => log.customerId === selectedCustomer
       );
     }
 
+    // Filter by list
     if (selectedList) {
       filtered = filtered.filter((log: any) => log.listId === selectedList);
     }
+
+    // Filter by search term
     if (searchTerm) {
       filtered = filtered.filter(
         (log: any) =>
@@ -1953,6 +1987,7 @@ const AdminAllItemsPage = () => {
       );
     }
 
+    // Sort by most recent first
     return filtered.sort(
       (a: any, b: any) =>
         new Date(b.timestamp || b.performedAt).getTime() -
@@ -1987,7 +2022,7 @@ const AdminAllItemsPage = () => {
               list.customer?.companyName || list.customer?.legalName,
             unacknowledgedChangesCount: list.unacknowledgedChangesCount || 0,
             pendingChanges: list.pendingChanges || [],
-            contactPerson: list.contactPerson || null,
+            contactPerson: list.contactPerson || null, // Add contact person data
           });
 
           if (
@@ -2001,6 +2036,7 @@ const AdminAllItemsPage = () => {
             });
           }
 
+          // Process activity logs for this list
           if (list.activityLogs && list.activityLogs.length > 0) {
             list.activityLogs.forEach((log: any) => {
               allCombinedActivityLogs.push({
@@ -2042,10 +2078,13 @@ const AdminAllItemsPage = () => {
           }
         });
 
+        // Fetch all customers to ensure we have a complete list for the dropdown
         try {
           const allCustomersResponse = await getAllCustomers();
           if (allCustomersResponse && allCustomersResponse.data) {
             const allCustomers = allCustomersResponse.data;
+
+            // Merge customers from lists with all customers to ensure we have everyone
             allCustomers.forEach((customer: any) => {
               if (!uniqueCustomers.find((c) => c.id === customer.id)) {
                 uniqueCustomers.push({
@@ -2066,6 +2105,7 @@ const AdminAllItemsPage = () => {
         setCustomers(uniqueCustomers);
         setLists(allListsData);
       } else {
+        // If no lists found, still try to fetch customers
         try {
           const allCustomersResponse = await getAllCustomers();
           if (allCustomersResponse && allCustomersResponse.data) {
@@ -2101,13 +2141,16 @@ const AdminAllItemsPage = () => {
       setContactPersons(data.data.contactPersons);
     }
   };
+  // Load all items from all lists
   useEffect(() => {
     loadAllItems();
     fetchContactPersons();
   }, []);
 
   console.log(allItems);
+  // Enhanced handleUpdateItem with optimistic state updates
   const handleUpdateItem = useCallback((itemId: string, updateData: any) => {
+    // Optimistically update the state
     setAllItems((prev) =>
       prev.map((item) =>
         item.id === itemId ? { ...item, ...updateData } : item
@@ -2115,8 +2158,10 @@ const AdminAllItemsPage = () => {
     );
   }, []);
 
+  // Handle adding item - optimistic update
   const handleAddItemOptimistic = useCallback(
     (newItem: any) => {
+      // Add the new item to the state with current timestamp
       const itemWithMetadata = {
         ...newItem,
         id: newItem.id || `temp-${Date.now()}`,
@@ -2133,16 +2178,22 @@ const AdminAllItemsPage = () => {
     [customers, lists]
   );
 
+  // Handle deleting selected items
   const handleDeleteSelectedItems = async () => {
     if (selectedRows.size === 0) return;
 
     try {
       setSaving(true);
 
+      // Optimistically remove items from state
       setAllItems((prev) =>
         prev.filter((item: any) => !selectedRows.has(item.id))
       );
+
+      // Clear selection
       setSelectedRows(new Set());
+
+      // Make API calls in the background
       const deletePromises = Array.from(selectedRows).map((itemId) =>
         deleteListItem(itemId)
       );
@@ -2156,6 +2207,7 @@ const AdminAllItemsPage = () => {
     } catch (error) {
       console.error("Failed to delete items:", error);
       toast.error("Failed to delete items");
+      // Reload data on error to restore correct state
       await loadAllItems();
     } finally {
       setSaving(false);
@@ -2165,6 +2217,7 @@ const AdminAllItemsPage = () => {
   const handleUpdateDelivery = useCallback(
     async (itemId: string, period: string, deliveryData: any) => {
       try {
+        // Optimistically update the state
         setAllItems((prev) =>
           prev.map((item: any) => {
             if (item.id === itemId) {
@@ -2238,16 +2291,15 @@ const AdminAllItemsPage = () => {
       await loadAllItems();
     }
   };
-
   const handleOpenItemActivityLogs = (item: any) => {
     setSelectedItemForLogs(item);
     setActivityLogsDialog(true);
   };
+
   const handleSwitchToMainActivityTab = () => {
     setActivityLogsDialog(false);
     setCurrentTab(1);
   };
-
   const filteredItems = useMemo(() => {
     let filtered = allItems;
 
@@ -2272,7 +2324,6 @@ const AdminAllItemsPage = () => {
     if (selectedList) {
       filtered = filtered.filter((item: any) => item.listId === selectedList);
     }
-
     if (showOnlyChanges) {
       filtered = filtered.filter(
         (item: any) =>
@@ -2403,11 +2454,11 @@ const AdminAllItemsPage = () => {
     const sortedCargos = Array.from(cargoMap.keys()).sort((a, b) => {
       const dataA = cargoMap.get(a)!;
       const dataB = cargoMap.get(b)!;
-
       const etaComparison = dataA.parsedEta - dataB.parsedEta;
       if (etaComparison !== 0) {
         return etaComparison;
       }
+
       return a.localeCompare(b);
     });
 
@@ -2447,7 +2498,6 @@ const AdminAllItemsPage = () => {
     if (cargoType) {
       label += cargoType;
     }
-
     if (cargoNo) {
       if (cargoType) {
         label += ` `;
@@ -2491,6 +2541,7 @@ const AdminAllItemsPage = () => {
         width: 200,
         resizable: true,
         renderCell: (props: any) => {
+          // Safely access contact person data with fallbacks
           const contactPersonName =
             props.row.contactPerson?.name || "Select Contact";
           const contactPersonId = props.row.contactPerson?.id || "";
@@ -2506,6 +2557,7 @@ const AdminAllItemsPage = () => {
                 p: 0,
               }}
             >
+              {/* Top level - Company Name (black) */}
               <Typography
                 variant="body2"
                 sx={{
@@ -2519,6 +2571,7 @@ const AdminAllItemsPage = () => {
                 {props.row.companyName}
               </Typography>
 
+              {/* Bottom level - List Name (grey) */}
               <Typography
                 variant="body2"
                 sx={{
@@ -2531,6 +2584,7 @@ const AdminAllItemsPage = () => {
                 {props.row.listName}
               </Typography>
 
+              {/* Contact Person Select */}
               <Select
                 size="small"
                 value={contactPersonId}
@@ -2719,6 +2773,7 @@ const AdminAllItemsPage = () => {
           );
         },
       },
+      // MERGED COLUMN - Item No. DE + Article Name
       {
         key: "item_info",
         name: "Item",
@@ -2740,6 +2795,7 @@ const AdminAllItemsPage = () => {
                 p: 1,
               }}
             >
+              {/* Top level - Item No. DE (black) */}
               <FieldHighlight
                 hasChanges={hasItemNoChanges}
                 fieldName="Item No."
@@ -2758,6 +2814,7 @@ const AdminAllItemsPage = () => {
                 </Typography>
               </FieldHighlight>
 
+              {/* Bottom level - Article Name (grey) */}
               <FieldHighlight
                 hasChanges={hasArticleNameChanges}
                 fieldName="Article Name"
@@ -2881,6 +2938,7 @@ const AdminAllItemsPage = () => {
       },
     ];
 
+    // Generate delivery columns based on unique cargo numbers - now properly sorted by ETA
     const deliveryColumns = deliveryColumnsData.sortedCargos.map((cargoNo) => {
       const cargoData = deliveryColumnsData.cargoDataMap.get(cargoNo);
       console.log(cargoData);
@@ -3069,6 +3127,7 @@ const AdminAllItemsPage = () => {
                     size="small"
                     onClick={async () => {
                       try {
+                        // Call API to acknowledge all changes for this item
                         const result = await acknowledgeItemChanges(
                           props.row.listId,
                           props.row.id
@@ -3080,6 +3139,8 @@ const AdminAllItemsPage = () => {
                             } changes`,
                             successStyles
                           );
+
+                          // Optimistically update the state
                           setAllItems((prev) =>
                             prev.map((item) =>
                               item.id === props.row.id
@@ -3312,6 +3373,7 @@ const AdminAllItemsPage = () => {
           </CardContent>
         </Box>
 
+        {/* Tabs Section */}
         <Card
           sx={{
             mb: 2,
@@ -3358,8 +3420,10 @@ const AdminAllItemsPage = () => {
             </Tabs>
           </Box>
 
+          {/* Tab Panel 0: Items Management */}
           <TabPanel value={currentTab} index={0}>
             <Box sx={{ p: 3 }}>
+              {/* Action Bar */}
               <Box
                 sx={{ display: "flex", justifyContent: "space-between", mb: 2 }}
               >
@@ -3422,6 +3486,7 @@ const AdminAllItemsPage = () => {
                 </Box>
               </Box>
 
+              {/* Items Grid */}
               <Paper
                 elevation={3}
                 sx={{
@@ -3601,7 +3666,6 @@ const AdminAllItemsPage = () => {
                 </CustomButton>
               </Box>
 
-              {/* Activity Logs Content */}
               <Box
                 sx={{
                   height: "600px",
@@ -3662,6 +3726,7 @@ const AdminAllItemsPage = () => {
         </Card>
       </Box>
 
+      {/* Dialogs */}
       <CreateListDialog
         setSelectedCustomerId={setSelectedCustomer}
         selectedCustomerId={selectedCustomer}

@@ -10,7 +10,6 @@ import {
   JoinColumn,
 } from "typeorm";
 import { Customer } from "./customers";
-import { Invoice } from "./invoice";
 import { DeliveryAddress } from "./inquiry";
 
 @Entity()
@@ -115,9 +114,6 @@ export class StarCustomerDetails {
 
   @Column({ nullable: true })
   deletedAt!: Date;
-
-  @OneToMany(() => Invoice, (invoice) => invoice.customer)
-  invoices!: Invoice[];
 
   @CreateDateColumn()
   createdAt!: Date;

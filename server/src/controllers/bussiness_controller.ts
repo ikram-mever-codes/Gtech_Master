@@ -42,7 +42,6 @@ export const bulkImportBusinesses = async (
   try {
     const { businesses, source = BUSINESS_SOURCE.GOOGLE_MAPS } = req.body;
 
-    // Validate input
     if (!businesses || !Array.isArray(businesses)) {
       return next(new ErrorHandler("Businesses array is required", 400));
     }
@@ -59,7 +58,6 @@ export const bulkImportBusinesses = async (
     const businessDetailsRepository =
       AppDataSource.getRepository(BusinessDetails);
 
-    // Initialize results tracking
     const results = {
       total: businesses.length,
       imported: 0,
@@ -77,13 +75,11 @@ export const bulkImportBusinesses = async (
       endTime: null as Date | null,
     };
 
-    // Helper function to extract first word for companyName
     const extractFirstWord = (businessName: string): string => {
       if (!businessName) return "";
       return businessName.split(" ")[0] || businessName;
     };
 
-    // Batch check for existing businesses - more efficient
     const businessesToCheck: Array<{
       index: number;
       data: any;
@@ -91,11 +87,8 @@ export const bulkImportBusinesses = async (
       normalizedCompanyName: string;
     }> = [];
 
-    // First pass: validate and normalize all businesses
     for (let i = 0; i < businesses.length; i++) {
       const businessData = businesses[i];
-
-      // Skip completely invalid entries
       if (!businessData.name || !businessData.address) {
         results.skippedInvalidData++;
         results.errorsList.push({
@@ -105,12 +98,10 @@ export const bulkImportBusinesses = async (
         continue;
       }
 
-      // Normalize data for duplicate checking (only company name and website)
       const normalizedWebsite = businessData.website
         ? normalizeWebsite(businessData.website)
         : null;
 
-      // Use first word for duplicate checking of company names
       const companyNameFirstWord = extractFirstWord(businessData.name);
       const normalizedCompanyName = companyNameFirstWord.trim().toLowerCase();
 
@@ -122,19 +113,15 @@ export const bulkImportBusinesses = async (
       });
     }
 
-    // Batch query for existing businesses to check duplicates efficiently
     const existingBusinessesByWebsite = new Map<string, any>();
     const existingBusinessesByName = new Map<string, any>();
 
-    // Get all unique websites and names to check
     const websitesToCheck = businessesToCheck
       .filter((b) => b.normalizedWebsite)
       .map((b) => b.normalizedWebsite!);
 
-    // Use first words for name checking
     const namesToCheck = businessesToCheck.map((b) => b.normalizedCompanyName);
 
-    // Query existing businesses by website
     if (websitesToCheck.length > 0) {
       const existingByWebsite = await businessDetailsRepository
         .createQueryBuilder("businessDetails")
@@ -158,7 +145,6 @@ export const bulkImportBusinesses = async (
       });
     }
 
-    // Query existing customers by company name (using first word matching)
     if (namesToCheck.length > 0) {
       const existingByName = await customerRepository
         .createQueryBuilder("customer")
@@ -180,7 +166,6 @@ export const bulkImportBusinesses = async (
       });
     }
 
-    // Process each business and separate duplicates from new entries
     const customersToSave: Customer[] = [];
     const seenInBatch = {
       websites: new Set<string>(),
@@ -198,16 +183,13 @@ export const bulkImportBusinesses = async (
       let duplicateReason = "";
       let existingRecord = null;
 
-      // Check for duplicates in current batch
       if (normalizedWebsite && seenInBatch.websites.has(normalizedWebsite)) {
         duplicateReason = "Duplicate website in current batch";
       } else if (seenInBatch.names.has(normalizedCompanyName)) {
         duplicateReason = "Duplicate company name in current batch";
       }
 
-      // Check against existing database records
       if (!duplicateReason) {
-        // Check by website
         if (
           normalizedWebsite &&
           existingBusinessesByWebsite.has(normalizedWebsite)
@@ -215,14 +197,12 @@ export const bulkImportBusinesses = async (
           duplicateReason = "Website already exists in database";
           existingRecord = existingBusinessesByWebsite.get(normalizedWebsite);
         }
-        // Check by company name (first word)
         else if (existingBusinessesByName.has(normalizedCompanyName)) {
           duplicateReason = "Company name already exists in database";
           existingRecord = existingBusinessesByName.get(normalizedCompanyName);
         }
       }
 
-      // If duplicate found, add to results and skip
       if (duplicateReason) {
         results.duplicates++;
         results.duplicateEntries.push({
@@ -243,16 +223,12 @@ export const bulkImportBusinesses = async (
       }
 
       try {
-        // Create new customer entity
         const customer = new Customer();
-
-        // Assign complete business name to legalName and first word to companyName
         const completeBusinessName = businessData.name.trim();
         const companyNameFirstWord = extractFirstWord(completeBusinessName);
 
-        // Required fields for Customer
-        customer.legalName = completeBusinessName; // Complete business name
-        customer.companyName = companyNameFirstWord; // First word only
+        customer.legalName = completeBusinessName;
+        customer.companyName = companyNameFirstWord;
         customer.email = businessData.email
           ? businessData.email.trim().toLowerCase()
           : `${companyNameFirstWord
@@ -268,15 +244,10 @@ export const bulkImportBusinesses = async (
             ? businessData.phoneNumber.trim()
             : "";
 
-        // Optional fields for Customer
         customer.avatar = businessData.avatar
           ? businessData.avatar.trim()
           : undefined;
-
-        // Create BusinessDetails
         const businessDetails = new BusinessDetails();
-
-        // Map business data to BusinessDetails
         businessDetails.businessSource = businessData.businessSource || source;
         businessDetails.longitude = sanitizeNumber(businessData.longitude);
         businessDetails.latitude = sanitizeNumber(businessData.latitude);
@@ -319,7 +290,6 @@ export const bulkImportBusinesses = async (
           ? businessData.category.trim()
           : undefined;
 
-        // Handle category tags if provided
         if (
           businessData.categoryTags &&
           Array.isArray(businessData.categoryTags)
@@ -350,7 +320,6 @@ export const bulkImportBusinesses = async (
 
         customer.businessDetails = businessDetails;
 
-        // Add to batch tracking (only website and company name)
         if (normalizedWebsite) {
           seenInBatch.websites.add(normalizedWebsite);
         }
@@ -375,14 +344,12 @@ export const bulkImportBusinesses = async (
       }
     }
 
-    // Save all non-duplicate customers
     if (customersToSave.length > 0) {
       try {
         console.log(
           `Attempting to save ${customersToSave.length} new businesses to database...`
         );
 
-        // Save in chunks to avoid parameter limits
         const CHUNK_SIZE = 50;
         const savedCustomers: Customer[] = [];
 
@@ -418,7 +385,6 @@ export const bulkImportBusinesses = async (
               chunkError
             );
 
-            // Try to save individually to identify specific problematic records
             for (const customer of chunk) {
               try {
                 const saved = await customerRepository.save(customer);
@@ -469,7 +435,6 @@ export const bulkImportBusinesses = async (
       source: source,
     });
 
-    // Always return success with detailed results
     return res.status(200).json({
       success: true,
       message: `Bulk import completed. ${results.imported} new businesses imported, ${results.duplicates} duplicates found.`,
@@ -748,7 +713,6 @@ export const createBusiness = async (
           businessDetails
         );
 
-        // Create StarBusinessDetails if device maker is "Yes" OR if conditions are met for automatic promotion
         if (isDeviceMaker === "Yes" || shouldBeStarBusiness) {
           const starBusiness = new StarBusinessDetails();
 
@@ -1078,7 +1042,6 @@ export const updateBusiness = async (
             businessDetails.additionalCategories =
               updateData.additionalCategories;
 
-          // Update device maker status
           if (isDeviceMaker !== undefined) {
             businessDetails.isDeviceMaker = isDeviceMaker as
               | "Yes"
@@ -1094,12 +1057,10 @@ export const updateBusiness = async (
           );
         }
 
-        // Handle StarBusinessDetails updates
         if (
           (isDeviceMaker === "Yes" || shouldBeStarBusiness) &&
           !customer.starBusinessDetails
         ) {
-          // Create new star business details
           const starBusiness = new StarBusinessDetails();
           if (starBusinessDetails) {
             starBusiness.inSeries = starBusinessDetails.inSeries || false;
@@ -1117,7 +1078,6 @@ export const updateBusiness = async (
           );
           customer.starBusinessDetails = savedStarBusiness;
         } else if (customer.starBusinessDetails && starBusinessDetails) {
-          // Update existing star business details
           Object.assign(customer.starBusinessDetails, starBusinessDetails);
           await transactionalEntityManager.save(
             StarBusinessDetails,
@@ -1125,18 +1085,15 @@ export const updateBusiness = async (
           );
         }
 
-        // Handle StarCustomerDetails updates
         let tempPassword: string | undefined;
         let defaultList: any;
 
         if (isStarCustomer && !customer.starCustomerDetails) {
-          // Create new star customer details
           const starCustomerDetails = new StarCustomerDetails();
 
           tempPassword = generateTempPassword();
           starCustomerDetails.password = await bcrypt.hash(tempPassword, 10);
 
-          // Set delivery address from business details
           if (customer.businessDetails) {
             starCustomerDetails.deliveryPostalCode =
               customer.businessDetails.postalCode || "";
@@ -1156,7 +1113,6 @@ export const updateBusiness = async (
 
           customer.starCustomerDetails = savedStarCustomerDetails;
 
-          // Create default list for the new star customer
           defaultList = new List();
           defaultList.name = `Default`;
           defaultList.description = `Default list for ${customer.companyName}`;
@@ -1168,16 +1124,12 @@ export const updateBusiness = async (
             defaultList
           );
 
-          // Update customer email for star customer
           customer.email = starCustomerEmail.trim().toLowerCase();
           customer.contactEmail = starCustomerEmail.trim().toLowerCase();
         }
-
-        // Update customer stage based on current state - UPDATED LOGIC
         if (isStarCustomer) {
           customer.stage = "star_customer";
         } else if (shouldBeStarBusiness) {
-          // AUTOMATIC PROMOTION TO STAR BUSINESS
           customer.stage = customer.starCustomerDetails
             ? "star_customer"
             : "star_business";
@@ -1192,7 +1144,6 @@ export const updateBusiness = async (
           customer.stage = "business";
         }
 
-        // Save customer
         await transactionalEntityManager.save(Customer, customer);
 
         return {
@@ -1201,7 +1152,7 @@ export const updateBusiness = async (
           defaultList,
           isDeviceMakerChanged,
           isStarCustomerChanged,
-          shouldBeStarBusiness, // Return this flag for response message
+          shouldBeStarBusiness,
         };
       }
     );
@@ -1213,7 +1164,6 @@ export const updateBusiness = async (
       isStarCustomerChanged: starCustomerChanged,
     } = result;
 
-    // Send email if upgrading to star customer - USING ALISHA'S PROPOSED TEXT
     if (isStarCustomer && tempPassword) {
       const loginLink = `${process.env.STAR_URL}/login`;
       const portalLink = "https://stars.gtech.de/potis";
@@ -1245,7 +1195,6 @@ export const updateBusiness = async (
       });
     }
 
-    // Fetch updated customer with all relations
     const finalCustomer = await customerRepository.findOne({
       where: { id },
       relations: [
@@ -1261,10 +1210,9 @@ export const updateBusiness = async (
       return next(new ErrorHandler("Business not found after update", 404));
     }
 
-    // RETURN RESPONSE WITH PROPER FIELD MAPPING
     const businessResponse = {
       id: finalCustomer.id,
-      displayName: finalCustomer.companyName, // DB companyName -> Frontend displayName
+      displayName: finalCustomer.companyName,
       companyName: finalCustomer.legalName,
       name: finalCustomer.legalName,
       legalName: finalCustomer.legalName,
@@ -1299,14 +1247,12 @@ export const updateBusiness = async (
             : undefined,
         }
         : undefined,
-      // Include default list if just created
       defaultList: defaultList
         ? {
           id: defaultList.id,
           name: defaultList.name,
         }
         : undefined,
-      // Backward compatibility fields
       website: finalCustomer.businessDetails?.website,
       hasWebsite: !!finalCustomer.businessDetails?.website,
       phoneNumber: finalCustomer.businessDetails?.contactPhone,
@@ -1613,7 +1559,7 @@ export const getAllBusinesses = async (
         customer.businessDetails || {};
 
       return {
-        id: customer.id,
+        id: customer.id, // This will now be customer.id
         companyName: customer.companyName,
         displayName: customer.companyName,
         legalName: customer.legalName,
@@ -1622,12 +1568,12 @@ export const getAllBusinesses = async (
         contactEmail: customer.contactEmail,
         contactPhoneNumber: customer.contactPhoneNumber,
         stage: customer.stage,
-        ...businessDetailsWithoutId,
+        ...businessDetailsWithoutId, // Spread without the id
         website: customer.businessDetails?.website,
         hasWebsite: !!customer.businessDetails?.website,
         phoneNumber: customer.businessDetails?.contactPhone,
         businessEmail: customer.businessDetails?.email,
-        status: BUSINESS_STATUS.ACTIVE,
+        status: BUSINESS_STATUS.ACTIVE, // Default status
         source: customer.businessDetails?.businessSource,
         createdAt: customer.createdAt,
         updatedAt: customer.updatedAt,
@@ -1653,6 +1599,7 @@ export const getAllBusinesses = async (
   }
 };
 
+// 7. Bulk Delete Businesses
 export const bulkDeleteBusinesses = async (
   req: Request,
   res: Response,
@@ -1681,6 +1628,7 @@ export const bulkDeleteBusinesses = async (
   }
 };
 
+// 8. Search Businesses by Location
 export const searchBusinessesByLocation = async (
   req: Request,
   res: Response,
@@ -1700,6 +1648,7 @@ export const searchBusinessesByLocation = async (
 
     const customerRepository = AppDataSource.getRepository(Customer);
 
+    // Haversine formula for distance calculation in kilometers
     const customers = await customerRepository
       .createQueryBuilder("customer")
       .leftJoinAndSelect("customer.businessDetails", "businessDetails")
@@ -1716,6 +1665,7 @@ export const searchBusinessesByLocation = async (
       .limit(lim)
       .getRawMany();
 
+    // Transform response
     const businesses = customers.map((raw: any) => ({
       id: raw.customer_id,
       name: raw.customer_companyName,
@@ -1726,6 +1676,7 @@ export const searchBusinessesByLocation = async (
       stage: raw.customer_stage,
       ...raw.businessDetails,
       distance: raw.distance,
+      // Backward compatibility fields
       website: raw.businessDetails_website,
       hasWebsite: !!raw.businessDetails_website,
       phoneNumber: raw.businessDetails_contactPhone,
@@ -1747,6 +1698,7 @@ export const searchBusinessesByLocation = async (
   }
 };
 
+// 9. Get Business Statistics
 export const getBusinessStatistics = async (
   req: Request,
   res: Response,
@@ -1775,6 +1727,7 @@ export const getBusinessStatistics = async (
       .andWhere("businessDetails.website IS NULL")
       .getCount();
 
+    // Count by source
     const sourceCounts = await businessDetailsRepository
       .createQueryBuilder("businessDetails")
       .innerJoin("businessDetails.customer", "customer")
@@ -1784,6 +1737,7 @@ export const getBusinessStatistics = async (
       .orderBy("count", "DESC")
       .getRawMany();
 
+    // Count by country
     const countryCounts = await businessDetailsRepository
       .createQueryBuilder("businessDetails")
       .innerJoin("businessDetails.customer", "customer")
@@ -1810,6 +1764,7 @@ export const getBusinessStatistics = async (
   }
 };
 
+// 10. Update Business Status in Bulk
 export const bulkUpdateStatus = async (
   req: Request,
   res: Response,
@@ -1821,6 +1776,9 @@ export const bulkUpdateStatus = async (
     if (!ids || !Array.isArray(ids) || ids.length === 0) {
       return next(new ErrorHandler("Array of business IDs is required", 400));
     }
+
+    // For now, we'll just return success since status is handled differently in new structure
+    // You might want to map status to stage or handle it differently based on your business logic
 
     return res.status(200).json({
       success: true,
@@ -1863,6 +1821,7 @@ export const deleteBusiness = async (
       return next(new ErrorHandler("Business not found", 404));
     }
 
+    // Check for contact persons and requested items ONLY
     if (customer.starBusinessDetails) {
       const starBusinessDetails = await AppDataSource.getRepository(
         StarBusinessDetails
@@ -1891,19 +1850,25 @@ export const deleteBusiness = async (
       }
     }
 
+    // SIMPLE FOCUSED APPROACH - Just handle list_creator and delete customer
     const queryRunner = AppDataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
 
     try {
+      // DISABLE CONSTRAINTS
       await queryRunner.query("SET session_replication_role = replica;");
 
+      // 1. Delete list_creator records FIRST (this is the main blocker)
       await queryRunner.query(
         `DELETE FROM list_creator WHERE "customerId" = $1`,
         [id]
       );
+
+      // 2. Delete customer
       await queryRunner.query(`DELETE FROM customer WHERE id = $1`, [id]);
 
+      // RE-ENABLE CONSTRAINTS
       await queryRunner.query("SET session_replication_role = DEFAULT;");
 
       await queryRunner.commitTransaction();

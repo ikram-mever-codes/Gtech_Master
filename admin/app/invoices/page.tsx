@@ -92,6 +92,10 @@ interface Invoice {
   }>;
   createdAt: string;
   updatedAt: string;
+  bill_to?: string;
+  ship_to?: string;
+  customItemCount?: number;
+  customTotalQty?: number;
 }
 
 interface FilterOptions {
@@ -1010,8 +1014,8 @@ const InvoiceListPage: React.FC = () => {
                                   {activeInvTab === "closed_invoices" && (
                                     <td className="py-4 px-4 text-xs font-semibold text-[#212529]">{invoice.invoiceNumber || "N/A"}</td>
                                   )}
-                                  <td className="py-4 px-4 text-xs text-[#212529]">{invoice.customer?.companyName || "N/A"}</td>
-                                  <td className="py-4 px-4 text-xs text-[#6C757D]">{invoice.customer?.city || "-"}</td>
+                                  <td className="py-4 px-4 text-xs text-[#212529]">{invoice.bill_to || "N/A"}</td>
+                                  <td className="py-4 px-4 text-xs text-[#6C757D]">{invoice.ship_to || "-"}</td>
                                   <td className="py-4 px-4 text-xs text-[#212529]">
                                     {activeInvTab === "open_invoices" ? (
                                       <span className="font-medium">{invoice.id.slice(-2)} - {invoice.orderNumber || "No Cargo"}</span>
@@ -1027,11 +1031,11 @@ const InvoiceListPage: React.FC = () => {
                                       onClick={() => toggleExpansion(invoice.id, 'items')}
                                       className="text-[#059669] font-bold hover:underline cursor-pointer"
                                     >
-                                      {invoice.items?.length || 0}
+                                      {invoice.customItemCount ?? invoice.items?.length ?? 0}
                                     </span>
                                   </td>
                                   <td className="py-4 px-4 text-xs text-[#212529] font-medium">
-                                    {invoice.items?.reduce((sum, item) => sum + item.quantity, 0) || 0}
+                                    {invoice.customTotalQty ?? invoice.items?.reduce((sum: any, item: any) => sum + item.quantity, 0) ?? 0}
                                   </td>
                                   {activeInvTab === "closed_invoices" && (
                                     <td className="py-4 px-4 text-xs text-right font-bold text-[#212529]">
@@ -1078,11 +1082,11 @@ const InvoiceListPage: React.FC = () => {
                                             columns={[
                                               { header: "Position", render: (_: any, idx: number) => idx + 1, width: "70px" },
                                               { header: "Taric Name EN", render: (it: any) => it.taricNameEn, width: "350px" },
-                                              { header: "Taric Code", render: (it: any) => `/ ${it.taricCode}`, width: "120px" },
-                                              { header: "Duty rate", render: (it: any) => it.dutyRate ? `${Number(it.dutyRate).toFixed(2)}` : "0.00", width: "80px" },
+                                              { header: "Taric Code", render: (it: any) => it.taricCode, width: "120px" },
+                                              { header: "Duty rate", render: (it: any) => it.dutyRate ? `${Number(it.dutyRate).toFixed(2)}` : "-", width: "80px" },
                                               { header: "Total Qty", render: (it: any) => it.totalQty, align: "center", width: "100px" },
-                                              { header: "Unit Price (€)", render: (it: any) => it.unitPrice?.toFixed(2), width: "100px" },
-                                              { header: "Total Price (€)", render: (it: any) => it.totalPrice?.toLocaleString(undefined, { minimumFractionDigits: 2 }), width: "120px" },
+                                              { header: "Unit Price (€)", render: (it: any) => it.unitPrice || "0.00", width: "100px" },
+                                              { header: "Total Price (€)", render: (it: any) => (Number(it.totalPrice) || 0).toLocaleString(undefined, { minimumFractionDigits: 2 }), width: "120px" },
                                               {
                                                 header: "Operation",
                                                 render: () => (

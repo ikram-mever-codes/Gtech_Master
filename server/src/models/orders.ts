@@ -14,6 +14,7 @@ import { OrderItem } from "./order_items";
 import { Category } from "./categories";
 import { Supplier } from "./suppliers";
 import { Cargo } from "./cargos";
+import { Customer } from "./customers";
 
 @Entity()
 export class Order {
@@ -23,8 +24,12 @@ export class Order {
   @Column({ type: "varchar", length: 255, unique: true })
   order_no!: string;
 
-  @Column({ type: "varchar", length: 50, nullable: true })
+  @Column({ type: "uuid", nullable: true })
   customer_id?: string;
+
+  @ManyToOne(() => Customer, { nullable: true })
+  @JoinColumn({ name: "customer_id" })
+  customer?: Customer;
 
   @Column({ type: "int", nullable: true })
   status?: number;

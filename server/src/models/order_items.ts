@@ -15,7 +15,7 @@ import { SupplierOrder } from "./supplier_orders";
 
 @Entity()
 export class OrderItem {
-  @PrimaryGeneratedColumn()
+  @PrimaryColumn()
   id!: number;
 
   @Column({ type: "varchar", length: 25, nullable: true })

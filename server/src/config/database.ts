@@ -47,8 +47,8 @@ export const AppDataSource = new DataSource({
   username: process.env.DB_USERNAME || "postgres",
   password: process.env.DB_PASSWORD || "Mujtaba@911",
   database: process.env.DB_NAME || "master",
-  synchronize: true,
-  logging: false,
+  synchronize: false,
+  logging: true,
 
   entities: [
     User,
@@ -151,7 +151,6 @@ export const initializeDatabase = async (): Promise<DataSource> => {
 
     await bootstrapAdminUser();
 
-    // Seed database with initial data
     const { seedDatabase } = await import("../services/seedDatabase");
     await seedDatabase();
 

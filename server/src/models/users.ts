@@ -68,7 +68,7 @@ export class User {
   @Column({ type: "boolean", default: false })
   isEmailVerified!: boolean;
 
-  @Column({ type: "varchar", nullable: false, default: false })
+  @Column({ type: "varchar", nullable: false, default: "" })
   emailVerificationCode?: string;
 
   @Column({ type: "timestamp", nullable: true })

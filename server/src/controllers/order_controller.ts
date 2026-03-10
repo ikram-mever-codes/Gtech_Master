@@ -109,19 +109,33 @@ export const createOrder = async (
 
     await queryRunner.commitTransaction();
 
+    const finalOrder = await queryRunner.manager.getRepository(Order).findOne({
+      where: { id: order.id },
+      relations: ["cargo", "cargo.customer", "customer", "supplier"],
+    });
+
     return res.status(201).json({
       success: true,
       message: "Order created successfully",
       data: {
-        id: order.id,
-        order_no: order.order_no,
-        category_id: order.category_id,
-        customer_id: order.customer_id,
-        supplier_id: order.supplier_id,
-        status: order.status,
-        comment: order.comment,
-        created_at: order.created_at,
-        updated_at: order.updated_at,
+        id: finalOrder!.id,
+        order_no: finalOrder!.order_no,
+        category_id: finalOrder!.category_id,
+        customer_id: finalOrder!.customer_id,
+        customer_name:
+          finalOrder!.cargo?.customer?.companyName ||
+          finalOrder!.cargo?.bill_to_display_name ||
+          finalOrder!.customer?.companyName ||
+          "No Customer",
+        supplier_id: finalOrder!.supplier_id,
+        supplier_name:
+          finalOrder!.supplier?.company_name ||
+          finalOrder!.supplier?.name ||
+          "Unassigned",
+        status: finalOrder!.status,
+        comment: finalOrder!.comment,
+        created_at: finalOrder!.created_at,
+        updated_at: finalOrder!.updated_at,
         items: lines.map((oi) => ({
           id: oi.id,
           order_id: oi.order_id,
@@ -252,7 +266,10 @@ export const updateOrder = async (
 
     await queryRunner.commitTransaction();
 
-    const freshOrder = await orderRepo.findOne({ where: { id: order.id } });
+    const finalOrder = await orderRepo.findOne({
+      where: { id: order.id },
+      relations: ["cargo", "cargo.customer", "customer", "supplier"],
+    });
     const freshItems = await orderItemsRepo.find({
       where: { order_id: order.id as any } as any,
     });
@@ -261,15 +278,24 @@ export const updateOrder = async (
       success: true,
       message: "Order updated successfully",
       data: {
-        id: freshOrder!.id,
-        order_no: freshOrder!.order_no,
-        category_id: freshOrder!.category_id,
-        customer_id: (freshOrder as any).customer_id,
-        supplier_id: freshOrder!.supplier_id,
-        status: freshOrder!.status,
-        comment: freshOrder!.comment,
-        created_at: freshOrder!.created_at,
-        updated_at: freshOrder!.updated_at,
+        id: finalOrder!.id,
+        order_no: finalOrder!.order_no,
+        category_id: finalOrder!.category_id,
+        customer_id: finalOrder!.customer_id,
+        customer_name:
+          finalOrder!.cargo?.customer?.companyName ||
+          finalOrder!.cargo?.bill_to_display_name ||
+          finalOrder!.customer?.companyName ||
+          "No Customer",
+        supplier_id: finalOrder!.supplier_id,
+        supplier_name:
+          finalOrder!.supplier?.company_name ||
+          finalOrder!.supplier?.name ||
+          "Unassigned",
+        status: finalOrder!.status,
+        comment: finalOrder!.comment,
+        created_at: finalOrder!.created_at,
+        updated_at: finalOrder!.updated_at,
         items: freshItems.map((oi: any) => ({
           id: oi.id,
           order_id: oi.order_id,
@@ -306,7 +332,11 @@ export const getAllOrders = async (
       .createQueryBuilder("o")
       .leftJoinAndSelect("o.orderItems", "oi")
       .leftJoinAndSelect("oi.item", "item")
+      .leftJoinAndSelect("o.supplier", "s")
+      .leftJoinAndSelect("item.supplier", "is")
       .leftJoinAndSelect("o.cargo", "cargo")
+      .leftJoinAndSelect("cargo.customer", "cust")
+      .leftJoinAndSelect("o.customer", "orderCust")
       .orderBy("o.created_at", "DESC")
       .addOrderBy("o.id", "DESC")
       .addOrderBy("oi.id", "ASC");
@@ -322,17 +352,14 @@ export const getAllOrders = async (
 
     const orders = await qb.getMany();
     const mappedOrders = orders.map((order) => ({
-      id: order.id,
-      order_no: order.order_no,
-      category_id: order.category_id,
-      customer_id: order.customer_id,
-      supplier_id: order.supplier_id,
-      cargo_id: order.cargo_id,
-      status: order.status,
-      comment: order.comment,
-      created_at: order.created_at,
-      updated_at: order.updated_at,
-      cargo: order.cargo,
+      ...order,
+      supplier_name:
+        order.supplier?.company_name || order.supplier?.name || "Unassigned",
+      customer_name:
+        order.cargo?.customer?.companyName ||
+        order.cargo?.bill_to_display_name ||
+        order.customer?.companyName ||
+        "No Customer",
       items: (order.orderItems || []).map((oi) => {
         const itemDetails = oi.item;
 
@@ -347,10 +374,29 @@ export const getAllOrders = async (
           model: itemDetails?.model || "-",
           price: oi.price || itemDetails?.price || 0,
           currency: oi.currency || itemDetails?.currency || "CNY",
+          supplier_name:
+            itemDetails?.supplier?.company_name ||
+            itemDetails?.supplier?.name ||
+            "Unassigned",
           item: itemDetails,
         };
       }),
+      orderItems: undefined,
     }));
+
+    console.log(`[BACKEND] Sent ${mappedOrders.length} orders to frontend`);
+    if (mappedOrders.length > 0) {
+      console.log(
+        `[BACKEND] First order (#${mappedOrders[0].order_no}) has ${mappedOrders[0].items?.length} items.`,
+      );
+      console.log(
+        `[BACKEND] Sample item:`,
+        JSON.stringify(mappedOrders[0].items?.[0] || {}, null, 2).substring(
+          0,
+          500,
+        ),
+      );
+    }
 
     return res.status(200).json({
       success: true,
@@ -376,42 +422,66 @@ export const getOrderById = async (
 
     const order = await orderRepository.findOne({
       where: { id: Number(orderId) },
-      relations: ["cargo"],
+      relations: [
+        "orderItems",
+        "orderItems.item",
+        "supplier",
+        "category",
+        "cargo",
+        "cargo.customer",
+        "customer",
+      ],
     });
+
     if (!order) return next(new ErrorHandler("Order not found", 404));
 
-    const lines = await orderItemsRepository.find({
-      where: { order_id: order.id as any } as any,
-      relations: ["item"],
-    });
+    const result = {
+      id: order.id,
+      order_no: order.order_no,
+      category_id: order.category_id,
+      category_name: order.category?.name,
+      customer_id: order.customer_id,
+      customer_name:
+        order.cargo?.customer?.companyName ||
+        order.cargo?.bill_to_display_name ||
+        order.customer?.companyName ||
+        "No Customer",
+      supplier_id: order.supplier_id,
+      supplier_name: order.supplier?.company_name || order.supplier?.name,
+      status: order.status,
+      comment: order.comment,
+      created_at: order.created_at,
+      updated_at: order.updated_at,
+      items: (order.orderItems || []).map((oi: any) => ({
+        id: oi.id,
+        order_id: oi.order_id,
+        item_id: oi.item_id,
+        ItemID_DE: oi.ItemID_DE,
+        qty: oi.qty,
+        qty_delivered: oi.qty_delivered,
+        qty_label: oi.qty_label,
+        remark_de: oi.remark_de,
+        remarks_cn: oi.remarks_cn,
+        status: oi.status,
+        price: oi.price || oi.item?.price,
+        currency: oi.currency || oi.item?.currency || "CNY",
+        ean: oi.item?.ean,
+        itemName: oi.item?.item_name || oi.item?.name,
+        item: oi.item,
+      })),
+    };
+
+    console.log(
+      `[BACKEND] getOrderById(${orderId}) result:`,
+      JSON.stringify(result, null, 2).substring(0, 1000) + "...",
+    );
+
     return res.status(200).json({
       success: true,
-      data: {
-        id: order.id,
-        order_no: order.order_no,
-        category_id: order.category_id,
-        customer_id: (order as any).customer_id,
-        supplier_id: order.supplier_id,
-        status: order.status,
-        comment: order.comment,
-        created_at: order.created_at,
-        updated_at: order.updated_at,
-        cargo: order.cargo,
-        items: lines.map((oi: any) => ({
-          id: oi.id,
-          order_id: oi.order_id,
-          item_id: oi.item_id,
-          qty: oi.qty,
-          ean: oi.item?.ean || "-",
-          status: oi.status,
-          item_name: oi.item?.item_name || "Unknown Item",
-          remark_de: oi.remark_de,
-          price: oi.price,
-          currency: oi.currency,
-        })),
-      },
+      data: result,
     });
   } catch (error) {
+    console.error("Error in getOrderById:", error);
     return next(error);
   }
 };
