@@ -4,17 +4,13 @@ import {
   Column,
   CreateDateColumn,
   UpdateDateColumn,
-  ManyToOne,
-  JoinColumn,
-  OneToOne,
-  PrimaryColumn,
 } from "typeorm";
 import { Item } from "./items";
 import { Category } from "./categories";
 
 @Entity("warehouse_items")
 export class WarehouseItem {
-  @PrimaryColumn()
+  @PrimaryGeneratedColumn()
   id!: number;
 
   @Column()

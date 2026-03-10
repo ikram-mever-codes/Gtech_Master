@@ -1,2 +1,5 @@
 .env
 /node_modules
+/test_smith.js
+/test_smith2.js
+/test_smith3.js
