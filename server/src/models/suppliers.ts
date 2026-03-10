@@ -105,9 +105,6 @@ export class Supplier {
   @OneToMany(() => Parent, (parent) => parent.supplier)
   parents!: Parent[];
 
-  @ManyToOne(() => Supplier, (supplier) => supplier.parents)
-  @JoinColumn({ name: "supplier_id" })
-  supplier!: Supplier;
 
   @CreateDateColumn()
   created_at!: Date;

@@ -75,6 +75,9 @@ export class Customer {
   @JoinColumn()
   starCustomerDetails?: StarCustomerDetails;
 
+  @OneToMany(() => Invoice, (invoice) => invoice.customer)
+  invoices!: Invoice[];
+
   @OneToMany(() => Inquiry, (inquiry) => inquiry.customer)
   inquiries!: Inquiry;
 

@@ -590,6 +590,7 @@ export class InvoiceController {
       const orderNumbers = invoices.map((i) => i.orderNumber).filter(Boolean);
       const orders = await AppDataSource.getRepository(Order).find({
         where: { order_no: In(orderNumbers) },
+        relations: ["cargo", "cargo.customer"]
       });
 
       const orderIds = orders.map((o) => o.id);
@@ -607,9 +608,15 @@ export class InvoiceController {
         });
       }
 
+      orders.forEach((o) => {
+        if (o.cargo && !orderToCargoMap.has(o.order_no)) {
+          orderToCargoMap.set(o.order_no, o.cargo);
+        }
+      });
+
       const orderItemsRaw = await AppDataSource.manager.query(`
         SELECT order_id, cargo_id, SUM(qty) as total_qty, COUNT(id) as count_items
-        FROM order_items
+        FROM order_item
         GROUP BY order_id, cargo_id
       `);
 

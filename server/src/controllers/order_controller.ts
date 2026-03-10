@@ -109,19 +109,26 @@ export const createOrder = async (
 
     await queryRunner.commitTransaction();
 
+    const finalOrder = await queryRunner.manager.getRepository(Order).findOne({
+      where: { id: order.id },
+      relations: ["cargo", "cargo.customer", "customer", "supplier"]
+    });
+
     return res.status(201).json({
       success: true,
       message: "Order created successfully",
       data: {
-        id: order.id,
-        order_no: order.order_no,
-        category_id: order.category_id,
-        customer_id: order.customer_id,
-        supplier_id: order.supplier_id,
-        status: order.status,
-        comment: order.comment,
-        created_at: order.created_at,
-        updated_at: order.updated_at,
+        id: finalOrder!.id,
+        order_no: finalOrder!.order_no,
+        category_id: finalOrder!.category_id,
+        customer_id: finalOrder!.customer_id,
+        customer_name: finalOrder!.cargo?.customer?.companyName || finalOrder!.cargo?.bill_to_display_name || finalOrder!.customer?.companyName || "No Customer",
+        supplier_id: finalOrder!.supplier_id,
+        supplier_name: finalOrder!.supplier?.company_name || finalOrder!.supplier?.name || "Unassigned",
+        status: finalOrder!.status,
+        comment: finalOrder!.comment,
+        created_at: finalOrder!.created_at,
+        updated_at: finalOrder!.updated_at,
         items: lines.map((oi) => ({
           id: oi.id,
           order_id: oi.order_id,
@@ -252,7 +259,10 @@ export const updateOrder = async (
 
     await queryRunner.commitTransaction();
 
-    const freshOrder = await orderRepo.findOne({ where: { id: order.id } });
+    const finalOrder = await orderRepo.findOne({
+      where: { id: order.id },
+      relations: ["cargo", "cargo.customer", "customer", "supplier"]
+    });
     const freshItems = await orderItemsRepo.find({
       where: { order_id: order.id as any } as any,
     });
@@ -261,15 +271,17 @@ export const updateOrder = async (
       success: true,
       message: "Order updated successfully",
       data: {
-        id: freshOrder!.id,
-        order_no: freshOrder!.order_no,
-        category_id: freshOrder!.category_id,
-        customer_id: (freshOrder as any).customer_id,
-        supplier_id: freshOrder!.supplier_id,
-        status: freshOrder!.status,
-        comment: freshOrder!.comment,
-        created_at: freshOrder!.created_at,
-        updated_at: freshOrder!.updated_at,
+        id: finalOrder!.id,
+        order_no: finalOrder!.order_no,
+        category_id: finalOrder!.category_id,
+        customer_id: finalOrder!.customer_id,
+        customer_name: finalOrder!.cargo?.customer?.companyName || finalOrder!.cargo?.bill_to_display_name || finalOrder!.customer?.companyName || "No Customer",
+        supplier_id: finalOrder!.supplier_id,
+        supplier_name: finalOrder!.supplier?.company_name || finalOrder!.supplier?.name || "Unassigned",
+        status: finalOrder!.status,
+        comment: finalOrder!.comment,
+        created_at: finalOrder!.created_at,
+        updated_at: finalOrder!.updated_at,
         items: freshItems.map((oi: any) => ({
           id: oi.id,
           order_id: oi.order_id,
@@ -310,6 +322,7 @@ export const getAllOrders = async (
       .leftJoinAndSelect("item.supplier", "is")
       .leftJoinAndSelect("o.cargo", "cargo")
       .leftJoinAndSelect("cargo.customer", "cust")
+      .leftJoinAndSelect("o.customer", "orderCust")
       .orderBy("o.created_at", "DESC")
       .addOrderBy("o.id", "DESC")
       .addOrderBy("oi.id", "ASC");
@@ -327,7 +340,7 @@ export const getAllOrders = async (
     const mappedOrders = orders.map((order) => ({
       ...order,
       supplier_name: order.supplier?.company_name || order.supplier?.name || "Unassigned",
-      customer_name: order.cargo?.customer?.companyName || order.cargo?.bill_to_display_name || "No Customer",
+      customer_name: order.cargo?.customer?.companyName || order.cargo?.bill_to_display_name || order.customer?.companyName || "No Customer",
       items: (order.orderItems || []).map((oi) => {
         const itemDetails = oi.item;
 
@@ -385,6 +398,7 @@ export const getOrderById = async (
         "category",
         "cargo",
         "cargo.customer",
+        "customer",
       ],
     });
 
@@ -396,7 +410,7 @@ export const getOrderById = async (
       category_id: order.category_id,
       category_name: order.category?.name,
       customer_id: order.customer_id,
-      customer_name: order.cargo?.customer?.companyName || order.cargo?.bill_to_display_name || "No Customer",
+      customer_name: order.cargo?.customer?.companyName || order.cargo?.bill_to_display_name || order.customer?.companyName || "No Customer",
       supplier_id: order.supplier_id,
       supplier_name: order.supplier?.company_name || order.supplier?.name,
       status: order.status,
