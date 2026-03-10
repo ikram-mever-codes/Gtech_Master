@@ -485,8 +485,21 @@ export const generateLabelPDF = async (
     const order = await orderRepo.findOne({ where: { id: item.order_id } });
 
     const doc = new PDFDocument({ size: [252, 102], margin: 0 });
-    const logoPath = path.join(__dirname, "../../public/logo.png");
+    const logo = path.join(__dirname, "../../public/logo.png");
+    const k1 = path.join(__dirname, "../../public/k1.png");
+    const k2 = path.join(__dirname, "../../public/k2.png");
+    let logoPath = logo;
 
+    if (item.item.item_name && item?.item?.item_name.includes("K011111")) {
+      logoPath = k1;
+    } else if (
+      item.item.item_name &&
+      item?.item?.item_name.includes("K022222")
+    ) {
+      logoPath = k2;
+    } else {
+      logoPath = logo;
+    }
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader(
       "Content-Disposition",
