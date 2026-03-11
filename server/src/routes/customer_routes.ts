@@ -45,7 +45,7 @@ router.put("/me", authenticateCustomer, uploadSingleFile, editCustomerProfile);
 router.get(
   "/all",
   authenticateUser,
-  authorize(UserRole.SALES),
+  authorize(UserRole.SALES, UserRole.PURCHASING),
   getAllCustomers
 );
 
@@ -74,7 +74,7 @@ router.get(
 router.put(
   "/:customerId/status",
   authenticateUser,
-  authorize(UserRole.SALES),
+  authorize(UserRole.SALES, UserRole.PURCHASING),
   updateCustomerStatus
 );
 

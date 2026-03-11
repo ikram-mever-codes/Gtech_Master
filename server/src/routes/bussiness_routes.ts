@@ -18,15 +18,12 @@ const router: any = Router();
 
 router.use(authenticateUser);
 
-// Restricted to Admin and Sales
-router.use(authorize(UserRole.SALES));
+router.use(authorize(UserRole.SALES, UserRole.PURCHASING));
 
-// Bulk operations
 router.post("/bulk-import", bulkImportBusinesses);
 router.post("/bulk-delete", isAdmin, bulkDeleteBusinesses);
 router.post("/bulk-update-status", bulkUpdateStatus);
 
-// CRUD operations
 router.post("/", createBusiness);
 router.get("/", getAllBusinesses);
 router.get("/statistics", getBusinessStatistics);
