@@ -27,7 +27,7 @@ export interface BillToShipToData {
     ship_to_remarks?: string;
 }
 
-export const WAREHOUSE_DETAILS: Partial<BillToShipToData> = {
+export const WAREHOUSE_BILL_TO: Partial<BillToShipToData> = {
     bill_to_company_name: "GTech Industries GmbH",
     bill_to_display_name: "GTech",
     bill_to_phone_no: "+4923043389510",
@@ -42,6 +42,9 @@ export const WAREHOUSE_DETAILS: Partial<BillToShipToData> = {
     bill_to_city: "Schwerte",
     bill_to_postal_code: "58239",
     bill_to_full_address: "Reichshofstr. 137",
+};
+
+export const WAREHOUSE_SHIP_TO: Partial<BillToShipToData> = {
     ship_to_company_name: "GTech Industries GmbH",
     ship_to_display_name: "GTech",
     ship_to_contact_person: "Markus",
@@ -70,29 +73,20 @@ const BillToShipToForm: React.FC<BillToShipToFormProps> = ({
     // Auto-fill logic for GT-Warehouse
     useEffect(() => {
         if (data.customer_type === "GT-Warehouse") {
-            onBatchChange(WAREHOUSE_DETAILS);
+            onBatchChange(WAREHOUSE_BILL_TO);
         }
     }, [data.customer_type]);
 
     // Auto-fill logic for Other Customer (from selected customer)
+    // Only filling ship_to_company_name as requested, others manual
     useEffect(() => {
-        if (data.customer_type === "Other Customer" && selectedCustomer) {
+        if (selectedCustomer) {
             onBatchChange({
-                bill_to_company_name: selectedCustomer.legalName || selectedCustomer.companyName || "",
-                bill_to_email: selectedCustomer.email || selectedCustomer.contactEmail || "",
-                bill_to_phone_no: selectedCustomer.contactPhoneNumber || "",
-                bill_to_country: selectedCustomer.country || "",
-                bill_to_city: selectedCustomer.city || "",
-                bill_to_postal_code: selectedCustomer.postalCode || "",
-                bill_to_full_address: selectedCustomer.addressLine1 || "",
                 ship_to_company_name: selectedCustomer.companyName || "",
-                ship_to_country: selectedCustomer.deliveryCountry || selectedCustomer.country || "",
-                ship_to_city: selectedCustomer.deliveryCity || selectedCustomer.city || "",
-                ship_to_postal_code: selectedCustomer.deliveryPostalCode || selectedCustomer.postalCode || "",
-                ship_to_full_address: selectedCustomer.deliveryAddressLine1 || selectedCustomer.addressLine1 || "",
+                // We leave other fields empty for manual entry as requested
             });
         }
-    }, [data.customer_type, selectedCustomer]);
+    }, [selectedCustomer]);
 
     const isGTWarehouse = data.customer_type === "GT-Warehouse";
 
