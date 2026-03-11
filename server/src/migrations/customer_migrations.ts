@@ -23,18 +23,18 @@ export const migrateExistingCustomers = async () => {
     for (const customer of existingCustomers) {
       try {
         console.log(
-          `Migrating customer: ${customer.companyName} (${customer.id})`
+          `Migrating customer: ${customer.companyName} (${customer.id})`,
         );
 
         const existingStarDetails = await starCustomerDetailsRepository.findOne(
           {
             where: { customer: { id: customer.id } },
-          }
+          },
         );
 
         if (existingStarDetails) {
           console.log(
-            `Customer ${customer.companyName} already migrated, skipping...`
+            `Customer ${customer.companyName} already migrated, skipping...`,
           );
           continue;
         }
@@ -44,7 +44,7 @@ export const migrateExistingCustomers = async () => {
 
         if (!password) {
           console.warn(
-            `Customer ${customer.companyName} has no password, generating temporary one`
+            `Customer ${customer.companyName} has no password, generating temporary one`,
           );
           const tempPassword = crypto.randomBytes(8).toString("hex");
           password = await bcrypt.hash(tempPassword, 10);
@@ -86,19 +86,19 @@ export const migrateExistingCustomers = async () => {
 
         migratedCount++;
         console.log(
-          `✅ Successfully migrated customer: ${customer.companyName}`
+          `✅ Successfully migrated customer: ${customer.companyName}`,
         );
 
         if (shouldNotifyPassword) {
           console.log(
-            `⚠️  Customer ${customer.companyName} needs password reset notification`
+            `⚠️  Customer ${customer.companyName} needs password reset notification`,
           );
         }
       } catch (customerError) {
         errorCount++;
         console.error(
           `❌ Failed to migrate customer ${customer.companyName}:`,
-          customerError
+          customerError,
         );
       }
     }
@@ -122,6 +122,6 @@ export const migrateExistingCustomers = async () => {
   }
 };
 
-if (require.main === module) {
-  migrateExistingCustomers();
-}
+// if (require.main === module) {
+//   migrateExistingCustomers();
+// }

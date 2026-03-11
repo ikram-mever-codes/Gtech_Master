@@ -90,7 +90,6 @@ export const initializeCronJobs = () => {
   }
 };
 
-
 app.use((req: Request, res: Response, next: NextFunction) => {
   res.status(404).json({ message: "Resource Not Found!" });
 });
