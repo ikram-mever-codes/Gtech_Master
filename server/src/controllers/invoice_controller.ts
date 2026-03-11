@@ -661,7 +661,7 @@ export class InvoiceController {
 
         return {
           ...inv,
-          bill_to: "GTech Industries GmbH",
+          bill_to: "GTech-Warehouse",
           ship_to:
             cargo?.ship_to_company_name ||
             cargo?.ship_to_display_name ||

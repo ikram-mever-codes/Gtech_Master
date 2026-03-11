@@ -246,7 +246,11 @@ export const login = async (
 
     const cleanRes = (user.assignedResources || []).map(r => r.trim()).filter(r => r.length > 0);
     const derivedRes = user.permissions?.map(p => p.resource.trim()) || [];
-    const finalResources = Array.from(new Set([...cleanRes, ...derivedRes]));
+    let finalResources = Array.from(new Set([...cleanRes, ...derivedRes]));
+    
+    if (user.role === UserRole.PURCHASING && !finalResources.includes("Orders")) {
+      finalResources.push("Orders");
+    }
 
     const userData = {
       id: user.id,
@@ -314,7 +318,11 @@ export const getMe = async (
 
     const cleanResources = (user.assignedResources || []).map(r => r.trim()).filter(r => r.length > 0);
     const derivedResources = user.permissions?.map(p => p.resource.trim()) || [];
-    const finalResources = Array.from(new Set([...cleanResources, ...derivedResources]));
+    let finalResources = Array.from(new Set([...cleanResources, ...derivedResources]));
+
+    if (user.role === UserRole.PURCHASING && !finalResources.includes("Orders")) {
+      finalResources.push("Orders");
+    }
 
     const userData = {
       id: user.id,
@@ -612,8 +620,12 @@ export const getUserById = async (
 
 
     const cleanResources = (user.assignedResources || []).map(r => r.trim()).filter(r => r.length > 0);
-    const derivedResources = user.permissions?.map(p => p.resource) || [];
-    const finalResources = cleanResources.length > 0 ? cleanResources : Array.from(new Set(derivedResources));
+    const derivedResources = user.permissions?.map(p => p.resource.trim()) || [];
+    let finalResources = cleanResources.length > 0 ? cleanResources : Array.from(new Set(derivedResources));
+
+    if (user.role === UserRole.PURCHASING && !finalResources.includes("Orders")) {
+      finalResources.push("Orders");
+    }
 
     const userData = {
       id: user.id,

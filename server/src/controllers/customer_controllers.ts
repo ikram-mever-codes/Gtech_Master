@@ -730,9 +730,8 @@ Dein GTech Team
       headers: {
         "X-Priority": "3",
         "X-Mailer": "Gtech Industries Gmbh",
-        "List-Unsubscribe": `<mailto:${
-          process.env.SUPPORT_EMAIL || "contact@gtech.de"
-        }>`,
+        "List-Unsubscribe": `<mailto:${process.env.SUPPORT_EMAIL || "contact@gtech.de"
+          }>`,
       },
     });
 
@@ -856,8 +855,7 @@ export const updateCustomerStatus = async (
 
     <p>We're writing to inform you that your account status has been updated to: <strong>${status.toUpperCase()}</strong></p>
 
-    ${
-      status === "verified"
+    ${status === "verified"
         ? `
       <h3>Welcome Aboard!</h3>
       <p>Your account is now fully activated. You can access our platform using the link below:</p>
@@ -871,10 +869,9 @@ export const updateCustomerStatus = async (
       </ol>
     `
         : ""
-    }
+      }
 
-    ${
-      status === "rejected"
+    ${status === "rejected"
         ? `
       <h3>Account Verification Required</h3>
       <p>We were unable to verify your account. Please contact our support team for more information.</p>
@@ -886,10 +883,9 @@ export const updateCustomerStatus = async (
       </ol>
     `
         : ""
-    }
+      }
 
-    ${
-      status === "pending"
+    ${status === "pending"
         ? `
       <h3>Verification in Progress</h3>
       <p>We're currently reviewing your submitted documents.</p>
@@ -897,7 +893,7 @@ export const updateCustomerStatus = async (
       <p>Expect resolution within 3-5 business days.</p>
     `
         : ""
-    }
+      }
 
     <p><strong>Security Note:</strong> Never share your login credentials. Our team will never ask for your password.</p>
 
@@ -917,9 +913,8 @@ Dear ${customer.companyName},
 
 We're writing to inform you that your account status has been updated to: ${status.toUpperCase()}
 
-${
-  status === "verified"
-    ? `
+${status === "verified"
+        ? `
 Welcome Aboard!
 
 Your account is now fully activated. You can access our platform here:
@@ -930,12 +925,11 @@ First-time login instructions:
 2. Click "Forgot Password" if you need to set/reset your credentials
 3. Contact support if you experience any issues
 `
-    : ""
-}
+        : ""
+      }
 
-${
-  status === "rejected"
-    ? `
+${status === "rejected"
+        ? `
 Account Verification Required
 
 We were unable to verify your account. Please contact our support team for more information.
@@ -945,12 +939,11 @@ Next Steps:
 2. Provide any requested documentation
 3. We'll assist you with the verification process
 `
-    : ""
-}
+        : ""
+      }
 
-${
-  status === "pending"
-    ? `
+${status === "pending"
+        ? `
 Verification in Progress
 
 We're currently reviewing your submitted documents.
@@ -959,8 +952,8 @@ You can check your verification status at: ${process.env.STAR_URL}/dashboard
 
 Expect resolution within 3-5 business days.
 `
-    : ""
-}
+        : ""
+      }
 
 Security Note: Never share your login credentials. Our team will never ask for your password.
 
