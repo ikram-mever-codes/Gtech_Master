@@ -677,8 +677,8 @@ const RequestedItemsPage: React.FC = () => {
                         className="px-6 py-4 cursor-pointer"
                         onClick={() => handleItemClick(item)}
                       >
-                        <div className="w-[10rem]">
-                          <div className="text-sm font-medium text-gray-900">
+                        <div className="w-[12.5rem]">
+                          <div className="text-sm font-medium text-gray-900 line-clamp-3 leading-tight break-words">
                             {item.itemName}
                           </div>
                           {item.material && (

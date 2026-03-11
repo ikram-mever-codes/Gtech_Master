@@ -381,7 +381,7 @@ const CustomerCreatePage: React.FC = () => {
                 label="Legal Name"
                 icon={<LucideBuilding size={20} />}
                 formik={formik}
-                placeholder="Gtech Industries Gmbh"
+                placeholder="Gtech-Warehouse"
               />
             </div>
 

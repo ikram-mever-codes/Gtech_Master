@@ -287,9 +287,9 @@ function OrdersTable({
     },
     {
       header: "Item name",
-      width: "120px",
+      width: "200px",
       render: (row) => (
-        <div className="line-clamp-2 leading-tight" title={row.item?.item_name || row.item?.name}>
+        <div className="line-clamp-3 leading-tight break-words" title={row.item?.item_name || row.item?.name}>
           {row.item?.item_name || row.item?.name || "Unknown"}
         </div>
       ),
@@ -1761,7 +1761,7 @@ const OrderPage = () => {
                             <tr>
                               <th className="px-3 py-2 border-b">Order No</th>
                               <th className="px-3 py-2 border-b">EAN</th>
-                              <th className="px-3 py-2 border-b w-[120px]">Item Name</th>
+                              <th className="px-3 py-2 border-b w-[200px]">Item Name</th>
                               <th className="px-3 py-2 border-b">Remark</th>
                               <th className="px-3 py-2 border-b text-center">Qty</th>
                             </tr>
@@ -1775,7 +1775,11 @@ const OrderPage = () => {
                                 <tr key={it.id || idx} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
                                   <td className="px-3 py-2 font-bold text-blue-600">{it._order_no || "-"}</td>
                                   <td className="px-3 py-2 text-gray-600">{ean}</td>
-                                  <td className="px-3 py-2 font-medium text-gray-900 line-clamp-2 leading-tight max-w-[120px]">{name}</td>
+                                  <td className="px-3 py-2 font-medium text-gray-900 max-w-[200px]">
+                                    <div className="line-clamp-3 leading-tight break-words">
+                                      {name}
+                                    </div>
+                                  </td>
                                   <td className="px-3 py-2 text-gray-500 italic">{it.remark_de || it.remarks_cn || "-"}</td>
                                   <td className="px-3 py-2 font-bold text-center">{it.qty}</td>
                                 </tr>
@@ -2009,9 +2013,9 @@ const OrderPage = () => {
                             },
                             {
                               header: "Item Name",
-                              width: "120px",
+                              width: "200px",
                               render: (item: any) => (
-                                <div className="text-[10px] leading-tight font-semibold text-gray-800 line-clamp-2">
+                                <div className="text-[10px] leading-tight font-semibold text-gray-800 line-clamp-3 break-words">
                                   {item.item?.item_name ||
                                     itemById.get(String(item.item_id))
                                       ?.item_name ||
@@ -2437,10 +2441,10 @@ const OrderPage = () => {
                       },
                       {
                         header: "Item name",
-                        width: "120px",
+                        width: "200px",
                         render: (row) => (
                           <div
-                            className="line-clamp-2 leading-tight"
+                            className="line-clamp-3 leading-tight break-words"
                             title={
                               row.item?.item_name ||
                               itemById.get(String(row.item_id))?.item_name
@@ -2551,10 +2555,10 @@ const OrderPage = () => {
                       },
                       {
                         header: "Item Name",
-                        width: "120px",
+                        width: "200px",
                         render: (row) => (
                           <div
-                            className="line-clamp-2 leading-tight"
+                            className="line-clamp-3 leading-tight break-words"
                             title={
                               row.item?.item_name ||
                               itemById.get(String(row.item_id))?.item_name
@@ -2695,10 +2699,10 @@ const OrderPage = () => {
                       },
                       {
                         header: "Item Name",
-                        width: "120px",
+                        width: "250px",
                         render: (row) => (
                           <div
-                            className="font-semibold text-gray-800 line-clamp-2 leading-tight"
+                            className="font-semibold text-gray-800 line-clamp-3 leading-tight break-words"
                             title={row.item?.item_name || row.item?.name}
                           >
                             {row.item?.item_name || row.item?.name || "Unknown"}
@@ -3033,9 +3037,9 @@ const OrderPage = () => {
                     },
                     {
                       header: "Item Name",
-                      width: "120px",
+                      width: "200px",
                       render: (row) => (
-                        <div className="font-bold text-gray-900 line-clamp-2 leading-tight">
+                        <div className="font-bold text-gray-900 line-clamp-3 leading-tight break-words">
                           {row.itemName}
                         </div>
                       ),

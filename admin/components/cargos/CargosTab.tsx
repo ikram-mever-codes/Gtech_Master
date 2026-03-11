@@ -1004,7 +1004,7 @@ const CargosTab: React.FC<CargosTabProps> = ({ customers: externalCustomers }) =
                                                             <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
                                                                 Item ID
                                                             </th>
-                                                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                                                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase w-[200px]">
                                                                 Item Name
                                                             </th>
                                                             <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
@@ -1023,7 +1023,9 @@ const CargosTab: React.FC<CargosTabProps> = ({ customers: externalCustomers }) =
                                                             <tr key={idx} className="hover:bg-gray-50">
                                                                 <td className="px-4 py-2 text-sm text-gray-900">{oi.item_id}</td>
                                                                 <td className="px-4 py-2 text-sm text-gray-900">
-                                                                    {oi.item?.item_name || oi.item?.name || "-"}
+                                                                    <div className="line-clamp-3 leading-tight break-words">
+                                                                        {oi.item?.item_name || oi.item?.name || "-"}
+                                                                    </div>
                                                                 </td>
                                                                 <td className="px-4 py-2 text-sm text-gray-600">{oi.order_id}</td>
                                                                 <td className="px-4 py-2 text-center text-sm font-medium text-gray-900">

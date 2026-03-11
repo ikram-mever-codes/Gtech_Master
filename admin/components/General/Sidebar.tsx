@@ -158,6 +158,7 @@ const Sidebar = () => {
 
     return allMenuItems.filter((item) => {
       if (item.resource === "Dashboard") return true;
+      if (user.role === "PURCHASING" && item.resource === "Orders") return true;
       return userResources.includes(item.resource);
     });
   }, [user]);

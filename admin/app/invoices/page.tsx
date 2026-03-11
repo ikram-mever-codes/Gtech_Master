@@ -1156,7 +1156,15 @@ const InvoiceListPage: React.FC = () => {
                                                 width: "110px"
                                               },
                                               { header: "EAN", render: (it: any) => it.item?.ean, width: "130px" },
-                                              { header: "Item Name", render: (it: any) => it.item?.item_name, width: "220px" },
+                                              {
+                                                header: "Item Name",
+                                                render: (it: any) => (
+                                                  <div className="line-clamp-3 leading-tight break-words" title={it.item?.item_name}>
+                                                    {it.item?.item_name}
+                                                  </div>
+                                                ),
+                                                width: "250px"
+                                              },
                                               { header: "Taric code", render: (it: any) => it.item?.taric?.code, width: "110px" },
                                               { header: "Remark", render: (it: any) => `// ${it.remark_de || ''}`, width: "100px" },
                                               { header: "Order_no", render: (it: any) => it.order?.order_no || "-", width: "100px" },

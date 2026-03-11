@@ -70,20 +70,16 @@ const BillToShipToForm: React.FC<BillToShipToFormProps> = ({
     isEditEnabled,
     selectedCustomer,
 }) => {
-    // Auto-fill logic for GT-Warehouse
     useEffect(() => {
         if (data.customer_type === "GT-Warehouse") {
             onBatchChange(WAREHOUSE_BILL_TO);
         }
     }, [data.customer_type]);
 
-    // Auto-fill logic for Other Customer (from selected customer)
-    // Only filling ship_to_company_name as requested, others manual
     useEffect(() => {
         if (selectedCustomer) {
             onBatchChange({
                 ship_to_company_name: selectedCustomer.companyName || "",
-                // We leave other fields empty for manual entry as requested
             });
         }
     }, [selectedCustomer]);
