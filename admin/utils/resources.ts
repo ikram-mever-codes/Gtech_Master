@@ -102,4 +102,3 @@ export const availableResources: ResourceConfig[] = [
         purchasingRestricted: false,
     },
 ];
-
