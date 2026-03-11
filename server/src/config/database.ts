@@ -47,8 +47,8 @@ export const AppDataSource = new DataSource({
   username: process.env.DB_USERNAME || "postgres",
   password: process.env.DB_PASSWORD || "Mujtaba@911",
   database: process.env.DB_NAME || "master",
-  synchronize: false,
-  logging: true,
+  synchronize: true,
+  logging: false,
 
   entities: [
     User,
@@ -93,8 +93,8 @@ export const AppDataSource = new DataSource({
     ssl:
       process.env.DB_SSL === "true"
         ? {
-          rejectUnauthorized: false,
-        }
+            rejectUnauthorized: false,
+          }
         : false,
   },
   poolSize: 10,
