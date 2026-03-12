@@ -47,7 +47,7 @@ import CargoTypesTab from "@/components/cargos/CargoTypesTab";
 import { getAllCustomers, CustomerData as APICustomerData, updateCustomerProfile } from "@/api/customers";
 import { updateOrderItemStatus, splitOrderItem } from "@/api/orders";
 import { getAllCargos, CargoType } from "@/api/cargos";
-import BillToShipToForm, { BillToShipToData } from "@/components/General/BillToShipToForm";
+import BillToShipToForm, { BillToShipToData, WAREHOUSE_BILL_TO } from "@/components/General/BillToShipToForm";
 import { toast } from "react-hot-toast";
 import CustomModal from "@/components/UI/CustomModal";
 import { Pencil, Scissors, MoveRight } from "lucide-react";
@@ -321,21 +321,22 @@ const InvoiceListPage: React.FC = () => {
   const handleOpenBTSTModal = (customer: any) => {
     setSelectedCustomerForEdit(customer);
     setBtstFormData({
-      customer_type: customer.customer_type || "Other Customer",
-      bill_to_company_name: customer.bill_to_company_name || customer.legalName || customer.companyName || "",
-      bill_to_display_name: customer.bill_to_display_name || "GTech",
-      bill_to_phone_no: customer.bill_to_phone_no || customer.contactPhoneNumber || "",
-      bill_to_tax_no: customer.bill_to_tax_no || customer.taxNumber || "",
-      bill_to_email: customer.bill_to_email || customer.email || "",
-      bill_to_website: customer.bill_to_website || "-",
-      bill_to_contact_person: customer.bill_to_contact_person || "-",
-      bill_to_contact_phone: customer.bill_to_contact_phone || "-",
-      bill_to_contact_mobile: customer.bill_to_contact_mobile || "-",
-      bill_to_contact_email: customer.bill_to_contact_email || "-",
-      bill_to_country: customer.bill_to_country || customer.country || "",
-      bill_to_city: customer.bill_to_city || customer.city || "",
-      bill_to_postal_code: customer.bill_to_postal_code || customer.postalCode || "",
-      bill_to_full_address: customer.bill_to_full_address || customer.addressLine1 || "",
+      customer_type: customer.customer_type || "GT-Warehouse",
+      ...(customer.customer_type === "Other Customer" ? {} : WAREHOUSE_BILL_TO),
+      bill_to_company_name: customer.bill_to_company_name || WAREHOUSE_BILL_TO.bill_to_company_name,
+      bill_to_display_name: customer.bill_to_display_name || WAREHOUSE_BILL_TO.bill_to_display_name,
+      bill_to_phone_no: customer.bill_to_phone_no || WAREHOUSE_BILL_TO.bill_to_phone_no,
+      bill_to_tax_no: customer.bill_to_tax_no || WAREHOUSE_BILL_TO.bill_to_tax_no,
+      bill_to_email: customer.bill_to_email || WAREHOUSE_BILL_TO.bill_to_email,
+      bill_to_website: customer.bill_to_website || WAREHOUSE_BILL_TO.bill_to_website,
+      bill_to_contact_person: customer.bill_to_contact_person || WAREHOUSE_BILL_TO.bill_to_contact_person,
+      bill_to_contact_phone: customer.bill_to_contact_phone || WAREHOUSE_BILL_TO.bill_to_contact_phone,
+      bill_to_contact_mobile: customer.bill_to_contact_mobile || WAREHOUSE_BILL_TO.bill_to_contact_mobile,
+      bill_to_contact_email: customer.bill_to_contact_email || WAREHOUSE_BILL_TO.bill_to_contact_email,
+      bill_to_country: customer.bill_to_country || WAREHOUSE_BILL_TO.bill_to_country,
+      bill_to_city: customer.bill_to_city || WAREHOUSE_BILL_TO.bill_to_city,
+      bill_to_postal_code: customer.bill_to_postal_code || WAREHOUSE_BILL_TO.bill_to_postal_code,
+      bill_to_full_address: customer.bill_to_full_address || WAREHOUSE_BILL_TO.bill_to_full_address,
       ship_to_company_name: customer.ship_to_company_name || customer.companyName || "",
       ship_to_display_name: customer.ship_to_display_name || customer.companyName || "",
       ship_to_contact_person: customer.ship_to_contact_person || "-",
@@ -1155,7 +1156,15 @@ const InvoiceListPage: React.FC = () => {
                                                 width: "110px"
                                               },
                                               { header: "EAN", render: (it: any) => it.item?.ean, width: "130px" },
-                                              { header: "Item Name", render: (it: any) => it.item?.item_name, width: "220px" },
+                                              {
+                                                header: "Item Name",
+                                                render: (it: any) => (
+                                                  <div className="line-clamp-3 leading-tight break-words" title={it.item?.item_name}>
+                                                    {it.item?.item_name}
+                                                  </div>
+                                                ),
+                                                width: "250px"
+                                              },
                                               { header: "Taric code", render: (it: any) => it.item?.taric?.code, width: "110px" },
                                               { header: "Remark", render: (it: any) => `// ${it.remark_de || ''}`, width: "100px" },
                                               { header: "Order_no", render: (it: any) => it.order?.order_no || "-", width: "100px" },

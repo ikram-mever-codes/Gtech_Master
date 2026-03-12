@@ -30,7 +30,7 @@ import {
 import { getAllOrders, type Order } from "@/api/orders";
 import { getAllCustomers } from "@/api/customers";
 import { errorStyles, successStyles } from "@/utils/constants";
-import BillToShipToForm, { BillToShipToData } from "../General/BillToShipToForm";
+import BillToShipToForm, { BillToShipToData, WAREHOUSE_BILL_TO } from "../General/BillToShipToForm";
 import { getAllCargoTypes, CargoTypeObj } from "@/api/cargo_types";
 
 
@@ -113,21 +113,8 @@ const CargosTab: React.FC<CargosTabProps> = ({ customers: externalCustomers }) =
         remark: "",
         cargo_status: "Open",
         shipped_at: "",
-        customer_type: "Other Customer",
-        bill_to_company_name: "",
-        bill_to_display_name: "",
-        bill_to_phone_no: "",
-        bill_to_tax_no: "",
-        bill_to_email: "",
-        bill_to_website: "",
-        bill_to_contact_person: "",
-        bill_to_contact_phone: "",
-        bill_to_contact_mobile: "",
-        bill_to_contact_email: "",
-        bill_to_country: "",
-        bill_to_city: "",
-        bill_to_postal_code: "",
-        bill_to_full_address: "",
+        customer_type: "GT-Warehouse",
+        ...WAREHOUSE_BILL_TO,
         ship_to_company_name: "",
         ship_to_display_name: "",
         ship_to_contact_person: "",
@@ -288,21 +275,8 @@ const CargosTab: React.FC<CargosTabProps> = ({ customers: externalCustomers }) =
             remark: "",
             cargo_status: "Open",
             shipped_at: "",
-            customer_type: "Other Customer",
-            bill_to_company_name: "",
-            bill_to_display_name: "",
-            bill_to_phone_no: "",
-            bill_to_tax_no: "",
-            bill_to_email: "",
-            bill_to_website: "",
-            bill_to_contact_person: "",
-            bill_to_contact_phone: "",
-            bill_to_contact_mobile: "",
-            bill_to_contact_email: "",
-            bill_to_country: "",
-            bill_to_city: "",
-            bill_to_postal_code: "",
-            bill_to_full_address: "",
+            customer_type: "GT-Warehouse",
+            ...WAREHOUSE_BILL_TO,
             ship_to_company_name: "",
             ship_to_display_name: "",
             ship_to_contact_person: "",
@@ -1030,7 +1004,7 @@ const CargosTab: React.FC<CargosTabProps> = ({ customers: externalCustomers }) =
                                                             <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
                                                                 Item ID
                                                             </th>
-                                                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                                                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase w-[200px]">
                                                                 Item Name
                                                             </th>
                                                             <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
@@ -1049,7 +1023,9 @@ const CargosTab: React.FC<CargosTabProps> = ({ customers: externalCustomers }) =
                                                             <tr key={idx} className="hover:bg-gray-50">
                                                                 <td className="px-4 py-2 text-sm text-gray-900">{oi.item_id}</td>
                                                                 <td className="px-4 py-2 text-sm text-gray-900">
-                                                                    {oi.item?.item_name || oi.item?.name || "-"}
+                                                                    <div className="line-clamp-3 leading-tight break-words">
+                                                                        {oi.item?.item_name || oi.item?.name || "-"}
+                                                                    </div>
                                                                 </td>
                                                                 <td className="px-4 py-2 text-sm text-gray-600">{oi.order_id}</td>
                                                                 <td className="px-4 py-2 text-center text-sm font-medium text-gray-900">

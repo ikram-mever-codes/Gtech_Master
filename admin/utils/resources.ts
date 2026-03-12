@@ -3,9 +3,9 @@ export interface ResourceConfig {
     name: string;
     description: string;
     actions: string[];
-    adminOnly?: boolean; // Only ADMIN role can access this resource
-    salesOnly?: boolean; // Only SALES can access (not PURCHASING)
-    purchasingRestricted?: boolean; // PURCHASING has limited access
+    adminOnly?: boolean;
+    salesOnly?: boolean;
+    purchasingRestricted?: boolean;
 }
 
 export const availableResources: ResourceConfig[] = [
@@ -19,7 +19,7 @@ export const availableResources: ResourceConfig[] = [
         name: "Users",
         description: "Manage user accounts and permissions",
         actions: ["create", "read", "update", "delete"],
-        adminOnly: true, // Only ADMIN can manage users
+        adminOnly: true,
     },
     {
         name: "Items",
@@ -32,55 +32,55 @@ export const availableResources: ResourceConfig[] = [
         description: "Manage scheduled items and lists - PURCHASING sees technical data only",
         actions: ["create", "read", "update", "delete"],
         adminOnly: false,
-        purchasingRestricted: true, // PURCHASING: technical data only, no customer info
+        purchasingRestricted: true,
     },
     {
         name: "Bussinesses",
         description: "Manage business accounts and companies",
         actions: ["create", "read", "update", "delete"],
-        adminOnly: true, // Only ADMIN can see and manage businesses
+        adminOnly: true,
     },
     {
         name: "Contacts",
         description: "Manage contact persons and relationships",
         actions: ["create", "read", "update", "delete"],
         adminOnly: false,
-        salesOnly: true, // Only SALES and ADMIN can access
+        salesOnly: true,
     },
     {
         name: "Customers",
         description: "Manage customer accounts and profiles - SALES ONLY",
         actions: ["create", "read", "update", "delete"],
         adminOnly: false,
-        salesOnly: true, // SALES can access, PURCHASING cannot
+        salesOnly: true,
     },
     {
         name: "Inquiries",
         description: "Manage customer inquiries and requests",
         actions: ["create", "read", "update", "delete", "convert"],
         adminOnly: false,
-        salesOnly: true, // SALES can see full inquiries, PURCHASING sees requests only
+        salesOnly: true,
     },
     {
         name: "Requests",
         description: "Technical requests data - PURCHASING can access (no customer info)",
         actions: ["read", "update"],
         adminOnly: false,
-        purchasingRestricted: true, // PURCHASING: technical data only
+        purchasingRestricted: true,
     },
     {
         name: "Offers",
         description: "Manage price offers and quotations - SALES ONLY",
         actions: ["create", "read", "update", "delete", "generate_pdf"],
         adminOnly: false,
-        salesOnly: true, // Only SALES and ADMIN can access offers
+        salesOnly: true,
     },
     {
         name: "Invoices",
         description: "Manage invoices and billing - SALES ONLY",
         actions: ["create", "read", "update", "delete"],
         adminOnly: false,
-        salesOnly: true, // Only SALES and ADMIN can access invoices
+        salesOnly: true,
     },
     {
         name: "Library",
@@ -90,10 +90,9 @@ export const availableResources: ResourceConfig[] = [
     },
     {
         name: "Orders",
-        description: "Manage customer orders and processing - SALES ONLY",
+        description: "Manage customer orders and processing",
         actions: ["create", "read", "update", "delete"],
         adminOnly: false,
-        salesOnly: true, // Only SALES and ADMIN can access orders
     },
     {
         name: "Suppliers",
@@ -103,4 +102,3 @@ export const availableResources: ResourceConfig[] = [
         purchasingRestricted: false,
     },
 ];
-

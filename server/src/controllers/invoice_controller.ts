@@ -661,19 +661,11 @@ export class InvoiceController {
 
         return {
           ...inv,
-          bill_to:
-            cargo?.bill_to_display_name ||
-            cargo?.bill_to_company_name ||
-            cargo?.customer?.companyName ||
-            cargo?.customer?.legalName ||
-            inv.customer?.companyName ||
-            "N/A",
+          bill_to: "GTech-Warehouse",
           ship_to:
+            cargo?.ship_to_company_name ||
             cargo?.ship_to_display_name ||
-            cargo?.ship_to_city ||
-            cargo?.customer?.city ||
-            cargo?.customer?.deliveryCity ||
-            inv.customer?.city ||
+            inv.customer?.companyName ||
             "-",
           customItemCount,
           customTotalQty

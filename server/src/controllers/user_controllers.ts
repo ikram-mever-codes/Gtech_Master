@@ -64,12 +64,17 @@ export const createUser = async (
     const emailVerificationExp = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
 
+    let finalAssignedResources = assignedResources || [];
+    if (role === UserRole.PURCHASING && !finalAssignedResources.includes("Orders")) {
+      finalAssignedResources.push("Orders");
+    }
+
     const user = userRepository.create({
       name,
       email,
       password: hashedPassword,
       role,
-      assignedResources: assignedResources || [],
+      assignedResources: finalAssignedResources,
       phoneNumber: phoneNumber || null,
       country: country || null,
       gender: gender || null,
@@ -87,9 +92,17 @@ export const createUser = async (
     await userRepository.save(user);
 
 
-    if (permissions && permissions.length > 0) {
+    const finalPermissions = permissions || [];
+    if (role === UserRole.PURCHASING && !finalPermissions.find((p: any) => p.resource === "Orders")) {
+      finalPermissions.push({
+        resource: "Orders",
+        actions: ["create", "read", "update", "delete"]
+      });
+    }
+
+    if (finalPermissions.length > 0) {
       const permissionRepository = AppDataSource.getRepository(Permission);
-      const permissionEntities = permissions.map((perm: any) =>
+      const permissionEntities = finalPermissions.map((perm: any) =>
         permissionRepository.create({
           resource: perm.resource,
           actions: perm.actions,
@@ -231,13 +244,21 @@ export const login = async (
     );
 
 
+    const cleanRes = (user.assignedResources || []).map(r => r.trim()).filter(r => r.length > 0);
+    const derivedRes = user.permissions?.map(p => p.resource.trim()) || [];
+    let finalResources = Array.from(new Set([...cleanRes, ...derivedRes]));
+    
+    if (user.role === UserRole.PURCHASING && !finalResources.includes("Orders")) {
+      finalResources.push("Orders");
+    }
+
     const userData = {
       id: user.id,
       name: user.name,
       email: user.email,
       role: user.role,
       permissions: user.permissions,
-      assignedResources: user.assignedResources,
+      assignedResources: finalResources,
       avatar: user.avatar,
       partnerName: user.partnerName,
       emergencyContact: user.emergencyContact,
@@ -297,7 +318,11 @@ export const getMe = async (
 
     const cleanResources = (user.assignedResources || []).map(r => r.trim()).filter(r => r.length > 0);
     const derivedResources = user.permissions?.map(p => p.resource.trim()) || [];
-    const finalResources = Array.from(new Set([...cleanResources, ...derivedResources]));
+    let finalResources = Array.from(new Set([...cleanResources, ...derivedResources]));
+
+    if (user.role === UserRole.PURCHASING && !finalResources.includes("Orders")) {
+      finalResources.push("Orders");
+    }
 
     const userData = {
       id: user.id,
@@ -595,8 +620,12 @@ export const getUserById = async (
 
 
     const cleanResources = (user.assignedResources || []).map(r => r.trim()).filter(r => r.length > 0);
-    const derivedResources = user.permissions?.map(p => p.resource) || [];
-    const finalResources = cleanResources.length > 0 ? cleanResources : Array.from(new Set(derivedResources));
+    const derivedResources = user.permissions?.map(p => p.resource.trim()) || [];
+    let finalResources = cleanResources.length > 0 ? cleanResources : Array.from(new Set(derivedResources));
+
+    if (user.role === UserRole.PURCHASING && !finalResources.includes("Orders")) {
+      finalResources.push("Orders");
+    }
 
     const userData = {
       id: user.id,
@@ -1112,7 +1141,11 @@ export const updateUser = async (
       user.email = email;
       user.role = role;
 
-      const rawResources = Array.isArray(assignedResources) ? assignedResources : [];
+      let rawResources = Array.isArray(assignedResources) ? assignedResources : [];
+      if (role === UserRole.PURCHASING && !rawResources.includes('Orders')) {
+        rawResources.push('Orders');
+      }
+
       user.assignedResources = rawResources.map((r: string) => r.trim()).filter((r: string) => r.length > 0);
       user.phoneNumber = phoneNumber || null;
       user.gender = gender || null;
@@ -1124,17 +1157,21 @@ export const updateUser = async (
       if (joiningDate !== undefined) user.joiningDate = joiningDate || null;
       if (isLoginEnabled !== undefined) user.isLoginEnabled = isLoginEnabled;
 
-      // Save user first
       await tUserRepo.save(user);
 
-      // Handle Permissions if provided
       if (permissions) {
-        // Delete existing for this user
         await tPermRepo.delete({ user: { id: user.id } });
 
-        // Save new ones if any
-        if (permissions.length > 0) {
-          const permissionEntities = permissions.map((perm: any) =>
+        const finalPermissions = Array.isArray(permissions) ? permissions : [];
+        if (role === UserRole.PURCHASING && !finalPermissions.find((p: any) => p.resource === "Orders")) {
+          finalPermissions.push({
+            resource: "Orders",
+            actions: ["create", "read", "update", "delete"]
+          });
+        }
+
+        if (finalPermissions.length > 0) {
+          const permissionEntities = finalPermissions.map((perm: any) =>
             tPermRepo.create({
               resource: String(perm.resource).trim(),
               actions: Array.isArray(perm.actions)
@@ -1148,7 +1185,6 @@ export const updateUser = async (
       }
     });
 
-    // Fetch the update state to confirm and return
     const updatedUser = await userRepository.findOne({
       where: { id: user.id },
       relations: ["permissions"],

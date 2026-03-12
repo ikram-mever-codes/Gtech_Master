@@ -23,7 +23,7 @@ const router: any = Router();
 
 router.use(authenticateUser);
 
-router.use(authorize(UserRole.SALES));
+router.use(authorize(UserRole.SALES, UserRole.PURCHASING));
 
 router.post("/", createContactPerson);
 router.get("/", getAllContactPersons);

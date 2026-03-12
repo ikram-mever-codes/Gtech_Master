@@ -134,9 +134,6 @@ export class EtlController {
       next(error);
     }
   }
-  /**
-   * Process a batch of orders
-   */
   private static async processOrderBatch(
     rows: any[],
     orderRepo: any,
@@ -164,7 +161,6 @@ export class EtlController {
           throw new Error("Order number is empty");
         }
 
-        // Check if order already exists
         const existingOrder = await orderRepo.findOne({
           where: { order_no: orderNo },
         });
@@ -444,9 +440,9 @@ export class EtlController {
       const csvOrderNos =
         records.length > 1
           ? records
-              .slice(1)
-              .map((r) => r[0]?.toString().trim())
-              .filter(Boolean)
+            .slice(1)
+            .map((r) => r[0]?.toString().trim())
+            .filter(Boolean)
           : [];
 
       // Find orders not in CSV and not containing "DENI"
@@ -547,9 +543,9 @@ export class EtlController {
       const csvMasterIds =
         records.length > 1
           ? records
-              .slice(1)
-              .map((r) => r[0]?.toString().trim())
-              .filter(Boolean)
+            .slice(1)
+            .map((r) => r[0]?.toString().trim())
+            .filter(Boolean)
           : [];
 
       const existingItems = await orderItemRepo.find({

@@ -287,10 +287,10 @@ function OrdersTable({
     },
     {
       header: "Item name",
-      width: "120px",
+      width: "200px",
       render: (row) => (
         <div
-          className="line-clamp-2 leading-tight"
+          className="line-clamp-3 leading-tight break-words"
           title={row.item?.item_name || row.item?.name}
         >
           {row.item?.item_name || row.item?.name || "Unknown"}
@@ -1776,7 +1776,7 @@ const OrderPage = () => {
                             <tr>
                               <th className="px-3 py-2 border-b">Order No</th>
                               <th className="px-3 py-2 border-b">EAN</th>
-                              <th className="px-3 py-2 border-b w-[120px]">
+                              <th className="px-3 py-2 border-b w-[200px]">
                                 Item Name
                               </th>
                               <th className="px-3 py-2 border-b">Remark</th>
@@ -2057,9 +2057,9 @@ const OrderPage = () => {
                             },
                             {
                               header: "Item Name",
-                              width: "120px",
+                              width: "200px",
                               render: (item: any) => (
-                                <div className="text-[10px] leading-tight font-semibold text-gray-800 line-clamp-2">
+                                <div className="text-[10px] leading-tight font-semibold text-gray-800 line-clamp-3 break-words">
                                   {item.item?.item_name ||
                                     itemById.get(String(item.item_id))
                                       ?.item_name ||
@@ -2485,10 +2485,10 @@ const OrderPage = () => {
                       },
                       {
                         header: "Item name",
-                        width: "120px",
+                        width: "200px",
                         render: (row) => (
                           <div
-                            className="line-clamp-2 leading-tight"
+                            className="line-clamp-3 leading-tight break-words"
                             title={
                               row.item?.item_name ||
                               itemById.get(String(row.item_id))?.item_name
@@ -2599,10 +2599,10 @@ const OrderPage = () => {
                       },
                       {
                         header: "Item Name",
-                        width: "120px",
+                        width: "200px",
                         render: (row) => (
                           <div
-                            className="line-clamp-2 leading-tight"
+                            className="line-clamp-3 leading-tight break-words"
                             title={
                               row.item?.item_name ||
                               itemById.get(String(row.item_id))?.item_name
@@ -2743,10 +2743,10 @@ const OrderPage = () => {
                       },
                       {
                         header: "Item Name",
-                        width: "120px",
+                        width: "250px",
                         render: (row) => (
                           <div
-                            className="font-semibold text-gray-800 line-clamp-2 leading-tight"
+                            className="font-semibold text-gray-800 line-clamp-3 leading-tight break-words"
                             title={row.item?.item_name || row.item?.name}
                           >
                             {row.item?.item_name || row.item?.name || "Unknown"}

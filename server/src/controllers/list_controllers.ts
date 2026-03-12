@@ -1271,12 +1271,9 @@ export const searchItems = async (
           id: Number(q),
         });
       }
-
-      // Only return items that have photos
       queryBuilder.andWhere("item.photo IS NOT NULL");
       queryBuilder.andWhere("item.photo != ''");
 
-      // Limit results
       queryBuilder.limit(10);
 
       const items = await queryBuilder.getMany();

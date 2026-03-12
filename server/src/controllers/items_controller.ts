@@ -424,21 +424,27 @@ export const createItem = async (
 
     await itemRepository.save(newItem);
 
-    const warehouseRepository = AppDataSource.getRepository(WarehouseItem);
-    const warehouseItem = warehouseRepository.create({
-      item_id: newItem.id,
-      item_no_de: parent.de_no,
-      item_name_de: item_name,
-      item_name_en: item_name,
-      stock_qty: 0,
-      msq: 0,
-      buffer: 0,
-      is_active: "Y",
-      is_stock_item: "N",
-      created_at: new Date(),
-    });
-
-    await warehouseRepository.save(warehouseItem);
+    try {
+      const warehouseRepository = AppDataSource.getRepository(WarehouseItem);
+      const warehouseItem = warehouseRepository.create({
+        item_id: newItem.id,
+        item_no_de: parent.de_no,
+        item_name_de: item_name,
+        item_name_en: item_name,
+        stock_qty: 0,
+        msq: 0,
+        buffer: 0,
+        is_active: "Y",
+        is_stock_item: "N",
+        created_at: new Date(),
+      });
+      await warehouseRepository.save(warehouseItem);
+    } catch (warehouseError: any) {
+      console.warn(
+        "Could not create warehouse entry for new item (table may not exist):",
+        warehouseError?.message,
+      );
+    }
 
     return res.status(201).json({
       success: true,
@@ -446,7 +452,7 @@ export const createItem = async (
       data: {
         id: newItem.id,
         item_name: newItem.item_name,
-        ean: newItem.ean,
+        ean: newItem.ean?.toString(),
         parent_id: newItem.parent_id,
         supplier_id: newItem.supplier_id,
         isActive: newItem.isActive,
@@ -750,11 +756,16 @@ export const getItemStatistics = async (
       where: { isActive: "Y" },
     });
 
-    const itemsWithStock = await warehouseRepository
-      .createQueryBuilder("warehouse")
-      .select("COUNT(DISTINCT warehouse.item_id)", "count")
-      .where("warehouse.stock_qty > 0")
-      .getRawOne();
+    let itemsWithStock: any = { count: 0 };
+    try {
+      itemsWithStock = await warehouseRepository
+        .createQueryBuilder("warehouse")
+        .select("COUNT(DISTINCT warehouse.item_id)", "count")
+        .where("warehouse.stock_qty > 0")
+        .getRawOne() || { count: 0 };
+    } catch (e: any) {
+      console.warn("Could not fetch warehouse stock statistics:", e.message);
+    }
 
     const itemsByCategory = await itemRepository
       .createQueryBuilder("item")
