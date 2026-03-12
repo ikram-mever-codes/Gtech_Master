@@ -19,6 +19,7 @@ import { api, handleApiError } from "@/utils/api";
 import { login } from "../Redux/features/userSlice";
 import axios from "axios";
 import { useRouter } from "next/navigation";
+import { UserRole } from "@/utils/interfaces";
 
 const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
@@ -46,8 +47,12 @@ const Login = () => {
       toast.dismiss();
       toast.success(`Welcome ${response.data.data.name}!`, successStyles);
 
-      router.push("/scheduled");
-      window.location.reload();
+      // Fix: Add preventDefault if in an event handler
+      if (response.data.data.role === "PURCHASING") {
+        router.push("/orders?tab=label_print");
+      } else {
+        router.push("/scheduled");
+      }
 
       return response.data;
     } catch (error) {
@@ -57,7 +62,11 @@ const Login = () => {
 
   useEffect(() => {
     if (user && !loading) {
-      router.push("/scheduled");
+      if (user.role === "PURCHASING") {
+        router.push("/orders?tab=label_print");
+      } else {
+        router.push("/scheduled");
+      }
     }
   }, [user, loading, router]);
 
