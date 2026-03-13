@@ -162,21 +162,41 @@ export const getItemById = async (
       return next(new ErrorHandler("Item not found", 404));
     }
 
-    const warehouseItems = await warehouseRepository.find({
-      where: { item_id: parseInt(id) },
-    });
+    let warehouseItems: any[] = [];
+    try {
+      warehouseItems = await warehouseRepository.find({
+        where: { item_id: parseInt(id) },
+      });
+    } catch (e: any) {
+      console.warn("warehouse_items table not available:", e.message);
+    }
 
-    const variationValues = await variationRepository.find({
-      where: { item_id: parseInt(id) },
-    });
+    let variationValues: any[] = [];
+    try {
+      variationValues = await variationRepository.find({
+        where: { item_id: parseInt(id) },
+      });
+    } catch (e: any) {
+      console.warn("variation_values table not available:", e.message);
+    }
 
-    const qualityCriteria = await qualityRepository.find({
-      where: { item_id: parseInt(id) },
-    });
+    let qualityCriteria: any[] = [];
+    try {
+      qualityCriteria = await qualityRepository.find({
+        where: { item_id: parseInt(id) },
+      });
+    } catch (e: any) {
+      console.warn("item_qualities table not available:", e.message);
+    }
 
-    const supplierItem = await supplierItemRepository.findOne({
-      where: { item_id: parseInt(id) },
-    });
+    let supplierItem: any = null;
+    try {
+      supplierItem = await supplierItemRepository.findOne({
+        where: { item_id: parseInt(id) },
+      });
+    } catch (e: any) {
+      console.warn("supplier_items table not available:", e.message);
+    }
 
     // const orderItems = await orderItemRepository.find({
     //   where: { item: parseInt(id) },
@@ -398,7 +418,7 @@ export const createItem = async (
     const newItem = itemRepository.create({
       item_name,
       item_name_cn,
-      ean: ean ? BigInt(ean) : null,
+      ean: ean ? ean.toString() : null,
       parent_id,
       taric_id,
       cat_id,
@@ -527,7 +547,7 @@ export const updateItem = async (
       if (value !== undefined) {
         if (field === "ean") {
           if (value && value.toString().trim() !== "") {
-            (item as any)[field] = BigInt(value);
+            (item as any)[field] = value.toString();
           } else {
             (item as any)[field] = null;
           }

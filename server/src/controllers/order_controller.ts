@@ -761,3 +761,39 @@ export const splitOrderItem = async (
     await queryRunner.release();
   }
 };
+
+export const updateOrderItemPrice = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { id } = req.params;
+    const { eur_special_price } = req.body;
+
+    if (eur_special_price === undefined) {
+      return next(new ErrorHandler("eur_special_price is required", 400));
+    }
+
+    const orderItemsRepo = AppDataSource.getRepository(OrderItem);
+    const orderItem = await orderItemsRepo.findOne({
+      where: { id: Number(id) },
+    });
+
+    if (!orderItem) {
+      return next(new ErrorHandler("Order Item not found", 404));
+    }
+
+    orderItem.eur_special_price = Number(eur_special_price);
+    orderItem.updated_at = new Date();
+    await orderItemsRepo.save(orderItem);
+
+    return res.status(200).json({
+      success: true,
+      message: "Order item price updated successfully",
+      data: orderItem,
+    });
+  } catch (error) {
+    return next(error);
+  }
+};

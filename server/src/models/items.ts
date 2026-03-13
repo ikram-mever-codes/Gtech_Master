@@ -37,8 +37,8 @@ export class Item {
   @Column({ type: "varchar", length: 3, nullable: true })
   supp_cat?: string;
 
-  @Column({ type: "bigint", nullable: true })
-  ean?: number;
+  @Column({ type: "varchar", length: 50, nullable: true })
+  ean?: string;
 
   @Column({ nullable: true })
   taric_id?: number;

@@ -749,8 +749,9 @@ export class InvoiceController {
 
       const orderNumber = invoice.orderNumber;
       let orderItems: any[] = [];
+      let cargo: any = null;
 
-      const cargo = await cargoRepository.findOne({
+      cargo = await cargoRepository.findOne({
         where: { cargo_no: orderNumber },
       });
 
@@ -770,25 +771,53 @@ export class InvoiceController {
           });
         }
       }
-      const taricGroupsMap = new Map<number | string, any>();
+
+      const getEffectiveTaricCode = (oi: any): string => {
+        const itemTaricCode = oi.item?.taric?.code || "";
+        const isProjectItem = !itemTaricCode || itemTaricCode === "0" || itemTaricCode === "0000000000";
+        if (isProjectItem && oi.set_taric_code) {
+          return oi.set_taric_code.toString();
+        }
+        return itemTaricCode || "unknown";
+      };
+
+      const getGroupKey = (oi: any): string => {
+        const itemTaricCode = oi.item?.taric?.code || "";
+        const isProjectItem = !itemTaricCode || itemTaricCode === "0" || itemTaricCode === "0000000000";
+        if (isProjectItem && oi.set_taric_code) {
+          return `set_${oi.set_taric_code}`;
+        }
+        const taricId = oi.item?.taric?.id;
+        return taricId ? `taric_${taricId}` : "unknown";
+      };
+
+      const taricGroupsMap = new Map<string, any>();
       orderItems.forEach((oi: any) => {
         const item = oi.item;
         const taric = item?.taric;
-        const taricId = taric?.id || "unknown";
+        const itemTaricCode = taric?.code || "";
+        const isProjectItem = !itemTaricCode || itemTaricCode === "0" || itemTaricCode === "0000000000";
+        const groupKey = getGroupKey(oi);
 
-        if (!taricGroupsMap.has(taricId)) {
-          taricGroupsMap.set(taricId, {
-            taricId,
-            taricNameEn: taric?.name_en || "Unknown",
-            taricCode: taric?.code || "-",
+        if (!taricGroupsMap.has(groupKey)) {
+          let displayCode = taric?.code || "-";
+          if (isProjectItem && oi.set_taric_code) {
+            displayCode = `${oi.set_taric_code}`;
+          }
+
+          taricGroupsMap.set(groupKey, {
+            taricId: taric?.id || groupKey,
+            taricNameEn: taric?.name_en || (isProjectItem ? "Project Item" : "Unknown"),
+            taricCode: displayCode,
             dutyRate: taric?.duty_rate || 0,
             totalQty: 0,
             totalPrice: 0,
             unitPrice: oi?.eur_special_price || oi?.price || item?.price || 0,
+            isProjectItem,
           });
         }
 
-        const group = taricGroupsMap.get(taricId);
+        const group = taricGroupsMap.get(groupKey)!;
         group.totalQty += oi.qty || 0;
         const currentPrice = oi?.eur_special_price || oi?.price || item?.price || 0;
         group.totalPrice += (oi.qty || 0) * (Number(currentPrice) || 0);
@@ -796,23 +825,33 @@ export class InvoiceController {
 
       const taricGroups = Array.from(taricGroupsMap.values());
 
+      const sortedItems = [...orderItems]
+        .map((oi: any) => ({
+          ...oi,
+          v: (oi.item?.length * oi.item?.width * oi.item?.height) / 1000 || 0,
+          w: oi.item?.weight || 0,
+          _effectiveTaricCode: getEffectiveTaricCode(oi),
+        }))
+        .sort((a, b) => {
+          const codeCompare = a._effectiveTaricCode.localeCompare(b._effectiveTaricCode);
+          if (codeCompare !== 0) return codeCompare;
+          return (a.item?.item_name || "").localeCompare(b.item?.item_name || "");
+        });
+
+      const orderNosInCargo = [...new Set(orderItems.map((oi: any) => oi.order?.order_no).filter(Boolean))];
+
       return res.json({
         success: true,
         data: {
           invoice,
-          detailedItems: orderItems
-            .map((oi: any) => ({
-              ...oi,
-              v:
-                (oi.item?.length * oi.item?.width * oi.item?.height) / 1000 ||
-                0,
-              w: oi.item?.weight || 0,
-            }))
-            .sort((a, b) => {
-              const codeA = a.item?.taric?.code || "";
-              const codeB = b.item?.taric?.code || "";
-              return codeA.localeCompare(codeB);
-            }),
+          cargo: cargo ? {
+            id: cargo.id,
+            cargo_no: cargo.cargo_no,
+            ship_to: cargo.ship_to_company_name || cargo.ship_to_display_name || null,
+            bill_to: cargo.bill_to_company_name || cargo.bill_to_display_name || null,
+          } : null,
+          orderNosInCargo,
+          detailedItems: sortedItems,
           taricGroups,
         },
       });
@@ -821,6 +860,7 @@ export class InvoiceController {
       return next(error);
     }
   };
+
 
   static markAsPaid = async (req: Request, res: Response, next: NextFunction) => {
     const invoiceRepository = AppDataSource.getRepository(Invoice);
