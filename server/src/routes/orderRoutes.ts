@@ -8,6 +8,7 @@ import {
   deleteOrder,
   generateLabelPDF,
   updateOrderItemStatus,
+  updateOrderItemPrice,
   splitOrderItem,
 } from "../controllers/order_controller";
 import { authenticateUser, authorize } from "../middlewares/authorized";
@@ -28,6 +29,11 @@ router.put(
   "/items/:id/status",
   authorize(UserRole.SALES, UserRole.PURCHASING),
   updateOrderItemStatus,
+);
+router.put(
+  "/items/:id/price",
+  authorize(UserRole.SALES, UserRole.PURCHASING),
+  updateOrderItemPrice,
 );
 router.post("/items/:id/split", authorize(UserRole.SALES, UserRole.PURCHASING), splitOrderItem);
 
