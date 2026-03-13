@@ -19,6 +19,8 @@ interface SpreadSheetProps {
     totalPrice?: number;
     totalCols?: TotalCol[];
     loading?: boolean;
+    renderRowDetails?: (row: any, index: number) => React.ReactNode;
+    expandedRowId?: string | number | null;
 }
 
 const SpreadSheet: React.FC<SpreadSheetProps> = ({
@@ -29,7 +31,9 @@ const SpreadSheet: React.FC<SpreadSheetProps> = ({
     totalQty,
     totalPrice,
     totalCols,
-    loading = false
+    loading = false,
+    renderRowDetails,
+    expandedRowId
 }) => {
     return (
         <div className="bg-white rounded-[4px] overflow-hidden shadow-sm mb-4 border border-gray-200 [&_th]:!text-white [&_th]:!border-r-[#4A5568]">
@@ -40,6 +44,8 @@ const SpreadSheet: React.FC<SpreadSheetProps> = ({
                 emptyMessage="No items found"
                 headerClassName="bg-[#343A40] border-b border-gray-300"
                 getRowClassName={(row, idx) => `text-[#212529] font-medium transition-colors border-b border-gray-200 ${idx % 2 === 0 ? 'bg-[#EAF5E5] hover:bg-[#D4EDDA]' : 'bg-white hover:bg-gray-50'}`}
+                renderRowDetails={renderRowDetails}
+                expandedRowId={expandedRowId}
             />
             {showTotals && (
                 <div className="bg-[#343A40] px-4 py-3 flex justify-between items-center border-t border-gray-600 text-[11px] font-bold text-white">

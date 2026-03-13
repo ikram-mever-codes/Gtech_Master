@@ -18,16 +18,14 @@ import {
   RefreshCw,
   User,
   DollarSign,
-  Clock,
   AlertCircle,
   CheckCircle,
   XCircle,
+  PlusCircle,
   Loader2,
   ChevronDown,
-  SortAsc,
-  SortDesc,
-  Printer,
   Package,
+  Clock,
 } from "lucide-react";
 
 import {
@@ -45,7 +43,7 @@ import Link from "next/link";
 import CargosTab from "@/components/cargos/CargosTab";
 import CargoTypesTab from "@/components/cargos/CargoTypesTab";
 import { getAllCustomers, CustomerData as APICustomerData, updateCustomerProfile } from "@/api/customers";
-import { updateOrderItemStatus, splitOrderItem } from "@/api/orders";
+import { updateOrderItemStatus, splitOrderItem, updateOrderItemPrice } from "@/api/orders";
 import { getAllCargos, CargoType } from "@/api/cargos";
 import BillToShipToForm, { BillToShipToData, WAREHOUSE_BILL_TO } from "@/components/General/BillToShipToForm";
 import { toast } from "react-hot-toast";
@@ -96,6 +94,9 @@ interface Invoice {
   ship_to?: string;
   customItemCount?: number;
   customTotalQty?: number;
+  description?: string;
+  freightCost?: number | string;
+  remark?: string;
 }
 
 interface FilterOptions {
@@ -159,6 +160,34 @@ const InvoiceListPage: React.FC = () => {
   const [showBTSTModal, setShowBTSTModal] = useState(false);
   const [selectedCustomerForEdit, setSelectedCustomerForEdit] = useState<any>(null);
   const [btstFormData, setBtstFormData] = useState<Partial<BillToShipToData>>({});
+
+  const [expandedPriceItemId, setExpandedPriceItemId] = useState<string | null>(null);
+  const [editingPrice, setEditingPrice] = useState<number>(0);
+
+  const [editingInvoiceId, setEditingInvoiceId] = useState<string | null>(null);
+  const [invoiceEditForm, setInvoiceEditForm] = useState({ description: "", freightCost: "", remark: "" });
+
+  const handleSetPrice = async (itemId: string | number) => {
+    try {
+      const res = await updateOrderItemPrice(itemId, editingPrice);
+      if (res.success) {
+        setExpandedPriceItemId(null);
+        Object.keys(expandedStates).forEach(async (invId) => {
+          if (expandedStates[invId].items) {
+            const response = await getExpandedInvoiceDetails(invId);
+            if (response.success) {
+              setExpandedStates(prev => ({
+                ...prev,
+                [invId]: { ...prev[invId], data: response.data }
+              }));
+            }
+          }
+        });
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  };
 
   const toggleExpansion = async (id: string, type: 'taric' | 'items') => {
     const currentState = expandedStates[id] || {};
@@ -1057,7 +1086,20 @@ const InvoiceListPage: React.FC = () => {
                                           <button className="text-[#DC3545] hover:text-red-700 transition-colors" title="Download PDF">
                                             <FileText className="w-5 h-5" />
                                           </button>
-                                          <button className="px-3.5 py-1 bg-[#28A745] text-white text-[10px] font-bold rounded-[4px] hover:bg-green-600 transition-colors">
+                                          <button
+                                            onClick={() => {
+                                              if (editingInvoiceId === invoice.id) setEditingInvoiceId(null);
+                                              else {
+                                                setEditingInvoiceId(invoice.id);
+                                                setInvoiceEditForm({
+                                                  description: invoice.description || "",
+                                                  freightCost: invoice.freightCost?.toString() || "",
+                                                  remark: invoice.remark || ""
+                                                });
+                                              }
+                                            }}
+                                            className="px-3.5 py-1 bg-[#28A745] text-white text-[10px] font-bold rounded-[4px] hover:bg-green-600 transition-colors"
+                                          >
                                             Edit
                                           </button>
                                           <button className="px-3 py-1 border border-[#6C757D] text-[#6C757D] text-[10px] font-bold rounded-[4px] hover:bg-gray-50 transition-colors">
@@ -1153,9 +1195,9 @@ const InvoiceListPage: React.FC = () => {
                                                     </div>
                                                   </div>
                                                 ),
-                                                width: "110px"
+                                                width: "100px"
                                               },
-                                              { header: "EAN", render: (it: any) => it.item?.ean, width: "130px" },
+                                              { header: "EAN", render: (it: any) => it.item?.ean, width: "110px" },
                                               {
                                                 header: "Item Name",
                                                 render: (it: any) => (
@@ -1165,20 +1207,140 @@ const InvoiceListPage: React.FC = () => {
                                                 ),
                                                 width: "250px"
                                               },
-                                              { header: "Taric code", render: (it: any) => it.item?.taric?.code, width: "110px" },
-                                              { header: "Remark", render: (it: any) => `// ${it.remark_de || ''}`, width: "100px" },
-                                              { header: "Order_no", render: (it: any) => it.order?.order_no || "-", width: "100px" },
-                                              { header: "SOID", render: (it: any) => it.supplier_order_id || "-", width: "60px" },
-                                              { header: "Status", render: (it: any) => it.status, width: "70px" },
-                                              { header: "V(dm³)", render: (it: any) => it.v?.toFixed(2), width: "80px", align: "center" },
-                                              { header: "W(kg)", render: (it: any) => it.w?.toFixed(2), width: "80px", align: "center" },
-                                              { header: "QTY", render: (it: any) => it.qty, width: "60px", align: "center" },
-                                              { header: "RMB", render: (it: any) => it.rmb_special_price || "-", width: "60px", align: "center" },
-                                              { header: "EK", render: (it: any) => it.eur_special_price || "-", width: "60px", align: "center" },
+                                              { header: "Taric code", render: (it: any) => it.item?.taric?.code, width: "90px" },
+                                              { header: "Remark", render: (it: any) => `// ${it.remark_de || ''}`, width: "80px" },
+                                              { header: "Order_no", render: (it: any) => it.order?.order_no || "-", width: "80px" },
+                                              { header: "SOID", render: (it: any) => it.supplier_order_id || "-", width: "50px" },
+                                              { header: "Status", render: (it: any) => it.status, width: "60px" },
+                                              { header: "V(dm³)", render: (it: any) => it.v?.toFixed(2), width: "60px", align: "center" },
+                                              { header: "W(kg)", render: (it: any) => it.w?.toFixed(2), width: "60px", align: "center" },
+                                              { header: "QTY", render: (it: any) => it.qty, width: "45px", align: "center" },
+                                              { header: "RMB", render: (it: any) => it.rmb_special_price || "-", width: "45px", align: "center" },
+                                              { header: "EK", render: (it: any) => it.eur_special_price || "-", width: "45px", align: "center" },
+                                              {
+                                                header: "Action",
+                                                render: (it: any) => (
+                                                  (!it.rmb_special_price || Number(it.rmb_special_price) === 0) ? (
+                                                    <button
+                                                      onClick={() => {
+                                                        setExpandedPriceItemId(expandedPriceItemId === it.id ? null : it.id);
+                                                        setEditingPrice(it.eur_special_price || 0);
+                                                      }}
+                                                      className="flex items-center gap-1.5 px-3 py-1.5 bg-[#EF4444] text-white text-[10px] font-bold rounded-[4px] hover:bg-red-600 transition-all shadow-md whitespace-nowrap"
+                                                    >
+                                                      <DollarSign className="w-3.5 h-3.5" /> SET EUR PRICE
+                                                    </button>
+                                                  ) : null
+                                                ),
+                                                width: "120px"
+                                              }
                                             ]}
+                                            expandedRowId={expandedPriceItemId}
+                                            renderRowDetails={(it: any) => (
+                                              <div className="bg-[#F8F9FA] p-4 rounded-md border border-gray-200 mt-2 shadow-inner">
+                                                <h4 className="text-[11px] font-bold text-[#495057] uppercase mb-3 tracking-wider flex items-center gap-2">
+                                                  <div className="w-1.5 h-1.5 bg-[#EF4444] rounded-full"></div>
+                                                  Set EUR Price for Item {it.id}
+                                                </h4>
+                                                <div className="space-y-3">
+                                                  <div>
+                                                    <label className="block text-[10px] font-bold text-[#6C757D] uppercase mb-1.5">EUR Special Price</label>
+                                                    <div className="relative">
+                                                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                                        <span className="text-gray-500 text-xs text-black">€</span>
+                                                      </div>
+                                                      <input
+                                                        type="number"
+                                                        step="0.01"
+                                                        value={editingPrice}
+                                                        onChange={(e) => setEditingPrice(Number(e.target.value))}
+                                                        className="w-full pl-7 pr-3 py-2 bg-white border border-gray-300 rounded-[4px] text-sm focus:ring-2 focus:ring-[#EF4444] focus:border-transparent outline-none transition-all shadow-sm font-medium text-black"
+                                                        placeholder="0.00"
+                                                      />
+                                                    </div>
+                                                  </div>
+                                                  <div className="flex gap-2 pt-1">
+                                                    <button
+                                                      onClick={() => setExpandedPriceItemId(null)}
+                                                      className="px-4 py-2 text-[11px] font-bold text-[#495057] bg-white border border-[#DEE2E6] rounded-[4px] hover:bg-gray-50 transition-all uppercase shadow-sm"
+                                                    >
+                                                      Cancel
+                                                    </button>
+                                                    <button
+                                                      onClick={() => handleSetPrice(it.id)}
+                                                      className="px-5 py-2 text-[11px] font-bold text-white bg-[#10B981] rounded-[4px] hover:bg-[#059669] transition-all uppercase shadow-md flex items-center gap-2"
+                                                    >
+                                                      <Check className="w-3.5 h-3.5" /> Set Price
+                                                    </button>
+                                                  </div>
+                                                </div>
+                                              </div>
+                                            )}
                                             showTotals={false}
                                           />
                                         )}
+                                      </div>
+                                    </td>
+                                  </tr>
+                                )}
+                                {editingInvoiceId === invoice.id && (
+                                  <tr>
+                                    <td colSpan={activeInvTab === "closed_invoices" ? 11 : 9} className="p-0 border-b border-[#E9ECEF] bg-[#F8F9FA]">
+                                      <div className="p-6 flex justify-center w-full">
+                                        <div className="bg-white p-6 rounded-[8px] border border-[#E9ECEF] shadow-sm w-full max-w-2xl">
+                                          <div className="space-y-4">
+                                            <div className="grid grid-cols-1 gap-4">
+                                              <div>
+                                                <label className="block text-[11px] font-bold text-[#495057] mb-1.5">Description *</label>
+                                                <input
+                                                  type="text"
+                                                  value={invoiceEditForm.description}
+                                                  onChange={(e) => setInvoiceEditForm({ ...invoiceEditForm, description: e.target.value })}
+                                                  className="w-full px-3 py-2 border border-[#DEE2E6] rounded-[4px] text-sm focus:outline-none focus:border-[#8CC21B]"
+                                                  placeholder="Freight cost"
+                                                />
+                                              </div>
+                                              <div>
+                                                <label className="block text-[11px] font-bold text-[#495057] mb-1.5">Freight Cost *</label>
+                                                <input
+                                                  type="number"
+                                                  step="0.01"
+                                                  value={invoiceEditForm.freightCost}
+                                                  onChange={(e) => setInvoiceEditForm({ ...invoiceEditForm, freightCost: e.target.value })}
+                                                  className="w-full px-3 py-2 border border-[#DEE2E6] rounded-[4px] text-sm focus:outline-none focus:border-[#8CC21B]"
+                                                  placeholder="Enter Freight Cost"
+                                                />
+                                              </div>
+                                              <div>
+                                                <label className="block text-[11px] font-bold text-[#495057] mb-1.5">Remark</label>
+                                                <textarea
+                                                  value={invoiceEditForm.remark}
+                                                  onChange={(e) => setInvoiceEditForm({ ...invoiceEditForm, remark: e.target.value })}
+                                                  rows={3}
+                                                  className="w-full px-3 py-2 border border-[#DEE2E6] rounded-[4px] text-sm focus:outline-none focus:border-[#8CC21B]"
+                                                  placeholder="Enter extra info"
+                                                />
+                                              </div>
+                                            </div>
+                                            <div className="flex justify-center gap-3 pt-4">
+                                              <button
+                                                onClick={() => setEditingInvoiceId(null)}
+                                                className="px-6 py-2 text-[11px] font-bold text-[#495057] bg-white border border-[#DEE2E6] rounded-[20px] hover:bg-gray-50 flex items-center gap-1.5 shadow-sm transition-all"
+                                              >
+                                                <XCircle className="w-3.5 h-3.5" /> Cancel
+                                              </button>
+                                              <button
+                                                onClick={() => {
+                                                  toast.success("Saved successfully");
+                                                  setEditingInvoiceId(null);
+                                                }}
+                                                className="px-6 py-2 text-[11px] font-bold text-white bg-[#059669] rounded-[20px] hover:bg-green-700 flex items-center gap-1.5 shadow-md transition-all"
+                                              >
+                                                <PlusCircle className="w-3.5 h-3.5" /> Save
+                                              </button>
+                                            </div>
+                                          </div>
+                                        </div>
                                       </div>
                                     </td>
                                   </tr>

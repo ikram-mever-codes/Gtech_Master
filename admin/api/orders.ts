@@ -170,6 +170,20 @@ export const updateOrderItemStatus = async (
   }
 };
 
+export const updateOrderItemPrice = async (itemId: string | number, eurPrice: number) => {
+  try {
+    toast.loading("Updating price...", loadingStyles);
+    const response = await api.put(`/orders/items/${itemId}/price`, { eur_special_price: eurPrice });
+    toast.dismiss();
+    toast.success("Price updated successfully", successStyles);
+    return response.data;
+  } catch (error) {
+    toast.dismiss();
+    handleApiError(error, "Price update failed");
+    throw error;
+  }
+};
+
 export const splitOrderItem = async (id: string | number, splitQty: number) => {
   try {
     toast.loading("Splitting item...", loadingStyles);
