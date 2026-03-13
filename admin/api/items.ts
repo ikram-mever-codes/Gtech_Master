@@ -12,7 +12,7 @@ export interface Item {
   name_cn: string | null;
   item_name: string;
   item_name_cn: string | null;
-  ean: bigint | null;
+  ean: string | null;
   is_active: string;
   parent_id: number | null;
   taric_id: number | null;
