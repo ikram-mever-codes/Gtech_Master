@@ -1047,9 +1047,13 @@ const InvoiceListPage: React.FC = () => {
                                   <td className="py-4 px-4 text-xs text-[#212529]">{invoice.bill_to || "N/A"}</td>
                                   <td className="py-4 px-4 text-xs text-[#6C757D]">{invoice.ship_to || "-"}</td>
                                   <td className="py-4 px-4 text-xs text-[#212529]">
-                                    {activeInvTab === "open_invoices" ? (
-                                      <span className="font-medium">{invoice.id.slice(-2)} - {invoice.orderNumber || "No Cargo"}</span>
-                                    ) : (
+                                    {activeInvTab === "open_invoices" ? (() => {
+                                      const cargoData = expandedStates[invoice.id]?.data?.cargo;
+                                      if (cargoData) {
+                                        return <span className="font-medium">{cargoData.id} - {cargoData.cargo_no}</span>;
+                                      }
+                                      return <span className="font-medium">{invoice.id.slice(-2)} - {invoice.orderNumber || "No Cargo"}</span>;
+                                    })() : (
                                       <span className="font-medium">{invoice.orderNumber || "No Cargo"}</span>
                                     )}
                                   </td>
@@ -1117,6 +1121,21 @@ const InvoiceListPage: React.FC = () => {
                                   <tr>
                                     <td colSpan={activeInvTab === "closed_invoices" ? 11 : 8} className="p-0 bg-[#F8F9FA]">
                                       <div className="p-4 space-y-4">
+                                        {expState.data?.cargo && (
+                                          <div className="flex items-center gap-4 px-4 py-2 bg-[#EFF6FF] border border-[#BFDBFE] rounded-[4px] text-xs">
+                                            <span className="font-bold text-[#1D4ED8]">
+                                              Cargo: {expState.data.cargo.id} - {expState.data.cargo.cargo_no}
+                                            </span>
+                                            {expState.data.orderNosInCargo?.length > 0 && (
+                                              <span className="text-[#374151]">
+                                                Orders: <span className="font-semibold">{expState.data.orderNosInCargo.join(", ")}</span>
+                                              </span>
+                                            )}
+                                            {expState.data.cargo.ship_to && (
+                                              <span className="text-[#374151]">Ship To: <span className="font-semibold">{expState.data.cargo.ship_to}</span></span>
+                                            )}
+                                          </div>
+                                        )}
                                         {expState.taric && (
                                           <SpreadSheet
                                             data={expState.data?.taricGroups || []}
@@ -1125,7 +1144,11 @@ const InvoiceListPage: React.FC = () => {
                                             columns={[
                                               { header: "Position", render: (_: any, idx: number) => idx + 1, width: "70px" },
                                               { header: "Taric Name EN", render: (it: any) => it.taricNameEn, width: "350px" },
-                                              { header: "Taric Code", render: (it: any) => it.taricCode, width: "120px" },
+                                              { header: "Taric Code", render: (it: any) => (
+                                                <span style={it.isProjectItem ? { color: '#F59E0B', fontWeight: 600 } : undefined}>
+                                                  {it.taricCode}
+                                                </span>
+                                              ), width: "140px" },
                                               { header: "Duty rate", render: (it: any) => it.dutyRate ? `${Number(it.dutyRate).toFixed(2)}` : "-", width: "80px" },
                                               { header: "Total Qty", render: (it: any) => it.totalQty, align: "center", width: "100px" },
                                               { header: "Unit Price (€)", render: (it: any) => it.unitPrice || "0.00", width: "100px" },

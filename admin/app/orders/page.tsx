@@ -825,18 +825,22 @@ const OrderPage = () => {
         const isPrinted =
           it.status?.toLowerCase() === "printed" || it.printed === "Y";
         if (isPrinted) {
+          const searchLower = reprintSearch.toLowerCase();
+          const itemData = itemById.get(String(it.item_id));
           const matchesSearch =
             !reprintSearch ||
             String(it.id).includes(reprintSearch) ||
             String(it.item_id).includes(reprintSearch) ||
-            itemById
-              .get(String(it.item_id))
-              ?.ean?.toString()
-              .includes(reprintSearch) ||
-            itemById
-              .get(String(it.item_id))
-              ?.item_name?.toLowerCase()
-              .includes(reprintSearch.toLowerCase());
+            it.item?.ean?.toString().includes(reprintSearch) ||
+            itemData?.ean?.toString().includes(reprintSearch) ||
+            it.item?.item_name?.toLowerCase().includes(searchLower) ||
+            it.item?.name?.toLowerCase().includes(searchLower) ||
+            it.itemName?.toLowerCase().includes(searchLower) ||
+            itemData?.item_name?.toLowerCase().includes(searchLower) ||
+            itemData?.name?.toLowerCase().includes(searchLower) ||
+            o.order_no?.toString().toLowerCase().includes(searchLower) ||
+            it.remark_de?.toLowerCase().includes(searchLower) ||
+            it.remarks_cn?.toLowerCase().includes(searchLower);
 
           if (matchesSearch) {
             list.push({ ...it, parentOrder: o });
@@ -858,18 +862,22 @@ const OrderPage = () => {
     const list: any[] = [];
     orders.forEach((o: any) => {
       (o.items || []).forEach((it: any) => {
+        const searchLower = reprintSearch.toLowerCase();
+        const itemData = itemById.get(String(it.item_id));
         const matchesSearch =
           !reprintSearch ||
           String(it.id).includes(reprintSearch) ||
           String(it.item_id).includes(reprintSearch) ||
-          itemById
-            .get(String(it.item_id))
-            ?.ean?.toString()
-            .includes(reprintSearch) ||
-          itemById
-            .get(String(it.item_id))
-            ?.item_name?.toLowerCase()
-            .includes(reprintSearch.toLowerCase());
+          it.item?.ean?.toString().includes(reprintSearch) ||
+          itemData?.ean?.toString().includes(reprintSearch) ||
+          it.item?.item_name?.toLowerCase().includes(searchLower) ||
+          it.item?.name?.toLowerCase().includes(searchLower) ||
+          it.itemName?.toLowerCase().includes(searchLower) ||
+          itemData?.item_name?.toLowerCase().includes(searchLower) ||
+          itemData?.name?.toLowerCase().includes(searchLower) ||
+          o.order_no?.toString().toLowerCase().includes(searchLower) ||
+          it.remark_de?.toLowerCase().includes(searchLower) ||
+          it.remarks_cn?.toLowerCase().includes(searchLower);
 
         if (matchesSearch) {
           list.push({ ...it, parentOrder: o });
