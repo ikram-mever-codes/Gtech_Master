@@ -52,17 +52,39 @@ export const getItems = async (
     const limitNum = parseInt(limit as string);
     const skip = (pageNum - 1) * limitNum;
 
-    const whereConditions: FindOptionsWhere<Item> = {};
+    let whereConditions: any = {};
 
     if (search) {
-      whereConditions.item_name = ILike(`%${search}%`);
+      const searchStr = search as string;
+      whereConditions = [
+        { item_name: ILike(`%${searchStr}%`) },
+        { item_name_cn: ILike(`%${searchStr}%`) },
+        { ean: ILike(`%${searchStr}%`) },
+      ];
+      const parsedId = parseInt(searchStr);
+      if (!isNaN(parsedId) && parsedId <= 2147483647) {
+        whereConditions.push({ id: parsedId });
+      }
+    } else {
+      whereConditions = {};
     }
 
     if (isActive) {
-      whereConditions.isActive = isActive as string;
+      const activeFilter = { isActive: isActive as string };
+      if (Array.isArray(whereConditions)) {
+        whereConditions = whereConditions.map(cond => ({ ...cond, ...activeFilter }));
+      } else {
+        whereConditions.isActive = isActive as string;
+      }
     }
+
     if (category) {
-      whereConditions.cat_id = parseInt(category as string);
+      const catFilter = { cat_id: parseInt(category as string) };
+      if (Array.isArray(whereConditions)) {
+        whereConditions = whereConditions.map(cond => ({ ...cond, ...catFilter }));
+      } else {
+        whereConditions.cat_id = parseInt(category as string);
+      }
     }
 
     if (parentId) {
@@ -835,6 +857,7 @@ export const searchItems = async (
       .orWhere("item.ean::text ILIKE :search", { search: searchTerm })
       .orWhere("parent.name_de ILIKE :search", { search: searchTerm })
       .orWhere("parent.name_en ILIKE :search", { search: searchTerm })
+      .orWhere("CAST(item.id AS TEXT) ILIKE :search", { search: searchTerm })
       .orderBy("item.created_at", "DESC")
       .take(parseInt(limit as string))
       .getMany();
@@ -883,21 +906,49 @@ export const getParents = async (
     const limitNum = parseInt(limit as string);
     const skip = (pageNum - 1) * limitNum;
 
-    const whereConditions: FindOptionsWhere<Parent> = {};
+    let whereConditions: any = {};
 
     if (search) {
-      whereConditions.name_de = ILike(`%${search}%`);
+      const searchStr = search as string;
+      whereConditions = [
+        { name_de: ILike(`%${searchStr}%`) },
+        { name_en: ILike(`%${searchStr}%`) },
+        { name_cn: ILike(`%${searchStr}%`) },
+        { de_no: ILike(`%${searchStr}%`) },
+      ];
+      const parsedId = parseInt(searchStr);
+      if (!isNaN(parsedId) && parsedId <= 2147483647) {
+        whereConditions.push({ id: parsedId });
+      }
+    } else {
+      whereConditions = {};
     }
 
     if (isActive) {
-      whereConditions.is_active = isActive as string;
+      const activeFilter = { is_active: isActive as string };
+      if (Array.isArray(whereConditions)) {
+        whereConditions = whereConditions.map(cond => ({ ...cond, ...activeFilter }));
+      } else {
+        whereConditions.is_active = isActive as string;
+      }
     }
+
     if (supplierId) {
-      whereConditions.supplier_id = parseInt(supplierId as string);
+      const supplierFilter = { supplier_id: parseInt(supplierId as string) };
+      if (Array.isArray(whereConditions)) {
+        whereConditions = whereConditions.map(cond => ({ ...cond, ...supplierFilter }));
+      } else {
+        whereConditions.supplier_id = parseInt(supplierId as string);
+      }
     }
 
     if (taricId) {
-      whereConditions.taric_id = parseInt(taricId as string);
+      const taricFilter = { taric_id: parseInt(taricId as string) };
+      if (Array.isArray(whereConditions)) {
+        whereConditions = whereConditions.map(cond => ({ ...cond, ...taricFilter }));
+      } else {
+        whereConditions.taric_id = parseInt(taricId as string);
+      }
     }
     const relations = ["taric", "supplier", "items"];
 
@@ -1323,6 +1374,9 @@ export const getWarehouseItems = async (
           search: `%${search}%`,
         })
         .orWhere("warehouse.item_no_de ILIKE :search", {
+          search: `%${search}%`,
+        })
+        .orWhere("CAST(warehouse.id AS TEXT) ILIKE :search", {
           search: `%${search}%`,
         });
     }
