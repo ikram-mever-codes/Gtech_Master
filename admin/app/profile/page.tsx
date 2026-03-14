@@ -46,18 +46,22 @@ import {
     Info,
     RefreshCw,
     Building,
+    Eye,
+    EyeOff,
+    AlertCircle,
 } from "lucide-react";
 import { useFormik } from "formik";
 import * as Yup from "yup";
 import { toast } from "react-hot-toast";
 import { useDispatch, useSelector } from "react-redux";
 import { RootState } from "@/app/Redux/store";
-import { getMe, updateUserProfile, prepareProfileFormData } from "@/api/user";
+import { getMe, updateUserProfile, prepareProfileFormData, changePassword } from "@/api/user";
 import { UserRole } from "@/utils/interfaces";
 import CustomButton from "@/components/UI/CustomButton";
 import { format } from "date-fns";
 import { availableResources } from "@/utils/resources";
 import PageHeader from "@/components/UI/PageHeader";
+import CustomModal from "@/components/UI/CustomModal";
 
 const validationSchema = Yup.object({
     name: Yup.string().required("Name is required"),
@@ -80,6 +84,9 @@ const ProfilePage = () => {
     const [profileData, setProfileData] = useState<any>(null);
     const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
     const [avatarFile, setAvatarFile] = useState<File | null>(null);
+    const [openPasswordModal, setOpenPasswordModal] = useState(false);
+    const [passwordLoading, setPasswordLoading] = useState(false);
+    const [showPasswords, setShowPasswords] = useState({ current: false, new: false, confirm: false });
     const fileInputRef = useRef<HTMLInputElement>(null);
     const dispatch = useDispatch();
 
@@ -154,6 +161,33 @@ const ProfilePage = () => {
                 setIsSubmitting(false);
             }
         },
+    });
+
+    const passwordFormik = useFormik({
+        initialValues: {
+            currentPassword: "",
+            newPassword: "",
+            confirmPassword: "",
+        },
+        validationSchema: Yup.object({
+            currentPassword: Yup.string().required("Current password is required"),
+            newPassword: Yup.string().min(6, "Password must be at least 6 characters").required("New password is required"),
+            confirmPassword: Yup.string()
+                .oneOf([Yup.ref('newPassword')], "Passwords must match")
+                .required("Please confirm your password"),
+        }),
+        onSubmit: async (values) => {
+            try {
+                setPasswordLoading(true);
+                await changePassword(values.currentPassword, values.newPassword);
+                setOpenPasswordModal(false);
+                passwordFormik.resetForm();
+            } catch (error) {
+                // Error toast is handled in api.ts or controller fallback
+            } finally {
+                setPasswordLoading(false);
+            }
+        }
     });
 
     const handleAvatarClick = () => {
@@ -614,7 +648,14 @@ const ProfilePage = () => {
                                                 <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Password Management</Typography>
                                                 <Typography variant="body2" color="text.secondary">Update your password to keep your account secure.</Typography>
                                             </Box>
-                                            <Button variant="outlined" startIcon={<Lock size={16} />} sx={{ borderRadius: "8px", fontWeight: 700 }}>Change Password</Button>
+                                            <Button
+                                                variant="outlined"
+                                                startIcon={<Lock size={16} />}
+                                                sx={{ borderRadius: "8px", fontWeight: 700 }}
+                                                onClick={() => setOpenPasswordModal(true)}
+                                            >
+                                                Change Password
+                                            </Button>
                                         </Box>
 
                                         <Divider />
@@ -643,6 +684,105 @@ const ProfilePage = () => {
                     </Paper>
                 </div>
             </div>
+
+            {/* Change Password Modal using CustomModal */}
+            <CustomModal
+                isOpen={openPasswordModal}
+                onClose={() => !passwordLoading && setOpenPasswordModal(false)}
+                title="Change Password"
+                width="max-w-md"
+                footer={
+                    <>
+                        <Button
+                            onClick={() => setOpenPasswordModal(false)}
+                            disabled={passwordLoading}
+                            sx={{ fontWeight: 700, textTransform: "none", color: "text.secondary" }}
+                        >
+                            Cancel
+                        </Button>
+                        <CustomButton
+                            onClick={() => passwordFormik.handleSubmit()}
+                            variant="contained"
+                            disabled={passwordLoading}
+                            startIcon={passwordLoading ? <CircularProgress size={16} /> : <CheckCircle size={18} />}
+                            sx={{ px: 3, fontWeight: 700, borderRadius: "6px", textTransform: "none" }}
+                        >
+                            {passwordLoading ? "Updating..." : "Update Password"}
+                        </CustomButton>
+                    </>
+                }
+            >
+                <form onSubmit={passwordFormik.handleSubmit}>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                        Please enter your current password and choose a strong new password.
+                    </Typography>
+
+                    <Stack spacing={2.5}>
+                        <Box>
+                            <Typography variant="subtitle2" sx={{ mb: 0.8, fontWeight: 600 }}>Current Password</Typography>
+                            <TextField
+                                fullWidth
+                                type={showPasswords.current ? "text" : "password"}
+                                name="currentPassword"
+                                value={passwordFormik.values.currentPassword}
+                                onChange={passwordFormik.handleChange}
+                                onBlur={passwordFormik.handleBlur}
+                                error={passwordFormik.touched.currentPassword && Boolean(passwordFormik.errors.currentPassword)}
+                                helperText={passwordFormik.touched.currentPassword && passwordFormik.errors.currentPassword}
+                                InputProps={{
+                                    endAdornment: (
+                                        <IconButton size="small" onClick={() => setShowPasswords(s => ({ ...s, current: !s.current }))}>
+                                            {showPasswords.current ? <EyeOff size={18} /> : <Eye size={18} />}
+                                        </IconButton>
+                                    )
+                                }}
+                            />
+                        </Box>
+
+                        <Box>
+                            <Typography variant="subtitle2" sx={{ mb: 0.8, fontWeight: 600 }}>New Password</Typography>
+                            <TextField
+                                fullWidth
+                                type={showPasswords.new ? "text" : "password"}
+                                name="newPassword"
+                                value={passwordFormik.values.newPassword}
+                                onChange={passwordFormik.handleChange}
+                                onBlur={passwordFormik.handleBlur}
+                                error={passwordFormik.touched.newPassword && Boolean(passwordFormik.errors.newPassword)}
+                                helperText={passwordFormik.touched.newPassword && passwordFormik.errors.newPassword}
+                                InputProps={{
+                                    endAdornment: (
+                                        <IconButton size="small" onClick={() => setShowPasswords(s => ({ ...s, new: !s.new }))}>
+                                            {showPasswords.new ? <EyeOff size={18} /> : <Eye size={18} />}
+                                        </IconButton>
+                                    )
+                                }}
+                            />
+                        </Box>
+
+                        <Box>
+                            <Typography variant="subtitle2" sx={{ mb: 0.8, fontWeight: 600 }}>Confirm New Password</Typography>
+                            <TextField
+                                fullWidth
+                                type={showPasswords.confirm ? "text" : "password"}
+                                name="confirmPassword"
+                                value={passwordFormik.values.confirmPassword}
+                                onChange={passwordFormik.handleChange}
+                                onBlur={passwordFormik.handleBlur}
+                                error={passwordFormik.touched.confirmPassword && Boolean(passwordFormik.errors.confirmPassword)}
+                                helperText={passwordFormik.touched.confirmPassword && passwordFormik.errors.confirmPassword}
+                                InputProps={{
+                                    endAdornment: (
+                                        <IconButton size="small" onClick={() => setShowPasswords(s => ({ ...s, confirm: !s.confirm }))}>
+                                            {showPasswords.confirm ? <EyeOff size={18} /> : <Eye size={18} />}
+                                        </IconButton>
+                                    )
+                                }}
+                            />
+                        </Box>
+                    </Stack>
+                </form>
+            </CustomModal>
         </Box >
     );
 };
