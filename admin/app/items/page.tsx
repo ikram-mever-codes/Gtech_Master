@@ -189,17 +189,6 @@ const ItemsManagementPage: React.FC = () => {
     });
   };
 
-  const formatDateTime = (dateString: string | Date) => {
-    const date = new Date(dateString);
-    return date.toLocaleString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
-
   const getStatusBadgeColor = (status: string) => {
     switch (status?.toLowerCase()) {
       case "active":
@@ -225,7 +214,7 @@ const ItemsManagementPage: React.FC = () => {
           const itemsResponse: any = await getItems({
             page: pagination.page,
             limit: pagination.limit,
-            search: filters.search,
+            search: filters.search, // This will search on item name, ID, DE, EAN, and item_no_de
             isActive: filters.isActive,
             category: filters.category,
           });
@@ -237,7 +226,7 @@ const ItemsManagementPage: React.FC = () => {
           const parentsResponse: any = await getParents({
             page: pagination.page,
             limit: pagination.limit,
-            search: filters.search,
+            search: filters.search, // For parents, search on name_de, name_en, de_no
             isActive: filters.isActive,
           });
           setParents(parentsResponse.data);
@@ -248,7 +237,7 @@ const ItemsManagementPage: React.FC = () => {
           const warehouseResponse: any = await getWarehouseItems({
             page: pagination.page,
             limit: pagination.limit,
-            search: filters.search,
+            search: filters.search, // For warehouse, search on item_no_de, item_name_de, item_name_en
             hasStock: filters.status,
           });
           setWarehouseItems(warehouseResponse.data);
@@ -286,7 +275,6 @@ const ItemsManagementPage: React.FC = () => {
       setLoading(false);
     }
   }, [activeTab, pagination.page, pagination.limit, filters, taricFilters]);
-
   const fetchStatistics = useCallback(async () => {
     try {
       const statsResponse = await getItemStatistics();
@@ -306,12 +294,13 @@ const ItemsManagementPage: React.FC = () => {
   useEffect(() => {
     const fetchInitialData = async () => {
       try {
-        const [parentsRes, taricsRes, catsRes, suppliersRes]: any = await Promise.all([
-          getParents({ limit: 1000, isActive: "Y" }),
-          getAllTarics({ limit: 1000 }),
-          getCategories(),
-          getAllSuppliers({ limit: 1000 }),
-        ]);
+        const [parentsRes, taricsRes, catsRes, suppliersRes]: any =
+          await Promise.all([
+            getParents({ limit: 1000, isActive: "Y" }),
+            getAllTarics({ limit: 1000 }),
+            getCategories(),
+            getAllSuppliers({ limit: 1000 }),
+          ]);
 
         if (parentsRes?.data) setParents(parentsRes.data);
         if (taricsRes?.data) setTarics(taricsRes.data);
@@ -346,7 +335,7 @@ const ItemsManagementPage: React.FC = () => {
     try {
       await deleteItem(itemId);
       fetchData();
-    } catch (error) { }
+    } catch (error) {}
   };
 
   const handleDeleteParent = async (parentId: number) => {
@@ -358,7 +347,7 @@ const ItemsManagementPage: React.FC = () => {
     try {
       await deleteParent(parentId);
       fetchData();
-    } catch (error) { }
+    } catch (error) {}
   };
 
   const handleToggleStatus = async (itemId: number, currentStatus: string) => {
@@ -370,7 +359,7 @@ const ItemsManagementPage: React.FC = () => {
         successStyles,
       );
       fetchData();
-    } catch (error) { }
+    } catch (error) {}
   };
 
   const handleOpenCreateItemModal = () => {
@@ -435,7 +424,6 @@ const ItemsManagementPage: React.FC = () => {
         isActive: itemFormData.isActive ? "Y" : "N",
       });
 
-      toast.success("Item created successfully", successStyles);
       setShowItemModal(false);
       fetchData();
     } catch (error: any) {
@@ -552,7 +540,7 @@ const ItemsManagementPage: React.FC = () => {
       }
       setSelectedTarics(new Set());
       fetchData();
-    } catch (error) { }
+    } catch (error) {}
   };
 
   const handleBulkDelete = async () => {
@@ -680,7 +668,6 @@ const ItemsManagementPage: React.FC = () => {
         return [];
     }
   };
-
   const getFilteredData = () => {
     const data = getCurrentData();
     return data.filter((item) => {
@@ -727,12 +714,24 @@ const ItemsManagementPage: React.FC = () => {
         if (filters.search) {
           if (activeTab === "items") {
             const it = item as any;
+
+            // Enhanced EAN search - try multiple formats
+            const eanValue = it.ean?.toString() || "";
+            const eanWithoutSpaces = eanValue.replace(/\s/g, "");
+            const searchWithoutSpaces = filters.search.replace(/\s/g, "");
+
             matchesSearch =
               it.id?.toString().includes(filters.search) ||
               it.de_no?.toLowerCase().includes(searchLower) ||
               it.item_name?.toLowerCase().includes(searchLower) ||
               it.name_en?.toLowerCase().includes(searchLower) ||
-              it.ean?.toString().includes(filters.search) ||
+              // Enhanced EAN matching
+              eanValue.includes(filters.search) ||
+              eanWithoutSpaces.includes(searchWithoutSpaces) ||
+              // Search for partial EAN matches (last 4 digits, first 4 digits, etc.)
+              (eanValue.length >= 4 &&
+                (eanValue.slice(-4).includes(searchWithoutSpaces) ||
+                  eanValue.slice(0, 4).includes(searchWithoutSpaces))) ||
               it.category?.toLowerCase().includes(searchLower) ||
               it.supplier_name?.toLowerCase().includes(searchLower) ||
               it.remark?.toLowerCase().includes(searchLower) ||
@@ -792,9 +791,9 @@ const ItemsManagementPage: React.FC = () => {
             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
               Category
             </th>
-            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+            {/* <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
               Supplier
-            </th>
+            </th> */}
             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
               Status
             </th>
@@ -967,11 +966,7 @@ const ItemsManagementPage: React.FC = () => {
                 {item.category || "-"}
               </div>
             </td>
-            <td className="px-4 py-3">
-              <div className="text-sm text-gray-900">
-                {item.supplier_name || "-"}
-              </div>
-            </td>
+
             <td className="px-4 py-3">
               <span
                 className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusBadgeColor(
@@ -1378,10 +1373,11 @@ const ItemsManagementPage: React.FC = () => {
 
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className={`px-4 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2 ${showFilters
-                ? "bg-[#8CC21B] text-white"
-                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                }`}
+              className={`px-4 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2 ${
+                showFilters
+                  ? "bg-[#8CC21B] text-white"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+              }`}
             >
               <FunnelIcon className="w-5 h-5" />
               Filters
@@ -1438,10 +1434,11 @@ const ItemsManagementPage: React.FC = () => {
                 <button
                   key={tab.key}
                   onClick={() => setActiveTab(tab.key as TabType)}
-                  className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${activeTab === tab.key
-                    ? "border-primary text-primary"
-                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                    }`}
+                  className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${
+                    activeTab === tab.key
+                      ? "border-primary text-primary"
+                      : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                  }`}
                 >
                   <tab.icon className="w-5 h-5" />
                   {tab.label}
@@ -1948,19 +1945,25 @@ const ItemsManagementPage: React.FC = () => {
                     Parent *
                   </label>
                   <ReactSelect
-                    options={parents?.map((parent) => ({
-                      value: parent.id,
-                      label: `${parent.name_de} (${parent.de_no})`,
-                    })) || []}
+                    options={
+                      parents?.map((parent) => ({
+                        value: parent.id,
+                        label: `${parent.name_de} (${parent.de_no})`,
+                      })) || []
+                    }
                     value={
                       itemFormData.parent_id
                         ? {
-                          value: itemFormData.parent_id,
-                          label: (() => {
-                            const p = parents?.find((x) => x.id === itemFormData.parent_id);
-                            return p ? `${p.name_de} (${p.de_no})` : "Unknown";
-                          })(),
-                        }
+                            value: itemFormData.parent_id,
+                            label: (() => {
+                              const p = parents?.find(
+                                (x) => x.id === itemFormData.parent_id,
+                              );
+                              return p
+                                ? `${p.name_de} (${p.de_no})`
+                                : "Unknown";
+                            })(),
+                          }
                         : null
                     }
                     onChange={(opt) =>
@@ -1981,19 +1984,23 @@ const ItemsManagementPage: React.FC = () => {
                     TARIC
                   </label>
                   <ReactSelect
-                    options={tarics?.map((taric) => ({
-                      value: taric.id,
-                      label: `${taric.code} - ${taric.name_de}`,
-                    })) || []}
+                    options={
+                      tarics?.map((taric) => ({
+                        value: taric.id,
+                        label: `${taric.code} - ${taric.name_de}`,
+                      })) || []
+                    }
                     value={
                       itemFormData.taric_id
                         ? {
-                          value: itemFormData.taric_id,
-                          label: (() => {
-                            const t = tarics?.find((x) => x.id === itemFormData.taric_id);
-                            return t ? `${t.code} - ${t.name_de}` : "Unknown";
-                          })(),
-                        }
+                            value: itemFormData.taric_id,
+                            label: (() => {
+                              const t = tarics?.find(
+                                (x) => x.id === itemFormData.taric_id,
+                              );
+                              return t ? `${t.code} - ${t.name_de}` : "Unknown";
+                            })(),
+                          }
                         : null
                     }
                     onChange={(opt) =>
@@ -2014,16 +2021,21 @@ const ItemsManagementPage: React.FC = () => {
                     Category
                   </label>
                   <ReactSelect
-                    options={categories?.map((cat) => ({
-                      value: cat.id,
-                      label: cat.name,
-                    })) || []}
+                    options={
+                      categories?.map((cat) => ({
+                        value: cat.id,
+                        label: cat.name,
+                      })) || []
+                    }
                     value={
                       itemFormData.cat_id
                         ? {
-                          value: itemFormData.cat_id,
-                          label: categories?.find((x) => x.id === itemFormData.cat_id)?.name || "Unknown",
-                        }
+                            value: itemFormData.cat_id,
+                            label:
+                              categories?.find(
+                                (x) => x.id === itemFormData.cat_id,
+                              )?.name || "Unknown",
+                          }
                         : null
                     }
                     onChange={(opt) =>
@@ -2044,19 +2056,25 @@ const ItemsManagementPage: React.FC = () => {
                     Supplier *
                   </label>
                   <ReactSelect
-                    options={suppliers?.map((s) => ({
-                      value: s.id,
-                      label: s.company_name || s.name || "Unnamed Supplier",
-                    })) || []}
+                    options={
+                      suppliers?.map((s) => ({
+                        value: s.id,
+                        label: s.company_name || s.name || "Unnamed Supplier",
+                      })) || []
+                    }
                     value={
                       itemFormData.supplier_id
                         ? {
-                          value: itemFormData.supplier_id,
-                          label: (() => {
-                            const s = suppliers?.find((x) => x.id === itemFormData.supplier_id);
-                            return s ? (s.company_name || s.name || "Unnamed") : "Unknown";
-                          })(),
-                        }
+                            value: itemFormData.supplier_id,
+                            label: (() => {
+                              const s = suppliers?.find(
+                                (x) => x.id === itemFormData.supplier_id,
+                              );
+                              return s
+                                ? s.company_name || s.name || "Unnamed"
+                                : "Unknown";
+                            })(),
+                          }
                         : null
                     }
                     onChange={(opt) =>
@@ -2176,7 +2194,10 @@ const ItemsManagementPage: React.FC = () => {
                     onChange={(e) =>
                       setItemFormData({
                         ...itemFormData,
-                        price: e.target.value === "" ? 0 : parseFloat(e.target.value),
+                        price:
+                          e.target.value === ""
+                            ? 0
+                            : parseFloat(e.target.value),
                       })
                     }
                     className="w-full px-4 py-2 border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-all"
@@ -2200,13 +2221,18 @@ const ItemsManagementPage: React.FC = () => {
                       value: itemFormData.currency,
                       label: (() => {
                         switch (itemFormData.currency) {
-                          case "CNY": return "CNY (¥)";
-                          case "EUR": return "EUR (€)";
-                          case "USD": return "USD ($)";
-                          case "GBP": return "GBP (£)";
-                          default: return itemFormData.currency;
+                          case "CNY":
+                            return "CNY (¥)";
+                          case "EUR":
+                            return "EUR (€)";
+                          case "USD":
+                            return "USD ($)";
+                          case "GBP":
+                            return "GBP (£)";
+                          default:
+                            return itemFormData.currency;
                         }
-                      })()
+                      })(),
                     }}
                     onChange={(opt) =>
                       setItemFormData({

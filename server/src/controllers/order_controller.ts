@@ -591,7 +591,6 @@ export const deleteOrder = async (
     } catch {}
   }
 };
-
 export const generateLabelPDF = async (
   req: Request,
   res: Response,
@@ -619,7 +618,7 @@ export const generateLabelPDF = async (
     // Get the order details
     const order = await orderRepo.findOne({ where: { id: item.order_id } });
 
-    const doc = new PDFDocument({ size: [252, 102], margin: 0 });
+    const doc = new PDFDocument({ size: [252, 110], margin: 0 });
     const logo = path.join(__dirname, "../../public/logo.png");
     const k1 = path.join(__dirname, "../../public/k1.png");
     const k2 = path.join(__dirname, "../../public/k2.png");
@@ -692,6 +691,7 @@ export const generateLabelPDF = async (
 
     const bottomSectionY = 68;
 
+    // Remark CN
     doc
       .font("Helvetica-Oblique")
       .fontSize(6.5)
@@ -701,10 +701,15 @@ export const generateLabelPDF = async (
       .fontSize(10)
       .text(item.remarks_cn || "/", valColA, bottomSectionY + 8);
 
+    // Remark W - keep at original position but fix the value Y coordinate
     doc
       .font("Helvetica-Oblique")
       .fontSize(6.5)
       .text("RemarkW", colA, bottomSectionY + 22);
+    doc
+      .font("Helvetica")
+      .fontSize(8) // Slightly smaller font to save space
+      .text(item.remark_de || "/", valColA, bottomSectionY + 30); // Positioned below its label
 
     // Use ean from warehouseItem instead of item.ean
     const barcodeValue = warehouseItem?.ean?.toString() || "";
@@ -730,7 +735,6 @@ export const generateLabelPDF = async (
     return next(error);
   }
 };
-
 export const updateOrderItemStatus = async (
   req: Request,
   res: Response,
