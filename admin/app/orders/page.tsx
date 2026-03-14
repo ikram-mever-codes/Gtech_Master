@@ -893,6 +893,7 @@ const OrderPage = () => {
         }
       });
     });
+    console.log(list);
     return list;
   }, [orders, reprintSearch, itemById]);
 
@@ -2742,11 +2743,21 @@ const OrderPage = () => {
                       {
                         header: "EAN",
                         width: "120px",
-                        render: (row) => (
-                          <span className="font-medium text-gray-600">
-                            {row.item?.ean || "-"}
-                          </span>
-                        ),
+                        render: (row) => {
+                          // Try multiple sources for EAN
+                          const ean =
+                            row.item?.ean || // From item
+                            row.warehouse_data?.ean || // From warehouse data
+                            row.ean || // Direct on row
+                            row.item?.warehouse_data?.ean || // Nested warehouse data
+                            "-";
+
+                          return (
+                            <span className="font-medium text-gray-600">
+                              {ean}
+                            </span>
+                          );
+                        },
                         align: "center",
                       },
                       {
@@ -2764,8 +2775,21 @@ const OrderPage = () => {
                       {
                         header: "Remark",
                         render: (row) => (
-                          <div className="text-gray-500 italic text-xs">
-                            {row.remarks_cn || row.remark_de || "//"}
+                          <div className="text-gray-500 italic text-xs space-y-0.5">
+                            {row.remark_de && (
+                              <div className=""> {row.remark_de} /</div>
+                            )}
+                            {row.remarks_cn && (
+                              <div className=""> {row.remarks_cn} /</div>
+                            )}
+                            {row.remark_en && (
+                              <div className=""> {row.remark_en}</div>
+                            )}
+                            {!row.remark_de &&
+                              !row.remarks_cn &&
+                              !row.remark_en && (
+                                <span className="text-gray-300">-</span>
+                              )}
                           </div>
                         ),
                       },
@@ -3102,15 +3126,26 @@ const OrderPage = () => {
                     header: "3-level remark",
                     render: (row) => (
                       <div className="text-xs text-gray-500 font-medium italic space-y-0.5">
+                        {row.remark_de && (
+                          <div className="text-blue-600">
+                            DE: {row.remark_de}
+                          </div>
+                        )}
                         {row.remarks_cn && (
                           <div className="text-red-600">
                             CN: {row.remarks_cn}
                           </div>
                         )}
-                        {row.remark_de && <div>DE: {row.remark_de}</div>}
-                        {!row.remarks_cn && !row.remark_de && (
-                          <span className="text-gray-300">-</span>
+                        {row.remark_en && (
+                          <div className="text-green-600">
+                            EN: {row.remark_en}
+                          </div>
                         )}
+                        {!row.remark_de &&
+                          !row.remarks_cn &&
+                          !row.remark_en && (
+                            <span className="text-gray-300">-</span>
+                          )}
                       </div>
                     ),
                   },

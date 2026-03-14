@@ -8,6 +8,7 @@ import { Order } from "../models/orders";
 import { OrderItem } from "../models/order_items";
 import { Item } from "../models/items";
 import { stat } from "fs";
+import { WarehouseItem } from "../models/warehouse_items";
 
 const padorder_no = (n: number) => `MA${String(n).padStart(4, "0")}`;
 
@@ -326,6 +327,7 @@ export const getAllOrders = async (
 ) => {
   try {
     const orderRepo = AppDataSource.getRepository(Order);
+    const warehouseRepo = AppDataSource.getRepository(WarehouseItem);
     const { search = "", status = "" } = (req.query || {}) as any;
 
     const qb = orderRepo
@@ -351,6 +353,39 @@ export const getAllOrders = async (
     }
 
     const orders = await qb.getMany();
+
+    // Collect all item IDs and ItemID_DEs from order items
+    const itemIds: number[] = [];
+    const itemIdDEs: (number | undefined)[] = [];
+
+    orders.forEach((order) => {
+      order.orderItems?.forEach((oi) => {
+        if (oi.item_id) itemIds.push(oi.item_id);
+        if (oi.ItemID_DE) itemIdDEs.push(oi.ItemID_DE);
+        if (oi.item?.id) itemIds.push(oi.item.id);
+      });
+    });
+
+    // Fetch all warehouse items that match either item_id or ItemID_DE
+    const warehouseItems = await warehouseRepo
+      .createQueryBuilder("wi")
+      .where("wi.item_id IN (:...itemIds)", {
+        itemIds: itemIds.length ? itemIds : [0],
+      })
+      .orWhere("wi.ItemID_DE IN (:...itemIdDEs)", {
+        itemIdDEs: itemIdDEs.length ? itemIdDEs : [0],
+      })
+      .getMany();
+
+    // Create lookup maps for quick access
+    const warehouseByItemId = new Map<number, WarehouseItem>();
+    const warehouseByItemIdDE = new Map<number, WarehouseItem>();
+
+    warehouseItems.forEach((wi) => {
+      if (wi.item_id) warehouseByItemId.set(wi.item_id, wi);
+      if (wi.ItemID_DE) warehouseByItemIdDE.set(wi.ItemID_DE, wi);
+    });
+
     const mappedOrders = orders.map((order) => ({
       ...order,
       supplier_name:
@@ -363,13 +398,31 @@ export const getAllOrders = async (
       items: (order.orderItems || []).map((oi) => {
         const itemDetails = oi.item;
 
+        // Find matching warehouse item
+        let warehouseItem = null;
+        if (oi.item_id) {
+          warehouseItem = warehouseByItemId.get(oi.item_id);
+        }
+        if (!warehouseItem && oi.ItemID_DE) {
+          warehouseItem = warehouseByItemIdDE.get(oi.ItemID_DE);
+        }
+        if (!warehouseItem && itemDetails?.id) {
+          warehouseItem = warehouseByItemId.get(itemDetails.id);
+        }
+
         return {
           ...oi,
+          de_no: warehouseItem?.item_no_de || "-",
           ItemID_DE: oi?.ItemID_DE || "-",
           item_id: oi.item_id || itemDetails?.id,
-          ean: itemDetails?.ean || "-",
+          ean: itemDetails?.ean || warehouseItem?.ean || "-",
+          remark_de: oi.remark_de,
+          remark_cn: oi.remarks_cn,
+          remark_en: oi?.item?.remark || "",
           item_name:
             itemDetails?.item_name ||
+            warehouseItem?.item_name_en ||
+            warehouseItem?.item_name_de ||
             (oi?.ItemID_DE ? `Unknown (DE: ${oi.ItemID_DE})` : "Unknown Item"),
           model: itemDetails?.model || "-",
           price: oi.price || itemDetails?.price || 0,
@@ -379,24 +432,28 @@ export const getAllOrders = async (
             itemDetails?.supplier?.name ||
             "Unassigned",
           item: itemDetails,
+          // Add warehouse data
+          warehouse_data: warehouseItem
+            ? {
+                id: warehouseItem.id,
+                item_no_de: warehouseItem.item_no_de,
+                item_name_de: warehouseItem.item_name_de,
+                item_name_en: warehouseItem.item_name_en,
+                stock_qty: warehouseItem.stock_qty,
+                msq: warehouseItem.msq,
+                buffer: warehouseItem.buffer,
+                is_stock_item: warehouseItem.is_stock_item,
+                is_SnSI: warehouseItem.is_SnSI,
+                ship_class: warehouseItem.ship_class,
+                is_active: warehouseItem.is_active,
+                is_no_auto_order: warehouseItem.is_no_auto_order,
+                category_id: warehouseItem.category_id,
+              }
+            : null,
         };
       }),
       orderItems: undefined,
     }));
-
-    console.log(`[BACKEND] Sent ${mappedOrders.length} orders to frontend`);
-    if (mappedOrders.length > 0) {
-      console.log(
-        `[BACKEND] First order (#${mappedOrders[0].order_no}) has ${mappedOrders[0].items?.length} items.`,
-      );
-      console.log(
-        `[BACKEND] Sample item:`,
-        JSON.stringify(mappedOrders[0].items?.[0] || {}, null, 2).substring(
-          0,
-          500,
-        ),
-      );
-    }
 
     return res.status(200).json({
       success: true,
@@ -544,7 +601,9 @@ export const generateLabelPDF = async (
     const { itemId } = req.params;
     const orderItemRepo = AppDataSource.getRepository(OrderItem);
     const orderRepo = AppDataSource.getRepository(Order);
+    const warehouseItemRepo = AppDataSource.getRepository(WarehouseItem);
 
+    // Get the order item with relations
     const item = await orderItemRepo.findOne({
       where: { id: Number(itemId) },
       relations: ["item"],
@@ -552,6 +611,12 @@ export const generateLabelPDF = async (
 
     if (!item) return next(new ErrorHandler("Item not found", 404));
 
+    // Get the warehouse item using item_id and use item_no_de
+    const warehouseItem = await warehouseItemRepo.findOne({
+      where: { ItemID_DE: item.ItemID_DE },
+    });
+
+    // Get the order details
     const order = await orderRepo.findOne({ where: { id: item.order_id } });
 
     const doc = new PDFDocument({ size: [252, 102], margin: 0 });
@@ -560,16 +625,20 @@ export const generateLabelPDF = async (
     const k2 = path.join(__dirname, "../../public/k2.png");
     let logoPath = logo;
 
-    if (item.item.item_name && item?.item?.item_name.includes("K011111")) {
+    if (
+      (item.item.item_name && item?.item?.item_name.includes("K011111")) ||
+      item.remarks_cn?.includes("K011111")
+    ) {
       logoPath = k1;
     } else if (
-      item.item.item_name &&
-      item?.item?.item_name.includes("K022222")
+      (item.item.item_name && item?.item?.item_name.includes("K022222")) ||
+      item.remarks_cn?.includes("K022222")
     ) {
       logoPath = k2;
     } else {
       logoPath = logo;
     }
+
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader(
       "Content-Disposition",
@@ -591,20 +660,21 @@ export const generateLabelPDF = async (
     doc.text("Order No / Qty", colB, row1LabelY);
     doc.text("Qty", colD, row1LabelY);
 
-    doc.font("Helvetica-Bold").fontSize(14);
+    doc.font("Helvetica-Bold").fontSize(10);
 
-    const itemID = item?.item?.ItemID_DE?.toString() || "N/A";
-    doc.text(itemID, valColA, row1ValueY);
+    // Use item_no_de from warehouseItem instead of ItemID_DE
+    const itemNoDE = warehouseItem?.item_no_de || "N/A";
+    doc.text(itemNoDE, valColA, row1ValueY);
 
     const orderNo = order?.order_no || "N/A";
     doc.text(orderNo, colB, row1ValueY);
 
-    doc.text(`${item.qty || 0}`, colD, row1ValueY);
+    doc.text(`${item.qty_label || 0}`, colD, row1ValueY);
     const orderNoWidth = doc.widthOfString(orderNo);
     doc
       .font("Helvetica")
       .fontSize(9)
-      .text(`/${item.qty_label}`, colB + orderNoWidth + 2, row1ValueY + 4);
+      .text(`/${item.qty}`, colB + orderNoWidth + 2, row1ValueY + 4);
 
     try {
       doc.image(logoPath, colLogo, 8, { width: 40 });
@@ -636,7 +706,8 @@ export const generateLabelPDF = async (
       .fontSize(6.5)
       .text("RemarkW", colA, bottomSectionY + 22);
 
-    const barcodeValue = item.item.ean?.toString() || "";
+    // Use ean from warehouseItem instead of item.ean
+    const barcodeValue = warehouseItem?.ean?.toString() || "";
     try {
       const barcodeBuffer = await bwipjs.toBuffer({
         bcid: "code128",

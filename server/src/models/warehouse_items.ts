@@ -8,7 +8,7 @@ import {
 import { Item } from "./items";
 import { Category } from "./categories";
 
-@Entity("warehouse_items")
+@Entity("warehouse_item")
 export class WarehouseItem {
   @PrimaryGeneratedColumn()
   id!: number;
