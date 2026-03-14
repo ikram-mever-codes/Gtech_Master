@@ -721,14 +721,46 @@ const ItemsManagementPage: React.FC = () => {
 
         return matchesSearch && matchesCode && matchesName;
       } else {
-        const matchesSearch =
-          !filters.search ||
-          Object.values(item).some((value: any) =>
-            value
-              ?.toString()
-              .toLowerCase()
-              .includes(filters.search.toLowerCase()),
-          );
+        const searchLower = filters.search.toLowerCase();
+        let matchesSearch = !filters.search;
+
+        if (filters.search) {
+          if (activeTab === "items") {
+            const it = item as any;
+            matchesSearch =
+              it.id?.toString().includes(filters.search) ||
+              it.de_no?.toLowerCase().includes(searchLower) ||
+              it.item_name?.toLowerCase().includes(searchLower) ||
+              it.name_en?.toLowerCase().includes(searchLower) ||
+              it.ean?.toString().includes(filters.search) ||
+              it.category?.toLowerCase().includes(searchLower) ||
+              it.supplier_name?.toLowerCase().includes(searchLower) ||
+              it.remark?.toLowerCase().includes(searchLower) ||
+              it.model?.toLowerCase().includes(searchLower);
+          } else if (activeTab === "parents") {
+            const p = item as any;
+            matchesSearch =
+              p.id?.toString().includes(filters.search) ||
+              p.de_no?.toLowerCase().includes(searchLower) ||
+              p.name_de?.toLowerCase().includes(searchLower) ||
+              p.name_en?.toLowerCase().includes(searchLower);
+          } else if (activeTab === "warehouse") {
+            const w = item as any;
+            matchesSearch =
+              w.id?.toString().includes(filters.search) ||
+              w.item_no_de?.toLowerCase().includes(searchLower) ||
+              w.item_name_de?.toLowerCase().includes(searchLower) ||
+              w.item_name_en?.toLowerCase().includes(searchLower);
+          } else if (activeTab === "suppliers") {
+            const s = item as any;
+            matchesSearch =
+              s.id?.toString().includes(filters.search) ||
+              s.name?.toLowerCase().includes(searchLower) ||
+              s.company_name?.toLowerCase().includes(searchLower) ||
+              s.contact_person?.toLowerCase().includes(searchLower) ||
+              s.email?.toLowerCase().includes(searchLower);
+          }
+        }
 
         const matchesActive =
           !filters.isActive || (item as any).is_active === filters.isActive;
@@ -747,6 +779,9 @@ const ItemsManagementPage: React.FC = () => {
           <>
             <th className="px-4 py-3 text-left text-xs text-nowrap font-semibold text-gray-600 uppercase tracking-wider">
               DE Number
+            </th>
+            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+              EAN
             </th>
             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
               Name
@@ -912,6 +947,11 @@ const ItemsManagementPage: React.FC = () => {
             <td className="px-4 py-3">
               <div className="font-medium text-gray-900">
                 {item.de_no || "-"}
+              </div>
+            </td>
+            <td className="px-4 py-3">
+              <div className="text-sm text-gray-900 font-medium">
+                {item.ean?.toString() || "-"}
               </div>
             </td>
             <td className="px-4 py-3">

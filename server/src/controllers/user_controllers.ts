@@ -1101,6 +1101,7 @@ export const updateUser = async (
       emergencyContact,
       joiningDate,
       isLoginEnabled,
+      password,
     } = req.body;
     if (!id) {
       return next(new ErrorHandler("User ID is required", 400));
@@ -1156,6 +1157,11 @@ export const updateUser = async (
       if (emergencyContact !== undefined) user.emergencyContact = emergencyContact || null;
       if (joiningDate !== undefined) user.joiningDate = joiningDate || null;
       if (isLoginEnabled !== undefined) user.isLoginEnabled = isLoginEnabled;
+
+      if (password) {
+        const hashedPassword = await bcrypt.hash(password, 10);
+        user.password = hashedPassword;
+      }
 
       await tUserRepo.save(user);
 
