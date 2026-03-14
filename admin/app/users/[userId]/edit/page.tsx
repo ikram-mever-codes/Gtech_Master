@@ -72,6 +72,7 @@ interface FormValues {
   emergencyContact: string;
   joiningDate: string;
   isLoginEnabled: boolean;
+  password?: string;
 }
 
 const validationSchema = Yup.object({
@@ -96,6 +97,7 @@ const validationSchema = Yup.object({
     ),
   joiningDate: Yup.date(),
   isLoginEnabled: Yup.boolean(),
+  password: Yup.string().min(6, "Password must be at least 6 characters"),
 });
 
 
@@ -163,6 +165,7 @@ const UserUpdatePage: React.FC = () => {
           emergencyContact: userData.emergencyContact || "",
           joiningDate: userData.joiningDate?.split("T")[0] || "",
           isLoginEnabled: userData.isLoginEnabled !== undefined ? userData.isLoginEnabled : true,
+          password: "",
         });
 
         const existingPermissions = userData.permissions || [];
@@ -227,13 +230,14 @@ const UserUpdatePage: React.FC = () => {
       emergencyContact: "",
       joiningDate: "",
       isLoginEnabled: true,
+      password: "",
     },
     validationSchema,
     onSubmit: async (values) => {
       try {
         setIsSubmitting(true);
 
-        const userData = {
+        const userData: any = {
           ...values,
           assignedResources: permissions.map((p) => p.resource),
           permissions: permissions.map((p) => ({
@@ -241,6 +245,10 @@ const UserUpdatePage: React.FC = () => {
             actions: p.actions,
           })),
         };
+
+        if (!userData.password) {
+          delete userData.password;
+        }
 
         await updateUserApi(userId, userData);
 
@@ -378,6 +386,17 @@ const UserUpdatePage: React.FC = () => {
                 icon={<LucideMail size={20} />}
                 formik={formik}
                 placeholder="john.doe@example.com"
+              />
+            </div>
+
+            <div>
+              <FormInput
+                name="password"
+                label="New Password (Optional)"
+                type="password"
+                icon={<LucideLock size={20} />}
+                formik={formik}
+                placeholder="Leave blank to keep unchanged"
               />
             </div>
 
