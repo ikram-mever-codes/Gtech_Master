@@ -872,13 +872,31 @@ const OrderPage = () => {
     orders.forEach((o: any) => {
       (o.items || []).forEach((it: any) => {
         const searchLower = reprintSearch.toLowerCase();
+
+        // Get item data from various sources
         const itemData = itemById.get(String(it.item_id));
+
+        // Collect all possible EAN sources
+        const eanSources = [
+          it.item?.ean,
+          itemData?.ean,
+          it.ean,
+          it.warehouse_data?.ean,
+          it.item?.warehouse_data?.ean,
+          o.items?.find((i: any) => i.item_id === it.item_id)?.item?.ean,
+        ].filter(Boolean); // Remove undefined/null values
+
+        // Check if any EAN matches the search
+        const matchesEAN = eanSources.some((ean) =>
+          ean?.toString().toLowerCase().includes(searchLower),
+        );
+
+        // Other search criteria
         const matchesSearch =
           !reprintSearch ||
-          String(it.id).includes(reprintSearch) ||
-          String(it.item_id).includes(reprintSearch) ||
-          it.item?.ean?.toString().includes(reprintSearch) ||
-          itemData?.ean?.toString().includes(reprintSearch) ||
+          matchesEAN ||
+          String(it.id).toLowerCase().includes(searchLower) ||
+          String(it.item_id).toLowerCase().includes(searchLower) ||
           it.item?.item_name?.toLowerCase().includes(searchLower) ||
           it.item?.name?.toLowerCase().includes(searchLower) ||
           it.itemName?.toLowerCase().includes(searchLower) ||
@@ -893,10 +911,8 @@ const OrderPage = () => {
         }
       });
     });
-    console.log(list);
     return list;
   }, [orders, reprintSearch, itemById]);
-
   const orderItemDetailsMap = useMemo(() => {
     const map = new Map<string, any>();
     orders.forEach((o: any) => {
@@ -2722,10 +2738,10 @@ const OrderPage = () => {
                         </div>
                         <input
                           type="text"
-                          placeholder="Search items..."
+                          placeholder="Search by EAN, Item name, Order No..."
                           value={reprintSearch}
                           onChange={(e) => setReprintSearch(e.target.value)}
-                          className="pl-9 pr-4 py-1.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#059669] w-64 shadow-sm text-xs text-gray-900"
+                          className="pl-9 pr-4 py-1.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#059669] w-80 shadow-sm text-xs text-gray-900"
                         />
                       </div>
                     </div>
@@ -2746,14 +2762,26 @@ const OrderPage = () => {
                         render: (row) => {
                           // Try multiple sources for EAN
                           const ean =
-                            row.item?.ean || // From item
-                            row.warehouse_data?.ean || // From warehouse data
-                            row.ean || // Direct on row
-                            row.item?.warehouse_data?.ean || // Nested warehouse data
+                            row.item?.ean ||
+                            row.warehouse_data?.ean ||
+                            row.ean ||
+                            row.item?.warehouse_data?.ean ||
+                            itemById.get(String(row.item_id))?.ean ||
                             "-";
 
+                          // Highlight the EAN if it matches the search
+                          const isHighlighted =
+                            reprintSearch &&
+                            ean !== "-" &&
+                            ean
+                              .toString()
+                              .toLowerCase()
+                              .includes(reprintSearch.toLowerCase());
+
                           return (
-                            <span className="font-medium text-gray-600">
+                            <span
+                              className={`font-medium ${isHighlighted ? "text-[#059669] font-bold" : "text-gray-600"}`}
+                            >
                               {ean}
                             </span>
                           );
