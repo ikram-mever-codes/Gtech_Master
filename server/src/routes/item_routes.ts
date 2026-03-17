@@ -46,7 +46,7 @@ router.use(authenticateUser);
 router.use(authorize(UserRole.ADMIN, UserRole.SALES, UserRole.PURCHASING));
 
 router.get("/", getItems);
-
+router.get("/tarics", getAllTarics);
 router.get("/export/csv", exportItemsToCSV);
 
 router.get("/:id", getItemById);

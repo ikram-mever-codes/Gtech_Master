@@ -176,6 +176,8 @@ const ItemsManagementPage: React.FC = () => {
     is_npr: false,
     is_eur_special: false,
     is_rmb_special: false,
+    item_no_de: "",
+    item_name_de: "",
   });
 
   const router = useRouter();
@@ -384,6 +386,8 @@ const ItemsManagementPage: React.FC = () => {
       is_npr: false,
       is_eur_special: false,
       is_rmb_special: false,
+      item_no_de: "",
+      item_name_de: "",
     });
     setShowItemModal(true);
   };
@@ -422,6 +426,10 @@ const ItemsManagementPage: React.FC = () => {
         price: Number(itemFormData.price) || 0,
         currency: itemFormData.currency || "CNY",
         isActive: itemFormData.isActive ? "Y" : "N",
+        item_no_de: itemFormData.item_no_de || undefined,
+        item_name_de: itemFormData.item_name_de || undefined,
+        is_eur_special: itemFormData.is_eur_special ? "Y" : "N",
+        is_rmb_special: itemFormData.is_rmb_special ? "Y" : "N",
       });
 
       setShowItemModal(false);
@@ -1921,7 +1929,6 @@ const ItemsManagementPage: React.FC = () => {
                     placeholder="Enter Chinese name"
                   />
                 </div>
-
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     EAN
@@ -1937,6 +1944,42 @@ const ItemsManagementPage: React.FC = () => {
                     }
                     className="w-full px-3 py-2 border border-gray-300 rounded-md"
                     placeholder="Enter EAN"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    DE Number
+                  </label>
+                  <input
+                    type="text"
+                    value={itemFormData.item_no_de}
+                    onChange={(e) =>
+                      setItemFormData({
+                        ...itemFormData,
+                        item_no_de: e.target.value,
+                      })
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                    placeholder="Enter DE number (e.g. DE1024)"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    DE Item Name
+                  </label>
+                  <input
+                    type="text"
+                    value={itemFormData.item_name_de}
+                    onChange={(e) =>
+                      setItemFormData({
+                        ...itemFormData,
+                        item_name_de: e.target.value,
+                      })
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                    placeholder="Enter DE item name"
                   />
                 </div>
 
@@ -2299,6 +2342,27 @@ const ItemsManagementPage: React.FC = () => {
                     <option value="Y">Yes</option>
                     <option value="N">No</option>
                   </select>
+                </div>
+
+                <div className="flex items-center gap-6 pt-6">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="is_eur_special"
+                      checked={itemFormData.is_eur_special}
+                      onChange={(e) =>
+                        setItemFormData({
+                          ...itemFormData,
+                          is_eur_special: e.target.checked,
+                          is_rmb_special: e.target.checked,
+                        })
+                      }
+                      className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
+                    />
+                    <label htmlFor="is_eur_special" className="text-sm font-medium text-gray-700">
+                      Special Item
+                    </label>
+                  </div>
                 </div>
               </div>
 

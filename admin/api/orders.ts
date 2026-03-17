@@ -184,10 +184,10 @@ export const updateOrderItemPrice = async (itemId: string | number, eurPrice: nu
   }
 };
 
-export const splitOrderItem = async (id: string | number, splitQty: number) => {
+export const splitOrderItem = async (id: string | number, splitQty: number, targetCargoId?: string | number, remarks?: string) => {
   try {
     toast.loading("Splitting item...", loadingStyles);
-    const response = await api.post(`/orders/items/${id}/split`, { splitQty });
+    const response = await api.post(`/orders/items/${id}/split`, { splitQty, targetCargoId, remarks });
     toast.dismiss();
     toast.success("Item split successfully", successStyles);
     return response.data;

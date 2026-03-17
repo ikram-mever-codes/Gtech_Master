@@ -130,7 +130,7 @@ class DataSanitizer {
   }
 }
 
-class MySQLToPostgresMigrator {
+export class MySQLToPostgresMigrator {
   private mysqlPool: mysql.Pool;
   private batchSize: number = 100;
 
@@ -532,9 +532,9 @@ class MySQLToPostgresMigrator {
 
     try {
       const [rows] = await connection.execute(`
-        SELECT id, parent_id, ItemID_DE, parent_no_de, is_dimension_special, 
+        SELECT id, parent_id, ItemID_DE, parent_no_de, is_dimension_special,
                model, supp_cat, ean, taric_id, weight, width, height, length,
-               item_name, item_name_cn, FOQ, FSQ, is_qty_dividable, ISBN, 
+               item_name, item_name_cn, FOQ, FSQ, is_qty_dividable, ISBN,
                cat_id, remark, RMB_Price, photo, pix_path, pix_path_eBay,
                is_npr, npr_remark, many_components, effort_rating, is_rmb_special,
                is_eur_special, is_pu_item, is_meter_item, is_new, isActive,
@@ -608,6 +608,12 @@ class MySQLToPostgresMigrator {
                 10,
                 2
               ),
+              price: DataSanitizer.sanitizeDecimalWithScale(
+                row.RMB_Price,
+                10,
+                2
+              ),
+              currency: "CNY",
               photo: DataSanitizer.sanitizeString(row.photo, 255, ""),
               pix_path: DataSanitizer.sanitizeString(row.pix_path, 1000, ""),
               pix_path_eBay: DataSanitizer.sanitizeString(
@@ -687,6 +693,8 @@ class MySQLToPostgresMigrator {
                   supp_cat: DataSanitizer.sanitizeString(row.supp_cat, 3, ""),
                   ean: DataSanitizer.sanitizeBigInt(row.ean),
                   taric_id: finalTaricId,
+                  price: DataSanitizer.sanitizeDecimalWithScale(row.price, 10, 2),
+                  currency: DataSanitizer.sanitizeString(row.currency, 10, "CNY"),
                   weight: DataSanitizer.sanitizeFloat(row.weight),
                   width: DataSanitizer.sanitizeFloat(row.width),
                   height: DataSanitizer.sanitizeFloat(row.height),
@@ -819,6 +827,9 @@ class MySQLToPostgresMigrator {
           const order = orderRepository.create({
             id: mysqlId,
             order_no: DataSanitizer.sanitizeString(row.order_no, 255, ""),
+            customer_id: null,
+            supplier_id: null,
+            cargo_id: null,
             category_id: DataSanitizer.sanitizeNumber(row.category_id),
             status: DataSanitizer.sanitizeNumber(row.status),
             comment: DataSanitizer.sanitizeString(row.comment, undefined, ""),
@@ -1138,7 +1149,6 @@ class MySQLToPostgresMigrator {
               null;
 
             if (!postgresItemId) {
-              // Try one more thing: direct query for safety if map failed (slower but identifies issue)
               const itemRepo = AppDataSource.getRepository(Item);
               const dbItem = await itemRepo.findOne({ where: { ItemID_DE: mysqlItemIdDE } });
               if (dbItem) {
@@ -1159,12 +1169,25 @@ class MySQLToPostgresMigrator {
               ItemID_DE: mysqlItemIdDE,
               order_id: postgresOrderId,
               qty: DataSanitizer.sanitizeNumber(row.qty),
-              remark_de: DataSanitizer.sanitizeString(
-                row.remark_de,
-                undefined,
-                ""
-              ),
+              remark_de: DataSanitizer.sanitizeString(row.remark_de, undefined, ""),
               qty_delivered: DataSanitizer.sanitizeNumber(row.qty_delivered),
+              category_id: null,
+              rmb_special_price: 0,
+              eur_special_price: 0,
+              price: 0,
+              currency: "CNY",
+              taric_id: null,
+              set_taric_code: null,
+              status: "NSO",
+              remarks_cn: "",
+              problems: "",
+              qty_label: DataSanitizer.sanitizeNumber(row.qty),
+              qty_split: 0,
+              supplier_order_id: null,
+              ref_no: "",
+              cargo_id: null,
+              printed: "N",
+              cargo_date: DataSanitizer.sanitizeDate(row.cargo_date),
               created_at:
                 DataSanitizer.sanitizeDate(row.created_at) || new Date(),
               updated_at:
@@ -1296,7 +1319,6 @@ class MySQLToPostgresMigrator {
 
             await supplierItemRepository.save(supplierItem);
 
-            // Sync supplier_id to the Item table if this is the default supplier
             if (supplierItem.is_default === "Y" && finalSupplierId) {
               const itemRepo = AppDataSource.getRepository(Item);
               await itemRepo.update(postgresItemId, { supplier_id: finalSupplierId });
@@ -1370,16 +1392,3 @@ class MySQLToPostgresMigrator {
     }
   }
 }
-async function runMigration() {
-  const migrator = new MySQLToPostgresMigrator();
-
-  try {
-    await migrator.migrateAllData();
-    console.log("\n🎊 Migration finished successfully!");
-    console.log("💡 Invalid foreign key references have been set to null.");
-  } catch (error) {
-    console.error("\n💥 Migration failed completely:", error);
-    process.exit(1);
-  }
-}
-runMigration().catch(console.error);
