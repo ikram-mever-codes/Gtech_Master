@@ -18,7 +18,7 @@ const router: any = express.Router();
 router.use(authenticateUser);
 
 router.post("/", authorize(UserRole.SALES, UserRole.PURCHASING), createOrder);
-router.get("/", authorize(UserRole.SALES, UserRole.PURCHASING), getAllOrders);
+router.get("/", /* authorize(UserRole.SALES, UserRole.PURCHASING), */ getAllOrders);
 
 router.get("/item/:itemId/label", authorize(UserRole.SALES, UserRole.PURCHASING), generateLabelPDF);
 

@@ -42,10 +42,13 @@ export type CreateCustomerPayload = {
   deliveryCountry?: string;
 };
 
-export const getAllCustomers = async () => {
+export const getAllCustomers = async (): Promise<any> => {
   try {
     const res = await api.get("/businesses");
-    return res;
+    const payload = res as any;
+    if (payload && typeof payload === "object" && "success" in payload)
+      return payload;
+    return { success: true, data: payload };
   } catch (error) {
     handleApiError(error);
   }

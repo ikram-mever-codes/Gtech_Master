@@ -782,9 +782,7 @@ export class InvoiceController {
       };
 
       const getGroupKey = (oi: any): string => {
-        const itemTaricCode = oi.item?.taric?.code || "";
-        const isProjectItem = !itemTaricCode || itemTaricCode === "0" || itemTaricCode === "0000000000";
-        if (isProjectItem && oi.set_taric_code) {
+        if (oi.set_taric_code) {
           return `set_${oi.set_taric_code}`;
         }
         const taricId = oi.item?.taric?.id;
@@ -800,13 +798,13 @@ export class InvoiceController {
         const groupKey = getGroupKey(oi);
 
         if (!taricGroupsMap.has(groupKey)) {
-          let displayCode = taric?.code || "-";
-          if (isProjectItem && oi.set_taric_code) {
+          let displayCode = oi.item?.taric?.code || "-";
+          if (oi.set_taric_code) {
             displayCode = `${oi.set_taric_code}`;
           }
 
           taricGroupsMap.set(groupKey, {
-            taricId: taric?.id || groupKey,
+            taricId: groupKey, // Use groupKey as the ID to avoid numeric collisions
             taricNameEn: taric?.name_en || (isProjectItem ? "Project Item" : "Unknown"),
             taricCode: displayCode,
             dutyRate: taric?.duty_rate || 0,

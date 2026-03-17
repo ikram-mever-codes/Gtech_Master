@@ -54,17 +54,17 @@ export const getItems = async (
       taricId,
     } = req.query;
 
-    const pageNum = parseInt(page as string);
-    const limitNum = parseInt(limit as string);
+    let pageNum = parseInt(page as string);
+    if (isNaN(pageNum)) pageNum = 1;
+    let limitNum = parseInt(limit as string);
+    if (isNaN(limitNum)) limitNum = 50;
     const skip = (pageNum - 1) * limitNum;
 
-    // Build the query builder for more control
     const queryBuilder = itemRepository
       .createQueryBuilder("item")
       .skip(skip)
       .take(limitNum);
 
-    // Add search conditions
     if (search) {
       const searchStr = search as string;
       queryBuilder.where(
@@ -78,7 +78,6 @@ export const getItems = async (
       }
     }
 
-    // Add filters
     if (isActive) {
       queryBuilder.andWhere("item.isActive = :isActive", { isActive });
     }
@@ -107,44 +106,46 @@ export const getItems = async (
       });
     }
 
-    // Add sorting
     queryBuilder.orderBy(
       `item.${sortBy}`,
       sortOrder === "DESC" ? "DESC" : "ASC",
     );
 
-    // Get total count
     const totalRecords = await queryBuilder.getCount();
-
-    // Get items
     const items = await queryBuilder.getMany();
 
-    // Collect all ItemID_DE values from items
+    const itemIds = items.map((item) => item.id);
     const itemIdDEs = items
       .map((item) => item.ItemID_DE)
       .filter((id) => id !== undefined && id !== null);
 
-    // Fetch warehouse items that match the ItemID_DE values
     let warehouseItems: any[] = [];
-    if (itemIdDEs.length > 0) {
-      warehouseItems = await warehouseRepository
-        .createQueryBuilder("wi")
-        .where("wi.ItemID_DE IN (:...itemIdDEs)", { itemIdDEs })
-        .getMany();
+    if (itemIds.length > 0) {
+      const warehouseQuery = warehouseRepository.createQueryBuilder("wi");
+      if (itemIdDEs.length > 0) {
+        warehouseQuery.where(
+          "(wi.ItemID_DE IN (:...itemIdDEs) OR wi.item_id IN (:...itemIds))",
+          { itemIdDEs, itemIds },
+        );
+      } else {
+        warehouseQuery.where("wi.item_id IN (:...itemIds)", { itemIds });
+      }
+      warehouseItems = await warehouseQuery.getMany();
     }
 
-    // Create a map for quick lookup of warehouse items by ItemID_DE
     const warehouseByItemIdDE = new Map<number, any>();
+    const warehouseByItemId = new Map<number, any>();
     warehouseItems.forEach((wi) => {
       if (wi.ItemID_DE) {
         warehouseByItemIdDE.set(wi.ItemID_DE, wi);
       }
+      if (wi.item_id) {
+        warehouseByItemId.set(wi.item_id, wi);
+      }
     });
 
-    // Manually fetch related data for each item
     const formattedItems = await Promise.all(
       items.map(async (item) => {
-        // Fetch parent data manually
         let parentData = null;
         if (item.parent_id) {
           parentData = await parentRepository.findOne({
@@ -153,7 +154,6 @@ export const getItems = async (
           });
         }
 
-        // Fetch taric data manually
         let taricData = null;
         if (item.taric_id) {
           taricData = await taricRepository.findOne({
@@ -162,7 +162,6 @@ export const getItems = async (
           });
         }
 
-        // Fetch category data manually
         let categoryData = null;
         if (item.cat_id) {
           categoryData = await categoryRepository.findOne({
@@ -171,7 +170,6 @@ export const getItems = async (
           });
         }
 
-        // Fetch supplier data manually
         let supplierData = null;
         if (item.supplier_id) {
           supplierData = await supplierRepository.findOne({
@@ -180,27 +178,25 @@ export const getItems = async (
           });
         }
 
-        // Get warehouse item data using ItemID_DE
         let warehouseData = null;
         if (item.ItemID_DE) {
           warehouseData = warehouseByItemIdDE.get(item.ItemID_DE);
         }
+        if (!warehouseData) {
+          warehouseData = warehouseByItemId.get(item.id);
+        }
 
-        // Determine the EAN to use:
-        // 1. If item has its own EAN, use it
-        // 2. Otherwise, use EAN from warehouse item if available
-        // 3. If neither, set to null
         const ean = item.ean || warehouseData?.ean || null;
 
         return {
           id: item.id,
-          de_no: warehouseData?.item_no_de || null,
+          de_no: warehouseData?.item_no_de || parentData?.de_no || null,
           name_de: parentData?.name_de || null,
           name_en: parentData?.name_en || null,
           name_cn: parentData?.name_cn || null,
           item_name: item.item_name,
           item_name_cn: item.item_name_cn,
-          ean: ean, // Use the determined EAN
+          ean: ean,
           ItemID_DE: item.ItemID_DE || null,
           is_active: item.isActive,
           parent_id: item.parent_id || null,
@@ -223,17 +219,17 @@ export const getItems = async (
           // Include warehouse data if needed
           warehouse_data: warehouseData
             ? {
-                id: warehouseData.id,
-                item_no_de: warehouseData.item_no_de,
-                item_name_de: warehouseData.item_name_de,
-                item_name_en: warehouseData.item_name_en,
-                stock_qty: warehouseData.stock_qty,
-                msq: warehouseData.msq,
-                buffer: warehouseData.buffer,
-                is_stock_item: warehouseData.is_stock_item,
-                is_SnSI: warehouseData.is_SnSI,
-                ship_class: warehouseData.ship_class,
-              }
+              id: warehouseData.id,
+              item_no_de: warehouseData.item_no_de,
+              item_name_de: warehouseData.item_name_de,
+              item_name_en: warehouseData.item_name_en,
+              stock_qty: warehouseData.stock_qty,
+              msq: warehouseData.msq,
+              buffer: warehouseData.buffer,
+              is_stock_item: warehouseData.is_stock_item,
+              is_SnSI: warehouseData.is_SnSI,
+              ship_class: warehouseData.ship_class,
+            }
             : null,
 
           created_at: item.created_at,
@@ -271,8 +267,8 @@ export const getItemById = async (
   try {
     const { id } = req.params;
 
-    if (!id) {
-      return next(new ErrorHandler("Item ID is required", 400));
+    if (!id || isNaN(parseInt(id))) {
+      return next(new ErrorHandler("Valid numeric Item ID is required", 400));
     }
 
     const itemRepository = AppDataSource.getRepository(Item);
@@ -446,23 +442,23 @@ export const getItemById = async (
 
       supplierItem: supplierItem
         ? {
-            priceRMB: supplierItem.price_rmb?.toString() || "0",
-            isPO: supplierItem.is_po || "No",
-            moq: supplierItem.moq?.toString() || "0",
-            interval: supplierItem.oi?.toString() || "0",
-            leadTime: supplierItem.lead_time || "",
-            noteCN: supplierItem.note_cn || "",
-            url: supplierItem.url || "",
-          }
+          priceRMB: supplierItem.price_rmb?.toString() || "0",
+          isPO: supplierItem.is_po || "No",
+          moq: supplierItem.moq?.toString() || "0",
+          interval: supplierItem.oi?.toString() || "0",
+          leadTime: supplierItem.lead_time || "",
+          noteCN: supplierItem.note_cn || "",
+          url: supplierItem.url || "",
+        }
         : {
-            priceRMB: "0",
-            isPO: "No",
-            moq: "0",
-            interval: "0",
-            leadTime: "",
-            noteCN: "",
-            url: "",
-          },
+          priceRMB: "0",
+          isPO: "No",
+          moq: "0",
+          interval: "0",
+          leadTime: "",
+          noteCN: "",
+          url: "",
+        },
 
       nprRemarks: item.npr_remark || "",
     };
@@ -515,6 +511,8 @@ export const createItem = async (
       is_eur_special = "N",
       is_rmb_special = "N",
       painPoints = [],
+      item_no_de,
+      item_name_de,
     } = req.body;
 
     if (!item_name || !parent_id) {
@@ -594,8 +592,8 @@ export const createItem = async (
       const warehouseRepository = AppDataSource.getRepository(WarehouseItem);
       const warehouseItem = warehouseRepository.create({
         item_id: newItem.id,
-        item_no_de: parent.de_no,
-        item_name_de: item_name,
+        item_no_de: item_no_de || parent.de_no,
+        item_name_de: item_name_de || item_name,
         item_name_en: item_name,
         stock_qty: 0,
         msq: 0,
@@ -749,6 +747,10 @@ export const updateItem = async (
           warehouseItem.buffer = parseInt(warehouseItemData.buffer);
         if (warehouseItemData.is_SnSI !== undefined)
           warehouseItem.is_SnSI = warehouseItemData.is_SnSI;
+        if (warehouseItemData.item_no_de !== undefined)
+          warehouseItem.item_no_de = warehouseItemData.item_no_de;
+        if (warehouseItemData.item_name_de !== undefined)
+          warehouseItem.item_name_de = warehouseItemData.item_name_de;
         await warehouseRepository.save(warehouseItem);
       }
     }
@@ -1127,9 +1129,9 @@ export const getParents = async (
       supplier_id: parent.supplier_id,
       supplier: parent.supplier
         ? {
-            id: parent.supplier.id,
-            name: parent.supplier.name,
-          }
+          id: parent.supplier.id,
+          name: parent.supplier.name,
+        }
         : null,
       item_count: parent.items?.length || 0,
       created_at: parent.created_at,
@@ -1205,17 +1207,17 @@ export const getParentById = async (
       is_active: parent.is_active,
       taric: parent.taric
         ? {
-            id: parent.taric.id,
-            code: parent.taric.code,
-            name_de: parent.taric.name_de,
-          }
+          id: parent.taric.id,
+          code: parent.taric.code,
+          name_de: parent.taric.name_de,
+        }
         : null,
       supplier: parent.supplier
         ? {
-            id: parent.supplier.id,
-            name: parent.supplier.name,
-            contact_person: parent.supplier.contact_person,
-          }
+          id: parent.supplier.id,
+          name: parent.supplier.name,
+          contact_person: parent.supplier.contact_person,
+        }
         : null,
       variations: {
         de: [parent.var_de_1, parent.var_de_2, parent.var_de_3].filter(Boolean),
@@ -1909,8 +1911,10 @@ export const getAllTarics = async (
       sortOrder = "ASC",
     } = req.query;
 
-    const pageNum = parseInt(page as string);
-    const limitNum = parseInt(limit as string);
+    let pageNum = parseInt(page as string);
+    if (isNaN(pageNum)) pageNum = 1;
+    let limitNum = parseInt(limit as string);
+    if (isNaN(limitNum)) limitNum = 30;
     const skip = (pageNum - 1) * limitNum;
 
     const whereConditions: FindOptionsWhere<Taric> = {};

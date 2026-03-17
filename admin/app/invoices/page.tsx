@@ -45,6 +45,7 @@ import CargoTypesTab from "@/components/cargos/CargoTypesTab";
 import { getAllCustomers, CustomerData as APICustomerData, updateCustomerProfile } from "@/api/customers";
 import { updateOrderItemStatus, splitOrderItem, updateOrderItemPrice } from "@/api/orders";
 import { getAllCargos, CargoType } from "@/api/cargos";
+import { getAllTaricsSimple } from "@/api/items";
 import BillToShipToForm, { BillToShipToData, WAREHOUSE_BILL_TO } from "@/components/General/BillToShipToForm";
 import { toast } from "react-hot-toast";
 import CustomModal from "@/components/UI/CustomModal";
@@ -164,8 +165,16 @@ const InvoiceListPage: React.FC = () => {
   const [expandedPriceItemId, setExpandedPriceItemId] = useState<string | null>(null);
   const [editingPrice, setEditingPrice] = useState<number>(0);
 
+  const [splitRemarks, setSplitRemarks] = useState<string>("");
+  const [tarics, setTarics] = useState<any[]>([]);
+  const [selectedTaricCode, setSelectedTaricCode] = useState<string>("");
+  const [expandedTaricGroupId, setExpandedTaricGroupId] = useState<string | null>(null);
+
   const [editingInvoiceId, setEditingInvoiceId] = useState<string | null>(null);
   const [invoiceEditForm, setInvoiceEditForm] = useState({ description: "", freightCost: "", remark: "" });
+
+  const [showTaricModal, setShowTaricModal] = useState(false);
+  const [selectedTaricGroup, setSelectedTaricGroup] = useState<any>(null);
 
   const handleSetPrice = async (itemId: string | number) => {
     try {
@@ -224,6 +233,9 @@ const InvoiceListPage: React.FC = () => {
     getAllCargos().then(res => {
       if (res.success) setCargos(res.data);
     });
+    getAllTaricsSimple().then(res => {
+      if (res.success) setTarics(res.data);
+    });
   }, []);
 
   const handleReassignItem = async () => {
@@ -247,9 +259,10 @@ const InvoiceListPage: React.FC = () => {
   const handleSplitItem = async () => {
     if (!selectedItem || splitQty <= 0) return;
     try {
-      await splitOrderItem(selectedItem.id, splitQty);
-      toast.success("Item split successfully");
+      await splitOrderItem(selectedItem.id, splitQty, targetCargoId, splitRemarks);
+      toast.success("Item split and moved successfully");
       setShowSPModal(false);
+      setSplitRemarks("");
       const invId = Object.keys(expandedStates).find(key =>
         expandedStates[key].data?.detailedItems?.some((it: any) => it.id === selectedItem.id)
       );
@@ -257,8 +270,75 @@ const InvoiceListPage: React.FC = () => {
         const res = await getExpandedInvoiceDetails(invId);
         setExpandedStates(prev => ({ ...prev, [invId]: { ...prev[invId], data: res.data } }));
       }
+      loadInvoices();
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const handleSetTaric = async (group: any) => {
+    if (!selectedTaricCode || !group) return;
+    try {
+      const invId = Object.keys(expandedStates).find(key =>
+        expandedStates[key].taric && expandedStates[key].data?.taricGroups?.some((g: any) => g.taricId === group.taricId)
+      );
+
+      if (!invId) {
+        toast.error("Could not find invoice for this taric group");
+        return;
+      }
+
+      const itemsInGroup = expandedStates[invId].data?.detailedItems?.filter((oi: any) => {
+        const itemTaricCode = oi.item?.taric?.code || "";
+        const isProjectItem = !itemTaricCode || itemTaricCode === "0" || itemTaricCode === "0000000000";
+        let oiGroupKey = "";
+        if (oi.set_taric_code) {
+          oiGroupKey = `set_${oi.set_taric_code}`;
+        } else {
+          const taricId = oi.item?.taric?.id;
+          oiGroupKey = taricId ? `taric_${taricId}` : "unknown";
+        }
+        return oiGroupKey === group.taricId;
+      });
+
+      if (itemsInGroup && itemsInGroup.length > 0) {
+        for (const oi of itemsInGroup) {
+          const originalCode = oi.item?.taric?.code;
+          const hasOriginal = originalCode && originalCode !== "0" && originalCode !== "0000000000";
+
+          let newTaricValue = "";
+          if (hasOriginal) {
+            newTaricValue = `${originalCode}/${selectedTaricCode}`;
+          } else {
+            const priorSet = oi.set_taric_code;
+            if (priorSet && priorSet.includes('/')) {
+              const parts = priorSet.split('/');
+              newTaricValue = `${parts[0]}/${selectedTaricCode}`;
+            } else if (priorSet && priorSet !== selectedTaricCode) {
+              newTaricValue = `${priorSet}/${selectedTaricCode}`;
+            } else {
+              newTaricValue = selectedTaricCode;
+            }
+          }
+          await updateOrderItemStatus(oi.id, { set_taric_code: newTaricValue });
+        }
+        toast.success("Taric codes updated successfully");
+        setShowTaricModal(false);
+        setSelectedTaricCode("");
+
+        const res = await getExpandedInvoiceDetails(invId);
+        if (res.success) {
+          setExpandedStates(prev => ({
+            ...prev,
+            [invId]: { ...prev[invId], data: res.data }
+          }));
+        }
+      } else {
+        toast.error("No items found in this group to update");
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to update taric codes");
     }
   };
 
@@ -1144,30 +1224,39 @@ const InvoiceListPage: React.FC = () => {
                                             columns={[
                                               { header: "Position", render: (_: any, idx: number) => idx + 1, width: "70px" },
                                               { header: "Taric Name EN", render: (it: any) => it.taricNameEn, width: "350px" },
-                                              { header: "Taric Code", render: (it: any) => (
-                                                <span style={it.isProjectItem ? { color: '#F59E0B', fontWeight: 600 } : undefined}>
-                                                  {it.taricCode}
-                                                </span>
-                                              ), width: "140px" },
+                                              {
+                                                header: "Taric Code", render: (it: any) => (
+                                                  <span style={it.isProjectItem ? { color: '#F59E0B', fontWeight: 600 } : undefined}>
+                                                    {it.taricCode}
+                                                  </span>
+                                                ), width: "140px"
+                                              },
                                               { header: "Duty rate", render: (it: any) => it.dutyRate ? `${Number(it.dutyRate).toFixed(2)}` : "-", width: "80px" },
                                               { header: "Total Qty", render: (it: any) => it.totalQty, align: "center", width: "100px" },
-                                              { header: "Unit Price (€)", render: (it: any) => it.unitPrice || "0.00", width: "100px" },
-                                              { header: "Total Price (€)", render: (it: any) => (Number(it.totalPrice) || 0).toLocaleString(undefined, { minimumFractionDigits: 2 }), width: "120px" },
+                                              { header: "Unit Price", render: (it: any) => it.unitPrice || "0.00", width: "100px" },
+                                              { header: "Total Price", render: (it: any) => (Number(it.totalPrice) || 0).toLocaleString(undefined, { minimumFractionDigits: 2 }), width: "120px" },
                                               {
                                                 header: "Operation",
-                                                render: () => (
-                                                  <button className="flex items-center gap-1 px-3 py-1 bg-[#1A73E8] text-white text-[10px] font-bold rounded hover:bg-[#1557B0]">
+                                                render: (group: any) => (
+                                                  <button
+                                                    onClick={() => {
+                                                      setSelectedTaricGroup(group); setSelectedTaricCode(""); setShowTaricModal(true);
+
+                                                    }}
+                                                    className="flex items-center gap-1 px-3 py-1 bg-[#1A73E8] text-white text-[10px] font-bold rounded hover:bg-[#1557B0]"
+                                                  >
                                                     <RefreshCw className="w-3 h-3" /> Set taric
                                                   </button>
                                                 ),
                                                 width: "120px"
                                               }
                                             ]}
+                                            expandedRowId={null}
                                             totalCols={[
                                               { label: "Grand Total", value: "", width: "620px", align: "left" },
                                               { value: expState.data?.taricGroups?.reduce((s: number, g: any) => s + (g.totalQty || 0), 0) || 0, width: "100px", align: "center" },
                                               { value: "", width: "100px" },
-                                              { value: `€${(expState.data?.taricGroups?.reduce((s: number, g: any) => s + (g.totalPrice || 0), 0) || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`, width: "120px", align: "left" },
+                                              { value: (expState.data?.taricGroups?.reduce((s: number, g: any) => s + (g.totalPrice || 0), 0) || 0).toLocaleString(undefined, { minimumFractionDigits: 2 }), width: "120px", align: "left" },
                                               { value: "", width: "120px" }
                                             ]}
                                           />
@@ -1198,7 +1287,9 @@ const InvoiceListPage: React.FC = () => {
                                                       <button
                                                         onClick={() => {
                                                           setSelectedItem(it);
-                                                          setSplitQty(Math.floor(it.qty / 2));
+                                                          setSplitQty(Math.floor(it.qty * 0.5));
+                                                          setTargetCargoId("");
+                                                          setSplitRemarks("");
                                                           setShowSPModal(true);
                                                         }}
                                                         className="flex items-center gap-1.5 px-2 py-1.5 text-[9px] font-bold bg-[#F15A24] text-white rounded-[4px] hover:bg-[#D9481B] transition shadow-sm uppercase"
@@ -1230,20 +1321,38 @@ const InvoiceListPage: React.FC = () => {
                                                 ),
                                                 width: "250px"
                                               },
-                                              { header: "Taric code", render: (it: any) => it.item?.taric?.code, width: "90px" },
+                                              { header: "Taric code", render: (it: any) => it.set_taric_code || it.item?.taric?.code, width: "90px" },
                                               { header: "Remark", render: (it: any) => `// ${it.remark_de || ''}`, width: "80px" },
                                               { header: "Order_no", render: (it: any) => it.order?.order_no || "-", width: "80px" },
                                               { header: "SOID", render: (it: any) => it.supplier_order_id || "-", width: "50px" },
                                               { header: "Status", render: (it: any) => it.status, width: "60px" },
                                               { header: "V(dm³)", render: (it: any) => it.v?.toFixed(2), width: "60px", align: "center" },
                                               { header: "W(kg)", render: (it: any) => it.w?.toFixed(2), width: "60px", align: "center" },
-                                              { header: "QTY", render: (it: any) => it.qty, width: "45px", align: "center" },
-                                              { header: "RMB", render: (it: any) => it.rmb_special_price || "-", width: "45px", align: "center" },
-                                              { header: "EK", render: (it: any) => it.eur_special_price || "-", width: "45px", align: "center" },
+                                              {
+                                                header: "QTY",
+                                                render: (it: any) => (
+                                                  <div className="flex flex-col items-center">
+                                                    <span className="font-bold">
+                                                      {it.qty_split && it.qty_split > it.qty ? `${it.qty}/${it.qty_split}` : it.qty}
+                                                    </span>
+                                                  </div>
+                                                ),
+                                                width: "60px",
+                                                align: "center"
+                                              },
+                                              { header: "RMB", render: (it: any) => it.rmb_special_price || "0", width: "45px", align: "center" },
+                                              {
+                                                header: "EK",
+                                                render: (it: any) => it.eur_special_price && Number(it.eur_special_price) > 0 ? (
+                                                  <span className="font-bold text-[#10B981]">{Number(it.eur_special_price).toFixed(2)}</span>
+                                                ) : "0",
+                                                width: "65px",
+                                                align: "center"
+                                              },
                                               {
                                                 header: "Action",
                                                 render: (it: any) => (
-                                                  (!it.rmb_special_price || Number(it.rmb_special_price) === 0) ? (
+                                                  (it.item?.is_eur_special === "Y" && (!it.eur_special_price || Number(it.eur_special_price) === 0)) ? (
                                                     <button
                                                       onClick={() => {
                                                         setExpandedPriceItemId(expandedPriceItemId === it.id ? null : it.id);
@@ -1270,7 +1379,7 @@ const InvoiceListPage: React.FC = () => {
                                                     <label className="block text-[10px] font-bold text-[#6C757D] uppercase mb-1.5">EUR Special Price</label>
                                                     <div className="relative">
                                                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                                        <span className="text-gray-500 text-xs text-black">€</span>
+                                                        <span className="text-gray-500 text-xs text-black"></span>
                                                       </div>
                                                       <input
                                                         type="number"
@@ -1593,29 +1702,79 @@ const InvoiceListPage: React.FC = () => {
           <CustomModal
             isOpen={showSPModal}
             onClose={() => setShowSPModal(false)}
-            title={`Split Item ${selectedItem.id}`}
+            title="Split Item"
           >
-            <div className="p-4 space-y-4">
-              <p className="text-sm text-gray-600">Current Qty: <span className="font-bold">{selectedItem.qty}</span></p>
+            <div className="p-4 space-y-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Split Quantity (amount to move to new row)</label>
-                <input
-                  type="number"
-                  value={splitQty}
-                  onChange={(e) => setSplitQty(Number(e.target.value))}
-                  min={1}
-                  max={selectedItem.qty - 1}
-                  className="w-full border border-gray-300 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-orange-500"
+                <label className="block text-sm font-bold text-gray-700 mb-2">Split Quantity:</label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    value={splitQty}
+                    onChange={(e) => setSplitQty(Number(e.target.value))}
+                    min={1}
+                    max={selectedItem.qty - 1}
+                    className="w-full border-2 border-[#10B981] rounded-xl p-3 text-lg outline-none focus:ring-0 shadow-sm"
+                    placeholder="Enter quantity to split"
+                  />
+                </div>
+                <p className="text-[10px] text-gray-500 mt-2 px-1">Available to split: {selectedItem.qty}</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">Enter Remarks (Optional)</label>
+                <textarea
+                  value={splitRemarks}
+                  onChange={(e) => setSplitRemarks(e.target.value)}
+                  className="w-full border border-gray-300 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-[#10B981] min-h-[100px]"
+                  placeholder="..."
                 />
               </div>
-              <div className="flex justify-end gap-2 mt-6">
-                <button onClick={() => setShowSPModal(false)} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Cancel</button>
+
+              <div className="flex justify-end pt-2">
                 <button
                   onClick={handleSplitItem}
                   disabled={splitQty <= 0 || splitQty >= selectedItem.qty}
-                  className="px-4 py-2 text-sm bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50"
+                  className="w-full sm:w-auto px-10 py-3 bg-[#10B981] text-white rounded-xl font-bold hover:bg-green-700 transition-all shadow-lg active:scale-95 disabled:opacity-50 disabled:active:scale-100"
                 >
-                  Split Now
+                  Save Split Changes
+                </button>
+              </div>
+            </div>
+          </CustomModal>
+        )}
+
+        {showTaricModal && selectedTaricGroup && (
+          <CustomModal
+            isOpen={showTaricModal}
+            onClose={() => setShowTaricModal(false)}
+            title="Set Taric Code"
+          >
+            <div className="p-4 space-y-4">
+              <p className="text-[11px] font-bold text-gray-600 mb-1 uppercase tracking-tight">
+                Current taric code is : <span className="text-black ml-1">{selectedTaricGroup.taricCode}</span>
+              </p>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Select new taric code</label>
+                <select
+                  value={selectedTaricCode}
+                  onChange={(e) => setSelectedTaricCode(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-[#1A73E8] bg-white text-black"
+                >
+                  <option value="">Select Taric Code</option>
+                  {tarics.map(t => (
+                    <option key={t.id} value={t.code}>{t.code} - {t.description_de}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex justify-end gap-2 mt-6">
+                <button onClick={() => setShowTaricModal(false)} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg border border-gray-200 uppercase font-bold text-[10px]">Cancel</button>
+                <button
+                  onClick={() => handleSetTaric(selectedTaricGroup)}
+                  disabled={!selectedTaricCode}
+                  className="px-6 py-2 text-sm bg-[#1A73E8] text-white rounded-lg hover:bg-[#1557B0] disabled:opacity-50 uppercase font-bold text-[10px]"
+                >
+                  Update Taric
                 </button>
               </div>
             </div>

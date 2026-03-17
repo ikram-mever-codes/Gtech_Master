@@ -255,6 +255,10 @@ export const createItem = async (itemData: {
   price?: number;
   currency?: string;
   isActive?: string;
+  item_no_de?: string;
+  item_name_de?: string;
+  is_eur_special?: string;
+  is_rmb_special?: string;
 }) => {
   try {
     toast.loading("Creating item...", loadingStyles);
@@ -308,6 +312,25 @@ export const updateItem = async (
     pix_path?: string;
     pix_path_eBay?: string;
     npr_remark?: string;
+    warehouseItemData?: {
+      is_stock_item?: string;
+      is_active?: string;
+      msq?: number;
+      is_no_auto_order?: string;
+      buffer?: number;
+      is_SnSI?: string;
+      item_no_de?: string;
+      item_name_de?: string;
+    };
+    supplierItem?: {
+      price_rmb?: number;
+      is_po?: string;
+      moq?: number;
+      oi?: number;
+      lead_time?: string;
+      note_cn?: string;
+      url?: string;
+    };
   }>,
 ) => {
   try {
@@ -621,16 +644,19 @@ export const bulkUpsertTarics = async (
   }
 };
 
-export const getAllTaricsSimple = async () => {
+export const getAllTaricsSimple = async (): Promise<any> => {
   try {
-    const response = await api.get("/items/tarics", {
+    const res = await api.get("/items/tarics", {
       params: {
         limit: 10000,
         sortBy: "code",
         sortOrder: "ASC",
       },
     });
-    return response;
+    const payload = res as any;
+    if (payload && typeof payload === "object" && "success" in payload)
+      return payload;
+    return { success: true, data: payload };
   } catch (error) {
     handleApiError(error, "Failed to fetch TARICs list");
     throw error;

@@ -6,7 +6,6 @@ import {
   UpdateDateColumn,
   ManyToOne,
   JoinColumn,
-  PrimaryColumn,
 } from "typeorm";
 import { Item } from "./items";
 import { Order } from "./orders";
@@ -15,7 +14,7 @@ import { SupplierOrder } from "./supplier_orders";
 
 @Entity()
 export class OrderItem {
-  @PrimaryColumn()
+  @PrimaryGeneratedColumn()
   id!: number;
 
   @Column({ type: "varchar", length: 25, nullable: true })
@@ -57,8 +56,8 @@ export class OrderItem {
   @Column({ type: "int", nullable: true })
   taric_id?: number;
 
-  @Column({ type: "bigint", nullable: true })
-  set_taric_code?: number;
+  @Column({ type: "varchar", length: 100, nullable: true })
+  set_taric_code?: string;
 
   @Column({ type: "varchar", length: 20, nullable: true })
   status?: string;

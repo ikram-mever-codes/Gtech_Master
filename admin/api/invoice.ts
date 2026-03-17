@@ -77,10 +77,13 @@ export const deleteInvoice = async (invoiceId: string) => {
   }
 };
 
-export const getAllInvoices = async () => {
+export const getAllInvoices = async (): Promise<any> => {
   try {
-    const response = await api.get("/invoices");
-    return response;
+    const res = await api.get("/invoices");
+    const payload = res as any;
+    if (payload && typeof payload === "object" && "success" in payload)
+      return payload;
+    return { success: true, data: payload };
   } catch (error) {
     handleApiError(error, "Failed to fetch invoices");
     throw error;
@@ -185,8 +188,11 @@ export const cancelInvoice = async (invoiceId: string) => {
 };
 export const getExpandedInvoiceDetails = async (id: string): Promise<any> => {
   try {
-    const response = await api.get(`/invoices/${id}/expanded`);
-    return response;
+    const res = await api.get(`/invoices/${id}/expanded`);
+    const payload = res as any;
+    if (payload && typeof payload === "object" && "success" in payload)
+      return payload;
+    return { success: true, data: payload };
   } catch (error) {
     console.error("Error fetching expanded invoice details:", error);
     throw error;

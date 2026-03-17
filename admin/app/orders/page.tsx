@@ -118,6 +118,8 @@ type OrderItemRow = {
   item?: any;
   supplier_id?: string;
   customer_id?: string;
+  supplier_order_id?: number | string;
+  taric_code?: string;
 };
 
 type Mode = "create" | "edit" | "convert";
@@ -272,6 +274,7 @@ function OrdersTable({
   onSplit,
 }: OrdersTableProps) {
   const isOrderItems = activeTab === "order_items";
+  console.log("OrdersTable debug:", { activeTab, isOrderItems, dataCount: orders?.length, sampleRow: orders?.[0] });
 
   const itemColumns: ColumnDef<any>[] = [
     {
@@ -283,7 +286,7 @@ function OrdersTable({
     {
       header: "EAN",
       width: "80px",
-      render: (row) => row.item?.ean || "-",
+      render: (row) => row.ean || row.item?.ean || "-",
     },
     {
       header: "Item name",
@@ -291,33 +294,27 @@ function OrdersTable({
       render: (row) => (
         <div
           className="line-clamp-3 leading-tight break-words"
-          title={row.item?.item_name || row.item?.name}
+          title={row.item_name || row.itemName || row.item?.item_name || row.item?.name}
         >
-          {row.item?.item_name || row.item?.name || "Unknown"}
+          {row.item_name || row.itemName || row.item?.item_name || row.item?.name || "Unknown"}
         </div>
       ),
     },
     {
       header: "Price",
       width: "80px",
-      render: (row) => (
-        <div className="font-semibold">
-          {row.price || row.item?.price
-            ? `${row.currency || row.item?.currency || "CNY"} ${row.price || row.item?.price}`
-            : row.rmb_special_price
-              ? `CNY ${row.rmb_special_price}`
-              : "-"}
-        </div>
-      ),
+      render: (row) => {
+        const val = row.price ?? row.item?.price ?? row.rmb_special_price ?? 0;
+        return <div className="font-semibold">{Number(val).toFixed(2)}</div>;
+      },
     },
     { header: "QTY", width: "40px", render: (row) => row.qty, align: "center" },
     {
       header: "Total",
       width: "80px",
       render: (row) => {
-        const p = row.price || row.rmb_special_price || row.item?.price;
-        const currency = row.currency || row.item?.currency || "CNY";
-        return p ? `${currency} ${(p * row.qty).toFixed(2)}` : "-";
+        const p = Number(row.price ?? row.rmb_special_price ?? row.item?.price ?? 0);
+        return !isNaN(p) ? (p * row.qty).toFixed(2) : "0.00";
       },
       align: "center",
     },
@@ -326,15 +323,19 @@ function OrdersTable({
       width: "100px",
       render: (row) => {
         const sid = row.supplier_id || row.item?.supplier_id;
+        let resolvedName = sid ? getSupplierName?.(sid) : null;
+        if (!resolvedName || resolvedName === "-") resolvedName = null;
+
         const sname =
-          (sid ? getSupplierName?.(sid) : null) ||
-          row.supplier_name ||
-          row.item?.supplier_name;
+          resolvedName ||
+          (row.supplier_name && row.supplier_name !== "Unassigned" ? row.supplier_name : null) ||
+          (row.item?.supplier_name && row.item?.supplier_name !== "Unassigned" ? row.item?.supplier_name : null);
+
         return (
           <div className="truncate">
-            {sname && sname !== "Unassigned"
+            {sname
               ? sname
-              : getCategoryName(row.category_id || row.item?.cat_id) || "-"}
+              : <span className="text-gray-400 text-xs">Unassigned</span>}
           </div>
         );
       },
@@ -496,10 +497,10 @@ function OrdersTable({
       render: (row) =>
         row.created_at
           ? new Intl.DateTimeFormat("de-DE", {
-              day: "2-digit",
-              month: "2-digit",
-              year: "numeric",
-            }).format(new Date(row.created_at))
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+          }).format(new Date(row.created_at))
           : "-",
       align: "center",
     },
@@ -509,10 +510,10 @@ function OrdersTable({
       render: (row) =>
         row.date_emailed && row.date_emailed !== "-"
           ? new Intl.DateTimeFormat("de-DE", {
-              day: "2-digit",
-              month: "2-digit",
-              year: "numeric",
-            }).format(new Date(row.date_emailed))
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+          }).format(new Date(row.date_emailed))
           : "-",
       align: "center",
     },
@@ -522,10 +523,10 @@ function OrdersTable({
       render: (row) =>
         row.date_delivery && row.date_delivery !== "-"
           ? new Intl.DateTimeFormat("de-DE", {
-              day: "2-digit",
-              month: "2-digit",
-              year: "numeric",
-            }).format(new Date(row.date_delivery))
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+          }).format(new Date(row.date_delivery))
           : "-",
       align: "center",
     },
@@ -930,9 +931,10 @@ const OrderPage = () => {
   );
 
   const getSupplierName = useCallback(
-    (supplierId: any) =>
-      suppliers.find((c) => String(c.id) === String(supplierId))
-        ?.company_name ?? "-",
+    (supplierId: any) => {
+      const s = suppliers.find((c) => String(c.id) === String(supplierId));
+      return s ? (s.company_name || s.name || s.name_cn || "-") : "-";
+    },
     [suppliers],
   );
 
@@ -1464,7 +1466,7 @@ const OrderPage = () => {
           const item = itemById.get(id);
           return {
             item_id: id,
-            itemName: item?.item_name || item?.name || "Unknown item",
+            itemName: l.item_name || l.itemName || item?.item_name || item?.name || "Unknown item",
             qty: Number(l.qty ?? 1),
             remark_de: String(l.remark_de ?? ""),
           };
@@ -1497,13 +1499,15 @@ const OrderPage = () => {
             return {
               item_id: id,
               itemName:
-                l.itemName || item?.item_name || item?.name || "Unknown item",
+                l.item_name || l.itemName || item?.item_name || item?.name || "Unknown item",
               qty: Number(l.qty ?? 1),
               qty_label: l.qty_label,
               remark_de: String(l.remark_de ?? ""),
               remarks_cn: String(l.remarks_cn ?? ""),
               remark_en: String(l.remark_en ?? ""),
               ean: l.ean || item?.ean || "-",
+              price: l.price || item?.price || 0,
+              currency: l.currency || item?.currency || "CNY",
               status: l.status || "NSO",
               item: l.item || item || null,
             };
@@ -1737,11 +1741,10 @@ const OrderPage = () => {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`py-3 px-1 border-b-2 font-medium text-sm ${
-                    activeTab === tab.id
-                      ? "border-gray-600 text-gray-900"
-                      : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                  }`}
+                  className={`py-3 px-1 border-b-2 font-medium text-sm ${activeTab === tab.id
+                    ? "border-gray-600 text-gray-900"
+                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                    }`}
                 >
                   {tab.label}
                 </button>
@@ -2167,7 +2170,7 @@ const OrderPage = () => {
                                   item.rmb_special_price ||
                                   "-";
                                 const c = item.currency || "CNY";
-                                return p !== "-" ? `${c} ${p}` : "-";
+                                return p !== "-" ? p : "0";
                               },
                               align: "center",
                             },
@@ -2184,7 +2187,7 @@ const OrderPage = () => {
                                   det?.rmb_special_price ||
                                   item.rmb_special_price ||
                                   0;
-                                return `${item.currency || "CNY"} ${(Number(p) * (item.qty || 0)).toFixed(2)}`;
+                                return (Number(p) * (item.qty || 0)).toFixed(2);
                               },
                               align: "center",
                               renderTotal: (data) => (
@@ -2657,12 +2660,7 @@ const OrderPage = () => {
                       {
                         header: "Price",
                         width: "70px",
-                        render: (row) =>
-                          row.price
-                            ? `${row.currency || "CNY"} ${row.price}`
-                            : row.rmb_special_price
-                              ? `CNY ${row.rmb_special_price}`
-                              : "-",
+                        render: (row) => row.price || row.rmb_special_price || "0",
                         align: "center",
                       },
                       {
@@ -3154,17 +3152,22 @@ const OrderPage = () => {
                     width: "120px",
                     render: (row) => (
                       <span
-                        className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                          row.status === "NSO"
-                            ? "bg-amber-100 text-amber-700"
-                            : row.status === "SO"
-                              ? "bg-blue-100 text-blue-700"
-                              : "bg-green-100 text-green-700"
-                        }`}
+                        className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${row.status === "NSO"
+                          ? "bg-amber-100 text-amber-700"
+                          : row.status === "SO"
+                            ? "bg-blue-100 text-blue-700"
+                            : "bg-green-100 text-green-700"
+                          }`}
                       >
                         {row.status || "NSO"}
                       </span>
                     ),
+                    align: "center",
+                  },
+                  {
+                    header: "Taric",
+                    width: "100px",
+                    render: (row) => row.taric_code || row.item?.taric?.code || "-",
                     align: "center",
                   },
                 ]}
@@ -3358,7 +3361,7 @@ const OrderPage = () => {
                             </td>
 
                             <td className="px-4 py-2 text-sm text-gray-700 border-b whitespace-nowrap">
-                              {row.currency || "CNY"} {row.price || 0}
+                              {row.price || 0}
                             </td>
 
                             <td className="px-4 py-2 text-sm text-gray-700 border-b text-center">

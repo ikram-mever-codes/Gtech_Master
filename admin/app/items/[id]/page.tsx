@@ -440,6 +440,8 @@ const ItemDetailsPage = () => {
           is_no_auto_order: updatedData.others?.isNAO ? "Y" : "N",
           buffer: toInt(updatedData.others?.buffer),
           is_SnSI: updatedData.others?.isSnSI ? "Y" : "N",
+          item_no_de: updatedData.others?.noDE,
+          item_name_de: updatedData.others?.nameDE,
         }
       };
 
@@ -661,21 +663,15 @@ const ItemDetailsPage = () => {
                       options={[{ label: "Yes", value: "Yes" }, { label: "No", value: "No" }]}
                     />
                     <SelectInfoRow
-                      label="EUR Special"
+                      label="Special Item"
                       value={itemData.parent.isEURSpecial ? "Yes" : "No"}
                       field="parent.isEURSpecial"
                       editMode={editMode}
                       itemData={itemData}
-                      setItemData={setItemData}
-                      options={[{ label: "Yes", value: "Yes" }, { label: "No", value: "No" }]}
-                    />
-                    <SelectInfoRow
-                      label="RMB Special"
-                      value={itemData.parent.isRMBSpecial ? "Yes" : "No"}
-                      field="parent.isRMBSpecial"
-                      editMode={editMode}
-                      itemData={itemData}
-                      setItemData={setItemData}
+                      setItemData={(updated) => {
+                        updated.parent.isRMBSpecial = updated.parent.isEURSpecial;
+                        setItemData(updated);
+                      }}
                       options={[{ label: "Yes", value: "Yes" }, { label: "No", value: "No" }]}
                     />
                   </div>
