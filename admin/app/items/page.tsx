@@ -208,6 +208,79 @@ const ItemsManagementPage: React.FC = () => {
     }
   };
 
+  // Enhanced EAN search utility function with better debugging
+  const matchesEANSearch = (
+    eanValue: string | number | undefined,
+    searchTerm: string,
+  ): boolean => {
+    if (!eanValue || !searchTerm) return false;
+
+    const eanStr = eanValue.toString().trim();
+    const searchStr = searchTerm.trim();
+
+    // Log for debugging
+    console.log("=== EAN SEARCH DEBUG ===");
+    console.log("Original EAN from DB:", eanValue, "Type:", typeof eanValue);
+    console.log("EAN as string:", eanStr);
+    console.log("Search term:", searchStr);
+    console.log("Search term length:", searchStr.length);
+    console.log("EAN length:", eanStr.length);
+
+    // Check if the EAN exactly matches the search (case insensitive)
+    if (eanStr.toLowerCase() === searchStr.toLowerCase()) {
+      console.log("✓ Exact match found");
+      return true;
+    }
+
+    // Check if the EAN includes the search term
+    if (eanStr.toLowerCase().includes(searchStr.toLowerCase())) {
+      console.log("✓ Includes match found");
+      return true;
+    }
+
+    // Check if the search term includes the EAN (in case user typed extra characters)
+    if (searchStr.toLowerCase().includes(eanStr.toLowerCase())) {
+      console.log("✓ Reverse includes match found");
+      return true;
+    }
+
+    // Remove any non-digit characters and compare
+    const eanDigits = eanStr.replace(/\D/g, "");
+    const searchDigits = searchStr.replace(/\D/g, "");
+
+    console.log("EAN digits only:", eanDigits);
+    console.log("Search digits only:", searchDigits);
+
+    if (eanDigits === searchDigits) {
+      console.log("✓ Digit exact match found");
+      return true;
+    }
+
+    if (eanDigits.includes(searchDigits)) {
+      console.log("✓ Digit includes match found");
+      return true;
+    }
+
+    if (searchDigits.includes(eanDigits)) {
+      console.log("✓ Reverse digit includes match found");
+      return true;
+    }
+
+    // Check if it's a partial match at the end (common for EAN searches)
+    if (eanDigits.length >= 4 && searchDigits.length >= 4) {
+      const eanEnd = eanDigits.slice(-searchDigits.length);
+      if (eanEnd === searchDigits) {
+        console.log("✓ End digits match found");
+        return true;
+      }
+    }
+
+    console.log("✗ No match found");
+    console.log("=====================");
+
+    return false;
+  };
+
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
@@ -277,6 +350,7 @@ const ItemsManagementPage: React.FC = () => {
       setLoading(false);
     }
   }, [activeTab, pagination.page, pagination.limit, filters, taricFilters]);
+
   const fetchStatistics = useCallback(async () => {
     try {
       const statsResponse = await getItemStatistics();
@@ -676,8 +750,28 @@ const ItemsManagementPage: React.FC = () => {
         return [];
     }
   };
+
   const getFilteredData = () => {
     const data = getCurrentData();
+
+    // Log the first few items to see their structure (for debugging)
+    if (activeTab === "items" && data.length > 0) {
+      console.log("=== DATA STRUCTURE DEBUG ===");
+      console.log("Total items in data:", data.length);
+      console.log(
+        "First 3 items structure:",
+        data.slice(0, 3).map((item: any) => ({
+          id: item.id,
+          ean: item.ean,
+          eanType: typeof item.ean,
+          de_no: item.de_no,
+          item_name: item.item_name,
+          item_no_de: item.item_no_de,
+          hasEan: !!item.ean,
+        })),
+      );
+    }
+
     return data.filter((item) => {
       if (activeTab === "tarics") {
         const taricItem = item as any;
@@ -723,27 +817,54 @@ const ItemsManagementPage: React.FC = () => {
           if (activeTab === "items") {
             const it = item as any;
 
-            // Enhanced EAN search - try multiple formats
-            const eanValue = it.ean?.toString() || "";
-            const eanWithoutSpaces = eanValue.replace(/\s/g, "");
-            const searchWithoutSpaces = filters.search.replace(/\s/g, "");
+            // Log the item's EAN for specific search term debugging
+            if (
+              filters.search === "4283230835321" ||
+              filters.search.includes("4283")
+            ) {
+              console.log("Checking item for EAN 4283230835321:", {
+                id: it.id,
+                ean: it.ean,
+                eanType: typeof it.ean,
+                eanValue: it.ean?.toString(),
+                eanLength: it.ean?.toString().length,
+                de_no: it.de_no,
+                item_name: it.item_name,
+                item_no_de: it.item_no_de,
+              });
+            }
 
-            matchesSearch =
+            // Enhanced EAN search using the utility function
+            const eanMatches = matchesEANSearch(it.ean, filters.search);
+
+            // Search in other fields
+            const textMatches =
               it.id?.toString().includes(filters.search) ||
               it.de_no?.toLowerCase().includes(searchLower) ||
               it.item_name?.toLowerCase().includes(searchLower) ||
               it.name_en?.toLowerCase().includes(searchLower) ||
-              // Enhanced EAN matching
-              eanValue.includes(filters.search) ||
-              eanWithoutSpaces.includes(searchWithoutSpaces) ||
-              // Search for partial EAN matches (last 4 digits, first 4 digits, etc.)
-              (eanValue.length >= 4 &&
-                (eanValue.slice(-4).includes(searchWithoutSpaces) ||
-                  eanValue.slice(0, 4).includes(searchWithoutSpaces))) ||
               it.category?.toLowerCase().includes(searchLower) ||
               it.supplier_name?.toLowerCase().includes(searchLower) ||
               it.remark?.toLowerCase().includes(searchLower) ||
-              it.model?.toLowerCase().includes(searchLower);
+              it.model?.toLowerCase().includes(searchLower) ||
+              it.item_no_de?.toLowerCase().includes(searchLower) ||
+              it.item_name_de?.toLowerCase().includes(searchLower);
+
+            matchesSearch = eanMatches || textMatches;
+
+            // Log if this item matches
+            if (
+              matchesSearch &&
+              (filters.search === "4283230835321" ||
+                filters.search.includes("4283"))
+            ) {
+              console.log("✓ Item MATCHED:", {
+                id: it.id,
+                ean: it.ean,
+                name: it.item_name,
+                matchedBy: eanMatches ? "EAN" : "Text",
+              });
+            }
           } else if (activeTab === "parents") {
             const p = item as any;
             matchesSearch =
@@ -932,96 +1053,111 @@ const ItemsManagementPage: React.FC = () => {
 
     switch (activeTab) {
       case "items":
-        return data.map((item: any) => (
-          <tr
-            key={item.id}
-            onClick={() => {
-              router.push(`/items/${item.id}`);
-            }}
-            className="hover:bg-gray-50 cursor-pointer transition-colors"
-          >
-            <td className="p-4">
-              <input
-                type="checkbox"
-                checked={selectedItems.has(item.id.toString())}
-                onChange={(e) => {
-                  e.stopPropagation();
-                  handleSelectItem(item.id.toString());
-                }}
-                className="w-4 h-4 text-primary focus:ring-primary border-gray-300 rounded"
-              />
-            </td>
-            <td className="px-4 py-3">
-              <div className="font-medium text-gray-900">
-                {item.de_no || "-"}
-              </div>
-            </td>
-            <td className="px-4 py-3">
-              <div className="text-sm text-gray-900 font-medium">
-                {item.ean?.toString() || "-"}
-              </div>
-            </td>
-            <td className="px-4 py-3">
-              <div className="text-sm text-gray-900">
-                {item.item_name || "-"}
-              </div>
-            </td>
-            <td className="px-4 py-3">
-              <div className="text-sm text-gray-900">{item.name_en || "-"}</div>
-            </td>
-            <td className="px-4 py-3">
-              <div className="text-sm text-gray-900">
-                {item.category || "-"}
-              </div>
-            </td>
+        return data.map((item: any) => {
+          // Highlight EAN if it matches search
+          const eanMatches =
+            filters.search && matchesEANSearch(item.ean, filters.search);
 
-            <td className="px-4 py-3">
-              <span
-                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusBadgeColor(
-                  item.is_active,
-                )}`}
-              >
-                {item.is_active === "Y" ? "Active" : "Inactive"}
-              </span>
-            </td>
-            <td className="px-4 py-3">
-              <div className="text-sm text-gray-600 text-nowrap">
-                {formatDate(item.created_at)}
-              </div>
-            </td>
-            <td className="px-4 py-3">
-              <div className="flex gap-2">
-                <button
-                  onClick={(e) => {
+          return (
+            <tr
+              key={item.id}
+              onClick={() => {
+                router.push(`/items/${item.id}`);
+              }}
+              className="hover:bg-gray-50 cursor-pointer transition-colors"
+            >
+              <td className="p-4">
+                <input
+                  type="checkbox"
+                  checked={selectedItems.has(item.id.toString())}
+                  onChange={(e) => {
                     e.stopPropagation();
-                    handleViewItem(item.id);
+                    handleSelectItem(item.id.toString());
                   }}
-                  className="text-blue-600 hover:text-blue-900 p-1"
+                  className="w-4 h-4 text-primary focus:ring-primary border-gray-300 rounded"
+                />
+              </td>
+              <td className="px-4 py-3">
+                <div className="font-medium text-gray-900">
+                  {item.de_no || "-"}
+                </div>
+              </td>
+              <td className="px-4 py-3">
+                <div
+                  className={`text-sm font-medium ${eanMatches ? "text-green-600 font-bold" : "text-gray-900"}`}
                 >
-                  <EyeIcon className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleEditItem(item.id);
-                  }}
-                  className="text-green-600 hover:text-green-900 p-1"
+                  {item.ean?.toString() || "-"}
+                  {eanMatches && (
+                    <span className="ml-2 text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
+                      Match
+                    </span>
+                  )}
+                </div>
+              </td>
+              <td className="px-4 py-3">
+                <div className="text-sm text-gray-900">
+                  {item.item_name || "-"}
+                </div>
+              </td>
+              <td className="px-4 py-3">
+                <div className="text-sm text-gray-900">
+                  {item.name_en || "-"}
+                </div>
+              </td>
+              <td className="px-4 py-3">
+                <div className="text-sm text-gray-900">
+                  {item.category || "-"}
+                </div>
+              </td>
+
+              <td className="px-4 py-3">
+                <span
+                  className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusBadgeColor(
+                    item.is_active,
+                  )}`}
                 >
-                  <EditIcon className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleDeleteItem(item.id);
-                  }}
-                  className="text-red-600 hover:text-red-900 p-1"
-                >
-                  <Delete className="w-4 h-4" />
-                </button>
-              </div>
-            </td>
-          </tr>
-        ));
+                  {item.is_active === "Y" ? "Active" : "Inactive"}
+                </span>
+              </td>
+              <td className="px-4 py-3">
+                <div className="text-sm text-gray-600 text-nowrap">
+                  {formatDate(item.created_at)}
+                </div>
+              </td>
+              <td className="px-4 py-3">
+                <div className="flex gap-2">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleViewItem(item.id);
+                    }}
+                    className="text-blue-600 hover:text-blue-900 p-1"
+                  >
+                    <EyeIcon className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleEditItem(item.id);
+                    }}
+                    className="text-green-600 hover:text-green-900 p-1"
+                  >
+                    <EditIcon className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteItem(item.id);
+                    }}
+                    className="text-red-600 hover:text-red-900 p-1"
+                  >
+                    <Delete className="w-4 h-4" />
+                  </button>
+                </div>
+              </td>
+            </tr>
+          );
+        });
 
       case "parents":
         return data.map((parent: any) => (
@@ -1330,6 +1466,19 @@ const ItemsManagementPage: React.FC = () => {
     return activeTab === "tarics" ? selectedTarics.size : selectedItems.size;
   };
 
+  useEffect(() => {
+    if (activeTab === "items" && filters.search) {
+      const itemsWithEAN = items
+        .filter((item) => item.ean)
+        .map((item) => ({
+          id: item.id,
+          ean: item.ean,
+          name: item.item_name,
+        }));
+      console.log("Items with EAN:", itemsWithEAN);
+      console.log("Filtered data:", filteredData);
+    }
+  }, [items, filters.search, filteredData, activeTab]);
   return (
     <div className="w-full mx-auto">
       <div
@@ -1578,7 +1727,7 @@ const ItemsManagementPage: React.FC = () => {
               <MagnifyingGlassIcon className="w-6 h-6 absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" />
               <input
                 type="text"
-                placeholder={`Search ${activeTab}...`}
+                placeholder={`Search ${activeTab}... (EAN, name, DE number, etc.)`}
                 value={filters.search}
                 onChange={(e) =>
                   setFilters({ ...filters, search: e.target.value })
@@ -1594,6 +1743,11 @@ const ItemsManagementPage: React.FC = () => {
                 </button>
               )}
             </div>
+            {filters.search && (
+              <p className="text-xs text-gray-500 mt-1 ml-2">
+                Searching for: "{filters.search}"
+              </p>
+            )}
           </div>
         )}
 
@@ -2359,7 +2513,10 @@ const ItemsManagementPage: React.FC = () => {
                       }
                       className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
                     />
-                    <label htmlFor="is_eur_special" className="text-sm font-medium text-gray-700">
+                    <label
+                      htmlFor="is_eur_special"
+                      className="text-sm font-medium text-gray-700"
+                    >
                       Special Item
                     </label>
                   </div>

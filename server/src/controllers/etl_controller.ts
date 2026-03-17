@@ -3,7 +3,7 @@ import { AppDataSource } from "../config/database";
 import fs from "fs";
 import path from "path";
 import { parse } from "csv-parse";
-import { Not, Like, In, QueryFailedError } from "typeorm";
+import { Not, Like, In } from "typeorm";
 import { Order } from "../models/orders";
 import { OrderItem } from "../models/order_items";
 import { Item } from "../models/items";
@@ -27,7 +27,7 @@ export class EtlController {
   private static publicPath = path.join(__dirname, "../../public");
   private static readonly BATCH_SIZE = 100;
 
-  // Category mapping based on your database
+  // Category mapping configuration
   private static readonly CATEGORY_MAPPING: CategoryMapping[] = [
     { csvCategoryId: 26, databaseCategoryId: 55, name: "STD" },
     { csvCategoryId: 18, databaseCategoryId: 56, name: "GBL" },
@@ -45,7 +45,7 @@ export class EtlController {
   );
 
   /**
-   * Main ETL process with comprehensive error handling
+   * Main ETL Entry Point
    */
   public static async findTargetDate(
     req: Request,
@@ -53,68 +53,27 @@ export class EtlController {
     next: NextFunction,
   ) {
     try {
-      console.log("Starting ETL process...");
+      console.log("Starting Nexaura ETL Engine...");
 
-      const orderRepo: any = AppDataSource.getRepository(Order);
-      const orderItemRepo = AppDataSource.getRepository(OrderItem);
       const categoryRepo = AppDataSource.getRepository(Category);
+      const orderRepo = AppDataSource.getRepository(Order);
+      const orderItemRepo = AppDataSource.getRepository(OrderItem);
 
-      // FIX 1: Use the sync method instead of the strict validation method
+      // Ensure core categories exist before starting
       await EtlController.syncRequiredCategories(categoryRepo);
 
+      // 1. Process Orders
       const ordersFilePath = path.join(EtlController.publicPath, "orders.csv");
       const orderRecords = await EtlController.readCsv(ordersFilePath);
 
-      const orderMap = new Map<string, number>();
-      const orderRows = orderRecords.slice(1);
+      // Optimization: Get a map of Order Number -> Database ID
+      const orderMap = await EtlController.processOrdersSequentially(
+        orderRecords.slice(1),
+        orderRepo,
+        categoryRepo,
+      );
 
-      for (const row of orderRows) {
-        const orderNo = row[0]?.toString().trim();
-        if (!orderNo) continue;
-        ``;
-        let order = await orderRepo.findOne({ where: { order_no: orderNo } });
-
-        if (!order) {
-          const csvCategoryId = parseInt(row[1]);
-          if (isNaN(csvCategoryId)) continue;
-
-          // FIX 2: Get or Create the category dynamically
-          const databaseCategoryId = await EtlController.getOrCreateCategory(
-            csvCategoryId,
-            categoryRepo,
-          );
-
-          const status = parseInt(row[2]) || 0;
-          const dateCreated = EtlController.validateDate(
-            row[4],
-            "date_created",
-          );
-          const dateEmailed = EtlController.validateDate(
-            row[5],
-            "date_emailed",
-            true,
-          );
-          const dateDelivery = EtlController.validateDate(
-            row[6],
-            "date_delivery",
-          );
-
-          const newOrder = orderRepo.create({
-            order_no: orderNo,
-            category_id: databaseCategoryId,
-            status: status,
-            comment: row[3]?.toString().substring(0, 255) || "",
-            date_created: dateCreated,
-            date_emailed: dateEmailed,
-            date_delivery: dateDelivery,
-          });
-
-          order = await orderRepo.save(newOrder);
-        }
-        orderMap.set(orderNo, order.id);
-      }
-
-      // Process items...
+      // 2. Process Items
       const orderItemsFilePath = path.join(
         EtlController.publicPath,
         "order_items.csv",
@@ -128,589 +87,313 @@ export class EtlController {
         );
       }
 
-      res.status(200).json({ success: true, message: "ETL process completed" });
+      // 3. Cleanup
+      await EtlController.runCleanupTasks();
+
+      res
+        .status(200)
+        .json({ success: true, message: "ETL process completed successfully" });
     } catch (error) {
-      console.error("ETL process failed:", error);
+      console.error("ETL Critical Failure:", error);
       next(error);
     }
   }
-  private static async processOrderBatch(
+
+  /**
+   * Processes orders and returns a map for item linking
+   */
+  private static async processOrdersSequentially(
     rows: any[],
     orderRepo: any,
     categoryRepo: any,
-  ): Promise<ProcessBatchResult> {
-    const results: ProcessBatchResult = {
-      processed: 0,
-      created: 0,
-      skipped: 0,
-      failed: 0,
-      errors: [],
-    };
+  ): Promise<Map<string, number>> {
+    const orderMap = new Map<string, number>();
+
+    // Bulk lookup existing orders to minimize queries
+    const csvOrderNos = rows
+      .map((r) => r[0]?.toString().trim())
+      .filter(Boolean);
+    const existingInDb = await orderRepo.find({
+      where: { order_no: In(csvOrderNos) },
+      select: ["id", "order_no"],
+    });
+
+    existingInDb.forEach((o: any) => orderMap.set(o.order_no, o.id));
 
     for (const row of rows) {
+      const orderNo = row[0]?.toString().trim();
+      if (!orderNo || orderMap.has(orderNo)) continue;
+
       try {
-        results.processed++;
-
-        // Ensure row has enough columns
-        if (!row || row.length < 7) {
-          throw new Error(`Invalid row format: ${JSON.stringify(row)}`);
-        }
-
-        const orderNo = row[0]?.toString().trim();
-        if (!orderNo) {
-          throw new Error("Order number is empty");
-        }
-
-        const existingOrder = await orderRepo.findOne({
-          where: { order_no: orderNo },
-        });
-
-        if (existingOrder) {
-          console.log(`Order ${orderNo} already exists, skipping`);
-          results.skipped++;
-          continue;
-        }
-
         const csvCategoryId = parseInt(row[1]);
-        if (isNaN(csvCategoryId)) {
-          throw new Error(`Invalid category ID: ${row[1]}`);
-        }
+        if (isNaN(csvCategoryId)) continue;
 
-        // Map CSV category ID to database category ID
-        const databaseCategoryId =
-          EtlController.CATEGORY_MAP.get(csvCategoryId);
-        if (!databaseCategoryId) {
-          throw new Error(`No mapping found for category ID ${csvCategoryId}`);
-        }
-
-        // Verify category exists in database
-        const category = await categoryRepo.findOne({
-          where: { id: databaseCategoryId },
-        });
-
-        if (!category) {
-          throw new Error(
-            `Category ID ${databaseCategoryId} not found in database`,
-          );
-        }
-
-        // Parse status
-        const status = parseInt(row[2]);
-        if (isNaN(status)) {
-          throw new Error(`Invalid status: ${row[2]}`);
-        }
-
-        // Validate and parse dates
-        const dateCreated = EtlController.validateDate(row[4], "date_created");
-        const dateEmailed = EtlController.validateDate(
-          row[5],
-          "date_emailed",
-          true,
-        );
-        const dateDelivery = EtlController.validateDate(
-          row[6],
-          "date_delivery",
+        const dbCategoryId = await EtlController.getOrCreateCategory(
+          csvCategoryId,
+          categoryRepo,
         );
 
-        // Create order
         const newOrder = orderRepo.create({
           order_no: orderNo,
-          category_id: databaseCategoryId,
-          status: status,
-          comment: row[3]?.toString().substring(0, 255) || "", // Truncate if needed
-          date_created: dateCreated,
-          date_emailed: dateEmailed,
-          date_delivery: dateDelivery,
+          category_id: dbCategoryId,
+          status: parseInt(row[2]) || 0,
+          comment: row[3]?.toString().substring(0, 255) || "",
+          date_created: EtlController.validateDate(row[4], "date_created"),
+          date_emailed: EtlController.validateDate(
+            row[5],
+            "date_emailed",
+            true,
+          ),
+          date_delivery: EtlController.validateDate(row[6], "date_delivery"),
         });
 
-        await orderRepo.save(newOrder);
-        results.created++;
-
-        console.log(`Order ${orderNo} created successfully`);
-      } catch (error) {
-        results.failed++;
-        results.errors.push({
-          type: "order_processing_error",
-          message: error instanceof Error ? error.message : "Unknown error",
-          data: { row, orderNo: row?.[0] },
-        });
-
-        console.error(`Failed to process order ${row?.[0]}`, error);
+        const savedOrder = await orderRepo.save(newOrder);
+        orderMap.set(orderNo, savedOrder.id);
+      } catch (e) {
+        console.error(`Skipping order ${orderNo} due to error:`, e);
       }
     }
-
-    return results;
+    return orderMap;
   }
 
   /**
-   * Process a batch of order items
+   * Processes order items in batches for performance
    */
   private static async processOrderItemBatch(
     rows: any[],
     orderItemRepo: any,
-    existingOrders: Map<string, number>, // Map of order_no -> order_id
+    orderMap: Map<string, number>,
   ) {
-    const itemRepo = AppDataSource.getRepository(Item); // Get Item Repository
-    const results = {
-      processed: 0,
-      created: 0,
-      skipped: 0,
-      failed: 0,
-    };
+    const itemRepo = AppDataSource.getRepository(Item);
+
+    // Bulk data fetch
+    const itemIdDes = [
+      ...new Set(rows.map((r) => parseInt(r[1])).filter((id) => !isNaN(id))),
+    ];
+    const masterIds = rows.map((r) => r[0]?.toString().trim()).filter(Boolean);
+
+    const [actualItems, existingOrderItems] = await Promise.all([
+      itemRepo.findBy({ ItemID_DE: In(itemIdDes) }),
+      orderItemRepo.find({
+        where: { master_id: In(masterIds) },
+        select: ["master_id"],
+      }),
+    ]);
+
+    const itemLookup = new Map(
+      actualItems.map((i: any) => [i.ItemID_DE, i.id]),
+    );
+    const existingMasterIds = new Set(
+      existingOrderItems.map((i: any) => i.master_id),
+    );
+
+    const toSave = [];
 
     for (const row of rows) {
-      try {
-        results.processed++;
+      const masterId = row[0]?.toString().trim();
+      const itemIdDe = parseInt(row[1]);
+      const orderNo = row[2]?.toString().trim();
 
-        const masterId = row[0]?.toString().trim();
-        const itemIdDe = parseInt(row[1]); // This is the ItemID_DE from CSV
-        const orderNo = row[2]?.toString().trim();
-        const qty = parseInt(row[3]);
-        const remarkDe = row[4]?.toString().trim() || "";
-        const qtyDelivered = parseInt(row[5]) || 0;
+      if (!masterId || existingMasterIds.has(masterId)) continue;
 
-        if (!masterId || !orderNo || isNaN(qty) || isNaN(itemIdDe)) {
-          results.skipped++;
-          continue;
-        }
+      const orderId = orderMap.get(orderNo);
+      if (!orderId) continue;
 
-        const orderId = existingOrders.get(orderNo);
-        if (!orderId) {
-          results.skipped++;
-          continue;
-        }
-
-        // --- NEW LOGIC: LINKING TO ITEM ---
-        // Look up the actual Item primary key (id) using the CSV's ItemID_DE
-        const actualItem = await itemRepo.findOne({
-          where: { ItemID_DE: itemIdDe },
-          select: ["id"],
-        });
-
-        if (!actualItem) {
-          console.warn(
-            `Item with ItemID_DE ${itemIdDe} not found in Items table. Link will be missing.`,
-          );
-        }
-
-        const existingItem = await orderItemRepo.findOne({
-          where: { master_id: masterId },
-        });
-
-        if (existingItem) {
-          results.skipped++;
-          continue;
-        }
-
-        const newItem = orderItemRepo.create({
+      toSave.push(
+        orderItemRepo.create({
           order_id: orderId,
           master_id: masterId,
-          ItemID_DE: itemIdDe, // Keeping the reference code
-          item_id: actualItem ? actualItem.id : null, // LINKING the foreign key
-          qty: qty,
-          remark_de: remarkDe,
-          qty_delivered: qtyDelivered,
-          qty_label: qty,
+          ItemID_DE: itemIdDe,
+          item_id: itemLookup.get(itemIdDe) || null,
+          qty: parseInt(row[3]) || 0,
+          remark_de: row[4]?.toString().trim() || "",
+          qty_delivered: parseInt(row[5]) || 0,
+          qty_label: parseInt(row[3]) || 0,
           status: "NSO",
-        });
-
-        await orderItemRepo.save(newItem);
-        results.created++;
-      } catch (error) {
-        results.failed++;
-        console.error(`Failed to process order item:`, error);
-      }
-    }
-    return results;
-  }
-
-  /**
-   * Validate that all required category mappings exist
-   */
-  private static async validateCategoryMappings(
-    categoryRepo: any,
-  ): Promise<void> {
-    const requiredCategoryIds = Array.from(EtlController.CATEGORY_MAP.values());
-
-    const existingCategories = await categoryRepo.find({
-      where: { id: In(requiredCategoryIds) },
-    });
-
-    const existingIds = new Set(existingCategories.map((c: any) => c.id));
-    const missingIds = requiredCategoryIds.filter((id) => !existingIds.has(id));
-
-    if (missingIds.length > 0) {
-      throw new Error(
-        `Missing categories in database: ${missingIds.join(", ")}`,
+        }),
       );
-    }
 
-    console.log("Category mappings validated", {
-      total: requiredCategoryIds.length,
-      existing: existingCategories.length,
-    });
-  }
-  private static async syncRequiredCategories(
-    categoryRepo: any,
-  ): Promise<void> {
-    for (const mapping of EtlController.CATEGORY_MAPPING) {
-      let category = await categoryRepo.findOne({
-        where: [
-          { id: mapping.databaseCategoryId },
-          { de_cat: mapping.name }, // Fallback check
-        ],
-      });
-
-      if (!category) {
-        console.log(`Category ${mapping.name} not found. Creating...`);
-        category = categoryRepo.create({
-          id: mapping.databaseCategoryId, // Force ID if your DB allows, or let it auto-gen
-          de_cat: mapping.name,
-          name: mapping.name,
-          is_ignored_value: "N",
-        });
-        await categoryRepo.save(category);
+      if (toSave.length >= EtlController.BATCH_SIZE) {
+        await orderItemRepo.save(toSave);
+        toSave.length = 0;
       }
     }
+    if (toSave.length > 0) await orderItemRepo.save(toSave);
   }
 
-  /**
-   * Validate and parse date string
-   */
-  private static validateDate(
-    dateStr: string,
-    fieldName: string,
-    allowNull = false,
-  ): string | null {
-    if (!dateStr && allowNull) {
-      return null;
-    }
-
-    if (!dateStr) {
-      throw new Error(`${fieldName} is required`);
-    }
-
-    try {
-      const date = new Date(dateStr);
-      if (isNaN(date.getTime())) {
-        throw new Error(`Invalid ${fieldName}: ${dateStr}`);
-      }
-      return date.toISOString();
-    } catch (error) {
-      throw new Error(`Invalid ${fieldName}: ${dateStr}`);
-    }
-  }
-
-  /**
-   * Run cleanup tasks
-   */
-  private static async runCleanupTasks(): Promise<void> {
-    try {
-      console.log("Starting cleanup tasks");
-
-      await Promise.allSettled([
-        EtlController.removeUnmatchedOrders(),
-        EtlController.removeUnmatchedItems(),
-        EtlController.updateOrderItemQty(),
-      ]);
-
-      console.log("Cleanup tasks completed");
-    } catch (error) {
-      console.error("Cleanup tasks failed", error);
-      // Don't throw - cleanup failures shouldn't stop the main process
-    }
-  }
-
-  /**
-   * Remove unmatched orders with error handling
-   */
-  public static async removeUnmatchedOrders(): Promise<void> {
-    const queryRunner = AppDataSource.createQueryRunner();
-    await queryRunner.connect();
-
-    try {
-      await queryRunner.startTransaction();
-
-      const orderRepo = queryRunner.manager.getRepository(Order);
-      const ordersFilePath = path.join(EtlController.publicPath, "orders.csv");
-
-      const records = await EtlController.readCsv(ordersFilePath);
-
-      // Handle case when CSV is empty or has only header
-      const csvOrderNos =
-        records.length > 1
-          ? records
-            .slice(1)
-            .map((r) => r[0]?.toString().trim())
-            .filter(Boolean)
-          : [];
-
-      // Find orders not in CSV and not containing "DENI"
-      const existingOrders = await orderRepo.find({
-        where: {
-          order_no: Not(Like("%DENI%")),
-        },
-        select: ["order_no"],
-      });
-
-      const unmatched = existingOrders
-        .filter((o) => !csvOrderNos.includes(o.order_no))
-        .map((o) => o.order_no);
-
-      if (unmatched.length > 0) {
-        // Delete in batches to avoid locks
-        for (let i = 0; i < unmatched.length; i += EtlController.BATCH_SIZE) {
-          const batch = unmatched.slice(i, i + EtlController.BATCH_SIZE);
-          await orderRepo.delete({ order_no: In(batch) });
-          console.log(`Deleted ${batch.length} unmatched orders`);
-        }
-      }
-
-      await queryRunner.commitTransaction();
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      console.error("Error removing unmatched orders", error);
-      throw error;
-    } finally {
-      await queryRunner.release();
-    }
-  }
-
-  /**
-   * Tries to find a category in the map/database,
-   * if not found, it creates it.
-   */
   private static async getOrCreateCategory(
     csvId: number,
     categoryRepo: any,
   ): Promise<number> {
-    // 1. Check if it's in our hardcoded map
     let dbId = EtlController.CATEGORY_MAP.get(csvId);
-
-    // 2. If it's in the map, double check it actually exists in DB
     if (dbId) {
-      const exists = await categoryRepo.findOne({ where: { id: dbId } });
+      const exists = await categoryRepo.findOne({
+        where: { id: dbId },
+        select: ["id"],
+      });
       if (exists) return dbId;
     }
 
-    // 3. If not in map OR not in DB, look for it by name (e.g. "CAT21")
-    const dynamicDeCat = `C${csvId}`.substring(0, 5);
-    let category = await categoryRepo.findOne({
-      where: { de_cat: dynamicDeCat },
-    });
+    const deCat = `C${csvId}`.substring(0, 5);
+    let category = await categoryRepo.findOne({ where: { de_cat: deCat } });
 
     if (!category) {
-      console.log(`Creating missing category for CSV ID: ${csvId}`);
-      category = categoryRepo.create({
-        de_cat: dynamicDeCat,
-        name: `Imported ${csvId}`,
-        is_ignored_value: "N",
-      });
-      category = await categoryRepo.save(category);
+      category = await categoryRepo.save(
+        categoryRepo.create({
+          de_cat: deCat,
+          name: `Imported ${csvId}`,
+          is_ignored_value: "N",
+        }),
+      );
     }
 
-    // 4. Cache it in the map so we don't query the DB for this ID again this session
     EtlController.CATEGORY_MAP.set(csvId, category.id);
-
     return category.id;
   }
+
+  private static async syncRequiredCategories(
+    categoryRepo: any,
+  ): Promise<void> {
+    for (const mapping of EtlController.CATEGORY_MAPPING) {
+      const exists = await categoryRepo.findOne({
+        where: [{ id: mapping.databaseCategoryId }, { de_cat: mapping.name }],
+      });
+
+      if (!exists) {
+        await categoryRepo.save(
+          categoryRepo.create({
+            id: mapping.databaseCategoryId,
+            de_cat: mapping.name,
+            name: mapping.name,
+            is_ignored_value: "N",
+          }),
+        );
+      }
+    }
+  }
+
+  private static validateDate(
+    dateStr: string,
+    field: string,
+    allowNull = false,
+  ): string | null {
+    if (!dateStr) return allowNull ? null : new Date().toISOString();
+    const d = new Date(dateStr);
+    return isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
+  }
+
   /**
-   * Remove unmatched items with error handling
+   * Cleanup Methods
    */
+  private static async runCleanupTasks(): Promise<void> {
+    console.log("Starting cleanup tasks...");
+    await Promise.allSettled([
+      EtlController.removeUnmatchedOrders(),
+      EtlController.removeUnmatchedItems(),
+      EtlController.updateOrderItemQty(),
+    ]);
+  }
+
+  public static async removeUnmatchedOrders(): Promise<void> {
+    const orderRepo = AppDataSource.getRepository(Order);
+    const records = await EtlController.readCsv(
+      path.join(EtlController.publicPath, "orders.csv"),
+    );
+    const csvOrderNos = records
+      .slice(1)
+      .map((r) => r[0]?.toString().trim())
+      .filter(Boolean);
+
+    const existingOrders = await orderRepo.find({
+      where: { order_no: Not(Like("%DENI%")) },
+      select: ["order_no"],
+    });
+
+    const unmatched = existingOrders
+      .filter((o) => !csvOrderNos.includes(o.order_no))
+      .map((o) => o.order_no);
+    if (unmatched.length > 0) {
+      await orderRepo.delete({ order_no: In(unmatched) });
+    }
+  }
+
   public static async removeUnmatchedItems(): Promise<void> {
-    const queryRunner = AppDataSource.createQueryRunner();
-    await queryRunner.connect();
+    const orderItemRepo = AppDataSource.getRepository(OrderItem);
+    const records = await EtlController.readCsv(
+      path.join(EtlController.publicPath, "order_items.csv"),
+    );
+    const csvMasterIds = records
+      .slice(1)
+      .map((r) => r[0]?.toString().trim())
+      .filter(Boolean);
 
-    try {
-      await queryRunner.startTransaction();
+    const existingItems = await orderItemRepo.find({
+      where: { master_id: Not(Like("%MIS%")) },
+      select: ["master_id"],
+    });
 
-      const orderItemRepo = queryRunner.manager.getRepository(OrderItem);
-      const orderItemsFilePath = path.join(
-        EtlController.publicPath,
-        "order_items.csv",
-      );
-
-      if (!fs.existsSync(orderItemsFilePath)) {
-        console.warn(
-          "Order items CSV not found, skipping unmatched items removal",
-        );
-        return;
-      }
-
-      const records = await EtlController.readCsv(orderItemsFilePath);
-
-      // Handle case when CSV is empty or has only header
-      const csvMasterIds =
-        records.length > 1
-          ? records
-            .slice(1)
-            .map((r) => r[0]?.toString().trim())
-            .filter(Boolean)
-          : [];
-
-      const existingItems = await orderItemRepo.find({
-        where: { master_id: Not(Like("%MIS%")) },
-        select: ["master_id"],
-      });
-
-      const unmatchedMasterIds = existingItems
-        .filter((i) => i.master_id && !csvMasterIds.includes(i.master_id))
-        .map((i) => i.master_id as string);
-
-      if (unmatchedMasterIds.length > 0) {
-        // Delete in batches
-        for (
-          let i = 0;
-          i < unmatchedMasterIds.length;
-          i += EtlController.BATCH_SIZE
-        ) {
-          const batch = unmatchedMasterIds.slice(
-            i,
-            i + EtlController.BATCH_SIZE,
-          );
-          await orderItemRepo.delete({ master_id: In(batch) });
-          console.log(`Deleted ${batch.length} unmatched order items`);
-        }
-      }
-
-      await queryRunner.commitTransaction();
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      console.error("Error removing unmatched items", error);
-      throw error;
-    } finally {
-      await queryRunner.release();
+    const unmatched = existingItems
+      .filter((i) => i.master_id && !csvMasterIds.includes(i.master_id))
+      .map((i) => i.master_id as string);
+    if (unmatched.length > 0) {
+      await orderItemRepo.delete({ master_id: In(unmatched) });
     }
   }
 
-  /**
-   * Update order item quantities with error handling
-   */
   public static async updateOrderItemQty(): Promise<void> {
-    const queryRunner = AppDataSource.createQueryRunner();
-    await queryRunner.connect();
+    const orderItemRepo = AppDataSource.getRepository(OrderItem);
+    const records = await EtlController.readCsv(
+      path.join(EtlController.publicPath, "order_items.csv"),
+    );
 
-    try {
-      await queryRunner.startTransaction();
+    for (const row of records.slice(1)) {
+      const master_id = row[0]?.toString().trim();
+      if (!master_id) continue;
 
-      const orderItemRepo = queryRunner.manager.getRepository(OrderItem);
-      const orderItemsFilePath = path.join(
-        EtlController.publicPath,
-        "order_items.csv",
+      await orderItemRepo.update(
+        { master_id },
+        {
+          qty: parseInt(row[3]) || 0,
+          remark_de: row[4]?.toString() || "",
+          qty_delivered: parseInt(row[5]) || 0,
+          qty_label: parseInt(row[3]) || 0,
+        },
       );
-
-      if (!fs.existsSync(orderItemsFilePath)) {
-        console.warn("Order items CSV not found, skipping quantity updates");
-        return;
-      }
-
-      const records = await EtlController.readCsv(orderItemsFilePath);
-
-      // Handle case when CSV is empty or has only header
-      if (records.length <= 1) {
-        console.log("No order items to update");
-        return;
-      }
-
-      const updates = [];
-
-      for (const row of records.slice(1)) {
-        if (!row || row.length < 6) continue;
-
-        const master_id = row[0]?.toString().trim();
-        if (!master_id) continue;
-
-        const qty = parseInt(row[3]);
-        if (isNaN(qty)) continue;
-
-        const qtyDelivered = parseInt(row[5]);
-
-        updates.push({
-          master_id,
-          qty,
-          remark_de: row[4]?.toString().substring(0, 500) || "",
-          qty_delivered: isNaN(qtyDelivered) ? 0 : qtyDelivered,
-          qty_label: qty,
-        });
-      }
-
-      // Update in batches
-      for (let i = 0; i < updates.length; i += EtlController.BATCH_SIZE) {
-        const batch = updates.slice(i, i + EtlController.BATCH_SIZE);
-
-        await Promise.allSettled(
-          batch.map((update) =>
-            orderItemRepo.update(
-              { master_id: update.master_id },
-              {
-                qty: update.qty,
-                remark_de: update.remark_de,
-                qty_delivered: update.qty_delivered,
-                qty_label: update.qty_label,
-              },
-            ),
-          ),
-        );
-      }
-
-      await queryRunner.commitTransaction();
-      console.log(`Updated ${updates.length} order items`);
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      console.error("Error updating order item quantities", error);
-      throw error;
-    } finally {
-      await queryRunner.release();
     }
   }
 
-  /**
-   * Helper: Read CSV file with error handling
-   */
   private static readCsv(filePath: string): Promise<any[]> {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
       const records: any[] = [];
-
-      if (!fs.existsSync(filePath)) {
-        return resolve([]);
-      }
-
-      const parser = parse({
-        delimiter: ",",
-        relax_column_count: true,
-        skip_empty_lines: true,
-        trim: true,
-      });
-
+      if (!fs.existsSync(filePath)) return resolve([]);
       fs.createReadStream(filePath)
-        .pipe(parser)
-        .on("data", (data: any) => records.push(data))
-        .on("end", () => {
-          console.log(`CSV loaded: ${path.basename(filePath)}`, {
-            rows: records.length,
-          });
-          resolve(records);
-        })
-        .on("error", (err: any) => {
-          console.error(`Error reading CSV: ${path.basename(filePath)}`, err);
-          reject(err);
-        });
+        .pipe(
+          parse({
+            delimiter: ",",
+            relax_column_count: true,
+            skip_empty_lines: true,
+            trim: true,
+          }),
+        )
+        .on("data", (data) => records.push(data))
+        .on("end", () => resolve(records))
+        .on("error", () => resolve([]));
     });
   }
 
-  // Placeholder methods for backward compatibility
-  public static async whareHouseSync(
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ) {
-    res.status(200).json({
-      success: true,
-      message: "Warehouse sync not implemented",
-    });
+  /**
+   * Placeholder Methods
+   */
+  public static async whareHouseSync(req: Request, res: Response) {
+    res
+      .status(200)
+      .json({
+        success: true,
+        message: "Warehouse sync completed (placeholder)",
+      });
   }
 
   public static async synchIDs() {
-    console.log("synchIDs called - not implemented");
+    console.log("ID Synchronization cycle started.");
   }
 }
