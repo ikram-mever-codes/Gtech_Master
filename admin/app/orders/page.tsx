@@ -1113,23 +1113,30 @@ const OrderPage = () => {
   const handleReassignItemAction = async () => {
     if (!selectedItem || !targetCargoId) return;
     try {
-      const orderId = selectedItem.order_id || selectedItem.parentOrder?.id;
-      if (!orderId) {
-        toast.error("Could not determine order for this item");
-        return;
+      const isItem = !!(selectedItem.item_id || selectedItem.parentOrder);
+      const cargoIdNum = Number(targetCargoId);
+
+      if (isItem) {
+        await updateOrderItemStatus(selectedItem.id, {
+          cargo_id: cargoIdNum,
+        });
+
+        const orderId = selectedItem.order_id || selectedItem.parentOrder?.id;
+        if (orderId) {
+          await assignOrdersToCargo(cargoIdNum, [Number(orderId)]);
+        }
+
+        toast.success(`Item reassigned to Cargo ${targetCargoId} — invoice updated!`);
+      } else {
+        await assignOrdersToCargo(cargoIdNum, [Number(selectedItem.id)]);
+        toast.success(`Order ${selectedItem.order_no} reassigned to Cargo ${targetCargoId} — invoice generated!`);
       }
-      await updateOrderItemStatus(selectedItem.id, {
-        cargo_id: Number(targetCargoId),
-      });
-      await assignOrdersToCargo(Number(targetCargoId), [Number(orderId)]);
-      toast.success(
-        `Item reassigned to Cargo ${targetCargoId} — invoice generated!`,
-      );
+
       setShowREModal(false);
       fetchOrders();
     } catch (err) {
       console.error(err);
-      toast.error("Failed to reassign item");
+      toast.error("Failed to reassign");
     }
   };
 
@@ -2742,12 +2749,11 @@ const OrderPage = () => {
                         header: "EAN",
                         width: "120px",
                         render: (row) => {
-                          // Try multiple sources for EAN
                           const ean =
-                            row.item?.ean || // From item
-                            row.warehouse_data?.ean || // From warehouse data
-                            row.ean || // Direct on row
-                            row.item?.warehouse_data?.ean || // Nested warehouse data
+                            row.item?.ean ||
+                            row.warehouse_data?.ean ||
+                            row.ean ||
+                            row.item?.warehouse_data?.ean ||
                             "-";
 
                           return (
@@ -2895,8 +2901,9 @@ const OrderPage = () => {
                   showConvert={false}
                   onConvert={openConvert}
                   onReassign={(o) => {
-                    setReassignOrder(o);
-                    setShowReassignModal(true);
+                    setSelectedItem(o);
+                    setTargetCargoId(o.cargo_id ? String(o.cargo_id) : "");
+                    setShowREModal(true);
                   }}
                   onGoToItems={(orderNo) => {
                     setOrderNoFilter(orderNo);
@@ -2916,64 +2923,7 @@ const OrderPage = () => {
         </div>
       </div>
 
-      {showReassignModal && reassignOrder && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-[60]">
-          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-gray-900">
-                Reassign Order to Cargo
-              </h3>
-              <button onClick={() => setShowReassignModal(false)}>
-                <XMarkIcon className="h-5 w-5 text-gray-500" />
-              </button>
-            </div>
-            <p className="text-sm text-gray-600 mb-4">
-              Order No:{" "}
-              <span className="font-semibold">{reassignOrder.order_no}</span>
-            </p>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Select Cargo
-                </label>
-                <select
-                  className="w-full px-3 py-2 border border-gray-300 rounded-[4px] text-sm"
-                  onChange={async (e) => {
-                    const cargoId = Number(e.target.value);
-                    if (!cargoId) return;
-                    try {
-                      const orderId =
-                        reassignOrder.order_id || reassignOrder.id;
-                      await assignOrdersToCargo(cargoId, [orderId]);
-                      toast.success(`Order reassigned to Cargo ${cargoId}`);
-                      setShowReassignModal(false);
-                      fetchOrders();
-                    } catch (err) {
-                      console.error(err);
-                      toast.error("Failed to reassign order to cargo");
-                    }
-                  }}
-                >
-                  <option value="">Select Cargo...</option>
-                  {cargos.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.cargo_no} ({c.cargo_status || "Open"})
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            <div className="mt-6 flex justify-end">
-              <button
-                onClick={() => setShowReassignModal(false)}
-                className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-[4px] hover:bg-gray-200 transition"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+
 
       {showSupplierConfirm && pendingNsoGroup && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70]">
@@ -3462,39 +3412,43 @@ const OrderPage = () => {
         <CustomModal
           isOpen={showREModal}
           onClose={() => setShowREModal(false)}
-          title={`Reassign Item ${selectedItem.id}`}
+          title={selectedItem.order_no ? `Reassign Order No: ${selectedItem.order_no}` : `Reassign Item ID: ${selectedItem.id}`}
         >
           <div className="p-4 space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Select Cargo
+              <label className="block text-sm font-bold text-gray-800 mb-2 uppercase tracking-wide">
+                Select Target Cargo
               </label>
-              <select
-                value={targetCargoId}
-                onChange={(e) => setTargetCargoId(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-[#059669]"
-              >
-                <option value="">-- Choose Cargo --</option>
-                {cargos.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.cargo_no}
-                  </option>
-                ))}
-              </select>
+              <Select
+                className="text-sm"
+                options={cargos.map(c => ({
+                  value: String(c.id),
+                  label: `${c.cargo_no} ${c.cargo_status ? `(${c.cargo_status})` : ""}`
+                }))}
+                value={cargos.map(c => ({
+                  value: String(c.id),
+                  label: `${c.cargo_no} ${c.cargo_status ? `(${c.cargo_status})` : ""}`
+                })).find(opt => opt.value === String(targetCargoId)) || null}
+                onChange={(opt: any) => setTargetCargoId(opt?.value || "")}
+                placeholder="Search or Select Cargo..."
+                isSearchable
+                isClearable
+              />
             </div>
-            <div className="flex justify-end gap-2 mt-6">
+            <div className="flex justify-end gap-3 mt-8">
               <button
                 onClick={() => setShowREModal(false)}
-                className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg"
+                className="px-5 py-2 text-sm font-bold text-gray-500 bg-gray-100 hover:bg-gray-200 rounded-[4px] transition-all uppercase"
               >
                 Cancel
               </button>
               <button
                 onClick={handleReassignItemAction}
                 disabled={!targetCargoId}
-                className="px-4 py-2 text-sm bg-[#059669] text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+                className="px-6 py-2 text-sm bg-[#059669] text-white rounded-[4px] hover:bg-green-700 disabled:opacity-50 transition-all font-bold uppercase shadow-md flex items-center gap-2"
               >
-                Reassign
+                <ArrowRightCircleIcon className="h-4 w-4" />
+                Confirm Reassign
               </button>
             </div>
           </div>
