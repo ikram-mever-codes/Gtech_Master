@@ -664,7 +664,7 @@ const CargosTab: React.FC<CargosTabProps> = ({ customers: externalCustomers }) =
 
             {showModal && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-                    <div className="bg-white rounded-[4px] shadow-2xl max-w-4xl w-full max-h-[92vh] flex flex-col overflow-hidden">
+                    <div className="bg-white rounded-[4px] shadow-2xl max-w-4xl w-full max-h-[92vh] flex flex-col">
                         <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white flex items-center justify-between flex-shrink-0">
                             <div className="flex items-center gap-3">
                                 <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center">

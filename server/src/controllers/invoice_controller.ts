@@ -659,6 +659,9 @@ export class InvoiceController {
           }
         }
 
+        // cargoNo: prefer cargo from map, otherwise if orderNumber looks like a cargo no use it directly
+        const cargoNo = cargo?.cargo_no || (inv.orderNumber && !orderIdMap.has(inv.orderNumber) ? inv.orderNumber : undefined);
+
         return {
           ...inv,
           bill_to: "GTech-Warehouse",
@@ -668,7 +671,8 @@ export class InvoiceController {
             inv.customer?.companyName ||
             "-",
           customItemCount,
-          customTotalQty
+          customTotalQty,
+          cargoNo: cargoNo || inv.orderNumber,
         };
       });
 

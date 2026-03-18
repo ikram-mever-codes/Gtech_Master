@@ -201,12 +201,16 @@ const InvoiceListPage: React.FC = () => {
 
   const toggleExpansion = async (id: string, type: 'taric' | 'items') => {
     const currentState = expandedStates[id] || {};
-    const isCurrentlyOpen = type === 'taric' ? currentState.taric : currentState.items;
+    let isCurrentlyOpen = type === 'taric' ? currentState.taric : currentState.items;
 
-    const newState = {
-      ...currentState,
-      [type]: !isCurrentlyOpen
-    };
+    let newState: any;
+    if (activeInvTab === 'closed_invoices') {
+      const bothActive = currentState.taric && currentState.items;
+      newState = { ...currentState, taric: !bothActive, items: !bothActive };
+      isCurrentlyOpen = bothActive;
+    } else {
+      newState = { ...currentState, [type]: !isCurrentlyOpen };
+    }
 
     if (!isCurrentlyOpen && !currentState.data) {
       setExpandedStates(prev => ({ ...prev, [id]: { ...newState, loading: true } }));
@@ -1137,7 +1141,7 @@ const InvoiceListPage: React.FC = () => {
                                       onClick={() => toggleExpansion(invoice.id, 'taric')}
                                       className="flex items-center gap-1.5 px-2.5 py-1 bg-[#495057] text-white text-[10px] font-bold rounded-[4px] hover:bg-[#343A40] transition-colors whitespace-nowrap"
                                     >
-                                      {invoice.id.slice(-2)} {expState.taric ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                                      {(invoice as any).cargoNo || invoice.orderNumber || invoice.id.slice(-6)} {expState.taric ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
                                     </button>
                                   </td>
                                   {activeInvTab === "closed_invoices" && (
@@ -1236,55 +1240,108 @@ const InvoiceListPage: React.FC = () => {
                                           </div>
                                         )}
                                         {expState.taric && (
-                                          <SpreadSheet
-                                            data={expState.data?.taricGroups || []}
-                                            loading={expState.loading}
-                                            showTotals={true}
-                                            columns={[
-                                              { header: "Position", render: (_: any, idx: number) => idx + 1, width: "70px" },
-                                              { header: "Taric Name EN", render: (it: any) => it.taricNameEn, width: "350px" },
-                                              {
-                                                header: "Taric Code", render: (it: any) => (
-                                                  <span style={it.isProjectItem ? { color: '#F59E0B', fontWeight: 600 } : undefined}>
-                                                    {it.taricCode}
-                                                  </span>
-                                                ), width: "140px"
-                                              },
-                                              { header: "Duty rate", render: (it: any) => it.dutyRate ? `${Number(it.dutyRate).toFixed(2)}` : "-", width: "80px" },
-                                              { header: "Total Qty", render: (it: any) => it.totalQty, align: "center", width: "100px" },
-                                              { header: "Unit Price", render: (it: any) => it.unitPrice || "0.00", width: "100px" },
-                                              { header: "Total Price", render: (it: any) => (Number(it.totalPrice) || 0).toLocaleString(undefined, { minimumFractionDigits: 2 }), width: "120px" },
-                                              {
-                                                header: "Operation",
-                                                render: (group: any) => (
-                                                  <button
-                                                    onClick={() => {
-                                                      setSelectedTaricGroup(group); setSelectedTaricCode(""); setShowTaricModal(true);
-
-                                                    }}
-                                                    className="flex items-center gap-1 px-3 py-1 bg-[#1A73E8] text-white text-[10px] font-bold rounded hover:bg-[#1557B0]"
-                                                  >
-                                                    <RefreshCw className="w-3 h-3" /> Set taric
-                                                  </button>
-                                                ),
-                                                width: "120px"
-                                              }
-                                            ]}
-                                            expandedRowId={null}
-                                            totalCols={[
-                                              { label: "Grand Total", value: "", width: "620px", align: "left" },
-                                              { value: expState.data?.taricGroups?.reduce((s: number, g: any) => s + (g.totalQty || 0), 0) || 0, width: "100px", align: "center" },
-                                              { value: "", width: "100px" },
-                                              { value: (expState.data?.taricGroups?.reduce((s: number, g: any) => s + (g.totalPrice || 0), 0) || 0).toLocaleString(undefined, { minimumFractionDigits: 2 }), width: "120px", align: "left" },
-                                              { value: "", width: "120px" }
-                                            ]}
-                                          />
+                                          <div className="space-y-2">
+                                            <h4 className="text-[11px] font-bold text-[#495057] uppercase tracking-wider mb-2">
+                                              Items to be shown in invoice based on Taric
+                                            </h4>
+                                            <SpreadSheet
+                                              data={expState.data?.taricGroups || []}
+                                              loading={expState.loading}
+                                              showTotals={true}
+                                              columns={activeInvTab === 'closed_invoices' ? [
+                                                { header: "Position", render: (_: any, idx: number) => idx + 1, width: "70px" },
+                                                { header: "Taric Name EN", render: (it: any) => it.taricNameEn, width: "350px" },
+                                                {
+                                                  header: "Taric Code", render: (it: any) => (
+                                                    <span style={it.isProjectItem ? { color: '#F59E0B', fontWeight: 600 } : undefined}>
+                                                      {it.taricCode}
+                                                    </span>
+                                                  ), width: "140px"
+                                                },
+                                                { header: "Duty rate", render: (it: any) => it.dutyRate ? `${Number(it.dutyRate).toFixed(2)}` : "-", width: "80px" },
+                                                { header: "Total Qty", render: (it: any) => it.totalQty, align: "center", width: "100px" },
+                                                { header: "Unit Price", render: (it: any) => it.unitPrice || "0.00", width: "100px" },
+                                                { header: "Total Price", render: (it: any) => (Number(it.totalPrice) || 0).toLocaleString(undefined, { minimumFractionDigits: 2 }), width: "120px" }
+                                              ] : [
+                                                { header: "Position", render: (_: any, idx: number) => idx + 1, width: "70px" },
+                                                { header: "Taric Name EN", render: (it: any) => it.taricNameEn, width: "350px" },
+                                                {
+                                                  header: "Taric Code", render: (it: any) => (
+                                                    <span style={it.isProjectItem ? { color: '#F59E0B', fontWeight: 600 } : undefined}>
+                                                      {it.taricCode}
+                                                    </span>
+                                                  ), width: "140px"
+                                                },
+                                                { header: "Duty rate", render: (it: any) => it.dutyRate ? `${Number(it.dutyRate).toFixed(2)}` : "-", width: "80px" },
+                                                { header: "Total Qty", render: (it: any) => it.totalQty, align: "center", width: "100px" },
+                                                { header: "Unit Price", render: (it: any) => it.unitPrice || "0.00", width: "100px" },
+                                                { header: "Total Price", render: (it: any) => (Number(it.totalPrice) || 0).toLocaleString(undefined, { minimumFractionDigits: 2 }), width: "120px" },
+                                                {
+                                                  header: "Operation",
+                                                  render: (group: any) => (
+                                                    <button
+                                                      onClick={() => {
+                                                        setSelectedTaricGroup(group); setSelectedTaricCode(""); setShowTaricModal(true);
+                                                      }}
+                                                      className="flex items-center gap-1 px-3 py-1 bg-[#1A73E8] text-white text-[10px] font-bold rounded hover:bg-[#1557B0]"
+                                                    >
+                                                      <RefreshCw className="w-3 h-3" /> Set taric
+                                                    </button>
+                                                  ),
+                                                  width: "120px"
+                                                }
+                                              ]}
+                                              expandedRowId={null}
+                                              totalCols={activeInvTab === 'closed_invoices' ? [
+                                                { label: "Grand Total", value: "", width: "740px", align: "left" },
+                                                { value: expState.data?.taricGroups?.reduce((s: number, g: any) => s + (g.totalQty || 0), 0) || 0, width: "100px", align: "center" },
+                                                { value: "", width: "100px" },
+                                                { value: (expState.data?.taricGroups?.reduce((s: number, g: any) => s + (g.totalPrice || 0), 0) || 0).toLocaleString(undefined, { minimumFractionDigits: 2 }), width: "120px", align: "left" }
+                                              ] : [
+                                                { label: "Grand Total", value: "", width: "620px", align: "left" },
+                                                { value: expState.data?.taricGroups?.reduce((s: number, g: any) => s + (g.totalQty || 0), 0) || 0, width: "100px", align: "center" },
+                                                { value: "", width: "100px" },
+                                                { value: (expState.data?.taricGroups?.reduce((s: number, g: any) => s + (g.totalPrice || 0), 0) || 0).toLocaleString(undefined, { minimumFractionDigits: 2 }), width: "120px", align: "left" },
+                                                { value: "", width: "120px" }
+                                              ]}
+                                            />
+                                          </div>
                                         )}
                                         {expState.items && (
                                           <SpreadSheet
                                             data={expState.data?.detailedItems || []}
                                             loading={expState.loading}
-                                            columns={[
+                                            columns={activeInvTab === 'closed_invoices' ? [
+                                              { header: "#", render: (_: any, idx: number) => idx + 1, width: "40px" },
+                                              { header: "EAN", render: (it: any) => it.item?.ean || "-", width: "110px" },
+                                              {
+                                                header: "Item Name",
+                                                render: (it: any) => (
+                                                  <div className="line-clamp-2 leading-tight py-1" title={it.item?.item_name}>
+                                                    {it.item?.item_name}
+                                                  </div>
+                                                ),
+                                                width: "350px"
+                                              },
+                                              { header: "Taric code", render: (it: any) => it.set_taric_code || it.item?.taric?.code || "-", width: "100px" },
+                                              {
+                                                header: "QTY",
+                                                render: (it: any) => (
+                                                  <span className="font-bold">{it.qty}</span>
+                                                ),
+                                                width: "60px",
+                                                align: "center"
+                                              },
+                                              { header: "RMB", render: (it: any) => it.rmb_special_price || "0", width: "60px", align: "center" },
+                                              {
+                                                header: "EK",
+                                                render: (it: any) => it.eur_special_price && Number(it.eur_special_price) > 0 ? (
+                                                  <span className="font-bold text-[#10B981]">{Number(it.eur_special_price).toFixed(2)}</span>
+                                                ) : "0",
+                                                width: "80px",
+                                                align: "center"
+                                              }
+                                            ] : [
                                               {
                                                 header: "ID",
                                                 render: (it: any) => (
