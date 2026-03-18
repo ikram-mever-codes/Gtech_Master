@@ -1,5 +1,6 @@
 "use client";
 import React, { useState, useEffect } from "react";
+import Select from "react-select";
 import {
   Search,
   Filter,
@@ -44,7 +45,7 @@ import CargosTab from "@/components/cargos/CargosTab";
 import CargoTypesTab from "@/components/cargos/CargoTypesTab";
 import { getAllCustomers, CustomerData as APICustomerData, updateCustomerProfile } from "@/api/customers";
 import { updateOrderItemStatus, splitOrderItem, updateOrderItemPrice } from "@/api/orders";
-import { getAllCargos, CargoType } from "@/api/cargos";
+import { getAllCargos, CargoType, assignOrdersToCargo } from "@/api/cargos";
 import { getAllTaricsSimple } from "@/api/items";
 import BillToShipToForm, { BillToShipToData, WAREHOUSE_BILL_TO } from "@/components/General/BillToShipToForm";
 import { toast } from "react-hot-toast";
@@ -241,18 +242,33 @@ const InvoiceListPage: React.FC = () => {
   const handleReassignItem = async () => {
     if (!selectedItem || !targetCargoId) return;
     try {
-      await updateOrderItemStatus(selectedItem.id, { cargo_id: Number(targetCargoId) });
+      const cargoIdNum = Number(targetCargoId);
+      await updateOrderItemStatus(selectedItem.id, { cargo_id: cargoIdNum });
+
+      const orderId = selectedItem.order_id || selectedItem.order?.id;
+      if (orderId) {
+        await assignOrdersToCargo(cargoIdNum, [Number(orderId)]);
+      }
+
       toast.success("Item reassigned successfully");
       setShowREModal(false);
+
       const invId = Object.keys(expandedStates).find(key =>
         expandedStates[key].data?.detailedItems?.some((it: any) => it.id === selectedItem.id)
       );
+
       if (invId) {
-        const res = await getExpandedInvoiceDetails(invId);
-        setExpandedStates(prev => ({ ...prev, [invId]: { ...prev[invId], data: res.data } }));
+        setExpandedStates(prev => {
+          const newState = { ...prev };
+          delete newState[invId];
+          return newState;
+        });
       }
+
+      await loadInvoices();
     } catch (err) {
       console.error(err);
+      toast.error("Failed to reassign item refresh");
     }
   };
 
@@ -267,10 +283,13 @@ const InvoiceListPage: React.FC = () => {
         expandedStates[key].data?.detailedItems?.some((it: any) => it.id === selectedItem.id)
       );
       if (invId) {
-        const res = await getExpandedInvoiceDetails(invId);
-        setExpandedStates(prev => ({ ...prev, [invId]: { ...prev[invId], data: res.data } }));
+        setExpandedStates(prev => {
+          const newState = { ...prev };
+          delete newState[invId];
+          return newState;
+        });
       }
-      loadInvoices();
+      await loadInvoices();
     } catch (err) {
       console.error(err);
     }
@@ -1672,26 +1691,39 @@ const InvoiceListPage: React.FC = () => {
           >
             <div className="p-4 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Select Cargo</label>
-                <select
-                  value={targetCargoId}
-                  onChange={(e) => setTargetCargoId(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-[#059669]"
-                >
-                  <option value="">-- Choose Cargo --</option>
-                  {cargos.map(c => (
-                    <option key={c.id} value={c.id}>{c.cargo_no}</option>
-                  ))}
-                </select>
+                <label className="block text-sm font-bold text-gray-800 mb-2 uppercase tracking-wide">
+                  Select Target Cargo
+                </label>
+                <Select
+                  className="text-sm"
+                  options={cargos.map(c => ({
+                    value: String(c.id),
+                    label: `${c.cargo_no} ${c.cargo_status ? `(${c.cargo_status})` : ""}`
+                  }))}
+                  value={cargos.map(c => ({
+                    value: String(c.id),
+                    label: `${c.cargo_no} ${c.cargo_status ? `(${c.cargo_status})` : ""}`
+                  })).find(opt => opt.value === String(targetCargoId)) || null}
+                  onChange={(opt: any) => setTargetCargoId(opt?.value || "")}
+                  placeholder="Search or Select Cargo..."
+                  isSearchable
+                  isClearable
+                />
               </div>
-              <div className="flex justify-end gap-2 mt-6">
-                <button onClick={() => setShowREModal(false)} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Cancel</button>
+              <div className="flex justify-end gap-3 mt-8">
+                <button
+                  onClick={() => setShowREModal(false)}
+                  className="px-5 py-2 text-sm font-bold text-gray-500 bg-gray-100 hover:bg-gray-200 rounded-[4px] transition-all uppercase"
+                >
+                  Cancel
+                </button>
                 <button
                   onClick={handleReassignItem}
                   disabled={!targetCargoId}
-                  className="px-4 py-2 text-sm bg-[#059669] text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+                  className="px-6 py-2 text-sm bg-[#059669] text-white rounded-[4px] hover:bg-green-700 disabled:opacity-50 transition-all font-bold uppercase shadow-md flex items-center gap-2"
                 >
-                  Reassign
+                  <RefreshCw className="w-4 h-4" />
+                  Confirm Reassign
                 </button>
               </div>
             </div>
