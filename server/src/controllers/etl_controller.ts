@@ -9,47 +9,43 @@ import { OrderItem } from "../models/order_items";
 import { Item } from "../models/items";
 import { Category } from "../models/categories";
 
-interface ETLSummary {
-  startTime: Date;
-  endTime: Date;
-  duration: number;
-  orders: {
-    total: number;
-    created: number;
-    updated: number;
-    failed: number;
-  };
-  items: {
-    total: number;
-    created: number;
-    updated: number;
-    failed: number;
-  };
-  categories: {
-    created: number;
-    existing: number;
-    failed: number;
-  };
-  errors: Array<{ type: string; message: string; row?: number; data?: any }>;
+interface ProcessBatchResult {
+  processed: number;
+  created: number;
+  updated: number;
+  skipped: number;
+  failed: number;
+  errors: Array<{ type: string; message: string; data?: any }>;
+}
+
+interface CategoryMapping {
+  csvCategoryId: number;
+  databaseCategoryId: number;
+  name: string;
 }
 
 export class EtlController {
   private static publicPath = path.join(__dirname, "../../public");
-  private static readonly BATCH_SIZE = 1000;
+  private static readonly BATCH_SIZE = 100;
 
-  // Category mapping
-  private static readonly CATEGORY_MAPPING: {
-    [key: number]: { id: number; name: string };
-  } = {
-    26: { id: 55, name: "STD" },
-    18: { id: 56, name: "GBL" },
-    13: { id: 57, name: "GTR" },
-    21: { id: 58, name: "PRO" },
-    20: { id: 59, name: "ERS" },
-    8: { id: 60, name: "TBA" },
-  };
+  // Category mapping based on your database
+  private static readonly CATEGORY_MAPPING: CategoryMapping[] = [
+    { csvCategoryId: 26, databaseCategoryId: 55, name: "STD" },
+    { csvCategoryId: 18, databaseCategoryId: 56, name: "GBL" },
+    { csvCategoryId: 13, databaseCategoryId: 57, name: "GTR" },
+    { csvCategoryId: 21, databaseCategoryId: 58, name: "PRO" },
+    { csvCategoryId: 20, databaseCategoryId: 59, name: "ERS" },
+    { csvCategoryId: 8, databaseCategoryId: 60, name: "TBA" },
+  ];
 
-  // German month mapping
+  private static readonly CATEGORY_MAP = new Map(
+    EtlController.CATEGORY_MAPPING.map((m) => [
+      m.csvCategoryId,
+      m.databaseCategoryId,
+    ]),
+  );
+
+  // German month mapping for date parsing
   private static readonly MONTH_MAP: { [key: string]: string } = {
     Jan: "01",
     Feb: "02",
@@ -66,437 +62,426 @@ export class EtlController {
   };
 
   /**
-   * Main ETL Entry Point
+   * Main ETL process - NO SKIPS, ALL DATES FROM CSV
    */
   public static async findTargetDate(
     req: Request,
     res: Response,
     next: NextFunction,
   ) {
-    const summary: ETLSummary = {
-      startTime: new Date(),
-      endTime: new Date(),
-      duration: 0,
-      orders: { total: 0, created: 0, updated: 0, failed: 0 },
-      items: { total: 0, created: 0, updated: 0, failed: 0 },
-      categories: { created: 0, existing: 0, failed: 0 },
-      errors: [],
-    };
-
     try {
-      console.log("\n" + "=".repeat(70));
-      console.log("🚀 STARTING ETL PROCESS");
-      console.log("=".repeat(70));
+      console.log("=".repeat(50));
+      console.log("Starting ETL process...");
+      console.log("=".repeat(50));
 
-      const categoryRepo = AppDataSource.getRepository(Category);
-      const orderRepo = AppDataSource.getRepository(Order);
+      const orderRepo: any = AppDataSource.getRepository(Order);
       const orderItemRepo = AppDataSource.getRepository(OrderItem);
-      const itemRepo = AppDataSource.getRepository(Item);
+      const categoryRepo = AppDataSource.getRepository(Category);
 
-      // STEP 1: Sync categories
-      console.log("\n📁 STEP 1: Syncing categories...");
-      await EtlController.syncCategories(categoryRepo, summary);
+      // Step 1: Sync categories
+      console.log("\n📁 Step 1: Syncing categories...");
+      await EtlController.syncRequiredCategories(categoryRepo);
 
-      // STEP 2: Read and process orders
-      console.log("\n📦 STEP 2: Processing orders...");
+      // Step 2: Read and process orders
+      console.log("\n📦 Step 2: Processing orders...");
       const ordersFilePath = path.join(EtlController.publicPath, "orders.csv");
-      const orderRows = await EtlController.readCsv(
-        ordersFilePath,
-        "orders.csv",
-      );
+      const orderRecords = await EtlController.readCsv(ordersFilePath);
 
-      if (orderRows.length <= 1) {
+      if (orderRecords.length <= 1) {
         throw new Error("No orders found in orders.csv");
       }
 
-      const orderData = orderRows.slice(1);
-      summary.orders.total = orderData.length;
+      const orderRows = orderRecords.slice(1);
+      console.log(`Found ${orderRows.length} orders to process`);
 
-      // Process all orders
-      const orderMap = await EtlController.processOrders(
-        orderData,
+      // Process ALL orders - create or update, never skip
+      const orderMap = await EtlController.processAllOrders(
+        orderRows,
         orderRepo,
         categoryRepo,
-        summary,
       );
 
-      // STEP 3: Read and process order items
-      console.log("\n📋 STEP 3: Processing order items...");
-      const itemsFilePath = path.join(
+      console.log(`\n✅ Orders complete: ${orderMap.size} total orders`);
+
+      // Step 3: Process order items
+      console.log("\n📋 Step 3: Processing order items...");
+      const orderItemsFilePath = path.join(
         EtlController.publicPath,
         "order_items.csv",
       );
-      const itemRows = await EtlController.readCsv(
-        itemsFilePath,
-        "order_items.csv",
-      );
 
-      if (itemRows.length <= 1) {
-        throw new Error("No order items found in order_items.csv");
+      if (fs.existsSync(orderItemsFilePath)) {
+        const itemRecords = await EtlController.readCsv(orderItemsFilePath);
+
+        if (itemRecords.length > 1) {
+          console.log(`Found ${itemRecords.length - 1} order items to process`);
+
+          const itemResults = await EtlController.processAllOrderItems(
+            itemRecords.slice(1),
+            orderItemRepo,
+            orderMap,
+          );
+
+          console.log(`\n✅ Items processed:`, itemResults);
+        } else {
+          console.log("No order items found in CSV");
+        }
+      } else {
+        console.log("order_items.csv not found");
       }
 
-      const itemData = itemRows.slice(1);
-      summary.items.total = itemData.length;
-
-      // Process all order items
-      await EtlController.processOrderItems(
-        itemData,
-        orderItemRepo,
-        itemRepo,
-        orderMap,
-        summary,
-      );
-
-      // Calculate duration
-      summary.endTime = new Date();
-      summary.duration =
-        summary.endTime.getTime() - summary.startTime.getTime();
-
-      // Print final summary
-      EtlController.printSummary(summary);
+      console.log("\n" + "=".repeat(50));
+      console.log("✅ ETL process completed successfully");
+      console.log("=".repeat(50));
 
       res.status(200).json({
         success: true,
         message: "ETL process completed successfully",
-        summary,
       });
     } catch (error) {
-      console.error("\n❌ ETL Failed:", error);
-      summary.errors.push({
-        type: "CRITICAL",
-        message: error instanceof Error ? error.message : String(error),
-        data: error,
-      });
-      EtlController.printSummary(summary);
+      console.error("❌ ETL process failed:", error);
       next(error);
     }
   }
 
   /**
-   * Sync categories
+   * Process ALL orders - create or update, never skip
    */
-  private static async syncCategories(
-    categoryRepo: any,
-    summary: ETLSummary,
-  ): Promise<void> {
-    for (const [csvId, mapping] of Object.entries(
-      EtlController.CATEGORY_MAPPING,
-    )) {
-      try {
-        let category = await categoryRepo.findOne({
-          where: { id: mapping.id },
-        });
-
-        if (!category) {
-          category = await categoryRepo.findOne({
-            where: { de_cat: mapping.name },
-          });
-
-          if (category) {
-            console.log(
-              `   📝 Category ${mapping.name} exists with ID ${category.id}`,
-            );
-            summary.categories.existing++;
-          } else {
-            category = categoryRepo.create({
-              id: mapping.id,
-              de_cat: mapping.name,
-              name: mapping.name,
-              is_ignored_value: "N",
-            });
-            await categoryRepo.save(category);
-            console.log(
-              `   ✅ Created category: ${mapping.name} (ID: ${mapping.id})`,
-            );
-            summary.categories.created++;
-          }
-        } else {
-          console.log(
-            `   📝 Category exists: ${mapping.name} (ID: ${mapping.id})`,
-          );
-          summary.categories.existing++;
-        }
-      } catch (error: any) {
-        console.error(
-          `   ❌ Failed to sync category ${mapping.name}:`,
-          error.message,
-        );
-        summary.categories.failed++;
-      }
-    }
-  }
-
-  /**
-   * Process orders with CORRECT column mappings
-   */
-  /**
-   * Process orders with CORRECT column mappings
-   */
-  private static async processOrders(
+  private static async processAllOrders(
     rows: any[],
     orderRepo: any,
     categoryRepo: any,
-    summary: ETLSummary,
   ): Promise<Map<string, number>> {
     const orderMap = new Map<string, number>();
+    let created = 0;
+    let updated = 0;
 
-    // Get all existing orders
-    const allOrderNos = rows
-      .map((r) => r[0]?.toString().trim())
-      .filter(Boolean);
-    const existingOrders = await orderRepo.find({
-      where: { order_no: In(allOrderNos) },
-      select: ["id", "order_no"],
-    });
+    console.log(`\nProcessing ${rows.length} orders...`);
 
-    // Populate map with existing orders: order_no -> id
-    existingOrders.forEach((o: any) => {
-      orderMap.set(o.order_no, o.id);
-    });
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const rowNum = i + 2; // +2 for header and 0-index
 
-    console.log(`   Found ${orderMap.size} existing orders`);
-
-    // Process orders in batches
-    for (let i = 0; i < rows.length; i += EtlController.BATCH_SIZE) {
-      const batch = rows.slice(i, i + EtlController.BATCH_SIZE);
-
-      for (const row of batch) {
-        try {
-          const orderNo = row[0]?.toString().trim(); // supplier_order_no
-          if (!orderNo) continue;
-
-          // Parse category (index 1)
-          const csvCategoryId = parseInt(row[1]);
-          let categoryId = 55; // Default to STD
-
-          if (!isNaN(csvCategoryId)) {
-            const mapping = EtlController.CATEGORY_MAPPING[csvCategoryId];
-            if (mapping) {
-              categoryId = mapping.id;
-            }
-          }
-
-          // Parse dates (indices 4,5,6)
-          const dateCreated =
-            EtlController.parseGermanDate(row[4]) || new Date();
-          const dateEmailed = EtlController.parseGermanDate(row[5]);
-          const dateDelivery =
-            EtlController.parseGermanDate(row[6]) || new Date();
-
-          const orderData = {
-            order_no: orderNo,
-            category_id: categoryId,
-            status: parseInt(row[2]) || 0, // order_status at index 2
-            comment: row[3]?.toString().substring(0, 255) || "", // order_comment at index 3
-            date_created: dateCreated.toISOString(),
-            date_emailed: dateEmailed ? dateEmailed.toISOString() : null,
-            date_delivery: dateDelivery.toISOString(),
-          };
-
-          if (orderMap.has(orderNo)) {
-            // Update existing
-            await orderRepo.update({ order_no: orderNo }, orderData);
-            summary.orders.updated++;
-          } else {
-            // Create new
-            const newOrder = orderRepo.create(orderData);
-            const saved = await orderRepo.save(newOrder);
-            // FIXED: Set order_no as key, saved.id as value
-            orderMap.set(orderNo, saved.id);
-            summary.orders.created++;
-          }
-        } catch (error: any) {
-          console.error(`   Error processing order:`, error.message);
-          summary.orders.failed++;
+      try {
+        const orderNo = row[0]?.toString().trim();
+        if (!orderNo) {
+          console.error(
+            `Row ${rowNum}: Missing order number, using placeholder`,
+          );
+          continue;
         }
-      }
 
-      const processed = Math.min(i + EtlController.BATCH_SIZE, rows.length);
-      console.log(`   Progress: ${processed}/${rows.length} orders processed`);
+        // Parse category - ALWAYS use a valid category ID
+        const csvCategoryId = parseInt(row[1]);
+        let databaseCategoryId = 55; // Default STD
+
+        if (!isNaN(csvCategoryId)) {
+          try {
+            databaseCategoryId = await EtlController.getOrCreateCategory(
+              csvCategoryId,
+              categoryRepo,
+            );
+          } catch (error) {
+            console.warn(
+              `Row ${rowNum}: Error with category ${csvCategoryId}, using default 55`,
+            );
+          }
+        }
+
+        // Parse dates - ALWAYS use CSV dates, never current date
+        const dateCreated = EtlController.parseGermanDateStrict(row[4]);
+        const dateEmailed = EtlController.parseGermanDateStrict(row[5]);
+        const dateDelivery = EtlController.parseGermanDateStrict(row[6]);
+
+        if (!dateCreated) {
+          console.error(
+            `Row ${rowNum}: Missing required date_created for order ${orderNo}`,
+          );
+          continue;
+        }
+
+        const status = parseInt(row[2]);
+        if (isNaN(status)) {
+          console.warn(
+            `Row ${rowNum}: Invalid status for order ${orderNo}, using 0`,
+          );
+        }
+
+        const orderData = {
+          order_no: orderNo,
+          category_id: databaseCategoryId,
+          status: isNaN(status) ? 0 : status,
+          comment: row[3]?.toString().substring(0, 255) || "",
+          date_created: dateCreated,
+          date_emailed: dateEmailed,
+          date_delivery: dateDelivery || dateCreated, // Use delivery date or fallback to created
+        };
+
+        // Check if order exists
+        const existingOrder = await orderRepo.findOne({
+          where: { order_no: orderNo },
+        });
+
+        if (existingOrder) {
+          // Update existing
+          await orderRepo.update({ order_no: orderNo }, orderData);
+          orderMap.set(orderNo, existingOrder.id);
+          updated++;
+        } else {
+          // Create new
+          const newOrder = orderRepo.create(orderData);
+          const saved = await orderRepo.save(newOrder);
+          orderMap.set(orderNo, saved.id);
+          created++;
+        }
+
+        if ((created + updated) % 10 === 0) {
+          console.log(
+            `Progress: ${created + updated}/${rows.length} orders processed`,
+          );
+        }
+      } catch (error) {
+        console.error(`Row ${rowNum}: Failed to process order:`, error);
+        // Don't skip - we want all orders
+      }
     }
 
-    // Verify the map has all orders
-    console.log(`\n   📊 Order map verification:`);
-    console.log(`      Total orders in map: ${orderMap.size}`);
-
-    // Log first 5 entries for debugging
-    const sampleEntries = Array.from(orderMap.entries()).slice(0, 5);
-    console.log(`      Sample mappings:`, sampleEntries);
-
-    console.log(
-      `\n   📊 Orders: ${summary.orders.created} created, ${summary.orders.updated} updated, ${summary.orders.failed} failed`,
-    );
-
+    console.log(`\n📊 Orders: ${created} created, ${updated} updated`);
     return orderMap;
   }
 
   /**
-   * Process order items with CORRECT column mappings
+   * Process ALL order items - create or update, never skip
    */
-  private static async processOrderItems(
+  private static async processAllOrderItems(
     rows: any[],
     orderItemRepo: any,
-    itemRepo: any,
     orderMap: Map<string, number>,
-    summary: ETLSummary,
-  ): Promise<void> {
+  ) {
+    const itemRepo = AppDataSource.getRepository(Item);
+    const results = {
+      processed: 0,
+      created: 0,
+      updated: 0,
+      failed: 0,
+    };
+
+    console.log(`\nProcessing ${rows.length} order items...`);
+
     // Get all items for lookup
     const allItems = await itemRepo.find({ select: ["id", "ItemID_DE"] });
     const itemLookup = new Map(allItems.map((i: any) => [i.ItemID_DE, i.id]));
 
-    console.log(`\n   📊 Processing ${rows.length} order items...`);
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const rowNum = i + 2; // +2 for header and 0-index
 
-    // Get existing order items
-    const allMasterIds = rows
-      .map((r) => r[0]?.toString().trim())
-      .filter(Boolean);
-    const existingItems = await orderItemRepo.find({
-      where: { master_id: In(allMasterIds) },
-      select: ["master_id"],
-    });
+      try {
+        results.processed++;
 
-    const existingMasterIds = new Set(
-      existingItems.map((i: any) => i.master_id),
-    );
-    console.log(`   Found ${existingMasterIds.size} existing items`);
+        // CORRECT COLUMN MAPPINGS for order_items.csv:
+        // 0: masterItemID, 1: ItemID_DE, 2: order_no, 3: qty, 4: remark, 5: qty_delivered
+        const masterId = row[0]?.toString().trim();
+        const itemIdDe = parseInt(row[1]);
+        const orderNo = row[2]?.toString().trim();
+        const qty = parseInt(row[3]);
+        const remarkDe = row[4]?.toString().trim() || "";
+        const qtyDelivered = parseInt(row[5]) || 0;
 
-    let inserted = 0;
-    let updated = 0;
-    let failed = 0;
-
-    // Process items in batches
-    for (let i = 0; i < rows.length; i += EtlController.BATCH_SIZE) {
-      const batch = rows.slice(i, i + EtlController.BATCH_SIZE);
-
-      for (const row of batch) {
-        try {
-          // Validate row
-          if (!row || row.length < 7) {
-            failed++;
-            continue;
-          }
-
-          const masterId = row[0]?.toString().trim(); // masterItemID at index 0
-          if (!masterId) {
-            failed++;
-            continue;
-          }
-
-          const orderNo = row[1]?.toString().trim(); // order_no at index 1 - THIS IS CORRECT!
-          if (!orderNo) {
-            failed++;
-            continue;
-          }
-
-          // Get order ID from map
-          const orderId = orderMap.get(orderNo);
-          console.log(orderId);
-          if (!orderId) {
-            console.warn(`   Order ${orderNo} not found for item ${masterId}`);
-            failed++;
-            continue;
-          }
-
-          // Parse ItemID_DE (index 2)
-          const itemIdDe = parseInt(row[2]?.toString().trim(), 10);
-          if (isNaN(itemIdDe) || itemIdDe <= 0) {
-            failed++;
-            continue;
-          }
-
-          // Parse quantities
-          const qty = parseInt(row[3]?.toString().trim(), 10) || 0; // qty at index 3
-          const qtyDelivered = parseInt(row[6]?.toString().trim(), 10) || 0; // qty_delivered at index 6
-          const remark = row[4]?.toString().trim() || ""; // remark at index 4
-
-          // Get item ID from lookup
-          const itemId = itemLookup.get(itemIdDe) || null;
-
-          if (existingMasterIds.has(masterId)) {
-            // Update existing
-            await orderItemRepo.update(
-              { master_id: masterId },
-              {
-                order_id: orderId,
-                ItemID_DE: itemIdDe,
-                item_id: itemId,
-                qty: qty,
-                remark_de: remark,
-                qty_delivered: qtyDelivered,
-                qty_label: qty,
-              },
-            );
-            updated++;
-          } else {
-            // Insert new
-            await orderItemRepo
-              .createQueryBuilder()
-              .insert()
-              .into(OrderItem)
-              .values({
-                order_id: orderId,
-                master_id: masterId,
-                ItemID_DE: itemIdDe,
-                item_id: itemId,
-                qty: qty,
-                remark_de: remark,
-                qty_delivered: qtyDelivered,
-                qty_label: qty,
-                status: "NSO",
-              })
-              .execute();
-            inserted++;
-          }
-        } catch (error: any) {
-          console.error(`   Error processing item:`, error.message);
-          failed++;
+        // Validate but don't skip - use defaults for missing data
+        if (!masterId) {
+          console.error(`Row ${rowNum}: Missing master_id, cannot process`);
+          results.failed++;
+          continue;
         }
-      }
 
-      const processed = Math.min(i + EtlController.BATCH_SIZE, rows.length);
-      console.log(
-        `   Progress: ${processed}/${rows.length} items processed (ins: ${inserted}, upd: ${updated}, fail: ${failed})`,
-      );
+        if (!orderNo) {
+          console.error(
+            `Row ${rowNum}: Missing order_no for master_id ${masterId}, cannot process`,
+          );
+          results.failed++;
+          continue;
+        }
+
+        // Get order ID - if not found, this is a critical error
+        const orderId = orderMap.get(orderNo);
+        if (!orderId) {
+          console.error(
+            `Row ${rowNum}: Order ${orderNo} not found for item ${masterId}`,
+          );
+          results.failed++;
+          continue;
+        }
+
+        // Handle ItemID_DE
+        if (isNaN(itemIdDe)) {
+          console.warn(
+            `Row ${rowNum}: Invalid ItemID_DE for master_id ${masterId}, using null`,
+          );
+          var itemIdDeValue = null;
+          var itemId = null;
+        } else {
+          var itemIdDeValue: any = itemIdDe;
+          var itemId = itemLookup.get(itemIdDe) || null;
+        }
+
+        // Handle quantity
+        if (isNaN(qty)) {
+          console.warn(
+            `Row ${rowNum}: Invalid quantity for master_id ${masterId}, using 0`,
+          );
+          var qtyValue = 0;
+        } else {
+          var qtyValue = qty;
+        }
+
+        // Check if order item exists
+        const existingItem = await orderItemRepo.findOne({
+          where: { master_id: masterId },
+        });
+
+        const itemData = {
+          order_id: orderId,
+          master_id: masterId,
+          ItemID_DE: itemIdDeValue,
+          item_id: itemId,
+          qty: qtyValue,
+          remark_de: remarkDe,
+          qty_delivered: qtyDelivered,
+          qty_label: qtyValue,
+          status: "NSO",
+        };
+
+        if (existingItem) {
+          // Update existing
+          await orderItemRepo.update({ master_id: masterId }, itemData);
+          results.updated++;
+        } else {
+          // Insert new
+          await orderItemRepo.save(orderItemRepo.create(itemData));
+          results.created++;
+        }
+
+        if ((results.created + results.updated) % 50 === 0) {
+          console.log(
+            `Progress: ${results.created + results.updated}/${rows.length} items processed`,
+          );
+        }
+      } catch (error) {
+        console.error(`Row ${rowNum}: Failed to process item:`, error);
+        results.failed++;
+      }
     }
 
-    summary.items.created = inserted;
-    summary.items.updated = updated;
-    summary.items.failed = failed;
-
     console.log(
-      `\n   📊 Items: ${inserted} created, ${updated} updated, ${failed} failed`,
+      `\n📊 Items: ${results.created} created, ${results.updated} updated, ${results.failed} failed`,
     );
+    return results;
   }
 
   /**
-   * Parse German date format
+   * Sync required categories - create if not exist
    */
-  private static parseGermanDate(dateStr: string): Date | null {
+  private static async syncRequiredCategories(
+    categoryRepo: any,
+  ): Promise<void> {
+    for (const mapping of EtlController.CATEGORY_MAPPING) {
+      try {
+        let category = await categoryRepo.findOne({
+          where: [{ id: mapping.databaseCategoryId }, { de_cat: mapping.name }],
+        });
+
+        if (!category) {
+          console.log(`Creating category: ${mapping.name}`);
+          category = categoryRepo.create({
+            id: mapping.databaseCategoryId,
+            de_cat: mapping.name,
+            name: mapping.name,
+            is_ignored_value: "N",
+          });
+          await categoryRepo.save(category);
+        }
+      } catch (error: any) {
+        if (error.code === "23505") {
+          console.log(`Category ${mapping.name} already exists`);
+        } else {
+          console.error(`Error creating category ${mapping.name}:`, error);
+        }
+      }
+    }
+  }
+
+  /**
+   * Get or create category - ALWAYS returns a valid category ID
+   */
+  private static async getOrCreateCategory(
+    csvId: number,
+    categoryRepo: any,
+  ): Promise<number> {
+    // Check if it's in our hardcoded map
+    let dbId = EtlController.CATEGORY_MAP.get(csvId);
+
+    if (dbId) {
+      const exists = await categoryRepo.findOne({ where: { id: dbId } });
+      if (exists) return dbId;
+    }
+
+    // Look for it by name
+    const dynamicDeCat = `C${csvId}`.substring(0, 5);
+    let category = await categoryRepo.findOne({
+      where: { de_cat: dynamicDeCat },
+    });
+
+    if (!category) {
+      console.log(`Creating missing category for CSV ID: ${csvId}`);
+      category = categoryRepo.create({
+        de_cat: dynamicDeCat,
+        name: `Imported ${csvId}`,
+        is_ignored_value: "N",
+      });
+      category = await categoryRepo.save(category);
+    }
+
+    // Cache it
+    EtlController.CATEGORY_MAP.set(csvId, category.id);
+    return category.id;
+  }
+
+  /**
+   * Parse German date format - STRICT: returns null if invalid, never uses current date
+   */
+  private static parseGermanDateStrict(dateStr: string): string | null {
     if (!dateStr || dateStr.trim() === "") return null;
 
     try {
       let cleaned = dateStr.trim().replace(/\s+/g, " ");
 
+      // Replace German months with numbers
       for (const [de, num] of Object.entries(EtlController.MONTH_MAP)) {
         cleaned = cleaned.replace(new RegExp(de, "g"), num);
       }
 
       const date = new Date(cleaned);
-      return isNaN(date.getTime()) ? null : date;
-    } catch {
+      if (isNaN(date.getTime())) {
+        console.warn(`Invalid date format: "${dateStr}"`);
+        return null;
+      }
+      return date.toISOString();
+    } catch (error) {
+      console.warn(`Error parsing date: "${dateStr}"`);
       return null;
     }
   }
 
   /**
-   * Read CSV file
+   * Helper: Read CSV file
    */
-  private static readCsv(filePath: string, filename: string): Promise<any[]> {
+  private static readCsv(filePath: string): Promise<any[]> {
     return new Promise((resolve) => {
       const records: any[] = [];
 
       if (!fs.existsSync(filePath)) {
-        console.log(`   ⚠️ File not found: ${filename}`);
+        console.log(`File not found: ${path.basename(filePath)}`);
         return resolve([]);
       }
 
@@ -507,67 +492,31 @@ export class EtlController {
             relax_column_count: true,
             skip_empty_lines: true,
             trim: true,
-            skip_records_with_error: true,
           }),
         )
-        .on("data", (data) => records.push(data))
+        .on("data", (data: any) => records.push(data))
         .on("end", () => {
-          console.log(`   📄 Read ${records.length} rows from ${filename}`);
+          console.log(
+            `Loaded ${records.length} rows from ${path.basename(filePath)}`,
+          );
           resolve(records);
         })
-        .on("error", (err) => {
-          console.error(`   ❌ Error reading ${filename}:`, err.message);
+        .on("error", (err: any) => {
+          console.error(`Error reading CSV: ${path.basename(filePath)}`, err);
           resolve([]);
         });
     });
   }
 
-  /**
-   * Print final summary
-   */
-  private static printSummary(summary: ETLSummary): void {
-    console.log("\n" + "=".repeat(70));
-    console.log("📊 FINAL ETL SUMMARY");
-    console.log("=".repeat(70));
-    console.log(`Duration: ${(summary.duration / 1000).toFixed(2)} seconds`);
-
-    console.log(`\n📁 Categories:`);
-    console.log(`   Created: ${summary.categories.created}`);
-    console.log(`   Existing: ${summary.categories.existing}`);
-    console.log(`   Failed: ${summary.categories.failed}`);
-
-    console.log(`\n📦 Orders:`);
-    console.log(`   Total: ${summary.orders.total}`);
-    console.log(`   Created: ${summary.orders.created}`);
-    console.log(`   Updated: ${summary.orders.updated}`);
-    console.log(`   Failed: ${summary.orders.failed}`);
-
-    console.log(`\n📋 Order Items:`);
-    console.log(`   Total: ${summary.items.total}`);
-    console.log(`   Created: ${summary.items.created}`);
-    console.log(`   Updated: ${summary.items.updated}`);
-    console.log(`   Failed: ${summary.items.failed}`);
-
-    if (summary.errors.length > 0) {
-      console.log(`\n⚠️ Errors (${summary.errors.length}):`);
-      summary.errors.slice(0, 10).forEach((err, idx) => {
-        console.log(`   ${idx + 1}. ${err.type}: ${err.message}`);
-      });
-    }
-    console.log("=".repeat(70));
-  }
-
-  /**
-   * Placeholder Methods
-   */
+  // Placeholder methods
   public static async whareHouseSync(req: Request, res: Response) {
     res.status(200).json({
       success: true,
-      message: "Warehouse sync completed (placeholder)",
+      message: "Warehouse sync not implemented",
     });
   }
 
   public static async synchIDs() {
-    console.log("ID Synchronization cycle started.");
+    console.log("synchIDs called - not implemented");
   }
 }
