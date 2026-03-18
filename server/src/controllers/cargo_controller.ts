@@ -6,108 +6,149 @@ import { Order } from "../models/orders";
 import { OrderItem } from "../models/order_items";
 import { Invoice, InvoiceItem } from "../models/invoice";
 import { Customer } from "../models/customers";
-import { Like } from "typeorm";
+import { Like, IsNull, In } from "typeorm";
 
-const generateInvoicesForOrders = async (orderIds: number[]) => {
-    if (!orderIds || orderIds.length === 0) return;
+export const generateInvoicesForOrders = async (orderIds: number[], cargoIds: number[] = []) => {
     try {
         const orderRepo = AppDataSource.getRepository(Order);
         const orderItemRepo = AppDataSource.getRepository(OrderItem);
         const invoiceRepo = AppDataSource.getRepository(Invoice);
         const invoiceItemRepo = AppDataSource.getRepository(InvoiceItem);
         const customerRepo = AppDataSource.getRepository(Customer);
+        const cargoRepo = AppDataSource.getRepository(Cargo);
 
-        for (const orderId of orderIds) {
-            const order = await orderRepo.findOne({ where: { id: orderId } });
-            if (!order) {
-                console.warn(`[Invoice] Order ${orderId} not found, skipping.`);
-                continue;
-            }
+        const cargoNumbers = new Set<string>();
+        const orderNumbers = new Set<string>();
 
-            const existingInvoice = await invoiceRepo.findOne({ where: { orderNumber: order.order_no } });
-            if (existingInvoice) {
-                await invoiceItemRepo.delete({ invoice: { id: existingInvoice.id } });
-                await invoiceRepo.remove(existingInvoice);
-            }
-            let customer = null;
-            if (order.customer_id) {
-                customer = await customerRepo.findOne({ where: { id: order.customer_id as string } });
-                if (!customer) {
-                    console.warn(`[Invoice] customer_id=${order.customer_id} not found in DB for order ${order.order_no}, proceeding without customer.`);
-                }
-            } else {
-                console.info(`[Invoice] Order ${order.order_no} has no customer_id (ETL order), creating invoice without customer.`);
-            }
-
-            const orderItems = await orderItemRepo.find({
-                where: { order_id: order.id },
-                relations: ["item", "item.taric"]
-            });
-
-            if (orderItems.length === 0) {
-                console.warn(`[Invoice] Order ${order.order_no} has no items, skipping.`);
-                continue;
-            }
-
-            let netTotal = 0;
-            let taxAmount = 0;
-            let grossTotal = 0;
-
-            const invoice = invoiceRepo.create({
-                invoiceNumber: `INV-${Date.now().toString().slice(-6)}-${order.id}`,
-                orderNumber: order.order_no,
-                invoiceDate: new Date(),
-                deliveryDate: order.date_delivery ? new Date(order.date_delivery) : new Date(),
-                netTotal: 0,
-                taxAmount: 0,
-                grossTotal: 0,
-                paidAmount: 0,
-                outstandingAmount: 0,
-                paymentMethod: "Bank Transfer",
-                shippingMethod: "Standard",
-                ...(customer ? { customer } : {}),
-                status: "draft",
-            });
-            const savedInvoice = await invoiceRepo.save(invoice);
-
-            const invoiceItemEntities: InvoiceItem[] = [];
-            for (const oi of orderItems) {
-                const quantity = oi.qty || 1;
-                const unitPrice = oi.price || oi.rmb_special_price || 0;
-                const netPrice = quantity * unitPrice;
-                const itemTaxRate = oi.item?.taric?.duty_rate ? Number(oi.item.taric.duty_rate) : 19;
-                const itemTax = (netPrice * itemTaxRate) / 100;
-                const grossPrice = netPrice + itemTax;
-                netTotal += netPrice;
-                taxAmount += itemTax;
-                grossTotal += grossPrice;
-
-                const invItem = invoiceItemRepo.create({
-                    quantity,
-                    articleNumber: oi.item?.ean?.toString() || oi.item?.model || oi.item?.ItemID_DE?.toString() || "Unknown",
-                    description: oi.item?.item_name || "Unknown Item",
-                    unitPrice,
-                    netPrice,
-                    taxRate: itemTaxRate,
-                    taxAmount: itemTax,
-                    grossPrice,
-                    invoice: savedInvoice,
-                });
-                invoiceItemEntities.push(invItem);
-            }
-            await invoiceItemRepo.save(invoiceItemEntities);
-
-            savedInvoice.netTotal = netTotal;
-            savedInvoice.taxAmount = taxAmount;
-            savedInvoice.grossTotal = grossTotal;
-            savedInvoice.outstandingAmount = grossTotal;
-            await invoiceRepo.save(savedInvoice);
-
-            console.log(`[Invoice] Created invoice ${savedInvoice.invoiceNumber} for order ${order.order_no}${customer ? '' : ' (no customer)'}`);
+        if (cargoIds.length > 0) {
+            const cargos = await cargoRepo.find({ where: { id: In(cargoIds) } });
+            cargos.forEach(c => c.cargo_no && cargoNumbers.add(c.cargo_no));
         }
+
+        if (orderIds.length > 0) {
+            const orders = await orderRepo.find({
+                where: { id: In(orderIds) },
+                relations: ["orderItems", "orderItems.cargo"]
+            });
+            for (const order of orders) {
+                orderNumbers.add(order.order_no);
+                if (order.orderItems) {
+                    for (const oi of order.orderItems) {
+                        if (oi.cargo_id && oi.cargo?.cargo_no) {
+                            cargoNumbers.add(oi.cargo.cargo_no);
+                        }
+                    }
+                }
+            }
+        }
+
+        for (const cargoNo of Array.from(cargoNumbers)) {
+            const cargo = await cargoRepo.findOne({ where: { cargo_no: cargoNo }, relations: ["customer"] });
+            if (!cargo) continue;
+
+            const items = await orderItemRepo.find({
+                where: { cargo_id: cargo.id },
+                relations: ["item", "item.taric", "order"]
+            });
+
+            await syncInvoiceRecord(cargoNo, items, cargo.customer || null, invoiceRepo, invoiceItemRepo, customerRepo);
+        }
+
+        for (const orderNo of Array.from(orderNumbers)) {
+            const items = await orderItemRepo.find({
+                where: {
+                    order: { order_no: orderNo },
+                    cargo_id: IsNull()
+                },
+                relations: ["item", "item.taric", "order"]
+            });
+
+            const order = await orderRepo.findOne({ where: { order_no: orderNo }, relations: ["customer"] });
+            if (!order) continue;
+
+            await syncInvoiceRecord(orderNo, items, order.customer || null, invoiceRepo, invoiceItemRepo, customerRepo);
+        }
+
     } catch (e) {
-        console.error("Failed to generate invoices for orders", e);
+        console.error("Failed to sync invoices", e);
     }
+};
+
+const syncInvoiceRecord = async (
+    orderNumber: string,
+    items: OrderItem[],
+    customer: Customer | null,
+    invoiceRepo: any,
+    invoiceItemRepo: any,
+    customerRepo: any
+) => {
+    let invoice = await invoiceRepo.findOne({ where: { orderNumber }, relations: ["items"] });
+
+    if (!invoice && items.length === 0) return;
+
+    if (invoice) {
+        await invoiceItemRepo.delete({ invoice: { id: invoice.id } });
+    } else {
+        invoice = invoiceRepo.create({
+            invoiceNumber: `INV-${orderNumber.startsWith("MA") ? orderNumber : "C-" + orderNumber}-${Date.now().toString().slice(-4)}`,
+            orderNumber: orderNumber,
+            invoiceDate: new Date(),
+            deliveryDate: new Date(),
+            status: "draft",
+            customer,
+            netTotal: 0,
+            taxAmount: 0,
+            grossTotal: 0,
+            paidAmount: 0,
+            outstandingAmount: 0,
+            paymentMethod: "Bank Transfer",
+            shippingMethod: "Cargo",
+        });
+        await invoiceRepo.save(invoice);
+    }
+
+    let netTotal = 0;
+    let taxAmount = 0;
+    let grossTotal = 0;
+    const invoiceItems: InvoiceItem[] = [];
+
+    for (const oi of items) {
+        const quantity = oi.qty || 1;
+        const unitPrice = oi.price || oi.rmb_special_price || 0;
+        const netPrice = quantity * unitPrice;
+        const itemTaxRate = oi.item?.taric?.duty_rate ? Number(oi.item.taric.duty_rate) : 19;
+        const itemTax = (netPrice * itemTaxRate) / 100;
+        const total = netPrice + itemTax;
+
+        netTotal += netPrice;
+        taxAmount += itemTax;
+        grossTotal += total;
+
+        invoiceItems.push(invoiceItemRepo.create({
+            quantity,
+            articleNumber: oi.item?.ean?.toString() || oi.item?.model || "Unknown",
+            description: oi.item?.item_name || "Unknown Item",
+            unitPrice,
+            netPrice,
+            taxRate: itemTaxRate,
+            taxAmount: itemTax,
+            grossPrice: total,
+            invoice,
+        }));
+    }
+
+    if (invoiceItems.length > 0) {
+        await invoiceItemRepo.save(invoiceItems);
+    }
+
+    invoice.netTotal = netTotal;
+    invoice.taxAmount = taxAmount;
+    invoice.grossTotal = grossTotal;
+    invoice.outstandingAmount = Math.max(0, grossTotal - (invoice.paidAmount || 0));
+    invoice.updatedAt = new Date();
+    if (customer) invoice.customer = customer;
+
+    await invoiceRepo.save(invoice);
 };
 
 export const getAllCargos = async (req: Request, res: Response, next: NextFunction) => {
@@ -348,7 +389,6 @@ export const assignOrdersToCargo = async (req: Request, res: Response, next: Nex
         const orderRepo = AppDataSource.getRepository(Order);
 
         if (validOrderIds.length > 0) {
-            // Update OrderItems
             await orderItemRepo
                 .createQueryBuilder()
                 .update(OrderItem)
@@ -356,7 +396,6 @@ export const assignOrdersToCargo = async (req: Request, res: Response, next: Nex
                 .where("order_id IN (:...validOrderIds)", { validOrderIds })
                 .execute();
 
-            // Also update Orders
             await orderRepo
                 .createQueryBuilder()
                 .update(Order)
