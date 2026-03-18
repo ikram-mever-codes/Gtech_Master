@@ -13,6 +13,7 @@ import { WarehouseItem } from "../models/warehouse_items";
 import { Invoice } from "../models/invoice";
 import { Cargo } from "../models/cargos";
 import { Customer } from "../models/customers";
+import { generateInvoicesForOrders } from "./cargo_controller";
 
 const padorder_no = (n: number) => `MA${String(n).padStart(4, "0")}`;
 
@@ -793,38 +794,11 @@ export const updateOrderItemStatus = async (
     orderItem.updated_at = new Date();
     await orderItemsRepo.save(orderItem);
 
-    if (newCargoId && String(newCargoId) !== String(oldCargoId)) {
-      const cargoRepo = AppDataSource.getRepository(Cargo);
-      const invoiceRepo = AppDataSource.getRepository(Invoice);
-      const targetCargo = await cargoRepo.findOne({ where: { id: Number(newCargoId) } });
+    const cargoIdsToRefresh: number[] = [];
+    if (oldCargoId) cargoIdsToRefresh.push(Number(oldCargoId));
+    if (newCargoId) cargoIdsToRefresh.push(Number(newCargoId));
 
-      if (targetCargo && targetCargo.cargo_no) {
-        const existingInvoice = await invoiceRepo.findOne({ where: { orderNumber: targetCargo.cargo_no } });
-        if (!existingInvoice) {
-          const customerRepo = AppDataSource.getRepository(Customer);
-          const customer = await customerRepo.findOne({ where: { id: orderItem.order.customer_id as any } });
-
-          if (customer) {
-            const newInvoice = invoiceRepo.create({
-              invoiceNumber: `INV-${targetCargo.cargo_no}-${Date.now().toString().slice(-4)}`,
-              orderNumber: targetCargo.cargo_no,
-              invoiceDate: new Date().toISOString().split('T')[0],
-              deliveryDate: new Date().toISOString().split('T')[0],
-              status: "draft",
-              customer: customer,
-              netTotal: 0,
-              taxAmount: 0,
-              grossTotal: 0,
-              paidAmount: 0,
-              outstandingAmount: 0,
-              paymentMethod: "Bank Transfer",
-              shippingMethod: "Sea",
-            });
-            await invoiceRepo.save(newInvoice);
-          }
-        }
-      }
-    }
+    await generateInvoicesForOrders([Number(orderItem.order_id)], cargoIdsToRefresh);
 
     return res.status(200).json({
       success: true,
@@ -893,40 +867,13 @@ export const splitOrderItem = async (
     await orderItemsRepo.save(orderItem);
     await orderItemsRepo.save(newItem);
 
-    if (targetCargoId && targetCargoId !== orderItem.cargo_id) {
-      const cargoRepo = queryRunner.manager.getRepository(Cargo);
-      const invoiceRepo = queryRunner.manager.getRepository(Invoice);
-      const targetCargo = await cargoRepo.findOne({ where: { id: targetCargoId } });
-
-      if (targetCargo && targetCargo.cargo_no) {
-        const existingInvoice = await invoiceRepo.findOne({ where: { orderNumber: targetCargo.cargo_no } });
-        if (!existingInvoice) {
-          const customerRepo = queryRunner.manager.getRepository(Customer);
-          const customer = await customerRepo.findOne({ where: { id: orderItem.order.customer_id as any } });
-
-          if (customer) {
-            const newInvoice = invoiceRepo.create({
-              invoiceNumber: `INV-${targetCargo.cargo_no}-${Date.now().toString().slice(-4)}`,
-              orderNumber: targetCargo.cargo_no,
-              invoiceDate: new Date().toISOString().split('T')[0],
-              deliveryDate: new Date().toISOString().split('T')[0],
-              status: "draft",
-              customer: customer,
-              netTotal: 0,
-              taxAmount: 0,
-              grossTotal: 0,
-              paidAmount: 0,
-              outstandingAmount: 0,
-              paymentMethod: "Bank Transfer",
-              shippingMethod: "Sea",
-            });
-            await invoiceRepo.save(newInvoice);
-          }
-        }
-      }
-    }
-
     await queryRunner.commitTransaction();
+
+    const cargoIdsToRefresh: number[] = [];
+    if (orderItem.cargo_id) cargoIdsToRefresh.push(Number(orderItem.cargo_id));
+    if (targetCargoId) cargoIdsToRefresh.push(Number(targetCargoId));
+
+    await generateInvoicesForOrders([Number(orderItem.order_id)], cargoIdsToRefresh);
 
     return res.status(200).json({
       success: true,
@@ -969,6 +916,10 @@ export const updateOrderItemPrice = async (
     orderItem.eur_special_price = Number(eur_special_price);
     orderItem.updated_at = new Date();
     await orderItemsRepo.save(orderItem);
+
+    if (orderItem.order_id) {
+      await generateInvoicesForOrders([Number(orderItem.order_id)], orderItem.cargo_id ? [Number(orderItem.cargo_id)] : []);
+    }
 
     return res.status(200).json({
       success: true,
