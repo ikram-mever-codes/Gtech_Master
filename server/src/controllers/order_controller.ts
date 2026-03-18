@@ -155,12 +155,12 @@ export const createOrder = async (
   } catch (error) {
     try {
       await queryRunner.rollbackTransaction();
-    } catch { }
+    } catch {}
     return next(error);
   } finally {
     try {
       await queryRunner.release();
-    } catch { }
+    } catch {}
   }
 };
 
@@ -315,12 +315,12 @@ export const updateOrder = async (
   } catch (error) {
     try {
       await queryRunner.rollbackTransaction();
-    } catch { }
+    } catch {}
     return next(error);
   } finally {
     try {
       await queryRunner.release();
-    } catch { }
+    } catch {}
   }
 };
 
@@ -391,7 +391,9 @@ export const getAllOrders = async (
     const itemRepo = AppDataSource.getRepository(Item);
     const fallbackItems = await itemRepo.find({
       where: {
-        ItemID_DE: In(itemIdDEs.filter((id) => id !== undefined && id !== null) as number[]),
+        ItemID_DE: In(
+          itemIdDEs.filter((id) => id !== undefined && id !== null) as number[],
+        ),
       },
       relations: ["supplier", "taric"],
     });
@@ -413,7 +415,7 @@ export const getAllOrders = async (
       items: (order.orderItems || []).map((oi) => {
         const itemDetails =
           oi.item || (oi.ItemID_DE ? itemByDE.get(oi.ItemID_DE) : null);
-
+        console.log(itemDetails);
         let warehouseItem = null;
         if (oi.item_id) {
           warehouseItem = warehouseByItemId.get(oi.item_id);
@@ -456,20 +458,20 @@ export const getAllOrders = async (
           item: itemDetails,
           warehouse_data: warehouseItem
             ? {
-              id: warehouseItem.id,
-              item_no_de: warehouseItem.item_no_de,
-              item_name_de: warehouseItem.item_name_de,
-              item_name_en: warehouseItem.item_name_en,
-              stock_qty: warehouseItem.stock_qty,
-              msq: warehouseItem.msq,
-              buffer: warehouseItem.buffer,
-              is_stock_item: warehouseItem.is_stock_item,
-              is_SnSI: warehouseItem.is_SnSI,
-              ship_class: warehouseItem.ship_class,
-              is_active: warehouseItem.is_active,
-              is_no_auto_order: warehouseItem.is_no_auto_order,
-              category_id: warehouseItem.category_id,
-            }
+                id: warehouseItem.id,
+                item_no_de: warehouseItem.item_no_de,
+                item_name_de: warehouseItem.item_name_de,
+                item_name_en: warehouseItem.item_name_en,
+                stock_qty: warehouseItem.stock_qty,
+                msq: warehouseItem.msq,
+                buffer: warehouseItem.buffer,
+                is_stock_item: warehouseItem.is_stock_item,
+                is_SnSI: warehouseItem.is_SnSI,
+                ship_class: warehouseItem.ship_class,
+                is_active: warehouseItem.is_active,
+                is_no_auto_order: warehouseItem.is_no_auto_order,
+                category_id: warehouseItem.category_id,
+              }
             : null,
         };
       }),
@@ -531,34 +533,38 @@ export const getOrderById = async (
       comment: order.comment,
       created_at: order.created_at,
       updated_at: order.updated_at,
-      items: await Promise.all((order.orderItems || []).map(async (oi: any) => {
-        let item = oi.item;
-        if (!item && oi.ItemID_DE) {
-          item = await AppDataSource.getRepository(Item).findOne({
-            where: { ItemID_DE: oi.ItemID_DE },
-            relations: ["taric"],
-          });
-        }
-        return {
-          id: oi.id,
-          order_id: oi.order_id,
-          item_id: oi.item_id || item?.id,
-          ItemID_DE: oi.ItemID_DE,
-          qty: oi.qty,
-          qty_delivered: oi.qty_delivered,
-          qty_label: oi.qty_label,
-          remark_de: oi.remark_de,
-          remarks_cn: oi.remarks_cn,
-          status: oi.status,
-          price: item?.price || oi.price,
-          currency: item?.currency || oi.currency || "CNY",
-          ean: item?.ean || oi.ean,
-          taric_id: oi.taric_id || item?.taric_id,
-          taric_code: oi.set_taric_code || item?.taric?.code || "-",
-          itemName: item?.item_name || (oi.ItemID_DE ? `Unknown (DE: ${oi.ItemID_DE})` : "Unknown"),
-          item: item,
-        };
-      })),
+      items: await Promise.all(
+        (order.orderItems || []).map(async (oi: any) => {
+          let item = oi.item;
+          if (!item && oi.ItemID_DE) {
+            item = await AppDataSource.getRepository(Item).findOne({
+              where: { ItemID_DE: oi.ItemID_DE },
+              relations: ["taric"],
+            });
+          }
+          return {
+            id: oi.id,
+            order_id: oi.order_id,
+            item_id: oi.item_id || item?.id,
+            ItemID_DE: oi.ItemID_DE,
+            qty: oi.qty,
+            qty_delivered: oi.qty_delivered,
+            qty_label: oi.qty_label,
+            remark_de: oi.remark_de,
+            remarks_cn: oi.remarks_cn,
+            status: oi.status,
+            price: item?.price || oi.price,
+            currency: item?.currency || oi.currency || "CNY",
+            ean: item?.ean || oi.ean,
+            taric_id: oi.taric_id || item?.taric_id,
+            taric_code: oi.set_taric_code || item?.taric?.code || "-",
+            itemName:
+              item?.item_name ||
+              (oi.ItemID_DE ? `Unknown (DE: ${oi.ItemID_DE})` : "Unknown"),
+            item: item,
+          };
+        }),
+      ),
     };
 
     console.log(
@@ -616,12 +622,12 @@ export const deleteOrder = async (
   } catch (error) {
     try {
       await queryRunner.rollbackTransaction();
-    } catch { }
+    } catch {}
     return next(error);
   } finally {
     try {
       await queryRunner.release();
-    } catch { }
+    } catch {}
   }
 };
 export const generateLabelPDF = async (
@@ -653,18 +659,17 @@ export const generateLabelPDF = async (
     const k2 = path.join(__dirname, "../../public/k2.png");
     let logoPath = logo;
 
+    // Logo Selection Logic
     if (
-      (item.item.item_name && item?.item?.item_name.includes("K011111")) ||
+      (item.item?.item_name && item.item.item_name.includes("K011111")) ||
       item.remarks_cn?.includes("K011111")
     ) {
       logoPath = k1;
     } else if (
-      (item.item.item_name && item?.item?.item_name.includes("K022222")) ||
+      (item.item?.item_name && item.item.item_name.includes("K022222")) ||
       item.remarks_cn?.includes("K022222")
     ) {
       logoPath = k2;
-    } else {
-      logoPath = logo;
     }
 
     res.setHeader("Content-Type", "application/pdf");
@@ -674,6 +679,7 @@ export const generateLabelPDF = async (
     );
     doc.pipe(res);
 
+    // --- Layout Constants ---
     const colA = 12;
     const valColA = 16;
     const colB = 85;
@@ -683,6 +689,7 @@ export const generateLabelPDF = async (
     const row1LabelY = 10;
     const row1ValueY = 22;
 
+    // 1. TOP ROW: Labels
     doc.fillColor("black").font("Helvetica-Oblique").fontSize(6.5);
     doc.text("ItemNoW", colA, row1LabelY);
     doc.text("Order No / Qty", colB, row1LabelY);
@@ -690,25 +697,41 @@ export const generateLabelPDF = async (
 
     doc.font("Helvetica-Bold").fontSize(10);
 
-    const itemNoDE = warehouseItem?.item_no_de || "N/A";
-    doc.text(itemNoDE, valColA, row1ValueY);
+    /**
+     * ITEM NO DE TRUNCATION
+     * If length > 10, take first 10 chars and add "..."
+     */
+    let itemNoDE = warehouseItem?.item_no_de || "N/A";
+    if (itemNoDE.length > 10) {
+      itemNoDE = itemNoDE.substring(0, 10) + "...";
+    }
+
+    // We still keep the width safety to prevent any overlap
+    doc.text(itemNoDE, valColA, row1ValueY, {
+      width: 68,
+      lineBreak: false,
+    });
 
     const orderNo = order?.order_no || "N/A";
     doc.text(orderNo, colB, row1ValueY);
 
     doc.text(`${item.qty_label || 0}`, colD, row1ValueY);
+
+    // 3. SECTION C: Split Qty
     const orderNoWidth = doc.widthOfString(orderNo);
     doc
       .font("Helvetica")
       .fontSize(9)
       .text(`/${item.qty}`, colB + orderNoWidth + 2, row1ValueY + 4);
 
+    // 4. LOGO: Repositioned lower to Y:14 (centered between label and value)
     try {
-      doc.image(logoPath, colLogo, 8, { width: 40 });
+      doc.image(logoPath, colLogo, 14, { width: 40 });
     } catch (e) {
       console.error("Logo missing at path:", logoPath);
     }
 
+    // 5. SECTION E: Description
     doc.font("Helvetica").fontSize(8).fillColor("#222222");
     const description = item.item?.item_name || "No description available";
     doc.text(description, valColA, 42, {
@@ -717,6 +740,7 @@ export const generateLabelPDF = async (
       lineBreak: true,
     });
 
+    // 6. SECTION F & G: Remarks
     const bottomSectionY = 68;
 
     doc
@@ -737,22 +761,25 @@ export const generateLabelPDF = async (
       .fontSize(8)
       .text(item.remark_de || "/", valColA, bottomSectionY + 30);
 
+    // 7. BARCODE
     const barcodeValue = warehouseItem?.ean?.toString() || "";
-    try {
-      const barcodeBuffer = await bwipjs.toBuffer({
-        bcid: "code128",
-        text: barcodeValue,
-        scale: 2,
-        height: 10,
-        includetext: true,
-        textsize: 10,
-        textgaps: 4,
-        textxalign: "center",
-      });
+    if (barcodeValue) {
+      try {
+        const barcodeBuffer = await bwipjs.toBuffer({
+          bcid: "code128",
+          text: barcodeValue,
+          scale: 2,
+          height: 10,
+          includetext: true,
+          textsize: 10,
+          textgaps: 4,
+          textxalign: "center",
+        });
 
-      doc.image(barcodeBuffer, 145, 62, { width: 100 });
-    } catch (barcodeErr) {
-      console.error("Barcode generation failed:", barcodeErr);
+        doc.image(barcodeBuffer, 145, 62, { width: 100 });
+      } catch (barcodeErr) {
+        console.error("Barcode generation failed:", barcodeErr);
+      }
     }
 
     doc.end();
@@ -760,6 +787,7 @@ export const generateLabelPDF = async (
     return next(error);
   }
 };
+
 export const updateOrderItemStatus = async (
   req: Request,
   res: Response,
@@ -796,20 +824,26 @@ export const updateOrderItemStatus = async (
     if (newCargoId && String(newCargoId) !== String(oldCargoId)) {
       const cargoRepo = AppDataSource.getRepository(Cargo);
       const invoiceRepo = AppDataSource.getRepository(Invoice);
-      const targetCargo = await cargoRepo.findOne({ where: { id: Number(newCargoId) } });
+      const targetCargo = await cargoRepo.findOne({
+        where: { id: Number(newCargoId) },
+      });
 
       if (targetCargo && targetCargo.cargo_no) {
-        const existingInvoice = await invoiceRepo.findOne({ where: { orderNumber: targetCargo.cargo_no } });
+        const existingInvoice = await invoiceRepo.findOne({
+          where: { orderNumber: targetCargo.cargo_no },
+        });
         if (!existingInvoice) {
           const customerRepo = AppDataSource.getRepository(Customer);
-          const customer = await customerRepo.findOne({ where: { id: orderItem.order.customer_id as any } });
+          const customer = await customerRepo.findOne({
+            where: { id: orderItem.order.customer_id as any },
+          });
 
           if (customer) {
             const newInvoice = invoiceRepo.create({
               invoiceNumber: `INV-${targetCargo.cargo_no}-${Date.now().toString().slice(-4)}`,
               orderNumber: targetCargo.cargo_no,
-              invoiceDate: new Date().toISOString().split('T')[0],
-              deliveryDate: new Date().toISOString().split('T')[0],
+              invoiceDate: new Date().toISOString().split("T")[0],
+              deliveryDate: new Date().toISOString().split("T")[0],
               status: "draft",
               customer: customer,
               netTotal: 0,
@@ -896,20 +930,26 @@ export const splitOrderItem = async (
     if (targetCargoId && targetCargoId !== orderItem.cargo_id) {
       const cargoRepo = queryRunner.manager.getRepository(Cargo);
       const invoiceRepo = queryRunner.manager.getRepository(Invoice);
-      const targetCargo = await cargoRepo.findOne({ where: { id: targetCargoId } });
+      const targetCargo = await cargoRepo.findOne({
+        where: { id: targetCargoId },
+      });
 
       if (targetCargo && targetCargo.cargo_no) {
-        const existingInvoice = await invoiceRepo.findOne({ where: { orderNumber: targetCargo.cargo_no } });
+        const existingInvoice = await invoiceRepo.findOne({
+          where: { orderNumber: targetCargo.cargo_no },
+        });
         if (!existingInvoice) {
           const customerRepo = queryRunner.manager.getRepository(Customer);
-          const customer = await customerRepo.findOne({ where: { id: orderItem.order.customer_id as any } });
+          const customer = await customerRepo.findOne({
+            where: { id: orderItem.order.customer_id as any },
+          });
 
           if (customer) {
             const newInvoice = invoiceRepo.create({
               invoiceNumber: `INV-${targetCargo.cargo_no}-${Date.now().toString().slice(-4)}`,
               orderNumber: targetCargo.cargo_no,
-              invoiceDate: new Date().toISOString().split('T')[0],
-              deliveryDate: new Date().toISOString().split('T')[0],
+              invoiceDate: new Date().toISOString().split("T")[0],
+              deliveryDate: new Date().toISOString().split("T")[0],
               status: "draft",
               customer: customer,
               netTotal: 0,
@@ -931,7 +971,7 @@ export const splitOrderItem = async (
     return res.status(200).json({
       success: true,
       message: "Order item split and moved successfully",
-      data: { original: orderItem, split: newItem }
+      data: { original: orderItem, split: newItem },
     });
   } catch (error) {
     if (queryRunner.isTransactionActive) {
@@ -942,7 +982,6 @@ export const splitOrderItem = async (
     await queryRunner.release();
   }
 };
-
 
 export const updateOrderItemPrice = async (
   req: Request,
