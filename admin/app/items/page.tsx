@@ -21,7 +21,7 @@ import {
 import { useRouter } from "next/navigation";
 import CustomButton from "@/components/UI/CustomButton";
 import PageHeader from "@/components/UI/PageHeader";
-import { EditIcon, EyeIcon, Plus, Package, LinkIcon } from "lucide-react";
+import { EditIcon, EyeIcon, Plus, Package, LinkIcon, Hash } from "lucide-react";
 import { Delete, Sync } from "@mui/icons-material";
 import { toast } from "react-hot-toast";
 import ReactSelect from "react-select";
@@ -77,6 +77,7 @@ type TabType = "items" | "parents" | "warehouse" | "tarics" | "suppliers";
 
 interface FilterState {
   search: string;
+  eanSearch: string;
   status: string;
   category: string;
   supplier: string;
@@ -124,12 +125,12 @@ const ItemsManagementPage: React.FC = () => {
 
   const [filters, setFilters] = useState<FilterState>({
     search: "",
+    eanSearch: "",
     status: "",
     category: "",
     supplier: "",
     isActive: "",
   });
-
   const [taricFilters, setTaricFilters] = useState<TaricFilterState>({
     search: "",
     code: "",
@@ -754,150 +755,37 @@ const ItemsManagementPage: React.FC = () => {
   const getFilteredData = () => {
     const data = getCurrentData();
 
-    // Log the first few items to see their structure (for debugging)
-    if (activeTab === "items" && data.length > 0) {
-      console.log("=== DATA STRUCTURE DEBUG ===");
-      console.log("Total items in data:", data.length);
-      console.log(
-        "First 3 items structure:",
-        data.slice(0, 3).map((item: any) => ({
-          id: item.id,
-          ean: item.ean,
-          eanType: typeof item.ean,
-          de_no: item.de_no,
-          item_name: item.item_name,
-          item_no_de: item.item_no_de,
-          hasEan: !!item.ean,
-        })),
-      );
-    }
-
     return data.filter((item) => {
-      if (activeTab === "tarics") {
-        const taricItem = item as any;
-        const matchesSearch =
-          !taricFilters.search ||
-          taricItem.code
-            ?.toLowerCase()
-            .includes(taricFilters.search.toLowerCase()) ||
-          taricItem.name_de
-            ?.toLowerCase()
-            .includes(taricFilters.search.toLowerCase()) ||
-          taricItem.name_en
-            ?.toLowerCase()
-            .includes(taricFilters.search.toLowerCase()) ||
-          taricItem.name_cn
-            ?.toLowerCase()
-            .includes(taricFilters.search.toLowerCase());
+      const it = item as any;
 
-        const matchesCode =
-          !taricFilters.code ||
-          taricItem.code
-            ?.toLowerCase()
-            .includes(taricFilters.code.toLowerCase());
-
-        const matchesName =
-          !taricFilters.name ||
-          taricItem.name_de
-            ?.toLowerCase()
-            .includes(taricFilters.name.toLowerCase()) ||
-          taricItem.name_en
-            ?.toLowerCase()
-            .includes(taricFilters.name.toLowerCase()) ||
-          taricItem.name_cn
-            ?.toLowerCase()
-            .includes(taricFilters.name.toLowerCase());
-
-        return matchesSearch && matchesCode && matchesName;
-      } else {
-        const searchLower = filters.search.toLowerCase();
-        let matchesSearch = !filters.search;
-
-        if (filters.search) {
-          if (activeTab === "items") {
-            const it = item as any;
-
-            // Log the item's EAN for specific search term debugging
-            if (
-              filters.search === "4283230835321" ||
-              filters.search.includes("4283")
-            ) {
-              console.log("Checking item for EAN 4283230835321:", {
-                id: it.id,
-                ean: it.ean,
-                eanType: typeof it.ean,
-                eanValue: it.ean?.toString(),
-                eanLength: it.ean?.toString().length,
-                de_no: it.de_no,
-                item_name: it.item_name,
-                item_no_de: it.item_no_de,
-              });
-            }
-
-            // Enhanced EAN search using the utility function
-            const eanMatches = matchesEANSearch(it.ean, filters.search);
-
-            // Search in other fields
-            const textMatches =
-              it.id?.toString().includes(filters.search) ||
-              it.de_no?.toLowerCase().includes(searchLower) ||
-              it.item_name?.toLowerCase().includes(searchLower) ||
-              it.name_en?.toLowerCase().includes(searchLower) ||
-              it.category?.toLowerCase().includes(searchLower) ||
-              it.supplier_name?.toLowerCase().includes(searchLower) ||
-              it.remark?.toLowerCase().includes(searchLower) ||
-              it.model?.toLowerCase().includes(searchLower) ||
-              it.item_no_de?.toLowerCase().includes(searchLower) ||
-              it.item_name_de?.toLowerCase().includes(searchLower);
-
-            matchesSearch = eanMatches || textMatches;
-
-            // Log if this item matches
-            if (
-              matchesSearch &&
-              (filters.search === "4283230835321" ||
-                filters.search.includes("4283"))
-            ) {
-              console.log("✓ Item MATCHED:", {
-                id: it.id,
-                ean: it.ean,
-                name: it.item_name,
-                matchedBy: eanMatches ? "EAN" : "Text",
-              });
-            }
-          } else if (activeTab === "parents") {
-            const p = item as any;
-            matchesSearch =
-              p.id?.toString().includes(filters.search) ||
-              p.de_no?.toLowerCase().includes(searchLower) ||
-              p.name_de?.toLowerCase().includes(searchLower) ||
-              p.name_en?.toLowerCase().includes(searchLower);
-          } else if (activeTab === "warehouse") {
-            const w = item as any;
-            matchesSearch =
-              w.id?.toString().includes(filters.search) ||
-              w.item_no_de?.toLowerCase().includes(searchLower) ||
-              w.item_name_de?.toLowerCase().includes(searchLower) ||
-              w.item_name_en?.toLowerCase().includes(searchLower);
-          } else if (activeTab === "suppliers") {
-            const s = item as any;
-            matchesSearch =
-              s.id?.toString().includes(filters.search) ||
-              s.name?.toLowerCase().includes(searchLower) ||
-              s.company_name?.toLowerCase().includes(searchLower) ||
-              s.contact_person?.toLowerCase().includes(searchLower) ||
-              s.email?.toLowerCase().includes(searchLower);
-          }
-        }
-
-        const matchesActive =
-          !filters.isActive || (item as any).is_active === filters.isActive;
-
-        return matchesSearch && matchesActive;
+      // 1. DEDICATED EAN SEARCH (Fixed Logic)
+      if (activeTab === "items" && filters.eanSearch) {
+        const eanMatches = matchesEANSearch(it.ean, filters.eanSearch);
+        if (!eanMatches) return false;
       }
+
+      // 2. GLOBAL SEARCH (Name, DE No, ID)
+      if (filters.search) {
+        const searchLower = filters.search.toLowerCase();
+        const matchesGlobal =
+          it.id?.toString().includes(searchLower) ||
+          it.de_no?.toLowerCase().includes(searchLower) ||
+          it.item_name?.toLowerCase().includes(searchLower) ||
+          it.item_no_de?.toLowerCase().includes(searchLower) ||
+          it.name_en?.toLowerCase().includes(searchLower) ||
+          matchesEANSearch(it.ean, filters.search); // Also check EAN in global search
+
+        if (!matchesGlobal) return false;
+      }
+
+      // 3. OTHER FILTERS
+      if (filters.isActive && it.is_active !== filters.isActive) return false;
+      if (filters.category && it.cat_id?.toString() !== filters.category)
+        return false;
+
+      return true;
     });
   };
-
   const filteredData = getFilteredData();
 
   const renderTableHeaders = () => {
@@ -1449,6 +1337,7 @@ const ItemsManagementPage: React.FC = () => {
       search: "",
       status: "",
       category: "",
+      eanSearch: "",
       supplier: "",
       isActive: "",
     });
@@ -1607,6 +1496,30 @@ const ItemsManagementPage: React.FC = () => {
 
         {showFilters && (
           <div className="mb-6 bg-gray-50 p-4 rounded-lg">
+            {activeTab === "items" && (
+              <div className="relative">
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1 flex items-center gap-1">
+                  <Hash className="w-3 h-3 text-green-600" /> EAN Search
+                </label>
+                <input
+                  type="text"
+                  placeholder="Scan or type EAN..."
+                  value={filters.eanSearch}
+                  onChange={(e) =>
+                    setFilters({ ...filters, eanSearch: e.target.value })
+                  }
+                  className="w-full px-3 py-2 border-2 border-green-200 rounded-md focus:border-green-500 outline-none text-sm transition-all bg-white"
+                />
+                {filters.eanSearch && (
+                  <button
+                    onClick={() => setFilters({ ...filters, eanSearch: "" })}
+                    className="absolute right-2 top-7 text-gray-400 hover:text-red-500"
+                  >
+                    <XMarkIcon className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            )}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               {activeTab === "tarics" ? (
                 <>
