@@ -1360,12 +1360,12 @@ const InvoiceListPage: React.FC = () => {
                                                       >
                                                         <div className="bg-white/20 p-0.5 rounded"><Package className="w-2.5 h-2.5" /></div> QTY
                                                       </button>
-                                                      <button
+                                                       <button
                                                         onClick={() => {
                                                           setSelectedItem(it);
                                                           setSplitQty(Math.floor(it.qty * 0.5));
                                                           setTargetCargoId("");
-                                                          setSplitRemarks("");
+                                                          setSplitRemarks(it.remarks_cn || "");
                                                           setShowSPModal(true);
                                                         }}
                                                         className="flex items-center gap-1.5 px-2 py-1.5 text-[9px] font-bold bg-[#F15A24] text-white rounded-[4px] hover:bg-[#D9481B] transition shadow-sm uppercase"
@@ -1791,7 +1791,7 @@ const InvoiceListPage: React.FC = () => {
           <CustomModal
             isOpen={showSPModal}
             onClose={() => setShowSPModal(false)}
-            title="Split Item"
+            title="Split Item Position Across Cargos"
           >
             <div className="p-4 space-y-6">
               <div>
@@ -1811,12 +1811,24 @@ const InvoiceListPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">Enter Remarks (Optional)</label>
+                <label className="block text-sm font-bold text-gray-700 mb-2">Target Cargo (Optional)</label>
+                <Select
+                  options={cargos.map(c => ({ value: String(c.id), label: `${c.cargo_no} (${c.cargo_status})` }))}
+                  value={cargos.map(c => ({ value: String(c.id), label: `${c.cargo_no} (${c.cargo_status})` })).find(opt => opt.value === targetCargoId) || null}
+                  onChange={(opt: any) => setTargetCargoId(opt?.value || "")}
+                  placeholder="Select cargo..."
+                  isClearable
+                  className="text-sm shadow-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">Review (CN)</label>
                 <textarea
                   value={splitRemarks}
                   onChange={(e) => setSplitRemarks(e.target.value)}
                   className="w-full border border-gray-300 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-[#10B981] min-h-[100px]"
-                  placeholder="..."
+                  placeholder="Chinese review or split notes..."
                 />
               </div>
 
@@ -1826,7 +1838,7 @@ const InvoiceListPage: React.FC = () => {
                   disabled={splitQty <= 0 || splitQty >= selectedItem.qty}
                   className="w-full sm:w-auto px-10 py-3 bg-[#10B981] text-white rounded-xl font-bold hover:bg-green-700 transition-all shadow-lg active:scale-95 disabled:opacity-50 disabled:active:scale-100"
                 >
-                  Save Split Changes
+                  Split & Move Item Position
                 </button>
               </div>
             </div>

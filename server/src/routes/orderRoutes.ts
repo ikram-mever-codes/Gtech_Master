@@ -10,6 +10,7 @@ import {
   updateOrderItemStatus,
   updateOrderItemPrice,
   splitOrderItem,
+  updateOrderItemLabel,
 } from "../controllers/order_controller";
 import { authenticateUser, authorize } from "../middlewares/authorized";
 import { UserRole } from "../models/users";
@@ -36,5 +37,6 @@ router.put(
   updateOrderItemPrice,
 );
 router.post("/items/:id/split", authorize(UserRole.SALES, UserRole.PURCHASING), splitOrderItem);
+router.put("/items/:id/label", authorize(UserRole.SALES, UserRole.PURCHASING), updateOrderItemLabel);
 
 export default router;

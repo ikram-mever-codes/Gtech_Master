@@ -154,28 +154,44 @@ const syncInvoiceRecord = async (
 export const getAllCargos = async (req: Request, res: Response, next: NextFunction) => {
     try {
         const cargoRepo = AppDataSource.getRepository(Cargo);
-        const { page = 1, limit = 50, search = "" } = req.query as any;
+        const { page = 1, limit = 50, search = "", unassignedOnly = "false" } = req.query as any;
 
         const pageNum = Math.max(1, Number(page));
         const limitNum = Math.max(1, Math.min(100, Number(limit)));
         const skip = (pageNum - 1) * limitNum;
 
-        const whereConditions: any[] = [];
+        const qb = cargoRepo.createQueryBuilder("cargo");
+
         if (search) {
-            whereConditions.push(
-                { cargo_no: Like(`%${search}%`) },
-                { note: Like(`%${search}%`) },
-                { remark: Like(`%${search}%`) },
-                { cargo_status: Like(`%${search}%`) }
-            );
+            qb.where("(cargo.cargo_no LIKE :search OR cargo.note LIKE :search OR cargo.remark LIKE :search OR cargo.cargo_status LIKE :search)", { search: `%${search}%` });
         }
 
-        const [cargos, total] = await cargoRepo.findAndCount({
-            where: whereConditions.length > 0 ? whereConditions : undefined,
-            order: { id: "DESC" },
-            skip,
-            take: limitNum,
-        });
+        if (unassignedOnly === "true") {
+            qb.andWhere(qb => {
+                const subQuery = qb.subQuery()
+                    .select("o.cargo_id")
+                    .from(Order, "o")
+                    .where("o.cargo_id IS NOT NULL")
+                    .getQuery();
+                return "cargo.id NOT IN " + subQuery;
+            });
+
+            // Also check CargoOrder table just in case
+            qb.andWhere(qb => {
+                const subQuery = qb.subQuery()
+                    .select("co.cargo_id")
+                    .from(CargoOrder, "co")
+                    .where("co.cargo_id IS NOT NULL")
+                    .getQuery();
+                return "cargo.id NOT IN " + subQuery;
+            });
+        }
+
+        const [cargos, total] = await qb
+            .orderBy("cargo.id", "DESC")
+            .skip(skip)
+            .take(limitNum)
+            .getManyAndCount();
 
         res.status(200).json({
             success: true,

@@ -4,7 +4,6 @@ import { api, handleApiError } from "../utils/api";
 import { loadingStyles, successStyles } from "@/utils/constants";
 import type { ResponseInterface } from "@/utils/interfaces";
 
-// -------------------- Types (frontend) --------------------
 
 export type OrderItemLine = {
   id?: number;
@@ -184,16 +183,30 @@ export const updateOrderItemPrice = async (itemId: string | number, eurPrice: nu
   }
 };
 
-export const splitOrderItem = async (id: string | number, splitQty: number, targetCargoId?: string | number, remarks?: string) => {
+export const splitOrderItem = async (id: string | number, splitQty: number, targetCargoId?: string | number, remarks_cn?: string) => {
   try {
     toast.loading("Splitting item...", loadingStyles);
-    const response = await api.post(`/orders/items/${id}/split`, { splitQty, targetCargoId, remarks });
+    const response = await api.post(`/orders/items/${id}/split`, { splitQty, targetCargoId, remarks_cn });
     toast.dismiss();
     toast.success("Item split successfully", successStyles);
     return response.data;
   } catch (error) {
     toast.dismiss();
     handleApiError(error, "Split failed");
+    throw error;
+  }
+};
+
+export const updateOrderItemLabel = async (id: string | number, splitQty: number, remarks_cn?: string) => {
+  try {
+    toast.loading("Updating label...", loadingStyles);
+    const response = await api.put(`/orders/items/${id}/label`, { splitQty, remarks_cn });
+    toast.dismiss();
+    toast.success("Label updated successfully", successStyles);
+    return response.data;
+  } catch (error) {
+    toast.dismiss();
+    handleApiError(error, "Update failed");
     throw error;
   }
 };
@@ -220,10 +233,8 @@ export const downloadItemLabel = async (itemId: number | string) => {
       responseType: "blob",
     });
 
-    // Create a blob from the response data
     const file = new Blob([response.data], { type: "application/pdf" });
 
-    // Create a link and trigger click to download/open
     const fileURL = URL.createObjectURL(file);
     const link = document.createElement("a");
     link.href = fileURL;
@@ -231,7 +242,6 @@ export const downloadItemLabel = async (itemId: number | string) => {
     document.body.appendChild(link);
     link.click();
 
-    // Cleanup
     setTimeout(() => {
       document.body.removeChild(link);
       URL.revokeObjectURL(fileURL);

@@ -35,7 +35,7 @@ import {
   updateOrder,
   deleteOrder,
   updateOrderItemStatus,
-  splitOrderItem,
+  updateOrderItemLabel,
   type Order,
   type OrderSearchFilters,
   getOrderStatusColor,
@@ -519,10 +519,10 @@ function OrdersTable({
       render: (row) =>
         row.created_at
           ? new Intl.DateTimeFormat("de-DE", {
-              day: "2-digit",
-              month: "2-digit",
-              year: "numeric",
-            }).format(new Date(row.created_at))
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+          }).format(new Date(row.created_at))
           : "-",
       align: "center",
     },
@@ -532,10 +532,10 @@ function OrdersTable({
       render: (row) =>
         row.date_emailed && row.date_emailed !== "-"
           ? new Intl.DateTimeFormat("de-DE", {
-              day: "2-digit",
-              month: "2-digit",
-              year: "numeric",
-            }).format(new Date(row.date_emailed))
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+          }).format(new Date(row.date_emailed))
           : "-",
       align: "center",
     },
@@ -545,10 +545,10 @@ function OrdersTable({
       render: (row) =>
         row.date_delivery && row.date_delivery !== "-"
           ? new Intl.DateTimeFormat("de-DE", {
-              day: "2-digit",
-              month: "2-digit",
-              year: "numeric",
-            }).format(new Date(row.date_delivery))
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+          }).format(new Date(row.date_delivery))
           : "-",
       align: "center",
     },
@@ -829,6 +829,7 @@ const OrderPage = () => {
   const [showSPModal, setShowSPModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState<any>(null);
   const [splitQty, setSplitQty] = useState<number>(0);
+  const [remarksCN, setRemarksCN] = useState("");
 
   const itemById = useMemo(() => {
     const map = new Map<string, Item>();
@@ -896,10 +897,8 @@ const OrderPage = () => {
       (o.items || []).forEach((it: any) => {
         const searchLower = reprintSearch.toLowerCase();
 
-        // Get item data from various sources
         const itemData = itemById.get(String(it.item_id));
 
-        // Collect all possible EAN sources
         const eanSources = [
           it.item?.ean,
           itemData?.ean,
@@ -907,14 +906,12 @@ const OrderPage = () => {
           it.warehouse_data?.ean,
           it.item?.warehouse_data?.ean,
           o.items?.find((i: any) => i.item_id === it.item_id)?.item?.ean,
-        ].filter(Boolean); // Remove undefined/null values
+        ].filter(Boolean);
 
-        // Check if any EAN matches the search
         const matchesEAN = eanSources.some((ean) =>
           ean?.toString().toLowerCase().includes(searchLower),
         );
 
-        // Other search criteria
         const matchesSearch =
           !reprintSearch ||
           matchesEAN ||
@@ -1137,11 +1134,12 @@ const OrderPage = () => {
   };
 
   const handleSplitItemAction = async () => {
-    if (!selectedItem || splitQty <= 0) return;
+    if (!selectedItem || splitQty < 0) return;
     try {
-      await splitOrderItem(selectedItem.id, splitQty);
-      toast.success("Item split successfully");
+      await updateOrderItemLabel(selectedItem.id, splitQty, remarksCN);
+      toast.success("Quantity updated successfully");
       setShowSPModal(false);
+      setRemarksCN("");
       fetchOrders();
     } catch (err) {
       console.error(err);
@@ -1176,6 +1174,7 @@ const OrderPage = () => {
 
       setShowREModal(false);
       fetchOrders();
+      fetchCargos();
     } catch (err) {
       console.error(err);
       toast.error("Failed to reassign");
@@ -1299,7 +1298,7 @@ const OrderPage = () => {
 
   const fetchCargos = useCallback(async () => {
     try {
-      const res = await getAllCargos();
+      const res = await getAllCargos({ unassignedOnly: "true", limit: 1000 });
       const data = res?.data ?? res;
       setCargos(Array.isArray(data) ? data : data?.cargos || []);
     } catch (e) {
@@ -1799,11 +1798,10 @@ const OrderPage = () => {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`py-3 px-1 border-b-2 font-medium text-sm ${
-                    activeTab === tab.id
-                      ? "border-gray-600 text-gray-900"
-                      : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                  }`}
+                  className={`py-3 px-1 border-b-2 font-medium text-sm ${activeTab === tab.id
+                    ? "border-gray-600 text-gray-900"
+                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                    }`}
                 >
                   {tab.label}
                 </button>
@@ -2367,15 +2365,14 @@ const OrderPage = () => {
                                         <button
                                           onClick={() => {
                                             setSelectedItem(item);
-                                            setSplitQty(
-                                              Math.floor(item.qty / 2),
-                                            );
+                                            setSplitQty(item.qty_label || item.qty);
+                                            setRemarksCN(item.remarks_cn || "");
                                             setShowSPModal(true);
                                           }}
                                           className="bg-orange-600 hover:bg-orange-700 text-white px-2 py-1 rounded text-[9px] font-bold uppercase flex items-center gap-1 shadow-sm transition-all active:scale-95 whitespace-nowrap"
                                         >
                                           <ScissorsIcon className="h-3 w-3" />{" "}
-                                          Split
+                                          Label
                                         </button>
 
                                         <button
@@ -2810,7 +2807,6 @@ const OrderPage = () => {
                             itemById.get(String(row.item_id))?.ean ||
                             "-";
 
-                          // Highlight the EAN if it matches the search
                           const isHighlighted =
                             reprintSearch &&
                             ean !== "-" &&
@@ -3165,13 +3161,12 @@ const OrderPage = () => {
                     width: "120px",
                     render: (row) => (
                       <span
-                        className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                          row.status === "NSO"
-                            ? "bg-amber-100 text-amber-700"
-                            : row.status === "SO"
-                              ? "bg-blue-100 text-blue-700"
-                              : "bg-green-100 text-green-700"
-                        }`}
+                        className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${row.status === "NSO"
+                          ? "bg-amber-100 text-amber-700"
+                          : row.status === "SO"
+                            ? "bg-blue-100 text-blue-700"
+                            : "bg-green-100 text-green-700"
+                          }`}
                       >
                         {row.status || "NSO"}
                       </span>
@@ -3532,23 +3527,34 @@ const OrderPage = () => {
         <CustomModal
           isOpen={showSPModal}
           onClose={() => setShowSPModal(false)}
-          title={`Split Item ${selectedItem.id}`}
+          title={`Update Label Quantity - Item ${selectedItem.id}`}
         >
           <div className="p-4 space-y-4">
             <p className="text-sm text-gray-600">
-              Current Qty: <span className="font-bold">{selectedItem.qty}</span>
+              Original Order Qty: <span className="font-bold">{selectedItem.qty}</span>
             </p>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Split Quantity (amount to move to new row)
+                Label Quantity
               </label>
               <input
                 type="number"
                 value={splitQty}
                 onChange={(e) => setSplitQty(Number(e.target.value))}
-                min={1}
-                max={selectedItem.qty - 1}
+                min={0}
                 className="w-full border border-gray-300 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-orange-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Review (CN)
+              </label>
+              <textarea
+                value={remarksCN}
+                onChange={(e) => setRemarksCN(e.target.value)}
+                rows={2}
+                className="w-full border border-gray-300 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-orange-500"
+                placeholder="Enter Chinese review..."
               />
             </div>
             <div className="flex justify-end gap-2 mt-6">
@@ -3560,10 +3566,10 @@ const OrderPage = () => {
               </button>
               <button
                 onClick={handleSplitItemAction}
-                disabled={splitQty <= 0 || splitQty >= selectedItem.qty}
+                disabled={splitQty < 0}
                 className="px-4 py-2 text-sm bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50"
               >
-                Split Now
+                Update Qty
               </button>
             </div>
           </div>

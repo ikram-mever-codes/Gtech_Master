@@ -52,6 +52,7 @@ export const getAllCargos = async (params?: {
     page?: number;
     limit?: number;
     search?: string;
+    unassignedOnly?: boolean | string;
 }) => {
     try {
         const res = await api.get("/cargos", { params });

@@ -156,12 +156,12 @@ export const createOrder = async (
   } catch (error) {
     try {
       await queryRunner.rollbackTransaction();
-    } catch {}
+    } catch { }
     return next(error);
   } finally {
     try {
       await queryRunner.release();
-    } catch {}
+    } catch { }
   }
 };
 
@@ -316,12 +316,12 @@ export const updateOrder = async (
   } catch (error) {
     try {
       await queryRunner.rollbackTransaction();
-    } catch {}
+    } catch { }
     return next(error);
   } finally {
     try {
       await queryRunner.release();
-    } catch {}
+    } catch { }
   }
 };
 
@@ -345,7 +345,8 @@ export const getAllOrders = async (
       .leftJoinAndSelect("o.cargo", "cargo")
       .leftJoinAndSelect("cargo.customer", "cust")
       .leftJoinAndSelect("o.customer", "orderCust")
-      .orderBy("o.created_at", "DESC")
+      .orderBy("o.date_emailed", "DESC")
+      .addOrderBy("o.created_at", "DESC")
       .addOrderBy("o.id", "DESC")
       .addOrderBy("oi.id", "ASC");
 
@@ -459,20 +460,20 @@ export const getAllOrders = async (
           item: itemDetails,
           warehouse_data: warehouseItem
             ? {
-                id: warehouseItem.id,
-                item_no_de: warehouseItem.item_no_de,
-                item_name_de: warehouseItem.item_name_de,
-                item_name_en: warehouseItem.item_name_en,
-                stock_qty: warehouseItem.stock_qty,
-                msq: warehouseItem.msq,
-                buffer: warehouseItem.buffer,
-                is_stock_item: warehouseItem.is_stock_item,
-                is_SnSI: warehouseItem.is_SnSI,
-                ship_class: warehouseItem.ship_class,
-                is_active: warehouseItem.is_active,
-                is_no_auto_order: warehouseItem.is_no_auto_order,
-                category_id: warehouseItem.category_id,
-              }
+              id: warehouseItem.id,
+              item_no_de: warehouseItem.item_no_de,
+              item_name_de: warehouseItem.item_name_de,
+              item_name_en: warehouseItem.item_name_en,
+              stock_qty: warehouseItem.stock_qty,
+              msq: warehouseItem.msq,
+              buffer: warehouseItem.buffer,
+              is_stock_item: warehouseItem.is_stock_item,
+              is_SnSI: warehouseItem.is_SnSI,
+              ship_class: warehouseItem.ship_class,
+              is_active: warehouseItem.is_active,
+              is_no_auto_order: warehouseItem.is_no_auto_order,
+              category_id: warehouseItem.category_id,
+            }
             : null,
         };
       }),
@@ -623,12 +624,12 @@ export const deleteOrder = async (
   } catch (error) {
     try {
       await queryRunner.rollbackTransaction();
-    } catch {}
+    } catch { }
     return next(error);
   } finally {
     try {
       await queryRunner.release();
-    } catch {}
+    } catch { }
   }
 };
 export const generateLabelPDF = async (
@@ -660,7 +661,6 @@ export const generateLabelPDF = async (
     const k2 = path.join(__dirname, "../../public/k2.png");
     let logoPath = logo;
 
-    // Logo Selection Logic
     if (
       (item.item?.item_name && item.item.item_name.includes("K011111")) ||
       item.remarks_cn?.includes("K011111")
@@ -680,7 +680,6 @@ export const generateLabelPDF = async (
     );
     doc.pipe(res);
 
-    // --- Layout Constants ---
     const colA = 12;
     const valColA = 16;
     const colB = 85;
@@ -690,7 +689,6 @@ export const generateLabelPDF = async (
     const row1LabelY = 10;
     const row1ValueY = 22;
 
-    // 1. TOP ROW: Labels
     doc.fillColor("black").font("Helvetica-Oblique").fontSize(6.5);
     doc.text("ItemNoW", colA, row1LabelY);
     doc.text("Order No / Qty", colB, row1LabelY);
@@ -707,7 +705,6 @@ export const generateLabelPDF = async (
       itemNoDE = itemNoDE.substring(0, 10) + "...";
     }
 
-    // We still keep the width safety to prevent any overlap
     doc.text(itemNoDE, valColA, row1ValueY, {
       width: 68,
       lineBreak: false,
@@ -718,21 +715,18 @@ export const generateLabelPDF = async (
 
     doc.text(`${item.qty_label || 0}`, colD, row1ValueY);
 
-    // 3. SECTION C: Split Qty
     const orderNoWidth = doc.widthOfString(orderNo);
     doc
       .font("Helvetica")
       .fontSize(9)
       .text(`/${item.qty}`, colB + orderNoWidth + 2, row1ValueY + 4);
 
-    // 4. LOGO: Repositioned lower to Y:14 (centered between label and value)
     try {
       doc.image(logoPath, colLogo, 14, { width: 40 });
     } catch (e) {
       console.error("Logo missing at path:", logoPath);
     }
 
-    // 5. SECTION E: Description
     doc.font("Helvetica").fontSize(8).fillColor("#222222");
     const description = item.item?.item_name || "No description available";
     doc.text(description, valColA, 42, {
@@ -741,7 +735,6 @@ export const generateLabelPDF = async (
       lineBreak: true,
     });
 
-    // 6. SECTION F & G: Remarks
     const bottomSectionY = 68;
 
     doc
@@ -762,7 +755,6 @@ export const generateLabelPDF = async (
       .fontSize(8)
       .text(item.remark_de || "/", valColA, bottomSectionY + 30);
 
-    // 7. BARCODE
     const barcodeValue = warehouseItem?.ean?.toString() || "";
     if (barcodeValue) {
       try {
@@ -840,6 +832,43 @@ export const updateOrderItemStatus = async (
     return next(error);
   }
 };
+export const updateOrderItemLabel = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { id } = req.params;
+    const { splitQty, remarks_cn } = req.body;
+
+    const orderItemsRepo = AppDataSource.getRepository(OrderItem);
+    const orderItem = await orderItemsRepo.findOne({
+      where: { id: Number(id) },
+    });
+
+    if (!orderItem) {
+      return next(new ErrorHandler("Order item not found", 404));
+    }
+
+    orderItem.qty_label = Number(splitQty) || 0;
+    if (remarks_cn !== undefined) {
+      orderItem.remarks_cn = remarks_cn;
+    }
+    orderItem.updated_at = new Date();
+
+    await orderItemsRepo.save(orderItem);
+
+    return res.status(200).json({
+      success: true,
+      message: "Label quantity and review updated successfully",
+      data: orderItem,
+    });
+  } catch (error) {
+    console.error("Error in updateOrderItemLabel:", error);
+    return next(error);
+  }
+};
+
 export const splitOrderItem = async (
   req: Request,
   res: Response,
@@ -849,7 +878,7 @@ export const splitOrderItem = async (
 
   try {
     const { id } = req.params;
-    const { splitQty, targetCargoId, remarks } = req.body;
+    const { splitQty, targetCargoId, remarks_cn } = req.body;
 
     if (!splitQty || splitQty <= 0) {
       return next(
@@ -877,17 +906,12 @@ export const splitOrderItem = async (
       );
     }
 
-    if (!orderItem.qty_split) {
-      orderItem.qty_split = orderItem.qty;
-    }
-
     const newItem = orderItemsRepo.create({
       ...orderItem,
       id: undefined,
       qty: splitQty,
       cargo_id: targetCargoId || orderItem.cargo_id,
-      remark_de: remarks || orderItem.remark_de,
-      qty_split: orderItem.qty_split,
+      remarks_cn: remarks_cn || orderItem.remarks_cn,
       created_at: new Date(),
       updated_at: new Date(),
     });
@@ -911,7 +935,7 @@ export const splitOrderItem = async (
 
     return res.status(200).json({
       success: true,
-      message: "Order item split and moved successfully",
+      message: "Order item split successfully",
       data: { original: orderItem, split: newItem },
     });
   } catch (error) {
