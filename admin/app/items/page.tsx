@@ -209,79 +209,41 @@ const ItemsManagementPage: React.FC = () => {
     }
   };
 
-  // Enhanced EAN search utility function with better debugging
-  const matchesEANSearch = (
-    eanValue: string | number | undefined,
-    searchTerm: string,
-  ): boolean => {
+  const matchesEANSearch = (eanValue: any, searchTerm: any) => {
     if (!eanValue || !searchTerm) return false;
 
-    const eanStr = eanValue.toString().trim();
-    const searchStr = searchTerm.trim();
+    // 1. Normalize: Remove EVERYTHING that isn't a digit (handles spaces, dashes, dots)
+    // This also handles if eanValue is passed as a number or scientific notation string
+    const eanDigits = eanValue.toString().replace(/\D/g, "");
+    const searchDigits = searchTerm.toString().replace(/\D/g, "");
 
-    // Log for debugging
-    console.log("=== EAN SEARCH DEBUG ===");
-    console.log("Original EAN from DB:", eanValue, "Type:", typeof eanValue);
-    console.log("EAN as string:", eanStr);
-    console.log("Search term:", searchStr);
-    console.log("Search term length:", searchStr.length);
-    console.log("EAN length:", eanStr.length);
+    // If after cleaning we have nothing, return false
+    if (!eanDigits || !searchDigits) return false;
 
-    // Check if the EAN exactly matches the search (case insensitive)
-    if (eanStr.toLowerCase() === searchStr.toLowerCase()) {
-      console.log("✓ Exact match found");
-      return true;
-    }
+    // 2. Exact Match (The most common paste scenario)
+    if (eanDigits === searchDigits) return true;
 
-    // Check if the EAN includes the search term
-    if (eanStr.toLowerCase().includes(searchStr.toLowerCase())) {
-      console.log("✓ Includes match found");
-      return true;
-    }
+    // 3. Partial Match: Does the EAN contain the search term?
+    // (Good for manual typing)
+    if (eanDigits.includes(searchDigits)) return true;
 
-    // Check if the search term includes the EAN (in case user typed extra characters)
-    if (searchStr.toLowerCase().includes(eanStr.toLowerCase())) {
-      console.log("✓ Reverse includes match found");
-      return true;
-    }
+    // 4. Reverse Match: Does the search term contain the EAN?
+    // (Good if a scanner adds a prefix/suffix)
+    if (searchDigits.includes(eanDigits)) return true;
 
-    // Remove any non-digit characters and compare
-    const eanDigits = eanStr.replace(/\D/g, "");
-    const searchDigits = searchStr.replace(/\D/g, "");
-
-    console.log("EAN digits only:", eanDigits);
-    console.log("Search digits only:", searchDigits);
-
-    if (eanDigits === searchDigits) {
-      console.log("✓ Digit exact match found");
-      return true;
-    }
-
-    if (eanDigits.includes(searchDigits)) {
-      console.log("✓ Digit includes match found");
-      return true;
-    }
-
-    if (searchDigits.includes(eanDigits)) {
-      console.log("✓ Reverse digit includes match found");
-      return true;
-    }
-
-    // Check if it's a partial match at the end (common for EAN searches)
-    if (eanDigits.length >= 4 && searchDigits.length >= 4) {
-      const eanEnd = eanDigits.slice(-searchDigits.length);
-      if (eanEnd === searchDigits) {
-        console.log("✓ End digits match found");
+    // 5. Tail Match: Check if the last X digits match
+    // (Helpful for EAN-13 vs EAN-8 or shorthand)
+    if (searchDigits.length >= 4) {
+      if (
+        eanDigits.endsWith(searchDigits) ||
+        searchDigits.endsWith(eanDigits)
+      ) {
         return true;
       }
     }
 
-    console.log("✗ No match found");
-    console.log("=====================");
-
     return false;
   };
-
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
