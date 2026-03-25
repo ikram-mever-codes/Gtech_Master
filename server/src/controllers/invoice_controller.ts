@@ -608,6 +608,14 @@ export class InvoiceController {
         });
       }
 
+      // Also ensure cargos map to themselves in the orderToCargoMap
+      const allCargos = await AppDataSource.getRepository(Cargo).find();
+      allCargos.forEach((c) => {
+        if (c.cargo_no) {
+          orderToCargoMap.set(c.cargo_no, c);
+        }
+      });
+
       orders.forEach((o) => {
         if (o.cargo && !orderToCargoMap.has(o.order_no)) {
           orderToCargoMap.set(o.order_no, o.cargo);
@@ -624,15 +632,17 @@ export class InvoiceController {
       const orderItemSummaryByCargoId = new Map();
       orderItemsRaw.forEach((row: any) => {
         if (row.order_id) {
+          const current = orderItemSummaryByOrderId.get(row.order_id) || { total_qty: 0, count_items: 0 };
           orderItemSummaryByOrderId.set(row.order_id, {
-            total_qty: Number(row.total_qty),
-            count_items: Number(row.count_items)
+            total_qty: current.total_qty + Number(row.total_qty),
+            count_items: current.count_items + Number(row.count_items)
           });
         }
         if (row.cargo_id) {
+          const current = orderItemSummaryByCargoId.get(row.cargo_id) || { total_qty: 0, count_items: 0 };
           orderItemSummaryByCargoId.set(row.cargo_id, {
-            total_qty: Number(row.total_qty),
-            count_items: Number(row.count_items)
+            total_qty: current.total_qty + Number(row.total_qty),
+            count_items: current.count_items + Number(row.count_items)
           });
         }
       });

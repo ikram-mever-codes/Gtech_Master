@@ -125,9 +125,9 @@ export const deleteCargo = async (id: number) => {
     }
 };
 
-export const assignOrdersToCargo = async (cargoId: number, orderIds: number[]) => {
+export const assignOrdersToCargo = async (cargoId: number, orderIds: number[], isSplitMove: boolean = false) => {
     try {
-        const res = await api.post(`/cargos/${cargoId}/orders`, { orderIds });
+        const res = await api.post(`/cargos/${cargoId}/orders`, { orderIds, isSplitMove });
         const payload = res as any;
         if (payload && typeof payload === "object" && "success" in payload) return payload;
         return { success: true, data: payload };

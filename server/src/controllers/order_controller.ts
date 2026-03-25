@@ -12,6 +12,7 @@ import { stat } from "fs";
 import { WarehouseItem } from "../models/warehouse_items";
 import { Invoice } from "../models/invoice";
 import { Cargo } from "../models/cargos";
+import { CargoOrder } from "../models/cargo_orders";
 import { Customer } from "../models/customers";
 import { generateInvoicesForOrders } from "./cargo_controller";
 
@@ -921,6 +922,21 @@ export const splitOrderItem = async (
 
     await orderItemsRepo.save(orderItem);
     await orderItemsRepo.save(newItem);
+
+    if (targetCargoId) {
+      const cargoOrderRepo = queryRunner.manager.getRepository(CargoOrder);
+      const existingLink = await cargoOrderRepo.findOne({
+        where: { cargo_id: Number(targetCargoId), order_id: Number(orderItem.order_id) },
+      });
+      if (!existingLink) {
+        await cargoOrderRepo.save(
+          cargoOrderRepo.create({
+            cargo_id: Number(targetCargoId),
+            order_id: Number(orderItem.order_id),
+          }),
+        );
+      }
+    }
 
     await queryRunner.commitTransaction();
 
