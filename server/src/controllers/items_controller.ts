@@ -215,21 +215,22 @@ export const getItems = async (
           painPoints: item.painPoints || [],
           taric_code: taricData?.code || null,
           taric_description: taricData?.description_de || null,
+          is_updated: item.is_updated,
 
           // Include warehouse data if needed
           warehouse_data: warehouseData
             ? {
-              id: warehouseData.id,
-              item_no_de: warehouseData.item_no_de,
-              item_name_de: warehouseData.item_name_de,
-              item_name_en: warehouseData.item_name_en,
-              stock_qty: warehouseData.stock_qty,
-              msq: warehouseData.msq,
-              buffer: warehouseData.buffer,
-              is_stock_item: warehouseData.is_stock_item,
-              is_SnSI: warehouseData.is_SnSI,
-              ship_class: warehouseData.ship_class,
-            }
+                id: warehouseData.id,
+                item_no_de: warehouseData.item_no_de,
+                item_name_de: warehouseData.item_name_de,
+                item_name_en: warehouseData.item_name_en,
+                stock_qty: warehouseData.stock_qty,
+                msq: warehouseData.msq,
+                buffer: warehouseData.buffer,
+                is_stock_item: warehouseData.is_stock_item,
+                is_SnSI: warehouseData.is_SnSI,
+                ship_class: warehouseData.ship_class,
+              }
             : null,
 
           created_at: item.created_at,
@@ -353,6 +354,7 @@ export const getItemById = async (
       supplier_name: item.supplier?.company_name || item.supplier?.name || "",
       painPoints: item.painPoints || [],
       isActive: item.isActive === "Y",
+      is_updated: item.is_updated,
 
       parent: {
         noDE: de_no,
@@ -442,23 +444,23 @@ export const getItemById = async (
 
       supplierItem: supplierItem
         ? {
-          priceRMB: supplierItem.price_rmb?.toString() || "0",
-          isPO: supplierItem.is_po || "No",
-          moq: supplierItem.moq?.toString() || "0",
-          interval: supplierItem.oi?.toString() || "0",
-          leadTime: supplierItem.lead_time || "",
-          noteCN: supplierItem.note_cn || "",
-          url: supplierItem.url || "",
-        }
+            priceRMB: supplierItem.price_rmb?.toString() || "0",
+            isPO: supplierItem.is_po || "No",
+            moq: supplierItem.moq?.toString() || "0",
+            interval: supplierItem.oi?.toString() || "0",
+            leadTime: supplierItem.lead_time || "",
+            noteCN: supplierItem.note_cn || "",
+            url: supplierItem.url || "",
+          }
         : {
-          priceRMB: "0",
-          isPO: "No",
-          moq: "0",
-          interval: "0",
-          leadTime: "",
-          noteCN: "",
-          url: "",
-        },
+            priceRMB: "0",
+            isPO: "No",
+            moq: "0",
+            interval: "0",
+            leadTime: "",
+            noteCN: "",
+            url: "",
+          },
 
       nprRemarks: item.npr_remark || "",
     };
@@ -477,6 +479,7 @@ export const getItemById = async (
     return next(error);
   }
 };
+
 export const createItem = async (
   req: Request,
   res: Response,
@@ -582,6 +585,7 @@ export const createItem = async (
       is_eur_special,
       is_rmb_special,
       painPoints,
+      is_updated: false, // New items don't need sync initially
       created_at: new Date(),
       updated_at: new Date(),
     });
@@ -620,6 +624,7 @@ export const createItem = async (
         parent_id: newItem.parent_id,
         supplier_id: newItem.supplier_id,
         isActive: newItem.isActive,
+        is_updated: newItem.is_updated,
       },
     });
   } catch (error) {
@@ -686,20 +691,33 @@ export const updateItem = async (
       "painPoints",
     ];
 
+    let hasChanges = false;
+
     updatableFields.forEach((field) => {
       const value = req.body[field];
       if (value !== undefined) {
+        const currentValue = (item as any)[field];
+        let newValue = value;
+
         if (field === "ean") {
           if (value && value.toString().trim() !== "") {
-            (item as any)[field] = value.toString();
+            newValue = value.toString();
           } else {
-            (item as any)[field] = null;
+            newValue = null;
           }
-        } else {
-          (item as any)[field] = value;
+        }
+
+        if (currentValue !== newValue) {
+          hasChanges = true;
+          (item as any)[field] = newValue;
         }
       }
     });
+
+    // Set is_updated to true if there were changes
+    if (hasChanges) {
+      item.is_updated = true;
+    }
 
     item.updated_at = new Date();
 
@@ -711,21 +729,62 @@ export const updateItem = async (
         where: { item_id: item.id },
       });
       if (supplierItem) {
-        if (supplierItemData.price_rmb !== undefined)
+        let supplierHasChanges = false;
+        if (
+          supplierItemData.price_rmb !== undefined &&
+          supplierItem.price_rmb !== parseFloat(supplierItemData.price_rmb)
+        ) {
           supplierItem.price_rmb = parseFloat(supplierItemData.price_rmb);
-        if (supplierItemData.is_po !== undefined)
+          supplierHasChanges = true;
+        }
+        if (
+          supplierItemData.is_po !== undefined &&
+          supplierItem.is_po !== supplierItemData.is_po
+        ) {
           supplierItem.is_po = supplierItemData.is_po;
-        if (supplierItemData.moq !== undefined)
+          supplierHasChanges = true;
+        }
+        if (
+          supplierItemData.moq !== undefined &&
+          supplierItem.moq !== parseInt(supplierItemData.moq)
+        ) {
           supplierItem.moq = parseInt(supplierItemData.moq);
-        if (supplierItemData.oi !== undefined)
+          supplierHasChanges = true;
+        }
+        if (
+          supplierItemData.oi !== undefined &&
+          supplierItem.oi !== parseInt(supplierItemData.oi)
+        ) {
           supplierItem.oi = parseInt(supplierItemData.oi);
-        if (supplierItemData.lead_time !== undefined)
+          supplierHasChanges = true;
+        }
+        if (
+          supplierItemData.lead_time !== undefined &&
+          supplierItem.lead_time !== supplierItemData.lead_time
+        ) {
           supplierItem.lead_time = supplierItemData.lead_time;
-        if (supplierItemData.note_cn !== undefined)
+          supplierHasChanges = true;
+        }
+        if (
+          supplierItemData.note_cn !== undefined &&
+          supplierItem.note_cn !== supplierItemData.note_cn
+        ) {
           supplierItem.note_cn = supplierItemData.note_cn;
-        if (supplierItemData.url !== undefined)
+          supplierHasChanges = true;
+        }
+        if (
+          supplierItemData.url !== undefined &&
+          supplierItem.url !== supplierItemData.url
+        ) {
           supplierItem.url = supplierItemData.url;
-        await supplierItemRepository.save(supplierItem);
+          supplierHasChanges = true;
+        }
+
+        if (supplierHasChanges) {
+          item.is_updated = true;
+          await itemRepository.save(item);
+          await supplierItemRepository.save(supplierItem);
+        }
       }
     }
 
@@ -735,23 +794,69 @@ export const updateItem = async (
         where: { item_id: item.id },
       });
       if (warehouseItem) {
-        if (warehouseItemData.is_stock_item !== undefined)
+        let warehouseHasChanges = false;
+        if (
+          warehouseItemData.is_stock_item !== undefined &&
+          warehouseItem.is_stock_item !== warehouseItemData.is_stock_item
+        ) {
           warehouseItem.is_stock_item = warehouseItemData.is_stock_item;
-        if (warehouseItemData.is_active !== undefined)
+          warehouseHasChanges = true;
+        }
+        if (
+          warehouseItemData.is_active !== undefined &&
+          warehouseItem.is_active !== warehouseItemData.is_active
+        ) {
           warehouseItem.is_active = warehouseItemData.is_active;
-        if (warehouseItemData.msq !== undefined)
+          warehouseHasChanges = true;
+        }
+        if (
+          warehouseItemData.msq !== undefined &&
+          warehouseItem.msq !== parseFloat(warehouseItemData.msq)
+        ) {
           warehouseItem.msq = parseFloat(warehouseItemData.msq);
-        if (warehouseItemData.is_no_auto_order !== undefined)
+          warehouseHasChanges = true;
+        }
+        if (
+          warehouseItemData.is_no_auto_order !== undefined &&
+          warehouseItem.is_no_auto_order !== warehouseItemData.is_no_auto_order
+        ) {
           warehouseItem.is_no_auto_order = warehouseItemData.is_no_auto_order;
-        if (warehouseItemData.buffer !== undefined)
+          warehouseHasChanges = true;
+        }
+        if (
+          warehouseItemData.buffer !== undefined &&
+          warehouseItem.buffer !== parseInt(warehouseItemData.buffer)
+        ) {
           warehouseItem.buffer = parseInt(warehouseItemData.buffer);
-        if (warehouseItemData.is_SnSI !== undefined)
+          warehouseHasChanges = true;
+        }
+        if (
+          warehouseItemData.is_SnSI !== undefined &&
+          warehouseItem.is_SnSI !== warehouseItemData.is_SnSI
+        ) {
           warehouseItem.is_SnSI = warehouseItemData.is_SnSI;
-        if (warehouseItemData.item_no_de !== undefined)
+          warehouseHasChanges = true;
+        }
+        if (
+          warehouseItemData.item_no_de !== undefined &&
+          warehouseItem.item_no_de !== warehouseItemData.item_no_de
+        ) {
           warehouseItem.item_no_de = warehouseItemData.item_no_de;
-        if (warehouseItemData.item_name_de !== undefined)
+          warehouseHasChanges = true;
+        }
+        if (
+          warehouseItemData.item_name_de !== undefined &&
+          warehouseItem.item_name_de !== warehouseItemData.item_name_de
+        ) {
           warehouseItem.item_name_de = warehouseItemData.item_name_de;
-        await warehouseRepository.save(warehouseItem);
+          warehouseHasChanges = true;
+        }
+
+        if (warehouseHasChanges) {
+          item.is_updated = true;
+          await itemRepository.save(item);
+          await warehouseRepository.save(warehouseItem);
+        }
       }
     }
 
@@ -762,6 +867,7 @@ export const updateItem = async (
         id: item.id,
         item_name: item.item_name,
         isActive: item.isActive,
+        is_updated: item.is_updated,
         updated_at: item.updated_at,
       },
     });
@@ -856,10 +962,13 @@ export const toggleItemStatus = async (
       return next(new ErrorHandler("Item not found", 404));
     }
 
-    item.isActive = isActive ? "Y" : "N";
-    item.updated_at = new Date();
-
-    await itemRepository.save(item);
+    const newStatus = isActive ? "Y" : "N";
+    if (item.isActive !== newStatus) {
+      item.isActive = newStatus;
+      item.is_updated = true; // Mark as updated for sync
+      item.updated_at = new Date();
+      await itemRepository.save(item);
+    }
 
     return res.status(200).json({
       success: true,
@@ -867,6 +976,7 @@ export const toggleItemStatus = async (
       data: {
         id: item.id,
         isActive: item.isActive,
+        is_updated: item.is_updated,
       },
     });
   } catch (error) {
@@ -898,14 +1008,23 @@ export const bulkUpdateItems = async (
         where: { id: parseInt(id) },
       });
       if (item) {
+        let hasChanges = false;
         Object.keys(updates).forEach((key) => {
           if (key in item && key !== "id") {
-            (item as any)[key] = updates[key];
+            const currentValue = (item as any)[key];
+            const newValue = updates[key];
+            if (currentValue !== newValue) {
+              hasChanges = true;
+              (item as any)[key] = newValue;
+            }
           }
         });
-        item.updated_at = new Date();
-        await itemRepository.save(item);
-        updatedItems.push(item);
+        if (hasChanges) {
+          item.is_updated = true;
+          item.updated_at = new Date();
+          await itemRepository.save(item);
+          updatedItems.push(item);
+        }
       }
     }
 
@@ -918,6 +1037,7 @@ export const bulkUpdateItems = async (
           id: item.id,
           item_name: item.item_name,
           isActive: item.isActive,
+          is_updated: item.is_updated,
         })),
       },
     });
@@ -939,6 +1059,10 @@ export const getItemStatistics = async (
 
     const activeItems = await itemRepository.count({
       where: { isActive: "Y" },
+    });
+
+    const itemsNeedingSync = await itemRepository.count({
+      where: { is_updated: true },
     });
 
     let itemsWithStock: any = { count: 0 };
@@ -968,6 +1092,7 @@ export const getItemStatistics = async (
         activeItems,
         inactiveItems: totalItems - activeItems,
         itemsWithStock: parseInt(itemsWithStock.count) || 0,
+        itemsNeedingSync,
         itemsByCategory,
       },
     });
@@ -1014,12 +1139,42 @@ export const searchItems = async (
       ean: item.ean,
       category: item.category?.name || null,
       is_active: item.isActive,
+      is_updated: item.is_updated,
     }));
 
     return res.status(200).json({
       success: true,
       data: formattedItems,
     });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+// ==================== ADDITIONAL SYNC UTILITY FUNCTION ====================
+export const resetUpdatedFlag = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { ids } = req.body;
+    const itemRepository = AppDataSource.getRepository(Item);
+
+    if (ids && Array.isArray(ids) && ids.length > 0) {
+      await itemRepository.update({ id: In(ids) }, { is_updated: false });
+      return res.status(200).json({
+        success: true,
+        message: `Reset is_updated flag for ${ids.length} items`,
+      });
+    } else {
+      // Reset all items if no specific IDs provided
+      await itemRepository.update({}, { is_updated: false });
+      return res.status(200).json({
+        success: true,
+        message: "Reset is_updated flag for all items",
+      });
+    }
   } catch (error) {
     return next(error);
   }
@@ -1129,9 +1284,9 @@ export const getParents = async (
       supplier_id: parent.supplier_id,
       supplier: parent.supplier
         ? {
-          id: parent.supplier.id,
-          name: parent.supplier.name,
-        }
+            id: parent.supplier.id,
+            name: parent.supplier.name,
+          }
         : null,
       item_count: parent.items?.length || 0,
       created_at: parent.created_at,
@@ -1207,17 +1362,17 @@ export const getParentById = async (
       is_active: parent.is_active,
       taric: parent.taric
         ? {
-          id: parent.taric.id,
-          code: parent.taric.code,
-          name_de: parent.taric.name_de,
-        }
+            id: parent.taric.id,
+            code: parent.taric.code,
+            name_de: parent.taric.name_de,
+          }
         : null,
       supplier: parent.supplier
         ? {
-          id: parent.supplier.id,
-          name: parent.supplier.name,
-          contact_person: parent.supplier.contact_person,
-        }
+            id: parent.supplier.id,
+            name: parent.supplier.name,
+            contact_person: parent.supplier.contact_person,
+          }
         : null,
       variations: {
         de: [parent.var_de_1, parent.var_de_2, parent.var_de_3].filter(Boolean),
@@ -2411,12 +2566,22 @@ export const exportItemsToCSV = async (
     const warehouseRepository = AppDataSource.getRepository(WarehouseItem);
     const variationRepository = AppDataSource.getRepository(VariationValue);
 
+    // Get only items that have is_updated = true
     const items = await itemRepository.find({
+      where: { is_updated: true },
       relations: ["parent", "taric", "category"],
       order: {
         id: "ASC",
       },
     });
+
+    if (items.length === 0) {
+      return res.status(200).json({
+        success: true,
+        message: "No items need to be synced",
+        data: [],
+      });
+    }
 
     const formatDate = (date: Date | undefined) => {
       if (!date) return "";
@@ -2424,10 +2589,18 @@ export const exportItemsToCSV = async (
       return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}:${String(d.getSeconds()).padStart(2, "0")}`;
     };
 
-    const getWarehouseData = async (itemId: number) => {
-      const warehouseItems = await warehouseRepository.find({
-        where: { item_id: itemId },
-      });
+    const getWarehouseData = async (itemId: number, itemIdDE?: number) => {
+      let warehouseItems: any = [];
+      if (itemIdDE) {
+        warehouseItems = await warehouseRepository.find({
+          where: { ItemID_DE: itemIdDE },
+        });
+      }
+      if (warehouseItems.length === 0) {
+        warehouseItems = await warehouseRepository.find({
+          where: { item_id: itemId },
+        });
+      }
       return warehouseItems[0] || null;
     };
 
@@ -2533,12 +2706,13 @@ export const exportItemsToCSV = async (
     ];
 
     const csvRows = [];
-
     csvRows.push(headers.join(";"));
+
+    const updatedItemIds: number[] = [];
 
     for (const item of items) {
       try {
-        const warehouseData = await getWarehouseData(item.id);
+        const warehouseData = await getWarehouseData(item.id, item.ItemID_DE);
         const variationData = await getVariationValues(item.id);
         const priceColumns = getPriceColumns(item);
 
@@ -2631,9 +2805,19 @@ export const exportItemsToCSV = async (
         });
 
         csvRows.push(formattedRow.join(";"));
+        updatedItemIds.push(item.id);
       } catch (itemError) {
         console.error(`Error processing item ${item.id}:`, itemError);
       }
+    }
+
+    // After successful CSV generation, reset is_updated to false for all exported items
+    if (updatedItemIds.length > 0) {
+      await itemRepository.update(
+        { id: In(updatedItemIds) },
+        { is_updated: false },
+      );
+      console.log(`Reset is_updated flag for ${updatedItemIds.length} items`);
     }
 
     const csvContent = csvRows.join("\n");

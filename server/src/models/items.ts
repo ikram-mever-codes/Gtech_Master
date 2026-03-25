@@ -136,6 +136,10 @@ export class Item {
   @Column({ nullable: true })
   supplier_id?: number;
 
+  // NEW FIELD: is_updated - marks if item needs to be synced to WaWi
+  @Column({ type: "boolean", default: false })
+  is_updated!: boolean;
+
   @CreateDateColumn()
   synced_at!: Date;
 
