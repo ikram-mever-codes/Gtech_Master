@@ -659,7 +659,6 @@ export class InvoiceController {
           }
         }
 
-        // cargoNo: prefer cargo from map, otherwise if orderNumber looks like a cargo no use it directly
         const cargoNo = cargo?.cargo_no || (inv.orderNumber && !orderIdMap.has(inv.orderNumber) ? inv.orderNumber : undefined);
 
         return {
@@ -793,6 +792,22 @@ export class InvoiceController {
         return taricId ? `taric_${taricId}` : "unknown";
       };
 
+      const manualTaricCodes: string[] = [];
+      orderItems.forEach((oi: any) => {
+        if (oi.set_taric_code) {
+          const codes = oi.set_taric_code.split("/");
+          codes.forEach((c: string) => {
+            if (c && c.trim()) manualTaricCodes.push(c.trim());
+          });
+        }
+      });
+
+      const uniqueManualCodes = [...new Set(manualTaricCodes)];
+      const manualTarics = uniqueManualCodes.length > 0
+        ? await AppDataSource.getRepository(Taric).find({ where: { code: In(uniqueManualCodes) } })
+        : [];
+      const manualTaricMap = new Map(manualTarics.map(t => [t.code, t]));
+
       const taricGroupsMap = new Map<string, any>();
       orderItems.forEach((oi: any) => {
         const item = oi.item;
@@ -803,15 +818,26 @@ export class InvoiceController {
 
         if (!taricGroupsMap.has(groupKey)) {
           let displayCode = oi.item?.taric?.code || "-";
+          let displayName = taric?.name_en || (isProjectItem ? "Project Item" : "Unknown");
+          let displayRate = taric?.duty_rate || 0;
+
           if (oi.set_taric_code) {
             displayCode = `${oi.set_taric_code}`;
+            const codes = displayCode.split("/");
+            const targetCode = codes.length > 1 ? codes[1].trim() : codes[0].trim();
+
+            const mTaric = manualTaricMap.get(targetCode);
+            if (mTaric) {
+              displayName = mTaric.name_en || displayName;
+              displayRate = mTaric.duty_rate !== undefined ? mTaric.duty_rate : displayRate;
+            }
           }
 
           taricGroupsMap.set(groupKey, {
-            taricId: groupKey, // Use groupKey as the ID to avoid numeric collisions
-            taricNameEn: taric?.name_en || (isProjectItem ? "Project Item" : "Unknown"),
+            taricId: groupKey,
+            taricNameEn: displayName,
             taricCode: displayCode,
-            dutyRate: taric?.duty_rate || 0,
+            dutyRate: displayRate,
             totalQty: 0,
             totalPrice: 0,
             unitPrice: oi?.eur_special_price || oi?.price || item?.price || 0,

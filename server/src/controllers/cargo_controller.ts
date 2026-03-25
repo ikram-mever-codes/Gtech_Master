@@ -6,6 +6,7 @@ import { Order } from "../models/orders";
 import { OrderItem } from "../models/order_items";
 import { Invoice, InvoiceItem } from "../models/invoice";
 import { Customer } from "../models/customers";
+import { Taric } from "../models/tarics";
 import { Like, IsNull, In } from "typeorm";
 
 export const generateInvoicesForOrders = async (orderIds: number[], cargoIds: number[] = []) => {
@@ -112,11 +113,37 @@ const syncInvoiceRecord = async (
     let grossTotal = 0;
     const invoiceItems: InvoiceItem[] = [];
 
+    const manualTaricCodes: string[] = [];
+    items.forEach(oi => {
+        if (oi.set_taric_code) {
+            const parts = oi.set_taric_code.split("/");
+            manualTaricCodes.push(parts[parts.length - 1].trim());
+        }
+    });
+    const uniqueCodes = [...new Set(manualTaricCodes)];
+    const manualTaricsList = uniqueCodes.length > 0
+        ? await AppDataSource.getRepository(Taric).find({ where: { code: In(uniqueCodes) } })
+        : [];
+    const manualTaricMap = new Map(manualTaricsList.map(t => [t.code, t]));
+
     for (const oi of items) {
         const quantity = oi.qty || 1;
-        const unitPrice = oi.price || oi.rmb_special_price || 0;
+        const unitPrice = oi.eur_special_price || oi.price || oi.rmb_special_price || 0;
         const netPrice = quantity * unitPrice;
-        const itemTaxRate = oi.item?.taric?.duty_rate ? Number(oi.item.taric.duty_rate) : 19;
+
+        let itemTaxRate = oi.item?.taric?.duty_rate !== undefined ? Number(oi.item?.taric?.duty_rate) : 19;
+        let itemDescription = oi.item?.item_name || "Unknown Item";
+
+        if (oi.set_taric_code) {
+            const parts = oi.set_taric_code.split("/");
+            const targetCode = parts[parts.length - 1].trim();
+            const mTaric = manualTaricMap.get(targetCode);
+            if (mTaric) {
+                itemTaxRate = mTaric.duty_rate !== undefined ? Number(mTaric.duty_rate) : itemTaxRate;
+                itemDescription = mTaric.name_en || itemDescription;
+            }
+        }
+
         const itemTax = (netPrice * itemTaxRate) / 100;
         const total = netPrice + itemTax;
 
@@ -127,7 +154,7 @@ const syncInvoiceRecord = async (
         invoiceItems.push(invoiceItemRepo.create({
             quantity,
             articleNumber: oi.item?.ean?.toString() || oi.item?.model || "Unknown",
-            description: oi.item?.item_name || "Unknown Item",
+            description: itemDescription,
             unitPrice,
             netPrice,
             taxRate: itemTaxRate,
@@ -176,7 +203,6 @@ export const getAllCargos = async (req: Request, res: Response, next: NextFuncti
                 return "cargo.id NOT IN " + subQuery;
             });
 
-            // Also check CargoOrder table just in case
             qb.andWhere(qb => {
                 const subQuery = qb.subQuery()
                     .select("co.cargo_id")
