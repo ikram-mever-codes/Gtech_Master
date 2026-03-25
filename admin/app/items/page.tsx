@@ -212,38 +212,51 @@ const ItemsManagementPage: React.FC = () => {
   const matchesEANSearch = (eanValue: any, searchTerm: any) => {
     if (!eanValue || !searchTerm) return false;
 
-    // 1. Normalize: Remove EVERYTHING that isn't a digit (handles spaces, dashes, dots)
-    // This also handles if eanValue is passed as a number or scientific notation string
-    const eanDigits = eanValue.toString().replace(/\D/g, "");
-    const searchDigits = searchTerm.toString().replace(/\D/g, "");
+    try {
+      // Handle scientific notation and ensure we have a clean string
+      let eanStr = "";
 
-    // If after cleaning we have nothing, return false
-    if (!eanDigits || !searchDigits) return false;
+      // If it's a number, format it properly without scientific notation
+      if (typeof eanValue === "number") {
+        eanStr = eanValue.toString();
+        // Check if it's in scientific notation
+        if (eanStr.includes("e")) {
+          // Parse as integer to avoid scientific notation
+          eanStr = Number(eanValue).toFixed(0);
+        }
+      } else {
+        eanStr = eanValue.toString();
+      }
 
-    // 2. Exact Match (The most common paste scenario)
-    if (eanDigits === searchDigits) return true;
+      // Remove all non-digit characters
+      const eanDigits = eanStr.replace(/\D/g, "");
+      const searchDigits = searchTerm.toString().replace(/\D/g, "");
 
-    // 3. Partial Match: Does the EAN contain the search term?
-    // (Good for manual typing)
-    if (eanDigits.includes(searchDigits)) return true;
+      if (!eanDigits || !searchDigits) return false;
 
-    // 4. Reverse Match: Does the search term contain the EAN?
-    // (Good if a scanner adds a prefix/suffix)
-    if (searchDigits.includes(eanDigits)) return true;
+      // Exact match (most common)
+      if (eanDigits === searchDigits) return true;
 
-    // 5. Tail Match: Check if the last X digits match
-    // (Helpful for EAN-13 vs EAN-8 or shorthand)
-    if (searchDigits.length >= 4) {
-      if (
-        eanDigits.endsWith(searchDigits) ||
-        searchDigits.endsWith(eanDigits)
-      ) {
+      // Partial match
+      if (eanDigits.includes(searchDigits)) return true;
+
+      // Check if search digits are a suffix of the EAN (useful for scanning)
+      if (searchDigits.length >= 4 && eanDigits.endsWith(searchDigits)) {
         return true;
       }
-    }
 
-    return false;
+      // Check if EAN digits are a suffix of search (if user typed extra characters)
+      if (eanDigits.length >= 4 && searchDigits.endsWith(eanDigits)) {
+        return true;
+      }
+
+      return false;
+    } catch (error) {
+      console.error("Error matching EAN:", error);
+      return false;
+    }
   };
+
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
