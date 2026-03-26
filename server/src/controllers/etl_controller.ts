@@ -3,7 +3,7 @@ import { AppDataSource } from "../config/database";
 import fs from "fs";
 import path from "path";
 import { parse } from "csv-parse";
-import { In } from "typeorm";
+import { In, Not } from "typeorm";
 import { Order } from "../models/orders";
 import { OrderItem } from "../models/order_items";
 import { Item } from "../models/items";
@@ -61,9 +61,6 @@ export class EtlController {
     Dez: "12",
   };
 
-  /**
-   * Main ETL process - NO SKIPS, ALL DATES FROM CSV
-   */
   public static async findTargetDate(
     req: Request,
     res: Response,
@@ -130,6 +127,24 @@ export class EtlController {
         console.log("order_items.csv not found");
       }
 
+      // Step 4: Handle orders with zero quantities
+      console.log("\n🔍 Step 4: Checking for zero-quantity orders...");
+      const zeroQuantityOrders = await EtlController.handleZeroQuantityOrders(
+        orderRepo,
+        orderItemRepo,
+      );
+
+      if (zeroQuantityOrders.length > 0) {
+        console.log(
+          `\n✅ Removed ${zeroQuantityOrders.length} orders due to zero quantity:`,
+        );
+        zeroQuantityOrders.forEach((orderNo) => {
+          console.log(`   - Order ${orderNo} removed from active list`);
+        });
+      } else {
+        console.log("No orders found with zero quantity to remove");
+      }
+
       console.log("\n" + "=".repeat(50));
       console.log("✅ ETL process completed successfully");
       console.log("=".repeat(50));
@@ -137,6 +152,8 @@ export class EtlController {
       res.status(200).json({
         success: true,
         message: "ETL process completed successfully",
+        zeroQuantityOrdersRemoved: zeroQuantityOrders.length,
+        removedOrders: zeroQuantityOrders,
       });
     } catch (error) {
       console.error("❌ ETL process failed:", error);
@@ -252,6 +269,7 @@ export class EtlController {
 
   /**
    * Process ALL order items - create or update, never skip
+   * Now with zero quantity detection
    */
   private static async processAllOrderItems(
     rows: any[],
@@ -264,6 +282,7 @@ export class EtlController {
       created: 0,
       updated: 0,
       failed: 0,
+      zeroQuantityItems: 0,
     };
 
     console.log(`\nProcessing ${rows.length} order items...`);
@@ -314,25 +333,30 @@ export class EtlController {
         }
 
         // Handle ItemID_DE
-        if (isNaN(itemIdDe)) {
+        let itemIdDeValue: any = null;
+        let itemId = null;
+        if (!isNaN(itemIdDe)) {
+          itemIdDeValue = itemIdDe;
+          itemId = itemLookup.get(itemIdDe) || null;
+        } else {
           console.warn(
             `Row ${rowNum}: Invalid ItemID_DE for master_id ${masterId}, using null`,
           );
-          var itemIdDeValue = null;
-          var itemId = null;
-        } else {
-          var itemIdDeValue: any = itemIdDe;
-          var itemId = itemLookup.get(itemIdDe) || null;
         }
 
         // Handle quantity
-        if (isNaN(qty)) {
+        let qtyValue = 0;
+        if (!isNaN(qty)) {
+          qtyValue = qty;
+        } else {
           console.warn(
             `Row ${rowNum}: Invalid quantity for master_id ${masterId}, using 0`,
           );
-          var qtyValue = 0;
-        } else {
-          var qtyValue = qty;
+        }
+
+        // Track zero quantity items
+        if (qtyValue === 0) {
+          results.zeroQuantityItems++;
         }
 
         // Check if order item exists
@@ -349,10 +373,17 @@ export class EtlController {
           remark_de: remarkDe,
           qty_delivered: qtyDelivered,
           qty_label: qtyValue,
-          status: "NSO",
+          status: qtyValue === 0 ? "CANCELLED" : "NSO",
         };
 
         if (existingItem) {
+          // Log when quantity changes to zero
+          if (existingItem.qty !== 0 && qtyValue === 0) {
+            console.log(
+              `⚠️  Item ${masterId} in order ${orderNo} set to ZERO quantity`,
+            );
+          }
+
           // Update existing
           await orderItemRepo.update({ master_id: masterId }, itemData);
           results.updated++;
@@ -360,6 +391,12 @@ export class EtlController {
           // Insert new
           await orderItemRepo.save(orderItemRepo.create(itemData));
           results.created++;
+
+          if (qtyValue === 0) {
+            console.log(
+              `⚠️  Item ${masterId} created with ZERO quantity for order ${orderNo}`,
+            );
+          }
         }
 
         if ((results.created + results.updated) % 50 === 0) {
@@ -374,9 +411,75 @@ export class EtlController {
     }
 
     console.log(
-      `\n📊 Items: ${results.created} created, ${results.updated} updated, ${results.failed} failed`,
+      `\n📊 Items: ${results.created} created, ${results.updated} updated, ${results.failed} failed, ${results.zeroQuantityItems} zero-quantity items`,
     );
+
     return results;
+  }
+
+  /**
+   * Handle orders with zero quantities - Mark them as completed so they don't appear in active lists
+   * Returns array of order numbers that were removed
+   */
+  private static async handleZeroQuantityOrders(
+    orderRepo: any,
+    orderItemRepo: any,
+  ): Promise<string[]> {
+    const removedOrders: string[] = [];
+
+    // Get all orders with status not completed (status != 999)
+    const activeOrders = await orderRepo.find({
+      where: {
+        status: Not(999),
+      },
+      relations: ["orderItems"],
+    });
+
+    console.log(
+      `Checking ${activeOrders.length} active orders for zero quantities...`,
+    );
+
+    for (const order of activeOrders) {
+      let shouldRemove = false;
+      let reason = "";
+
+      // Case 1: Order has no items
+      if (!order.orderItems || order.orderItems.length === 0) {
+        shouldRemove = true;
+        reason = "no items";
+      }
+      // Case 2: Check if all items have zero quantity
+      else {
+        const allItemsZero = order.orderItems.every(
+          (item: any) =>
+            item.qty === 0 || item.qty === null || item.qty === undefined,
+        );
+
+        if (allItemsZero) {
+          shouldRemove = true;
+          reason = "all items have zero quantity";
+        }
+      }
+
+      // Remove the order if it meets criteria
+      if (shouldRemove) {
+        console.log(
+          `🗑️  Removing order ${order.order_no} from active list (${reason})`,
+        );
+
+        // Mark order as completed (status 999)
+        await orderRepo.update(order.id, {
+          status: 999, // Completed/Archived status
+          comment: order.comment
+            ? `${order.comment} - [REMOVED: ${reason} at ${new Date().toISOString()}]`
+            : `[REMOVED: ${reason} at ${new Date().toISOString()}]`,
+        });
+
+        removedOrders.push(order.order_no);
+      }
+    }
+
+    return removedOrders;
   }
 
   /**
