@@ -369,8 +369,8 @@ const InvoiceListPage: React.FC = () => {
   const handleUpdateQty = async () => {
     if (!selectedItem || newQty <= 0) return;
     try {
-      await updateOrderItemStatus(selectedItem.id, { qty: newQty, remarks_cn: qtyRemarks });
-      toast.success("Quantity updated successfully");
+      await updateOrderItemStatus(selectedItem.id, { qty_label: newQty, remarks_cn: qtyRemarks });
+      toast.success("QtyLabel updated successfully");
       setShowQTYModal(false);
       setQtyRemarks("");
       const invId = Object.keys(expandedStates).find(key =>
@@ -1355,13 +1355,13 @@ const InvoiceListPage: React.FC = () => {
                                                       <button
                                                         onClick={() => {
                                                           setSelectedItem(it);
-                                                          setNewQty(it.qty);
+                                                          setNewQty(it.qty_label || it.qty);
                                                           setQtyRemarks(it.remarks_cn || "");
                                                           setShowQTYModal(true);
                                                         }}
                                                         className="flex items-center gap-1.5 px-2 py-1.5 text-[9px] font-bold bg-[#495057] text-white rounded-[4px] hover:bg-[#343A40] transition shadow-sm uppercase"
                                                       >
-                                                        <div className="bg-white/20 p-0.5 rounded"><Package className="w-2.5 h-2.5" /></div> QTY
+                                                        <div className="bg-white/20 p-0.5 rounded"><Package className="w-2.5 h-2.5" /></div> QtyLabel
                                                       </button>
                                                       <button
                                                         onClick={() => {
@@ -1867,7 +1867,9 @@ const InvoiceListPage: React.FC = () => {
                 >
                   <option value="">Select Taric Code</option>
                   {tarics.map(t => (
-                    <option key={t.id} value={t.code}>{t.code} - {t.description_de}</option>
+                    <option key={t.id} value={t.code}>
+                      {t.code} - {t.description_de || t.name_de || t.name_en || 'No description available'}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -1889,11 +1891,11 @@ const InvoiceListPage: React.FC = () => {
           <CustomModal
             isOpen={showQTYModal}
             onClose={() => setShowQTYModal(false)}
-            title={`Update QTY`}
+            title={`Update QtyLabel for this item`}
           >
             <div className="p-4 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">New QTY</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">New QtyLabel</label>
                 <input
                   type="number"
                   value={newQty}
@@ -1919,7 +1921,7 @@ const InvoiceListPage: React.FC = () => {
                   disabled={newQty <= 0}
                   className="px-4 py-2 text-sm bg-[#059669] text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
                 >
-                  Update Qty
+                  Update QtyLabel
                 </button>
               </div>
             </div>
