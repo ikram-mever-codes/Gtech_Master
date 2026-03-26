@@ -37,6 +37,7 @@ import { Cargo } from "../models/cargos";
 import { CargoOrder } from "../models/cargo_orders";
 import { CargoType } from "../models/cargo_types";
 import { SupplierOrder } from "../models/supplier_orders";
+import { fixSequences } from "../utils/dbUtils";
 
 dotenv.config();
 
@@ -93,8 +94,8 @@ export const AppDataSource = new DataSource({
     ssl:
       process.env.DB_SSL === "true"
         ? {
-            rejectUnauthorized: false,
-          }
+          rejectUnauthorized: false,
+        }
         : false,
   },
   poolSize: 10,
@@ -153,6 +154,8 @@ export const initializeDatabase = async (): Promise<DataSource> => {
 
     const { seedDatabase } = await import("../services/seedDatabase");
     await seedDatabase();
+
+    await fixSequences();
 
     return AppDataSource;
   } catch (error) {

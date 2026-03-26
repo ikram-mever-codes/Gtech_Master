@@ -608,7 +608,6 @@ export class InvoiceController {
         });
       }
 
-      // Also ensure cargos map to themselves in the orderToCargoMap
       const allCargos = await AppDataSource.getRepository(Cargo).find();
       allCargos.forEach((c) => {
         if (c.cargo_no) {
