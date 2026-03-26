@@ -2072,21 +2072,22 @@ export const getAllTarics = async (
     if (isNaN(limitNum)) limitNum = 30;
     const skip = (pageNum - 1) * limitNum;
 
-    const whereConditions: FindOptionsWhere<Taric> = {};
+    let whereConditions: any = {};
 
     if (search) {
-      whereConditions.code = ILike(`%${search}%`);
-      whereConditions.name_de = ILike(`%${search}%`);
-      whereConditions.name_en = ILike(`%${search}%`);
-      whereConditions.name_cn = ILike(`%${search}%`);
-    }
-
-    if (code) {
-      whereConditions.code = ILike(`%${code}%`);
-    }
-
-    if (name) {
-      whereConditions.name_de = ILike(`%${name}%`);
+      whereConditions = [
+        { code: ILike(`%${search}%`) },
+        { name_de: ILike(`%${search}%`) },
+        { name_en: ILike(`%${search}%`) },
+        { name_cn: ILike(`%${search}%`) },
+      ];
+    } else {
+      if (code) {
+        whereConditions.code = ILike(`%${code}%`);
+      }
+      if (name) {
+        whereConditions.name_de = ILike(`%${name}%`);
+      }
     }
 
     const totalRecords = await taricRepository.count({
@@ -2308,6 +2309,13 @@ export const updateTaric = async (
       "reguler_artikel",
       "duty_rate",
     ];
+
+    if (req.body.code !== undefined && req.body.code !== taric.code) {
+      const existingTaric = await taricRepository.findOne({ where: { code: req.body.code } });
+      if (existingTaric) {
+        return next(new ErrorHandler("TARIC with this code already exists", 400));
+      }
+    }
 
     updatableFields.forEach((field) => {
       if (req.body[field] !== undefined) {

@@ -86,8 +86,6 @@ interface FilterState {
 
 interface TaricFilterState {
   search: string;
-  code: string;
-  name: string;
 }
 
 interface PaginationState {
@@ -133,8 +131,6 @@ const ItemsManagementPage: React.FC = () => {
   });
   const [taricFilters, setTaricFilters] = useState<TaricFilterState>({
     search: "",
-    code: "",
-    name: "",
   });
 
   const [showTaricModal, setShowTaricModal] = useState(false);
@@ -299,10 +295,7 @@ const ItemsManagementPage: React.FC = () => {
           const taricsResponse: any = await getAllTarics({
             page: pagination.page,
             limit: pagination.limit,
-            search:
-              taricFilters.search || taricFilters.code || taricFilters.name,
-            code: taricFilters.code,
-            name: taricFilters.name,
+            search: taricFilters.search,
           });
           setTarics(taricsResponse.data);
           setPagination(taricsResponse.pagination);
@@ -387,7 +380,7 @@ const ItemsManagementPage: React.FC = () => {
     try {
       await deleteItem(itemId);
       fetchData();
-    } catch (error) {}
+    } catch (error) { }
   };
 
   const handleDeleteParent = async (parentId: number) => {
@@ -399,7 +392,7 @@ const ItemsManagementPage: React.FC = () => {
     try {
       await deleteParent(parentId);
       fetchData();
-    } catch (error) {}
+    } catch (error) { }
   };
 
   const handleToggleStatus = async (itemId: number, currentStatus: string) => {
@@ -411,7 +404,7 @@ const ItemsManagementPage: React.FC = () => {
         successStyles,
       );
       fetchData();
-    } catch (error) {}
+    } catch (error) { }
   };
 
   const handleOpenCreateItemModal = () => {
@@ -574,6 +567,9 @@ const ItemsManagementPage: React.FC = () => {
       setShowTaricModal(false);
       fetchData();
     } catch (error: any) {
+      console.error("Taric submit error:", error);
+      const message = error.response?.data?.message || error.message || "Failed to save TARIC";
+      toast.error(message, errorStyles);
     } finally {
       setLoading(false);
     }
@@ -598,7 +594,7 @@ const ItemsManagementPage: React.FC = () => {
       }
       setSelectedTarics(new Set());
       fetchData();
-    } catch (error) {}
+    } catch (error) { }
   };
 
   const handleBulkDelete = async () => {
@@ -1321,8 +1317,6 @@ const ItemsManagementPage: React.FC = () => {
   const resetTaricFilters = () => {
     setTaricFilters({
       search: "",
-      code: "",
-      name: "",
     });
   };
 
@@ -1394,11 +1388,10 @@ const ItemsManagementPage: React.FC = () => {
 
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className={`px-4 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2 ${
-                showFilters
+              className={`px-4 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2 ${showFilters
                   ? "bg-[#8CC21B] text-white"
                   : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-              }`}
+                }`}
             >
               <FunnelIcon className="w-5 h-5" />
               Filters
@@ -1455,11 +1448,10 @@ const ItemsManagementPage: React.FC = () => {
                 <button
                   key={tab.key}
                   onClick={() => setActiveTab(tab.key as TabType)}
-                  className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${
-                    activeTab === tab.key
+                  className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${activeTab === tab.key
                       ? "border-primary text-primary"
                       : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                  }`}
+                    }`}
                 >
                   <tab.icon className="w-5 h-5" />
                   {tab.label}
@@ -1498,7 +1490,7 @@ const ItemsManagementPage: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               {activeTab === "tarics" ? (
                 <>
-                  <div>
+                  <div className="md:col-span-3">
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Search
                     </label>
@@ -1510,40 +1502,6 @@ const ItemsManagementPage: React.FC = () => {
                         setTaricFilters({
                           ...taricFilters,
                           search: e.target.value,
-                        })
-                      }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Code
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="TARIC code..."
-                      value={taricFilters.code}
-                      onChange={(e) =>
-                        setTaricFilters({
-                          ...taricFilters,
-                          code: e.target.value,
-                        })
-                      }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Name
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="Name in any language..."
-                      value={taricFilters.name}
-                      onChange={(e) =>
-                        setTaricFilters({
-                          ...taricFilters,
-                          name: e.target.value,
                         })
                       }
                       className="w-full px-3 py-2 border border-gray-300 rounded-md"
@@ -2039,16 +1997,16 @@ const ItemsManagementPage: React.FC = () => {
                     value={
                       itemFormData.parent_id
                         ? {
-                            value: itemFormData.parent_id,
-                            label: (() => {
-                              const p = parents?.find(
-                                (x) => x.id === itemFormData.parent_id,
-                              );
-                              return p
-                                ? `${p.name_de} (${p.de_no})`
-                                : "Unknown";
-                            })(),
-                          }
+                          value: itemFormData.parent_id,
+                          label: (() => {
+                            const p = parents?.find(
+                              (x) => x.id === itemFormData.parent_id,
+                            );
+                            return p
+                              ? `${p.name_de} (${p.de_no})`
+                              : "Unknown";
+                          })(),
+                        }
                         : null
                     }
                     onChange={(opt) =>
@@ -2078,14 +2036,14 @@ const ItemsManagementPage: React.FC = () => {
                     value={
                       itemFormData.taric_id
                         ? {
-                            value: itemFormData.taric_id,
-                            label: (() => {
-                              const t = tarics?.find(
-                                (x) => x.id === itemFormData.taric_id,
-                              );
-                              return t ? `${t.code} - ${t.name_de}` : "Unknown";
-                            })(),
-                          }
+                          value: itemFormData.taric_id,
+                          label: (() => {
+                            const t = tarics?.find(
+                              (x) => x.id === itemFormData.taric_id,
+                            );
+                            return t ? `${t.code} - ${t.name_de}` : "Unknown";
+                          })(),
+                        }
                         : null
                     }
                     onChange={(opt) =>
@@ -2115,12 +2073,12 @@ const ItemsManagementPage: React.FC = () => {
                     value={
                       itemFormData.cat_id
                         ? {
-                            value: itemFormData.cat_id,
-                            label:
-                              categories?.find(
-                                (x) => x.id === itemFormData.cat_id,
-                              )?.name || "Unknown",
-                          }
+                          value: itemFormData.cat_id,
+                          label:
+                            categories?.find(
+                              (x) => x.id === itemFormData.cat_id,
+                            )?.name || "Unknown",
+                        }
                         : null
                     }
                     onChange={(opt) =>
@@ -2150,16 +2108,16 @@ const ItemsManagementPage: React.FC = () => {
                     value={
                       itemFormData.supplier_id
                         ? {
-                            value: itemFormData.supplier_id,
-                            label: (() => {
-                              const s = suppliers?.find(
-                                (x) => x.id === itemFormData.supplier_id,
-                              );
-                              return s
-                                ? s.company_name || s.name || "Unnamed"
-                                : "Unknown";
-                            })(),
-                          }
+                          value: itemFormData.supplier_id,
+                          label: (() => {
+                            const s = suppliers?.find(
+                              (x) => x.id === itemFormData.supplier_id,
+                            );
+                            return s
+                              ? s.company_name || s.name || "Unnamed"
+                              : "Unknown";
+                          })(),
+                        }
                         : null
                     }
                     onChange={(opt) =>

@@ -6,6 +6,7 @@ import { Order } from "../models/orders";
 import { OrderItem } from "../models/order_items";
 import { Invoice, InvoiceItem } from "../models/invoice";
 import { Customer } from "../models/customers";
+import { Taric } from "../models/tarics";
 import { Like, IsNull, In } from "typeorm";
 
 export const generateInvoicesForOrders = async (orderIds: number[], cargoIds: number[] = []) => {
@@ -112,11 +113,37 @@ const syncInvoiceRecord = async (
     let grossTotal = 0;
     const invoiceItems: InvoiceItem[] = [];
 
+    const manualTaricCodes: string[] = [];
+    items.forEach(oi => {
+        if (oi.set_taric_code) {
+            const parts = oi.set_taric_code.split("/");
+            manualTaricCodes.push(parts[parts.length - 1].trim());
+        }
+    });
+    const uniqueCodes = [...new Set(manualTaricCodes)];
+    const manualTaricsList = uniqueCodes.length > 0
+        ? await AppDataSource.getRepository(Taric).find({ where: { code: In(uniqueCodes) } })
+        : [];
+    const manualTaricMap = new Map(manualTaricsList.map(t => [t.code, t]));
+
     for (const oi of items) {
         const quantity = oi.qty || 1;
-        const unitPrice = oi.price || oi.rmb_special_price || 0;
+        const unitPrice = oi.eur_special_price || oi.price || oi.rmb_special_price || 0;
         const netPrice = quantity * unitPrice;
-        const itemTaxRate = oi.item?.taric?.duty_rate ? Number(oi.item.taric.duty_rate) : 19;
+
+        let itemTaxRate = oi.item?.taric?.duty_rate !== undefined ? Number(oi.item?.taric?.duty_rate) : 19;
+        let itemDescription = oi.item?.item_name || "Unknown Item";
+
+        if (oi.set_taric_code) {
+            const parts = oi.set_taric_code.split("/");
+            const targetCode = parts[parts.length - 1].trim();
+            const mTaric = manualTaricMap.get(targetCode);
+            if (mTaric) {
+                itemTaxRate = mTaric.duty_rate !== undefined ? Number(mTaric.duty_rate) : itemTaxRate;
+                itemDescription = mTaric.name_en || itemDescription;
+            }
+        }
+
         const itemTax = (netPrice * itemTaxRate) / 100;
         const total = netPrice + itemTax;
 
@@ -127,7 +154,7 @@ const syncInvoiceRecord = async (
         invoiceItems.push(invoiceItemRepo.create({
             quantity,
             articleNumber: oi.item?.ean?.toString() || oi.item?.model || "Unknown",
-            description: oi.item?.item_name || "Unknown Item",
+            description: itemDescription,
             unitPrice,
             netPrice,
             taxRate: itemTaxRate,
@@ -139,6 +166,9 @@ const syncInvoiceRecord = async (
 
     if (invoiceItems.length > 0) {
         await invoiceItemRepo.save(invoiceItems);
+    } else if (invoice?.id) {
+        await invoiceRepo.delete(invoice.id);
+        return;
     }
 
     invoice.netTotal = netTotal;
@@ -154,28 +184,43 @@ const syncInvoiceRecord = async (
 export const getAllCargos = async (req: Request, res: Response, next: NextFunction) => {
     try {
         const cargoRepo = AppDataSource.getRepository(Cargo);
-        const { page = 1, limit = 50, search = "" } = req.query as any;
+        const { page = 1, limit = 50, search = "", unassignedOnly = "false" } = req.query as any;
 
         const pageNum = Math.max(1, Number(page));
         const limitNum = Math.max(1, Math.min(100, Number(limit)));
         const skip = (pageNum - 1) * limitNum;
 
-        const whereConditions: any[] = [];
+        const qb = cargoRepo.createQueryBuilder("cargo");
+
         if (search) {
-            whereConditions.push(
-                { cargo_no: Like(`%${search}%`) },
-                { note: Like(`%${search}%`) },
-                { remark: Like(`%${search}%`) },
-                { cargo_status: Like(`%${search}%`) }
-            );
+            qb.where("(cargo.cargo_no LIKE :search OR cargo.note LIKE :search OR cargo.remark LIKE :search OR cargo.cargo_status LIKE :search)", { search: `%${search}%` });
         }
 
-        const [cargos, total] = await cargoRepo.findAndCount({
-            where: whereConditions.length > 0 ? whereConditions : undefined,
-            order: { id: "DESC" },
-            skip,
-            take: limitNum,
-        });
+        if (unassignedOnly === "true") {
+            qb.andWhere(qb => {
+                const subQuery = qb.subQuery()
+                    .select("o.cargo_id")
+                    .from(Order, "o")
+                    .where("o.cargo_id IS NOT NULL")
+                    .getQuery();
+                return "cargo.id NOT IN " + subQuery;
+            });
+
+            qb.andWhere(qb => {
+                const subQuery = qb.subQuery()
+                    .select("co.cargo_id")
+                    .from(CargoOrder, "co")
+                    .where("co.cargo_id IS NOT NULL")
+                    .getQuery();
+                return "cargo.id NOT IN " + subQuery;
+            });
+        }
+
+        const [cargos, total] = await qb
+            .orderBy("cargo.id", "DESC")
+            .skip(skip)
+            .take(limitNum)
+            .getManyAndCount();
 
         res.status(200).json({
             success: true,
@@ -368,11 +413,12 @@ export const assignOrdersToCargo = async (req: Request, res: Response, next: Nex
         }
 
         const cargoOrderRepo = AppDataSource.getRepository(CargoOrder);
+        const { isSplitMove } = req.body;
 
         const existing = await cargoOrderRepo.find({ where: { cargo_id: cargo.id } });
         const existingIds = new Set(existing.map((e) => e.order_id));
 
-        const newEntries = orderIds
+        const newEntries = validOrderIds
             .filter((oid: number) => !existingIds.has(oid))
             .map((oid: number) =>
                 cargoOrderRepo.create({
@@ -388,20 +434,27 @@ export const assignOrdersToCargo = async (req: Request, res: Response, next: Nex
         const orderItemRepo = AppDataSource.getRepository(OrderItem);
         const orderRepo = AppDataSource.getRepository(Order);
 
-        if (validOrderIds.length > 0) {
-            await orderItemRepo
-                .createQueryBuilder()
-                .update(OrderItem)
-                .set({ cargo_id: cargo.id })
-                .where("order_id IN (:...validOrderIds)", { validOrderIds })
-                .execute();
+        if (validOrderIds.length > 0 && !isSplitMove) {
+            const orders = await orderRepo.find({ where: { id: In(validOrderIds) } });
 
-            await orderRepo
-                .createQueryBuilder()
-                .update(Order)
-                .set({ cargo_id: cargo.id })
-                .where("id IN (:...validOrderIds)", { validOrderIds })
-                .execute();
+            for (const order of orders) {
+                const oldCargoId = order.cargo_id;
+
+                const qb = orderItemRepo
+                    .createQueryBuilder()
+                    .update(OrderItem)
+                    .set({ cargo_id: cargo.id })
+                    .where("order_id = :orderId", { orderId: order.id });
+
+                if (oldCargoId) {
+                    qb.andWhere("cargo_id = :oldCargoId", { oldCargoId });
+                } else {
+                    qb.andWhere("cargo_id IS NULL");
+                }
+                await qb.execute();
+                order.cargo_id = cargo.id;
+                await orderRepo.save(order);
+            }
         }
 
         await generateInvoicesForOrders(validOrderIds);

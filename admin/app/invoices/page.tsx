@@ -176,6 +176,7 @@ const InvoiceListPage: React.FC = () => {
 
   const [showTaricModal, setShowTaricModal] = useState(false);
   const [selectedTaricGroup, setSelectedTaricGroup] = useState<any>(null);
+  const [qtyRemarks, setQtyRemarks] = useState("");
 
   const handleSetPrice = async (itemId: string | number) => {
     try {
@@ -251,7 +252,7 @@ const InvoiceListPage: React.FC = () => {
 
       const orderId = selectedItem.order_id || selectedItem.order?.id;
       if (orderId) {
-        await assignOrdersToCargo(cargoIdNum, [Number(orderId)]);
+        await assignOrdersToCargo(cargoIdNum, [Number(orderId)], true);
       }
 
       toast.success("Item reassigned successfully");
@@ -368,9 +369,10 @@ const InvoiceListPage: React.FC = () => {
   const handleUpdateQty = async () => {
     if (!selectedItem || newQty <= 0) return;
     try {
-      await updateOrderItemStatus(selectedItem.id, { qty: newQty });
+      await updateOrderItemStatus(selectedItem.id, { qty: newQty, remarks_cn: qtyRemarks });
       toast.success("Quantity updated successfully");
       setShowQTYModal(false);
+      setQtyRemarks("");
       const invId = Object.keys(expandedStates).find(key =>
         expandedStates[key].data?.detailedItems?.some((it: any) => it.id === selectedItem.id)
       );
@@ -1354,6 +1356,7 @@ const InvoiceListPage: React.FC = () => {
                                                         onClick={() => {
                                                           setSelectedItem(it);
                                                           setNewQty(it.qty);
+                                                          setQtyRemarks(it.remarks_cn || "");
                                                           setShowQTYModal(true);
                                                         }}
                                                         className="flex items-center gap-1.5 px-2 py-1.5 text-[9px] font-bold bg-[#495057] text-white rounded-[4px] hover:bg-[#343A40] transition shadow-sm uppercase"
@@ -1365,7 +1368,7 @@ const InvoiceListPage: React.FC = () => {
                                                           setSelectedItem(it);
                                                           setSplitQty(Math.floor(it.qty * 0.5));
                                                           setTargetCargoId("");
-                                                          setSplitRemarks("");
+                                                          setSplitRemarks(it.remarks_cn || "");
                                                           setShowSPModal(true);
                                                         }}
                                                         className="flex items-center gap-1.5 px-2 py-1.5 text-[9px] font-bold bg-[#F15A24] text-white rounded-[4px] hover:bg-[#D9481B] transition shadow-sm uppercase"
@@ -1791,7 +1794,7 @@ const InvoiceListPage: React.FC = () => {
           <CustomModal
             isOpen={showSPModal}
             onClose={() => setShowSPModal(false)}
-            title="Split Item"
+            title="Split Item Position Across Cargos"
           >
             <div className="p-4 space-y-6">
               <div>
@@ -1811,12 +1814,24 @@ const InvoiceListPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">Enter Remarks (Optional)</label>
+                <label className="block text-sm font-bold text-gray-700 mb-2">Target Cargo (Optional)</label>
+                <Select
+                  options={cargos.map(c => ({ value: String(c.id), label: `${c.cargo_no} (${c.cargo_status})` }))}
+                  value={cargos.map(c => ({ value: String(c.id), label: `${c.cargo_no} (${c.cargo_status})` })).find(opt => opt.value === targetCargoId) || null}
+                  onChange={(opt: any) => setTargetCargoId(opt?.value || "")}
+                  placeholder="Select cargo..."
+                  isClearable
+                  className="text-sm shadow-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">Review (CN)</label>
                 <textarea
                   value={splitRemarks}
                   onChange={(e) => setSplitRemarks(e.target.value)}
                   className="w-full border border-gray-300 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-[#10B981] min-h-[100px]"
-                  placeholder="..."
+                  placeholder="Chinese review or split notes..."
                 />
               </div>
 
@@ -1826,7 +1841,7 @@ const InvoiceListPage: React.FC = () => {
                   disabled={splitQty <= 0 || splitQty >= selectedItem.qty}
                   className="w-full sm:w-auto px-10 py-3 bg-[#10B981] text-white rounded-xl font-bold hover:bg-green-700 transition-all shadow-lg active:scale-95 disabled:opacity-50 disabled:active:scale-100"
                 >
-                  Save Split Changes
+                  Split & Move Item Position
                 </button>
               </div>
             </div>
@@ -1874,17 +1889,27 @@ const InvoiceListPage: React.FC = () => {
           <CustomModal
             isOpen={showQTYModal}
             onClose={() => setShowQTYModal(false)}
-            title={`Update Quantity for Item ${selectedItem.id}`}
+            title={`Update QTY`}
           >
             <div className="p-4 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">New Quantity</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">New QTY</label>
                 <input
                   type="number"
                   value={newQty}
                   onChange={(e) => setNewQty(Number(e.target.value))}
                   min={1}
-                  className="w-full border border-gray-300 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-[#059669]"
+                  className="w-full border border-gray-300 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-[#8CC21B]"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Enter Remarks</label>
+                <textarea
+                  value={qtyRemarks}
+                  onChange={(e) => setQtyRemarks(e.target.value)}
+                  rows={3}
+                  className="w-full border border-gray-300 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-[#8CC21B]"
+                  placeholder="Enter remarks..."
                 />
               </div>
               <div className="flex justify-end gap-2 mt-6">

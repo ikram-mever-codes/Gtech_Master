@@ -15,7 +15,7 @@ export class Taric {
   @PrimaryColumn()
   id!: number;
 
-  @Column({ type: "varchar", length: 11, nullable: true })
+  @Column({ type: "varchar", length: 11, nullable: true, unique: true })
   code?: string;
 
   @Column({ type: "char", length: 1, default: "Y" })

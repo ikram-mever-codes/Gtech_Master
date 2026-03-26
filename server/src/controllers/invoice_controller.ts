@@ -608,6 +608,13 @@ export class InvoiceController {
         });
       }
 
+      const allCargos = await AppDataSource.getRepository(Cargo).find();
+      allCargos.forEach((c) => {
+        if (c.cargo_no) {
+          orderToCargoMap.set(c.cargo_no, c);
+        }
+      });
+
       orders.forEach((o) => {
         if (o.cargo && !orderToCargoMap.has(o.order_no)) {
           orderToCargoMap.set(o.order_no, o.cargo);
@@ -624,15 +631,17 @@ export class InvoiceController {
       const orderItemSummaryByCargoId = new Map();
       orderItemsRaw.forEach((row: any) => {
         if (row.order_id) {
+          const current = orderItemSummaryByOrderId.get(row.order_id) || { total_qty: 0, count_items: 0 };
           orderItemSummaryByOrderId.set(row.order_id, {
-            total_qty: Number(row.total_qty),
-            count_items: Number(row.count_items)
+            total_qty: current.total_qty + Number(row.total_qty),
+            count_items: current.count_items + Number(row.count_items)
           });
         }
         if (row.cargo_id) {
+          const current = orderItemSummaryByCargoId.get(row.cargo_id) || { total_qty: 0, count_items: 0 };
           orderItemSummaryByCargoId.set(row.cargo_id, {
-            total_qty: Number(row.total_qty),
-            count_items: Number(row.count_items)
+            total_qty: current.total_qty + Number(row.total_qty),
+            count_items: current.count_items + Number(row.count_items)
           });
         }
       });
@@ -659,7 +668,6 @@ export class InvoiceController {
           }
         }
 
-        // cargoNo: prefer cargo from map, otherwise if orderNumber looks like a cargo no use it directly
         const cargoNo = cargo?.cargo_no || (inv.orderNumber && !orderIdMap.has(inv.orderNumber) ? inv.orderNumber : undefined);
 
         return {
@@ -674,9 +682,28 @@ export class InvoiceController {
           customTotalQty,
           cargoNo: cargoNo || inv.orderNumber,
         };
+      })
+        .filter(inv => {
+          if (req.query.status === 'draft') {
+            return inv.customItemCount > 0;
+          }
+          return true;
+        });
+
+      const finalDataMap = new Map();
+      data.forEach(inv => {
+        const key = inv.cargoNo || inv.orderNumber;
+        if (!finalDataMap.has(key)) {
+          finalDataMap.set(key, inv);
+        } else {
+          const existing = finalDataMap.get(key);
+          if (inv.orderNumber === inv.cargoNo) {
+            finalDataMap.set(key, inv);
+          }
+        }
       });
 
-      return res.status(200).json({ success: true, data });
+      return res.status(200).json({ success: true, data: Array.from(finalDataMap.values()) });
     } catch (error) {
       console.error(error);
       return next(error);
@@ -793,6 +820,22 @@ export class InvoiceController {
         return taricId ? `taric_${taricId}` : "unknown";
       };
 
+      const manualTaricCodes: string[] = [];
+      orderItems.forEach((oi: any) => {
+        if (oi.set_taric_code) {
+          const codes = oi.set_taric_code.split("/");
+          codes.forEach((c: string) => {
+            if (c && c.trim()) manualTaricCodes.push(c.trim());
+          });
+        }
+      });
+
+      const uniqueManualCodes = [...new Set(manualTaricCodes)];
+      const manualTarics = uniqueManualCodes.length > 0
+        ? await AppDataSource.getRepository(Taric).find({ where: { code: In(uniqueManualCodes) } })
+        : [];
+      const manualTaricMap = new Map(manualTarics.map(t => [t.code, t]));
+
       const taricGroupsMap = new Map<string, any>();
       orderItems.forEach((oi: any) => {
         const item = oi.item;
@@ -803,15 +846,26 @@ export class InvoiceController {
 
         if (!taricGroupsMap.has(groupKey)) {
           let displayCode = oi.item?.taric?.code || "-";
+          let displayName = taric?.name_en || (isProjectItem ? "Project Item" : "Unknown");
+          let displayRate = taric?.duty_rate || 0;
+
           if (oi.set_taric_code) {
             displayCode = `${oi.set_taric_code}`;
+            const codes = displayCode.split("/");
+            const targetCode = codes.length > 1 ? codes[1].trim() : codes[0].trim();
+
+            const mTaric = manualTaricMap.get(targetCode);
+            if (mTaric) {
+              displayName = mTaric.name_en || displayName;
+              displayRate = mTaric.duty_rate !== undefined ? mTaric.duty_rate : displayRate;
+            }
           }
 
           taricGroupsMap.set(groupKey, {
-            taricId: groupKey, // Use groupKey as the ID to avoid numeric collisions
-            taricNameEn: taric?.name_en || (isProjectItem ? "Project Item" : "Unknown"),
+            taricId: groupKey,
+            taricNameEn: displayName,
             taricCode: displayCode,
-            dutyRate: taric?.duty_rate || 0,
+            dutyRate: displayRate,
             totalQty: 0,
             totalPrice: 0,
             unitPrice: oi?.eur_special_price || oi?.price || item?.price || 0,
