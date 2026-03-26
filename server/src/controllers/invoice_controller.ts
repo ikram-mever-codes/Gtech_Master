@@ -682,9 +682,28 @@ export class InvoiceController {
           customTotalQty,
           cargoNo: cargoNo || inv.orderNumber,
         };
+      })
+        .filter(inv => {
+          if (req.query.status === 'draft') {
+            return inv.customItemCount > 0;
+          }
+          return true;
+        });
+
+      const finalDataMap = new Map();
+      data.forEach(inv => {
+        const key = inv.cargoNo || inv.orderNumber;
+        if (!finalDataMap.has(key)) {
+          finalDataMap.set(key, inv);
+        } else {
+          const existing = finalDataMap.get(key);
+          if (inv.orderNumber === inv.cargoNo) {
+            finalDataMap.set(key, inv);
+          }
+        }
       });
 
-      return res.status(200).json({ success: true, data });
+      return res.status(200).json({ success: true, data: Array.from(finalDataMap.values()) });
     } catch (error) {
       console.error(error);
       return next(error);
