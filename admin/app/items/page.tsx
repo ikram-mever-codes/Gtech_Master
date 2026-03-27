@@ -729,27 +729,24 @@ const ItemsManagementPage: React.FC = () => {
     return data.filter((item) => {
       const it = item as any;
 
-      // 1. DEDICATED EAN SEARCH (Fixed Logic)
       if (activeTab === "items" && filters.eanSearch) {
         const eanMatches = matchesEANSearch(it.ean, filters.eanSearch);
         if (!eanMatches) return false;
       }
 
-      // 2. GLOBAL SEARCH (Name, DE No, ID)
       if (filters.search) {
         const searchLower = filters.search.toLowerCase();
         const matchesGlobal =
           it.id?.toString().includes(searchLower) ||
+          it.name?.toLowerCase().includes(searchLower) ||
           it.de_no?.toLowerCase().includes(searchLower) ||
           it.item_name?.toLowerCase().includes(searchLower) ||
           it.item_no_de?.toLowerCase().includes(searchLower) ||
           it.name_en?.toLowerCase().includes(searchLower) ||
-          matchesEANSearch(it.ean, filters.search); // Also check EAN in global search
+          matchesEANSearch(it.ean, filters.search);
 
         if (!matchesGlobal) return false;
       }
-
-      // 3. OTHER FILTERS
       if (filters.isActive && it.is_active !== filters.isActive) return false;
       if (filters.category && it.cat_id?.toString() !== filters.category)
         return false;
@@ -1389,8 +1386,8 @@ const ItemsManagementPage: React.FC = () => {
             <button
               onClick={() => setShowFilters(!showFilters)}
               className={`px-4 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2 ${showFilters
-                  ? "bg-[#8CC21B] text-white"
-                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                ? "bg-[#8CC21B] text-white"
+                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                 }`}
             >
               <FunnelIcon className="w-5 h-5" />
@@ -1449,8 +1446,8 @@ const ItemsManagementPage: React.FC = () => {
                   key={tab.key}
                   onClick={() => setActiveTab(tab.key as TabType)}
                   className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${activeTab === tab.key
-                      ? "border-primary text-primary"
-                      : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                    ? "border-primary text-primary"
+                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
                     }`}
                 >
                   <tab.icon className="w-5 h-5" />

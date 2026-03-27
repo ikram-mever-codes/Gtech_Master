@@ -18,13 +18,13 @@ export const getAllSuppliers = async (req: Request, res: Response, next: NextFun
         let whereClause: any = {};
         if (search) {
             whereClause = [
-                { name: Like(`%${search}%`) },
-                { name_cn: Like(`%${search}%`) },
-                { company_name: Like(`%${search}%`) },
-                { email: Like(`%${search}%`) },
-                { contact_person: Like(`%${search}%`) },
-                { city: Like(`%${search}%`) },
-                { province: Like(`%${search}%`) },
+                { name: ILike(`%${search}%`) },
+                { name_cn: ILike(`%${search}%`) },
+                { company_name: ILike(`%${search}%`) },
+                { email: ILike(`%${search}%`) },
+                { contact_person: ILike(`%${search}%`) },
+                { city: ILike(`%${search}%`) },
+                { province: ILike(`%${search}%`) },
             ];
         }
 
