@@ -14,6 +14,7 @@ export interface Item {
   item_name_cn: string | null;
   ean: string | null;
   is_active: string;
+  is_updated: boolean; // Add is_updated field
   parent_id: number | null;
   taric_id: number | null;
   category_id: number | null;
@@ -97,6 +98,7 @@ export interface ItemDetails {
   supplier_id: number | null;
   supplier_name: string | null;
   isActive: boolean;
+  is_updated: boolean; // Add is_updated field
   parent: {
     noDE: string;
     nameDE: string;
@@ -187,6 +189,7 @@ export interface StatisticsResponse {
     activeItems: number;
     inactiveItems: number;
     itemsWithStock: number;
+    itemsNeedingSync: number; // Add this field
     itemsByCategory: Array<{
       category: string;
       count: string;
@@ -194,6 +197,7 @@ export interface StatisticsResponse {
   };
 }
 
+// Existing getItems function (updated to handle is_updated)
 export const getItems = async (params?: {
   page?: number;
   limit?: number;
@@ -205,6 +209,7 @@ export const getItems = async (params?: {
   taricId?: string;
   sortBy?: string;
   sortOrder?: "ASC" | "DESC";
+  includeOnlyUpdated?: boolean; // Add optional filter for updated items only
 }) => {
   try {
     const response = await api.get("/items", {
@@ -421,6 +426,85 @@ export const searchItems = async (query: string, limit: number = 10) => {
     throw error;
   }
 };
+
+// NEW: Get pending sync count
+export const getPendingSyncCount = async () => {
+  try {
+    const response = await api.get("/items/sync/pending-count");
+    return response;
+  } catch (error) {
+    handleApiError(error, "Failed to fetch pending sync count");
+    throw error;
+  }
+};
+
+// NEW: Reset updated flags
+export const resetUpdatedFlags = async (ids?: number[]) => {
+  try {
+    toast.loading("Resetting sync flags...", loadingStyles);
+    const response = await api.post("/items/sync/reset-flags", { ids });
+    toast.dismiss();
+    toast.success("Sync flags reset successfully", successStyles);
+    return response;
+  } catch (error) {
+    handleApiError(error, "Failed to reset sync flags");
+    throw error;
+  }
+};
+
+// UPDATED: Export items to CSV with better error handling
+export const exportItemsToCSV = async (showToast: boolean = true) => {
+  try {
+    if (showToast) {
+      toast.loading("Exporting updated items...", loadingStyles);
+    }
+
+    const response = await fetch(`${BASE_URL}/items/export/csv`, {
+      method: "GET",
+      credentials: "include",
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || "Export failed");
+    }
+
+    const blob = await response.blob();
+
+    // Check if the response is a CSV (has content)
+    if (blob.size === 0) {
+      if (showToast) {
+        toast.dismiss();
+        toast.error("No items to export. All items are already synced.");
+      }
+      return { success: false, message: "No items to export" };
+    }
+
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `updated_Item_List_${new Date().toISOString().slice(0, 19).replace(/:/g, "-")}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+
+    if (showToast) {
+      toast.dismiss();
+      toast.success("Items exported successfully", successStyles);
+    }
+
+    return { success: true };
+  } catch (error) {
+    if (showToast) {
+      toast.dismiss();
+      handleApiError(error, "Failed to export CSV");
+    }
+    throw error;
+  }
+};
+
+// ==================== TARIC Functions ====================
 
 export interface Taric {
   id: number;
@@ -663,6 +747,8 @@ export const getAllTaricsSimple = async (): Promise<any> => {
   }
 };
 
+// ==================== Parent Functions ====================
+
 export const getParents = async (params?: {
   page?: number;
   limit?: number;
@@ -781,6 +867,8 @@ export const searchParents = async (query: string, limit: number = 10) => {
   }
 };
 
+// ==================== Warehouse Functions ====================
+
 export const getWarehouseItems = async (params?: {
   page?: number;
   limit?: number;
@@ -820,6 +908,8 @@ export const updateWarehouseStock = async (
   }
 };
 
+// ==================== Variation Functions ====================
+
 export const getItemVariations = async (itemId: number) => {
   try {
     const response = await api.get(`/items/${itemId}/variations`);
@@ -852,6 +942,8 @@ export const updateItemVariations = async (
     throw error;
   }
 };
+
+// ==================== Quality Criteria Functions ====================
 
 export const getItemQualityCriteria = async (itemId: number) => {
   try {
@@ -918,6 +1010,8 @@ export const deleteQualityCriterion = async (id: number) => {
   }
 };
 
+// ==================== PDF Functions ====================
+
 export const downloadOrderPdf = async (id: string) => {
   try {
     const response: any = await api.get(`/offers/${id}/download-pdf`, {
@@ -936,25 +1030,5 @@ export const downloadOrderPdf = async (id: string) => {
   } catch (error) {
     handleApiError(error, "Failed to download PDF");
     throw error;
-  }
-};
-
-export const exportItemsToCSV = async () => {
-  try {
-    const response = await fetch(`${BASE_URL}/items/export/csv`, {
-      method: "GET",
-      credentials: "include",
-    });
-    const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "updated_Item_List.csv";
-    document.body.appendChild(a);
-    a.click();
-    window.URL.revokeObjectURL(url);
-    document.body.removeChild(a);
-  } catch (error) {
-    console.error("Error exporting CSV:", error);
   }
 };
