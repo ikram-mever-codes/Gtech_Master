@@ -1407,18 +1407,18 @@ const InvoiceListPage: React.FC = () => {
                                               { header: "Status", render: (it: any) => it.status, width: "60px" },
                                               { header: "V(dm³)", render: (it: any) => it.v?.toFixed(2), width: "60px", align: "center" },
                                               { header: "W(kg)", render: (it: any) => it.w?.toFixed(2), width: "60px", align: "center" },
-                                              {
-                                                header: "QTY",
-                                                render: (it: any) => (
-                                                  <div className="flex flex-col items-center">
-                                                    <span className="font-bold">
-                                                      {it.qty_split && it.qty_split > it.qty ? `${it.qty}/${it.qty_split}` : it.qty}
-                                                    </span>
-                                                  </div>
-                                                ),
-                                                width: "60px",
-                                                align: "center"
-                                              },
+                                                {
+                                                  header: "QTY",
+                                                  render: (it: any) => (
+                                                    <div className="flex flex-col items-center">
+                                                      <span className="font-bold">
+                                                        {it.qty_label ? `${it.qty_label}/${it.qty}` : it.qty}
+                                                      </span>
+                                                    </div>
+                                                  ),
+                                                  width: "60px",
+                                                  align: "center"
+                                                },
                                               { header: "RMB", render: (it: any) => it.rmb_special_price || "0", width: "45px", align: "center" },
                                               {
                                                 header: "EK",
