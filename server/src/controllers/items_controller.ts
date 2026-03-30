@@ -897,7 +897,7 @@ export const updateItem = async (
         try {
           const newWarehouseItem = new WarehouseItem();
           newWarehouseItem.item_id = item.id;
-          if (item.ItemID_DE) newWarehouseItem.ItemID_DE = item.ItemID_DE;
+          newWarehouseItem.ItemID_DE = item.ItemID_DE ? Number(item.ItemID_DE) : undefined;
           newWarehouseItem.item_no_de = warehouseItemData.item_no_de || "";
           newWarehouseItem.item_name_de = warehouseItemData.item_name_de || item.item_name || "";
           newWarehouseItem.item_name_en = item.item_name || "";
