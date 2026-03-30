@@ -14,6 +14,7 @@ import { Invoice } from "../models/invoice";
 import { Cargo } from "../models/cargos";
 import { CargoOrder } from "../models/cargo_orders";
 import { Customer } from "../models/customers";
+import { SupplierItem } from "../models/supplier_items";
 import { generateInvoicesForOrders } from "./cargo_controller";
 
 const padorder_no = (n: number) => `MA${String(n).padStart(4, "0")}`;
@@ -75,12 +76,23 @@ export const createOrder = async (
     await orderRepo.save(order);
 
     const itemRepo = queryRunner.manager.getRepository(Item);
+    const supplierItemRepo = queryRunner.manager.getRepository(SupplierItem);
+
     const itemIds = items.map((it: any) => Number(it.item_id));
     const dbItems = await itemRepo
       .createQueryBuilder("i")
       .where("i.id IN (:...itemIds)", { itemIds })
       .getMany();
     const itemMap = new Map(dbItems.map((i) => [i.id, i]));
+
+    // Fetch RMB_Price from supplier_items for all items
+    const supplierItems = await supplierItemRepo
+      .createQueryBuilder("si")
+      .where("si.item_id IN (:...itemIds)", { itemIds })
+      .getMany();
+    const rmbPriceMap = new Map(
+      supplierItems.map((si) => [si.item_id, si.price_rmb]),
+    );
 
     const lines = items.map((it: any) => {
       const item_id = Number(it.item_id);
@@ -94,13 +106,14 @@ export const createOrder = async (
       }
 
       const dbItem = itemMap.get(item_id);
+      const rmbPrice = rmbPriceMap.get(item_id);
 
       return orderItemsRepo.create({
         order_id: order.id,
         item_id,
         qty,
         remark_de: it.remark_de,
-        rmb_special_price: dbItem?.RMB_Price,
+        rmb_special_price: rmbPrice, // Use RMB_Price from supplier_items
         price: dbItem?.price,
         currency: dbItem?.currency,
         taric_id: dbItem?.taric_id,
@@ -157,12 +170,12 @@ export const createOrder = async (
   } catch (error) {
     try {
       await queryRunner.rollbackTransaction();
-    } catch { }
+    } catch {}
     return next(error);
   } finally {
     try {
       await queryRunner.release();
-    } catch { }
+    } catch {}
   }
 };
 
@@ -233,12 +246,23 @@ export const updateOrder = async (
         .execute();
 
       const itemRepo = queryRunner.manager.getRepository(Item);
+      const supplierItemRepo = queryRunner.manager.getRepository(SupplierItem);
+
       const itemIds = items.map((it: any) => Number(it.item_id));
       const dbItems = await itemRepo
         .createQueryBuilder("i")
         .where("i.id IN (:...itemIds)", { itemIds })
         .getMany();
       const itemMap = new Map(dbItems.map((i) => [i.id, i]));
+
+      // Fetch RMB_Price from supplier_items for all items
+      const supplierItems = await supplierItemRepo
+        .createQueryBuilder("si")
+        .where("si.item_id IN (:...itemIds)", { itemIds })
+        .getMany();
+      const rmbPriceMap = new Map(
+        supplierItems.map((si) => [si.item_id, si.price_rmb]),
+      );
 
       const newLines = items.map((it: any) => {
         const item_id = Number(it.item_id);
@@ -250,13 +274,14 @@ export const updateOrder = async (
           throw new ErrorHandler("Invalid qty in items[]", 400);
 
         const dbItem = itemMap.get(item_id);
+        const rmbPrice = rmbPriceMap.get(item_id);
 
         return orderItemsRepo.create({
           order_id: order.id,
           item_id,
           qty,
           remark_de: it.remark_de,
-          rmb_special_price: dbItem?.RMB_Price,
+          rmb_special_price: rmbPrice, // Use RMB_Price from supplier_items
           price: dbItem?.price,
           currency: dbItem?.currency,
           taric_id: dbItem?.taric_id,
@@ -317,12 +342,12 @@ export const updateOrder = async (
   } catch (error) {
     try {
       await queryRunner.rollbackTransaction();
-    } catch { }
+    } catch {}
     return next(error);
   } finally {
     try {
       await queryRunner.release();
-    } catch { }
+    } catch {}
   }
 };
 
@@ -406,6 +431,15 @@ export const getAllOrders = async (
       if (item.ItemID_DE) itemByDE.set(item.ItemID_DE, item);
     });
 
+    // Fetch RMB_Price from supplier_items for all items
+    const supplierItemRepo = AppDataSource.getRepository(SupplierItem);
+    const supplierItems = await supplierItemRepo.find({
+      where: { item_id: In(itemIds.length ? itemIds : [0]) },
+    });
+    const rmbPriceMap = new Map(
+      supplierItems.map((si) => [si.item_id, si.price_rmb]),
+    );
+
     const mappedOrders = orders.map((order) => ({
       ...order,
       supplier_name:
@@ -437,6 +471,9 @@ export const getAllOrders = async (
           order.supplier?.name ||
           null;
 
+        // Get RMB_Price from supplier_items
+        const rmbPrice = rmbPriceMap.get(oi.item_id || itemDetails?.id || 0);
+
         return {
           ...oi,
           de_no: warehouseItem?.item_no_de || "-",
@@ -458,23 +495,24 @@ export const getAllOrders = async (
           taric_code: oi.set_taric_code || itemDetails?.taric?.code || "-",
           supplier_id: itemDetails?.supplier_id || order.supplier_id,
           supplier_name: resolvedSupplierName || "Unassigned",
+          rmb_price: rmbPrice, // Add RMB_Price from supplier_items
           item: itemDetails,
           warehouse_data: warehouseItem
             ? {
-              id: warehouseItem.id,
-              item_no_de: warehouseItem.item_no_de,
-              item_name_de: warehouseItem.item_name_de,
-              item_name_en: warehouseItem.item_name_en,
-              stock_qty: warehouseItem.stock_qty,
-              msq: warehouseItem.msq,
-              buffer: warehouseItem.buffer,
-              is_stock_item: warehouseItem.is_stock_item,
-              is_SnSI: warehouseItem.is_SnSI,
-              ship_class: warehouseItem.ship_class,
-              is_active: warehouseItem.is_active,
-              is_no_auto_order: warehouseItem.is_no_auto_order,
-              category_id: warehouseItem.category_id,
-            }
+                id: warehouseItem.id,
+                item_no_de: warehouseItem.item_no_de,
+                item_name_de: warehouseItem.item_name_de,
+                item_name_en: warehouseItem.item_name_en,
+                stock_qty: warehouseItem.stock_qty,
+                msq: warehouseItem.msq,
+                buffer: warehouseItem.buffer,
+                is_stock_item: warehouseItem.is_stock_item,
+                is_SnSI: warehouseItem.is_SnSI,
+                ship_class: warehouseItem.ship_class,
+                is_active: warehouseItem.is_active,
+                is_no_auto_order: warehouseItem.is_no_auto_order,
+                category_id: warehouseItem.category_id,
+              }
             : null,
         };
       }),
@@ -502,6 +540,7 @@ export const getOrderById = async (
 
     const orderRepository = AppDataSource.getRepository(Order);
     const orderItemsRepository = AppDataSource.getRepository(OrderItem);
+    const supplierItemRepository = AppDataSource.getRepository(SupplierItem);
 
     const order = await orderRepository.findOne({
       where: { id: Number(orderId) },
@@ -518,6 +557,19 @@ export const getOrderById = async (
     });
 
     if (!order) return next(new ErrorHandler("Order not found", 404));
+
+    // Get all item IDs from order items
+    const itemIds = (order.orderItems || [])
+      .map((oi) => oi.item_id || oi.item?.id)
+      .filter((id) => id !== undefined && id !== null);
+
+    // Fetch RMB_Price from supplier_items for all items
+    const supplierItems = await supplierItemRepository.find({
+      where: { item_id: In(itemIds.length ? itemIds : [0]) },
+    });
+    const rmbPriceMap = new Map(
+      supplierItems.map((si) => [si.item_id, si.price_rmb]),
+    );
 
     const result = {
       id: order.id,
@@ -545,6 +597,9 @@ export const getOrderById = async (
               relations: ["taric"],
             });
           }
+
+          const rmbPrice = rmbPriceMap.get(oi.item_id || item?.id || 0);
+
           return {
             id: oi.id,
             order_id: oi.order_id,
@@ -564,6 +619,7 @@ export const getOrderById = async (
             itemName:
               item?.item_name ||
               (oi.ItemID_DE ? `Unknown (DE: ${oi.ItemID_DE})` : "Unknown"),
+            rmb_price: rmbPrice, // Add RMB_Price from supplier_items
             item: item,
           };
         }),
@@ -625,14 +681,15 @@ export const deleteOrder = async (
   } catch (error) {
     try {
       await queryRunner.rollbackTransaction();
-    } catch { }
+    } catch {}
     return next(error);
   } finally {
     try {
       await queryRunner.release();
-    } catch { }
+    } catch {}
   }
 };
+
 export const generateLabelPDF = async (
   req: Request,
   res: Response,
@@ -833,6 +890,7 @@ export const updateOrderItemStatus = async (
     return next(error);
   }
 };
+
 export const updateOrderItemLabel = async (
   req: Request,
   res: Response,
@@ -926,7 +984,10 @@ export const splitOrderItem = async (
     if (targetCargoId) {
       const cargoOrderRepo = queryRunner.manager.getRepository(CargoOrder);
       const existingLink = await cargoOrderRepo.findOne({
-        where: { cargo_id: Number(targetCargoId), order_id: Number(orderItem.order_id) },
+        where: {
+          cargo_id: Number(targetCargoId),
+          order_id: Number(orderItem.order_id),
+        },
       });
       if (!existingLink) {
         await cargoOrderRepo.save(

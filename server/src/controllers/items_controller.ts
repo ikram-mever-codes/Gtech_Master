@@ -27,6 +27,24 @@ import { UserRole } from "../models/users";
 import { filterDataByRole } from "../utils/dataFilter";
 import { AuthorizedRequest } from "../middlewares/authorized";
 
+const getRMBPriceFromSupplier = async (
+  itemId: number,
+): Promise<number | null> => {
+  try {
+    const supplierItemRepository = AppDataSource.getRepository(SupplierItem);
+    const supplierItem = await supplierItemRepository.findOne({
+      where: { item_id: itemId },
+    });
+
+    // Return the price_rmb if found, otherwise null
+    return supplierItem?.price_rmb || null;
+  } catch (error) {
+    console.error(`Error fetching RMB_Price for item ${itemId}:`, error);
+    return null;
+  }
+};
+
+// Modified getItems function
 export const getItems = async (
   req: Request,
   res: Response,
@@ -144,6 +162,13 @@ export const getItems = async (
       }
     });
 
+    // Fetch RMB_Price for all items from supplier_items
+    const rmbPriceMap = new Map<number, number | null>();
+    for (const item of items) {
+      const rmbPrice = await getRMBPriceFromSupplier(item.id);
+      rmbPriceMap.set(item.id, rmbPrice);
+    }
+
     const formattedItems = await Promise.all(
       items.map(async (item) => {
         let parentData = null;
@@ -187,6 +212,7 @@ export const getItems = async (
         }
 
         const ean = item.ean || warehouseData?.ean || null;
+        const rmbPrice = rmbPriceMap.get(item.id) || null;
 
         return {
           id: item.id,
@@ -216,6 +242,7 @@ export const getItems = async (
           taric_code: taricData?.code || null,
           taric_description: taricData?.description_de || null,
           is_updated: item.is_updated,
+          rmb_price: rmbPrice, // Add RMB_Price from supplier_items
 
           // Include warehouse data if needed
           warehouse_data: warehouseData
@@ -260,6 +287,7 @@ export const getItems = async (
   }
 };
 
+// Modified getItemById function
 export const getItemById = async (
   req: Request,
   res: Response,
@@ -341,6 +369,9 @@ export const getItemById = async (
     const de_no = primaryWarehouseItem?.item_no_de || item.parent?.de_no || "";
     const ean = item.ean || primaryWarehouseItem?.ean || "";
 
+    // Fetch RMB_Price from supplier_items (dynamic query)
+    const rmbPrice = await getRMBPriceFromSupplier(parseInt(id));
+
     const formattedItem = {
       id: item.id,
       itemNo: `${item.id} / ${de_no}`,
@@ -363,7 +394,7 @@ export const getItemById = async (
         isActive: item.parent?.is_active === "Y",
         isSpecialItem: item.parent?.is_NwV === "Y",
         priceEUR: 0,
-        priceRMB: 0,
+        priceRMB: rmbPrice || 0, // Use RMB_Price from supplier_items
         isEURSpecial: item.is_eur_special || "N",
         isRMBSpecial: item.is_rmb_special || "N",
         isDimensionSpecial: item.is_dimension_special || "N",
@@ -421,7 +452,7 @@ export const getItemById = async (
         isSnSI: primaryWarehouseItem?.is_SnSI === "Y",
         foq: item.FOQ?.toString() || "0",
         fsq: item.FSQ?.toString() || "0",
-        rmbPrice: item.RMB_Price?.toString() || "0",
+        rmbPrice: rmbPrice?.toString() || "0", // Use RMB_Price from supplier_items
         isDimensionSpecial: item.is_dimension_special || "N",
         suppCat: item.supp_cat || "",
       },
@@ -2311,9 +2342,13 @@ export const updateTaric = async (
     ];
 
     if (req.body.code !== undefined && req.body.code !== taric.code) {
-      const existingTaric = await taricRepository.findOne({ where: { code: req.body.code } });
+      const existingTaric = await taricRepository.findOne({
+        where: { code: req.body.code },
+      });
       if (existingTaric) {
-        return next(new ErrorHandler("TARIC with this code already exists", 400));
+        return next(
+          new ErrorHandler("TARIC with this code already exists", 400),
+        );
       }
     }
 
@@ -2573,6 +2608,7 @@ export const exportItemsToCSV = async (
     const itemRepository = AppDataSource.getRepository(Item);
     const warehouseRepository = AppDataSource.getRepository(WarehouseItem);
     const variationRepository = AppDataSource.getRepository(VariationValue);
+    const supplierItemRepository = AppDataSource.getRepository(SupplierItem);
 
     // Get only items that have is_updated = true
     const items = await itemRepository.find({
@@ -2590,6 +2626,20 @@ export const exportItemsToCSV = async (
         data: [],
       });
     }
+
+    // Fetch all supplier items for the items we're exporting
+    const itemIds = items.map((item) => item.id);
+    const supplierItems = await supplierItemRepository.find({
+      where: { item_id: In(itemIds) },
+    });
+
+    // Create a map for quick lookup of RMB_Price by item_id
+    const rmbPriceMap = new Map<number, number>();
+    supplierItems.forEach((supplierItem) => {
+      if (supplierItem.price_rmb) {
+        rmbPriceMap.set(supplierItem.item_id, supplierItem.price_rmb);
+      }
+    });
 
     const formatDate = (date: Date | undefined) => {
       if (!date) return "";
@@ -2619,8 +2669,8 @@ export const exportItemsToCSV = async (
       return variations[0] || null;
     };
 
-    const getPriceColumns = (item: any) => {
-      const basePrice = item.RMB_Price || 0;
+    const getPriceColumns = (rmbPrice: number) => {
+      const basePrice = rmbPrice || 0;
       const priceLevels = [1, 2, 5, 10, 25, 50, 100, 200, 500, 1000, 2000];
 
       return priceLevels.map((level) => {
@@ -2722,7 +2772,10 @@ export const exportItemsToCSV = async (
       try {
         const warehouseData = await getWarehouseData(item.id, item.ItemID_DE);
         const variationData = await getVariationValues(item.id);
-        const priceColumns = getPriceColumns(item);
+
+        // Get RMB_Price from the map (from supplier_items)
+        const rmbPrice = rmbPriceMap.get(item.id) || 0;
+        const priceColumns = getPriceColumns(rmbPrice);
 
         const parent = item.parent;
 
@@ -2767,23 +2820,17 @@ export const exportItemsToCSV = async (
           "0",
           "0",
           warehouseData?.buffer?.toString() || "0",
-          Number(item.RMB_Price || 0)
-            .toFixed(2)
-            .replace(".", ","),
+          rmbPrice.toFixed(2).replace(".", ","), // Using RMB_Price from supplier_items
           "Y",
           item.many_components?.toString() || "1",
           item.effort_rating?.toString() || "3",
-          Number(item.RMB_Price || 0)
-            .toFixed(2)
-            .replace(".", ","),
+          rmbPrice.toFixed(2).replace(".", ","), // Using RMB_Price from supplier_items
           volume.toFixed(2).replace(".", ","),
           "0,00",
           "0,00",
           "0,00",
           "0,00",
-          Number(item.RMB_Price || 0)
-            .toFixed(2)
-            .replace(".", ","),
+          rmbPrice.toFixed(2).replace(".", ","), // Using RMB_Price from supplier_items
           ...priceColumns,
           ...bulkQuantities.map((qty) => qty.toString()),
           "19",

@@ -80,9 +80,6 @@ export class Item {
   remark?: string;
 
   @Column({ type: "decimal", precision: 10, scale: 2, nullable: true })
-  RMB_Price?: number;
-
-  @Column({ type: "decimal", precision: 10, scale: 2, nullable: true })
   price?: number;
 
   @Column({ type: "varchar", length: 10, nullable: true })
