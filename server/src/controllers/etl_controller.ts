@@ -3,20 +3,11 @@ import { AppDataSource } from "../config/database";
 import fs from "fs";
 import path from "path";
 import { parse } from "csv-parse";
-import { In, Not } from "typeorm";
+import { In } from "typeorm";
 import { Order } from "../models/orders";
 import { OrderItem } from "../models/order_items";
 import { Item } from "../models/items";
 import { Category } from "../models/categories";
-
-interface ProcessBatchResult {
-  processed: number;
-  created: number;
-  updated: number;
-  skipped: number;
-  failed: number;
-  errors: Array<{ type: string; message: string; data?: any }>;
-}
 
 interface CategoryMapping {
   csvCategoryId: number;
@@ -28,7 +19,7 @@ export class EtlController {
   private static publicPath = path.join(__dirname, "../../public");
   private static readonly BATCH_SIZE = 100;
 
-  // Valid order statuses from WaWi (only these should be processed)
+  // Valid order statuses from WaWi (for active orders)
   private static readonly VALID_WAWI_STATUSES = [
     "in Bearbeitung",
     "teilgeliefert",
@@ -72,18 +63,6 @@ export class EtlController {
     res: Response,
     next: NextFunction,
   ) {
-    const startTime = Date.now();
-    const result = {
-      ordersProcessed: 0,
-      ordersCreated: 0,
-      ordersUpdated: 0,
-      ordersRemoved: 0,
-      itemsProcessed: 0,
-      itemsCreated: 0,
-      itemsUpdated: 0,
-      errors: [] as string[],
-    };
-
     try {
       console.log("=".repeat(50));
       console.log("Starting ETL process...");
@@ -97,8 +76,8 @@ export class EtlController {
       console.log("\n📁 Step 1: Syncing categories...");
       await EtlController.syncRequiredCategories(categoryRepo);
 
-      // Step 2: Read and process orders (ONLY orders with valid status)
-      console.log("\n📦 Step 2: Processing orders...");
+      // Step 2: Read orders from CSV
+      console.log("\n📦 Step 2: Reading orders from CSV...");
       const ordersFilePath = path.join(EtlController.publicPath, "orders.csv");
       const orderRecords = await EtlController.readCsv(ordersFilePath);
 
@@ -109,31 +88,18 @@ export class EtlController {
       const orderRows = orderRecords.slice(1);
       console.log(`Found ${orderRows.length} orders in CSV`);
 
-      // Filter orders based on WaWi status
-      const validOrders = orderRows.filter((row) => {
-        const status = row[2]?.toString().trim().toLowerCase();
-        return EtlController.VALID_WAWI_STATUSES.includes(status);
-      });
-
-      console.log(
-        `Filtered to ${validOrders.length} orders with valid status (${EtlController.VALID_WAWI_STATUSES.join(", ")})`,
-      );
-      console.log(
-        `Skipped ${orderRows.length - validOrders.length} orders with other statuses`,
-      );
-
-      // Process ALL valid orders - create or update
+      // Step 3: Process ALL orders from CSV (create or update based on status)
+      console.log("\n📋 Step 3: Processing orders...");
       const orderMap = await EtlController.processAllOrders(
-        validOrders,
+        orderRows,
         orderRepo,
         categoryRepo,
-        result,
       );
 
-      console.log(`\n✅ Orders complete: ${orderMap.size} total active orders`);
+      console.log(`\n✅ Orders processed: ${orderMap.size} orders in database`);
 
-      // Step 3: Process order items
-      console.log("\n📋 Step 3: Processing order items...");
+      // Step 4: Process order items
+      console.log("\n📋 Step 4: Processing order items...");
       const orderItemsFilePath = path.join(
         EtlController.publicPath,
         "order_items.csv",
@@ -145,11 +111,10 @@ export class EtlController {
         if (itemRecords.length > 1) {
           console.log(`Found ${itemRecords.length - 1} order items in CSV`);
 
-          await EtlController.processAllOrderItems(
+          await EtlController.processOrderItems(
             itemRecords.slice(1),
             orderItemRepo,
             orderMap,
-            result,
           );
         } else {
           console.log("No order items found in CSV");
@@ -158,48 +123,33 @@ export class EtlController {
         console.log("order_items.csv not found");
       }
 
-      // Step 4: Handle orders with zero quantities or completed status
-      console.log("\n🔍 Step 4: Checking for orders to remove...");
-      const removedOrders = await EtlController.removeCompletedOrders(
+      // Step 5: Delete orders that are NOT in the CSV (orders removed from MIS/WaWi)
+      console.log("\n🗑️ Step 5: Removing orders not in MIS...");
+      const deletedOrders = await EtlController.deleteOrdersNotInCSV(
         orderRepo,
         orderItemRepo,
-        validOrders,
+        orderRows, // Use ALL orders from CSV for comparison
       );
-      result.ordersRemoved = removedOrders.length;
 
-      if (removedOrders.length > 0) {
-        console.log(`\n✅ Removed ${removedOrders.length} orders:`);
-        removedOrders.forEach((orderNo) => {
-          console.log(`   - Order ${orderNo} removed from active list`);
+      if (deletedOrders.length > 0) {
+        console.log(`\n✅ Removed ${deletedOrders.length} orders not in MIS:`);
+        deletedOrders.forEach((orderNo) => {
+          console.log(`   - Order ${orderNo} deleted`);
         });
       } else {
-        console.log("No orders found to remove");
+        console.log("No orders to remove");
       }
 
-      const duration = ((Date.now() - startTime) / 1000).toFixed(2);
       console.log("\n" + "=".repeat(50));
       console.log("✅ ETL process completed successfully");
       console.log("=".repeat(50));
-      console.log(`Duration: ${duration} seconds`);
-      console.log(
-        `Orders: ${result.ordersCreated} created, ${result.ordersUpdated} updated`,
-      );
-      console.log(
-        `Items: ${result.itemsCreated} created, ${result.itemsUpdated} updated`,
-      );
-      console.log(`Removed: ${result.ordersRemoved} orders`);
 
       res.status(200).json({
         success: true,
         message: "ETL process completed successfully",
         summary: {
-          duration: `${duration}s`,
-          ordersCreated: result.ordersCreated,
-          ordersUpdated: result.ordersUpdated,
-          ordersRemoved: result.ordersRemoved,
-          itemsCreated: result.itemsCreated,
-          itemsUpdated: result.itemsUpdated,
-          errors: result.errors,
+          ordersProcessed: orderRows.length,
+          ordersDeleted: deletedOrders.length,
         },
       });
     } catch (error) {
@@ -209,15 +159,17 @@ export class EtlController {
   }
 
   /**
-   * Process ALL valid orders - create or update
+   * Process ALL orders from CSV - CREATE or UPDATE
+   * Orders with invalid status (completed/cancelled) will be marked as inactive
    */
   private static async processAllOrders(
     rows: any[],
     orderRepo: any,
     categoryRepo: any,
-    result: any,
   ): Promise<Map<string, number>> {
     const orderMap = new Map<string, number>();
+    let created = 0;
+    let updated = 0;
 
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
@@ -226,7 +178,7 @@ export class EtlController {
       try {
         const orderNo = row[0]?.toString().trim();
         if (!orderNo) {
-          result.errors.push(`Row ${rowNum}: Missing order number`);
+          console.error(`Row ${rowNum}: Missing order number`);
           continue;
         }
 
@@ -253,21 +205,34 @@ export class EtlController {
         const dateDelivery = EtlController.parseGermanDateStrict(row[6]);
 
         if (!dateCreated) {
-          result.errors.push(
-            `Row ${rowNum}: Missing date_created for order ${orderNo}`,
+          console.error(
+            `Row ${rowNum}: Missing date_created for order ${orderNo}, using current date`,
           );
-          continue;
+          // Don't skip - use current date as fallback
+          const currentDate = new Date().toISOString();
+          var finalDateCreated = currentDate;
+          var finalDateDelivery = dateDelivery || currentDate;
+        } else {
+          var finalDateCreated = dateCreated;
+          var finalDateDelivery = dateDelivery || dateCreated;
         }
 
         // Get the original WaWi status
         const wawiStatus = row[2]?.toString().trim().toLowerCase() || "";
+
+        // Determine master status based on WaWi status
         let masterStatus = 20; // Default active status
 
-        // Map WaWi status to Master status
         if (wawiStatus === "teilgeliefert") {
           masterStatus = 25; // Partially delivered
         } else if (wawiStatus === "in bearbeitung") {
           masterStatus = 20; // In progress
+        } else {
+          // Orders with other statuses (completed, cancelled, etc.) are marked as inactive
+          masterStatus = 999; // Completed/Archived
+          console.log(
+            `Row ${rowNum}: Order ${orderNo} has status "${wawiStatus}" - marking as inactive (999)`,
+          );
         }
 
         const orderData = {
@@ -275,9 +240,9 @@ export class EtlController {
           category_id: databaseCategoryId,
           status: masterStatus,
           comment: row[3]?.toString().substring(0, 255) || "",
-          date_created: dateCreated,
+          date_created: finalDateCreated,
           date_emailed: dateEmailed,
-          date_delivery: dateDelivery || dateCreated,
+          date_delivery: finalDateDelivery,
         };
 
         // Check if order exists
@@ -286,49 +251,50 @@ export class EtlController {
         });
 
         if (existingOrder) {
-          // Update existing order
+          // UPDATE existing order
           await orderRepo.update({ order_no: orderNo }, orderData);
           orderMap.set(orderNo, existingOrder.id);
-          result.ordersUpdated++;
+          updated++;
         } else {
-          // Create new order
+          // CREATE new order
           const newOrder = orderRepo.create(orderData);
           const saved = await orderRepo.save(newOrder);
           orderMap.set(orderNo, saved.id);
-          result.ordersCreated++;
+          created++;
         }
-        result.ordersProcessed++;
 
-        if (result.ordersProcessed % 10 === 0) {
+        if ((created + updated) % 10 === 0) {
           console.log(
-            `Progress: ${result.ordersProcessed}/${rows.length} orders processed`,
+            `Progress: ${created + updated}/${rows.length} orders processed`,
           );
         }
       } catch (error) {
         console.error(`Row ${rowNum}: Failed to process order:`, error);
-        result.errors.push(
-          `Row ${rowNum}: ${error instanceof Error ? error.message : String(error)}`,
-        );
       }
     }
 
+    console.log(`\n📊 Orders: ${created} created, ${updated} updated`);
     return orderMap;
   }
 
   /**
-   * Process ALL order items - update existing items, create new ones
+   * Process order items - CREATE or UPDATE existing items
    */
-  private static async processAllOrderItems(
+  private static async processOrderItems(
     rows: any[],
     orderItemRepo: any,
     orderMap: Map<string, number>,
-    result: any,
   ) {
     const itemRepo = AppDataSource.getRepository(Item);
+    let created = 0;
+    let updated = 0;
+    let failed = 0;
 
     // Get all items for lookup
     const allItems = await itemRepo.find({ select: ["id", "ItemID_DE"] });
     const itemLookup = new Map(allItems.map((i: any) => [i.ItemID_DE, i.id]));
+
+    console.log(`\nProcessing ${rows.length} order items...`);
 
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
@@ -345,27 +311,26 @@ export class EtlController {
         const qtyDelivered = parseInt(row[5]) || 0;
 
         if (!masterId) {
-          result.errors.push(`Row ${rowNum}: Missing master_id`);
-          result.itemsProcessed++;
+          console.error(`Row ${rowNum}: Missing master_id`);
+          failed++;
           continue;
         }
 
         if (!orderNo) {
-          result.errors.push(
+          console.error(
             `Row ${rowNum}: Missing order_no for master_id ${masterId}`,
           );
-          result.itemsProcessed++;
+          failed++;
           continue;
         }
 
         // Get order ID
         const orderId = orderMap.get(orderNo);
         if (!orderId) {
-          // Order might be filtered out due to status - log but don't fail
           console.warn(
-            `Row ${rowNum}: Order ${orderNo} not found (filtered out?), skipping item ${masterId}`,
+            `Row ${rowNum}: Order ${orderNo} not found, skipping item ${masterId}`,
           );
-          result.itemsProcessed++;
+          failed++;
           continue;
         }
 
@@ -397,11 +362,11 @@ export class EtlController {
           remark_de: remarkDe,
           qty_delivered: qtyDelivered,
           qty_label: qtyValue,
-          status: qtyValue === 0 ? "CANCELLED" : "NSO",
+          status: "NSO",
         };
 
         if (existingItem) {
-          // Update existing - check if anything changed
+          // UPDATE existing item if changed
           const needsUpdate =
             existingItem.qty !== qtyValue ||
             existingItem.remark_de !== remarkDe ||
@@ -410,113 +375,80 @@ export class EtlController {
 
           if (needsUpdate) {
             await orderItemRepo.update({ master_id: masterId }, itemData);
-            result.itemsUpdated++;
-            if (qtyValue === 0) {
-              console.log(
-                `⚠️  Item ${masterId} in order ${orderNo} quantity set to 0 (cancelled)`,
-              );
-            }
-          } else {
-            result.itemsSkipped++;
+            updated++;
           }
         } else {
-          // Insert new
+          // CREATE new item
           await orderItemRepo.save(orderItemRepo.create(itemData));
-          result.itemsCreated++;
-          if (qtyValue === 0) {
-            console.log(
-              `⚠️  Item ${masterId} created with 0 quantity for order ${orderNo}`,
-            );
-          }
+          created++;
         }
-        result.itemsProcessed++;
 
-        if (result.itemsProcessed % 50 === 0) {
+        if ((created + updated) % 50 === 0) {
           console.log(
-            `Progress: ${result.itemsProcessed}/${rows.length} items processed`,
+            `Progress: ${created + updated}/${rows.length} items processed`,
           );
         }
       } catch (error) {
         console.error(`Row ${rowNum}: Failed to process item:`, error);
-        result.errors.push(
-          `Row ${rowNum}: ${error instanceof Error ? error.message : String(error)}`,
-        );
-        result.itemsFailed++;
+        failed++;
       }
     }
 
     console.log(
-      `\n📊 Items: ${result.itemsCreated} created, ${result.itemsUpdated} updated, ${result.itemsFailed} failed`,
+      `\n📊 Items: ${created} created, ${updated} updated, ${failed} failed`,
     );
   }
 
   /**
-   * Remove orders that are no longer in WaWi or have zero quantity
+   * DELETE orders that are NOT in the CSV (orders removed from MIS/WaWi)
    */
-  private static async removeCompletedOrders(
+  private static async deleteOrdersNotInCSV(
     orderRepo: any,
     orderItemRepo: any,
-    validOrdersFromCSV: any[],
+    allOrdersFromCSV: any[],
   ): Promise<string[]> {
-    const removedOrders: string[] = [];
+    const deletedOrders: string[] = [];
 
-    // Get all active orders in Master system
-    const activeOrders = await orderRepo.find({
-      where: {
-        status: Not(999), // Not archived/completed
-      },
-      relations: ["orderItems"],
+    // Get all orders currently in database
+    const allOrdersInDb = await orderRepo.find({
+      select: ["id", "order_no"],
     });
 
-    console.log(`Checking ${activeOrders.length} active orders...`);
-
-    // Get order numbers from current CSV (valid orders only)
+    // Get order numbers from ALL orders in CSV (not just filtered ones)
     const csvOrderNos = new Set(
-      validOrdersFromCSV
-        .map((row) => row[0]?.toString().trim())
-        .filter(Boolean),
+      allOrdersFromCSV.map((row) => row[0]?.toString().trim()).filter(Boolean),
     );
 
-    for (const order of activeOrders) {
-      let shouldRemove = false;
-      let reason = "";
+    console.log(`Found ${allOrdersInDb.length} orders in database`);
+    console.log(`Found ${csvOrderNos.size} orders in CSV`);
 
-      // Check if order is still in CSV (still in WaWi with valid status)
-      if (!csvOrderNos.has(order.order_no)) {
-        shouldRemove = true;
-        reason = "not in WaWi or has invalid status";
-      }
-      // Check if order has any items with quantity > 0
-      else if (!order.orderItems || order.orderItems.length === 0) {
-        shouldRemove = true;
-        reason = "no order items";
-      } else {
-        const hasValidItems = order.orderItems.some(
-          (item: any) =>
-            item.qty > 0 && item.qty !== null && item.qty !== undefined,
-        );
-        if (!hasValidItems) {
-          shouldRemove = true;
-          reason = "all items have zero quantity";
-        }
-      }
+    // Find orders in database that are NOT in CSV
+    const ordersToDelete = allOrdersInDb.filter(
+      (order: { order_no: string }) => !csvOrderNos.has(order.order_no),
+    );
 
-      if (shouldRemove) {
-        console.log(`🗑️  Removing order ${order.order_no} (${reason})`);
+    if (ordersToDelete.length === 0) {
+      return [];
+    }
 
-        // Archive the order (status 999) instead of deleting
-        await orderRepo.update(order.id, {
-          status: 999, // Completed/Archived
-          comment: order.comment
-            ? `${order.comment} - [ARCHIVED: ${reason} at ${new Date().toISOString()}]`
-            : `[ARCHIVED: ${reason} at ${new Date().toISOString()}]`,
-        });
+    console.log(`\n🗑️ Deleting ${ordersToDelete.length} orders not in MIS...`);
 
-        removedOrders.push(order.order_no);
+    for (const order of ordersToDelete) {
+      try {
+        // First delete all order items for this order
+        await orderItemRepo.delete({ order_id: order.id });
+
+        // Then delete the order itself
+        await orderRepo.delete({ id: order.id });
+
+        deletedOrders.push(order.order_no);
+        console.log(`   ✅ Deleted order ${order.order_no}`);
+      } catch (error) {
+        console.error(`   ❌ Failed to delete order ${order.order_no}:`, error);
       }
     }
 
-    return removedOrders;
+    return deletedOrders;
   }
 
   /**

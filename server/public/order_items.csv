@@ -1,4 +1,12 @@
 master_id,ItemID_DE,order_no,qty,remark_de,qty_delivered
+27864,12350,DE3144,3,"3 Einheiten für Auftrag B98909",0
+27862,11959,DE3143,2,"2 Einheiten für Auftrag B98907",0
+27863,10784,DE3143,2,"2 Einheiten für Auftrag B98907",0
+27861,12322,DE3142,100,"Topband lasered + labeled 13mm bearing ",0
+27860,11420,DE3141,50,,0
+27859,11041,DE3140,10,"d1: 10mm with keyway / d2:15mm no keyway",0
+27858,10752,DE3139,300,"packaged in sets of 5",0
+27857,12349,DE3138,100,,0
 27854,11457,DE3136,30,,0
 27853,8428,DE3135,5,"5 Einheiten für Auftrag B98830",0
 27852,11480,DE3134,2,"2 Einheiten für Auftrag B98826",0
@@ -6,6 +14,7 @@ master_id,ItemID_DE,order_no,qty,remark_de,qty_delivered
 27849,4071,DE3133,30,"PP204 pillow block high qualitiy (tolerance met)",0
 27850,4071,DE3133,15,"bearing SB204-ZZ low cost-  no lubrication hole",0
 27851,4071,DE3133,30,"bearing SB204-ZZ LDK -  no lubrication hole",0
+27855,4071,DE3133,2,"sprocket KS06B-1-19",0
 27847,6343,DE3132,1000,,0
 27845,12348,DE3131,500,"yellow housing w/ logo",0
 27846,12341,DE3131,5000,"black housing w/ logo - 100pcs / box",0
@@ -21,7 +30,6 @@ master_id,ItemID_DE,order_no,qty,remark_de,qty_delivered
 27837,9828,DE3127,300,"300 Einheiten für Auftrag B98718",0
 27838,702,DE3127,400,"400 Einheiten für Auftrag B98718",0
 27839,23,DE3127,800,"800 Einheiten für Auftrag B98718",0
-27832,8441,DE3126,20,"20 Einheiten für Auftrag B98735",0
 27831,2695,DE3125,10,"10 Einheiten für Auftrag B98726",0
 27822,7664,DE3124,10,,0
 27824,2419,DE3124,10,,0
@@ -32,17 +40,9 @@ master_id,ItemID_DE,order_no,qty,remark_de,qty_delivered
 27829,6407,DE3124,10,,0
 27830,9637,DE3124,10,,0
 27821,474,DE3123,4000,"in plastic bag",0
-27816,9529,DE3122,1,"SFU1610-3-2 L600",0
-27817,4071,DE3122,4,"SFU1610-3-2 L350",0
-27818,4071,DE3122,12,"SFU1610-3-2 L450",0
-27819,4071,DE3122,4,"SFU1610-3-2 L548 - customized length",0
-27820,10819,DE3122,30,,0
 27814,12056,DE3120,10,,0
-27813,9603,DE3119,1,"1 Einheit für Auftrag B98654",0
 27812,3708,DE3118,105,,0
 27811,8969,DE3117,2,"2 Einheiten für Auftrag B98635",0
-27772,11411,DE3114,10,"10 Einheiten für Auftrag B98630",0
-27773,6419,DE3114,10,"10 Einheiten für Auftrag B98630",0
 27770,11323,DE3113,1,"1 Einheit für Auftrag B98613",0
 27771,11306,DE3113,2,"2 Einheiten für Auftrag B98613",0
 27769,9569,DE3112,1,"1 Einheit für Auftrag B98612",0
@@ -81,7 +81,6 @@ master_id,ItemID_DE,order_no,qty,remark_de,qty_delivered
 27765,2642,DE3111,20,,0
 27767,9601,DE3111,10,,0
 27768,8719,DE3111,5,,0
-27731,4509,DE3110,1,,0
 27725,2191,DE3108,40,,0
 27726,6034,DE3108,120,,0
 27727,12343,DE3108,100,,0
@@ -95,22 +94,10 @@ master_id,ItemID_DE,order_no,qty,remark_de,qty_delivered
 27722,9828,DE3107,300,,0
 27723,702,DE3107,500,,0
 27724,23,DE3107,800,,0
-27717,6407,DE3106,10,,0
 27716,4071,DE3105,2,"2pcs replacement needles ",0
 27711,6256,DE3101,4000,,0
 27710,5918,DE3100,1000,,0
-27702,4071,DE3094,3,"Ball screw SFU2510-4/2 L335mmm nut with metal deflection, customized according to drawing Weiyuan",0
-27689,1855,DE3089,40,"40 Einheiten für Auftrag B98364",0
-27690,1852,DE3089,50,"50 Einheiten für Auftrag B98364",0
-27691,1854,DE3089,80,"80 Einheiten für Auftrag B98364",0
-27692,1853,DE3089,96,"96 Einheiten für Auftrag B98364",0
 27693,677,DE3089,240,"240 Einheiten für Auftrag B98364",0
-27694,679,DE3089,640,"640 Einheiten für Auftrag B98364",0
-27695,6316,DE3089,1400,"1400 Einheiten für Auftrag B98364",0
-27696,32,DE3089,5600,"5600 Einheiten für Auftrag B98364",0
-27678,4071,DE3086,1,"dot peen engraving  machine 300 x 300mm electric",0
-27675,5783,DE3084,11,,0
-27676,6255,DE3084,5000,,0
 27638,6969,DE3082,10,,0
 27639,8973,DE3082,20,,0
 27640,5022,DE3082,20,,0
@@ -160,17 +147,6 @@ master_id,ItemID_DE,order_no,qty,remark_de,qty_delivered
 27614,11592,DE3077,1,"1 Einheit für Auftrag  B98392",0
 27615,11589,DE3077,1,"1 Einheit für Auftrag  B98392",0
 27616,11593,DE3077,1,"1 Einheit für Auftrag  B98392",0
-27520,5693,DE3050,100,,0
-27521,6344,DE3050,100,,0
-27522,6281,DE3050,200,,0
-27525,702,DE3050,400,,0
-27526,9828,DE3050,400,,0
-27527,6296,DE3050,300,,0
-27528,23,DE3050,900,,0
-27539,6295,DE3050,100,,0
-27540,9471,DE3050,100,,0
-27541,6346,DE3050,100,,0
-27519,680,DE3049,5000,,0
 27505,12338,DE3039,200,,0
 27506,12340,DE3039,400,,0
 27507,12337,DE3039,600,,0
