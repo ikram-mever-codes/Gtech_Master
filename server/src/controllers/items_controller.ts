@@ -268,7 +268,15 @@ export const getItemById = async (
   try {
     const { id } = req.params;
 
-    if (!id || isNaN(parseInt(id))) {
+    if (!id) {
+      return next(new ErrorHandler("Item ID is required", 400));
+    }
+
+    if (id === "tarics" || id === "stats" || id === "parents" || id === "warehouse") {
+      return next();
+    }
+
+    if (isNaN(parseInt(id))) {
       return next(new ErrorHandler("Valid numeric Item ID is required", 400));
     }
 
