@@ -472,7 +472,12 @@ export const getAllOrders = async (
           null;
 
         // Get RMB_Price from supplier_items
-        const rmbPrice = rmbPriceMap.get(oi.item_id || itemDetails?.id || 0);
+        const rmbPrice =
+          rmbPriceMap.get(oi.item_id || itemDetails?.id || 0) || 0;
+
+        // Determine the price to use (priority: rmb_price from supplier_items > item.price)
+        const finalPrice =
+          rmbPrice > 0 ? rmbPrice : itemDetails?.price || oi.price || 0;
 
         return {
           ...oi,
@@ -489,8 +494,8 @@ export const getAllOrders = async (
             warehouseItem?.item_name_de ||
             (oi?.ItemID_DE ? `Unknown (DE: ${oi.ItemID_DE})` : "Unknown Item"),
           model: itemDetails?.model || "-",
-          price: itemDetails?.price || oi.price || 0,
-          currency: itemDetails?.currency || oi.currency || "CNY",
+          price: finalPrice, // Use price from supplier_items (rmb_price) or fallback to item price
+          currency: "CNY", // RMB_Price is always in CNY
           taric_id: oi.taric_id || itemDetails?.taric_id,
           taric_code: oi.set_taric_code || itemDetails?.taric?.code || "-",
           supplier_id: itemDetails?.supplier_id || order.supplier_id,
@@ -598,7 +603,11 @@ export const getOrderById = async (
             });
           }
 
-          const rmbPrice = rmbPriceMap.get(oi.item_id || item?.id || 0);
+          const rmbPrice = rmbPriceMap.get(oi.item_id || item?.id || 0) || 0;
+
+          // Determine the price to use (priority: rmb_price from supplier_items > item.price)
+          const finalPrice =
+            rmbPrice > 0 ? rmbPrice : item?.price || oi.price || 0;
 
           return {
             id: oi.id,
@@ -611,8 +620,8 @@ export const getOrderById = async (
             remark_de: oi.remark_de,
             remarks_cn: oi.remarks_cn,
             status: oi.status,
-            price: item?.price || oi.price,
-            currency: item?.currency || oi.currency || "CNY",
+            price: finalPrice, // Use price from supplier_items (rmb_price) or fallback to item price
+            currency: "CNY", // RMB_Price is always in CNY
             ean: item?.ean || oi.ean,
             taric_id: oi.taric_id || item?.taric_id,
             taric_code: oi.set_taric_code || item?.taric?.code || "-",
