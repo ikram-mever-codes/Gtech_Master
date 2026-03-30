@@ -50,7 +50,6 @@ router.use(authorize(UserRole.ADMIN, UserRole.SALES, UserRole.PURCHASING));
 // Item routes
 router.get("/", getItems);
 router.get("/export/csv", exportItemsToCSV);
-router.get("/:id", getItemById);
 router.post("/", createItem);
 router.put("/:id", updateItem);
 router.delete("/:id", deleteItem);
@@ -130,5 +129,7 @@ router.delete("/tarics/delete/:id", deleteTaric);
 router.get("/tarics/search/quick-search", searchTarics);
 router.get("/tarics/stats/statistics", getTaricStatistics);
 router.post("/tarics/bulk-upsert", bulkUpsertTarics);
+
+router.get("/:id", getItemById);
 
 export default router;
