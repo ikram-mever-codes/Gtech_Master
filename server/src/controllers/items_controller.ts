@@ -220,17 +220,17 @@ export const getItems = async (
           // Include warehouse data if needed
           warehouse_data: warehouseData
             ? {
-                id: warehouseData.id,
-                item_no_de: warehouseData.item_no_de,
-                item_name_de: warehouseData.item_name_de,
-                item_name_en: warehouseData.item_name_en,
-                stock_qty: warehouseData.stock_qty,
-                msq: warehouseData.msq,
-                buffer: warehouseData.buffer,
-                is_stock_item: warehouseData.is_stock_item,
-                is_SnSI: warehouseData.is_SnSI,
-                ship_class: warehouseData.ship_class,
-              }
+              id: warehouseData.id,
+              item_no_de: warehouseData.item_no_de,
+              item_name_de: warehouseData.item_name_de,
+              item_name_en: warehouseData.item_name_en,
+              stock_qty: warehouseData.stock_qty,
+              msq: warehouseData.msq,
+              buffer: warehouseData.buffer,
+              is_stock_item: warehouseData.is_stock_item,
+              is_SnSI: warehouseData.is_SnSI,
+              ship_class: warehouseData.ship_class,
+            }
             : null,
 
           created_at: item.created_at,
@@ -288,7 +288,6 @@ export const getItemById = async (
       return next(new ErrorHandler("Item not found", 404));
     }
 
-    // Fetch warehouse items using ItemID_DE if available, otherwise by item_id
     let warehouseItems: any[] = [];
     try {
       if (item.ItemID_DE) {
@@ -297,7 +296,6 @@ export const getItemById = async (
         });
       }
 
-      // If no warehouse items found by ItemID_DE, try by item_id
       if (warehouseItems.length === 0) {
         warehouseItems = await warehouseRepository.find({
           where: { item_id: parseInt(id) },
@@ -334,10 +332,8 @@ export const getItemById = async (
       console.warn("supplier_items table not available:", e.message);
     }
 
-    // Get the primary warehouse item (first one)
     const primaryWarehouseItem = warehouseItems[0] || null;
 
-    // Determine the correct DE number and EAN
     const de_no = primaryWarehouseItem?.item_no_de || item.parent?.de_no || "";
     const ean = item.ean || primaryWarehouseItem?.ean || "";
 
@@ -444,23 +440,23 @@ export const getItemById = async (
 
       supplierItem: supplierItem
         ? {
-            priceRMB: supplierItem.price_rmb?.toString() || "0",
-            isPO: supplierItem.is_po || "No",
-            moq: supplierItem.moq?.toString() || "0",
-            interval: supplierItem.oi?.toString() || "0",
-            leadTime: supplierItem.lead_time || "",
-            noteCN: supplierItem.note_cn || "",
-            url: supplierItem.url || "",
-          }
+          priceRMB: supplierItem.price_rmb?.toString() || "0",
+          isPO: supplierItem.is_po || "No",
+          moq: supplierItem.moq?.toString() || "0",
+          interval: supplierItem.oi?.toString() || "0",
+          leadTime: supplierItem.lead_time || "",
+          noteCN: supplierItem.note_cn || "",
+          url: supplierItem.url || "",
+        }
         : {
-            priceRMB: "0",
-            isPO: "No",
-            moq: "0",
-            interval: "0",
-            leadTime: "",
-            noteCN: "",
-            url: "",
-          },
+          priceRMB: "0",
+          isPO: "No",
+          moq: "0",
+          interval: "0",
+          leadTime: "",
+          noteCN: "",
+          url: "",
+        },
 
       nprRemarks: item.npr_remark || "",
     };
@@ -1284,9 +1280,9 @@ export const getParents = async (
       supplier_id: parent.supplier_id,
       supplier: parent.supplier
         ? {
-            id: parent.supplier.id,
-            name: parent.supplier.name,
-          }
+          id: parent.supplier.id,
+          name: parent.supplier.name,
+        }
         : null,
       item_count: parent.items?.length || 0,
       created_at: parent.created_at,
@@ -1362,17 +1358,17 @@ export const getParentById = async (
       is_active: parent.is_active,
       taric: parent.taric
         ? {
-            id: parent.taric.id,
-            code: parent.taric.code,
-            name_de: parent.taric.name_de,
-          }
+          id: parent.taric.id,
+          code: parent.taric.code,
+          name_de: parent.taric.name_de,
+        }
         : null,
       supplier: parent.supplier
         ? {
-            id: parent.supplier.id,
-            name: parent.supplier.name,
-            contact_person: parent.supplier.contact_person,
-          }
+          id: parent.supplier.id,
+          name: parent.supplier.name,
+          contact_person: parent.supplier.contact_person,
+        }
         : null,
       variations: {
         de: [parent.var_de_1, parent.var_de_2, parent.var_de_3].filter(Boolean),
