@@ -864,21 +864,19 @@ export const updateItem = async (
       } else {
         console.warn(`No warehouse record found for item ${item.id} (ItemID_DE: ${item.ItemID_DE}) — creating new warehouse entry.`);
         try {
-          const newWarehouseItem = warehouseRepository.create({
-            item_id: item.id,
-            ItemID_DE: item.ItemID_DE || null,
-            item_no_de: warehouseItemData.item_no_de || item.parent_no_de || "",
-            item_name_de: warehouseItemData.item_name_de || item.item_name || "",
-            item_name_en: warehouseItemData.item_name_en || item.item_name || "",
-            stock_qty: 0,
-            msq: warehouseItemData.msq !== undefined ? parseFloat(warehouseItemData.msq) : 0,
-            buffer: warehouseItemData.buffer !== undefined ? parseInt(warehouseItemData.buffer) : 0,
-            is_active: warehouseItemData.is_active || "Y",
-            is_stock_item: warehouseItemData.is_stock_item || "N",
-            is_no_auto_order: warehouseItemData.is_no_auto_order || "N",
-            is_SnSI: warehouseItemData.is_SnSI || "N",
-            created_at: new Date(),
-          });
+          const newWarehouseItem = new WarehouseItem();
+          newWarehouseItem.item_id = item.id;
+          if (item.ItemID_DE) newWarehouseItem.ItemID_DE = item.ItemID_DE;
+          newWarehouseItem.item_no_de = warehouseItemData.item_no_de || "";
+          newWarehouseItem.item_name_de = warehouseItemData.item_name_de || item.item_name || "";
+          newWarehouseItem.item_name_en = item.item_name || "";
+          newWarehouseItem.stock_qty = 0;
+          newWarehouseItem.msq = warehouseItemData.msq !== undefined ? parseFloat(warehouseItemData.msq) : 0;
+          newWarehouseItem.buffer = warehouseItemData.buffer !== undefined ? parseInt(warehouseItemData.buffer) : 0;
+          newWarehouseItem.is_active = warehouseItemData.is_active || "Y";
+          newWarehouseItem.is_stock_item = warehouseItemData.is_stock_item || "N";
+          newWarehouseItem.is_no_auto_order = warehouseItemData.is_no_auto_order || "N";
+          newWarehouseItem.is_SnSI = warehouseItemData.is_SnSI || "N";
           await warehouseRepository.save(newWarehouseItem);
           item.is_updated = true;
           await itemRepository.save(item);
