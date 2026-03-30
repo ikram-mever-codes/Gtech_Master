@@ -49,8 +49,6 @@ router.get("/", getItems);
 router.get("/tarics", getAllTarics);
 router.get("/export/csv", exportItemsToCSV);
 
-router.get("/:id", getItemById);
-
 router.post("/", createItem);
 
 router.put("/:id", updateItem);
@@ -124,5 +122,7 @@ router.get("/tarics/search/quick-search", searchTarics);
 router.get("/tarics/stats/statistics", getTaricStatistics);
 
 router.post("/tarics/bulk-upsert", bulkUpsertTarics);
+
+router.get("/:id", getItemById);
 
 export default router;
