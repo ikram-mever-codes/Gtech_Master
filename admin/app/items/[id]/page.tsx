@@ -220,6 +220,8 @@ const ItemDetailsPage = () => {
     picture: null as File | null,
     pictureUrl: "",
   });
+  const [uploadingPictures, setUploadingPictures] = useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [allSuppliers, setAllSuppliers] = useState<Supplier[]>([]);
 
   const handleOpenQualityModal = (quality: any = null) => {
@@ -307,6 +309,75 @@ const ItemDetailsPage = () => {
     }
   };
 
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0 || !itemData) return;
+    setUploadingPictures(true);
+    const toastId = toast.loading("Uploading pictures...", loadingStyles);
+
+    try {
+      const files = Array.from(e.target.files);
+      const newUrls: string[] = [];
+
+      for (const file of files) {
+        const formData = new FormData();
+        formData.append("file", file);
+        const res = await uploadFile(formData);
+        if (res.data?.url) {
+          newUrls.push(res.data.url);
+        }
+      }
+
+      if (newUrls.length > 0) {
+        const updated = { ...itemData };
+        let currentShop = updated.pictures.shopPicture;
+        let currentEbay = updated.pictures.ebayPictures;
+        let currentGallery = updated.pictures.pixPath ? updated.pictures.pixPath.split(",").filter(Boolean) : [];
+
+        newUrls.forEach(url => {
+          if (!currentShop) {
+            currentShop = url;
+          } else if (!currentEbay) {
+            currentEbay = url;
+          } else {
+            currentGallery.push(url);
+          }
+        });
+
+        updated.pictures.shopPicture = currentShop;
+        updated.pictures.ebayPictures = currentEbay;
+        updated.pictures.pixPath = currentGallery.join(",");
+
+        await handleUpdateItem(updated);
+        toast.success("Pictures uploaded successfully", { id: toastId, ...successStyles });
+      } else {
+        toast.dismiss(toastId);
+      }
+    } catch (error) {
+      console.error("Upload error:", error);
+      toast.error("Failed to upload pictures", { id: toastId, ...errorStyles });
+    } finally {
+      setUploadingPictures(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const handleRemoveImage = async (field: string, url: string) => {
+    if (!itemData || !confirm("Are you sure you want to remove this picture?")) return;
+
+    const updated = { ...itemData };
+    if (field === "shopPicture") {
+      updated.pictures.shopPicture = "";
+    } else if (field === "ebayPictures") {
+      updated.pictures.ebayPictures = "";
+    } else if (field === "pixPath") {
+      const pics = updated.pictures.pixPath.split(",").filter(Boolean);
+      updated.pictures.pixPath = pics.filter(p => p !== url).join(",");
+    }
+
+    await handleUpdateItem(updated);
+    toast.success("Picture removed");
+  };
+
   const tabs = [
     { id: "item", label: "Item Details" },
     { id: "parent", label: "Parent Details" },
@@ -361,6 +432,12 @@ const ItemDetailsPage = () => {
             isNAO: toBool(rawItem.others.isNAO),
             isSnSI: toBool(rawItem.others.isSnSI),
             isDimensionSpecial: toBool(rawItem.others.isDimensionSpecial),
+            pixPath: rawItem.others.pixPath || "",
+          },
+          pictures: {
+            shopPicture: rawItem.pictures.shopPicture || "",
+            ebayPictures: rawItem.pictures.ebayPictures || "",
+            pixPath: rawItem.pictures.pixPath || "",
           }
         };
 
@@ -442,12 +519,50 @@ const ItemDetailsPage = () => {
           is_SnSI: updatedData.others?.isSnSI ? "Y" : "N",
           item_no_de: updatedData.others?.noDE,
           item_name_de: updatedData.others?.nameDE,
-        }
+        },
+        photo: updatedData.pictures?.shopPicture,
+        pix_path: updatedData.pictures?.pixPath,
+        pix_path_eBay: updatedData.pictures?.ebayPictures,
       };
 
       await updateItem(itemId, payload);
-      setItemData({ ...itemData, ...updatedData });
       setEditMode(false);
+
+      const toBool = (val: any) => val === "Y" || val === "Yes" || val === true || val === 1 || val === "1";
+      const itemResponse: any = await getItemById(itemId);
+      const rawItem = itemResponse.data;
+      const transformedItem: ItemDetails = {
+        ...rawItem,
+        isActive: toBool(rawItem.isActive),
+        parent: {
+          ...rawItem.parent,
+          isActive: toBool(rawItem.parent.isActive),
+          isSpecialItem: toBool(rawItem.parent.isSpecialItem),
+          isEURSpecial: toBool(rawItem.parent.isEURSpecial),
+          isRMBSpecial: toBool(rawItem.parent.isRMBSpecial),
+          isDimensionSpecial: toBool(rawItem.parent.isDimensionSpecial),
+        },
+        others: {
+          ...rawItem.others,
+          isQTYdiv: toBool(rawItem.others.isQTYdiv),
+          isMeter: toBool(rawItem.others.isMeter),
+          isPU: toBool(rawItem.others.isPU),
+          isNPR: toBool(rawItem.others.isNPR),
+          isNew: toBool(rawItem.others.isNew),
+          isActive: toBool(rawItem.others.isActive),
+          isStock: toBool(rawItem.others.isStock),
+          isNAO: toBool(rawItem.others.isNAO),
+          isSnSI: toBool(rawItem.others.isSnSI),
+          isDimensionSpecial: toBool(rawItem.others.isDimensionSpecial),
+          pixPath: rawItem.others.pixPath || "",
+        },
+        pictures: {
+          shopPicture: rawItem.pictures.shopPicture || "",
+          ebayPictures: rawItem.pictures.ebayPictures || "",
+          pixPath: rawItem.pictures.pixPath || "",
+        }
+      };
+      setItemData(transformedItem);
     } catch (error) {
       console.error("Save error:", error);
     }
@@ -1233,68 +1348,73 @@ const ItemDetailsPage = () => {
 
           {activeTab === "pictures" && (
             <div>
-              <SectionHeader
-                title="Item Pictures"
-                icon={<PhotoIcon className="h-5 w-5 text-blue-500" />}
-              />
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div>
-                  <h4 className="text-md font-semibold text-gray-900 mb-4">
-                    Shop Picture
-                  </h4>
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <div className="mb-3">
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Path:
-                      </label>
-                      <code className="text-sm text-gray-600 bg-gray-100 px-3 py-2 rounded block overflow-x-auto">
-                        {itemData.pictures.shopPicture}
-                      </code>
-                    </div>
-                    <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
-                      <div className="h-48 bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
-                        <PhotoIcon className="h-12 w-12 text-gray-400" />
-                      </div>
-                    </div>
-                    <div className="mt-3 flex gap-2">
-                      <button className="px-3 py-1 text-sm bg-gray-600 text-white rounded hover:bg-gray-700">
-                        Replace
-                      </button>
-                      <button className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50">
-                        View Full Size
-                      </button>
-                    </div>
-                  </div>
-                </div>
-                <div>
-                  <h4 className="text-md font-semibold text-gray-900 mb-4">
-                    eBay Pictures
-                  </h4>
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <div className="mb-3">
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Path:
-                      </label>
-                      <code className="text-sm text-gray-600 bg-gray-100 px-3 py-2 rounded block overflow-x-auto">
-                        {itemData.pictures.ebayPictures}
-                      </code>
-                    </div>
-                    <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
-                      <div className="h-48 bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
-                        <PhotoIcon className="h-12 w-12 text-gray-400" />
-                      </div>
-                    </div>
-                    <div className="mt-3 flex gap-2">
-                      <button className="px-3 py-1 text-sm bg-gray-600 text-white rounded hover:bg-gray-700">
-                        Replace
-                      </button>
-                      <button className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50">
-                        View Full Size
-                      </button>
-                    </div>
-                  </div>
-                </div>
+              <div className="flex justify-between items-center mb-6">
+                <SectionHeader
+                  title="Item Gallery"
+                  icon={<PhotoIcon className="h-5 w-5 text-blue-500" />}
+                />
+                <p className="text-sm text-gray-500 italic">
+                  Showing all item pictures. No separate categories.
+                </p>
               </div>
+
+              {itemData.pictures && (
+                [
+                  itemData.pictures.shopPicture,
+                  itemData.pictures.ebayPictures,
+                  ...((itemData.pictures.pixPath || "").split(",").filter(Boolean))
+                ]
+              ).filter(Boolean).length > 0 ? (
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                  {(
+                    [
+                      { field: "shopPicture", url: itemData.pictures.shopPicture },
+                      { field: "ebayPictures", url: itemData.pictures.ebayPictures },
+                      ...((itemData.pictures.pixPath || "").split(",").filter(Boolean)).map(url => ({ field: "pixPath", url }))
+                    ]
+                  ).filter(item => item.url).map((pic, index) => (
+                    <div key={index} className="group relative aspect-square bg-gray-100 rounded-lg overflow-hidden border border-gray-200">
+                      <img
+                        src={pic.url}
+                        alt={`Item ${index + 1}`}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          target.src = "https://placehold.co/400x400?text=Invalid+Image";
+                        }}
+                      />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                        <button
+                          onClick={() => window.open(pic.url, "_blank")}
+                          className="p-2 bg-white rounded-full text-gray-700 hover:text-primary transition-colors"
+                          title="View Full Size"
+                        >
+                          <EyeIcon className="h-5 w-5" />
+                        </button>
+                        <button
+                          onClick={() => handleRemoveImage(pic.field, pic.url)}
+                          className="p-2 bg-white rounded-full text-red-600 hover:text-red-700 transition-colors"
+                          title="Remove Image"
+                        >
+                          <XCircleIcon className="h-5 w-5" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-12 bg-gray-50 rounded-xl border-2 border-dashed border-gray-200">
+                  <PhotoIcon className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                  <p className="text-gray-500">No pictures found for this item</p>
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="mt-4 px-4 py-2 bg-primary text-white rounded-lg flex items-center gap-2 mx-auto"
+                  >
+                    <PhotoIcon className="h-4 w-4" />
+                    Upload First Picture
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -1320,9 +1440,22 @@ const ItemDetailsPage = () => {
               <ArrowDownTrayIcon className="h-4 w-4" />
               Export Details
             </button>
-            <button className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 text-gray-700">
+            <input
+              type="file"
+              ref={fileInputRef}
+              className="hidden"
+              multiple
+              accept="image/*"
+              onChange={(e) => handleImageUpload(e)}
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploadingPictures}
+              className={`px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 text-gray-700 ${uploadingPictures ? "opacity-50 cursor-not-allowed" : ""
+                }`}
+            >
               <PhotoIcon className="h-4 w-4" />
-              Add Pictures
+              {uploadingPictures ? "Uploading..." : "Add Pictures"}
             </button>
             <button className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 text-gray-700">
               <DocumentIcon className="h-4 w-4" />

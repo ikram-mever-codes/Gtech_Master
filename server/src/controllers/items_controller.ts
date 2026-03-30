@@ -450,6 +450,7 @@ export const getItemById = async (
         fsq: item.FSQ?.toString() || "0",
         rmbPrice: rmbPrice?.toString() || "0", // Use RMB_Price from supplier_items
         isDimensionSpecial: item.is_dimension_special || "N",
+        pixPath: item.pix_path || "",
         suppCat: item.supp_cat || "",
       },
 
@@ -467,6 +468,7 @@ export const getItemById = async (
       pictures: {
         shopPicture: item.photo || "",
         ebayPictures: item.pix_path_eBay || "",
+        pixPath: item.pix_path || "",
       },
 
       supplierItem: supplierItem
@@ -741,7 +743,6 @@ export const updateItem = async (
       }
     });
 
-    // Set is_updated to true if there were changes
     if (hasChanges) {
       item.is_updated = true;
     }
@@ -817,9 +818,16 @@ export const updateItem = async (
 
     const warehouseItemData = req.body.warehouseItemData;
     if (warehouseItemData) {
-      const warehouseItem = await warehouseRepository.findOne({
+      let warehouseItem = await warehouseRepository.findOne({
         where: { item_id: item.id },
       });
+
+      if (!warehouseItem && item.ItemID_DE) {
+        warehouseItem = await warehouseRepository.findOne({
+          where: { ItemID_DE: item.ItemID_DE },
+        });
+      }
+
       if (warehouseItem) {
         let warehouseHasChanges = false;
         if (
@@ -884,6 +892,8 @@ export const updateItem = async (
           await itemRepository.save(item);
           await warehouseRepository.save(warehouseItem);
         }
+      } else {
+        console.warn(`No warehouse record found for item ${item.id} (ItemID_DE: ${item.ItemID_DE}) — warehouse fields not saved.`);
       }
     }
 

@@ -165,6 +165,7 @@ export interface ItemDetails {
   pictures: {
     shopPicture: string;
     ebayPictures: string;
+    pixPath: string;
   };
   price: string;
   currency: string;

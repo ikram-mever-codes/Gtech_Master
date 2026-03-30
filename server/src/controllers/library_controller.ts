@@ -8,7 +8,6 @@ import { User } from "../models/users";
 import { Customer } from "../models/customers";
 import ErrorHandler from "../utils/errorHandler";
 
-// Helper function to determine file type from mime type
 const getFileType = (mimeType: string): FileType => {
   if (mimeType.startsWith("image/")) return FileType.IMAGE;
   if (mimeType === "application/pdf") return FileType.PDF;
@@ -31,7 +30,6 @@ const getFileType = (mimeType: string): FileType => {
   return FileType.OTHER;
 };
 
-// Upload single file
 export const uploadFile = async (
   req: Request,
   res: Response,
@@ -45,7 +43,6 @@ export const uploadFile = async (
       return next(new ErrorHandler("No file uploaded", 400));
     }
 
-    // Validate file exists
     if (!fs.existsSync(req.file.path)) {
       return next(new ErrorHandler("File not found", 404));
     }
@@ -54,13 +51,10 @@ export const uploadFile = async (
     const userRepository = AppDataSource.getRepository(User);
     const customerRepository = AppDataSource.getRepository(Customer);
 
-    // Get user who uploaded
     let uploadedBy = null;
     if (userId) {
       uploadedBy = await userRepository.findOne({ where: { id: userId } });
     }
-
-    // Get customer if provided
     let customer = null;
     if (customerId) {
       customer = await customerRepository.findOne({
@@ -70,32 +64,47 @@ export const uploadFile = async (
 
     let cloudinaryResult;
     try {
-      // Upload to Cloudinary
-      cloudinaryResult = await cloudinary.uploader.upload(req.file.path, {
-        folder: "library",
-        resource_type: "auto",
-      });
+      const isCloudinaryConfigured =
+        process.env.CLOUDINARY_CLOUD_NAME &&
+        process.env.CLOUDINARY_API_KEY &&
+        process.env.CLOUDINARY_API_SECRET;
 
-      // Generate thumbnail for images
+      let fileUrl = "";
       let thumbnailUrl = undefined;
-      if (req.file.mimetype.startsWith("image/")) {
-        const thumbnail = await cloudinary.uploader.upload(req.file.path, {
-          folder: "library/thumbnails",
-          width: 300,
-          height: 200,
-          crop: "fill",
+
+      if (isCloudinaryConfigured) {
+        cloudinaryResult = await cloudinary.uploader.upload(req.file.path, {
+          folder: "library",
+          resource_type: "auto",
         });
-        thumbnailUrl = thumbnail.secure_url;
+        fileUrl = cloudinaryResult.secure_url;
+
+        if (req.file.mimetype.startsWith("image/")) {
+          const thumbnail = await cloudinary.uploader.upload(req.file.path, {
+            folder: "library/thumbnails",
+            width: 300,
+            height: 200,
+            crop: "fill",
+          });
+          thumbnailUrl = thumbnail.secure_url;
+        }
+      } else {
+        const protocol = req.protocol;
+        const host = req.get("host");
+        fileUrl = `${protocol}://${host}/uploads/${req.file.filename}`;
+
+        if (req.file.mimetype.startsWith("image/")) {
+          thumbnailUrl = fileUrl;
+        }
       }
 
-      // Create file record
       const file = fileRepository.create({
         filename: req.file.filename || "",
         originalName: req.file.originalname,
         fileSize: req.file.size,
         mimeType: req.file.mimetype,
         fileType: getFileType(req.file.mimetype),
-        url: cloudinaryResult.secure_url,
+        url: fileUrl,
         thumbnailUrl,
         description: description || null,
         tags: tags ? tags.split(",").map((tag: string) => tag.trim()) : [],
@@ -108,27 +117,27 @@ export const uploadFile = async (
 
       await fileRepository.save(file);
 
-      // Delete local file after successful upload
-      fs.unlinkSync(req.file.path);
+      if (isCloudinaryConfigured) {
+        fs.unlinkSync(req.file.path);
+      }
 
       return res.status(201).json({
         success: true,
         message: "File uploaded successfully",
         data: file,
       });
-    } catch (uploadError) {
-      // Clean up local file if upload failed
+    } catch (uploadError: any) {
+      console.error("Upload error details:", uploadError);
       if (fs.existsSync(req.file.path)) {
         fs.unlinkSync(req.file.path);
       }
-      return next(new ErrorHandler("Failed to upload file to cloud", 500));
+      return next(new ErrorHandler(`Failed to upload file: ${uploadError.message}`, 500));
     }
   } catch (error) {
     return next(error);
   }
 };
 
-// Get all files (with filters)
 export const getFiles = async (
   req: Request,
   res: Response,
@@ -149,7 +158,6 @@ export const getFiles = async (
     const fileRepository = AppDataSource.getRepository(LibraryFile);
     const query = fileRepository.createQueryBuilder("file");
 
-    // Apply filters
     if (type) {
       query.andWhere("file.fileType = :type", { type });
     }
@@ -165,24 +173,19 @@ export const getFiles = async (
       query.andWhere("file.customerId = :customerId", { customerId });
     }
 
-    // Regular users can only see public files or their own files
     if (userRole !== "ADMIN" && userRole !== "MANAGER") {
       query.andWhere(
         "(file.isPublic = :isPublic OR file.uploadedById = :userId)",
         { isPublic: true, userId }
       );
     } else if (isPublic !== undefined) {
-      // Admins/Managers can filter by isPublic if specified
       query.andWhere("file.isPublic = :isPublic", {
         isPublic: isPublic === "true",
       });
     }
-
-    // Pagination
     const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
     query.skip(skip).take(parseInt(limit as string));
 
-    // Order by upload date
     query.orderBy("file.uploadedAt", "DESC");
 
     const [files, total] = await query.getManyAndCount();
@@ -202,7 +205,6 @@ export const getFiles = async (
   }
 };
 
-// Get single file by ID
 export const getFileById = async (
   req: Request,
   res: Response,
@@ -227,7 +229,6 @@ export const getFileById = async (
       return next(new ErrorHandler("File not found", 404));
     }
 
-    // Check access permissions
     if (
       userRole !== "ADMIN" &&
       userRole !== "MANAGER" &&
@@ -246,7 +247,6 @@ export const getFileById = async (
   }
 };
 
-// Delete file
 export const deleteFile = async (
   req: Request,
   res: Response,
@@ -268,7 +268,6 @@ export const deleteFile = async (
       return next(new ErrorHandler("File not found", 404));
     }
 
-    // Check permissions: Only admin/manager or file owner can delete
     if (
       userRole !== "ADMIN" &&
       userRole !== "MANAGER" &&
@@ -277,14 +276,12 @@ export const deleteFile = async (
       return next(new ErrorHandler("Access denied", 403));
     }
 
-    // Delete from Cloudinary
     try {
       const publicId = file.url.split("/").pop()?.split(".")[0];
       if (publicId) {
         await cloudinary.uploader.destroy(`library/${publicId}`);
       }
 
-      // Delete thumbnail if exists
       if (file.thumbnailUrl) {
         const thumbPublicId = file.thumbnailUrl.split("/").pop()?.split(".")[0];
         if (thumbPublicId) {
@@ -295,10 +292,8 @@ export const deleteFile = async (
       }
     } catch (cloudinaryError) {
       console.error("Cloudinary deletion error:", cloudinaryError);
-      // Continue with database deletion even if cloudinary fails
     }
 
-    // Delete from database
     await fileRepository.delete(fileId);
 
     return res.status(200).json({
@@ -310,7 +305,6 @@ export const deleteFile = async (
   }
 };
 
-// Update file metadata
 export const updateFile = async (
   req: Request,
   res: Response,
@@ -333,7 +327,6 @@ export const updateFile = async (
       return next(new ErrorHandler("File not found", 404));
     }
 
-    // Check permissions: Only admin/manager or file owner can update
     if (
       userRole !== "ADMIN" &&
       userRole !== "MANAGER" &&
@@ -342,7 +335,6 @@ export const updateFile = async (
       return next(new ErrorHandler("Access denied", 403));
     }
 
-    // Update fields
     if (description !== undefined) file.description = description;
     if (tags !== undefined) {
       file.tags = Array.isArray(tags)
@@ -365,7 +357,6 @@ export const updateFile = async (
   }
 };
 
-// Get file statistics
 export const getFileStats = async (
   req: Request,
   res: Response,
