@@ -12,7 +12,7 @@ import { Item } from "./items";
 
 @Entity()
 export class ItemQuality {
-  @PrimaryColumn()
+  @PrimaryGeneratedColumn()
   id!: number;
 
   @Column()
@@ -21,24 +21,17 @@ export class ItemQuality {
   @Column({ type: "varchar", length: 255, nullable: true })
   picture?: string;
 
-  @Column({ type: "varchar", length: 50, nullable: true })
-  name_cn?: string;
-
-  @Column({ type: "varchar", length: 50, nullable: true })
+  @Column({ type: "varchar", length: 150, nullable: true })
   name?: string;
 
-  @Column({ type: "varchar", length: 255, nullable: true })
+  @Column({ type: "text", nullable: true })
   description?: string;
 
   @Column({ type: "text", nullable: true })
-  full_description?: string;
+  description_cn?: string;
 
   @Column({ type: "int", nullable: true })
   confirmed?: number;
-
-  // @ManyToOne(() => Item, (item) => item.itemQualities)
-  // @JoinColumn({ name: "item_id" })
-  // item!: Item;
 
   @CreateDateColumn()
   created_at!: Date;

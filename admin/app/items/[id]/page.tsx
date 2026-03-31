@@ -1239,7 +1239,10 @@ const ItemDetailsPage = () => {
                           <td className="px-4 py-3 text-sm text-gray-900">{criteria.name}</td>
                           <td className="px-4 py-3 text-sm">
                             {criteria.picture ? (
-                              <button className="text-blue-600 hover:text-blue-800">
+                              <button
+                                onClick={() => window.open(criteria.picture, "_blank")}
+                                className="text-blue-600 hover:text-blue-800"
+                              >
                                 <EyeIcon className="h-5 w-5" />
                               </button>
                             ) : (

@@ -2035,7 +2035,7 @@ export const updateQualityCriterion = async (
     if (name !== undefined) criterion.name = name;
     if (picture !== undefined) criterion.picture = picture;
     if (description !== undefined) criterion.description = description;
-    // if (description_cn !== undefined) criterion.description_cn = description_cn;
+    if (description_cn !== undefined) (criterion as any).description_cn = description_cn;
 
     criterion.updated_at = new Date();
     await qualityRepository.save(criterion);
