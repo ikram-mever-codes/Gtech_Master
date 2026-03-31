@@ -14,7 +14,7 @@ import { Supplier } from "./suppliers";
 
 @Entity()
 export class SupplierItem {
-  @PrimaryColumn()
+  @PrimaryGeneratedColumn()
   id!: number;
 
   @Column()

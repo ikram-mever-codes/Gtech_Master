@@ -361,7 +361,7 @@ export const getItemById = async (
       is_updated: item.is_updated,
 
       parent: {
-        noDE: de_no,
+        noDE: item.parent?.de_no || item.parent_no_de || "",
         nameDE: item.parent?.name_de || "",
         nameEN: item.parent?.name_en || "",
         isActive: item.parent?.is_active === "Y",
@@ -638,6 +638,18 @@ export const createItem = async (
   }
 };
 
+const toNum = (val: any) => {
+  if (val === null || val === undefined || val === "") return null;
+  const n = parseFloat(val);
+  return isNaN(n) ? null : n;
+};
+
+const toInt = (val: any) => {
+  if (val === null || val === undefined || val === "") return null;
+  const n = parseInt(val);
+  return isNaN(n) ? null : n;
+};
+
 export const updateItem = async (
   req: Request,
   res: Response,
@@ -790,6 +802,21 @@ export const updateItem = async (
           await itemRepository.save(item);
           await supplierItemRepository.save(supplierItem);
         }
+      } else {
+        const newSupplierItem = supplierItemRepository.create({
+          item_id: item.id,
+          supplier_id: toInt(req.body.supplier_id) || 0,
+          price_rmb: toNum(supplierItemData.price_rmb) || 0,
+          is_po: supplierItemData.is_po || "No",
+          moq: toInt(supplierItemData.moq) || 0,
+          oi: toInt(supplierItemData.oi) || 0,
+          lead_time: supplierItemData.lead_time || "",
+          note_cn: supplierItemData.note_cn || "",
+          url: supplierItemData.url || "",
+        });
+        await supplierItemRepository.save(newSupplierItem);
+        item.is_updated = true;
+        await itemRepository.save(item);
       }
     }
 
