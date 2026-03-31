@@ -40,7 +40,7 @@ class DataSanitizer {
   static sanitizeString(
     value: any,
     maxLength?: number,
-    defaultValue: string = ""
+    defaultValue: string = "",
   ): string {
     if (value === null || value === undefined || value === "") {
       return defaultValue;
@@ -80,7 +80,7 @@ class DataSanitizer {
     value: any,
     precision: number = 10,
     scale: number = 2,
-    defaultValue: number = 0
+    defaultValue: number = 0,
   ): number {
     if (value === null || value === undefined || value === "") {
       return defaultValue;
@@ -100,7 +100,7 @@ class DataSanitizer {
   static sanitizeBoolean(
     value: any,
     trueValues: string[] = ["Y", "y", "1", "true", "yes"],
-    defaultValue: string = "N"
+    defaultValue: string = "N",
   ): string {
     if (value === null || value === undefined || value === "") {
       return defaultValue;
@@ -232,7 +232,7 @@ export class MySQLToPostgresMigrator {
   private async processInBatches<T>(
     rows: T[],
     processFunction: (row: T) => Promise<void>,
-    tableName: string
+    tableName: string,
   ): Promise<void> {
     let successCount = 0;
     let errorCount = 0;
@@ -247,15 +247,16 @@ export class MySQLToPostgresMigrator {
         } catch (error: any) {
           errorCount++;
           console.log(
-            `   Error on record ${(row as any).id || "unknown"}: ${error.message
-            }`
+            `   Error on record ${(row as any).id || "unknown"}: ${
+              error.message
+            }`,
           );
         }
       }
     }
 
     console.log(
-      `   ✅ ${successCount} records migrated, ❌ ${errorCount} errors`
+      `   ✅ ${successCount} records migrated, ❌ ${errorCount} errors`,
     );
   }
 
@@ -282,7 +283,7 @@ export class MySQLToPostgresMigrator {
             is_ignored_value: DataSanitizer.sanitizeBoolean(
               row.is_ignored_value,
               ["Y", "y", "1", "true"],
-              "N"
+              "N",
             ),
             name: DataSanitizer.sanitizeString(row.name, 255, "-"),
             de_cat: DataSanitizer.sanitizeString(row.de_cat, 5, "00000"),
@@ -295,7 +296,7 @@ export class MySQLToPostgresMigrator {
           await categoryRepository.save(category);
           this.categoryIdMap.set(mysqlId, mysqlId);
         },
-        "categories"
+        "categories",
       );
     } catch (error) {
       console.error("❌ Failed to migrate categories:", error);
@@ -332,24 +333,24 @@ export class MySQLToPostgresMigrator {
             company_name: DataSanitizer.sanitizeString(
               row.company_name,
               100,
-              "-"
+              "-",
             ),
             extra_note: DataSanitizer.sanitizeString(row.extra_note, 255, ""),
             min_order_value: DataSanitizer.sanitizeNumber(row.min_order_value),
             is_fully_prepared: DataSanitizer.sanitizeString(
               row.is_fully_prepared,
               3,
-              "No"
+              "No",
             ),
             is_tax_included: DataSanitizer.sanitizeString(
               row.is_tax_included,
               2,
-              "No"
+              "No",
             ),
             is_freight_included: DataSanitizer.sanitizeString(
               row.is_freight_included,
               2,
-              "No"
+              "No",
             ),
             province: DataSanitizer.sanitizeString(row.province, 50, ""),
             city: DataSanitizer.sanitizeString(row.city, 50, ""),
@@ -357,12 +358,12 @@ export class MySQLToPostgresMigrator {
             full_address: DataSanitizer.sanitizeString(
               row.full_address,
               255,
-              ""
+              "",
             ),
             contact_person: DataSanitizer.sanitizeString(
               row.contact_person,
               150,
-              ""
+              "",
             ),
             phone: DataSanitizer.sanitizeString(row.phone, 12, ""),
             mobile: DataSanitizer.sanitizeString(row.mobile, 50, ""),
@@ -372,7 +373,7 @@ export class MySQLToPostgresMigrator {
             account_number: DataSanitizer.sanitizeString(
               row.account_number,
               45,
-              ""
+              "",
             ),
             beneficiary: DataSanitizer.sanitizeString(row.beneficiary, 45, ""),
             deposit: DataSanitizer.sanitizeNumber(row.deposit),
@@ -389,7 +390,7 @@ export class MySQLToPostgresMigrator {
 
           await supplierRepository.save(supplier);
         },
-        "suppliers"
+        "suppliers",
       );
     } catch (error) {
       console.error("❌ Failed to migrate suppliers:", error);
@@ -421,20 +422,20 @@ export class MySQLToPostgresMigrator {
             reguler_artikel: DataSanitizer.sanitizeBoolean(
               row.reguler_artikel,
               ["Y", "y", "1", "true"],
-              "Y"
+              "Y",
             ),
             duty_rate: DataSanitizer.sanitizeDecimal(row.duty_rate),
             name_de: DataSanitizer.sanitizeString(row.name_de, 132, "-"),
             description_de: DataSanitizer.sanitizeString(
               row.description_de,
               undefined,
-              ""
+              "",
             ),
             name_en: DataSanitizer.sanitizeString(row.name_en, 255, "-"),
             description_en: DataSanitizer.sanitizeString(
               row.description_en,
               undefined,
-              ""
+              "",
             ),
             name_cn: DataSanitizer.sanitizeString(row.name_cn, undefined, "-"),
             created_at:
@@ -445,7 +446,7 @@ export class MySQLToPostgresMigrator {
 
           await taricRepository.save(taric);
         },
-        "tarics"
+        "tarics",
       );
     } catch (error) {
       console.error("❌ Failed to migrate tarics:", error);
@@ -487,7 +488,7 @@ export class MySQLToPostgresMigrator {
             is_active: DataSanitizer.sanitizeBoolean(
               row.is_active,
               ["Y", "y", "1", "true"],
-              "Y"
+              "Y",
             ),
             name_de: DataSanitizer.sanitizeString(row.name_de, 111, "-"),
             name_en: DataSanitizer.sanitizeString(row.name_en, 80, "-"),
@@ -501,13 +502,13 @@ export class MySQLToPostgresMigrator {
             is_NwV: DataSanitizer.sanitizeBoolean(
               row.is_NwV,
               ["Y", "y", "1", "true"],
-              "N"
+              "N",
             ),
             parent_rank: DataSanitizer.sanitizeNumber(row.parent_rank, 3),
             is_var_unilingual: DataSanitizer.sanitizeBoolean(
               row.is_var_unilingual,
               ["Y", "y", "1", "true"],
-              "N"
+              "N",
             ),
             created_at:
               DataSanitizer.sanitizeDate(row.created_at) || new Date(),
@@ -517,7 +518,7 @@ export class MySQLToPostgresMigrator {
 
           await parentRepository.save(parent);
         },
-        "parents"
+        "parents",
       );
     } catch (error) {
       console.error("❌ Failed to migrate parents:", error);
@@ -572,12 +573,12 @@ export class MySQLToPostgresMigrator {
               parent_no_de: DataSanitizer.sanitizeString(
                 row.parent_no_de,
                 50,
-                ""
+                "",
               ),
               is_dimension_special: DataSanitizer.sanitizeString(
                 row.is_dimension_special,
                 1,
-                "N"
+                "N",
               ),
               model: DataSanitizer.sanitizeString(row.model, 100, ""),
               supp_cat: DataSanitizer.sanitizeString(row.supp_cat, 3, ""),
@@ -591,14 +592,14 @@ export class MySQLToPostgresMigrator {
               item_name_cn: DataSanitizer.sanitizeString(
                 row.item_name_cn,
                 1000,
-                ""
+                "",
               ),
               FOQ: DataSanitizer.sanitizeDecimalWithScale(row.FOQ, 10, 0),
               FSQ: DataSanitizer.sanitizeDecimalWithScale(row.FSQ, 10, 0),
               is_qty_dividable: DataSanitizer.sanitizeString(
                 row.is_qty_dividable,
                 1,
-                "Y"
+                "Y",
               ),
               ISBN: DataSanitizer.sanitizeNumber(row.ISBN, 0),
               cat_id: finalCatId,
@@ -606,12 +607,12 @@ export class MySQLToPostgresMigrator {
               RMB_Price: DataSanitizer.sanitizeDecimalWithScale(
                 row.RMB_Price,
                 10,
-                2
+                2,
               ),
               price: DataSanitizer.sanitizeDecimalWithScale(
                 row.RMB_Price,
                 10,
-                2
+                2,
               ),
               currency: "CNY",
               photo: DataSanitizer.sanitizeString(row.photo, 255, ""),
@@ -619,23 +620,23 @@ export class MySQLToPostgresMigrator {
               pix_path_eBay: DataSanitizer.sanitizeString(
                 row.pix_path_eBay,
                 1000,
-                ""
+                "",
               ),
               is_npr: DataSanitizer.sanitizeString(row.is_npr, 1, "N"),
               npr_remark: DataSanitizer.sanitizeString(row.npr_remark, 255, ""),
               many_components: DataSanitizer.sanitizeNumber(
-                row.many_components
+                row.many_components,
               ),
               effort_rating: DataSanitizer.sanitizeNumber(row.effort_rating),
               is_rmb_special: DataSanitizer.sanitizeString(
                 row.is_rmb_special,
                 1,
-                "N"
+                "N",
               ),
               is_eur_special: DataSanitizer.sanitizeString(
                 row.is_eur_special,
                 1,
-                "N"
+                "N",
               ),
               is_pu_item: DataSanitizer.sanitizeNumber(row.is_pu_item, 0),
               is_meter_item: DataSanitizer.sanitizeNumber(row.is_meter_item, 0),
@@ -643,7 +644,7 @@ export class MySQLToPostgresMigrator {
               isActive: DataSanitizer.sanitizeBoolean(
                 row.isActive,
                 ["Y", "y", "1", "true"],
-                "Y"
+                "Y",
               ),
               note: DataSanitizer.sanitizeString(row.note, 200, ""),
               synced_at:
@@ -665,7 +666,7 @@ export class MySQLToPostgresMigrator {
             errorCount++;
             if (error.message.includes("foreign key constraint")) {
               console.log(
-                `   FK Error on item ${row.id}: Setting cat_id to null`
+                `   FK Error on item ${row.id}: Setting cat_id to null`,
               );
               try {
                 const mysqlId = DataSanitizer.sanitizeNumber(row.id);
@@ -682,19 +683,27 @@ export class MySQLToPostgresMigrator {
                   parent_no_de: DataSanitizer.sanitizeString(
                     row.parent_no_de,
                     50,
-                    ""
+                    "",
                   ),
                   is_dimension_special: DataSanitizer.sanitizeString(
                     row.is_dimension_special,
                     1,
-                    "N"
+                    "N",
                   ),
                   model: DataSanitizer.sanitizeString(row.model, 100, ""),
                   supp_cat: DataSanitizer.sanitizeString(row.supp_cat, 3, ""),
                   ean: DataSanitizer.sanitizeBigInt(row.ean),
                   taric_id: finalTaricId,
-                  price: DataSanitizer.sanitizeDecimalWithScale(row.price, 10, 2),
-                  currency: DataSanitizer.sanitizeString(row.currency, 10, "CNY"),
+                  price: DataSanitizer.sanitizeDecimalWithScale(
+                    row.price,
+                    10,
+                    2,
+                  ),
+                  currency: DataSanitizer.sanitizeString(
+                    row.currency,
+                    10,
+                    "CNY",
+                  ),
                   weight: DataSanitizer.sanitizeFloat(row.weight),
                   width: DataSanitizer.sanitizeFloat(row.width),
                   height: DataSanitizer.sanitizeFloat(row.height),
@@ -702,19 +711,19 @@ export class MySQLToPostgresMigrator {
                   item_name: DataSanitizer.sanitizeString(
                     row.item_name,
                     1000,
-                    ""
+                    "",
                   ),
                   item_name_cn: DataSanitizer.sanitizeString(
                     row.item_name_cn,
                     1000,
-                    ""
+                    "",
                   ),
                   FOQ: DataSanitizer.sanitizeDecimalWithScale(row.FOQ, 10, 0),
                   FSQ: DataSanitizer.sanitizeDecimalWithScale(row.FSQ, 10, 0),
                   is_qty_dividable: DataSanitizer.sanitizeString(
                     row.is_qty_dividable,
                     1,
-                    "Y"
+                    "Y",
                   ),
                   ISBN: DataSanitizer.sanitizeNumber(row.ISBN, 0),
                   cat_id: null,
@@ -722,51 +731,51 @@ export class MySQLToPostgresMigrator {
                   RMB_Price: DataSanitizer.sanitizeDecimalWithScale(
                     row.RMB_Price,
                     10,
-                    2
+                    2,
                   ),
                   photo: DataSanitizer.sanitizeString(row.photo, 255, ""),
                   pix_path: DataSanitizer.sanitizeString(
                     row.pix_path,
                     1000,
-                    ""
+                    "",
                   ),
                   pix_path_eBay: DataSanitizer.sanitizeString(
                     row.pix_path_eBay,
                     1000,
-                    ""
+                    "",
                   ),
                   is_npr: DataSanitizer.sanitizeString(row.is_npr, 1, "N"),
                   npr_remark: DataSanitizer.sanitizeString(
                     row.npr_remark,
                     255,
-                    ""
+                    "",
                   ),
                   many_components: DataSanitizer.sanitizeNumber(
-                    row.many_components
+                    row.many_components,
                   ),
                   effort_rating: DataSanitizer.sanitizeNumber(
-                    row.effort_rating
+                    row.effort_rating,
                   ),
                   is_rmb_special: DataSanitizer.sanitizeString(
                     row.is_rmb_special,
                     1,
-                    "N"
+                    "N",
                   ),
                   is_eur_special: DataSanitizer.sanitizeString(
                     row.is_eur_special,
                     1,
-                    "N"
+                    "N",
                   ),
                   is_pu_item: DataSanitizer.sanitizeNumber(row.is_pu_item, 0),
                   is_meter_item: DataSanitizer.sanitizeNumber(
                     row.is_meter_item,
-                    0
+                    0,
                   ),
                   is_new: DataSanitizer.sanitizeString(row.is_new, 1, "Y"),
                   isActive: DataSanitizer.sanitizeBoolean(
                     row.isActive,
                     ["Y", "y", "1", "true"],
-                    "Y"
+                    "Y",
                   ),
                   note: DataSanitizer.sanitizeString(row.note, 200, ""),
                   synced_at:
@@ -783,7 +792,7 @@ export class MySQLToPostgresMigrator {
                 errorCount--;
               } catch (retryError: any) {
                 console.log(
-                  `   Retry failed for item ${row.id}: ${retryError.message}`
+                  `   Retry failed for item ${row.id}: ${retryError.message}`,
                 );
               }
             } else {
@@ -794,7 +803,7 @@ export class MySQLToPostgresMigrator {
       }
 
       console.log(
-        `   ✅ ${successCount} items migrated, ❌ ${errorCount} errors`
+        `   ✅ ${successCount} items migrated, ❌ ${errorCount} errors`,
       );
     } catch (error) {
       console.error("❌ Failed to migrate items:", error);
@@ -836,18 +845,18 @@ export class MySQLToPostgresMigrator {
             date_created: DataSanitizer.sanitizeString(
               row.date_created,
               255,
-              ""
+              "",
             ),
 
             date_emailed: DataSanitizer.sanitizeString(
               row.date_emailed,
               255,
-              ""
+              "",
             ),
             date_delivery: DataSanitizer.sanitizeString(
               row.date_delivery,
               255,
-              ""
+              "",
             ),
             created_at:
               DataSanitizer.sanitizeDate(row.created_at) || new Date(),
@@ -861,7 +870,7 @@ export class MySQLToPostgresMigrator {
             this.orderNoMap.set(String(row.order_no).trim(), savedOrder.id);
           }
         },
-        "orders"
+        "orders",
       );
     } catch (error) {
       console.error("❌ Failed to migrate orders:", error);
@@ -901,7 +910,7 @@ export class MySQLToPostgresMigrator {
             if (!postgresItemId) {
               skippedCount++;
               console.log(
-                `   Skipping warehouse item ${row.id}: Item ${mysqlItemId} not found`
+                `   Skipping warehouse item ${row.id}: Item ${mysqlItemId} not found`,
               );
               continue;
             }
@@ -919,22 +928,22 @@ export class MySQLToPostgresMigrator {
               item_name_de: DataSanitizer.sanitizeString(
                 row.item_name_de,
                 500,
-                "-"
+                "-",
               ),
               item_name_en: DataSanitizer.sanitizeString(
                 row.item_name_en,
                 500,
-                "-"
+                "-",
               ),
               is_no_auto_order: DataSanitizer.sanitizeBoolean(
                 row.is_no_auto_order,
                 ["Y", "y", "1", "true"],
-                "N"
+                "N",
               ),
               is_active: DataSanitizer.sanitizeBoolean(
                 row.is_active,
                 ["Y", "y", "1", "true"],
-                "Y"
+                "Y",
               ),
               stock_qty: DataSanitizer.sanitizeDecimal(row.stock_qty),
               msq: DataSanitizer.sanitizeDecimal(row.msq),
@@ -942,12 +951,12 @@ export class MySQLToPostgresMigrator {
               is_stock_item: DataSanitizer.sanitizeBoolean(
                 row.is_stock_item,
                 ["Y", "y", "1", "true"],
-                "Y"
+                "Y",
               ),
               is_SnSI: DataSanitizer.sanitizeBoolean(
                 row.is_SnSI,
                 ["Y", "y", "1", "true"],
-                "Y"
+                "Y",
               ),
               ship_class: DataSanitizer.sanitizeString(row.ship_class, 50, ""),
               created_at:
@@ -961,14 +970,14 @@ export class MySQLToPostgresMigrator {
           } catch (error: any) {
             errorCount++;
             console.log(
-              `   Error on warehouse item ${row.id}: ${error.message}`
+              `   Error on warehouse item ${row.id}: ${error.message}`,
             );
           }
         }
       }
 
       console.log(
-        `   ✅ ${successCount} records migrated, ⏭️ ${skippedCount} skipped, ❌ ${errorCount} errors`
+        `   ✅ ${successCount} records migrated, ⏭️ ${skippedCount} skipped, ❌ ${errorCount} errors`,
       );
     } catch (error) {
       console.error("❌ Failed to migrate warehouse items:", error);
@@ -1029,14 +1038,14 @@ export class MySQLToPostgresMigrator {
           } catch (error: any) {
             errorCount++;
             console.log(
-              `   Error on variation value ${row.id}: ${error.message}`
+              `   Error on variation value ${row.id}: ${error.message}`,
             );
           }
         }
       }
 
       console.log(
-        `   ✅ ${successCount} records migrated, ⏭️ ${skippedCount} skipped, ❌ ${errorCount} errors`
+        `   ✅ ${successCount} records migrated, ⏭️ ${skippedCount} skipped, ❌ ${errorCount} errors`,
       );
     } catch (error) {
       console.error("❌ Failed to migrate variation values:", error);
@@ -1056,7 +1065,8 @@ export class MySQLToPostgresMigrator {
         FROM item_qualities
       `);
 
-      const itemQualityRepository = AppDataSource.getRepository(ItemQuality);
+      const itemQualityRepository: any =
+        AppDataSource.getRepository(ItemQuality);
       const itemQualities = rows as any[];
 
       let successCount = 0;
@@ -1085,12 +1095,12 @@ export class MySQLToPostgresMigrator {
               description: DataSanitizer.sanitizeString(
                 row.description,
                 255,
-                ""
+                "",
               ),
               full_description: DataSanitizer.sanitizeString(
                 row.full_description,
                 undefined,
-                ""
+                "",
               ),
               confirmed: DataSanitizer.sanitizeNumber(row.confirmed),
               created_at:
@@ -1109,7 +1119,7 @@ export class MySQLToPostgresMigrator {
       }
 
       console.log(
-        `   ✅ ${successCount} records migrated, ⏭️ ${skippedCount} skipped, ❌ ${errorCount} errors`
+        `   ✅ ${successCount} records migrated, ⏭️ ${skippedCount} skipped, ❌ ${errorCount} errors`,
       );
     } catch (error) {
       console.error("❌ Failed to migrate item qualities:", error);
@@ -1150,12 +1160,14 @@ export class MySQLToPostgresMigrator {
 
             if (!postgresItemId) {
               const itemRepo = AppDataSource.getRepository(Item);
-              const dbItem = await itemRepo.findOne({ where: { ItemID_DE: mysqlItemIdDE } });
+              const dbItem = await itemRepo.findOne({
+                where: { ItemID_DE: mysqlItemIdDE },
+              });
               if (dbItem) {
                 postgresItemId = dbItem.id;
               } else {
                 console.log(
-                  `   Warning: order item ${row.id} references ItemID_DE=${mysqlItemIdDE} which was not found in Postgres — inserting with item_id=null`
+                  `   Warning: order item ${row.id} references ItemID_DE=${mysqlItemIdDE} which was not found in Postgres — inserting with item_id=null`,
                 );
               }
             }
@@ -1169,7 +1181,11 @@ export class MySQLToPostgresMigrator {
               ItemID_DE: mysqlItemIdDE,
               order_id: postgresOrderId,
               qty: DataSanitizer.sanitizeNumber(row.qty),
-              remark_de: DataSanitizer.sanitizeString(row.remark_de, undefined, ""),
+              remark_de: DataSanitizer.sanitizeString(
+                row.remark_de,
+                undefined,
+                "",
+              ),
               qty_delivered: DataSanitizer.sanitizeNumber(row.qty_delivered),
               category_id: null,
               rmb_special_price: 0,
@@ -1202,7 +1218,9 @@ export class MySQLToPostgresMigrator {
 
             if (error.message.includes("foreign key constraint")) {
               try {
-                const retryItemIdDE = DataSanitizer.sanitizeNumber(row.ItemID_DE);
+                const retryItemIdDE = DataSanitizer.sanitizeNumber(
+                  row.ItemID_DE,
+                );
                 const retryItemId =
                   this.itemIdMapByDE.get(retryItemIdDE) ??
                   this.itemIdMap.get(retryItemIdDE) ??
@@ -1213,7 +1231,7 @@ export class MySQLToPostgresMigrator {
                   master_id: DataSanitizer.sanitizeString(
                     row.master_id,
                     25,
-                    ""
+                    "",
                   ),
                   item_id: retryItemId,
                   ItemID_DE: retryItemIdDE,
@@ -1222,10 +1240,10 @@ export class MySQLToPostgresMigrator {
                   remark_de: DataSanitizer.sanitizeString(
                     row.remark_de,
                     undefined,
-                    ""
+                    "",
                   ),
                   qty_delivered: DataSanitizer.sanitizeNumber(
-                    row.qty_delivered
+                    row.qty_delivered,
                   ),
                   created_at:
                     DataSanitizer.sanitizeDate(row.created_at) || new Date(),
@@ -1237,11 +1255,11 @@ export class MySQLToPostgresMigrator {
                 successCount++;
                 errorCount--;
                 console.log(
-                  `   ✓ Recovered order item ${row.id} by setting order_id to null`
+                  `   ✓ Recovered order item ${row.id} by setting order_id to null`,
                 );
               } catch (retryError: any) {
                 console.log(
-                  `   ✗ Retry failed for order item ${row.id}: ${retryError.message}`
+                  `   ✗ Retry failed for order item ${row.id}: ${retryError.message}`,
                 );
               }
             }
@@ -1250,7 +1268,7 @@ export class MySQLToPostgresMigrator {
       }
 
       console.log(
-        `   ✅ ${successCount} records migrated, ⏭️ ${skippedCount} skipped, ❌ ${errorCount} errors`
+        `   ✅ ${successCount} records migrated, ⏭️ ${skippedCount} skipped, ❌ ${errorCount} errors`,
       );
     } catch (error) {
       console.error("❌ Failed to migrate order items:", error);
@@ -1301,7 +1319,7 @@ export class MySQLToPostgresMigrator {
               is_default: DataSanitizer.sanitizeBoolean(
                 row.is_default,
                 ["Y", "y", "1", "true"],
-                "Y"
+                "Y",
               ),
               moq: DataSanitizer.sanitizeNumber(row.moq),
               oi: DataSanitizer.sanitizeNumber(row.oi, 0),
@@ -1321,14 +1339,16 @@ export class MySQLToPostgresMigrator {
 
             if (supplierItem.is_default === "Y" && finalSupplierId) {
               const itemRepo = AppDataSource.getRepository(Item);
-              await itemRepo.update(postgresItemId, { supplier_id: finalSupplierId });
+              await itemRepo.update(postgresItemId, {
+                supplier_id: finalSupplierId,
+              });
             }
 
             successCount++;
           } catch (error: any) {
             errorCount++;
             console.log(
-              `   Error on supplier item ${row.id}: ${error.message}`
+              `   Error on supplier item ${row.id}: ${error.message}`,
             );
 
             if (error.message.includes("foreign key constraint")) {
@@ -1347,7 +1367,7 @@ export class MySQLToPostgresMigrator {
                   is_default: DataSanitizer.sanitizeBoolean(
                     row.is_default,
                     ["Y", "y", "1", "true"],
-                    "Y"
+                    "Y",
                   ),
                   moq: DataSanitizer.sanitizeNumber(row.moq),
                   oi: DataSanitizer.sanitizeNumber(row.oi, 0),
@@ -1358,12 +1378,12 @@ export class MySQLToPostgresMigrator {
                   lead_time: DataSanitizer.sanitizeString(
                     row.lead_time,
                     100,
-                    ""
+                    "",
                   ),
                   updated_by: DataSanitizer.sanitizeString(
                     row.updated_by,
                     25,
-                    ""
+                    "",
                   ),
                   created_at:
                     DataSanitizer.sanitizeDate(row.created_at) || new Date(),
@@ -1383,7 +1403,7 @@ export class MySQLToPostgresMigrator {
       }
 
       console.log(
-        `   ✅ ${successCount} records migrated, ⏭️ ${skippedCount} skipped, ❌ ${errorCount} errors`
+        `   ✅ ${successCount} records migrated, ⏭️ ${skippedCount} skipped, ❌ ${errorCount} errors`,
       );
     } catch (error) {
       console.error("❌ Failed to migrate supplier items:", error);
