@@ -236,7 +236,7 @@ const InvoiceListPage: React.FC = () => {
   };
 
   useEffect(() => {
-    getAllCargos({ status: "Open,Pending", limit: 1000, availableOnly: true }).then((res) => {
+    getAllCargos({ limit: 1000, availableOnly: true }).then((res) => {
       if (res.success) setCargos(res.data);
     });
     getAllTaricsSimple().then(res => {
@@ -1757,17 +1757,11 @@ const InvoiceListPage: React.FC = () => {
                 <Select
                   className="text-sm"
                   options={cargos
-                    .filter((c) =>
-                      ["Open", "Pending"].includes(c.cargo_status || "Open"),
-                    )
                     .map((c) => ({
                       value: String(c.id),
                       label: `${c.cargo_no} ${c.cargo_status ? `(${c.cargo_status})` : ""}`,
                     }))}
                   value={cargos
-                    .filter((c) =>
-                      ["Open", "Pending"].includes(c.cargo_status || "Open"),
-                    )
                     .map((c) => ({
                       value: String(c.id),
                       label: `${c.cargo_no} ${c.cargo_status ? `(${c.cargo_status})` : ""}`,

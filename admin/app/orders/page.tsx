@@ -1298,7 +1298,7 @@ const OrderPage = () => {
 
   const fetchCargos = useCallback(async () => {
     try {
-      const res = await getAllCargos({ status: "Open,Pending", limit: 1000, availableOnly: true });
+      const res = await getAllCargos({ limit: 1000, availableOnly: true });
       const data = res?.data ?? res;
       setCargos(Array.isArray(data) ? data : data?.cargos || []);
     } catch (e) {
@@ -3486,9 +3486,6 @@ const OrderPage = () => {
               <Select
                 className="text-sm"
                 options={cargos
-                  .filter((c) =>
-                    ["Open", "Pending"].includes(c.cargo_status || "Open"),
-                  )
                   .map((c) => ({
                     value: String(c.id),
                     label: `${c.cargo_no} ${c.cargo_status ? `(${c.cargo_status})` : ""}`,
