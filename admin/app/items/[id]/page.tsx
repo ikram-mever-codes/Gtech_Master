@@ -223,6 +223,9 @@ const ItemDetailsPage = () => {
   const [uploadingPictures, setUploadingPictures] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [allSuppliers, setAllSuppliers] = useState<Supplier[]>([]);
+  const [uploadingAttachments, setUploadingAttachments] = useState(false);
+  const attachmentInputRef = React.useRef<HTMLInputElement>(null);
+  const [attachments, setAttachments] = useState<any[]>([]);
 
   const handleOpenQualityModal = (quality: any = null) => {
     if (quality) {
@@ -376,6 +379,68 @@ const ItemDetailsPage = () => {
 
     await handleUpdateItem(updated);
     toast.success("Picture removed");
+  };
+
+
+  const handleAttachmentUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0 || !id) return;
+
+    const toastId = toast.loading("Uploading attachments...", loadingStyles);
+    setUploadingAttachments(true);
+
+    try {
+      for (let i = 0; i < files.length; i++) {
+        const formData = new FormData();
+        formData.append("file", files[i]);
+        formData.append("itemId", id as string);
+        formData.append("isPublic", "true");
+        await uploadFile(formData);
+      }
+
+      const itemResponse: any = await getItemById(parseInt(id as string));
+      if (itemResponse.data) {
+        const toBool = (val: any) => val === "Y" || val === "Yes" || val === true || val === 1 || val === "1";
+        const rawItem = itemResponse.data;
+        const transformedItem: ItemDetails = {
+          ...rawItem,
+          isActive: toBool(rawItem.isActive),
+          parent: { ...rawItem.parent, isActive: toBool(rawItem.parent.isActive), isSpecialItem: toBool(rawItem.parent.isSpecialItem) },
+          others: { ...rawItem.others, isQTYdiv: toBool(rawItem.others.isQTYdiv), isMeter: toBool(rawItem.others.isMeter), isPU: toBool(rawItem.others.isPU), isNPR: toBool(rawItem.others.isNPR), isNew: toBool(rawItem.others.isNew), isActive: toBool(rawItem.others.isActive), isStock: toBool(rawItem.others.isStock), isNAO: toBool(rawItem.others.isNAO), isSnSI: toBool(rawItem.others.isSnSI) },
+          pictures: { shopPicture: rawItem.pictures.shopPicture || "", ebayPictures: rawItem.pictures.ebayPictures || "", pixPath: rawItem.pictures.pixPath || "" }
+        };
+        setItemData(transformedItem);
+      }
+
+      toast.success("Attachments uploaded successfully", { id: toastId, ...successStyles });
+    } catch (error) {
+      console.error("Attachment upload error:", error);
+      toast.error("Failed to upload attachments", { id: toastId, ...errorStyles });
+    } finally {
+      setUploadingAttachments(false);
+      if (attachmentInputRef.current) attachmentInputRef.current.value = "";
+    }
+  };
+
+  const handleDeleteAttachment = async (fileId: string) => {
+    if (!confirm("Are you sure you want to delete this attachment?")) return;
+
+    const toastId = toast.loading("Deleting attachment...", loadingStyles);
+    try {
+      const { deleteFile } = await import("@/api/library");
+      await deleteFile(fileId);
+
+      // Refresh data
+      if (itemData) {
+        setItemData({
+          ...itemData,
+          attachments: itemData.attachments.filter(a => a.id !== fileId)
+        });
+      }
+      toast.success("Attachment deleted", { id: toastId, ...successStyles });
+    } catch (error) {
+      toast.error("Failed to delete attachment", { id: toastId, ...errorStyles });
+    }
   };
 
   const tabs = [
@@ -1295,11 +1360,20 @@ const ItemDetailsPage = () => {
                   title="Attachments"
                   icon={<DocumentIcon className="h-5 w-5 text-gray-500" />}
                 />
+                <input
+                  type="file"
+                  ref={attachmentInputRef}
+                  className="hidden"
+                  multiple
+                  onChange={handleAttachmentUpload}
+                />
                 <button
-                  onClick={() => { }}
-                  className="px-4 py-2 bg-[#8CC21B] text-white rounded-lg flex items-center gap-2 text-sm font-medium hover:bg-[#7ab318] transition-colors"
+                  onClick={() => attachmentInputRef.current?.click()}
+                  disabled={uploadingAttachments}
+                  className="px-4 py-2 bg-[#8CC21B] text-white rounded-lg flex items-center gap-2 text-sm font-medium hover:bg-[#7ab318] transition-colors disabled:opacity-50"
                 >
-                  Upload New Attachment
+                  <DocumentIcon className="h-4 w-4" />
+                  {uploadingAttachments ? "Uploading..." : "Upload New Attachment"}
                 </button>
               </div>
 
@@ -1324,13 +1398,19 @@ const ItemDetailsPage = () => {
                               {attachment.name || attachment.fileName}
                             </div>
                           </td>
-                          <td className="px-4 py-3 text-sm text-gray-500">{attachment.uploadDate || "—"}</td>
+                          <td className="px-4 py-3 text-sm text-gray-500">{attachment.uploadedAt ? new Date(attachment.uploadedAt).toLocaleDateString() : "—"}</td>
                           <td className="px-4 py-3 text-sm">
                             <div className="flex items-center gap-3">
-                              <button className="text-blue-600 hover:text-blue-800 flex items-center gap-1">
-                                <ArrowDownTrayIcon className="h-4 w-4" /> Download
+                              <button
+                                onClick={() => window.open(attachment.url, "_blank")}
+                                className="text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                              >
+                                <ArrowDownTrayIcon className="h-4 w-4" /> View/Download
                               </button>
-                              <button className="text-red-600 hover:text-red-800">
+                              <button
+                                onClick={() => handleDeleteAttachment(attachment.id)}
+                                className="text-red-600 hover:text-red-800"
+                              >
                                 Delete
                               </button>
                             </div>
@@ -1460,7 +1540,10 @@ const ItemDetailsPage = () => {
               <PhotoIcon className="h-4 w-4" />
               {uploadingPictures ? "Uploading..." : "Add Pictures"}
             </button>
-            <button className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 text-gray-700">
+            <button
+              onClick={() => attachmentInputRef.current?.click()}
+              className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 text-gray-700"
+            >
               <DocumentIcon className="h-4 w-4" />
               Add Documents
             </button>

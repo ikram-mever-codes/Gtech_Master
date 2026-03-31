@@ -36,7 +36,7 @@ export const uploadFile = async (
   next: NextFunction
 ) => {
   try {
-    const { description, tags, isPublic, customerId } = req.body;
+    const { description, tags, isPublic, customerId, itemId } = req.body;
     const userId = (req as any).user?.id;
 
     if (!req.file) {
@@ -113,6 +113,7 @@ export const uploadFile = async (
         uploadedById: userId || null,
         customer,
         customerId: customerId || null,
+        itemId: itemId ? parseInt(itemId) : null,
       });
 
       await fileRepository.save(file);
@@ -148,6 +149,7 @@ export const getFiles = async (
       type,
       search,
       customerId,
+      itemId,
       isPublic,
       page = 1,
       limit = 20,
@@ -171,6 +173,10 @@ export const getFiles = async (
 
     if (customerId) {
       query.andWhere("file.customerId = :customerId", { customerId });
+    }
+
+    if (itemId) {
+      query.andWhere("file.itemId = :itemId", { itemId });
     }
 
     if (userRole !== "ADMIN" && userRole !== "MANAGER") {

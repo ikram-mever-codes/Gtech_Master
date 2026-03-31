@@ -184,16 +184,27 @@ const syncInvoiceRecord = async (
 export const getAllCargos = async (req: Request, res: Response, next: NextFunction) => {
     try {
         const cargoRepo = AppDataSource.getRepository(Cargo);
-        const { page = 1, limit = 50, search = "", unassignedOnly = "false" } = req.query as any;
-
+        const { page = 1, limit = 50, search = "", unassignedOnly = "false", status = "", availableOnly = "false" } = req.query as any;
+        
         const pageNum = Math.max(1, Number(page));
-        const limitNum = Math.max(1, Math.min(100, Number(limit)));
+        const limitNum = Math.max(1, Math.min(1000, Number(limit)));
         const skip = (pageNum - 1) * limitNum;
 
         const qb = cargoRepo.createQueryBuilder("cargo");
 
+        if (status) {
+            const statuses = status.split(",").map((s: string) => s.trim());
+            qb.andWhere("cargo.cargo_status IN (:...statuses)", { statuses });
+        }
+
+        if (availableOnly === "true") {
+            qb.andWhere("cargo.cargo_status != 'Shipped'");
+            qb.leftJoin(Invoice, "invoice", "invoice.orderNumber = cargo.cargo_no");
+            qb.andWhere("(invoice.id IS NULL OR invoice.status NOT IN ('sent', 'paid', 'overdue', 'cancelled'))");
+        }
+
         if (search) {
-            qb.where("(cargo.cargo_no LIKE :search OR cargo.note LIKE :search OR cargo.remark LIKE :search OR cargo.cargo_status LIKE :search)", { search: `%${search}%` });
+            qb.andWhere("(cargo.cargo_no LIKE :search OR cargo.note LIKE :search OR cargo.remark LIKE :search OR cargo.cargo_status LIKE :search)", { search: `%${search}%` });
         }
 
         if (unassignedOnly === "true") {
@@ -218,6 +229,7 @@ export const getAllCargos = async (req: Request, res: Response, next: NextFuncti
 
         const [cargos, total] = await qb
             .orderBy("cargo.id", "DESC")
+            .groupBy("cargo.id")
             .skip(skip)
             .take(limitNum)
             .getManyAndCount();

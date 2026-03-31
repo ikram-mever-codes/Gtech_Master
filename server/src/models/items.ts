@@ -13,6 +13,7 @@ import { Taric } from "./tarics";
 import { Category } from "./categories";
 import { OrderItem } from "./order_items";
 import { Supplier } from "./suppliers";
+import { LibraryFile } from "./library";
 
 @Entity()
 export class Item {
@@ -164,4 +165,7 @@ export class Item {
 
   @OneToMany(() => OrderItem, (orderItem) => orderItem.item)
   orderItems: OrderItem[];
+
+  @OneToMany(() => LibraryFile, (file) => file.itemId)
+  attachments: LibraryFile[];
 }

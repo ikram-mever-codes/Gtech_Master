@@ -823,7 +823,7 @@ const ItemsManagementPage: React.FC = () => {
         if (!matchesGlobal) return false;
       }
       if (filters.isActive && it.is_active !== filters.isActive) return false;
-      if (filters.category && it.cat_id?.toString() !== filters.category)
+      if (filters.category && it.category_id?.toString() !== filters.category)
         return false;
 
       return true;
@@ -1679,11 +1679,14 @@ const ItemsManagementPage: React.FC = () => {
                       className="w-full px-3 py-2 border border-gray-300 rounded-md"
                     >
                       <option value="">All Categories</option>
-                      {categories.map((cat: any) => (
-                        <option key={cat.id} value={cat.id}>
-                          {cat.name}
-                        </option>
-                      ))}
+                      {Array.from(new Set(categories.map(c => c.name))).map((name) => {
+                        const cat = categories.find(c => c.name === name);
+                        return (
+                          <option key={cat.id} value={cat.id}>
+                            {cat.name}
+                          </option>
+                        );
+                      })}
                     </select>
                   </div>
                   <div className="md:col-span-2 flex items-end">
