@@ -70,6 +70,9 @@ export class LibraryFile {
   @Column({ nullable: true })
   customerId?: string;
 
+  @Column({ nullable: true })
+  itemId?: number;
+
   @CreateDateColumn()
   uploadedAt!: Date;
 

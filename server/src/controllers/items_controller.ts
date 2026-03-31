@@ -11,6 +11,7 @@ import { OrderItem } from "../models/order_items";
 import { ItemQuality } from "../models/item_qualities";
 import { Supplier } from "../models/suppliers";
 import { SupplierItem } from "../models/supplier_items";
+import { LibraryFile } from "../models/library";
 import {
   Like,
   Between,
@@ -342,6 +343,16 @@ export const getItemById = async (
 
     const primaryWarehouseItem = warehouseItems[0] || null;
 
+    let attachments: any[] = [];
+    try {
+      const libraryRepository = AppDataSource.getRepository(LibraryFile);
+      attachments = await libraryRepository.find({
+        where: { itemId: parseInt(id) },
+      });
+    } catch (e: any) {
+      console.warn("library_files table not available:", e.message);
+    }
+
     const de_no = primaryWarehouseItem?.item_no_de || item.parent?.de_no || "";
     const ean = item.ean || primaryWarehouseItem?.ean || "";
 
@@ -440,7 +451,14 @@ export const getItemById = async (
         descriptionCN: qc.description_cn || "",
       })),
 
-      attachments: [],
+      attachments: attachments.map((file: any) => ({
+        id: file.id,
+        filename: file.filename,
+        originalName: file.originalName,
+        url: file.url,
+        fileType: file.fileType,
+        uploadedAt: file.uploadedAt,
+      })),
 
       pictures: {
         shopPicture: item.photo || "",
