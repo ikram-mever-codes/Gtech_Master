@@ -296,7 +296,15 @@ export const getItemById = async (
   try {
     const { id } = req.params;
 
-    if (!id || isNaN(parseInt(id))) {
+    if (!id) {
+      return next(new ErrorHandler("Item ID is required", 400));
+    }
+
+    if (id === "tarics" || id === "stats" || id === "parents" || id === "warehouse") {
+      return next();
+    }
+
+    if (isNaN(parseInt(id))) {
       return next(new ErrorHandler("Valid numeric Item ID is required", 400));
     }
 
@@ -2058,7 +2066,7 @@ export const updateQualityCriterion = async (
     if (name !== undefined) criterion.name = name;
     if (picture !== undefined) criterion.picture = picture;
     if (description !== undefined) criterion.description = description;
-    // if (description_cn !== undefined) criterion.description_cn = description_cn;
+    if (description_cn !== undefined) (criterion as any).description_cn = description_cn;
 
     criterion.updated_at = new Date();
     await qualityRepository.save(criterion);
