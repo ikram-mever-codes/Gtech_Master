@@ -774,7 +774,7 @@ const ItemDetailsPage = () => {
                 />
                 <SelectInfoRow
                   label="Category"
-                  value={itemData.category_id?.toString()}
+                  value={itemData.category_id?.toString() ?? ""}
                   field="category_id"
                   options={categories.map((c: any) => ({
                     label: c.name,
