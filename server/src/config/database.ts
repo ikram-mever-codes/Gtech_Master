@@ -38,6 +38,8 @@ import { CargoOrder } from "../models/cargo_orders";
 import { CargoType } from "../models/cargo_types";
 import { SupplierOrder } from "../models/supplier_orders";
 import { fixSequences } from "../utils/dbUtils";
+import { SalesPrice } from "../models/sales_prices";
+import { PurchasePrice } from "../models/purchase_prices";
 
 dotenv.config();
 
@@ -64,6 +66,8 @@ export const AppDataSource = new DataSource({
     ListCreator,
     Inquiry,
     DeliveryAddress,
+    SalesPrice,
+    PurchasePrice,
     UserCreator,
     Business,
     RequestedItem,
@@ -94,8 +98,8 @@ export const AppDataSource = new DataSource({
     ssl:
       process.env.DB_SSL === "true"
         ? {
-          rejectUnauthorized: false,
-        }
+            rejectUnauthorized: false,
+          }
         : false,
   },
   poolSize: 10,
