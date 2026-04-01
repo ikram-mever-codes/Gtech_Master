@@ -102,9 +102,16 @@ export const getItems = async (
     }
 
     if (category) {
-      queryBuilder.andWhere("item.cat_id = :catId", {
-        catId: parseInt(category as string),
-      });
+      const categoryValue = (category as string).trim();
+      queryBuilder.leftJoin("item.category", "cat");
+      if (!isNaN(parseInt(categoryValue))) {
+        queryBuilder.andWhere("(item.cat_id = :catId OR cat.name ILIKE :catName)", {
+          catId: parseInt(categoryValue),
+          catName: `%${categoryValue}%`
+        });
+      } else {
+        queryBuilder.andWhere("cat.name ILIKE :catName", { catName: `%${categoryValue}%` });
+      }
     }
 
     if (supplier) {
@@ -394,6 +401,7 @@ export const getItemById = async (
       nameCN: item.item_name_cn || "",
       ean: ean?.toString() || "",
       category: item.category?.name || "STD",
+      category_id: item.cat_id,
       model: item.model || "",
       remark: item.remark || "",
       supplier_id: item.supplier_id,

@@ -29,6 +29,7 @@ import {
   ItemDetails,
 } from "@/api/items";
 import { getAllSuppliers, Supplier } from "@/api/suppliers";
+import { getCategories } from "@/api/categories";
 import { uploadFile } from "@/api/library";
 import CustomModal from "@/components/UI/CustomModal";
 import { loadingStyles, successStyles, errorStyles } from "@/utils/constants";
@@ -166,7 +167,9 @@ const SelectInfoRow = ({
           ))}
         </select>
       ) : (
-        <span className="text-gray-900">{value || "—"}</span>
+        <span className="text-gray-900">
+          {options.find((opt) => opt.value === value)?.label || value || "—"}
+        </span>
       )}
     </div>
   </div>
@@ -223,6 +226,7 @@ const ItemDetailsPage = () => {
   const [uploadingPictures, setUploadingPictures] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [allSuppliers, setAllSuppliers] = useState<Supplier[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
   const [uploadingAttachments, setUploadingAttachments] = useState(false);
   const attachmentInputRef = React.useRef<HTMLInputElement>(null);
   const [attachments, setAttachments] = useState<any[]>([]);
@@ -324,7 +328,7 @@ const ItemDetailsPage = () => {
       for (const file of files) {
         const formData = new FormData();
         formData.append("file", file);
-        const res = await uploadFile(formData);
+        const res = await uploadFile(formData, false);
         if (res.data?.url) {
           newUrls.push(res.data.url);
         }
@@ -395,7 +399,7 @@ const ItemDetailsPage = () => {
         formData.append("file", files[i]);
         formData.append("itemId", id as string);
         formData.append("isPublic", "true");
-        await uploadFile(formData);
+        await uploadFile(formData, false);
       }
 
       const itemResponse: any = await getItemById(parseInt(id as string));
@@ -461,15 +465,17 @@ const ItemDetailsPage = () => {
       setLoading(true);
       try {
         const itemId = parseInt(id as string);
-        const [itemResponse, variationsResponse, qualityResponse, suppliersRes]: any =
+        const [itemResponse, variationsResponse, qualityResponse, suppliersRes, catsRes]: any =
           await Promise.all([
             getItemById(itemId),
             getItemVariations(itemId),
             getItemQualityCriteria(itemId),
-            getAllSuppliers({ limit: 1000 })
+            getAllSuppliers({ limit: 1000 }),
+            getCategories()
           ]);
 
         if (suppliersRes?.data) setAllSuppliers(suppliersRes.data);
+        if (catsRes?.data) setCategories(catsRes.data);
 
         const rawItem = itemResponse.data;
         const toBool = (val: any) => val === "Y" || val === "Yes" || val === true || val === 1 || val === "1";
@@ -544,6 +550,7 @@ const ItemDetailsPage = () => {
         ean: updatedData.ean ? updatedData.ean.toString() : null,
         model: updatedData.model,
         remark: updatedData.remark,
+        cat_id: toInt(updatedData.category_id),
         isActive: updatedData.isActive ? "Y" : "N",
         weight: toNum(updatedData.dimensions?.weight),
         length: toNum(updatedData.dimensions?.length),
@@ -765,10 +772,14 @@ const ItemDetailsPage = () => {
                   itemData={itemData}
                   setItemData={setItemData}
                 />
-                <EditableInfoRow
+                <SelectInfoRow
                   label="Category"
-                  value={itemData.category}
-                  field="category"
+                  value={itemData.category_id?.toString() ?? ""}
+                  field="category_id"
+                  options={categories.map((c: any) => ({
+                    label: c.name,
+                    value: c.id.toString(),
+                  }))}
                   editMode={editMode}
                   itemData={itemData}
                   setItemData={setItemData}
@@ -1360,13 +1371,7 @@ const ItemDetailsPage = () => {
                   title="Attachments"
                   icon={<DocumentIcon className="h-5 w-5 text-gray-500" />}
                 />
-                <input
-                  type="file"
-                  ref={attachmentInputRef}
-                  className="hidden"
-                  multiple
-                  onChange={handleAttachmentUpload}
-                />
+
                 <button
                   onClick={() => attachmentInputRef.current?.click()}
                   disabled={uploadingAttachments}
@@ -1530,6 +1535,13 @@ const ItemDetailsPage = () => {
               multiple
               accept="image/*"
               onChange={(e) => handleImageUpload(e)}
+            />
+            <input
+              type="file"
+              ref={attachmentInputRef}
+              className="hidden"
+              multiple
+              onChange={(e) => handleAttachmentUpload(e)}
             />
             <button
               onClick={() => fileInputRef.current?.click()}

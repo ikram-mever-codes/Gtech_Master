@@ -93,6 +93,7 @@ export interface ItemDetails {
   nameCN: string;
   ean: string;
   category: string;
+  category_id: number | null;
   model: string;
   remark: string;
   supplier_id: number | null;
