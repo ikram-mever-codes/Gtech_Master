@@ -11,13 +11,13 @@ export interface LibraryFile {
   fileSize: number;
   mimeType: string;
   fileType:
-    | "IMAGE"
-    | "DOCUMENT"
-    | "PDF"
-    | "SPREADSHEET"
-    | "PRESENTATION"
-    | "ARCHIVE"
-    | "OTHER";
+  | "IMAGE"
+  | "DOCUMENT"
+  | "PDF"
+  | "SPREADSHEET"
+  | "PRESENTATION"
+  | "ARCHIVE"
+  | "OTHER";
   url: string;
   thumbnailUrl?: string;
   description?: string;
@@ -60,18 +60,25 @@ export interface UploadFilePayload {
   customerId?: string;
 }
 
-// API Functions
-export const uploadFile = async (formData: FormData) => {
+export const uploadFile = async (formData: FormData, showToasts: boolean = true) => {
+  let toastId = "";
   try {
-    toast.loading("Uploading file...", loadingStyles);
+    if (showToasts) {
+      toastId = toast.loading("Uploading file...", loadingStyles);
+    }
     const response = await api.post("/library/upload", formData, {
       headers: { "Content-Type": "multipart/form-data" },
     });
-    toast.dismiss();
-    toast.success("File uploaded successfully", successStyles);
+    if (showToasts) {
+      toast.dismiss(toastId);
+      toast.success("File uploaded successfully", successStyles);
+    }
     return response;
   } catch (error) {
-    handleApiError(error, "Failed to upload file");
+    if (showToasts) {
+      toast.dismiss(toastId);
+      handleApiError(error, "Failed to upload file");
+    }
     throw error;
   }
 };

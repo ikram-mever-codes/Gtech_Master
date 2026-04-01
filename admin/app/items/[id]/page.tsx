@@ -328,7 +328,7 @@ const ItemDetailsPage = () => {
       for (const file of files) {
         const formData = new FormData();
         formData.append("file", file);
-        const res = await uploadFile(formData);
+        const res = await uploadFile(formData, false);
         if (res.data?.url) {
           newUrls.push(res.data.url);
         }
@@ -399,7 +399,7 @@ const ItemDetailsPage = () => {
         formData.append("file", files[i]);
         formData.append("itemId", id as string);
         formData.append("isPublic", "true");
-        await uploadFile(formData);
+        await uploadFile(formData, false);
       }
 
       const itemResponse: any = await getItemById(parseInt(id as string));
@@ -1371,13 +1371,7 @@ const ItemDetailsPage = () => {
                   title="Attachments"
                   icon={<DocumentIcon className="h-5 w-5 text-gray-500" />}
                 />
-                <input
-                  type="file"
-                  ref={attachmentInputRef}
-                  className="hidden"
-                  multiple
-                  onChange={handleAttachmentUpload}
-                />
+
                 <button
                   onClick={() => attachmentInputRef.current?.click()}
                   disabled={uploadingAttachments}
@@ -1541,6 +1535,13 @@ const ItemDetailsPage = () => {
               multiple
               accept="image/*"
               onChange={(e) => handleImageUpload(e)}
+            />
+            <input
+              type="file"
+              ref={attachmentInputRef}
+              className="hidden"
+              multiple
+              onChange={(e) => handleAttachmentUpload(e)}
             />
             <button
               onClick={() => fileInputRef.current?.click()}
