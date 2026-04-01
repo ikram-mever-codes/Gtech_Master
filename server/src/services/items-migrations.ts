@@ -266,9 +266,9 @@ export class MySQLToPostgresMigrator {
 
     try {
       const [rows] = await connection.execute(`
-        SELECT id, is_ignored_value, name, de_cat, created_at, updated_at 
-        FROM categories
-      `);
+          SELECT id, is_ignored_value, name, de_cat, created_at, updated_at 
+          FROM categories
+        `);
 
       const categoryRepository = AppDataSource.getRepository(Category);
       const categories = rows as any[];
@@ -311,13 +311,13 @@ export class MySQLToPostgresMigrator {
 
     try {
       const [rows] = await connection.execute(`
-        SELECT id, order_type_id, name, name_cn, company_name, extra_note, 
-               min_order_value, is_fully_prepared, is_tax_included, is_freight_included,
-               province, city, street, full_address, contact_person, phone, mobile,
-               email, website, bank_name, account_number, beneficiary, deposit,
-               bbgd, bagd, percentage, percentage2, percentage3, created_at, updated_at
-        FROM suppliers
-      `);
+          SELECT id, order_type_id, name, name_cn, company_name, extra_note, 
+                min_order_value, is_fully_prepared, is_tax_included, is_freight_included,
+                province, city, street, full_address, contact_person, phone, mobile,
+                email, website, bank_name, account_number, beneficiary, deposit,
+                bbgd, bagd, percentage, percentage2, percentage3, created_at, updated_at
+          FROM suppliers
+        `);
 
       const supplierRepository = AppDataSource.getRepository(Supplier);
       const suppliers = rows as any[];
@@ -405,10 +405,10 @@ export class MySQLToPostgresMigrator {
 
     try {
       const [rows] = await connection.execute(`
-        SELECT id, code, reguler_artikel, duty_rate, name_de, description_de,
-               name_en, description_en, name_cn, created_at, updated_at
-        FROM tarics
-      `);
+          SELECT id, code, reguler_artikel, duty_rate, name_de, description_de,
+                name_en, description_en, name_cn, created_at, updated_at
+          FROM tarics
+        `);
 
       const taricRepository = AppDataSource.getRepository(Taric);
       const tarics = rows as any[];
@@ -461,11 +461,11 @@ export class MySQLToPostgresMigrator {
 
     try {
       const [rows] = await connection.execute(`
-        SELECT id, taric_id, supplier_id, de_id, de_no, is_active, name_de, name_en,
-               name_cn, var_de_1, var_de_2, var_de_3, var_en_1, var_en_2, var_en_3,
-               is_NwV, parent_rank, is_var_unilingual, created_at, updated_at
-        FROM parents
-      `);
+          SELECT id, taric_id, supplier_id, de_id, de_no, is_active, name_de, name_en,
+                name_cn, var_de_1, var_de_2, var_de_3, var_en_1, var_en_2, var_en_3,
+                is_NwV, parent_rank, is_var_unilingual, created_at, updated_at
+          FROM parents
+        `);
 
       const parentRepository: any = AppDataSource.getRepository(Parent);
       const parents = rows as any[];
@@ -533,15 +533,15 @@ export class MySQLToPostgresMigrator {
 
     try {
       const [rows] = await connection.execute(`
-        SELECT id, parent_id, ItemID_DE, parent_no_de, is_dimension_special,
-               model, supp_cat, ean, taric_id, weight, width, height, length,
-               item_name, item_name_cn, FOQ, FSQ, is_qty_dividable, ISBN,
-               cat_id, remark, RMB_Price, photo, pix_path, pix_path_eBay,
-               is_npr, npr_remark, many_components, effort_rating, is_rmb_special,
-               is_eur_special, is_pu_item, is_meter_item, is_new, isActive,
-               note, synced_at, created_at, updated_at
-        FROM items
-      `);
+          SELECT id, parent_id, ItemID_DE, parent_no_de, is_dimension_special,
+                model, supp_cat, ean, taric_id, weight, width, height, length,
+                item_name, item_name_cn, FOQ, FSQ, is_qty_dividable, ISBN,
+                cat_id, remark, RMB_Price, photo, pix_path, pix_path_eBay,
+                is_npr, npr_remark, many_components, effort_rating, is_rmb_special,
+                is_eur_special, is_pu_item, is_meter_item, is_new, isActive,
+                note, synced_at, created_at, updated_at
+          FROM items
+        `);
 
       const itemRepository: any = AppDataSource.getRepository(Item);
       const items = rows as any[];
@@ -819,10 +819,10 @@ export class MySQLToPostgresMigrator {
 
     try {
       const [rows] = await connection.execute(`
-        SELECT id, order_no, category_id, status, comment, date_created, date_emailed,
-               date_delivery, created_at, updated_at
-        FROM orders
-      `);
+          SELECT id, order_no, category_id, status, comment, date_created, date_emailed,
+                date_delivery, created_at, updated_at
+          FROM orders
+        `);
 
       const orderRepository: any = AppDataSource.getRepository(Order);
       const orders = rows as any[];
@@ -885,11 +885,11 @@ export class MySQLToPostgresMigrator {
 
     try {
       const [rows] = await connection.execute(`
-        SELECT id, item_id, ItemID_DE, category_id, ean, item_no_de, item_name_de,
-               item_name_en, is_no_auto_order, is_active, stock_qty, msq, buffer,
-               is_stock_item, is_SnSI, ship_class, created_at, updated_at
-        FROM warehouse_items
-      `);
+          SELECT id, item_id, ItemID_DE, category_id, ean, item_no_de, item_name_de,
+                item_name_en, is_no_auto_order, is_active, stock_qty, msq, buffer,
+                is_stock_item, is_SnSI, ship_class, created_at, updated_at
+          FROM warehouse_items
+        `);
 
       const warehouseItemRepository: any =
         AppDataSource.getRepository(WarehouseItem);
@@ -992,10 +992,10 @@ export class MySQLToPostgresMigrator {
 
     try {
       const [rows] = await connection.execute(`
-        SELECT id, item_id, value_de, value_de_2, value_de_3, value_en, value_en_2,
-               value_en_3, created_at, updated_at
-        FROM variation_values
-      `);
+          SELECT id, item_id, value_de, value_de_2, value_de_3, value_en, value_en_2,
+                value_en_3, created_at, updated_at
+          FROM variation_values
+        `);
 
       const variationValueRepository =
         AppDataSource.getRepository(VariationValue);
@@ -1060,10 +1060,10 @@ export class MySQLToPostgresMigrator {
 
     try {
       const [rows] = await connection.execute(`
-        SELECT id, item_id, picture, name_cn, name, description, full_description,
-               confirmed, created_at, updated_at
-        FROM item_qualities
-      `);
+          SELECT id, item_id, picture, name_cn, name, description, full_description,
+                confirmed, created_at, updated_at
+          FROM item_qualities
+        `);
 
       const itemQualityRepository: any =
         AppDataSource.getRepository(ItemQuality);
@@ -1134,10 +1134,10 @@ export class MySQLToPostgresMigrator {
 
     try {
       const [rows] = await connection.execute(`
-        SELECT id, master_id, ItemID_DE, order_no, qty, remark_de, qty_delivered,
-               created_at, updated_at
-        FROM order_items
-      `);
+          SELECT id, master_id, ItemID_DE, order_no, qty, remark_de, qty_delivered,
+                created_at, updated_at
+          FROM order_items
+        `);
 
       const orderItemRepository: any = AppDataSource.getRepository(OrderItem);
       const orderItems = rows as any[];
@@ -1283,10 +1283,10 @@ export class MySQLToPostgresMigrator {
 
     try {
       const [rows] = await connection.execute(`
-        SELECT id, item_id, supplier_id, is_default, moq, oi, price_rmb, url,
-               note_cn, is_po, lead_time, updated_by, created_at, updated_at
-        FROM supplier_items
-      `);
+          SELECT id, item_id, supplier_id, is_default, moq, oi, price_rmb, url,
+                note_cn, is_po, lead_time, updated_by, created_at, updated_at
+          FROM supplier_items
+        `);
 
       const supplierItemRepository: any =
         AppDataSource.getRepository(SupplierItem);
