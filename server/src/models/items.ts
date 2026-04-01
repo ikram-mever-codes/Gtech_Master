@@ -14,6 +14,8 @@ import { Category } from "./categories";
 import { OrderItem } from "./order_items";
 import { Supplier } from "./suppliers";
 import { LibraryFile } from "./library";
+import { PurchasePrice } from "./purchase_prices";
+import { SalesPrice } from "./sales_prices";
 
 @Entity()
 export class Item {
@@ -137,6 +139,21 @@ export class Item {
   // NEW FIELD: is_updated - marks if item needs to be synced to WaWi
   @Column({ type: "boolean", default: false })
   is_updated!: boolean;
+
+  @Column({ type: "decimal", precision: 10, scale: 4, nullable: true })
+  transfer_price_eur?: number;
+
+  @Column({ type: "char", length: 1, default: "N" })
+  is_special_transfer_price!: string;
+
+  @Column({ type: "char", length: 1, default: "N" })
+  is_special_purchase_price_RMB!: string;
+
+  @OneToMany(() => PurchasePrice, (pp) => pp.item)
+  purchasePrices!: PurchasePrice[];
+
+  @OneToMany(() => SalesPrice, (sp) => sp.item)
+  salesPrices!: SalesPrice[];
 
   @CreateDateColumn()
   synced_at!: Date;
