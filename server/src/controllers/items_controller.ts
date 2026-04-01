@@ -105,12 +105,14 @@ export const getItems = async (
       const categoryValue = (category as string).trim();
       queryBuilder.leftJoin("item.category", "cat");
       if (!isNaN(parseInt(categoryValue))) {
-        queryBuilder.andWhere("(item.cat_id = :catId OR cat.name ILIKE :catName)", {
+        queryBuilder.andWhere("(item.cat_id = :catId OR TRIM(cat.name) ILIKE :catNameExact)", {
           catId: parseInt(categoryValue),
-          catName: `%${categoryValue}%`
+          catNameExact: categoryValue,
         });
       } else {
-        queryBuilder.andWhere("cat.name ILIKE :catName", { catName: `%${categoryValue}%` });
+        queryBuilder.andWhere("TRIM(cat.name) ILIKE :catNameExact", {
+          catNameExact: categoryValue,
+        });
       }
     }
 
@@ -782,7 +784,7 @@ export const updateItem = async (
           }
         }
 
-        if (currentValue !== newValue) {
+        if (currentValue != newValue) {
           hasChanges = true;
           (item as any)[field] = newValue;
         }
@@ -1042,6 +1044,9 @@ export const deleteItem = async (
         item_id: parseInt(id),
       });
       await transactionalEntityManager.delete(ItemQuality, {
+        item_id: parseInt(id),
+      });
+      await transactionalEntityManager.delete(SupplierItem, {
         item_id: parseInt(id),
       });
       await transactionalEntityManager.delete(Item, parseInt(id));

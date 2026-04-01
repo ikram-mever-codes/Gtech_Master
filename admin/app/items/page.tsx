@@ -822,8 +822,12 @@ const ItemsManagementPage: React.FC = () => {
 
         if (!matchesGlobal) return false;
       }
-      if (filters.isActive && it.is_active !== filters.isActive) return false;
-      if (filters.category && it.category !== filters.category)
+      if (filters.isActive && it.is_active?.trim() !== filters.isActive.trim()) return false;
+      if (
+        filters.category &&
+        it.category?.toString().trim().toLowerCase() !==
+          filters.category.trim().toLowerCase()
+      )
         return false;
 
       return true;
@@ -1679,13 +1683,20 @@ const ItemsManagementPage: React.FC = () => {
                       className="w-full px-3 py-2 border border-gray-300 rounded-md"
                     >
                       <option value="">All Categories</option>
-                      {Array.from(new Set(categories.map(c => c.name))).sort().map((name) => {
-                        return (
-                          <option key={name} value={name}>
-                            {name}
-                          </option>
-                        );
-                      })}
+                      {Array.from(
+                        new Set(
+                          categories.map((c) => c.name?.toString().trim()),
+                        ),
+                      )
+                        .filter(Boolean)
+                        .sort()
+                        .map((name) => {
+                          return (
+                            <option key={name} value={name}>
+                              {name}
+                            </option>
+                          );
+                        })}
                     </select>
                   </div>
                   <div className="md:col-span-2 flex items-end">
