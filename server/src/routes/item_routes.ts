@@ -34,6 +34,7 @@ import {
   exportItemsToCSV,
   resetUpdatedFlag,
   syncTransferPrices,
+  feedTransferPrices,
 } from "../controllers/items_controller";
 import { authenticateUser, authorize } from "../middlewares/authorized";
 import { AppDataSource } from "../config/database";
@@ -43,7 +44,7 @@ import { Item } from "../models/items";
 
 const router: any = express.Router();
 
-router.get("/pricing/transfer-prices", syncTransferPrices);
+router.get("/pricing/transfer-prices", feedTransferPrices);
 // router.use(authenticateUser);
 // router.use(authorize(UserRole.ADMIN, UserRole.SALES, UserRole.PURCHASING));
 

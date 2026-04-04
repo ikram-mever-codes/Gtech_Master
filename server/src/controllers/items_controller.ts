@@ -84,8 +84,8 @@ export const feedTransferPrices = async (
         const newPrice = calculateTransferPrice(supplierItem.price_rmb);
 
         // Only update if the price actually changed
-        if (item.price !== newPrice) {
-          item.price = newPrice;
+        if (item.transfer_price_EUR !== newPrice) {
+          item.transfer_price_EUR = newPrice;
           item.is_updated = true; // Mark for sync if applicable
           await itemRepo.save(item);
           updatedCount++;
@@ -977,8 +977,8 @@ export const syncTransferPrices = async (
       });
       if (sItem && sItem.price_rmb) {
         const newTransferPrice = calculateTransferPrice(sItem.price_rmb);
-        if (item.price !== newTransferPrice) {
-          item.price = newTransferPrice;
+        if (item.transfer_price_EUR !== newTransferPrice) {
+          item.transfer_price_EUR = newTransferPrice;
           item.is_updated = true;
           await itemRepo.save(item);
           count++;
