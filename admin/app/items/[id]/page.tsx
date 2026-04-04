@@ -44,8 +44,9 @@ const StatusIndicator = ({
   label?: string;
 }) => (
   <span
-    className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${value ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
-      }`}
+    className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+      value ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+    }`}
   >
     {value ? (
       <CheckCircleIcon className="h-3 w-3" />
@@ -146,7 +147,7 @@ const SelectInfoRow = ({
               ];
               let finalValue: any = val;
               if (booleanFields.includes(field)) {
-                finalValue = (val === "Y" || val === "Yes");
+                finalValue = val === "Y" || val === "Yes";
               }
 
               if (field.includes(".")) {
@@ -259,7 +260,9 @@ const ItemDetailsPage = () => {
     setEditingQuality(null);
   };
 
-  const handleQualityFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleQualityFormChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
+  ) => {
     const { name, value } = e.target;
     setQualityFormData((prev) => ({ ...prev, [name]: value }));
   };
@@ -307,7 +310,8 @@ const ItemDetailsPage = () => {
   };
 
   const handleDeleteQuality = async (qualityId: number) => {
-    if (!confirm("Are you sure you want to delete this quality criterion?")) return;
+    if (!confirm("Are you sure you want to delete this quality criterion?"))
+      return;
     try {
       await deleteQualityCriterion(qualityId);
       setQualityCriteria((prev) => prev.filter((q) => q.id !== qualityId));
@@ -338,9 +342,11 @@ const ItemDetailsPage = () => {
         const updated = { ...itemData };
         let currentShop = updated.pictures.shopPicture;
         let currentEbay = updated.pictures.ebayPictures;
-        let currentGallery = updated.pictures.pixPath ? updated.pictures.pixPath.split(",").filter(Boolean) : [];
+        let currentGallery = updated.pictures.pixPath
+          ? updated.pictures.pixPath.split(",").filter(Boolean)
+          : [];
 
-        newUrls.forEach(url => {
+        newUrls.forEach((url) => {
           if (!currentShop) {
             currentShop = url;
           } else if (!currentEbay) {
@@ -355,7 +361,10 @@ const ItemDetailsPage = () => {
         updated.pictures.pixPath = currentGallery.join(",");
 
         await handleUpdateItem(updated);
-        toast.success("Pictures uploaded successfully", { id: toastId, ...successStyles });
+        toast.success("Pictures uploaded successfully", {
+          id: toastId,
+          ...successStyles,
+        });
       } else {
         toast.dismiss(toastId);
       }
@@ -369,7 +378,8 @@ const ItemDetailsPage = () => {
   };
 
   const handleRemoveImage = async (field: string, url: string) => {
-    if (!itemData || !confirm("Are you sure you want to remove this picture?")) return;
+    if (!itemData || !confirm("Are you sure you want to remove this picture?"))
+      return;
 
     const updated = { ...itemData };
     if (field === "shopPicture") {
@@ -378,15 +388,16 @@ const ItemDetailsPage = () => {
       updated.pictures.ebayPictures = "";
     } else if (field === "pixPath") {
       const pics = updated.pictures.pixPath.split(",").filter(Boolean);
-      updated.pictures.pixPath = pics.filter(p => p !== url).join(",");
+      updated.pictures.pixPath = pics.filter((p) => p !== url).join(",");
     }
 
     await handleUpdateItem(updated);
     toast.success("Picture removed");
   };
 
-
-  const handleAttachmentUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAttachmentUpload = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
     const files = e.target.files;
     if (!files || files.length === 0 || !id) return;
 
@@ -404,22 +415,52 @@ const ItemDetailsPage = () => {
 
       const itemResponse: any = await getItemById(parseInt(id as string));
       if (itemResponse.data) {
-        const toBool = (val: any) => val === "Y" || val === "Yes" || val === true || val === 1 || val === "1";
+        const toBool = (val: any) =>
+          val === "Y" ||
+          val === "Yes" ||
+          val === true ||
+          val === 1 ||
+          val === "1";
         const rawItem = itemResponse.data;
         const transformedItem: ItemDetails = {
           ...rawItem,
           isActive: toBool(rawItem.isActive),
-          parent: { ...rawItem.parent, isActive: toBool(rawItem.parent.isActive), isSpecialItem: toBool(rawItem.parent.isSpecialItem) },
-          others: { ...rawItem.others, isQTYdiv: toBool(rawItem.others.isQTYdiv), isMeter: toBool(rawItem.others.isMeter), isPU: toBool(rawItem.others.isPU), isNPR: toBool(rawItem.others.isNPR), isNew: toBool(rawItem.others.isNew), isActive: toBool(rawItem.others.isActive), isStock: toBool(rawItem.others.isStock), isNAO: toBool(rawItem.others.isNAO), isSnSI: toBool(rawItem.others.isSnSI) },
-          pictures: { shopPicture: rawItem.pictures.shopPicture || "", ebayPictures: rawItem.pictures.ebayPictures || "", pixPath: rawItem.pictures.pixPath || "" }
+          parent: {
+            ...rawItem.parent,
+            isActive: toBool(rawItem.parent.isActive),
+            isSpecialItem: toBool(rawItem.parent.isSpecialItem),
+          },
+          others: {
+            ...rawItem.others,
+            isQTYdiv: toBool(rawItem.others.isQTYdiv),
+            isMeter: toBool(rawItem.others.isMeter),
+            isPU: toBool(rawItem.others.isPU),
+            isNPR: toBool(rawItem.others.isNPR),
+            isNew: toBool(rawItem.others.isNew),
+            isActive: toBool(rawItem.others.isActive),
+            isStock: toBool(rawItem.others.isStock),
+            isNAO: toBool(rawItem.others.isNAO),
+            isSnSI: toBool(rawItem.others.isSnSI),
+          },
+          pictures: {
+            shopPicture: rawItem.pictures.shopPicture || "",
+            ebayPictures: rawItem.pictures.ebayPictures || "",
+            pixPath: rawItem.pictures.pixPath || "",
+          },
         };
         setItemData(transformedItem);
       }
 
-      toast.success("Attachments uploaded successfully", { id: toastId, ...successStyles });
+      toast.success("Attachments uploaded successfully", {
+        id: toastId,
+        ...successStyles,
+      });
     } catch (error) {
       console.error("Attachment upload error:", error);
-      toast.error("Failed to upload attachments", { id: toastId, ...errorStyles });
+      toast.error("Failed to upload attachments", {
+        id: toastId,
+        ...errorStyles,
+      });
     } finally {
       setUploadingAttachments(false);
       if (attachmentInputRef.current) attachmentInputRef.current.value = "";
@@ -438,12 +479,15 @@ const ItemDetailsPage = () => {
       if (itemData) {
         setItemData({
           ...itemData,
-          attachments: itemData.attachments.filter(a => a.id !== fileId)
+          attachments: itemData.attachments.filter((a) => a.id !== fileId),
         });
       }
       toast.success("Attachment deleted", { id: toastId, ...successStyles });
     } catch (error) {
-      toast.error("Failed to delete attachment", { id: toastId, ...errorStyles });
+      toast.error("Failed to delete attachment", {
+        id: toastId,
+        ...errorStyles,
+      });
     }
   };
 
@@ -465,20 +509,30 @@ const ItemDetailsPage = () => {
       setLoading(true);
       try {
         const itemId = parseInt(id as string);
-        const [itemResponse, variationsResponse, qualityResponse, suppliersRes, catsRes]: any =
-          await Promise.all([
-            getItemById(itemId),
-            getItemVariations(itemId),
-            getItemQualityCriteria(itemId),
-            getAllSuppliers({ limit: 1000 }),
-            getCategories()
-          ]);
+        const [
+          itemResponse,
+          variationsResponse,
+          qualityResponse,
+          suppliersRes,
+          catsRes,
+        ]: any = await Promise.all([
+          getItemById(itemId),
+          getItemVariations(itemId),
+          getItemQualityCriteria(itemId),
+          getAllSuppliers({ limit: 1000 }),
+          getCategories(),
+        ]);
 
         if (suppliersRes?.data) setAllSuppliers(suppliersRes.data);
         if (catsRes?.data) setCategories(catsRes.data);
 
         const rawItem = itemResponse.data;
-        const toBool = (val: any) => val === "Y" || val === "Yes" || val === true || val === 1 || val === "1";
+        const toBool = (val: any) =>
+          val === "Y" ||
+          val === "Yes" ||
+          val === true ||
+          val === 1 ||
+          val === "1";
 
         const transformedItem: ItemDetails = {
           ...rawItem,
@@ -509,7 +563,7 @@ const ItemDetailsPage = () => {
             shopPicture: rawItem.pictures.shopPicture || "",
             ebayPictures: rawItem.pictures.ebayPictures || "",
             pixPath: rawItem.pictures.pixPath || "",
-          }
+          },
         };
 
         setItemData(transformedItem);
@@ -565,7 +619,9 @@ const ItemDetailsPage = () => {
         npr_remark: updatedData.nprRemarks,
         RMB_Price: toNum(updatedData.others?.rmbPrice),
         FOQ: toInt(updatedData.others?.foq) || 0,
-        is_dimension_special: updatedData.others?.isDimensionSpecial ? "Y" : "N",
+        is_dimension_special: updatedData.others?.isDimensionSpecial
+          ? "Y"
+          : "N",
         is_eur_special: updatedData.parent?.isEURSpecial ? "Y" : "N",
         is_rmb_special: updatedData.parent?.isRMBSpecial ? "Y" : "N",
         is_new: updatedData.others?.isNew ? "Y" : "N",
@@ -600,7 +656,12 @@ const ItemDetailsPage = () => {
       await updateItem(itemId, payload);
       setEditMode(false);
 
-      const toBool = (val: any) => val === "Y" || val === "Yes" || val === true || val === 1 || val === "1";
+      const toBool = (val: any) =>
+        val === "Y" ||
+        val === "Yes" ||
+        val === true ||
+        val === 1 ||
+        val === "1";
       const itemResponse: any = await getItemById(itemId);
       const rawItem = itemResponse.data;
       const transformedItem: ItemDetails = {
@@ -632,14 +693,13 @@ const ItemDetailsPage = () => {
           shopPicture: rawItem.pictures.shopPicture || "",
           ebayPictures: rawItem.pictures.ebayPictures || "",
           pixPath: rawItem.pictures.pixPath || "",
-        }
+        },
       };
       setItemData(transformedItem);
     } catch (error) {
       console.error("Save error:", error);
     }
   };
-
 
   if (loading) {
     return (
@@ -689,7 +749,10 @@ const ItemDetailsPage = () => {
           </button>
           <div className="flex items-center justify-between">
             <div>
-              <PageHeader title={`Item Details: ${itemData.itemNo}`} icon={Package} />
+              <PageHeader
+                title={`Item Details: ${itemData.itemNo}`}
+                icon={Package}
+              />
             </div>
             <div className="flex gap-3">
               <CustomButton
@@ -731,10 +794,11 @@ const ItemDetailsPage = () => {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`px-4 py-2 text-sm font-medium whitespace-nowrap transition-colors ${activeTab === tab.id
-                  ? "text-gray-900 border-b-2 border-gray-600"
-                  : "text-gray-500 hover:text-gray-700"
-                  }`}
+                className={`px-4 py-2 text-sm font-medium whitespace-nowrap transition-colors ${
+                  activeTab === tab.id
+                    ? "text-gray-900 border-b-2 border-gray-600"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
               >
                 {tab.label}
               </button>
@@ -751,6 +815,15 @@ const ItemDetailsPage = () => {
                   label="EAN"
                   value={itemData.ean}
                   field="ean"
+                  editMode={editMode}
+                  itemData={itemData}
+                  setItemData={setItemData}
+                  readOnly={true}
+                />
+                <EditableInfoRow
+                  label="Transfer Price (EUR)"
+                  value={`€ ${itemData.transfer_price}`}
+                  field="transfer_price_EUR"
                   editMode={editMode}
                   itemData={itemData}
                   setItemData={setItemData}
@@ -802,7 +875,11 @@ const ItemDetailsPage = () => {
                 />
                 <InfoRow
                   label="Price (RMB) ¥"
-                  value={(itemData as any).others?.rmbPrice ? `¥ ${(itemData as any).others.rmbPrice}` : "—"}
+                  value={
+                    (itemData as any).others?.rmbPrice
+                      ? `¥ ${(itemData as any).others.rmbPrice}`
+                      : "—"
+                  }
                 />
                 <InfoRow label="Active">
                   <StatusIndicator value={itemData.isActive} />
@@ -851,7 +928,10 @@ const ItemDetailsPage = () => {
                       editMode={editMode}
                       itemData={itemData}
                       setItemData={setItemData}
-                      options={[{ label: "Yes", value: "Yes" }, { label: "No", value: "No" }]}
+                      options={[
+                        { label: "Yes", value: "Yes" },
+                        { label: "No", value: "No" },
+                      ]}
                     />
                     <SelectInfoRow
                       label="Special Item"
@@ -860,10 +940,14 @@ const ItemDetailsPage = () => {
                       editMode={editMode}
                       itemData={itemData}
                       setItemData={(updated) => {
-                        updated.parent.isRMBSpecial = updated.parent.isEURSpecial;
+                        updated.parent.isRMBSpecial =
+                          updated.parent.isEURSpecial;
                         setItemData(updated);
                       }}
-                      options={[{ label: "Yes", value: "Yes" }, { label: "No", value: "No" }]}
+                      options={[
+                        { label: "Yes", value: "Yes" },
+                        { label: "No", value: "No" },
+                      ]}
                     />
                   </div>
                 </div>
@@ -894,7 +978,7 @@ const ItemDetailsPage = () => {
                               >
                                 {variation}
                               </li>
-                            )
+                            ),
                           )}
                         </ul>
                       ) : (
@@ -949,7 +1033,8 @@ const ItemDetailsPage = () => {
                                     value={variation}
                                     onChange={(e) => {
                                       const updated = { ...itemData };
-                                      updated.variationsEN.variations[index] = e.target.value;
+                                      updated.variationsEN.variations[index] =
+                                        e.target.value;
                                       setItemData(updated);
                                     }}
                                     className="w-full bg-transparent border-none focus:ring-0 p-0 text-gray-900"
@@ -958,7 +1043,7 @@ const ItemDetailsPage = () => {
                                   variation
                                 )}
                               </li>
-                            )
+                            ),
                           )}
                         </ul>
                       ) : (
@@ -984,7 +1069,8 @@ const ItemDetailsPage = () => {
                                   value={value}
                                   onChange={(e) => {
                                     const updated = { ...itemData };
-                                    updated.variationsEN.values[index] = e.target.value;
+                                    updated.variationsEN.values[index] =
+                                      e.target.value;
                                     setItemData(updated);
                                   }}
                                   className="w-full bg-transparent border-none focus:ring-0 p-0 text-gray-900"
@@ -1080,10 +1166,38 @@ const ItemDetailsPage = () => {
               <div className="mb-10">
                 <SectionHeader title="Dimensions / Others" />
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <EditableInfoRow label="Weight" value={itemData.dimensions.weight} field="dimensions.weight" editMode={editMode} itemData={itemData} setItemData={setItemData} />
-                  <EditableInfoRow label="Length" value={itemData.dimensions.length} field="dimensions.length" editMode={editMode} itemData={itemData} setItemData={setItemData} />
-                  <EditableInfoRow label="Width" value={itemData.dimensions.width} field="dimensions.width" editMode={editMode} itemData={itemData} setItemData={setItemData} />
-                  <EditableInfoRow label="Height" value={itemData.dimensions.height} field="dimensions.height" editMode={editMode} itemData={itemData} setItemData={setItemData} />
+                  <EditableInfoRow
+                    label="Weight"
+                    value={itemData.dimensions.weight}
+                    field="dimensions.weight"
+                    editMode={editMode}
+                    itemData={itemData}
+                    setItemData={setItemData}
+                  />
+                  <EditableInfoRow
+                    label="Length"
+                    value={itemData.dimensions.length}
+                    field="dimensions.length"
+                    editMode={editMode}
+                    itemData={itemData}
+                    setItemData={setItemData}
+                  />
+                  <EditableInfoRow
+                    label="Width"
+                    value={itemData.dimensions.width}
+                    field="dimensions.width"
+                    editMode={editMode}
+                    itemData={itemData}
+                    setItemData={setItemData}
+                  />
+                  <EditableInfoRow
+                    label="Height"
+                    value={itemData.dimensions.height}
+                    field="dimensions.height"
+                    editMode={editMode}
+                    itemData={itemData}
+                    setItemData={setItemData}
+                  />
                   <SelectInfoRow
                     label="Is QTY Dividable"
                     value={itemData.others.isQTYdiv ? "Y" : "N"}
@@ -1091,11 +1205,35 @@ const ItemDetailsPage = () => {
                     editMode={editMode}
                     itemData={itemData}
                     setItemData={setItemData}
-                    options={[{ label: "Y", value: "Y" }, { label: "N", value: "N" }]}
+                    options={[
+                      { label: "Y", value: "Y" },
+                      { label: "N", value: "N" },
+                    ]}
                   />
-                  <EditableInfoRow label="ISBN" value={itemData.dimensions.isbn} field="dimensions.isbn" editMode={editMode} itemData={itemData} setItemData={setItemData} />
-                  <EditableInfoRow label="MC" value={itemData.others.mc} field="others.mc" editMode={editMode} itemData={itemData} setItemData={setItemData} />
-                  <EditableInfoRow label="ER" value={itemData.others.er} field="others.er" editMode={editMode} itemData={itemData} setItemData={setItemData} />
+                  <EditableInfoRow
+                    label="ISBN"
+                    value={itemData.dimensions.isbn}
+                    field="dimensions.isbn"
+                    editMode={editMode}
+                    itemData={itemData}
+                    setItemData={setItemData}
+                  />
+                  <EditableInfoRow
+                    label="MC"
+                    value={itemData.others.mc}
+                    field="others.mc"
+                    editMode={editMode}
+                    itemData={itemData}
+                    setItemData={setItemData}
+                  />
+                  <EditableInfoRow
+                    label="ER"
+                    value={itemData.others.er}
+                    field="others.er"
+                    editMode={editMode}
+                    itemData={itemData}
+                    setItemData={setItemData}
+                  />
                   <SelectInfoRow
                     label="Is PU"
                     value={itemData.others.isPU ? "Yes" : "No"}
@@ -1103,7 +1241,10 @@ const ItemDetailsPage = () => {
                     editMode={editMode}
                     itemData={itemData}
                     setItemData={setItemData}
-                    options={[{ label: "Yes", value: "Yes" }, { label: "No", value: "No" }]}
+                    options={[
+                      { label: "Yes", value: "Yes" },
+                      { label: "No", value: "No" },
+                    ]}
                   />
                   <SelectInfoRow
                     label="Is Meter"
@@ -1112,9 +1253,19 @@ const ItemDetailsPage = () => {
                     editMode={editMode}
                     itemData={itemData}
                     setItemData={setItemData}
-                    options={[{ label: "Yes", value: "Yes" }, { label: "No", value: "No" }]}
+                    options={[
+                      { label: "Yes", value: "Yes" },
+                      { label: "No", value: "No" },
+                    ]}
                   />
-                  <EditableInfoRow label="FOQ" value={itemData.others.foq} field="others.foq" editMode={editMode} itemData={itemData} setItemData={setItemData} />
+                  <EditableInfoRow
+                    label="FOQ"
+                    value={itemData.others.foq}
+                    field="others.foq"
+                    editMode={editMode}
+                    itemData={itemData}
+                    setItemData={setItemData}
+                  />
                   <SelectInfoRow
                     label="Is New?"
                     value={itemData.others.isNew ? "Yes" : "No"}
@@ -1122,19 +1273,58 @@ const ItemDetailsPage = () => {
                     editMode={editMode}
                     itemData={itemData}
                     setItemData={setItemData}
-                    options={[{ label: "Yes", value: "Yes" }, { label: "No", value: "No" }]}
+                    options={[
+                      { label: "Yes", value: "Yes" },
+                      { label: "No", value: "No" },
+                    ]}
                   />
-                  <EditableInfoRow label="Taric" value={itemData.others.taricCode} field="others.taricCode" editMode={editMode} itemData={itemData} setItemData={setItemData} />
+                  <EditableInfoRow
+                    label="Taric"
+                    value={itemData.others.taricCode}
+                    field="others.taricCode"
+                    editMode={editMode}
+                    itemData={itemData}
+                    setItemData={setItemData}
+                  />
                 </div>
               </div>
 
               <div>
                 <SectionHeader title="Warehouse Item" />
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <EditableInfoRow label="ID DE" value={itemData.others.idDE} field="others.idDE" editMode={editMode} itemData={itemData} setItemData={setItemData} readOnly={true} />
-                  <EditableInfoRow label="NO DE" value={itemData.others.noDE} field="others.noDE" editMode={editMode} itemData={itemData} setItemData={setItemData} />
-                  <EditableInfoRow label="Name DE" value={itemData.others.nameDE} field="others.nameDE" editMode={editMode} itemData={itemData} setItemData={setItemData} />
-                  <EditableInfoRow label="Name EN" value={itemData.others.nameEN} field="others.nameEN" editMode={editMode} itemData={itemData} setItemData={setItemData} />
+                  <EditableInfoRow
+                    label="ID DE"
+                    value={itemData.others.idDE}
+                    field="others.idDE"
+                    editMode={editMode}
+                    itemData={itemData}
+                    setItemData={setItemData}
+                    readOnly={true}
+                  />
+                  <EditableInfoRow
+                    label="NO DE"
+                    value={itemData.others.noDE}
+                    field="others.noDE"
+                    editMode={editMode}
+                    itemData={itemData}
+                    setItemData={setItemData}
+                  />
+                  <EditableInfoRow
+                    label="Name DE"
+                    value={itemData.others.nameDE}
+                    field="others.nameDE"
+                    editMode={editMode}
+                    itemData={itemData}
+                    setItemData={setItemData}
+                  />
+                  <EditableInfoRow
+                    label="Name EN"
+                    value={itemData.others.nameEN}
+                    field="others.nameEN"
+                    editMode={editMode}
+                    itemData={itemData}
+                    setItemData={setItemData}
+                  />
                   <SelectInfoRow
                     label="isStock"
                     value={itemData.others.isStock ? "Y" : "N"}
@@ -1142,9 +1332,20 @@ const ItemDetailsPage = () => {
                     editMode={editMode}
                     itemData={itemData}
                     setItemData={setItemData}
-                    options={[{ label: "Y", value: "Y" }, { label: "N", value: "N" }]}
+                    options={[
+                      { label: "Y", value: "Y" },
+                      { label: "N", value: "N" },
+                    ]}
                   />
-                  <EditableInfoRow label="Qty" value={itemData.others.qty} field="others.qty" editMode={editMode} itemData={itemData} setItemData={setItemData} readOnly={true} />
+                  <EditableInfoRow
+                    label="Qty"
+                    value={itemData.others.qty}
+                    field="others.qty"
+                    editMode={editMode}
+                    itemData={itemData}
+                    setItemData={setItemData}
+                    readOnly={true}
+                  />
                   <SelectInfoRow
                     label="isActive"
                     value={itemData.others.isActive ? "Y" : "N"}
@@ -1152,9 +1353,19 @@ const ItemDetailsPage = () => {
                     editMode={editMode}
                     itemData={itemData}
                     setItemData={setItemData}
-                    options={[{ label: "Y", value: "Y" }, { label: "N", value: "N" }]}
+                    options={[
+                      { label: "Y", value: "Y" },
+                      { label: "N", value: "N" },
+                    ]}
                   />
-                  <EditableInfoRow label="MSQ" value={itemData.others.msq} field="others.msq" editMode={editMode} itemData={itemData} setItemData={setItemData} />
+                  <EditableInfoRow
+                    label="MSQ"
+                    value={itemData.others.msq}
+                    field="others.msq"
+                    editMode={editMode}
+                    itemData={itemData}
+                    setItemData={setItemData}
+                  />
                   <SelectInfoRow
                     label="isNAOi"
                     value={itemData.others.isNAO ? "Y" : "N"}
@@ -1162,9 +1373,19 @@ const ItemDetailsPage = () => {
                     editMode={editMode}
                     itemData={itemData}
                     setItemData={setItemData}
-                    options={[{ label: "Y", value: "Y" }, { label: "N", value: "N" }]}
+                    options={[
+                      { label: "Y", value: "Y" },
+                      { label: "N", value: "N" },
+                    ]}
                   />
-                  <EditableInfoRow label="Buffer" value={itemData.others.buffer} field="others.buffer" editMode={editMode} itemData={itemData} setItemData={setItemData} />
+                  <EditableInfoRow
+                    label="Buffer"
+                    value={itemData.others.buffer}
+                    field="others.buffer"
+                    editMode={editMode}
+                    itemData={itemData}
+                    setItemData={setItemData}
+                  />
                   <SelectInfoRow
                     label="isSnS"
                     value={itemData.others.isSnSI ? "Y" : "N"}
@@ -1172,7 +1393,10 @@ const ItemDetailsPage = () => {
                     editMode={editMode}
                     itemData={itemData}
                     setItemData={setItemData}
-                    options={[{ label: "Yes", value: "Y" }, { label: "No", value: "N" }]}
+                    options={[
+                      { label: "Yes", value: "Y" },
+                      { label: "No", value: "N" },
+                    ]}
                   />
                 </div>
               </div>
@@ -1197,7 +1421,11 @@ const ItemDetailsPage = () => {
                   editMode={editMode}
                   itemData={itemData}
                   setItemData={setItemData}
-                  options={[{ label: "Select", value: "" }, { label: "Yes", value: "Yes" }, { label: "No", value: "No" }]}
+                  options={[
+                    { label: "Select", value: "" },
+                    { label: "Yes", value: "Yes" },
+                    { label: "No", value: "No" },
+                  ]}
                 />
                 <EditableInfoRow
                   label="MOQ"
@@ -1251,10 +1479,10 @@ const ItemDetailsPage = () => {
                   setItemData={setItemData}
                   options={[
                     { label: "No supplier assigned", value: "" },
-                    ...allSuppliers.map(s => ({
+                    ...allSuppliers.map((s) => ({
                       label: s.company_name || s.name || `Supplier ${s.id}`,
-                      value: String(s.id)
-                    }))
+                      value: String(s.id),
+                    })),
                   ]}
                 />
                 {!editMode && itemData.supplier_id && (
@@ -1297,26 +1525,50 @@ const ItemDetailsPage = () => {
                   <table className="w-full">
                     <thead className="bg-[#F8F9FB]">
                       <tr>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">ID</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Item_ID</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Name</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Picture</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Description</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Description CN</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Action</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Apply to Parent</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">
+                          ID
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">
+                          Item_ID
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">
+                          Name
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">
+                          Picture
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">
+                          Description
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">
+                          Description CN
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">
+                          Action
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">
+                          Apply to Parent
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
                       {qualityCriteria.map((criteria, index) => (
                         <tr key={index} className="hover:bg-gray-50">
-                          <td className="px-4 py-3 text-sm text-gray-900">{criteria.id}</td>
-                          <td className="px-4 py-3 text-sm text-gray-900">{criteria.itemId || itemData.id}</td>
-                          <td className="px-4 py-3 text-sm text-gray-900">{criteria.name}</td>
+                          <td className="px-4 py-3 text-sm text-gray-900">
+                            {criteria.id}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-900">
+                            {criteria.itemId || itemData.id}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-900">
+                            {criteria.name}
+                          </td>
                           <td className="px-4 py-3 text-sm">
                             {criteria.picture ? (
                               <button
-                                onClick={() => window.open(criteria.picture, "_blank")}
+                                onClick={() =>
+                                  window.open(criteria.picture, "_blank")
+                                }
                                 className="text-blue-600 hover:text-blue-800"
                               >
                                 <EyeIcon className="h-5 w-5" />
@@ -1325,8 +1577,12 @@ const ItemDetailsPage = () => {
                               <span className="text-gray-400">—</span>
                             )}
                           </td>
-                          <td className="px-4 py-3 text-sm text-gray-900">{criteria.description}</td>
-                          <td className="px-4 py-3 text-sm text-gray-900">{criteria.descriptionCN}</td>
+                          <td className="px-4 py-3 text-sm text-gray-900">
+                            {criteria.description}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-900">
+                            {criteria.descriptionCN}
+                          </td>
                           <td className="px-4 py-3 text-sm">
                             <button
                               onClick={() => handleOpenQualityModal(criteria)}
@@ -1342,7 +1598,10 @@ const ItemDetailsPage = () => {
                             </button>
                           </td>
                           <td className="px-4 py-3 text-sm text-gray-900">
-                            <input type="checkbox" className="rounded border-gray-300 text-primary focus:ring-primary" />
+                            <input
+                              type="checkbox"
+                              className="rounded border-gray-300 text-primary focus:ring-primary"
+                            />
                           </td>
                         </tr>
                       ))}
@@ -1352,7 +1611,9 @@ const ItemDetailsPage = () => {
               ) : (
                 <div className="text-center py-12 bg-gray-50 rounded-xl border-2 border-dashed border-gray-200">
                   <ExclamationTriangleIcon className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                  <p className="text-gray-500">No quality criteria found for this item</p>
+                  <p className="text-gray-500">
+                    No quality criteria found for this item
+                  </p>
                   <CustomButton
                     onClick={() => handleOpenQualityModal()}
                     className="mt-4 px-4 py-2 bg-primary text-white rounded-lg"
@@ -1378,7 +1639,9 @@ const ItemDetailsPage = () => {
                   className="px-4 py-2 bg-[#8CC21B] text-white rounded-lg flex items-center gap-2 text-sm font-medium hover:bg-[#7ab318] transition-colors disabled:opacity-50"
                 >
                   <DocumentIcon className="h-4 w-4" />
-                  {uploadingAttachments ? "Uploading..." : "Upload New Attachment"}
+                  {uploadingAttachments
+                    ? "Uploading..."
+                    : "Upload New Attachment"}
                 </button>
               </div>
 
@@ -1387,48 +1650,73 @@ const ItemDetailsPage = () => {
                   <table className="w-full">
                     <thead className="bg-[#F8F9FB]">
                       <tr>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">ID</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Attachment Name</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Upload date</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Action</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">
+                          ID
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">
+                          Attachment Name
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">
+                          Upload date
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">
+                          Action
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
-                      {itemData.attachments.map((attachment: any, index: number) => (
-                        <tr key={index} className="hover:bg-gray-50">
-                          <td className="px-4 py-3 text-sm text-gray-900">{attachment.id}</td>
-                          <td className="px-4 py-3 text-sm text-gray-900 font-medium">
-                            <div className="flex items-center gap-2">
-                              <DocumentIcon className="h-4 w-4 text-gray-400" />
-                              {attachment.name || attachment.fileName}
-                            </div>
-                          </td>
-                          <td className="px-4 py-3 text-sm text-gray-500">{attachment.uploadedAt ? new Date(attachment.uploadedAt).toLocaleDateString() : "—"}</td>
-                          <td className="px-4 py-3 text-sm">
-                            <div className="flex items-center gap-3">
-                              <button
-                                onClick={() => window.open(attachment.url, "_blank")}
-                                className="text-blue-600 hover:text-blue-800 flex items-center gap-1"
-                              >
-                                <ArrowDownTrayIcon className="h-4 w-4" /> View/Download
-                              </button>
-                              <button
-                                onClick={() => handleDeleteAttachment(attachment.id)}
-                                className="text-red-600 hover:text-red-800"
-                              >
-                                Delete
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
+                      {itemData.attachments.map(
+                        (attachment: any, index: number) => (
+                          <tr key={index} className="hover:bg-gray-50">
+                            <td className="px-4 py-3 text-sm text-gray-900">
+                              {attachment.id}
+                            </td>
+                            <td className="px-4 py-3 text-sm text-gray-900 font-medium">
+                              <div className="flex items-center gap-2">
+                                <DocumentIcon className="h-4 w-4 text-gray-400" />
+                                {attachment.name || attachment.fileName}
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-sm text-gray-500">
+                              {attachment.uploadedAt
+                                ? new Date(
+                                    attachment.uploadedAt,
+                                  ).toLocaleDateString()
+                                : "—"}
+                            </td>
+                            <td className="px-4 py-3 text-sm">
+                              <div className="flex items-center gap-3">
+                                <button
+                                  onClick={() =>
+                                    window.open(attachment.url, "_blank")
+                                  }
+                                  className="text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                                >
+                                  <ArrowDownTrayIcon className="h-4 w-4" />{" "}
+                                  View/Download
+                                </button>
+                                <button
+                                  onClick={() =>
+                                    handleDeleteAttachment(attachment.id)
+                                  }
+                                  className="text-red-600 hover:text-red-800"
+                                >
+                                  Delete
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ),
+                      )}
                     </tbody>
                   </table>
                 </div>
               ) : (
                 <div className="text-center py-12 bg-gray-50 rounded-xl border-2 border-dashed border-gray-200">
                   <DocumentIcon className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                  <p className="text-gray-500">No attachments found for this item</p>
+                  <p className="text-gray-500">
+                    No attachments found for this item
+                  </p>
                 </div>
               )}
             </div>
@@ -1446,54 +1734,70 @@ const ItemDetailsPage = () => {
                 </p>
               </div>
 
-              {itemData.pictures && (
-                [
-                  itemData.pictures.shopPicture,
-                  itemData.pictures.ebayPictures,
-                  ...((itemData.pictures.pixPath || "").split(",").filter(Boolean))
-                ]
-              ).filter(Boolean).length > 0 ? (
+              {itemData.pictures &&
+              [
+                itemData.pictures.shopPicture,
+                itemData.pictures.ebayPictures,
+                ...(itemData.pictures.pixPath || "").split(",").filter(Boolean),
+              ].filter(Boolean).length > 0 ? (
                 <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                  {(
-                    [
-                      { field: "shopPicture", url: itemData.pictures.shopPicture },
-                      { field: "ebayPictures", url: itemData.pictures.ebayPictures },
-                      ...((itemData.pictures.pixPath || "").split(",").filter(Boolean)).map(url => ({ field: "pixPath", url }))
-                    ]
-                  ).filter(item => item.url).map((pic, index) => (
-                    <div key={index} className="group relative aspect-square bg-gray-100 rounded-lg overflow-hidden border border-gray-200">
-                      <img
-                        src={pic.url}
-                        alt={`Item ${index + 1}`}
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          const target = e.target as HTMLImageElement;
-                          target.src = "https://placehold.co/400x400?text=Invalid+Image";
-                        }}
-                      />
-                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                        <button
-                          onClick={() => window.open(pic.url, "_blank")}
-                          className="p-2 bg-white rounded-full text-gray-700 hover:text-primary transition-colors"
-                          title="View Full Size"
-                        >
-                          <EyeIcon className="h-5 w-5" />
-                        </button>
-                        <button
-                          onClick={() => handleRemoveImage(pic.field, pic.url)}
-                          className="p-2 bg-white rounded-full text-red-600 hover:text-red-700 transition-colors"
-                          title="Remove Image"
-                        >
-                          <XCircleIcon className="h-5 w-5" />
-                        </button>
+                  {[
+                    {
+                      field: "shopPicture",
+                      url: itemData.pictures.shopPicture,
+                    },
+                    {
+                      field: "ebayPictures",
+                      url: itemData.pictures.ebayPictures,
+                    },
+                    ...(itemData.pictures.pixPath || "")
+                      .split(",")
+                      .filter(Boolean)
+                      .map((url) => ({ field: "pixPath", url })),
+                  ]
+                    .filter((item) => item.url)
+                    .map((pic, index) => (
+                      <div
+                        key={index}
+                        className="group relative aspect-square bg-gray-100 rounded-lg overflow-hidden border border-gray-200"
+                      >
+                        <img
+                          src={pic.url}
+                          alt={`Item ${index + 1}`}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.src =
+                              "https://placehold.co/400x400?text=Invalid+Image";
+                          }}
+                        />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                          <button
+                            onClick={() => window.open(pic.url, "_blank")}
+                            className="p-2 bg-white rounded-full text-gray-700 hover:text-primary transition-colors"
+                            title="View Full Size"
+                          >
+                            <EyeIcon className="h-5 w-5" />
+                          </button>
+                          <button
+                            onClick={() =>
+                              handleRemoveImage(pic.field, pic.url)
+                            }
+                            className="p-2 bg-white rounded-full text-red-600 hover:text-red-700 transition-colors"
+                            title="Remove Image"
+                          >
+                            <XCircleIcon className="h-5 w-5" />
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
                 </div>
               ) : (
                 <div className="text-center py-12 bg-gray-50 rounded-xl border-2 border-dashed border-gray-200">
                   <PhotoIcon className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                  <p className="text-gray-500">No pictures found for this item</p>
+                  <p className="text-gray-500">
+                    No pictures found for this item
+                  </p>
                   <button
                     onClick={() => fileInputRef.current?.click()}
                     className="mt-4 px-4 py-2 bg-primary text-white rounded-lg flex items-center gap-2 mx-auto"
@@ -1546,8 +1850,9 @@ const ItemDetailsPage = () => {
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={uploadingPictures}
-              className={`px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 text-gray-700 ${uploadingPictures ? "opacity-50 cursor-not-allowed" : ""
-                }`}
+              className={`px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 text-gray-700 ${
+                uploadingPictures ? "opacity-50 cursor-not-allowed" : ""
+              }`}
             >
               <PhotoIcon className="h-4 w-4" />
               {uploadingPictures ? "Uploading..." : "Add Pictures"}
@@ -1569,7 +1874,11 @@ const ItemDetailsPage = () => {
       <CustomModal
         isOpen={isQualityModalOpen}
         onClose={handleCloseQualityModal}
-        title={editingQuality ? "Update Quality of this item" : "Add Quality to this item"}
+        title={
+          editingQuality
+            ? "Update Quality of this item"
+            : "Add Quality to this item"
+        }
         width="max-w-md"
         footer={
           <div className="flex gap-2 w-full justify-end">
@@ -1628,7 +1937,11 @@ const ItemDetailsPage = () => {
                 Choose file
               </label>
               <span className="text-sm text-gray-500">
-                {qualityFormData.picture ? qualityFormData.picture.name : (qualityFormData.pictureUrl ? "Existing photo" : "No file chosen")}
+                {qualityFormData.picture
+                  ? qualityFormData.picture.name
+                  : qualityFormData.pictureUrl
+                    ? "Existing photo"
+                    : "No file chosen"}
               </span>
             </div>
           </div>

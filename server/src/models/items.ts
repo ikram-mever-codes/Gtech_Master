@@ -136,12 +136,17 @@ export class Item {
   @Column({ nullable: true })
   supplier_id?: number;
 
-  // NEW FIELD: is_updated - marks if item needs to be synced to WaWi
   @Column({ type: "boolean", default: false })
   is_updated!: boolean;
 
-  @Column({ type: "decimal", precision: 10, scale: 4, nullable: true })
-  transfer_price_eur?: number;
+  @Column({
+    name: "transfer_price (EUR)",
+    type: "decimal",
+    precision: 10,
+    scale: 4,
+    nullable: true,
+  })
+  transfer_price_EUR?: number;
 
   @Column({ type: "char", length: 1, default: "N" })
   is_special_transfer_price!: string;

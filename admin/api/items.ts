@@ -94,6 +94,7 @@ export interface ItemDetails {
   ean: string;
   category: string;
   category_id: number | null;
+  transfer_price: string;
   model: string;
   remark: string;
   supplier_id: number | null;

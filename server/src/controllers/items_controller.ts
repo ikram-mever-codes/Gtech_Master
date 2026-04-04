@@ -45,7 +45,63 @@ const getRMBPriceFromSupplier = async (
   }
 };
 
-// Modified getItems function
+const calculateTransferPrice = (rmbPrice: number): number => {
+  const FACTOR = 1.15;
+  return parseFloat((rmbPrice * FACTOR).toFixed(2));
+};
+
+/**
+ * Feeds transfer prices for all items belonging to the 'STD' category.
+ * Can be triggered via a button or a cron job.
+ */
+export const feedTransferPrices = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const itemRepo = AppDataSource.getRepository(Item);
+    const supplierItemRepo = AppDataSource.getRepository(SupplierItem);
+    const categoryRepo = AppDataSource.getRepository(Category);
+
+    // 1. Identify the 'STD' category ID
+    const stdCategory = await categoryRepo.findOne({ where: { name: "STD" } });
+    if (!stdCategory) {
+      return next(new ErrorHandler("STD Category not found in system", 404));
+    }
+
+    // 2. Get all items in STD category
+    const items = await itemRepo.find({ where: { cat_id: stdCategory.id } });
+
+    let updatedCount = 0;
+
+    for (const item of items) {
+      const supplierItem = await supplierItemRepo.findOne({
+        where: { item_id: item.id },
+      });
+
+      if (supplierItem && supplierItem.price_rmb) {
+        const newPrice = calculateTransferPrice(supplierItem.price_rmb);
+
+        // Only update if the price actually changed
+        if (item.price !== newPrice) {
+          item.price = newPrice;
+          item.is_updated = true; // Mark for sync if applicable
+          await itemRepo.save(item);
+          updatedCount++;
+        }
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: `Successfully updated transfer prices for ${updatedCount} items.`,
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
 export const getItems = async (
   req: Request,
   res: Response,
@@ -105,10 +161,13 @@ export const getItems = async (
       const categoryValue = (category as string).trim();
       queryBuilder.leftJoin("item.category", "cat");
       if (!isNaN(parseInt(categoryValue))) {
-        queryBuilder.andWhere("(item.cat_id = :catId OR TRIM(cat.name) ILIKE :catNameExact)", {
-          catId: parseInt(categoryValue),
-          catNameExact: categoryValue,
-        });
+        queryBuilder.andWhere(
+          "(item.cat_id = :catId OR TRIM(cat.name) ILIKE :catNameExact)",
+          {
+            catId: parseInt(categoryValue),
+            catNameExact: categoryValue,
+          },
+        );
       } else {
         queryBuilder.andWhere("TRIM(cat.name) ILIKE :catNameExact", {
           catNameExact: categoryValue,
@@ -257,17 +316,17 @@ export const getItems = async (
           // Include warehouse data if needed
           warehouse_data: warehouseData
             ? {
-              id: warehouseData.id,
-              item_no_de: warehouseData.item_no_de,
-              item_name_de: warehouseData.item_name_de,
-              item_name_en: warehouseData.item_name_en,
-              stock_qty: warehouseData.stock_qty,
-              msq: warehouseData.msq,
-              buffer: warehouseData.buffer,
-              is_stock_item: warehouseData.is_stock_item,
-              is_SnSI: warehouseData.is_SnSI,
-              ship_class: warehouseData.ship_class,
-            }
+                id: warehouseData.id,
+                item_no_de: warehouseData.item_no_de,
+                item_name_de: warehouseData.item_name_de,
+                item_name_en: warehouseData.item_name_en,
+                stock_qty: warehouseData.stock_qty,
+                msq: warehouseData.msq,
+                buffer: warehouseData.buffer,
+                is_stock_item: warehouseData.is_stock_item,
+                is_SnSI: warehouseData.is_SnSI,
+                ship_class: warehouseData.ship_class,
+              }
             : null,
 
           created_at: item.created_at,
@@ -297,7 +356,6 @@ export const getItems = async (
   }
 };
 
-// Modified getItemById function
 export const getItemById = async (
   req: Request,
   res: Response,
@@ -310,7 +368,12 @@ export const getItemById = async (
       return next(new ErrorHandler("Item ID is required", 400));
     }
 
-    if (id === "tarics" || id === "stats" || id === "parents" || id === "warehouse") {
+    if (
+      id === "tarics" ||
+      id === "stats" ||
+      id === "parents" ||
+      id === "warehouse"
+    ) {
       return next();
     }
 
@@ -411,7 +474,9 @@ export const getItemById = async (
       painPoints: item.painPoints || [],
       isActive: item.isActive === "Y",
       is_updated: item.is_updated,
-
+      transfer_price: item.transfer_price_EUR
+        ? Number(item.transfer_price_EUR).toFixed(2)
+        : "null",
       parent: {
         noDE: item.parent?.de_no || item.parent_no_de || "",
         nameDE: item.parent?.name_de || "",
@@ -509,23 +574,23 @@ export const getItemById = async (
 
       supplierItem: supplierItem
         ? {
-          priceRMB: supplierItem.price_rmb?.toString() || "0",
-          isPO: supplierItem.is_po || "No",
-          moq: supplierItem.moq?.toString() || "0",
-          interval: supplierItem.oi?.toString() || "0",
-          leadTime: supplierItem.lead_time || "",
-          noteCN: supplierItem.note_cn || "",
-          url: supplierItem.url || "",
-        }
+            priceRMB: supplierItem.price_rmb?.toString() || "0",
+            isPO: supplierItem.is_po || "No",
+            moq: supplierItem.moq?.toString() || "0",
+            interval: supplierItem.oi?.toString() || "0",
+            leadTime: supplierItem.lead_time || "",
+            noteCN: supplierItem.note_cn || "",
+            url: supplierItem.url || "",
+          }
         : {
-          priceRMB: "0",
-          isPO: "No",
-          moq: "0",
-          interval: "0",
-          leadTime: "",
-          noteCN: "",
-          url: "",
-        },
+            priceRMB: "0",
+            isPO: "No",
+            moq: "0",
+            interval: "0",
+            leadTime: "",
+            noteCN: "",
+            url: "",
+          },
 
       nprRemarks: item.npr_remark || "",
     };
@@ -589,42 +654,42 @@ export const createItem = async (
       );
     }
 
+    // Validations
     if (supplier_id) {
-      const supplierRepo = AppDataSource.getRepository(Supplier);
-      const supplier = await supplierRepo.findOne({
+      const supplier = await AppDataSource.getRepository(Supplier).findOne({
         where: { id: supplier_id },
       });
-      if (!supplier) {
-        return next(new ErrorHandler("Supplier not found", 404));
-      }
+      if (!supplier) return next(new ErrorHandler("Supplier not found", 404));
     }
 
     const parent = await parentRepository.findOne({ where: { id: parent_id } });
-    if (!parent) {
-      return next(new ErrorHandler("Parent not found", 404));
-    }
+    if (!parent) return next(new ErrorHandler("Parent not found", 404));
 
     if (taric_id) {
       const taric = await taricRepository.findOne({ where: { id: taric_id } });
-      if (!taric) {
-        return next(new ErrorHandler("Taric not found", 404));
-      }
+      if (!taric) return next(new ErrorHandler("Taric not found", 404));
     }
 
+    let category = null;
     if (cat_id) {
-      const category = await categoryRepository.findOne({
-        where: { id: cat_id },
-      });
-      if (!category) {
-        return next(new ErrorHandler("Category not found", 404));
-      }
+      category = await categoryRepository.findOne({ where: { id: cat_id } });
+      if (!category) return next(new ErrorHandler("Category not found", 404));
     }
 
     if (ean) {
-      const existingItem = await itemRepository.findOne({ where: { ean } });
-      if (existingItem) {
+      const existingItem = await itemRepository.findOne({
+        where: { ean: ean.toString() },
+      });
+      if (existingItem)
         return next(new ErrorHandler("Item with this EAN already exists", 400));
-      }
+    }
+
+    // --- TRANSFER PRICE LOGIC ---
+    let finalPrice = price ? parseFloat(price) : null;
+    const finalRMB = RMB_Price ? parseFloat(RMB_Price) : null;
+
+    if (category?.name === "STD" && finalRMB) {
+      finalPrice = calculateTransferPrice(finalRMB);
     }
 
     const newItem = itemRepository.create({
@@ -641,8 +706,8 @@ export const createItem = async (
       height: height ? parseFloat(height) : null,
       remark,
       model,
-      RMB_Price: RMB_Price ? parseFloat(RMB_Price) : null,
-      price: price ? parseFloat(price) : null,
+      RMB_Price: finalRMB,
+      price: finalPrice,
       currency,
       isActive,
       is_qty_dividable,
@@ -650,13 +715,14 @@ export const createItem = async (
       is_eur_special,
       is_rmb_special,
       painPoints,
-      is_updated: false, // New items don't need sync initially
+      is_updated: false,
       created_at: new Date(),
       updated_at: new Date(),
     });
 
     await itemRepository.save(newItem);
 
+    // Create Warehouse Entry
     try {
       const warehouseRepository = AppDataSource.getRepository(WarehouseItem);
       const warehouseItem = warehouseRepository.create({
@@ -672,41 +738,18 @@ export const createItem = async (
         created_at: new Date(),
       });
       await warehouseRepository.save(warehouseItem);
-    } catch (warehouseError: any) {
-      console.warn(
-        "Could not create warehouse entry for new item (table may not exist):",
-        warehouseError?.message,
-      );
+    } catch (err) {
+      console.warn("Warehouse creation failed:", err);
     }
 
     return res.status(201).json({
       success: true,
       message: "Item created successfully",
-      data: {
-        id: newItem.id,
-        item_name: newItem.item_name,
-        ean: newItem.ean?.toString(),
-        parent_id: newItem.parent_id,
-        supplier_id: newItem.supplier_id,
-        isActive: newItem.isActive,
-        is_updated: newItem.is_updated,
-      },
+      data: newItem,
     });
   } catch (error) {
     return next(error);
   }
-};
-
-const toNum = (val: any) => {
-  if (val === null || val === undefined || val === "") return null;
-  const n = parseFloat(val);
-  return isNaN(n) ? null : n;
-};
-
-const toInt = (val: any) => {
-  if (val === null || val === undefined || val === "") return null;
-  const n = parseInt(val);
-  return isNaN(n) ? null : n;
 };
 
 export const updateItem = async (
@@ -717,17 +760,15 @@ export const updateItem = async (
   try {
     const { id } = req.params;
     const itemRepository = AppDataSource.getRepository(Item);
-    const supplierItemRepository = AppDataSource.getRepository(SupplierItem);
+    const supplierItemRepository: any =
+      AppDataSource.getRepository(SupplierItem);
     const warehouseRepository = AppDataSource.getRepository(WarehouseItem);
+    const categoryRepository = AppDataSource.getRepository(Category);
 
-    if (!id) {
-      return next(new ErrorHandler("Item ID is required", 400));
-    }
+    if (!id) return next(new ErrorHandler("Item ID is required", 400));
 
     const item = await itemRepository.findOne({ where: { id: parseInt(id) } });
-    if (!item) {
-      return next(new ErrorHandler("Item not found", 404));
-    }
+    if (!item) return next(new ErrorHandler("Item not found", 404));
 
     const updatableFields = [
       "item_name",
@@ -757,7 +798,6 @@ export const updateItem = async (
       "FOQ",
       "FSQ",
       "ISBN",
-      "RMB_Price",
       "many_components",
       "effort_rating",
       "is_pu_item",
@@ -766,23 +806,18 @@ export const updateItem = async (
       "supp_cat",
       "ItemID_DE",
       "painPoints",
+      "price",
     ];
 
     let hasChanges = false;
 
+    // 1. Update basic item fields
     updatableFields.forEach((field) => {
       const value = req.body[field];
       if (value !== undefined) {
         const currentValue = (item as any)[field];
-        let newValue = value;
-
-        if (field === "ean") {
-          if (value && value.toString().trim() !== "") {
-            newValue = value.toString();
-          } else {
-            newValue = null;
-          }
-        }
+        let newValue =
+          field === "ean" ? (value ? value.toString() : null) : value;
 
         if (currentValue != newValue) {
           hasChanges = true;
@@ -791,209 +826,184 @@ export const updateItem = async (
       }
     });
 
-    if (hasChanges) {
-      item.is_updated = true;
-    }
-
-    item.updated_at = new Date();
-
-    await itemRepository.save(item);
-
+    // 2. Handle Supplier Item and Transfer Price Logic
     const supplierItemData = req.body.supplierItem;
+    const category = await categoryRepository.findOne({
+      where: { id: item.cat_id },
+    });
+
+    let currentRMBPrice: any = null;
+
     if (supplierItemData) {
-      const supplierItem = await supplierItemRepository.findOne({
+      let supplierItem = await supplierItemRepository.findOne({
         where: { item_id: item.id },
       });
+
       if (supplierItem) {
-        let supplierHasChanges = false;
-        if (
-          supplierItemData.price_rmb !== undefined &&
-          supplierItem.price_rmb !== parseFloat(supplierItemData.price_rmb)
-        ) {
-          supplierItem.price_rmb = parseFloat(supplierItemData.price_rmb);
-          supplierHasChanges = true;
-        }
-        if (
-          supplierItemData.is_po !== undefined &&
-          supplierItem.is_po !== supplierItemData.is_po
-        ) {
-          supplierItem.is_po = supplierItemData.is_po;
-          supplierHasChanges = true;
-        }
-        if (
-          supplierItemData.moq !== undefined &&
-          supplierItem.moq !== parseInt(supplierItemData.moq)
-        ) {
-          supplierItem.moq = parseInt(supplierItemData.moq);
-          supplierHasChanges = true;
-        }
-        if (
-          supplierItemData.oi !== undefined &&
-          supplierItem.oi !== parseInt(supplierItemData.oi)
-        ) {
-          supplierItem.oi = parseInt(supplierItemData.oi);
-          supplierHasChanges = true;
-        }
-        if (
-          supplierItemData.lead_time !== undefined &&
-          supplierItem.lead_time !== supplierItemData.lead_time
-        ) {
-          supplierItem.lead_time = supplierItemData.lead_time;
-          supplierHasChanges = true;
-        }
-        if (
-          supplierItemData.note_cn !== undefined &&
-          supplierItem.note_cn !== supplierItemData.note_cn
-        ) {
-          supplierItem.note_cn = supplierItemData.note_cn;
-          supplierHasChanges = true;
-        }
-        if (
-          supplierItemData.url !== undefined &&
-          supplierItem.url !== supplierItemData.url
-        ) {
-          supplierItem.url = supplierItemData.url;
-          supplierHasChanges = true;
+        let sChanges = false;
+        if (supplierItemData.price_rmb !== undefined) {
+          const newRMB = parseFloat(supplierItemData.price_rmb);
+          if (supplierItem.price_rmb !== newRMB) {
+            supplierItem.price_rmb = newRMB;
+            currentRMBPrice = newRMB;
+            sChanges = true;
+          }
         }
 
-        if (supplierHasChanges) {
-          item.is_updated = true;
-          await itemRepository.save(item);
+        // Update other fields
+        if (supplierItemData.is_po !== undefined) {
+          supplierItem.is_po = supplierItemData.is_po;
+          sChanges = true;
+        }
+        if (supplierItemData.moq !== undefined) {
+          supplierItem.moq = parseInt(supplierItemData.moq);
+          sChanges = true;
+        }
+        if (supplierItemData.oi !== undefined) {
+          supplierItem.oi = parseInt(supplierItemData.oi);
+          sChanges = true;
+        }
+        if (supplierItemData.lead_time !== undefined) {
+          supplierItem.lead_time = supplierItemData.lead_time;
+          sChanges = true;
+        }
+        if (supplierItemData.url !== undefined) {
+          supplierItem.url = supplierItemData.url;
+          sChanges = true;
+        }
+
+        if (sChanges) {
           await supplierItemRepository.save(supplierItem);
+          hasChanges = true; // Mark item as updated because supplier relation changed
         }
       } else {
-        const newSupplierItem = supplierItemRepository.create({
+        const newSI = supplierItemRepository.create({
           item_id: item.id,
           supplier_id: toInt(req.body.supplier_id) || 0,
-          price_rmb: toNum(supplierItemData.price_rmb) || 0,
+          price_rmb: toNum(supplierItemData.price_rmb),
           is_po: supplierItemData.is_po || "No",
-          moq: toInt(supplierItemData.moq) || 0,
-          oi: toInt(supplierItemData.oi) || 0,
+          moq: toInt(supplierItemData.moq),
+          oi: toInt(supplierItemData.oi),
           lead_time: supplierItemData.lead_time || "",
-          note_cn: supplierItemData.note_cn || "",
           url: supplierItemData.url || "",
         });
-        await supplierItemRepository.save(newSupplierItem);
-        item.is_updated = true;
-        await itemRepository.save(item);
+        await supplierItemRepository.save(newSI);
+        currentRMBPrice = newSI.price_rmb;
+        hasChanges = true;
       }
     }
 
+    // 3. Apply Transfer Price Calculation if Category is STD
+    // If currentRMBPrice wasn't updated in this request, fetch it from DB
+    if (category?.name === "STD") {
+      if (currentRMBPrice === null) {
+        const existingSI = await supplierItemRepository.findOne({
+          where: { item_id: item.id },
+        });
+        currentRMBPrice = existingSI?.price_rmb || null;
+      }
+
+      if (currentRMBPrice) {
+        const calculated = calculateTransferPrice(Number(currentRMBPrice));
+        if (item.price !== calculated) {
+          item.price = calculated;
+          hasChanges = true;
+        }
+      }
+    }
+
+    if (hasChanges) {
+      item.is_updated = true;
+      item.updated_at = new Date();
+      await itemRepository.save(item);
+    }
+
+    // 4. Handle Warehouse Item Update
     const warehouseItemData = req.body.warehouseItemData;
     if (warehouseItemData) {
       let warehouseItem = await warehouseRepository.findOne({
         where: { item_id: item.id },
       });
-
-      if (!warehouseItem && item.ItemID_DE) {
-        warehouseItem = await warehouseRepository.findOne({
-          where: { ItemID_DE: item.ItemID_DE },
-        });
-      }
-
       if (warehouseItem) {
-        let warehouseHasChanges = false;
-        if (
-          warehouseItemData.is_stock_item !== undefined &&
-          warehouseItem.is_stock_item !== warehouseItemData.is_stock_item
-        ) {
-          warehouseItem.is_stock_item = warehouseItemData.is_stock_item;
-          warehouseHasChanges = true;
-        }
-        if (
-          warehouseItemData.is_active !== undefined &&
-          warehouseItem.is_active !== warehouseItemData.is_active
-        ) {
-          warehouseItem.is_active = warehouseItemData.is_active;
-          warehouseHasChanges = true;
-        }
-        if (
-          warehouseItemData.msq !== undefined &&
-          warehouseItem.msq !== parseFloat(warehouseItemData.msq)
-        ) {
-          warehouseItem.msq = parseFloat(warehouseItemData.msq);
-          warehouseHasChanges = true;
-        }
-        if (
-          warehouseItemData.is_no_auto_order !== undefined &&
-          warehouseItem.is_no_auto_order !== warehouseItemData.is_no_auto_order
-        ) {
-          warehouseItem.is_no_auto_order = warehouseItemData.is_no_auto_order;
-          warehouseHasChanges = true;
-        }
-        if (
-          warehouseItemData.buffer !== undefined &&
-          warehouseItem.buffer !== parseInt(warehouseItemData.buffer)
-        ) {
-          warehouseItem.buffer = parseInt(warehouseItemData.buffer);
-          warehouseHasChanges = true;
-        }
-        if (
-          warehouseItemData.is_SnSI !== undefined &&
-          warehouseItem.is_SnSI !== warehouseItemData.is_SnSI
-        ) {
-          warehouseItem.is_SnSI = warehouseItemData.is_SnSI;
-          warehouseHasChanges = true;
-        }
-        if (
-          warehouseItemData.item_no_de !== undefined &&
-          warehouseItem.item_no_de !== warehouseItemData.item_no_de
-        ) {
-          warehouseItem.item_no_de = warehouseItemData.item_no_de;
-          warehouseHasChanges = true;
-        }
-        if (
-          warehouseItemData.item_name_de !== undefined &&
-          warehouseItem.item_name_de !== warehouseItemData.item_name_de
-        ) {
-          warehouseItem.item_name_de = warehouseItemData.item_name_de;
-          warehouseHasChanges = true;
-        }
-
-        if (warehouseHasChanges) {
-          item.is_updated = true;
-          await itemRepository.save(item);
-          await warehouseRepository.save(warehouseItem);
-        }
-      } else {
-        console.warn(`No warehouse record found for item ${item.id} (ItemID_DE: ${item.ItemID_DE}) — creating new warehouse entry.`);
-        try {
-          const newWarehouseItem = new WarehouseItem();
-          newWarehouseItem.item_id = item.id;
-          newWarehouseItem.ItemID_DE = item.ItemID_DE ? Number(item.ItemID_DE) : undefined;
-          newWarehouseItem.item_no_de = warehouseItemData.item_no_de || "";
-          newWarehouseItem.item_name_de = warehouseItemData.item_name_de || item.item_name || "";
-          newWarehouseItem.item_name_en = item.item_name || "";
-          newWarehouseItem.stock_qty = 0;
-          newWarehouseItem.msq = warehouseItemData.msq !== undefined ? parseFloat(warehouseItemData.msq) : 0;
-          newWarehouseItem.buffer = warehouseItemData.buffer !== undefined ? parseInt(warehouseItemData.buffer) : 0;
-          newWarehouseItem.is_active = warehouseItemData.is_active || "Y";
-          newWarehouseItem.is_stock_item = warehouseItemData.is_stock_item || "N";
-          newWarehouseItem.is_no_auto_order = warehouseItemData.is_no_auto_order || "N";
-          newWarehouseItem.is_SnSI = warehouseItemData.is_SnSI || "N";
-          await warehouseRepository.save(newWarehouseItem);
-          item.is_updated = true;
-          await itemRepository.save(item);
-        } catch (createErr: any) {
-          console.error("Failed to create warehouse record:", createErr.message);
-        }
+        Object.assign(warehouseItem, {
+          is_stock_item:
+            warehouseItemData.is_stock_item ?? warehouseItem.is_stock_item,
+          is_active: warehouseItemData.is_active ?? warehouseItem.is_active,
+          msq: warehouseItemData.msq
+            ? parseFloat(warehouseItemData.msq)
+            : warehouseItem.msq,
+          buffer: warehouseItemData.buffer
+            ? parseInt(warehouseItemData.buffer)
+            : warehouseItem.buffer,
+          item_no_de: warehouseItemData.item_no_de ?? warehouseItem.item_no_de,
+          item_name_de:
+            warehouseItemData.item_name_de ?? warehouseItem.item_name_de,
+        });
+        await warehouseRepository.save(warehouseItem);
       }
     }
 
     return res.status(200).json({
       success: true,
       message: "Item updated successfully",
-      data: {
-        id: item.id,
-        item_name: item.item_name,
-        isActive: item.isActive,
-        is_updated: item.is_updated,
-        updated_at: item.updated_at,
-      },
+      data: item,
     });
   } catch (error) {
     return next(error);
   }
+};
+
+export const syncTransferPrices = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const itemRepo = AppDataSource.getRepository(Item);
+    const categoryRepo = AppDataSource.getRepository(Category);
+    const supplierItemRepo = AppDataSource.getRepository(SupplierItem);
+
+    const stdCategory = await categoryRepo.findOne({ where: { name: "STD" } });
+    if (!stdCategory)
+      return next(new ErrorHandler("STD Category not found", 404));
+
+    const items = await itemRepo.find({ where: { supp_cat: "STD" } });
+    console.log(items);
+    let count = 0;
+
+    for (const item of items) {
+      const sItem = await supplierItemRepo.findOne({
+        where: { item_id: item.id },
+      });
+      if (sItem && sItem.price_rmb) {
+        const newTransferPrice = calculateTransferPrice(sItem.price_rmb);
+        if (item.price !== newTransferPrice) {
+          item.price = newTransferPrice;
+          item.is_updated = true;
+          await itemRepo.save(item);
+          count++;
+        }
+      }
+    }
+
+    return res
+      .status(200)
+      .json({ success: true, message: `Updated ${count} transfer prices.` });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const toNum = (val: any) => {
+  if (val === null || val === undefined || val === "") return null;
+  const n = parseFloat(val);
+  return isNaN(n) ? null : n;
+};
+
+const toInt = (val: any) => {
+  if (val === null || val === undefined || val === "") return null;
+  const n = parseInt(val);
+  return isNaN(n) ? null : n;
 };
 
 export const deleteItem = async (
@@ -1407,9 +1417,9 @@ export const getParents = async (
       supplier_id: parent.supplier_id,
       supplier: parent.supplier
         ? {
-          id: parent.supplier.id,
-          name: parent.supplier.name,
-        }
+            id: parent.supplier.id,
+            name: parent.supplier.name,
+          }
         : null,
       item_count: parent.items?.length || 0,
       created_at: parent.created_at,
@@ -1485,17 +1495,17 @@ export const getParentById = async (
       is_active: parent.is_active,
       taric: parent.taric
         ? {
-          id: parent.taric.id,
-          code: parent.taric.code,
-          name_de: parent.taric.name_de,
-        }
+            id: parent.taric.id,
+            code: parent.taric.code,
+            name_de: parent.taric.name_de,
+          }
         : null,
       supplier: parent.supplier
         ? {
-          id: parent.supplier.id,
-          name: parent.supplier.name,
-          contact_person: parent.supplier.contact_person,
-        }
+            id: parent.supplier.id,
+            name: parent.supplier.name,
+            contact_person: parent.supplier.contact_person,
+          }
         : null,
       variations: {
         de: [parent.var_de_1, parent.var_de_2, parent.var_de_3].filter(Boolean),
@@ -2124,7 +2134,8 @@ export const updateQualityCriterion = async (
     if (name !== undefined) criterion.name = name;
     if (picture !== undefined) criterion.picture = picture;
     if (description !== undefined) criterion.description = description;
-    if (description_cn !== undefined) (criterion as any).description_cn = description_cn;
+    if (description_cn !== undefined)
+      (criterion as any).description_cn = description_cn;
 
     criterion.updated_at = new Date();
     await qualityRepository.save(criterion);

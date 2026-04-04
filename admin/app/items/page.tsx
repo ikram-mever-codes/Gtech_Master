@@ -75,7 +75,6 @@ import {
   VariationValue,
   QualityCriterion,
   Taric,
-  TaricDetails,
   PaginatedResponse,
   StatisticsResponse,
 } from "@/api/items";
@@ -822,7 +821,8 @@ const ItemsManagementPage: React.FC = () => {
 
         if (!matchesGlobal) return false;
       }
-      if (filters.isActive && it.is_active?.trim() !== filters.isActive.trim()) return false;
+      if (filters.isActive && it.is_active?.trim() !== filters.isActive.trim())
+        return false;
       if (
         filters.category &&
         it.category?.toString().trim().toLowerCase() !==
