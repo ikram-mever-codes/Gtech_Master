@@ -1047,18 +1047,51 @@ export const deleteItem = async (
     }
 
     await AppDataSource.transaction(async (transactionalEntityManager) => {
-      await transactionalEntityManager.delete(WarehouseItem, {
-        item_id: parseInt(id),
-      });
-      await transactionalEntityManager.delete(VariationValue, {
-        item_id: parseInt(id),
-      });
-      await transactionalEntityManager.delete(ItemQuality, {
-        item_id: parseInt(id),
-      });
-      await transactionalEntityManager.delete(SupplierItem, {
-        item_id: parseInt(id),
-      });
+      await transactionalEntityManager
+        .createQueryBuilder()
+        .delete()
+        .from(WarehouseItem)
+        .where("item_id = :itemId", { itemId: parseInt(id) })
+        .execute();
+
+      await transactionalEntityManager
+        .createQueryBuilder()
+        .delete()
+        .from(VariationValue)
+        .where("item_id = :itemId", { itemId: parseInt(id) })
+        .execute();
+
+      await transactionalEntityManager
+        .createQueryBuilder()
+        .delete()
+        .from(ItemQuality)
+        .where("item_id = :itemId", { itemId: parseInt(id) })
+        .execute();
+
+      await transactionalEntityManager
+        .createQueryBuilder()
+        .delete()
+        .from(SupplierItem)
+        .where("item_id = :itemId", { itemId: parseInt(id) })
+        .execute();
+
+      // Also clear LibraryFiles (attachments)
+      await transactionalEntityManager
+        .createQueryBuilder()
+        .delete()
+        .from(LibraryFile)
+        .where("item_id = :itemId", { itemId: parseInt(id) })
+        .execute();
+
+      // Also clear Order Items (if any exist - usually you might want to block this, 
+      // but if the user wants to delete forcibly, we clear it)
+      await transactionalEntityManager
+        .createQueryBuilder()
+        .delete()
+        .from(OrderItem)
+        .where("item_id = :itemId", { itemId: parseInt(id) })
+        .execute();
+
       await transactionalEntityManager.delete(Item, parseInt(id));
     });
 
