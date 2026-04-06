@@ -37,7 +37,6 @@ const getRMBPriceFromSupplier = async (
       where: { item_id: itemId },
     });
 
-    // Return the price_rmb if found, otherwise null
     return supplierItem?.price_rmb || null;
   } catch (error) {
     console.error(`Error fetching RMB_Price for item ${itemId}:`, error);
@@ -316,17 +315,17 @@ export const getItems = async (
           // Include warehouse data if needed
           warehouse_data: warehouseData
             ? {
-                id: warehouseData.id,
-                item_no_de: warehouseData.item_no_de,
-                item_name_de: warehouseData.item_name_de,
-                item_name_en: warehouseData.item_name_en,
-                stock_qty: warehouseData.stock_qty,
-                msq: warehouseData.msq,
-                buffer: warehouseData.buffer,
-                is_stock_item: warehouseData.is_stock_item,
-                is_SnSI: warehouseData.is_SnSI,
-                ship_class: warehouseData.ship_class,
-              }
+              id: warehouseData.id,
+              item_no_de: warehouseData.item_no_de,
+              item_name_de: warehouseData.item_name_de,
+              item_name_en: warehouseData.item_name_en,
+              stock_qty: warehouseData.stock_qty,
+              msq: warehouseData.msq,
+              buffer: warehouseData.buffer,
+              is_stock_item: warehouseData.is_stock_item,
+              is_SnSI: warehouseData.is_SnSI,
+              ship_class: warehouseData.ship_class,
+            }
             : null,
 
           created_at: item.created_at,
@@ -484,7 +483,7 @@ export const getItemById = async (
         isActive: item.parent?.is_active === "Y",
         isSpecialItem: item.parent?.is_NwV === "Y",
         priceEUR: 0,
-        priceRMB: rmbPrice || 0, // Use RMB_Price from supplier_items
+        priceRMB: rmbPrice || 0,
         isEURSpecial: item.is_eur_special || "N",
         isRMBSpecial: item.is_rmb_special || "N",
         isDimensionSpecial: item.is_dimension_special || "N",
@@ -574,23 +573,23 @@ export const getItemById = async (
 
       supplierItem: supplierItem
         ? {
-            priceRMB: supplierItem.price_rmb?.toString() || "0",
-            isPO: supplierItem.is_po || "No",
-            moq: supplierItem.moq?.toString() || "0",
-            interval: supplierItem.oi?.toString() || "0",
-            leadTime: supplierItem.lead_time || "",
-            noteCN: supplierItem.note_cn || "",
-            url: supplierItem.url || "",
-          }
+          priceRMB: supplierItem.price_rmb?.toString() || "0",
+          isPO: supplierItem.is_po || "No",
+          moq: supplierItem.moq?.toString() || "0",
+          interval: supplierItem.oi?.toString() || "0",
+          leadTime: supplierItem.lead_time || "",
+          noteCN: supplierItem.note_cn || "",
+          url: supplierItem.url || "",
+        }
         : {
-            priceRMB: "0",
-            isPO: "No",
-            moq: "0",
-            interval: "0",
-            leadTime: "",
-            noteCN: "",
-            url: "",
-          },
+          priceRMB: "0",
+          isPO: "No",
+          moq: "0",
+          interval: "0",
+          leadTime: "",
+          noteCN: "",
+          url: "",
+        },
 
       nprRemarks: item.npr_remark || "",
     };
@@ -874,7 +873,7 @@ export const updateItem = async (
 
         if (sChanges) {
           await supplierItemRepository.save(supplierItem);
-          hasChanges = true; // Mark item as updated because supplier relation changed
+          hasChanges = true;
         }
       } else {
         const newSI = supplierItemRepository.create({
@@ -1080,7 +1079,7 @@ export const deleteItem = async (
         .createQueryBuilder()
         .delete()
         .from(LibraryFile)
-        .where("item_id = :itemId", { itemId: parseInt(id) })
+        .where("itemId = :itemId", { itemId: parseInt(id) })
         .execute();
 
       // Also clear Order Items (if any exist - usually you might want to block this, 
@@ -1131,7 +1130,7 @@ export const toggleItemStatus = async (
     const newStatus = isActive ? "Y" : "N";
     if (item.isActive !== newStatus) {
       item.isActive = newStatus;
-      item.is_updated = true; // Mark as updated for sync
+      item.is_updated = true;
       item.updated_at = new Date();
       await itemRepository.save(item);
     }
@@ -1450,9 +1449,9 @@ export const getParents = async (
       supplier_id: parent.supplier_id,
       supplier: parent.supplier
         ? {
-            id: parent.supplier.id,
-            name: parent.supplier.name,
-          }
+          id: parent.supplier.id,
+          name: parent.supplier.name,
+        }
         : null,
       item_count: parent.items?.length || 0,
       created_at: parent.created_at,
@@ -1528,17 +1527,17 @@ export const getParentById = async (
       is_active: parent.is_active,
       taric: parent.taric
         ? {
-            id: parent.taric.id,
-            code: parent.taric.code,
-            name_de: parent.taric.name_de,
-          }
+          id: parent.taric.id,
+          code: parent.taric.code,
+          name_de: parent.taric.name_de,
+        }
         : null,
       supplier: parent.supplier
         ? {
-            id: parent.supplier.id,
-            name: parent.supplier.name,
-            contact_person: parent.supplier.contact_person,
-          }
+          id: parent.supplier.id,
+          name: parent.supplier.name,
+          contact_person: parent.supplier.contact_person,
+        }
         : null,
       variations: {
         de: [parent.var_de_1, parent.var_de_2, parent.var_de_3].filter(Boolean),
