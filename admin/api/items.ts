@@ -14,7 +14,8 @@ export interface Item {
   item_name_cn: string | null;
   ean: string | null;
   is_active: string;
-  is_updated: boolean; // Add is_updated field
+  is_updated: boolean;
+  is_new: string;
   parent_id: number | null;
   taric_id: number | null;
   category_id: number | null;
@@ -213,6 +214,7 @@ export const getItems = async (params?: {
   sortBy?: string;
   sortOrder?: "ASC" | "DESC";
   includeOnlyUpdated?: boolean; // Add optional filter for updated items only
+  isNew?: string;
 }) => {
   try {
     const response = await api.get("/items", {
@@ -456,13 +458,19 @@ export const resetUpdatedFlags = async (ids?: number[]) => {
 };
 
 // UPDATED: Export items to CSV with better error handling
-export const exportItemsToCSV = async (showToast: boolean = true) => {
+export const exportItemsToCSV = async (
+  showToast: boolean = true,
+  type: "updated" | "new" = "updated",
+) => {
   try {
     if (showToast) {
-      toast.loading("Exporting updated items...", loadingStyles);
+      toast.loading(
+        `Exporting ${type === "new" ? "new" : "updated"} items...`,
+        loadingStyles,
+      );
     }
 
-    const response = await fetch(`${BASE_URL}/items/export/csv`, {
+    const response = await fetch(`${BASE_URL}/items/export/csv?type=${type}`, {
       method: "GET",
       credentials: "include",
     });
@@ -478,7 +486,9 @@ export const exportItemsToCSV = async (showToast: boolean = true) => {
     if (blob.size === 0) {
       if (showToast) {
         toast.dismiss();
-        toast.error("No items to export. All items are already synced.");
+        toast.error(
+          `No ${type === "new" ? "new" : "updated"} items to export.`,
+        );
       }
       return { success: false, message: "No items to export" };
     }
@@ -486,7 +496,7 @@ export const exportItemsToCSV = async (showToast: boolean = true) => {
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `updated_Item_List_${new Date().toISOString().slice(0, 19).replace(/:/g, "-")}.csv`;
+    a.download = `${type === "new" ? "new" : "updated"}_Item_List_${new Date().toISOString().slice(0, 19).replace(/:/g, "-")}.csv`;
     document.body.appendChild(a);
     a.click();
     window.URL.revokeObjectURL(url);
@@ -494,7 +504,10 @@ export const exportItemsToCSV = async (showToast: boolean = true) => {
 
     if (showToast) {
       toast.dismiss();
-      toast.success("Items exported successfully", successStyles);
+      toast.success(
+        `${type === "new" ? "New" : "Updated"} items exported successfully`,
+        successStyles,
+      );
     }
 
     return { success: true };

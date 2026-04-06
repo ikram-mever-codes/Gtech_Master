@@ -82,7 +82,13 @@ import { getAllSuppliers, Supplier } from "@/api/suppliers";
 import { getCategories } from "@/api/categories";
 import { loadingStyles, successStyles, errorStyles } from "@/utils/constants";
 
-type TabType = "items" | "parents" | "warehouse" | "tarics" | "suppliers";
+type TabType =
+  | "items"
+  | "parents"
+  | "warehouse"
+  | "tarics"
+  | "suppliers"
+  | "new_items";
 
 interface FilterState {
   search: string;
@@ -130,6 +136,7 @@ const ItemsManagementPage: React.FC = () => {
     inactiveItems: 0,
     itemsWithStock: 0,
     itemsNeedingSync: 0,
+    itemsPendingNew: 0,
     itemsByCategory: [],
   });
 
@@ -334,6 +341,16 @@ const ItemsManagementPage: React.FC = () => {
             setPagination(suppliersResponse.pagination);
           }
           break;
+        case "new_items":
+          const newItemsResponse: any = await getItems({
+            page: pagination.page,
+            limit: pagination.limit,
+            search: filters.search,
+            isNew: "Y",
+          });
+          setItems(newItemsResponse.data);
+          setPagination(newItemsResponse.pagination);
+          break;
       }
     } catch (error) {
       console.error("Error fetching data:", error);
@@ -353,7 +370,7 @@ const ItemsManagementPage: React.FC = () => {
 
   useEffect(() => {
     fetchData();
-    if (activeTab === "items") {
+    if (activeTab === "items" || activeTab === "new_items") {
       fetchStatistics();
       fetchPendingSyncCount();
     }
@@ -395,21 +412,20 @@ const ItemsManagementPage: React.FC = () => {
   }, [activeTab]);
 
   // Handle CSV Export
-  const handleExportCSV = async () => {
+  const handleExportCSV = async (type: "updated" | "new" = "updated") => {
     if (exporting) return;
 
     setExporting(true);
     try {
-      await exportItemsToCSV(true);
+      await exportItemsToCSV(true, type);
       // Refresh pending sync count after export
       await fetchPendingSyncCount();
-      // Refresh statistics to update itemsNeedingSync count
+      // Refresh statistics to update counts
       await fetchStatistics();
-      // Refresh items list to show updated is_updated flags
+      // Refresh items list
       await fetchData();
     } catch (error: any) {
       console.error("Export failed:", error);
-      // Error toast is already handled in the API function
     } finally {
       setExporting(false);
     }
@@ -550,6 +566,7 @@ const ItemsManagementPage: React.FC = () => {
       setShowItemModal(false);
       fetchData();
       fetchPendingSyncCount();
+      fetchStatistics();
     } catch (error: any) {
       toast.error(error.message || "Failed to create item", errorStyles);
     } finally {
@@ -797,6 +814,8 @@ const ItemsManagementPage: React.FC = () => {
         return tarics;
       case "suppliers":
         return suppliers;
+      case "new_items":
+        return items;
       default:
         return [];
     }
@@ -826,6 +845,7 @@ const ItemsManagementPage: React.FC = () => {
 
         if (!matchesGlobal) return false;
       }
+
       if (filters.isActive && it.is_active?.trim() !== filters.isActive.trim())
         return false;
       if (
@@ -842,6 +862,7 @@ const ItemsManagementPage: React.FC = () => {
 
   const renderTableHeaders = () => {
     switch (activeTab) {
+      case "new_items":
       case "items":
         return (
           <>
@@ -865,6 +886,9 @@ const ItemsManagementPage: React.FC = () => {
             </th>
             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
               Sync Status
+            </th>
+            <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
+              New
             </th>
             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
               Created
@@ -992,9 +1016,9 @@ const ItemsManagementPage: React.FC = () => {
     const data = filteredData;
 
     switch (activeTab) {
+      case "new_items":
       case "items":
         return data.map((item: any) => {
-          // Highlight EAN if it matches search
           const eanMatches =
             filters.search && matchesEANSearch(item.ean, filters.search);
 
@@ -1061,12 +1085,19 @@ const ItemsManagementPage: React.FC = () => {
               <td className="px-4 py-3">
                 <span
                   className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${item.is_updated
-                      ? "bg-yellow-100 text-yellow-700"
-                      : "bg-green-100 text-green-700"
+                    ? "bg-yellow-100 text-yellow-700"
+                    : "bg-green-100 text-green-700"
                     }`}
                 >
                   {item.is_updated ? "Pending Sync" : "Synced"}
                 </span>
+              </td>
+              <td className="px-4 py-3 text-center">
+                {item.is_new === "Y" && (
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-600 text-white animate-pulse">
+                    NEW
+                  </span>
+                )}
               </td>
               <td className="px-4 py-3">
                 <div className="text-sm text-gray-600 text-nowrap">
@@ -1449,14 +1480,37 @@ const ItemsManagementPage: React.FC = () => {
           </div>
 
           <div className="flex gap-3 flex-wrap">
+            {activeTab === "new_items" && (
+              <button
+                onClick={() => handleExportCSV("new")}
+                disabled={exporting || statistics.itemsPendingNew === 0}
+                className={`px-4 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2 ${exporting || statistics.itemsPendingNew === 0
+                  ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                  : "bg-blue-600 text-white hover:bg-blue-700"
+                  }`}
+              >
+                {exporting ? (
+                  <>
+                    <ArrowPathIcon className="w-5 h-5 animate-spin" />
+                    Exporting...
+                  </>
+                ) : (
+                  <>
+                    <CloudDownloadIcon className="w-5 h-5" />
+                    Export New Items ({statistics.itemsPendingNew})
+                  </>
+                )}
+              </button>
+            )}
+
             {activeTab === "items" && (
               <>
                 <button
-                  onClick={handleExportCSV}
+                  onClick={() => handleExportCSV()}
                   disabled={exporting || pendingSyncCount === 0}
                   className={`px-4 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2 ${exporting || pendingSyncCount === 0
-                      ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                      : "bg-blue-600 text-white hover:bg-blue-700"
+                    ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                    : "bg-blue-600 text-white hover:bg-blue-700"
                     }`}
                 >
                   {exporting ? (
@@ -1522,8 +1576,8 @@ const ItemsManagementPage: React.FC = () => {
             <button
               onClick={() => setShowFilters(!showFilters)}
               className={`px-4 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2 ${showFilters
-                  ? "bg-[#8CC21B] text-white"
-                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                ? "bg-[#8CC21B] text-white"
+                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                 }`}
             >
               <FunnelIcon className="w-5 h-5" />
@@ -1577,13 +1631,14 @@ const ItemsManagementPage: React.FC = () => {
                 { key: "warehouse", label: "Warehouse", icon: ArchiveBoxIcon },
                 { key: "tarics", label: "TARICs", icon: DocumentTextIcon },
                 { key: "suppliers", label: "Suppliers", icon: TruckIcon },
+                { key: "new_items", label: "New Items", icon: PlusIcon },
               ].map((tab) => (
                 <button
                   key={tab.key}
                   onClick={() => setActiveTab(tab.key as TabType)}
                   className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${activeTab === tab.key
-                      ? "border-primary text-primary"
-                      : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                    ? "border-primary text-primary"
+                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
                     }`}
                 >
                   <tab.icon className="w-5 h-5" />
@@ -1591,6 +1646,11 @@ const ItemsManagementPage: React.FC = () => {
                   {tab.key === "items" && pendingSyncCount > 0 && (
                     <span className="ml-1 text-xs bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded-full">
                       {pendingSyncCount}
+                    </span>
+                  )}
+                  {tab.key === "new_items" && statistics.itemsPendingNew > 0 && (
+                    <span className="ml-1 text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full">
+                      {statistics.itemsPendingNew}
                     </span>
                   )}
                 </button>

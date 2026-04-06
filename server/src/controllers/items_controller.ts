@@ -126,6 +126,7 @@ export const getItems = async (
       sortOrder = "DESC",
       parentId,
       taricId,
+      isNew,
     } = req.query;
 
     let pageNum = parseInt(page as string);
@@ -190,6 +191,9 @@ export const getItems = async (
       queryBuilder.andWhere("item.taric_id = :taricId", {
         taricId: parseInt(taricId as string),
       });
+    }
+    if (isNew === "Y") {
+      queryBuilder.andWhere("item.is_new = :isNew", { isNew: "Y" });
     }
 
     queryBuilder.orderBy(
@@ -460,7 +464,12 @@ export const getItemById = async (
 
     const formattedItem = {
       id: item.id,
+      de_no: de_no,
+      is_new: item.is_new || "N",
       itemNo: `${item.id} / ${de_no}`,
+      item_name: item.item_name || "",
+      is_active: item.isActive || "N",
+      created_at: item.created_at,
       name: item.item_name || "",
       nameCN: item.item_name_cn || "",
       ean: ean?.toString() || "",
@@ -714,6 +723,7 @@ export const createItem = async (
       is_eur_special,
       is_rmb_special,
       painPoints,
+      is_new: "Y",
       is_updated: false,
       created_at: new Date(),
       updated_at: new Date(),
@@ -1230,6 +1240,10 @@ export const getItemStatistics = async (
       where: { is_updated: true },
     });
 
+    const itemsPendingNew = await itemRepository.count({
+      where: { is_new: "Y" },
+    });
+
     let itemsWithStock: any = { count: 0 };
     try {
       itemsWithStock = (await warehouseRepository
@@ -1258,6 +1272,7 @@ export const getItemStatistics = async (
         inactiveItems: totalItems - activeItems,
         itemsWithStock: parseInt(itemsWithStock.count) || 0,
         itemsNeedingSync,
+        itemsPendingNew,
         itemsByCategory,
       },
     });
@@ -2740,14 +2755,19 @@ export const exportItemsToCSV = async (
   next: NextFunction,
 ) => {
   try {
+    const { type = "updated" } = req.query;
     const itemRepository = AppDataSource.getRepository(Item);
     const warehouseRepository = AppDataSource.getRepository(WarehouseItem);
     const variationRepository = AppDataSource.getRepository(VariationValue);
     const supplierItemRepository = AppDataSource.getRepository(SupplierItem);
 
-    // Get only items that have is_updated = true
+    let whereClause: any = { is_updated: true };
+    if (type === "new") {
+      whereClause = { is_new: "Y" };
+    }
+
     const items = await itemRepository.find({
-      where: { is_updated: true },
+      where: whereClause,
       relations: ["parent", "taric", "category"],
       order: {
         id: "ASC",
@@ -2757,7 +2777,7 @@ export const exportItemsToCSV = async (
     if (items.length === 0) {
       return res.status(200).json({
         success: true,
-        message: "No items need to be synced",
+        message: `No ${type} items need to be synced`,
         data: [],
       });
     }
@@ -3001,13 +3021,21 @@ export const exportItemsToCSV = async (
       }
     }
 
-    // After successful CSV generation, reset is_updated to false for all exported items
+    // After successful CSV generation, reset flags
     if (updatedItemIds.length > 0) {
-      await itemRepository.update(
-        { id: In(updatedItemIds) },
-        { is_updated: false },
-      );
-      console.log(`Reset is_updated flag for ${updatedItemIds.length} items`);
+      if (type === "new") {
+        await itemRepository.update(
+          { id: In(updatedItemIds) },
+          { is_new: "N" },
+        );
+        console.log(`Reset is_new flag for ${updatedItemIds.length} items`);
+      } else {
+        await itemRepository.update(
+          { id: In(updatedItemIds) },
+          { is_updated: false },
+        );
+        console.log(`Reset is_updated flag for ${updatedItemIds.length} items`);
+      }
     }
 
     const csvContent = csvRows.join("\n");
