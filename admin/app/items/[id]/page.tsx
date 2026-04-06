@@ -475,7 +475,12 @@ const ItemDetailsPage = () => {
           ]);
 
         if (suppliersRes?.data) setAllSuppliers(suppliersRes.data);
-        if (catsRes?.data) setCategories(catsRes.data);
+        if (catsRes?.data) {
+          const regularCategories = catsRes.data.filter(
+            (cat: any) => !cat.name?.toString().trim().startsWith("Imported"),
+          );
+          setCategories(regularCategories);
+        }
 
         const rawItem = itemResponse.data;
         const toBool = (val: any) => val === "Y" || val === "Yes" || val === true || val === 1 || val === "1";

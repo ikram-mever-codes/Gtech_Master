@@ -4,10 +4,6 @@ import ErrorHandler from "../utils/errorHandler";
 import { AppDataSource } from "../config/database";
 import { Category } from "../models/categories";
 
-// ────────────────────────────────────────────────
-//              CATEGORY MANAGEMENT
-// ────────────────────────────────────────────────
-
 export const getCategories = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const categoryRepo = AppDataSource.getRepository(Category);
@@ -18,7 +14,10 @@ export const getCategories = async (req: Request, res: Response, next: NextFunct
         "c.name",
       ]);
 
-    const categories = await qb.orderBy("c.id", "DESC").getMany();
+    const categories = await qb
+      .where("c.name NOT ILIKE :prefix", { prefix: "Imported%" })
+      .orderBy("c.id", "DESC")
+      .getMany();
     return res.status(200).json({
       success: true,
       data: categories,
