@@ -844,8 +844,6 @@ export const getAllTaricsSimple = async (): Promise<any> => {
   }
 };
 
-// ==================== Parent Functions ====================
-
 export const getParents = async (params?: {
   page?: number;
   limit?: number;

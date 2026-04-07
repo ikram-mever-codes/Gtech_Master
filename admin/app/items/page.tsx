@@ -90,8 +90,7 @@ type TabType =
   | "parents"
   | "warehouse"
   | "tarics"
-  | "suppliers"
-  | "new_items";
+  | "suppliers";
 
 interface FilterState {
   search: string;
@@ -223,12 +222,15 @@ const ItemsManagementPage: React.FC = () => {
   }, []);
 
   const formatDate = (dateString: string | Date) => {
+    if (!dateString || dateString === "0000-00-00 00:00:00") return "-";
     const date = new Date(dateString);
-    return date.toLocaleDateString("en-US", {
+    if (isNaN(date.getTime())) return "-";
+    
+    return new Intl.DateTimeFormat("de-DE", {
+      day: "2-digit",
+      month: "2-digit",
       year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
+    }).format(date);
   };
 
   const getStatusBadgeColor = (status: string) => {
@@ -346,16 +348,7 @@ const ItemsManagementPage: React.FC = () => {
             setPagination(suppliersResponse.pagination);
           }
           break;
-        case "new_items":
-          const newItemsResponse: any = await getItems({
-            page: pagination.page,
-            limit: pagination.limit,
-            search: filters.search,
-            isNew: "Y",
-          });
-          setItems(newItemsResponse.data);
-          setPagination(newItemsResponse.pagination);
-          break;
+
       }
     } catch (error) {
       console.error("Error fetching data:", error);
@@ -375,11 +368,9 @@ const ItemsManagementPage: React.FC = () => {
 
   useEffect(() => {
     fetchData();
-    if (activeTab === "items" || activeTab === "new_items") {
+    if (activeTab === "items") {
       fetchStatistics();
       fetchPendingSyncCount();
-    }
-    if (activeTab === "new_items") {
       fetchNewItemsCount();
     }
   }, [
@@ -834,8 +825,6 @@ const ItemsManagementPage: React.FC = () => {
     switch (activeTab) {
       case "items":
         return items;
-      case "new_items":
-        return newItems;
       case "parents":
         return parents;
       case "warehouse":
@@ -844,8 +833,6 @@ const ItemsManagementPage: React.FC = () => {
         return tarics;
       case "suppliers":
         return suppliers;
-      case "new_items":
-        return items;
       default:
         return [];
     }
@@ -892,7 +879,6 @@ const ItemsManagementPage: React.FC = () => {
 
   const renderTableHeaders = () => {
     switch (activeTab) {
-      case "new_items":
       case "items":
         return (
           <>
@@ -917,9 +903,6 @@ const ItemsManagementPage: React.FC = () => {
             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
               Sync Status
             </th>
-            <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
-              New
-            </th>
             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
               Created
             </th>
@@ -929,38 +912,7 @@ const ItemsManagementPage: React.FC = () => {
           </>
         );
 
-      case "new_items":
-        return (
-          <>
-            <th className="px-4 py-3 text-left text-xs text-nowrap font-semibold text-gray-600 uppercase tracking-wider">
-              DE Number
-            </th>
-            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-              EAN
-            </th>
-            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-              Item Name
-            </th>
-            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-              English Name
-            </th>
-            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-              Category
-            </th>
-            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-              Supplier
-            </th>
-            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-              Status
-            </th>
-            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-              Created
-            </th>
-            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-              Actions
-            </th>
-          </>
-        );
+
 
       case "parents":
         return (
@@ -1079,11 +1031,11 @@ const ItemsManagementPage: React.FC = () => {
     const data = filteredData;
 
     switch (activeTab) {
-      case "new_items":
       case "items":
         return data.map((item: any) => {
           const eanMatches =
             filters.search && matchesEANSearch(item.ean, filters.search);
+          const isNewItem = item.is_new === "Y";
 
           return (
             <tr
@@ -1091,7 +1043,11 @@ const ItemsManagementPage: React.FC = () => {
               onClick={() => {
                 router.push(`/items/${item.id}`);
               }}
-              className="hover:bg-gray-50 cursor-pointer transition-colors"
+              className={`cursor-pointer transition-colors ${
+                isNewItem
+                  ? "bg-blue-50 hover:bg-blue-100 border-l-4 border-l-blue-400"
+                  : "hover:bg-gray-50"
+              }`}
             >
               <td className="p-4">
                 <input
@@ -1156,13 +1112,7 @@ const ItemsManagementPage: React.FC = () => {
                   {item.is_updated ? "Pending Sync" : "Synced"}
                 </span>
               </td>
-              <td className="px-4 py-3 text-center">
-                {item.is_new === "Y" && (
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-600 text-white animate-pulse">
-                    NEW
-                  </span>
-                )}
-              </td>
+
               <td className="px-4 py-3">
                 <div className="text-sm text-gray-600 text-nowrap">
                   {formatDate(item.created_at)}
@@ -1203,95 +1153,7 @@ const ItemsManagementPage: React.FC = () => {
           );
         });
 
-      case "new_items":
-        return data.map((item: any) => (
-          <tr
-            key={item.id}
-            onClick={() => router.push(`/items/${item.id}`)}
-            className="hover:bg-emerald-50 cursor-pointer transition-colors border-l-2 border-l-emerald-400"
-          >
-            <td className="p-4">
-              <input
-                type="checkbox"
-                checked={selectedItems.has(item.id.toString())}
-                onChange={(e) => {
-                  e.stopPropagation();
-                  handleSelectItem(item.id.toString());
-                }}
-                className="w-4 h-4 text-primary focus:ring-primary border-gray-300 rounded"
-              />
-            </td>
-            <td className="px-4 py-3">
-              <div className="font-medium text-gray-900">
-                {item.de_no || "-"}
-              </div>
-            </td>
-            <td className="px-4 py-3">
-              <div className="text-sm font-medium text-gray-900">
-                {item.ean?.toString() || "-"}
-              </div>
-            </td>
-            <td className="px-4 py-3">
-              <div className="flex items-center gap-2">
-                <div className="text-sm text-gray-900">
-                  {item.item_name || "-"}
-                </div>
-                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-bold bg-emerald-100 text-emerald-700">
-                  NEW
-                </span>
-              </div>
-            </td>
-            <td className="px-4 py-3">
-              <div className="text-sm text-gray-900">{item.name_en || "-"}</div>
-            </td>
-            <td className="px-4 py-3">
-              <div className="text-sm text-gray-900">
-                {item.category || "-"}
-              </div>
-            </td>
-            <td className="px-4 py-3">
-              <div className="text-sm text-gray-600">
-                {item.supplier_name || "-"}
-              </div>
-            </td>
-            <td className="px-4 py-3">
-              <span
-                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusBadgeColor(item.is_active)}`}
-              >
-                {item.is_active === "Y" ? "Active" : "Inactive"}
-              </span>
-            </td>
-            <td className="px-4 py-3">
-              <div className="text-sm text-gray-600 text-nowrap">
-                {formatDate(item.created_at)}
-              </div>
-            </td>
-            <td className="px-4 py-3">
-              <div className="flex gap-2">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    router.push(`/items/${item.id}`);
-                  }}
-                  className="text-blue-600 hover:text-blue-900 p-1"
-                  title="View item"
-                >
-                  <EyeIcon className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    router.push(`/items/${item.id}`);
-                  }}
-                  className="text-green-600 hover:text-green-900 p-1"
-                  title="Edit item"
-                >
-                  <EditIcon className="w-4 h-4" />
-                </button>
-              </div>
-            </td>
-          </tr>
-        ));
+
 
       case "parents":
         return data.map((parent: any) => (
@@ -1633,26 +1495,26 @@ const ItemsManagementPage: React.FC = () => {
             )}
           </div>
 
-          <div className="flex gap-3 flex-wrap">
-            {activeTab === "new_items" && (
+          <div className="flex gap-1.5 items-center">
+            {activeTab === "items" && newItemsCount > 0 && (
               <button
-                onClick={() => handleExportCSV("new")}
-                disabled={exporting || statistics.itemsPendingNew === 0}
-                className={`px-4 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2 ${
-                  exporting || statistics.itemsPendingNew === 0
+                onClick={handleExportNewItemsCSV}
+                disabled={exportingNew}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all flex items-center gap-1.5 ${
+                  exportingNew
                     ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                    : "bg-blue-600 text-white hover:bg-blue-700"
+                    : "bg-emerald-600 text-white hover:bg-emerald-700"
                 }`}
               >
-                {exporting ? (
+                {exportingNew ? (
                   <>
-                    <ArrowPathIcon className="w-5 h-5 animate-spin" />
+                    <ArrowPathIcon className="w-4 h-4 animate-spin" />
                     Exporting...
                   </>
                 ) : (
                   <>
-                    <CloudDownloadIcon className="w-5 h-5" />
-                    Export New Items ({statistics.itemsPendingNew})
+                    <ArrowDownTrayIcon className="w-4 h-4" />
+                    Export to WaWi CSV ({newItemsCount})
                   </>
                 )}
               </button>
@@ -1663,7 +1525,7 @@ const ItemsManagementPage: React.FC = () => {
                 <button
                   onClick={() => handleExportCSV()}
                   disabled={exporting || pendingSyncCount === 0}
-                  className={`px-4 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2 ${
+                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all flex items-center gap-1.5 ${
                     exporting || pendingSyncCount === 0
                       ? "bg-gray-300 text-gray-500 cursor-not-allowed"
                       : "bg-blue-600 text-white hover:bg-blue-700"
@@ -1671,12 +1533,12 @@ const ItemsManagementPage: React.FC = () => {
                 >
                   {exporting ? (
                     <>
-                      <ArrowPathIcon className="w-5 h-5 animate-spin" />
+                      <ArrowPathIcon className="w-4 h-4 animate-spin" />
                       Exporting...
                     </>
                   ) : (
                     <>
-                      <CloudDownloadIcon className="w-5 h-5" />
+                      <CloudDownloadIcon className="w-4 h-4" />
                       Sync to WaWi ({pendingSyncCount})
                     </>
                   )}
@@ -1685,10 +1547,10 @@ const ItemsManagementPage: React.FC = () => {
                 {process.env.NODE_ENV === "development" && (
                   <button
                     onClick={handleResetSyncFlags}
-                    className="px-4 py-2.5 bg-orange-600 text-white rounded-lg font-medium hover:bg-orange-700 transition-all flex items-center gap-2"
+                    className="px-3 py-1.5 bg-orange-600 text-white rounded-md text-xs font-medium hover:bg-orange-700 transition-all flex items-center gap-1.5"
                     title="Admin: Reset all sync flags"
                   >
-                    <ArrowPathIcon className="w-5 h-5" />
+                    <ArrowPathIcon className="w-4 h-4" />
                     Reset Sync Flags
                   </button>
                 )}
@@ -1700,29 +1562,29 @@ const ItemsManagementPage: React.FC = () => {
                 {activeTab === "tarics" ? (
                   <button
                     onClick={handleBulkDeleteTarics}
-                    className="px-4 py-2.5 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-all flex items-center gap-2"
+                    className="px-3 py-1.5 bg-red-600 text-white rounded-md text-xs font-medium hover:bg-red-700 transition-all flex items-center gap-1.5"
                   >
-                    Delete Selected ({selectedTarics.size})
+                    Delete ({selectedTarics.size})
                   </button>
                 ) : (
                   <>
                     <button
                       onClick={handleBulkActivate}
-                      className="px-4 py-2.5 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-all flex items-center gap-2"
+                      className="px-3 py-1.5 bg-green-600 text-white rounded-md text-xs font-medium hover:bg-green-700 transition-all"
                     >
-                      Activate Selected
+                      Activate
                     </button>
                     <button
                       onClick={handleBulkDeactivate}
-                      className="px-4 py-2.5 bg-yellow-600 text-white rounded-lg font-medium hover:bg-yellow-700 transition-all flex items-center gap-2"
+                      className="px-3 py-1.5 bg-yellow-600 text-white rounded-md text-xs font-medium hover:bg-yellow-700 transition-all"
                     >
-                      Deactivate Selected
+                      Deactivate
                     </button>
                     <button
                       onClick={handleBulkDelete}
-                      className="px-4 py-2.5 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-all flex items-center gap-2"
+                      className="px-3 py-1.5 bg-red-600 text-white rounded-md text-xs font-medium hover:bg-red-700 transition-all"
                     >
-                      Delete Selected
+                      Delete
                     </button>
                   </>
                 )}
@@ -1731,74 +1593,52 @@ const ItemsManagementPage: React.FC = () => {
 
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className={`px-4 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2 ${
+              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all flex items-center gap-1.5 ${
                 showFilters
                   ? "bg-[#8CC21B] text-white"
                   : "bg-gray-100 text-gray-700 hover:bg-gray-200"
               }`}
             >
-              <FunnelIcon className="w-5 h-5" />
+              <FunnelIcon className="w-4 h-4" />
               Filters
             </button>
 
             <button
               onClick={() => fetchData()}
-              className="px-4 py-2.5 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-all flex items-center gap-2"
+              className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-md text-xs font-medium hover:bg-gray-200 transition-all flex items-center gap-1.5"
             >
-              <ArrowPathIcon className="w-5 h-5" />
+              <ArrowPathIcon className="w-4 h-4" />
               Refresh
             </button>
 
             {activeTab === "items" && (
               <button
                 onClick={handleOpenCreateItemModal}
-                className="px-4 py-2.5 bg-[#8CC21B] text-white rounded-lg font-medium hover:bg-[#8CC21B] transition-all flex items-center gap-2"
+                className="px-3 py-1.5 bg-[#8CC21B] text-white rounded-md text-xs font-medium hover:bg-[#7ab318] transition-all flex items-center gap-1.5"
               >
-                <PlusIcon className="w-5 h-5" />
+                <PlusIcon className="w-4 h-4" />
                 New Item
               </button>
             )}
             {activeTab === "tarics" && (
               <button
                 onClick={handleCreateTaric}
-                className="px-4 py-2.5 bg-[#8CC21B] text-white rounded-lg font-medium hover:bg-[#8CC21B] transition-all flex items-center gap-2"
+                className="px-3 py-1.5 bg-[#8CC21B] text-white rounded-md text-xs font-medium hover:bg-[#7ab318] transition-all flex items-center gap-1.5"
               >
-                <PlusIcon className="w-5 h-5" />
+                <PlusIcon className="w-4 h-4" />
                 New TARIC
               </button>
             )}
             {activeTab === "suppliers" && (
               <button
                 onClick={() => router.push("/suppliers")}
-                className="px-4 py-2.5 bg-[#8CC21B] text-white rounded-lg font-medium hover:bg-[#7ab318] transition-all flex items-center gap-2"
+                className="px-3 py-1.5 bg-[#8CC21B] text-white rounded-md text-xs font-medium hover:bg-[#7ab318] transition-all flex items-center gap-1.5"
               >
-                <PlusIcon className="w-5 h-5" />
+                <PlusIcon className="w-4 h-4" />
                 Manage Suppliers
               </button>
             )}
-            {activeTab === "new_items" && (
-              <button
-                onClick={handleExportNewItemsCSV}
-                disabled={exportingNew || newItemsCount === 0}
-                className={`px-4 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2 ${
-                  exportingNew || newItemsCount === 0
-                    ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                    : "bg-emerald-600 text-white hover:bg-emerald-700"
-                }`}
-              >
-                {exportingNew ? (
-                  <>
-                    <ArrowPathIcon className="w-5 h-5 animate-spin" />
-                    Exporting...
-                  </>
-                ) : (
-                  <>
-                    <ArrowDownTrayIcon className="w-5 h-5" />
-                    Export to WaWi CSV ({newItemsCount})
-                  </>
-                )}
-              </button>
-            )}
+
           </div>
         </div>
 
@@ -1807,16 +1647,10 @@ const ItemsManagementPage: React.FC = () => {
             <nav className="-mb-px flex space-x-8">
               {[
                 { key: "items", label: "Items", icon: CubeIcon },
-                {
-                  key: "new_items",
-                  label: "New Items",
-                  icon: ClipboardDocumentListIcon,
-                },
                 { key: "parents", label: "Parents", icon: BuildingOfficeIcon },
                 { key: "warehouse", label: "Warehouse", icon: ArchiveBoxIcon },
                 { key: "tarics", label: "TARICs", icon: DocumentTextIcon },
                 { key: "suppliers", label: "Suppliers", icon: TruckIcon },
-                { key: "new_items", label: "New Items", icon: PlusIcon },
               ].map((tab) => (
                 <button
                   key={tab.key}
@@ -1834,9 +1668,9 @@ const ItemsManagementPage: React.FC = () => {
                       {pendingSyncCount}
                     </span>
                   )}
-                  {tab.key === "new_items" && newItemsCount > 0 && (
+                  {tab.key === "items" && newItemsCount > 0 && (
                     <span className="ml-1 text-xs bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full font-bold">
-                      {newItemsCount}
+                      {newItemsCount} new
                     </span>
                   )}
                 </button>
