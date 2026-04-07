@@ -520,7 +520,88 @@ export const exportItemsToCSV = async (
   }
 };
 
-// ==================== TARIC Functions ====================
+
+export const getNewItems = async (params?: {
+  page?: number;
+  limit?: number;
+  search?: string;
+}) => {
+  try {
+    const response = await api.get("/items/new-items", { params });
+    return response;
+  } catch (error) {
+    handleApiError(error, "Failed to fetch new items");
+    throw error;
+  }
+};
+
+export const getNewItemsCount = async () => {
+  try {
+    const response = await api.get("/items/new-items/count");
+    return response;
+  } catch (error) {
+    handleApiError(error, "Failed to fetch new items count");
+    throw error;
+  }
+};
+
+export const exportNewItemsToCSV = async (showToast: boolean = true) => {
+  try {
+    if (showToast) {
+      toast.loading("Exporting new items to WaWi CSV...", loadingStyles);
+    }
+
+    const response = await fetch(`${BASE_URL}/items/export/new-items-csv`, {
+      method: "GET",
+      credentials: "include",
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || "Export failed");
+    }
+
+    const contentType = response.headers.get("content-type") || "";
+    if (contentType.includes("application/json")) {
+      if (showToast) {
+        toast.dismiss();
+        toast.error("No new items to export.");
+      }
+      return { success: false, message: "No new items" };
+    }
+
+    const blob = await response.blob();
+    if (blob.size === 0) {
+      if (showToast) {
+        toast.dismiss();
+        toast.error("No new items to export.");
+      }
+      return { success: false, message: "No new items to export" };
+    }
+
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `new_items_${new Date().toISOString().slice(0, 19).replace(/:/g, "-")}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+
+    if (showToast) {
+      toast.dismiss();
+      toast.success("New items exported! is_new flag has been reset.", successStyles);
+    }
+
+    return { success: true };
+  } catch (error) {
+    if (showToast) {
+      toast.dismiss();
+      handleApiError(error, "Failed to export new items CSV");
+    }
+    throw error;
+  }
+};
 
 export interface Taric {
   id: number;
@@ -883,8 +964,6 @@ export const searchParents = async (query: string, limit: number = 10) => {
   }
 };
 
-// ==================== Warehouse Functions ====================
-
 export const getWarehouseItems = async (params?: {
   page?: number;
   limit?: number;
@@ -924,8 +1003,6 @@ export const updateWarehouseStock = async (
   }
 };
 
-// ==================== Variation Functions ====================
-
 export const getItemVariations = async (itemId: number) => {
   try {
     const response = await api.get(`/items/${itemId}/variations`);
@@ -958,8 +1035,6 @@ export const updateItemVariations = async (
     throw error;
   }
 };
-
-// ==================== Quality Criteria Functions ====================
 
 export const getItemQualityCriteria = async (itemId: number) => {
   try {
@@ -1025,8 +1100,6 @@ export const deleteQualityCriterion = async (id: number) => {
     throw error;
   }
 };
-
-// ==================== PDF Functions ====================
 
 export const downloadOrderPdf = async (id: string) => {
   try {

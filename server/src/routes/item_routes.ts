@@ -35,6 +35,8 @@ import {
   resetUpdatedFlag,
   syncTransferPrices,
   feedTransferPrices,
+  getNewItems,
+  exportNewItemsToCSV,
 } from "../controllers/items_controller";
 import { authenticateUser, authorize } from "../middlewares/authorized";
 import { AppDataSource } from "../config/database";
@@ -45,20 +47,25 @@ import { Item } from "../models/items";
 const router: any = express.Router();
 
 router.get("/pricing/transfer-prices", feedTransferPrices);
-// router.use(authenticateUser);
-// router.use(authorize(UserRole.ADMIN, UserRole.SALES, UserRole.PURCHASING));
 
-// Item Core Routes
 router.get("/", getItems);
 router.post("/", createItem);
 router.get("/export/csv", exportItemsToCSV);
+router.get("/export/new-items-csv", exportNewItemsToCSV);
+router.get("/new-items", getNewItems);
+router.get("/new-items/count", async (req: Request, res: Response) => {
+  try {
+    const itemRepository = AppDataSource.getRepository(Item);
+    const count = await itemRepository.count({ where: { is_new: "Y" } });
+    res.json({ success: true, data: { count } });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Failed to get new items count" });
+  }
+});
 router.get("/stats/statistics", getItemStatistics);
 router.get("/search/quick-search", searchItems);
 router.patch("/bulk-update", bulkUpdateItems);
 
-// Financial & Pricing Routes
-
-// Sync Management
 router.post("/sync/reset-flags", resetUpdatedFlag);
 router.get("/sync/pending-count", async (req: Request, res: Response) => {
   try {
@@ -75,12 +82,10 @@ router.get("/sync/pending-count", async (req: Request, res: Response) => {
   }
 });
 
-// Specific Item ID Routes
 router.get("/:id", getItemById);
 router.put("/:id", updateItem);
 router.delete("/:id", deleteItem);
-// s
-// Parent Routes
+
 router.get("/parents/simple", async (req: Request, res: Response) => {
   try {
     const parents = await AppDataSource.getRepository(Parent).find({
@@ -102,7 +107,6 @@ router.put("/parents/:id", updateParent);
 router.delete("/parents/:id", deleteParent);
 router.get("/parents/search/quick-search", searchParents);
 
-// TARIC Routes
 router.get("/tarics/all", getAllTarics);
 router.get("/tarics/:id", getTaricById);
 router.post("/tarics/create", createTaric);
@@ -112,7 +116,6 @@ router.get("/tarics/search/quick-search", searchTarics);
 router.get("/tarics/stats/statistics", getTaricStatistics);
 router.post("/tarics/bulk-upsert", bulkUpsertTarics);
 
-// Warehouse & Meta
 router.get("/warehouse/items", getWarehouseItems);
 router.patch("/warehouse/:id/stock", updateWarehouseStock);
 router.get("/:itemId/variations", getItemVariations);

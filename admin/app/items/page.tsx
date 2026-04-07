@@ -69,6 +69,9 @@ import {
   exportItemsToCSV,
   getPendingSyncCount,
   resetUpdatedFlags,
+  getNewItems,
+  getNewItemsCount,
+  exportNewItemsToCSV,
   Item,
   Parent,
   WarehouseItem,
@@ -117,9 +120,12 @@ const ItemsManagementPage: React.FC = () => {
   const [warehouseItems, setWarehouseItems] = useState<WarehouseItem[]>([]);
   const [tarics, setTarics] = useState<Taric[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [newItems, setNewItems] = useState<any[]>([]);
+  const [newItemsCount, setNewItemsCount] = useState(0);
 
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [exportingNew, setExportingNew] = useState(false);
   const [pendingSyncCount, setPendingSyncCount] = useState(0);
   const [pagination, setPagination] = useState<PaginationState>({
     page: 1,
@@ -198,13 +204,21 @@ const ItemsManagementPage: React.FC = () => {
 
   const router = useRouter();
 
-  // Fetch pending sync count
   const fetchPendingSyncCount = useCallback(async () => {
     try {
       const response: any = await getPendingSyncCount();
       setPendingSyncCount(response.data?.pendingCount || 0);
     } catch (error) {
       console.error("Error fetching pending sync count:", error);
+    }
+  }, []);
+
+  const fetchNewItemsCount = useCallback(async () => {
+    try {
+      const response: any = await getNewItemsCount();
+      setNewItemsCount(response.data?.count || 0);
+    } catch (error) {
+      console.error("Error fetching new items count:", error);
     }
   }, []);
 
@@ -238,39 +252,30 @@ const ItemsManagementPage: React.FC = () => {
     if (!eanValue || !searchTerm) return false;
 
     try {
-      // Handle scientific notation and ensure we have a clean string
       let eanStr = "";
 
-      // If it's a number, format it properly without scientific notation
       if (typeof eanValue === "number") {
         eanStr = eanValue.toString();
-        // Check if it's in scientific notation
         if (eanStr.includes("e")) {
-          // Parse as integer to avoid scientific notation
           eanStr = Number(eanValue).toFixed(0);
         }
       } else {
         eanStr = eanValue.toString();
       }
 
-      // Remove all non-digit characters
       const eanDigits = eanStr.replace(/\D/g, "");
       const searchDigits = searchTerm.toString().replace(/\D/g, "");
 
       if (!eanDigits || !searchDigits) return false;
 
-      // Exact match (most common)
       if (eanDigits === searchDigits) return true;
 
-      // Partial match
       if (eanDigits.includes(searchDigits)) return true;
 
-      // Check if search digits are a suffix of the EAN (useful for scanning)
       if (searchDigits.length >= 4 && eanDigits.endsWith(searchDigits)) {
         return true;
       }
 
-      // Check if EAN digits are a suffix of search (if user typed extra characters)
       if (eanDigits.length >= 4 && searchDigits.endsWith(eanDigits)) {
         return true;
       }
@@ -374,7 +379,16 @@ const ItemsManagementPage: React.FC = () => {
       fetchStatistics();
       fetchPendingSyncCount();
     }
-  }, [fetchData, fetchStatistics, fetchPendingSyncCount, activeTab]);
+    if (activeTab === "new_items") {
+      fetchNewItemsCount();
+    }
+  }, [
+    fetchData,
+    fetchStatistics,
+    fetchPendingSyncCount,
+    fetchNewItemsCount,
+    activeTab,
+  ]);
 
   useEffect(() => {
     const fetchInitialData = async () => {
@@ -452,6 +466,20 @@ const ItemsManagementPage: React.FC = () => {
     }
   };
 
+  const handleExportNewItemsCSV = async () => {
+    if (exportingNew) return;
+    setExportingNew(true);
+    try {
+      await exportNewItemsToCSV(true);
+      await fetchNewItemsCount();
+      await fetchData();
+    } catch (error: any) {
+      console.error("New items export failed:", error);
+    } finally {
+      setExportingNew(false);
+    }
+  };
+
   const handleViewItem = (itemId: number) => {
     router.push(`/items/${itemId}`);
   };
@@ -467,7 +495,7 @@ const ItemsManagementPage: React.FC = () => {
       await deleteItem(itemId);
       fetchData();
       fetchPendingSyncCount();
-    } catch (error) { }
+    } catch (error) {}
   };
 
   const handleDeleteParent = async (parentId: number) => {
@@ -479,7 +507,7 @@ const ItemsManagementPage: React.FC = () => {
     try {
       await deleteParent(parentId);
       fetchData();
-    } catch (error) { }
+    } catch (error) {}
   };
 
   const handleToggleStatus = async (itemId: number, currentStatus: string) => {
@@ -492,7 +520,7 @@ const ItemsManagementPage: React.FC = () => {
       );
       fetchData();
       fetchPendingSyncCount();
-    } catch (error) { }
+    } catch (error) {}
   };
 
   const handleOpenCreateItemModal = () => {
@@ -687,7 +715,7 @@ const ItemsManagementPage: React.FC = () => {
       }
       setSelectedTarics(new Set());
       fetchData();
-    } catch (error) { }
+    } catch (error) {}
   };
 
   const handleBulkDelete = async () => {
@@ -806,6 +834,8 @@ const ItemsManagementPage: React.FC = () => {
     switch (activeTab) {
       case "items":
         return items;
+      case "new_items":
+        return newItems;
       case "parents":
         return parents;
       case "warehouse":
@@ -851,7 +881,7 @@ const ItemsManagementPage: React.FC = () => {
       if (
         filters.category &&
         it.category?.toString().trim().toLowerCase() !==
-        filters.category.trim().toLowerCase()
+          filters.category.trim().toLowerCase()
       )
         return false;
 
@@ -889,6 +919,39 @@ const ItemsManagementPage: React.FC = () => {
             </th>
             <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
               New
+            </th>
+            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+              Created
+            </th>
+            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+              Actions
+            </th>
+          </>
+        );
+
+      case "new_items":
+        return (
+          <>
+            <th className="px-4 py-3 text-left text-xs text-nowrap font-semibold text-gray-600 uppercase tracking-wider">
+              DE Number
+            </th>
+            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+              EAN
+            </th>
+            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+              Item Name
+            </th>
+            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+              English Name
+            </th>
+            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+              Category
+            </th>
+            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+              Supplier
+            </th>
+            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+              Status
             </th>
             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
               Created
@@ -1084,10 +1147,11 @@ const ItemsManagementPage: React.FC = () => {
               </td>
               <td className="px-4 py-3">
                 <span
-                  className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${item.is_updated
-                    ? "bg-yellow-100 text-yellow-700"
-                    : "bg-green-100 text-green-700"
-                    }`}
+                  className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                    item.is_updated
+                      ? "bg-yellow-100 text-yellow-700"
+                      : "bg-green-100 text-green-700"
+                  }`}
                 >
                   {item.is_updated ? "Pending Sync" : "Synced"}
                 </span>
@@ -1138,6 +1202,96 @@ const ItemsManagementPage: React.FC = () => {
             </tr>
           );
         });
+
+      case "new_items":
+        return data.map((item: any) => (
+          <tr
+            key={item.id}
+            onClick={() => router.push(`/items/${item.id}`)}
+            className="hover:bg-emerald-50 cursor-pointer transition-colors border-l-2 border-l-emerald-400"
+          >
+            <td className="p-4">
+              <input
+                type="checkbox"
+                checked={selectedItems.has(item.id.toString())}
+                onChange={(e) => {
+                  e.stopPropagation();
+                  handleSelectItem(item.id.toString());
+                }}
+                className="w-4 h-4 text-primary focus:ring-primary border-gray-300 rounded"
+              />
+            </td>
+            <td className="px-4 py-3">
+              <div className="font-medium text-gray-900">
+                {item.de_no || "-"}
+              </div>
+            </td>
+            <td className="px-4 py-3">
+              <div className="text-sm font-medium text-gray-900">
+                {item.ean?.toString() || "-"}
+              </div>
+            </td>
+            <td className="px-4 py-3">
+              <div className="flex items-center gap-2">
+                <div className="text-sm text-gray-900">
+                  {item.item_name || "-"}
+                </div>
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-bold bg-emerald-100 text-emerald-700">
+                  NEW
+                </span>
+              </div>
+            </td>
+            <td className="px-4 py-3">
+              <div className="text-sm text-gray-900">{item.name_en || "-"}</div>
+            </td>
+            <td className="px-4 py-3">
+              <div className="text-sm text-gray-900">
+                {item.category || "-"}
+              </div>
+            </td>
+            <td className="px-4 py-3">
+              <div className="text-sm text-gray-600">
+                {item.supplier_name || "-"}
+              </div>
+            </td>
+            <td className="px-4 py-3">
+              <span
+                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusBadgeColor(item.is_active)}`}
+              >
+                {item.is_active === "Y" ? "Active" : "Inactive"}
+              </span>
+            </td>
+            <td className="px-4 py-3">
+              <div className="text-sm text-gray-600 text-nowrap">
+                {formatDate(item.created_at)}
+              </div>
+            </td>
+            <td className="px-4 py-3">
+              <div className="flex gap-2">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    router.push(`/items/${item.id}`);
+                  }}
+                  className="text-blue-600 hover:text-blue-900 p-1"
+                  title="View item"
+                >
+                  <EyeIcon className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    router.push(`/items/${item.id}`);
+                  }}
+                  className="text-green-600 hover:text-green-900 p-1"
+                  title="Edit item"
+                >
+                  <EditIcon className="w-4 h-4" />
+                </button>
+              </div>
+            </td>
+          </tr>
+        ));
 
       case "parents":
         return data.map((parent: any) => (
@@ -1484,10 +1638,11 @@ const ItemsManagementPage: React.FC = () => {
               <button
                 onClick={() => handleExportCSV("new")}
                 disabled={exporting || statistics.itemsPendingNew === 0}
-                className={`px-4 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2 ${exporting || statistics.itemsPendingNew === 0
-                  ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                  : "bg-blue-600 text-white hover:bg-blue-700"
-                  }`}
+                className={`px-4 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2 ${
+                  exporting || statistics.itemsPendingNew === 0
+                    ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                    : "bg-blue-600 text-white hover:bg-blue-700"
+                }`}
               >
                 {exporting ? (
                   <>
@@ -1508,10 +1663,11 @@ const ItemsManagementPage: React.FC = () => {
                 <button
                   onClick={() => handleExportCSV()}
                   disabled={exporting || pendingSyncCount === 0}
-                  className={`px-4 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2 ${exporting || pendingSyncCount === 0
-                    ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                    : "bg-blue-600 text-white hover:bg-blue-700"
-                    }`}
+                  className={`px-4 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2 ${
+                    exporting || pendingSyncCount === 0
+                      ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                      : "bg-blue-600 text-white hover:bg-blue-700"
+                  }`}
                 >
                   {exporting ? (
                     <>
@@ -1575,10 +1731,11 @@ const ItemsManagementPage: React.FC = () => {
 
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className={`px-4 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2 ${showFilters
-                ? "bg-[#8CC21B] text-white"
-                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                }`}
+              className={`px-4 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2 ${
+                showFilters
+                  ? "bg-[#8CC21B] text-white"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+              }`}
             >
               <FunnelIcon className="w-5 h-5" />
               Filters
@@ -1619,6 +1776,29 @@ const ItemsManagementPage: React.FC = () => {
                 Manage Suppliers
               </button>
             )}
+            {activeTab === "new_items" && (
+              <button
+                onClick={handleExportNewItemsCSV}
+                disabled={exportingNew || newItemsCount === 0}
+                className={`px-4 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2 ${
+                  exportingNew || newItemsCount === 0
+                    ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                    : "bg-emerald-600 text-white hover:bg-emerald-700"
+                }`}
+              >
+                {exportingNew ? (
+                  <>
+                    <ArrowPathIcon className="w-5 h-5 animate-spin" />
+                    Exporting...
+                  </>
+                ) : (
+                  <>
+                    <ArrowDownTrayIcon className="w-5 h-5" />
+                    Export to WaWi CSV ({newItemsCount})
+                  </>
+                )}
+              </button>
+            )}
           </div>
         </div>
 
@@ -1627,6 +1807,11 @@ const ItemsManagementPage: React.FC = () => {
             <nav className="-mb-px flex space-x-8">
               {[
                 { key: "items", label: "Items", icon: CubeIcon },
+                {
+                  key: "new_items",
+                  label: "New Items",
+                  icon: ClipboardDocumentListIcon,
+                },
                 { key: "parents", label: "Parents", icon: BuildingOfficeIcon },
                 { key: "warehouse", label: "Warehouse", icon: ArchiveBoxIcon },
                 { key: "tarics", label: "TARICs", icon: DocumentTextIcon },
@@ -1636,10 +1821,11 @@ const ItemsManagementPage: React.FC = () => {
                 <button
                   key={tab.key}
                   onClick={() => setActiveTab(tab.key as TabType)}
-                  className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${activeTab === tab.key
-                    ? "border-primary text-primary"
-                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                    }`}
+                  className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${
+                    activeTab === tab.key
+                      ? "border-primary text-primary"
+                      : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                  }`}
                 >
                   <tab.icon className="w-5 h-5" />
                   {tab.label}
@@ -1648,9 +1834,9 @@ const ItemsManagementPage: React.FC = () => {
                       {pendingSyncCount}
                     </span>
                   )}
-                  {tab.key === "new_items" && statistics.itemsPendingNew > 0 && (
-                    <span className="ml-1 text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full">
-                      {statistics.itemsPendingNew}
+                  {tab.key === "new_items" && newItemsCount > 0 && (
+                    <span className="ml-1 text-xs bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full font-bold">
+                      {newItemsCount}
                     </span>
                   )}
                 </button>
@@ -2206,16 +2392,16 @@ const ItemsManagementPage: React.FC = () => {
                     value={
                       itemFormData.parent_id
                         ? {
-                          value: itemFormData.parent_id,
-                          label: (() => {
-                            const p = parents?.find(
-                              (x) => x.id === itemFormData.parent_id,
-                            );
-                            return p
-                              ? `${p.name_de} (${p.de_no})`
-                              : "Unknown";
-                          })(),
-                        }
+                            value: itemFormData.parent_id,
+                            label: (() => {
+                              const p = parents?.find(
+                                (x) => x.id === itemFormData.parent_id,
+                              );
+                              return p
+                                ? `${p.name_de} (${p.de_no})`
+                                : "Unknown";
+                            })(),
+                          }
                         : null
                     }
                     onChange={(opt) =>
@@ -2245,14 +2431,14 @@ const ItemsManagementPage: React.FC = () => {
                     value={
                       itemFormData.taric_id
                         ? {
-                          value: itemFormData.taric_id,
-                          label: (() => {
-                            const t = tarics?.find(
-                              (x) => x.id === itemFormData.taric_id,
-                            );
-                            return t ? `${t.code} - ${t.name_de}` : "Unknown";
-                          })(),
-                        }
+                            value: itemFormData.taric_id,
+                            label: (() => {
+                              const t = tarics?.find(
+                                (x) => x.id === itemFormData.taric_id,
+                              );
+                              return t ? `${t.code} - ${t.name_de}` : "Unknown";
+                            })(),
+                          }
                         : null
                     }
                     onChange={(opt) =>
@@ -2282,12 +2468,12 @@ const ItemsManagementPage: React.FC = () => {
                     value={
                       itemFormData.cat_id
                         ? {
-                          value: itemFormData.cat_id,
-                          label:
-                            categories?.find(
-                              (x) => x.id === itemFormData.cat_id,
-                            )?.name || "Unknown",
-                        }
+                            value: itemFormData.cat_id,
+                            label:
+                              categories?.find(
+                                (x) => x.id === itemFormData.cat_id,
+                              )?.name || "Unknown",
+                          }
                         : null
                     }
                     onChange={(opt) =>
@@ -2317,16 +2503,16 @@ const ItemsManagementPage: React.FC = () => {
                     value={
                       itemFormData.supplier_id
                         ? {
-                          value: itemFormData.supplier_id,
-                          label: (() => {
-                            const s = suppliers?.find(
-                              (x) => x.id === itemFormData.supplier_id,
-                            );
-                            return s
-                              ? s.company_name || s.name || "Unnamed"
-                              : "Unknown";
-                          })(),
-                        }
+                            value: itemFormData.supplier_id,
+                            label: (() => {
+                              const s = suppliers?.find(
+                                (x) => x.id === itemFormData.supplier_id,
+                              );
+                              return s
+                                ? s.company_name || s.name || "Unnamed"
+                                : "Unknown";
+                            })(),
+                          }
                         : null
                     }
                     onChange={(opt) =>
