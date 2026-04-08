@@ -46,9 +46,8 @@ const StatusIndicator = ({
   label?: string;
 }) => (
   <span
-    className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
-      value ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
-    }`}
+    className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${value ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+      }`}
   >
     {value ? (
       <CheckCircleIcon className="h-3 w-3" />
@@ -228,11 +227,13 @@ const ItemDetailsPage = () => {
   });
   const [uploadingPictures, setUploadingPictures] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const attachmentInputRef = React.useRef<HTMLInputElement>(null);
   const [allSuppliers, setAllSuppliers] = useState<Supplier[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [uploadingAttachments, setUploadingAttachments] = useState(false);
-  const attachmentInputRef = React.useRef<HTMLInputElement>(null);
   const [attachments, setAttachments] = useState<any[]>([]);
+  const [isLinkSupplierModalOpen, setIsLinkSupplierModalOpen] = useState(false);
+  const [selectedSupplierToLink, setSelectedSupplierToLink] = useState("");
 
   const formatDate = (dateString: string | Date) => {
     if (!dateString) return "—";
@@ -271,6 +272,86 @@ const ItemDetailsPage = () => {
   const handleCloseQualityModal = () => {
     setIsQualityModalOpen(false);
     setEditingQuality(null);
+  };
+
+  const calculateEANCheckDigit = (code: string) => {
+    let sum = 0;
+    for (let i = 0; i < code.length; i++) {
+      const digit = parseInt(code[i]);
+      sum += i % 2 === 0 ? digit * 1 : digit * 3;
+    }
+    const remainder = sum % 10;
+    return remainder === 0 ? 0 : 10 - remainder;
+  };
+
+  const generateEAN = (itemId: number) => {
+    const prefix = "789";
+    const timestamp = (Date.now() % 1000000).toString().padStart(6, "0");
+    const idStr = itemId.toString().padStart(6, "0");
+    const baseNumber = (idStr + timestamp).slice(0, 9);
+    const eanWithoutCheck = prefix + baseNumber;
+    const checkDigit = calculateEANCheckDigit(eanWithoutCheck);
+    return eanWithoutCheck + checkDigit;
+  };
+
+  const handleLinkSupplier = () => {
+    if (!selectedSupplierToLink || !itemData) return;
+
+    const supplier = allSuppliers.find(
+      (s) => String(s.id) === selectedSupplierToLink,
+    );
+    if (!supplier) return;
+
+    if (
+      itemData.supplierItems?.some(
+        (si) => String(si.supplierId) === selectedSupplierToLink,
+      )
+    ) {
+      toast.error("This supplier is already linked to this item", errorStyles);
+      return;
+    }
+
+    const newLink = {
+      id: -Math.floor(Date.now() % 1000000000),
+      supplierId: supplier.id,
+      supplierName: String(supplier.company_name || supplier.name || "Unknown"),
+      priceRMB: "0",
+      isPO: "No",
+      moq: "0",
+      interval: "0",
+      leadTime: "",
+      noteCN: "",
+      url: "",
+      isDefault: (itemData.supplierItems?.length || 0) === 0,
+    };
+
+    const updated: ItemDetails = {
+      ...itemData,
+      supplierItems: [...(itemData.supplierItems || []), newLink],
+    };
+
+    setItemData(updated);
+
+    setIsLinkSupplierModalOpen(false);
+    setSelectedSupplierToLink("");
+    toast.success(
+      "Supplier source added to list. Remember to save changes.",
+      successStyles,
+    );
+  };
+
+  const handleRemoveSupplier = (linkId: number) => {
+    if (!itemData) return;
+    const link = itemData.supplierItems?.find(si => si.id === linkId);
+    if (link?.isDefault) {
+      toast.error("Cannot remove the default supplier. Set another as default first.", errorStyles);
+      return;
+    }
+
+    setItemData({
+      ...itemData,
+      supplierItems: itemData.supplierItems.filter(si => si.id !== linkId)
+    });
   };
 
   const handleQualityFormChange = (
@@ -313,7 +394,6 @@ const ItemDetailsPage = () => {
         await createQualityCriterion(itemId, payload);
       }
 
-      // Refresh data
       const qualityResponse = await getItemQualityCriteria(itemId);
       setQualityCriteria(qualityResponse.data || []);
       handleCloseQualityModal();
@@ -427,7 +507,7 @@ const ItemDetailsPage = () => {
       }
 
       const itemResponse: any = await getItemById(parseInt(id as string));
-      if (itemResponse.data) {
+      if (itemResponse.data && itemData) {
         const toBool = (val: any) =>
           val === "Y" ||
           val === "Yes" ||
@@ -437,11 +517,15 @@ const ItemDetailsPage = () => {
         const rawItem = itemResponse.data;
         const transformedItem: ItemDetails = {
           ...rawItem,
+          id: rawItem.id || itemData.id,
           isActive: toBool(rawItem.isActive),
           parent: {
             ...rawItem.parent,
             isActive: toBool(rawItem.parent.isActive),
             isSpecialItem: toBool(rawItem.parent.isSpecialItem),
+            isEURSpecial: toBool(rawItem.parent.isEURSpecial),
+            isRMBSpecial: toBool(rawItem.parent.isRMBSpecial),
+            isDimensionSpecial: toBool(rawItem.parent.isDimensionSpecial),
           },
           others: {
             ...rawItem.others,
@@ -454,6 +538,8 @@ const ItemDetailsPage = () => {
             isStock: toBool(rawItem.others.isStock),
             isNAO: toBool(rawItem.others.isNAO),
             isSnSI: toBool(rawItem.others.isSnSI),
+            isDimensionSpecial: toBool(rawItem.others.isDimensionSpecial),
+            pixPath: rawItem.others.pixPath || "",
           },
           pictures: {
             shopPicture: rawItem.pictures.shopPicture || "",
@@ -488,7 +574,6 @@ const ItemDetailsPage = () => {
       const { deleteFile } = await import("@/api/library");
       await deleteFile(fileId);
 
-      // Refresh data
       if (itemData) {
         setItemData({
           ...itemData,
@@ -616,10 +701,16 @@ const ItemDetailsPage = () => {
         return isNaN(n) ? null : n;
       };
 
+      let finalEan = updatedData.ean;
+      if (!finalEan || finalEan.trim() === "") {
+        finalEan = generateEAN(itemId);
+        setItemData(prev => prev ? ({ ...prev, ean: finalEan }) : null);
+      }
+
       const payload: any = {
         item_name: updatedData.name,
         item_name_cn: updatedData.nameCN,
-        ean: updatedData.ean ? updatedData.ean.toString() : null,
+        ean: finalEan.toString(),
         model: updatedData.model,
         remark: updatedData.remark,
         cat_id: toInt(updatedData.category_id),
@@ -813,11 +904,10 @@ const ItemDetailsPage = () => {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`px-4 py-2 text-sm font-medium whitespace-nowrap transition-colors ${
-                  activeTab === tab.id
-                    ? "text-gray-900 border-b-2 border-gray-600"
-                    : "text-gray-500 hover:text-gray-700"
-                }`}
+                className={`px-4 py-2 text-sm font-medium whitespace-nowrap transition-colors ${activeTab === tab.id
+                  ? "text-gray-900 border-b-2 border-gray-600"
+                  : "text-gray-500 hover:text-gray-700"
+                  }`}
               >
                 {tab.label}
               </button>
@@ -837,7 +927,7 @@ const ItemDetailsPage = () => {
                   editMode={editMode}
                   itemData={itemData}
                   setItemData={setItemData}
-                  readOnly={true}
+                  readOnly={false}
                 />
                 <EditableInfoRow
                   label="Transfer Price (EUR)"
@@ -1422,111 +1512,117 @@ const ItemDetailsPage = () => {
             </div>
           )}
           {activeTab === "supplier" && (
-            <div className="space-y-8">
-              <div className="flex justify-between items-center">
-                <SectionHeader 
-                  title="Supplier Sources" 
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <SectionHeader
+                  title="Supplier Sources"
                   icon={<LinkIcon className="h-5 w-5 text-[#8CC21B]" />}
                 />
-                <button
-                  onClick={() => router.push("/suppliers")}
-                  className="px-4 py-2 bg-[#8CC21B] text-white rounded-lg flex items-center gap-2 text-sm font-medium hover:bg-[#7ab318] transition-colors"
-                >
-                  <PlusIcon className="h-4 w-4" />
-                  Manage Suppliers
-                </button>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setIsLinkSupplierModalOpen(true)}
+                    className="px-4 py-2 bg-white border border-[#8CC21B] text-[#8CC21B] rounded-lg flex items-center gap-2 text-sm font-medium hover:bg-[#8CC21B] hover:text-white transition-all shadow-sm"
+                  >
+                    <PlusIcon className="h-4 w-4" />
+                    Link New Supplier
+                  </button>
+                  <button
+                    onClick={() => router.push("/suppliers")}
+                    className="px-4 py-2 bg-[#8CC21B] text-white rounded-lg flex items-center gap-2 text-sm font-medium hover:bg-[#7ab318] transition-colors shadow-sm"
+                  >
+                    <PencilIcon className="h-4 w-4" />
+                    Supplier List
+                  </button>
+                </div>
               </div>
 
-              <div className="grid grid-cols-1 gap-6">
+              <div className="grid grid-cols-1 gap-4">
                 {itemData.supplierItems && itemData.supplierItems.length > 0 ? (
-                  itemData.supplierItems.map((si: any, index: number) => (
-                    <div 
-                      key={si.id} 
-                      className={`relative p-6 rounded-2xl border transition-all ${
-                        si.isDefault 
-                          ? "bg-blue-50/50 border-blue-200 shadow-sm" 
-                          : "bg-white border-gray-100 hover:border-gray-300"
-                      }`}
+                  itemData.supplierItems.map((si: any) => (
+                    <div
+                      key={si.id}
+                      className={`p-4 rounded-xl border transition-all flex items-center justify-between group ${si.isDefault
+                        ? "bg-blue-50/50 border-blue-200 shadow-sm"
+                        : "bg-white border-gray-100 hover:border-gray-200"
+                        }`}
                     >
-                      {si.isDefault && (
-                        <div className="absolute -top-3 left-6 px-3 py-1 bg-blue-600 text-white text-[10px] font-bold uppercase tracking-wider rounded-full shadow-sm">
-                          Default Source
+                      <div className="flex items-center gap-4">
+                        <div
+                          className={`p-2 rounded-lg ${si.isDefault
+                            ? "bg-blue-100 text-blue-600"
+                            : "bg-gray-100 text-gray-400"
+                            }`}
+                        >
+                          <Package className="h-5 w-5" />
                         </div>
-                      )}
-
-                      <div className="flex flex-col md:flex-row justify-between gap-6">
-                        <div className="flex-1">
-                          <h4 className="text-lg font-bold text-gray-900 mb-1">
-                            {si.supplierName}
-                          </h4>
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                             ID: {si.supplierId}
-                          </span>
-                        </div>
-                        
-                        <div className="flex flex-wrap gap-4 items-center">
-                          <button
-                            onClick={() => window.open(si.url, '_blank')}
-                            disabled={!si.url}
-                            className="p-2 bg-white border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50 transition-all disabled:opacity-30"
-                            title="Visit Supplier Website"
-                          >
-                            <LinkIcon className="h-5 w-5" />
-                          </button>
-                          {editMode && (
-                             <button
-                               onClick={() => {
-                                 const updated = { ...itemData };
-                                 updated.supplierItems = updated.supplierItems.map((x: any) => ({
-                                   ...x,
-                                   isDefault: x.id === si.id
-                                 }));
-                                 setItemData(updated);
-                               }}
-                               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                                 si.isDefault 
-                                  ? "bg-blue-600 text-white" 
-                                  : "bg-white border border-blue-200 text-blue-600 hover:bg-blue-50"
-                               }`}
-                             >
-                               {si.isDefault ? "Current Default" : "Set as Default"}
-                             </button>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-bold text-gray-900 line-clamp-1">
+                              {si.supplierName}
+                            </h4>
+                            <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded font-medium">
+                              ID: {si.supplierId}
+                            </span>
+                          </div>
+                          {si.isDefault && (
+                            <span className="text-[10px] bg-blue-600 text-white px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">
+                              Default Source
+                            </span>
                           )}
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-y-6 gap-x-8 mt-6">
-                        <div className="space-y-1">
-                          <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Price RMB</p>
-                          <p className="text-sm font-bold text-gray-900">¥ {si.priceRMB}</p>
-                        </div>
-                        <div className="space-y-1">
-                          <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">MOQ</p>
-                          <p className="text-sm font-medium text-gray-700">{si.moq}</p>
-                        </div>
-                        <div className="space-y-1">
-                          <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Lead Time</p>
-                          <p className="text-sm font-medium text-gray-700">{si.leadTime || "—"}</p>
-                        </div>
-                        <div className="space-y-1">
-                          <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">isPO</p>
-                          <p className="text-sm font-medium text-gray-700">{si.isPO}</p>
-                        </div>
-                      </div>
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => window.open(si.url, "_blank")}
+                          disabled={!si.url}
+                          className={`p-2 rounded-lg transition-all ${si.url
+                            ? "text-blue-500 hover:bg-blue-50"
+                            : "text-gray-300 cursor-not-allowed"
+                            }`}
+                        >
+                          <LinkIcon className="h-5 w-5" />
+                        </button>
 
-                      {si.noteCN && (
-                        <div className="mt-4 p-3 bg-white/60 border border-gray-100 rounded-lg">
-                          <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">Internal Note (CN)</p>
-                          <p className="text-xs text-gray-700 italic">{si.noteCN}</p>
-                        </div>
-                      )}
+                        {editMode && (
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => {
+                                const updated = { ...itemData };
+                                updated.supplierItems = updated.supplierItems.map(
+                                  (x: any) => ({
+                                    ...x,
+                                    isDefault: x.id === si.id,
+                                  }),
+                                );
+                                setItemData(updated);
+                              }}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${si.isDefault
+                                ? "bg-blue-600 text-white"
+                                : "bg-white border border-blue-200 text-blue-600 hover:bg-blue-50"
+                                }`}
+                            >
+                              {si.isDefault ? "Default" : "Set Default"}
+                            </button>
+                            {!si.isDefault && (
+                              <button
+                                onClick={() => handleRemoveSupplier(si.id)}
+                                className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                              >
+                                <TrashIcon className="h-5 w-5" />
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   ))
                 ) : (
-                  <div className="text-center py-20 bg-gray-50/50 rounded-2xl border-2 border-dashed border-gray-200">
-                    <LinkIcon className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                    <h3 className="text-lg font-medium text-gray-900">No Supplier Links</h3>
-                    <p className="text-sm text-gray-500 mt-1">Assign this item to suppliers to manage sourcing prices.</p>
+                  <div className="text-center py-12 bg-gray-50 rounded-xl border-2 border-dashed border-gray-200">
+                    <LinkIcon className="h-10 w-10 text-gray-300 mx-auto mb-3" />
+                    <p className="text-gray-500 font-medium">
+                      No suppliers linked to this item.
+                    </p>
                   </div>
                 )}
               </div>
@@ -1702,7 +1798,7 @@ const ItemDetailsPage = () => {
                               </div>
                             </td>
                             <td className="px-4 py-3 text-sm text-gray-500">
-                              {formatDate(attachment.uploadedAt)}
+                              {attachment.uploadedAt ? formatDate(attachment.uploadedAt) : "—"}
                             </td>
                             <td className="px-4 py-3 text-sm">
                               <div className="flex items-center gap-4">
@@ -1715,8 +1811,8 @@ const ItemDetailsPage = () => {
                                   View
                                 </button>
                                 <a
-                                  href={attachment.url.includes('cloudinary') 
-                                    ? attachment.url.replace('/upload/', '/upload/fl_attachment/') 
+                                  href={attachment.url.includes('cloudinary')
+                                    ? attachment.url.replace('/upload/', '/upload/fl_attachment/')
                                     : attachment.url}
                                   download={attachment.originalName || attachment.filename}
                                   className="text-[#8CC21B] hover:text-[#7ab318] flex items-center gap-1.5 font-medium"
@@ -1727,9 +1823,10 @@ const ItemDetailsPage = () => {
                                 </a>
                                 <button
                                   onClick={() => handleDeleteAttachment(attachment.id)}
-                                  className="text-red-500 hover:text-red-700 ml-2"
-                                  title="Delete Permanent"
+                                  className="text-red-600 hover:text-red-800 flex items-center gap-1.5 font-medium"
+                                  title="Delete Attachment"
                                 >
+                                  <TrashIcon className="h-4 w-4" />
                                   Delete
                                 </button>
                               </div>
@@ -1764,11 +1861,11 @@ const ItemDetailsPage = () => {
               </div>
 
               {itemData.pictures &&
-              [
-                itemData.pictures.shopPicture,
-                itemData.pictures.ebayPictures,
-                ...(itemData.pictures.pixPath || "").split(",").filter(Boolean),
-              ].filter(Boolean).length > 0 ? (
+                [
+                  itemData.pictures.shopPicture,
+                  itemData.pictures.ebayPictures,
+                  ...(itemData.pictures.pixPath || "").split(",").filter(Boolean),
+                ].filter(Boolean).length > 0 ? (
                 <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
                   {[
                     {
@@ -1879,9 +1976,8 @@ const ItemDetailsPage = () => {
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={uploadingPictures}
-              className={`px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 text-gray-700 ${
-                uploadingPictures ? "opacity-50 cursor-not-allowed" : ""
-              }`}
+              className={`px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 text-gray-700 ${uploadingPictures ? "opacity-50 cursor-not-allowed" : ""
+                }`}
             >
               <PhotoIcon className="h-4 w-4" />
               {uploadingPictures ? "Uploading..." : "Add Pictures"}
@@ -2001,6 +2097,58 @@ const ItemDetailsPage = () => {
               rows={3}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary"
             />
+          </div>
+        </div>
+      </CustomModal>
+
+      {/* Link Supplier Modal */}
+      <CustomModal
+        isOpen={isLinkSupplierModalOpen}
+        onClose={() => setIsLinkSupplierModalOpen(false)}
+        title="Link New Supplier Source"
+      >
+        <div className="space-y-6">
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-gray-700">
+              Select Supplier
+            </label>
+            <div className="relative">
+              <select
+                value={selectedSupplierToLink}
+                onChange={(e) => setSelectedSupplierToLink(e.target.value)}
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#8CC21B] focus:border-transparent transition-all outline-none appearance-none"
+              >
+                <option value="">Choose a supplier...</option>
+                {allSuppliers.map((s) => (
+                  <option key={s.id} value={String(s.id)}>
+                    [{s.id}] {s.company_name || s.name}
+                  </option>
+                ))}
+              </select>
+              <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
+                <ChevronRightIcon className="h-4 w-4 text-gray-400 rotate-90" />
+              </div>
+            </div>
+            <p className="text-xs text-gray-500 italic">
+              Link an additional supplier to this item. You can then set
+              specific prices and lead times for this source.
+            </p>
+          </div>
+
+          <div className="flex gap-3 pt-2">
+            <button
+              onClick={() => setIsLinkSupplierModalOpen(false)}
+              className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition-all"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleLinkSupplier}
+              disabled={!selectedSupplierToLink}
+              className="flex-1 px-4 py-3 bg-[#8CC21B] text-white rounded-xl font-semibold hover:bg-[#7ab318] transition-all disabled:opacity-50 shadow-md"
+            >
+              Link Supplier
+            </button>
           </div>
         </div>
       </CustomModal>

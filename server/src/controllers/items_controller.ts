@@ -593,7 +593,7 @@ export const getItemById = async (
         url: si.url || "",
         isDefault: si.is_default === "Y",
       })),
-      
+
       // Keep single supplierItem for backwards compatibility (the default one)
       supplierItem: (() => {
         const defaultSi = supplierItems.find(si => si.is_default === 'Y') || supplierItems[0];
@@ -872,13 +872,34 @@ export const updateItem = async (
 
     const supplierItemData = req.body.supplierItem;
     const supplierItemsData = req.body.supplierItems;
-
     if (supplierItemsData && Array.isArray(supplierItemsData)) {
+      const existingSupplierItems = await supplierItemRepository.find({
+        where: { item_id: item.id }
+      });
+
+      const incomingIds = supplierItemsData.filter(si => si.id > 0).map(si => si.id);
+
+      for (const existing of existingSupplierItems) {
+        if (!incomingIds.includes(existing.id)) {
+          await supplierItemRepository.delete(existing.id);
+        }
+      }
+
       for (const siData of supplierItemsData) {
-        if (siData.id) {
+        if (siData.id > 0) {
           await supplierItemRepository.update(siData.id, {
             is_default: siData.isDefault ? "Y" : "N",
           });
+        } else if (siData.id < 0 && siData.supplierId) {
+          const newSI = supplierItemRepository.create({
+            item_id: item.id,
+            supplier_id: siData.supplierId,
+            is_default: siData.isDefault ? "Y" : "N",
+            price_rmb: parseFloat(siData.priceRMB) || 0,
+            moq: parseInt(siData.moq) || 0,
+            lead_time: siData.leadTime || "",
+          });
+          await supplierItemRepository.save(newSI);
         }
       }
       hasChanges = true;

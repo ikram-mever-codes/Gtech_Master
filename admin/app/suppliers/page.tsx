@@ -325,47 +325,47 @@ const SuppliersPage: React.FC = () => {
                                                     className="hover:bg-gray-50 cursor-pointer transition-colors"
                                                     onClick={() => handleOpenEdit(supplier.id)}
                                                 >
-                                                    <td className="px-2 py-2">
-                                                        <div className="text-[11px] text-gray-500">
+                                                    <td className="px-1.5 py-1.5">
+                                                        <div className="text-[10px] text-gray-500">
                                                             {(pagination.page - 1) * pagination.limit + index + 1}
                                                         </div>
                                                     </td>
-                                                    <td className="px-2 py-2">
-                                                        <div className="text-[11px] font-medium text-gray-900 truncate max-w-[120px]" title={supplier.name}>
+                                                    <td className="px-1.5 py-1.5">
+                                                        <div className="text-[10px] font-medium text-gray-900 truncate max-w-[100px]" title={supplier.name}>
                                                             {supplier.name || "-"}
                                                         </div>
                                                     </td>
-                                                    <td className="px-2 py-2">
-                                                        <div className="text-[11px] text-gray-900 truncate max-w-[100px]" title={supplier.name_cn}>
+                                                    <td className="px-1.5 py-1.5">
+                                                        <div className="text-[10px] text-gray-900 truncate max-w-[80px]" title={supplier.name_cn}>
                                                             {supplier.name_cn || "-"}
                                                         </div>
                                                     </td>
-                                                    <td className="px-2 py-2">
-                                                        <div className="text-[11px] text-gray-900 truncate max-w-[140px]" title={supplier.company_name}>
+                                                    <td className="px-1.5 py-1.5">
+                                                        <div className="text-[10px] text-gray-900 truncate max-w-[110px]" title={supplier.company_name}>
                                                             {supplier.company_name || "-"}
                                                         </div>
                                                     </td>
-                                                    <td className="px-2 py-2">
-                                                        <div className="text-[11px] text-gray-900">
+                                                    <td className="px-1.5 py-1.5">
+                                                        <div className="text-[10px] text-gray-900 truncate max-w-[90px]" title={supplier.contact_person}>
                                                             {supplier.contact_person || "-"}
                                                         </div>
                                                     </td>
-                                                    <td className="px-2 py-2">
-                                                        <div className="text-[11px] text-gray-900">
+                                                    <td className="px-1.5 py-1.5">
+                                                        <div className="text-[10px] text-gray-900">
                                                             {supplier.city || "-"}
                                                         </div>
                                                     </td>
-                                                    <td className="px-2 py-2">
-                                                        <div className="text-[10px] text-gray-900 truncate max-w-[120px]" title={supplier.email}>
+                                                    <td className="px-1.5 py-1.5">
+                                                        <div className="text-[10px] text-gray-900 truncate max-w-[100px]" title={supplier.email}>
                                                             {supplier.email || "-"}
                                                         </div>
                                                     </td>
-                                                    <td className="px-2 py-2">
+                                                    <td className="px-1.5 py-1.5">
                                                         <div className="text-[10px] text-gray-900">
                                                             {supplier.phone || "-"}
                                                         </div>
                                                     </td>
-                                                    <td className="px-2 py-2">
+                                                    <td className="px-1.5 py-1.5">
                                                         <div className="text-[10px] text-gray-600 text-nowrap">
                                                             {formatDate(supplier.created_at)}
                                                         </div>
