@@ -102,7 +102,9 @@ export interface ItemDetails {
   supplier_id: number | null;
   supplier_name: string | null;
   isActive: boolean;
-  is_updated: boolean; // Add is_updated field
+  is_updated: boolean;
+  created_at?: Date | string;
+  updated_at?: Date | string;
   parent: {
     noDE: string;
     nameDE: string;

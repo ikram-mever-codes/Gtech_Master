@@ -235,8 +235,8 @@ const ItemDetailsPage = () => {
   const [isLinkSupplierModalOpen, setIsLinkSupplierModalOpen] = useState(false);
   const [selectedSupplierToLink, setSelectedSupplierToLink] = useState("");
 
-  const formatDate = (dateString: string | Date) => {
-    if (!dateString) return "—";
+  const formatDate = (dateString: string | Date | null | undefined) => {
+    if (!dateString || dateString === "0000-00-00 00:00:00") return "—";
     const date = new Date(dateString);
     if (isNaN(date.getTime())) return "—";
     return new Intl.DateTimeFormat("de-DE", {
@@ -1798,12 +1798,17 @@ const ItemDetailsPage = () => {
                               </div>
                             </td>
                             <td className="px-4 py-3 text-sm text-gray-500">
-                              {attachment.uploadedAt ? formatDate(attachment.uploadedAt) : "—"}
+                              {attachment.createdAt ? formatDate(attachment.createdAt) : (attachment.uploadedAt ? formatDate(attachment.uploadedAt) : "—")}
                             </td>
                             <td className="px-4 py-3 text-sm">
                               <div className="flex items-center gap-4">
                                 <button
-                                  onClick={() => window.open(attachment.url, "_blank")}
+                                  onClick={() => {
+                                    // If it's a PDF or Image, we can try to open it in a clean way
+                                    // For Cloudinary, we can ensure it's not forced as attachment
+                                    const viewUrl = attachment.url.replace('/upload/fl_attachment/', '/upload/');
+                                    window.open(viewUrl, "_blank", "noreferrer");
+                                  }}
                                   className="text-blue-600 hover:text-blue-800 flex items-center gap-1.5 font-medium"
                                   title="View PDF/Image"
                                 >
@@ -1992,7 +1997,7 @@ const ItemDetailsPage = () => {
           </div>
 
           <div className="text-sm text-gray-500">
-            Last updated: {new Date().toLocaleDateString()}
+            Last updated: {itemData?.updated_at ? formatDate(itemData.updated_at) : formatDate(new Date())}
           </div>
         </div>
       </div>
