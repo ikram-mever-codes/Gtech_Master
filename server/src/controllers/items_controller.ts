@@ -334,6 +334,7 @@ export const getItems = async (
 
           created_at: item.created_at,
           updated_at: item.updated_at,
+          synced_at: (item as any).synced_at,
         };
       }),
     );
@@ -3213,6 +3214,7 @@ export const getNewItems = async (
             supplierData?.company_name || supplierData?.name || null,
           created_at: item.created_at,
           updated_at: item.updated_at,
+          synced_at: (item as any).synced_at,
         };
       }),
     );

@@ -221,16 +221,20 @@ const ItemsManagementPage: React.FC = () => {
     }
   }, []);
 
-  const formatDate = (dateString: string | Date) => {
+  const formatDate = (dateString: string | Date | null | undefined) => {
     if (!dateString || dateString === "0000-00-00 00:00:00") return "-";
-    const date = new Date(dateString);
-    if (isNaN(date.getTime())) return "-";
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return "-";
 
-    return new Intl.DateTimeFormat("de-DE", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    }).format(date);
+      return new Date(dateString).toLocaleDateString("de-DE", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      });
+    } catch (e) {
+      return "-";
+    }
   };
 
   const generateRandomEAN12 = () => {
@@ -459,18 +463,14 @@ const ItemsManagementPage: React.FC = () => {
     fetchInitialData();
   }, [activeTab]);
 
-  // Handle CSV Export
   const handleExportCSV = async (type: "updated" | "new" = "updated") => {
     if (exporting) return;
 
     setExporting(true);
     try {
       await exportItemsToCSV(true, type);
-      // Refresh pending sync count after export
       await fetchPendingSyncCount();
-      // Refresh statistics to update counts
       await fetchStatistics();
-      // Refresh items list
       await fetchData();
     } catch (error: any) {
       console.error("Export failed:", error);
@@ -1087,8 +1087,8 @@ const ItemsManagementPage: React.FC = () => {
                 router.push(`/items/${item.id}`);
               }}
               className={`cursor-pointer transition-colors ${isNewItem
-                  ? "bg-blue-50 hover:bg-blue-100 border-l-4 border-l-blue-400"
-                  : "hover:bg-gray-50"
+                ? "bg-blue-50 hover:bg-blue-100 border-l-4 border-l-blue-400"
+                : "hover:bg-gray-50"
                 }`}
             >
               <td className="p-4">
@@ -1146,8 +1146,8 @@ const ItemsManagementPage: React.FC = () => {
               <td className="px-4 py-3">
                 <span
                   className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${item.is_updated
-                      ? "bg-yellow-100 text-yellow-700"
-                      : "bg-green-100 text-green-700"
+                    ? "bg-yellow-100 text-yellow-700"
+                    : "bg-green-100 text-green-700"
                     }`}
                 >
                   {item.is_updated ? "Pending Sync" : "Synced"}
@@ -1156,7 +1156,17 @@ const ItemsManagementPage: React.FC = () => {
 
               <td className="px-4 py-3">
                 <div className="text-sm text-gray-600 text-nowrap">
-                  {formatDate(item.created_at)}
+                  {(() => {
+                    const d = item.created_at || item.synced_at || item.updated_at;
+                    if (!d || d === "0000-00-00 00:00:00") return "-";
+                    const dateObj = new Date(d);
+                    if (isNaN(dateObj.getTime())) return "-";
+                    return new Intl.DateTimeFormat("de-DE", {
+                      day: "2-digit",
+                      month: "2-digit",
+                      year: "numeric",
+                    }).format(dateObj);
+                  })()}
                 </div>
               </td>
               <td className="px-4 py-3">
@@ -1238,7 +1248,17 @@ const ItemsManagementPage: React.FC = () => {
             </td>
             <td className="px-4 py-3">
               <div className="text-sm text-gray-600">
-                {formatDate(parent.created_at)}
+                {(() => {
+                  const d = parent.created_at || parent.updated_at;
+                  if (!d || d === "0000-00-00 00:00:00") return "-";
+                  const dateObj = new Date(d);
+                  if (isNaN(dateObj.getTime())) return "-";
+                  return new Intl.DateTimeFormat("de-DE", {
+                    day: "2-digit",
+                    month: "2-digit",
+                    year: "numeric",
+                  }).format(dateObj);
+                })()}
               </div>
             </td>
             <td className="px-4 py-3">
@@ -1431,7 +1451,17 @@ const ItemsManagementPage: React.FC = () => {
             </td>
             <td className="px-4 py-3">
               <div className="text-sm text-gray-600">
-                {formatDate(taric.created_at)}
+                {(() => {
+                  const d = taric.created_at || taric.updated_at;
+                  if (!d || d === "0000-00-00 00:00:00") return "-";
+                  const dateObj = new Date(d);
+                  if (isNaN(dateObj.getTime())) return "-";
+                  return new Intl.DateTimeFormat("de-DE", {
+                    day: "2-digit",
+                    month: "2-digit",
+                    year: "numeric",
+                  }).format(dateObj);
+                })()}
               </div>
             </td>
             <td className="px-4 py-3">
@@ -1542,8 +1572,8 @@ const ItemsManagementPage: React.FC = () => {
                 onClick={handleExportNewItemsCSV}
                 disabled={exportingNew}
                 className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all flex items-center gap-1.5 ${exportingNew
-                    ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                    : "bg-emerald-600 text-white hover:bg-emerald-700"
+                  ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                  : "bg-emerald-600 text-white hover:bg-emerald-700"
                   }`}
               >
                 {exportingNew ? (
@@ -1566,8 +1596,8 @@ const ItemsManagementPage: React.FC = () => {
                   onClick={() => handleExportCSV()}
                   disabled={exporting || pendingSyncCount === 0}
                   className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all flex items-center gap-1.5 ${exporting || pendingSyncCount === 0
-                      ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                      : "bg-blue-600 text-white hover:bg-blue-700"
+                    ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                    : "bg-blue-600 text-white hover:bg-blue-700"
                     }`}
                 >
                   {exporting ? (
@@ -1633,8 +1663,8 @@ const ItemsManagementPage: React.FC = () => {
             <button
               onClick={() => setShowFilters(!showFilters)}
               className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all flex items-center gap-1.5 ${showFilters
-                  ? "bg-[#8CC21B] text-white"
-                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                ? "bg-[#8CC21B] text-white"
+                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                 }`}
             >
               <FunnelIcon className="w-4 h-4" />
@@ -1694,8 +1724,8 @@ const ItemsManagementPage: React.FC = () => {
                   key={tab.key}
                   onClick={() => setActiveTab(tab.key as TabType)}
                   className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${activeTab === tab.key
-                      ? "border-primary text-primary"
-                      : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                    ? "border-primary text-primary"
+                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
                     }`}
                 >
                   <tab.icon className="w-5 h-5" />

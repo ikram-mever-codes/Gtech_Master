@@ -14,13 +14,11 @@ export const filterDataByRole = (data: any, role: UserRole): any => {
 };
 
 const filterObjectByRole = (obj: any, role: UserRole): any => {
-    if (!obj || typeof obj !== "object") return obj;
+    if (!obj || typeof obj !== "object" || obj instanceof Date) return obj;
 
     const filtered = { ...obj };
 
-    // Sales / Customer Team (DE & CY)
     if (role === UserRole.SALES) {
-        // Explicitly restrict all supplier identity data
         const supplierFields = [
             "supplier", "supplierName", "supplier_name",
             "supplierContact", "supplier_contact",
@@ -30,9 +28,7 @@ const filterObjectByRole = (obj: any, role: UserRole): any => {
         supplierFields.forEach(field => delete filtered[field]);
     }
 
-    // Purchasing / Supply Chain (CN)
     if (role === UserRole.PURCHASING) {
-        // Explicitly restrict all customer identity data
         const customerFields = [
             "customer", "customerName", "customer_name",
             "customerAddress", "customer_address",
@@ -43,7 +39,6 @@ const filterObjectByRole = (obj: any, role: UserRole): any => {
         ];
         customerFields.forEach(field => delete filtered[field]);
 
-        // Explicitly restrict all sales prices
         const priceFields = [
             "salesPrice", "sales_price", "sale_price",
             "selling_price", "salesPrices", "sales_prices",
@@ -52,14 +47,12 @@ const filterObjectByRole = (obj: any, role: UserRole): any => {
         ];
         priceFields.forEach(field => delete filtered[field]);
 
-        // Explicitly restrict all sales documents
         const docFields = [
             "offers", "offer", "orders", "order", "invoices", "invoice"
         ];
         docFields.forEach(field => delete filtered[field]);
     }
 
-    // Recursively filter nested objects/arrays if they are not deleted
     for (const key in filtered) {
         if (filtered[key] && typeof filtered[key] === "object") {
             filtered[key] = filterDataByRole(filtered[key], role);

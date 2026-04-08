@@ -33,6 +33,7 @@ export interface Item {
   currency: string | null;
   created_at: Date;
   updated_at: Date;
+  synced_at?: Date;
 }
 
 export interface Parent {
