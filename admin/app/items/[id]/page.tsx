@@ -13,6 +13,8 @@ import {
   MagnifyingGlassIcon,
   ArrowLeftIcon,
   LinkIcon,
+  PlusIcon,
+  TrashIcon,
 } from "@heroicons/react/24/outline";
 import Image from "next/image";
 import CustomButton from "@/components/UI/CustomButton";
@@ -231,6 +233,17 @@ const ItemDetailsPage = () => {
   const [uploadingAttachments, setUploadingAttachments] = useState(false);
   const attachmentInputRef = React.useRef<HTMLInputElement>(null);
   const [attachments, setAttachments] = useState<any[]>([]);
+
+  const formatDate = (dateString: string | Date) => {
+    if (!dateString) return "—";
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return "—";
+    return new Intl.DateTimeFormat("de-DE", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    }).format(date);
+  };
 
   const handleOpenQualityModal = (quality: any = null) => {
     if (quality) {
@@ -632,6 +645,7 @@ const ItemDetailsPage = () => {
         is_new: updatedData.others?.isNew ? "Y" : "N",
         is_npr: updatedData.others?.isNPR ? "Y" : "N",
         supplier_id: toInt(updatedData.supplier_id),
+        supplierItems: updatedData.supplierItems,
 
         supplierItem: {
           price_rmb: toNum(updatedData.supplierItem?.priceRMB),
@@ -1408,100 +1422,111 @@ const ItemDetailsPage = () => {
             </div>
           )}
           {activeTab === "supplier" && (
-            <div>
-              <SectionHeader title="Supplier Item" />
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                <EditableInfoRow
-                  label="Price RMB"
-                  value={itemData.supplierItem?.priceRMB || "0"}
-                  field="supplierItem.priceRMB"
-                  editMode={editMode}
-                  itemData={itemData}
-                  setItemData={setItemData}
+            <div className="space-y-8">
+              <div className="flex justify-between items-center">
+                <SectionHeader 
+                  title="Supplier Sources" 
+                  icon={<LinkIcon className="h-5 w-5 text-[#8CC21B]" />}
                 />
-                <SelectInfoRow
-                  label="isPO -"
-                  value={itemData.supplierItem?.isPO || "No"}
-                  field="supplierItem.isPO"
-                  editMode={editMode}
-                  itemData={itemData}
-                  setItemData={setItemData}
-                  options={[
-                    { label: "Select", value: "" },
-                    { label: "Yes", value: "Yes" },
-                    { label: "No", value: "No" },
-                  ]}
-                />
-                <EditableInfoRow
-                  label="MOQ"
-                  value={itemData.supplierItem?.moq || "0"}
-                  field="supplierItem.moq"
-                  editMode={editMode}
-                  itemData={itemData}
-                  setItemData={setItemData}
-                />
-                <EditableInfoRow
-                  label="Interval"
-                  value={itemData.supplierItem?.interval || "0"}
-                  field="supplierItem.interval"
-                  editMode={editMode}
-                  itemData={itemData}
-                  setItemData={setItemData}
-                />
-                <EditableInfoRow
-                  label="Lead time"
-                  value={itemData.supplierItem?.leadTime || ""}
-                  field="supplierItem.leadTime"
-                  editMode={editMode}
-                  itemData={itemData}
-                  setItemData={setItemData}
-                />
-                <EditableInfoRow
-                  label="Note CN"
-                  value={itemData.supplierItem?.noteCN || ""}
-                  field="supplierItem.noteCN"
-                  editMode={editMode}
-                  itemData={itemData}
-                  setItemData={setItemData}
-                />
-                <EditableInfoRow
-                  label="Item URL"
-                  value={itemData.supplierItem?.url || ""}
-                  field="supplierItem.url"
-                  editMode={editMode}
-                  itemData={itemData}
-                  setItemData={setItemData}
-                />
+                <button
+                  onClick={() => router.push("/suppliers")}
+                  className="px-4 py-2 bg-[#8CC21B] text-white rounded-lg flex items-center gap-2 text-sm font-medium hover:bg-[#7ab318] transition-colors"
+                >
+                  <PlusIcon className="h-4 w-4" />
+                  Manage Suppliers
+                </button>
               </div>
 
-              <div className="mt-8 pt-6 border-t border-gray-100">
-                <SelectInfoRow
-                  label="Supplier Name"
-                  value={String(itemData.supplier_id || "")}
-                  field="supplier_id"
-                  editMode={editMode}
-                  itemData={itemData}
-                  setItemData={setItemData}
-                  options={[
-                    { label: "No supplier assigned", value: "" },
-                    ...allSuppliers.map((s) => ({
-                      label: s.company_name || s.name || `Supplier ${s.id}`,
-                      value: String(s.id),
-                    })),
-                  ]}
-                />
-                {!editMode && itemData.supplier_id && (
-                  <div className="mt-4 p-4 bg-gray-50 rounded-lg max-w-md">
-                    <p className="text-sm text-gray-600 mb-2">
-                      Supplier ID: {itemData.supplier_id}
-                    </p>
-                    <button
-                      onClick={() => router.push("/suppliers")}
-                      className="text-[#8CC21B] hover:text-[#7ab318] text-sm font-medium flex items-center gap-1"
+              <div className="grid grid-cols-1 gap-6">
+                {itemData.supplierItems && itemData.supplierItems.length > 0 ? (
+                  itemData.supplierItems.map((si: any, index: number) => (
+                    <div 
+                      key={si.id} 
+                      className={`relative p-6 rounded-2xl border transition-all ${
+                        si.isDefault 
+                          ? "bg-blue-50/50 border-blue-200 shadow-sm" 
+                          : "bg-white border-gray-100 hover:border-gray-300"
+                      }`}
                     >
-                      View All Suppliers
-                      <ChevronRightIcon className="h-4 w-4" />
-                    </button>
+                      {si.isDefault && (
+                        <div className="absolute -top-3 left-6 px-3 py-1 bg-blue-600 text-white text-[10px] font-bold uppercase tracking-wider rounded-full shadow-sm">
+                          Default Source
+                        </div>
+                      )}
+
+                      <div className="flex flex-col md:flex-row justify-between gap-6">
+                        <div className="flex-1">
+                          <h4 className="text-lg font-bold text-gray-900 mb-1">
+                            {si.supplierName}
+                          </h4>
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                             ID: {si.supplierId}
+                          </span>
+                        </div>
+                        
+                        <div className="flex flex-wrap gap-4 items-center">
+                          <button
+                            onClick={() => window.open(si.url, '_blank')}
+                            disabled={!si.url}
+                            className="p-2 bg-white border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50 transition-all disabled:opacity-30"
+                            title="Visit Supplier Website"
+                          >
+                            <LinkIcon className="h-5 w-5" />
+                          </button>
+                          {editMode && (
+                             <button
+                               onClick={() => {
+                                 const updated = { ...itemData };
+                                 updated.supplierItems = updated.supplierItems.map((x: any) => ({
+                                   ...x,
+                                   isDefault: x.id === si.id
+                                 }));
+                                 setItemData(updated);
+                               }}
+                               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                                 si.isDefault 
+                                  ? "bg-blue-600 text-white" 
+                                  : "bg-white border border-blue-200 text-blue-600 hover:bg-blue-50"
+                               }`}
+                             >
+                               {si.isDefault ? "Current Default" : "Set as Default"}
+                             </button>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-y-6 gap-x-8 mt-6">
+                        <div className="space-y-1">
+                          <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Price RMB</p>
+                          <p className="text-sm font-bold text-gray-900">¥ {si.priceRMB}</p>
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">MOQ</p>
+                          <p className="text-sm font-medium text-gray-700">{si.moq}</p>
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Lead Time</p>
+                          <p className="text-sm font-medium text-gray-700">{si.leadTime || "—"}</p>
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">isPO</p>
+                          <p className="text-sm font-medium text-gray-700">{si.isPO}</p>
+                        </div>
+                      </div>
+
+                      {si.noteCN && (
+                        <div className="mt-4 p-3 bg-white/60 border border-gray-100 rounded-lg">
+                          <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">Internal Note (CN)</p>
+                          <p className="text-xs text-gray-700 italic">{si.noteCN}</p>
+                        </div>
+                      )}
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-20 bg-gray-50/50 rounded-2xl border-2 border-dashed border-gray-200">
+                    <LinkIcon className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900">No Supplier Links</h3>
+                    <p className="text-sm text-gray-500 mt-1">Assign this item to suppliers to manage sourcing prices.</p>
                   </div>
                 )}
               </div>
@@ -1656,9 +1681,6 @@ const ItemDetailsPage = () => {
                     <thead className="bg-[#F8F9FB]">
                       <tr>
                         <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">
-                          ID
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">
                           Attachment Name
                         </th>
                         <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">
@@ -1673,38 +1695,40 @@ const ItemDetailsPage = () => {
                       {itemData.attachments.map(
                         (attachment: any, index: number) => (
                           <tr key={index} className="hover:bg-gray-50">
-                            <td className="px-4 py-3 text-sm text-gray-900">
-                              {attachment.id}
-                            </td>
                             <td className="px-4 py-3 text-sm text-gray-900 font-medium">
                               <div className="flex items-center gap-2">
                                 <DocumentIcon className="h-4 w-4 text-gray-400" />
-                                {attachment.name || attachment.fileName}
+                                {attachment.originalName || attachment.filename || "Unnamed Attachment"}
                               </div>
                             </td>
                             <td className="px-4 py-3 text-sm text-gray-500">
-                              {attachment.uploadedAt
-                                ? new Date(
-                                    attachment.uploadedAt,
-                                  ).toLocaleDateString()
-                                : "—"}
+                              {formatDate(attachment.uploadedAt)}
                             </td>
                             <td className="px-4 py-3 text-sm">
-                              <div className="flex items-center gap-3">
+                              <div className="flex items-center gap-4">
                                 <button
-                                  onClick={() =>
-                                    window.open(attachment.url, "_blank")
-                                  }
-                                  className="text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                                  onClick={() => window.open(attachment.url, "_blank")}
+                                  className="text-blue-600 hover:text-blue-800 flex items-center gap-1.5 font-medium"
+                                  title="View PDF/Image"
                                 >
-                                  <ArrowDownTrayIcon className="h-4 w-4" />{" "}
-                                  View/Download
+                                  <EyeIcon className="h-4 w-4" />
+                                  View
                                 </button>
+                                <a
+                                  href={attachment.url.includes('cloudinary') 
+                                    ? attachment.url.replace('/upload/', '/upload/fl_attachment/') 
+                                    : attachment.url}
+                                  download={attachment.originalName || attachment.filename}
+                                  className="text-[#8CC21B] hover:text-[#7ab318] flex items-center gap-1.5 font-medium"
+                                  title="Download File"
+                                >
+                                  <ArrowDownTrayIcon className="h-4 w-4" />
+                                  Download
+                                </a>
                                 <button
-                                  onClick={() =>
-                                    handleDeleteAttachment(attachment.id)
-                                  }
-                                  className="text-red-600 hover:text-red-800"
+                                  onClick={() => handleDeleteAttachment(attachment.id)}
+                                  className="text-red-500 hover:text-red-700 ml-2"
+                                  title="Delete Permanent"
                                 >
                                   Delete
                                 </button>

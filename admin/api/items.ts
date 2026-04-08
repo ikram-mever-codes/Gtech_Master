@@ -163,6 +163,19 @@ export interface ItemDetails {
     noteCN: string;
     url: string;
   };
+  supplierItems: {
+    id: number;
+    supplierId: number;
+    supplierName: string;
+    priceRMB: string;
+    isPO: string;
+    moq: string;
+    interval: string;
+    leadTime: string;
+    noteCN: string;
+    url: string;
+    isDefault: boolean;
+  }[];
   qualityCriteria: QualityCriterion[];
   attachments: any[];
   pictures: {

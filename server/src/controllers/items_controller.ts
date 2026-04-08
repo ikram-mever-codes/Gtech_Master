@@ -319,17 +319,17 @@ export const getItems = async (
 
           warehouse_data: warehouseData
             ? {
-                id: warehouseData.id,
-                item_no_de: warehouseData.item_no_de,
-                item_name_de: warehouseData.item_name_de,
-                item_name_en: warehouseData.item_name_en,
-                stock_qty: warehouseData.stock_qty,
-                msq: warehouseData.msq,
-                buffer: warehouseData.buffer,
-                is_stock_item: warehouseData.is_stock_item,
-                is_SnSI: warehouseData.is_SnSI,
-                ship_class: warehouseData.ship_class,
-              }
+              id: warehouseData.id,
+              item_no_de: warehouseData.item_no_de,
+              item_name_de: warehouseData.item_name_de,
+              item_name_en: warehouseData.item_name_en,
+              stock_qty: warehouseData.stock_qty,
+              msq: warehouseData.msq,
+              buffer: warehouseData.buffer,
+              is_stock_item: warehouseData.is_stock_item,
+              is_SnSI: warehouseData.is_SnSI,
+              ship_class: warehouseData.ship_class,
+            }
             : null,
 
           created_at: item.created_at,
@@ -435,10 +435,11 @@ export const getItemById = async (
       console.warn("item_qualities table not available:", e.message);
     }
 
-    let supplierItem: any = null;
+    let supplierItems: any[] = [];
     try {
-      supplierItem = await supplierItemRepository.findOne({
+      supplierItems = await supplierItemRepository.find({
         where: { item_id: parseInt(id) },
+        relations: ["supplier"],
       });
     } catch (e: any) {
       console.warn("supplier_items table not available:", e.message);
@@ -579,25 +580,44 @@ export const getItemById = async (
         pixPath: item.pix_path || "",
       },
 
-      supplierItem: supplierItem
-        ? {
-            priceRMB: supplierItem.price_rmb?.toString() || "0",
-            isPO: supplierItem.is_po || "No",
-            moq: supplierItem.moq?.toString() || "0",
-            interval: supplierItem.oi?.toString() || "0",
-            leadTime: supplierItem.lead_time || "",
-            noteCN: supplierItem.note_cn || "",
-            url: supplierItem.url || "",
-          }
-        : {
-            priceRMB: "0",
-            isPO: "No",
-            moq: "0",
-            interval: "0",
-            leadTime: "",
-            noteCN: "",
-            url: "",
-          },
+      supplierItems: supplierItems.map((si: any) => ({
+        id: si.id,
+        supplierId: si.supplier_id,
+        supplierName: si.supplier?.company_name || si.supplier?.name || "Unknown",
+        priceRMB: si.price_rmb?.toString() || "0",
+        isPO: si.is_po || "No",
+        moq: si.moq?.toString() || "0",
+        interval: si.oi?.toString() || "0",
+        leadTime: si.lead_time || "",
+        noteCN: si.note_cn || "",
+        url: si.url || "",
+        isDefault: si.is_default === "Y",
+      })),
+      
+      // Keep single supplierItem for backwards compatibility (the default one)
+      supplierItem: (() => {
+        const defaultSi = supplierItems.find(si => si.is_default === 'Y') || supplierItems[0];
+        return defaultSi ? {
+          id: defaultSi.id,
+          supplierId: defaultSi.supplier_id,
+          supplierName: defaultSi.supplier?.company_name || defaultSi.supplier?.name || "Unknown",
+          priceRMB: defaultSi.price_rmb?.toString() || "0",
+          isPO: defaultSi.is_po || "No",
+          moq: defaultSi.moq?.toString() || "0",
+          interval: defaultSi.oi?.toString() || "0",
+          leadTime: defaultSi.lead_time || "",
+          noteCN: defaultSi.note_cn || "",
+          url: defaultSi.url || "",
+        } : {
+          priceRMB: "0",
+          isPO: "No",
+          moq: "0",
+          interval: "0",
+          leadTime: "",
+          noteCN: "",
+          url: "",
+        };
+      })(),
 
       nprRemarks: item.npr_remark || "",
     };
@@ -730,7 +750,24 @@ export const createItem = async (
 
     await itemRepository.save(newItem);
 
-    // Create Warehouse Entry
+    try {
+      if (supplier_id) {
+        const supplierItemRepository = AppDataSource.getRepository(SupplierItem);
+        const supplierItem = supplierItemRepository.create({
+          item_id: newItem.id,
+          supplier_id: supplier_id,
+          price_rmb: finalRMB || 0,
+          is_default: "Y",
+          is_po: "No",
+          oi: 0,
+          moq: 1,
+        });
+        await supplierItemRepository.save(supplierItem);
+      }
+    } catch (err) {
+      console.warn("Supplier item creation failed:", err);
+    }
+
     try {
       const warehouseRepository = AppDataSource.getRepository(WarehouseItem);
       const warehouseItem = warehouseRepository.create({
@@ -834,6 +871,19 @@ export const updateItem = async (
     });
 
     const supplierItemData = req.body.supplierItem;
+    const supplierItemsData = req.body.supplierItems;
+
+    if (supplierItemsData && Array.isArray(supplierItemsData)) {
+      for (const siData of supplierItemsData) {
+        if (siData.id) {
+          await supplierItemRepository.update(siData.id, {
+            is_default: siData.isDefault ? "Y" : "N",
+          });
+        }
+      }
+      hasChanges = true;
+    }
+
     const category = await categoryRepository.findOne({
       where: { id: item.cat_id },
     });
@@ -1454,9 +1504,9 @@ export const getParents = async (
       supplier_id: parent.supplier_id,
       supplier: parent.supplier
         ? {
-            id: parent.supplier.id,
-            name: parent.supplier.name,
-          }
+          id: parent.supplier.id,
+          name: parent.supplier.name,
+        }
         : null,
       item_count: parent.items?.length || 0,
       created_at: parent.created_at,
@@ -1532,17 +1582,17 @@ export const getParentById = async (
       is_active: parent.is_active,
       taric: parent.taric
         ? {
-            id: parent.taric.id,
-            code: parent.taric.code,
-            name_de: parent.taric.name_de,
-          }
+          id: parent.taric.id,
+          code: parent.taric.code,
+          name_de: parent.taric.name_de,
+        }
         : null,
       supplier: parent.supplier
         ? {
-            id: parent.supplier.id,
-            name: parent.supplier.name,
-            contact_person: parent.supplier.contact_person,
-          }
+          id: parent.supplier.id,
+          name: parent.supplier.name,
+          contact_person: parent.supplier.contact_person,
+        }
         : null,
       variations: {
         de: [parent.var_de_1, parent.var_de_2, parent.var_de_3].filter(Boolean),
@@ -3091,23 +3141,23 @@ export const getNewItems = async (
       items.map(async (item) => {
         const parentData = item.parent_id
           ? await parentRepository.findOne({
-              where: { id: item.parent_id },
-              select: ["id", "de_no", "name_de", "name_en"],
-            })
+            where: { id: item.parent_id },
+            select: ["id", "de_no", "name_de", "name_en"],
+          })
           : null;
 
         const categoryData = item.cat_id
           ? await categoryRepository.findOne({
-              where: { id: item.cat_id },
-              select: ["id", "name"],
-            })
+            where: { id: item.cat_id },
+            select: ["id", "name"],
+          })
           : null;
 
         const supplierData = item.supplier_id
           ? await supplierRepository.findOne({
-              where: { id: item.supplier_id },
-              select: ["id", "name", "company_name"],
-            })
+            where: { id: item.supplier_id },
+            select: ["id", "name", "company_name"],
+          })
           : null;
 
         let warehouseData: any = null;
