@@ -347,6 +347,7 @@ const ItemsManagementPage: React.FC = () => {
             search: filters.search,
             isActive: filters.isActive,
             category: filters.category,
+            eanSearch: filters.eanSearch,
           });
           setItems(itemsResponse.data);
           setPagination(itemsResponse.pagination);
@@ -2229,29 +2230,18 @@ const ItemsManagementPage: React.FC = () => {
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     EAN
                   </label>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={itemFormData.ean}
-                      onChange={(e) =>
-                        setItemFormData({
-                          ...itemFormData,
-                          ean: e.target.value,
-                        })
-                      }
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-md"
-                      placeholder="Enter EAN"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleAutoGenerateEAN}
-                      className="px-3 py-2 bg-gray-100 text-gray-700 border border-gray-300 rounded-md text-xs font-semibold hover:bg-gray-200 transition-all flex items-center gap-1"
-                      title="Auto-generate EAN13"
-                    >
-                      <Sync className="w-3.5 h-3.5" />
-                      Auto
-                    </button>
-                  </div>
+                  <input
+                    type="text"
+                    value={itemFormData.ean}
+                    onChange={(e) =>
+                      setItemFormData({
+                        ...itemFormData,
+                        ean: e.target.value,
+                      })
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                    placeholder="Enter EAN (Leave empty for auto-generate)"
+                  />
                 </div>
 
                 <div>

@@ -309,7 +309,6 @@ const CustomerCreatePage: React.FC = () => {
           boxShadow: "0 4px 15px rgba(0, 0, 0, 0.05)",
         }}
       >
-        {/* Header */}
         <Box
           sx={{
             p: 3,

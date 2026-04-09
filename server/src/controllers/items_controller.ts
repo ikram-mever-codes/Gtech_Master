@@ -127,6 +127,7 @@ export const getItems = async (
       parentId,
       taricId,
       isNew,
+      eanSearch,
     } = req.query;
 
     let pageNum = parseInt(page as string);
@@ -140,10 +141,17 @@ export const getItems = async (
       .skip(skip)
       .take(limitNum);
 
+    if (eanSearch) {
+      const eanStr = (eanSearch as string).trim();
+      queryBuilder.andWhere("item.ean ILIKE :eanSearch", {
+        eanSearch: `%${eanStr}%`,
+      });
+    }
+
     if (search) {
-      const searchStr = search as string;
-      queryBuilder.where(
-        "(item.item_name ILIKE :search OR item.item_name_cn ILIKE :search OR item.ean ILIKE :search)",
+      const searchStr = (search as string).trim();
+      queryBuilder.andWhere(
+        "(item.item_name ILIKE :search OR item.item_name_cn ILIKE :search OR item.ean ILIKE :search OR item.model ILIKE :search)",
         { search: `%${searchStr}%` },
       );
 
@@ -649,7 +657,7 @@ export const createItem = async (
     const taricRepository = AppDataSource.getRepository(Taric);
     const categoryRepository = AppDataSource.getRepository(Category);
 
-    const {
+    let {
       item_name,
       item_name_cn,
       ean,
@@ -682,7 +690,6 @@ export const createItem = async (
       );
     }
 
-    // Validations
     if (supplier_id) {
       const supplier = await AppDataSource.getRepository(Supplier).findOne({
         where: { id: supplier_id },
@@ -704,7 +711,22 @@ export const createItem = async (
       if (!category) return next(new ErrorHandler("Category not found", 404));
     }
 
-    if (ean) {
+    if (!ean || ean.trim() === "") {
+      const prefix = "789";
+      const timestamp = (Date.now() % 1000000).toString().padStart(6, "0");
+      const random = Math.floor(Math.random() * 1000000).toString().padStart(6, "0");
+      const baseNumber = (timestamp + random).slice(0, 9);
+      const eanWithoutCheck = prefix + baseNumber;
+
+      let sum = 0;
+      for (let i = 0; i < eanWithoutCheck.length; i++) {
+        const digit = parseInt(eanWithoutCheck[i]);
+        sum += i % 2 === 0 ? digit * 1 : digit * 3;
+      }
+      const remainder = sum % 10;
+      const checkDigit = remainder === 0 ? 0 : 10 - remainder;
+      ean = eanWithoutCheck + checkDigit;
+    } else {
       const existingItem = await itemRepository.findOne({
         where: { ean: ean.toString() },
       });

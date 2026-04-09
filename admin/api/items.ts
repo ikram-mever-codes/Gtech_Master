@@ -231,6 +231,7 @@ export const getItems = async (params?: {
   sortOrder?: "ASC" | "DESC";
   includeOnlyUpdated?: boolean; // Add optional filter for updated items only
   isNew?: string;
+  eanSearch?: string;
 }) => {
   try {
     const response = await api.get("/items", {
