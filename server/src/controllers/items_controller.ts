@@ -2160,9 +2160,20 @@ export const getItemQualityCriteria = async (
       order: { created_at: "ASC" },
     });
 
+    const formattedCriteria = criteria.map((qc: any) => ({
+      id: qc.id,
+      itemId: qc.item_id,
+      name: qc.name || "",
+      picture: qc.picture || "",
+      description: qc.description || "",
+      descriptionCN: qc.description_cn || "",
+      created_at: qc.created_at,
+      updated_at: qc.updated_at,
+    }));
+
     return res.status(200).json({
       success: true,
-      data: criteria,
+      data: formattedCriteria,
     });
   } catch (error) {
     return next(error);
