@@ -4,7 +4,6 @@ import { api, handleApiError } from "../utils/api";
 import { loadingStyles, successStyles } from "@/utils/constants";
 import type { ResponseInterface } from "@/utils/interfaces";
 
-
 export type OrderItemLine = {
   id?: number;
   order_id?: number;
@@ -169,10 +168,15 @@ export const updateOrderItemStatus = async (
   }
 };
 
-export const updateOrderItemPrice = async (itemId: string | number, eurPrice: number) => {
+export const updateOrderItemPrice = async (
+  itemId: string | number,
+  eurPrice: number,
+) => {
   try {
     toast.loading("Updating price...", loadingStyles);
-    const response = await api.put(`/orders/items/${itemId}/price`, { eur_special_price: eurPrice });
+    const response = await api.put(`/orders/items/${itemId}/price`, {
+      eur_special_price: eurPrice,
+    });
     toast.dismiss();
     toast.success("Price updated successfully", successStyles);
     return response.data;
@@ -183,10 +187,19 @@ export const updateOrderItemPrice = async (itemId: string | number, eurPrice: nu
   }
 };
 
-export const splitOrderItem = async (id: string | number, splitQty: number, targetCargoId?: string | number, remarks_cn?: string) => {
+export const splitOrderItem = async (
+  id: string | number,
+  splitQty: number,
+  targetCargoId?: string | number,
+  remarks_cn?: string,
+) => {
   try {
     toast.loading("Splitting item...", loadingStyles);
-    const response = await api.post(`/orders/items/${id}/split`, { splitQty, targetCargoId, remarks_cn });
+    const response = await api.post(`/orders/items/${id}/split`, {
+      splitQty,
+      targetCargoId,
+      remarks_cn,
+    });
     toast.dismiss();
     toast.success("Item split successfully", successStyles);
     return response.data;
@@ -197,10 +210,17 @@ export const splitOrderItem = async (id: string | number, splitQty: number, targ
   }
 };
 
-export const updateOrderItemLabel = async (id: string | number, splitQty: number, remarks_cn?: string) => {
+export const updateOrderItemLabel = async (
+  id: string | number,
+  splitQty: number,
+  remarks_cn?: string,
+) => {
   try {
     toast.loading("Updating label...", loadingStyles);
-    const response = await api.put(`/orders/items/${id}/label`, { splitQty, remarks_cn });
+    const response = await api.put(`/orders/items/${id}/label`, {
+      splitQty,
+      remarks_cn,
+    });
     toast.dismiss();
     toast.success("Label updated successfully", successStyles);
     return response.data;
@@ -252,5 +272,34 @@ export const downloadItemLabel = async (itemId: number | string) => {
   } catch (error) {
     toast.dismiss();
     handleApiError(error, "Failed to generate label");
+  }
+};
+
+export const downloadCommercialInvoice = async (orderId: number | string) => {
+  try {
+    toast.loading("Generating Commercial Invoice...", loadingStyles);
+
+    const response = await api.get(`/orders/${orderId}/commercial-invoice`, {
+      responseType: "blob",
+    });
+
+    const file = new Blob([response.data], { type: "application/pdf" });
+    const fileURL = URL.createObjectURL(file);
+    const link = document.createElement("a");
+    link.href = fileURL;
+    link.download = `Commercial_Invoice_${orderId}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+
+    setTimeout(() => {
+      document.body.removeChild(link);
+      URL.revokeObjectURL(fileURL);
+    }, 100);
+
+    toast.dismiss();
+    toast.success("Invoice generated!", successStyles);
+  } catch (error) {
+    toast.dismiss();
+    handleApiError(error, "Failed to generate invoice");
   }
 };

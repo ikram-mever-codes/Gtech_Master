@@ -1076,3 +1076,278 @@ export const updateOrderItemPrice = async (
     return next(error);
   }
 };
+
+export const generateCommercialInvoicePDF = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { orderId } = req.params;
+    const data = {
+      invoiceNo: "CI260040",
+      date: "2026-01-20",
+      cargoNo: "C2026-E1",
+      customerID: "7",
+      billTo: {
+        name: "GTech Industries GmbH",
+        contact: "Markus Entner",
+        street: "Reichshofstr. 137",
+        city: "58239 Schwerte",
+        country: "Germany",
+        phone: "+4923043389510",
+        eori: "DE977540238364617",
+      },
+      shipTo: {
+        company: "GoodBytz GmbH",
+        contact: "Lucas Marks",
+        street: "Werner-Otto-Strasse 13g",
+        city: "22179, Hamburg",
+        country: "Germany",
+        phone: "+4940239684026",
+      },
+      items: [
+        {
+          no: 1,
+          desc: "Flywheels and pulleys, including pulley blocks",
+          hs: "8483508090",
+          qty: 800,
+          unit: 3.23,
+          price: 2584.0,
+        },
+        {
+          no: 2,
+          desc: "Freight cost",
+          hs: "n/a",
+          qty: "n/a",
+          unit: "n/a",
+          price: 292.0,
+        },
+      ],
+      totalQty: 800,
+      totalPrice: 2876.0,
+      waybill: "1149458284",
+    };
+
+    const doc = new PDFDocument({ size: "A4", margin: 40 });
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename=Invoice_${data.invoiceNo}.pdf`,
+    );
+    doc.pipe(res);
+
+    // --- PAGE 1: Header Branding  ---
+    doc
+      .fillColor("#777777")
+      .font("Helvetica")
+      .fontSize(20)
+      .text("GTech Industries Limited", 40, 20, { align: "right" });
+
+    // Checkmarks for Engineering Design Manufacturing [cite: 2]
+    doc.fontSize(10).text("Engineering ✓ Design ✓ Manufacturing ✓", 40, 45, {
+      align: "right",
+    });
+
+    doc
+      .moveTo(40, 60)
+      .lineTo(555, 60)
+      .strokeColor("#cccccc")
+      .lineWidth(1)
+      .stroke();
+
+    // Company Addresses [cite: 3]
+    doc.fontSize(8.5).fillColor("#666666");
+    doc.text(
+      "GTech Industries Limited:   3A, 12/F, Kaiser Centre, N. 18 Centre Street, Sai Ying Pun, Hong Kong",
+      40,
+      70,
+    );
+    doc.text(
+      "GTech Establishment China: West Dafeng Metallurgical Plant, Bowang Huisheng Square, Bowang, Ma'anshan, Anhui",
+      40,
+      82,
+    );
+    // Chinese address translation included in original [cite: 5]
+    doc.text("中国安徽省马鞍山市博望区博望汇盛广场西大丰冶金厂", 40, 94);
+
+    // --- Bill To / Ship To Section [cite: 4, 13] ---
+    doc.fillColor("black").font("Helvetica-Bold").fontSize(10.5);
+    doc.text("BILL TO:", 40, 125);
+    doc.text("SHIP TO:", 240, 120);
+
+    // Bill To Content [cite: 6-12]
+    doc.font("Helvetica-Bold").fontSize(11).text(data.billTo.name, 40, 142);
+    doc.font("Helvetica").fontSize(10).text(data.billTo.contact, 40, 156);
+    doc.text(data.billTo.street, 40, 175);
+    doc.text(data.billTo.city, 40, 188);
+    doc.text(data.billTo.country, 40, 201);
+    doc.text(data.billTo.phone, 40, 218);
+    doc.font("Helvetica-Bold").text(`EORI: ${data.billTo.eori}`, 40, 235);
+
+    // Ship To Content [cite: 14-18, 24]
+    doc.font("Helvetica-Bold").fontSize(11).text(data.shipTo.company, 240, 137);
+    doc.font("Helvetica").fontSize(10).text(data.shipTo.contact, 240, 151);
+    doc.text(data.shipTo.street, 240, 164);
+    doc.text(data.shipTo.city, 240, 182);
+    doc.text(data.shipTo.country, 240, 195);
+    doc.text(data.shipTo.phone, 240, 210);
+
+    // Invoice Meta Data [cite: 19-22]
+    doc
+      .font("Helvetica")
+      .fontSize(11)
+      .text("Customer ID: ", 420, 150, { continued: true })
+      .font("Helvetica-Bold")
+      .text(data.customerID);
+    doc
+      .font("Helvetica")
+      .text("Date: ", 420, 180, { continued: true })
+      .font("Helvetica-Bold")
+      .text(data.date);
+    doc
+      .font("Helvetica")
+      .text("Invoice No: ", 420, 210, { continued: true })
+      .font("Helvetica-Bold")
+      .text(data.invoiceNo);
+    doc
+      .font("Helvetica")
+      .text("Cargo No.: ", 420, 240, { continued: true })
+      .font("Helvetica-Bold")
+      .text(data.cargoNo);
+
+    // Commercial Invoice Title [cite: 23]
+    doc
+      .fontSize(13)
+      .font("Helvetica-Bold")
+      .text("Commercial Invoice", 0, 280, { align: "center" });
+
+    // --- Table Layout  ---
+    const tableTop = 320;
+    doc
+      .moveTo(40, tableTop)
+      .lineTo(555, tableTop)
+      .strokeColor("#bb0000")
+      .lineWidth(1.5)
+      .stroke();
+
+    doc.fontSize(9.5).font("Helvetica-Bold");
+    doc.text("No", 40, tableTop + 12);
+    doc.text("Description", 75, tableTop + 12);
+    doc.text("(EU HS code)", 340, tableTop + 12);
+    doc.text("Qty", 425, tableTop + 6);
+    doc.text("(pcs)", 425, tableTop + 17);
+    doc.text("Unit", 470, tableTop + 6);
+    doc.text("(€)*", 470, tableTop + 17);
+    doc.text("Price", 525, tableTop + 6);
+    doc.text("(€)", 525, tableTop + 17);
+
+    doc
+      .moveTo(40, tableTop + 32)
+      .lineTo(555, tableTop + 32)
+      .strokeColor("#cccccc")
+      .lineWidth(1)
+      .stroke();
+
+    // Table Rows
+    let itemY = tableTop + 45;
+    data.items.forEach((item) => {
+      doc.font("Helvetica").fontSize(10);
+      doc.text(item.no.toString(), 40, itemY);
+      doc.text(item.desc, 75, itemY, { width: 250 });
+      doc.text(item.hs.toString(), 340, itemY);
+      doc.text(item.qty.toString(), 425, itemY);
+      doc.text(item.unit.toString(), 470, itemY);
+      doc.text(item.price.toFixed(2), 525, itemY, { align: "right" });
+      itemY += 25;
+    });
+
+    // Total Row
+    doc.moveTo(350, itemY).lineTo(555, itemY).strokeColor("black").stroke();
+    itemY += 12;
+    doc
+      .font("Helvetica-Bold")
+      .fontSize(11)
+      .text("Total :", 360, itemY, { underline: true });
+    doc.text(data.totalQty.toString(), 425, itemY, { underline: true });
+    doc.text(`${data.totalPrice.toFixed(2)} €`, 510, itemY, {
+      underline: true,
+    });
+
+    // --- Remarks and Confirmations [cite: 26-33] ---
+    doc
+      .fontSize(9)
+      .font("Helvetica-Bold")
+      .text(
+        "* Unit price is calculated and can have errors from rounding",
+        40,
+        itemY + 45,
+      );
+
+    const remarkY = itemY + 80;
+    doc.fontSize(10).font("Helvetica").text("Remark:", 40, remarkY);
+    doc.text(`DHL Express, ${data.cargoNo}`, 100, remarkY);
+    doc.text(`Express, ${data.cargoNo}`, 100, remarkY + 15);
+    doc.text("DHL Express, 30kg total", 100, remarkY + 30);
+    doc.text("2parcels", 100, remarkY + 45);
+    doc.text(`WAYBILL ${data.waybill}`, 100, remarkY + 60);
+
+    doc.text(
+      "We hereby confirm that no raw material from Russia were used",
+      100,
+      remarkY + 95,
+    );
+    doc.text(
+      "in the production of the goods mentioned in this invoice.",
+      100,
+      remarkY + 110,
+    );
+
+    // --- Footer Construction  ---
+    const footerY = 730;
+    doc
+      .moveTo(40, footerY - 10)
+      .lineTo(555, footerY - 10)
+      .strokeColor("#cccccc")
+      .stroke();
+
+    // Footer Column 1: Bank Details
+    doc.fontSize(8).fillColor("#444444").font("Helvetica-Bold");
+    doc.text("GTech Industries Limited", 40, footerY);
+    doc.font("Helvetica");
+    doc.text("Acc. No 478798112483", 40, footerY + 12);
+    doc.text("Swift Code: DHBKHKHΗ", 40, footerY + 24);
+    doc.text("DBS Bank (Hong Kong)", 40, footerY + 36);
+
+    // Footer Column 2: Contact Info
+    const col2X = 220;
+    doc.text("+86 555 6767 199", col2X, footerY);
+    doc.text("+86 17355524828", col2X, footerY + 12);
+    doc.text("Contact: lili", col2X, footerY + 24);
+    doc.text("info@gtech-industries.net", col2X, footerY + 36);
+
+    // Footer Column 3: Logo and Branding
+    const logoPath = path.join(__dirname, "../../assets/logo.png"); // Adjust path as needed
+    try {
+      doc.image(logoPath, 450, footerY - 5, { width: 60 });
+      doc
+        .fontSize(14)
+        .font("Helvetica-Bold")
+        .text("GTech", 450, footerY + 45);
+    } catch (e) {
+      // Fallback text if logo is missing
+      doc
+        .fontSize(16)
+        .font("Helvetica-Bold")
+        .text("GTech", 450, footerY + 5);
+    }
+
+    // Page number [cite: 37]
+    doc.fontSize(8).font("Helvetica").text("1/1", 530, 800);
+
+    doc.end();
+  } catch (error) {
+    next(error);
+  }
+};

@@ -11,6 +11,7 @@ import {
   updateOrderItemPrice,
   splitOrderItem,
   updateOrderItemLabel,
+  generateCommercialInvoicePDF,
 } from "../controllers/order_controller";
 import { authenticateUser, authorize } from "../middlewares/authorized";
 import { UserRole } from "../models/users";
@@ -18,14 +19,39 @@ import { UserRole } from "../models/users";
 const router: any = express.Router();
 router.use(authenticateUser);
 
+router.get(
+  "/:orderId/commercial-invoice",
+  // authorize(UserRole.SALES, UserRole.PURCHASING),
+  generateCommercialInvoicePDF,
+);
+
 router.post("/", authorize(UserRole.SALES, UserRole.PURCHASING), createOrder);
-router.get("/", /* authorize(UserRole.SALES, UserRole.PURCHASING), */ getAllOrders);
+router.get(
+  "/",
+  /* authorize(UserRole.SALES, UserRole.PURCHASING), */ getAllOrders,
+);
 
-router.get("/item/:itemId/label", authorize(UserRole.SALES, UserRole.PURCHASING), generateLabelPDF);
+router.get(
+  "/item/:itemId/label",
+  authorize(UserRole.SALES, UserRole.PURCHASING),
+  generateLabelPDF,
+);
 
-router.get("/:orderId", authorize(UserRole.SALES, UserRole.PURCHASING), getOrderById);
-router.put("/:orderId", authorize(UserRole.SALES, UserRole.PURCHASING), updateOrder);
-router.delete("/:orderId", authorize(UserRole.SALES, UserRole.PURCHASING), deleteOrder);
+router.get(
+  "/:orderId",
+  authorize(UserRole.SALES, UserRole.PURCHASING),
+  getOrderById,
+);
+router.put(
+  "/:orderId",
+  authorize(UserRole.SALES, UserRole.PURCHASING),
+  updateOrder,
+);
+router.delete(
+  "/:orderId",
+  authorize(UserRole.SALES, UserRole.PURCHASING),
+  deleteOrder,
+);
 router.put(
   "/items/:id/status",
   authorize(UserRole.SALES, UserRole.PURCHASING),
@@ -36,7 +62,15 @@ router.put(
   authorize(UserRole.SALES, UserRole.PURCHASING),
   updateOrderItemPrice,
 );
-router.post("/items/:id/split", authorize(UserRole.SALES, UserRole.PURCHASING), splitOrderItem);
-router.put("/items/:id/label", authorize(UserRole.SALES, UserRole.PURCHASING), updateOrderItemLabel);
+router.post(
+  "/items/:id/split",
+  authorize(UserRole.SALES, UserRole.PURCHASING),
+  splitOrderItem,
+);
+router.put(
+  "/items/:id/label",
+  authorize(UserRole.SALES, UserRole.PURCHASING),
+  updateOrderItemLabel,
+);
 
 export default router;
