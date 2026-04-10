@@ -209,7 +209,7 @@ export interface StatisticsResponse {
     activeItems: number;
     inactiveItems: number;
     itemsWithStock: number;
-    itemsNeedingSync: number; // Add this field
+    itemsNeedingSync: number;
     itemsByCategory: Array<{
       category: string;
       count: string;
@@ -217,7 +217,6 @@ export interface StatisticsResponse {
   };
 }
 
-// Existing getItems function (updated to handle is_updated)
 export const getItems = async (params?: {
   page?: number;
   limit?: number;
@@ -229,7 +228,7 @@ export const getItems = async (params?: {
   taricId?: string;
   sortBy?: string;
   sortOrder?: "ASC" | "DESC";
-  includeOnlyUpdated?: boolean; // Add optional filter for updated items only
+  includeOnlyUpdated?: boolean;
   isNew?: string;
   eanSearch?: string;
 }) => {
@@ -449,7 +448,6 @@ export const searchItems = async (query: string, limit: number = 10) => {
   }
 };
 
-// NEW: Get pending sync count
 export const getPendingSyncCount = async () => {
   try {
     const response = await api.get("/items/sync/pending-count");
@@ -460,7 +458,6 @@ export const getPendingSyncCount = async () => {
   }
 };
 
-// NEW: Reset updated flags
 export const resetUpdatedFlags = async (ids?: number[]) => {
   try {
     toast.loading("Resetting sync flags...", loadingStyles);
@@ -474,7 +471,6 @@ export const resetUpdatedFlags = async (ids?: number[]) => {
   }
 };
 
-// UPDATED: Export items to CSV with better error handling
 export const exportItemsToCSV = async (
   showToast: boolean = true,
   type: "updated" | "new" = "updated",
@@ -499,7 +495,6 @@ export const exportItemsToCSV = async (
 
     const blob = await response.blob();
 
-    // Check if the response is a CSV (has content)
     if (blob.size === 0) {
       if (showToast) {
         toast.dismiss();
@@ -844,7 +839,7 @@ export const bulkUpsertTarics = async (
 
 export const getAllTaricsSimple = async (): Promise<any> => {
   try {
-    const res = await api.get("/items/tarics", {
+    const res = await api.get("/items/tarics/all", {
       params: {
         limit: 10000,
         sortBy: "code",
