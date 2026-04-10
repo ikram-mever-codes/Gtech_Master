@@ -1084,53 +1084,86 @@ export const generateCommercialInvoicePDF = async (
 ) => {
   try {
     const { orderId } = req.params;
+
+    // FIX: Removed Number() conversion because your DB uses UUIDs (strings)
+    if (!orderId || typeof orderId !== "string") {
+      return next(new ErrorHandler("Invalid Order ID format.", 400));
+    }
+
+    const orderRepository = AppDataSource.getRepository(Order);
+    const order = await orderRepository.findOne({
+      where: { order_no: orderId }, // 'as any' bypasses strict type check for UUID string vs Number
+      relations: [
+        "customer",
+        "cargo",
+        "cargo.customer",
+        "orderItems",
+        "orderItems.item",
+        "orderItems.item.taric",
+      ],
+    });
+
+    if (!order) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Order not found" });
+    }
+
+    const cargo = order.cargo;
+    const items = order.orderItems || [];
+
+    // --- Dynamic Data Mapping ---
     const data = {
-      invoiceNo: "CI260040",
-      date: "2026-01-20",
-      cargoNo: "C2026-E1",
-      customerID: "7",
+      invoiceNo: order.order_no || "N/A",
+      date: order.date_created || new Date().toISOString().split("T")[0],
+      cargoNo: cargo?.cargo_no || "N/A",
+      customerID: order.customer?.id?.slice(0, 8) || "7",
       billTo: {
-        name: "GTech Industries GmbH",
-        contact: "Markus Entner",
-        street: "Reichshofstr. 137",
-        city: "58239 Schwerte",
-        country: "Germany",
-        phone: "+4923043389510",
-        eori: "DE977540238364617",
+        name:
+          cargo?.bill_to_company_name || order.customer?.companyName || "N/A",
+        contact:
+          cargo?.bill_to_contact_person || order.customer?.legalName || "-",
+        street:
+          cargo?.bill_to_full_address || order.customer?.addressLine1 || "N/A",
+        city: `${cargo?.bill_to_postal_code || order.customer?.postalCode || ""} ${cargo?.bill_to_city || order.customer?.city || ""}`,
+        country: cargo?.bill_to_country || order.customer?.country || "Germany",
+        phone:
+          cargo?.bill_to_phone_no ||
+          order.customer?.contactPhoneNumber ||
+          "N/A",
+        eori: cargo?.bill_to_tax_no || "DE977540238364617",
       },
       shipTo: {
-        company: "GoodBytz GmbH",
-        contact: "Lucas Marks",
-        street: "Werner-Otto-Strasse 13g",
-        city: "22179, Hamburg",
-        country: "Germany",
-        phone: "+4940239684026",
+        company: cargo?.ship_to_company_name || "GoodBytz GmbH",
+        contact: cargo?.ship_to_contact_person || "Lucas Marks",
+        street: cargo?.ship_to_full_address || "Werner-Otto-Strasse 13g",
+        city: `${cargo?.ship_to_postal_code || "22179"}, ${cargo?.ship_to_city || "Hamburg"}`,
+        country: cargo?.ship_to_country || "Germany",
+        phone: cargo?.ship_to_contact_phone || "+4940239684026",
       },
-      items: [
-        {
-          no: 1,
-          desc: "Flywheels and pulleys, including pulley blocks",
-          hs: "8483508090",
-          qty: 800,
-          unit: 3.23,
-          price: 2584.0,
-        },
-        {
-          no: 2,
-          desc: "Freight cost",
-          hs: "n/a",
-          qty: "n/a",
-          unit: "n/a",
-          price: 292.0,
-        },
-      ],
-      totalQty: 800,
-      totalPrice: 2876.0,
+      lineItems: items.map((oi, index) => ({
+        no: index + 1,
+        desc: oi.item?.item_name || "Unknown Item",
+        hs: oi.set_taric_code || oi.item?.taric?.code || "n/a",
+        qty: oi.qty || 0,
+        unit: Number(oi.price || 0).toFixed(3),
+        price: (Number(oi.qty || 0) * Number(oi.price || 0)).toFixed(2),
+      })),
       waybill: "1149458284",
     };
 
-    const doc = new PDFDocument({ size: "A4", margin: 40 });
+    const totalQty = data.lineItems.reduce(
+      (sum, it) => sum + Number(it.qty),
+      0,
+    );
+    const subTotal = data.lineItems.reduce(
+      (sum, it) => sum + Number(it.price),
+      0,
+    );
+    const freightCost = 292.0;
+    const grandTotal = (subTotal + freightCost).toFixed(2);
 
+    const doc = new PDFDocument({ size: "A4", margin: 40 });
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader(
       "Content-Disposition",
@@ -1138,18 +1171,15 @@ export const generateCommercialInvoicePDF = async (
     );
     doc.pipe(res);
 
-    // --- PAGE 1: Header Branding  ---
+    // --- Header ---
     doc
       .fillColor("#777777")
       .font("Helvetica")
       .fontSize(20)
       .text("GTech Industries Limited", 40, 20, { align: "right" });
-
-    // Checkmarks for Engineering Design Manufacturing [cite: 2]
-    doc.fontSize(10).text("Engineering ✓ Design ✓ Manufacturing ✓", 40, 45, {
+    doc.fontSize(10).text("Engineering ✔ Design ✔ Manufacturing ✔", 40, 45, {
       align: "right",
     });
-
     doc
       .moveTo(40, 60)
       .lineTo(555, 60)
@@ -1157,7 +1187,7 @@ export const generateCommercialInvoicePDF = async (
       .lineWidth(1)
       .stroke();
 
-    // Company Addresses [cite: 3]
+    // --- Addresses ---
     doc.fontSize(8.5).fillColor("#666666");
     doc.text(
       "GTech Industries Limited:   3A, 12/F, Kaiser Centre, N. 18 Centre Street, Sai Ying Pun, Hong Kong",
@@ -1169,32 +1199,34 @@ export const generateCommercialInvoicePDF = async (
       40,
       82,
     );
-    // Chinese address translation included in original [cite: 5]
     doc.text("中国安徽省马鞍山市博望区博望汇盛广场西大丰冶金厂", 40, 94);
 
-    // --- Bill To / Ship To Section [cite: 4, 13] ---
-    doc.fillColor("black").font("Helvetica-Bold").fontSize(10.5);
-    doc.text("BILL TO:", 40, 125);
+    // --- Bill To / Ship To ---
+    doc
+      .fillColor("black")
+      .font("Helvetica-Bold")
+      .fontSize(10.5)
+      .text("BILL TO:", 40, 125);
     doc.text("SHIP TO:", 240, 120);
 
-    // Bill To Content [cite: 6-12]
     doc.font("Helvetica-Bold").fontSize(11).text(data.billTo.name, 40, 142);
     doc.font("Helvetica").fontSize(10).text(data.billTo.contact, 40, 156);
-    doc.text(data.billTo.street, 40, 175);
-    doc.text(data.billTo.city, 40, 188);
-    doc.text(data.billTo.country, 40, 201);
-    doc.text(data.billTo.phone, 40, 218);
+    doc
+      .text(data.billTo.street, 40, 175)
+      .text(data.billTo.city, 40, 188)
+      .text(data.billTo.country, 40, 201)
+      .text(data.billTo.phone, 40, 218);
     doc.font("Helvetica-Bold").text(`EORI: ${data.billTo.eori}`, 40, 235);
 
-    // Ship To Content [cite: 14-18, 24]
     doc.font("Helvetica-Bold").fontSize(11).text(data.shipTo.company, 240, 137);
     doc.font("Helvetica").fontSize(10).text(data.shipTo.contact, 240, 151);
-    doc.text(data.shipTo.street, 240, 164);
-    doc.text(data.shipTo.city, 240, 182);
-    doc.text(data.shipTo.country, 240, 195);
-    doc.text(data.shipTo.phone, 240, 210);
+    doc
+      .text(data.shipTo.street, 240, 164)
+      .text(data.shipTo.city, 240, 182)
+      .text(data.shipTo.country, 240, 195)
+      .text(data.shipTo.phone, 240, 210);
 
-    // Invoice Meta Data [cite: 19-22]
+    // --- Meta Data ---
     doc
       .font("Helvetica")
       .fontSize(11)
@@ -1217,13 +1249,12 @@ export const generateCommercialInvoicePDF = async (
       .font("Helvetica-Bold")
       .text(data.cargoNo);
 
-    // Commercial Invoice Title [cite: 23]
     doc
       .fontSize(13)
       .font("Helvetica-Bold")
       .text("Commercial Invoice", 0, 280, { align: "center" });
 
-    // --- Table Layout  ---
+    // --- Table Layout ---
     const tableTop = 320;
     doc
       .moveTo(40, tableTop)
@@ -1233,15 +1264,13 @@ export const generateCommercialInvoicePDF = async (
       .stroke();
 
     doc.fontSize(9.5).font("Helvetica-Bold");
-    doc.text("No", 40, tableTop + 12);
-    doc.text("Description", 75, tableTop + 12);
-    doc.text("(EU HS code)", 340, tableTop + 12);
-    doc.text("Qty", 425, tableTop + 6);
-    doc.text("(pcs)", 425, tableTop + 17);
-    doc.text("Unit", 470, tableTop + 6);
-    doc.text("(€)*", 470, tableTop + 17);
-    doc.text("Price", 525, tableTop + 6);
-    doc.text("(€)", 525, tableTop + 17);
+    doc
+      .text("No", 40, tableTop + 12)
+      .text("Description", 75, tableTop + 12)
+      .text("(EU HS code)", 340, tableTop + 12);
+    doc.text("Qty", 425, tableTop + 6).text("(pcs)", 425, tableTop + 17);
+    doc.text("Unit", 470, tableTop + 6).text("(€)*", 470, tableTop + 17);
+    doc.text("Price", 525, tableTop + 6).text("(€)", 525, tableTop + 17);
 
     doc
       .moveTo(40, tableTop + 32)
@@ -1250,32 +1279,45 @@ export const generateCommercialInvoicePDF = async (
       .lineWidth(1)
       .stroke();
 
-    // Table Rows
     let itemY = tableTop + 45;
-    data.items.forEach((item) => {
+    data.lineItems.forEach((item) => {
       doc.font("Helvetica").fontSize(10);
       doc.text(item.no.toString(), 40, itemY);
       doc.text(item.desc, 75, itemY, { width: 250 });
       doc.text(item.hs.toString(), 340, itemY);
       doc.text(item.qty.toString(), 425, itemY);
       doc.text(item.unit.toString(), 470, itemY);
-      doc.text(item.price.toFixed(2), 525, itemY, { align: "right" });
+      doc.text(item.price.toString(), 515, itemY, { align: "right" });
       itemY += 25;
     });
 
-    // Total Row
-    doc.moveTo(350, itemY).lineTo(555, itemY).strokeColor("black").stroke();
+    // Freight Row
+    doc.text((data.lineItems.length + 1).toString(), 40, itemY);
+    doc.text("Freight cost", 75, itemY);
+    doc.text("n/a", 340, itemY).text("n/a", 425, itemY).text("n/a", 470, itemY);
+    doc.text(freightCost.toFixed(2), 515, itemY, { align: "right" });
+    itemY += 25;
+
+    // --- Total Row ---
+    doc
+      .moveTo(340, itemY)
+      .lineTo(555, itemY)
+      .strokeColor("black")
+      .lineWidth(1)
+      .stroke();
     itemY += 12;
     doc
       .font("Helvetica-Bold")
       .fontSize(11)
       .text("Total :", 360, itemY, { underline: true });
-    doc.text(data.totalQty.toString(), 425, itemY, { underline: true });
-    doc.text(`${data.totalPrice.toFixed(2)} €`, 510, itemY, {
+    doc.text(totalQty.toString(), 425, itemY, { underline: true });
+    doc.text(`${grandTotal} €`, 485, itemY, {
+      width: 70,
+      align: "right",
       underline: true,
     });
 
-    // --- Remarks and Confirmations [cite: 26-33] ---
+    // --- Footer Section ---
     doc
       .fontSize(9)
       .font("Helvetica-Bold")
@@ -1284,15 +1326,14 @@ export const generateCommercialInvoicePDF = async (
         40,
         itemY + 45,
       );
-
     const remarkY = itemY + 80;
     doc.fontSize(10).font("Helvetica").text("Remark:", 40, remarkY);
     doc.text(`DHL Express, ${data.cargoNo}`, 100, remarkY);
-    doc.text(`Express, ${data.cargoNo}`, 100, remarkY + 15);
-    doc.text("DHL Express, 30kg total", 100, remarkY + 30);
-    doc.text("2parcels", 100, remarkY + 45);
-    doc.text(`WAYBILL ${data.waybill}`, 100, remarkY + 60);
-
+    doc
+      .text(`Express, ${data.cargoNo}`, 100, remarkY + 15)
+      .text("DHL Express, 30kg total", 100, remarkY + 30)
+      .text("2parcels", 100, remarkY + 45)
+      .text(`WAYBILL ${data.waybill}`, 100, remarkY + 60);
     doc.text(
       "We hereby confirm that no raw material from Russia were used",
       100,
@@ -1304,48 +1345,41 @@ export const generateCommercialInvoicePDF = async (
       remarkY + 110,
     );
 
-    // --- Footer Construction  ---
     const footerY = 730;
     doc
       .moveTo(40, footerY - 10)
       .lineTo(555, footerY - 10)
       .strokeColor("#cccccc")
       .stroke();
+    doc
+      .fontSize(8)
+      .fillColor("#444444")
+      .font("Helvetica-Bold")
+      .text("GTech Industries Limited", 40, footerY);
+    doc
+      .font("Helvetica")
+      .text("Acc. No 478798112483", 40, footerY + 12)
+      .text("Swift Code: DHBKHKHΗ", 40, footerY + 24)
+      .text("DBS Bank (Hong Kong)", 40, footerY + 36);
 
-    // Footer Column 1: Bank Details
-    doc.fontSize(8).fillColor("#444444").font("Helvetica-Bold");
-    doc.text("GTech Industries Limited", 40, footerY);
-    doc.font("Helvetica");
-    doc.text("Acc. No 478798112483", 40, footerY + 12);
-    doc.text("Swift Code: DHBKHKHΗ", 40, footerY + 24);
-    doc.text("DBS Bank (Hong Kong)", 40, footerY + 36);
-
-    // Footer Column 2: Contact Info
     const col2X = 220;
-    doc.text("+86 555 6767 199", col2X, footerY);
-    doc.text("+86 17355524828", col2X, footerY + 12);
-    doc.text("Contact: lili", col2X, footerY + 24);
-    doc.text("info@gtech-industries.net", col2X, footerY + 36);
+    doc
+      .text("+86 555 6767 199", col2X, footerY)
+      .text("+86 17355524828", col2X, footerY + 12)
+      .text("Contact: lili", col2X, footerY + 24)
+      .text("info@gtech-industries.net", col2X, footerY + 36);
 
-    // Footer Column 3: Logo and Branding
-    const logoPath = path.join(__dirname, "../../assets/logo.png"); // Adjust path as needed
+    const logoPath = path.join(__dirname, "../../assets/logo.png");
     try {
-      doc.image(logoPath, 450, footerY - 5, { width: 60 });
-      doc
-        .fontSize(14)
-        .font("Helvetica-Bold")
-        .text("GTech", 450, footerY + 45);
+      doc.image(logoPath, 450, footerY - 5, { width: 100 });
     } catch (e) {
-      // Fallback text if logo is missing
       doc
         .fontSize(16)
         .font("Helvetica-Bold")
         .text("GTech", 450, footerY + 5);
     }
 
-    // Page number [cite: 37]
     doc.fontSize(8).font("Helvetica").text("1/1", 530, 800);
-
     doc.end();
   } catch (error) {
     next(error);

@@ -275,7 +275,7 @@ export const downloadItemLabel = async (itemId: number | string) => {
   }
 };
 
-export const downloadCommercialInvoice = async (orderId: number | string) => {
+export const downloadCommercialInvoice = async (orderId: any) => {
   try {
     toast.loading("Generating Commercial Invoice...", loadingStyles);
 
