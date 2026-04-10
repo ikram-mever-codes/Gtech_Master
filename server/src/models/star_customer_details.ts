@@ -76,7 +76,6 @@ export class StarCustomerDetails {
   @Column({ type: "varchar", length: 100, nullable: true })
   billingCountry?: string;
 
-  // Delivery Address Snapshot - keeping old field names for backward compatibility
   @Column({ type: "varchar", length: 255, nullable: true })
   deliveryAddressLine1?: string;
 
@@ -101,7 +100,6 @@ export class StarCustomerDetails {
   @Column({ type: "text", nullable: true })
   deliveryAdditionalInfo?: string;
 
-  // Relationship to DeliveryAddress entity (optional)
   @ManyToOne(() => DeliveryAddress, {
     nullable: true,
     onDelete: "SET NULL",

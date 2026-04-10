@@ -34,9 +34,11 @@ import { getAllSuppliers, Supplier } from "@/api/suppliers";
 import { getCategories } from "@/api/categories";
 import { uploadFile } from "@/api/library";
 import CustomModal from "@/components/UI/CustomModal";
-import { loadingStyles, successStyles, errorStyles } from "@/utils/constants";
+import { loadingStyles, successStyles, errorStyles, BASE_URL } from "@/utils/constants";
 import { Package } from "lucide-react";
 import PageHeader from "@/components/UI/PageHeader";
+
+const hasChinese = (str: string) => /[\u4e00-\u9fa5]/.test(str || "");
 
 const StatusIndicator = ({
   value,
@@ -244,6 +246,22 @@ const ItemDetailsPage = () => {
       month: "2-digit",
       year: "numeric",
     }).format(date);
+  };
+
+  const getCorrectUrl = (url: string) => {
+    if (!url) return "";
+    if (url.includes("cloudinary.com")) return url;
+
+    if (url.includes("/uploads/")) {
+      const fileName = url.split("/uploads/").pop();
+      try {
+        const apiOrigin = new URL(BASE_URL).origin;
+        return `${apiOrigin}/uploads/${fileName}`;
+      } catch (e) {
+        return url;
+      }
+    }
+    return url;
   };
 
   const handleOpenQualityModal = (quality: any = null) => {
@@ -1558,7 +1576,7 @@ const ItemDetailsPage = () => {
                         <div>
                           <div className="flex items-center gap-2">
                             <h4 className="font-bold text-gray-900 line-clamp-1">
-                              {si.supplierName}
+                              {si.supplierName && !hasChinese(si.supplierName) ? si.supplierName : ""}
                             </h4>
                             <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded font-medium">
                               ID: {si.supplierId}
@@ -1690,16 +1708,17 @@ const ItemDetailsPage = () => {
                             {criteria.name}
                           </td>
                           <td className="px-4 py-3 text-sm">
-                            {criteria.picture ? (
-                              <button
-                                onClick={() =>
-                                  window.open(criteria.picture, "_blank")
-                                }
-                                className="text-blue-600 hover:text-blue-800"
-                              >
-                                <EyeIcon className="h-5 w-5" />
-                              </button>
-                            ) : (
+                              {criteria.picture ? (
+                                <button
+                                  onClick={() =>
+                                    window.open(getCorrectUrl(criteria.picture).replace('/upload/fl_attachment/', '/upload/'), "_blank")
+                                  }
+                                  className="text-blue-600 hover:text-blue-800"
+                                  title="View Picture"
+                                >
+                                  <EyeIcon className="h-5 w-5" />
+                                </button>
+                              ) : (
                               <span className="text-gray-400">—</span>
                             )}
                           </td>
@@ -1789,55 +1808,59 @@ const ItemDetailsPage = () => {
                     </thead>
                     <tbody className="divide-y divide-gray-200">
                       {itemData.attachments.map(
-                        (attachment: any, index: number) => (
-                          <tr key={index} className="hover:bg-gray-50">
-                            <td className="px-4 py-3 text-sm text-gray-900 font-medium">
-                              <div className="flex items-center gap-2">
-                                <DocumentIcon className="h-4 w-4 text-gray-400" />
-                                {attachment.originalName || attachment.filename || "Unnamed Attachment"}
-                              </div>
-                            </td>
-                            <td className="px-4 py-3 text-sm text-gray-500">
-                              {attachment.createdAt ? formatDate(attachment.createdAt) : (attachment.uploadedAt ? formatDate(attachment.uploadedAt) : "—")}
-                            </td>
-                            <td className="px-4 py-3 text-sm">
-                              <div className="flex items-center gap-4">
-                                <button
-                                  onClick={() => {
-                                    // If it's a PDF or Image, we can try to open it in a clean way
-                                    // For Cloudinary, we can ensure it's not forced as attachment
-                                    const viewUrl = attachment.url.replace('/upload/fl_attachment/', '/upload/');
-                                    window.open(viewUrl, "_blank", "noreferrer");
-                                  }}
-                                  className="text-blue-600 hover:text-blue-800 flex items-center gap-1.5 font-medium"
-                                  title="View PDF/Image"
-                                >
-                                  <EyeIcon className="h-4 w-4" />
-                                  View
-                                </button>
-                                <a
-                                  href={attachment.url.includes('cloudinary')
-                                    ? attachment.url.replace('/upload/', '/upload/fl_attachment/')
-                                    : attachment.url}
-                                  download={attachment.originalName || attachment.filename}
-                                  className="text-[#8CC21B] hover:text-[#7ab318] flex items-center gap-1.5 font-medium"
-                                  title="Download File"
-                                >
-                                  <ArrowDownTrayIcon className="h-4 w-4" />
-                                  Download
-                                </a>
-                                <button
-                                  onClick={() => handleDeleteAttachment(attachment.id)}
-                                  className="text-red-600 hover:text-red-800 flex items-center gap-1.5 font-medium"
-                                  title="Delete Attachment"
-                                >
-                                  <TrashIcon className="h-4 w-4" />
-                                  Delete
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ),
+                        (attachment: any, index: number) => {
+                          const finalUrl = getCorrectUrl(attachment.url);
+
+                          return (
+                            <tr key={index} className="hover:bg-gray-50">
+                              <td className="px-4 py-3 text-sm text-gray-900 font-medium">
+                                <div className="flex items-center gap-2">
+                                  <DocumentIcon className="h-4 w-4 text-gray-400" />
+                                  {attachment.originalName || attachment.filename || "Unnamed Attachment"}
+                                </div>
+                              </td>
+                              <td className="px-4 py-3 text-sm text-gray-500">
+                                {attachment.createdAt ? formatDate(attachment.createdAt) : (attachment.uploadedAt ? formatDate(attachment.uploadedAt) : "—")}
+                              </td>
+                              <td className="px-4 py-3 text-sm">
+                                <div className="flex items-center gap-4">
+                                  <button
+                                    onClick={() => {
+                                      const viewUrl = finalUrl.replace('/upload/fl_attachment/', '/upload/');
+                                      window.open(viewUrl, "_blank", "noreferrer");
+                                    }}
+                                    className="text-blue-600 hover:text-blue-800 flex items-center gap-1.5 font-medium"
+                                    title="View PDF/Image"
+                                  >
+                                    <EyeIcon className="h-4 w-4" />
+                                    View
+                                  </button>
+                                  <a
+                                    href={finalUrl.includes('cloudinary')
+                                      ? finalUrl.replace('/upload/', '/upload/fl_attachment/')
+                                      : finalUrl}
+                                    download={attachment.originalName || attachment.filename}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="text-[#8CC21B] hover:text-[#7ab318] flex items-center gap-1.5 font-medium"
+                                    title="Download File"
+                                  >
+                                    <ArrowDownTrayIcon className="h-4 w-4" />
+                                    Download
+                                  </a>
+                                  <button
+                                    onClick={() => handleDeleteAttachment(attachment.id)}
+                                    className="text-red-600 hover:text-red-800 flex items-center gap-1.5 font-medium"
+                                    title="Delete Attachment"
+                                  >
+                                    <TrashIcon className="h-4 w-4" />
+                                    Delete
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        },
                       )}
                     </tbody>
                   </table>
@@ -1893,7 +1916,7 @@ const ItemDetailsPage = () => {
                         className="group relative aspect-square bg-gray-100 rounded-lg overflow-hidden border border-gray-200"
                       >
                         <img
-                          src={pic.url}
+                          src={getCorrectUrl(pic.url)}
                           alt={`Item ${index + 1}`}
                           className="w-full h-full object-cover"
                           onError={(e) => {
@@ -1904,7 +1927,7 @@ const ItemDetailsPage = () => {
                         />
                         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                           <button
-                            onClick={() => window.open(pic.url, "_blank")}
+                            onClick={() => window.open(getCorrectUrl(pic.url).replace('/upload/fl_attachment/', '/upload/'), "_blank")}
                             className="p-2 bg-white rounded-full text-gray-700 hover:text-primary transition-colors"
                             title="View Full Size"
                           >
@@ -2126,7 +2149,7 @@ const ItemDetailsPage = () => {
                 <option value="">Choose a supplier...</option>
                 {allSuppliers.map((s) => (
                   <option key={s.id} value={String(s.id)}>
-                    [{s.id}] {s.company_name || s.name}
+                    [{s.id}]{s.name && !hasChinese(s.name) ? " " + s.name : ""}
                   </option>
                 ))}
               </select>
