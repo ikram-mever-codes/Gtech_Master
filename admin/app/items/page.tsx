@@ -153,6 +153,14 @@ const ItemsManagementPage: React.FC = () => {
     supplier: "",
     isActive: "",
   });
+
+  const hasChinese = (str: string) => /[\u4e00-\u9fa5]/.test(str || "");
+
+  const getSupplierLabel = (s: any) => {
+    const name = s.name || "";
+    const isEnglish = name && !hasChinese(name);
+    return `[ID: ${s.id}]${isEnglish ? " " + name : ""}`;
+  };
   const [taricFilters, setTaricFilters] = useState<TaricFilterState>({
     search: "",
   });
@@ -1052,9 +1060,6 @@ const ItemsManagementPage: React.FC = () => {
               Name
             </th>
             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-              Company
-            </th>
-            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
               Contact
             </th>
             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
@@ -1391,8 +1396,7 @@ const ItemsManagementPage: React.FC = () => {
                 className="w-4 h-4 text-primary focus:ring-primary border-gray-300 rounded"
               />
             </td>
-            <td className="px-4 py-3 font-medium">{supplier.name}</td>
-            <td className="px-4 py-3">{supplier.company_name}</td>
+            <td className="px-4 py-3 font-medium">{supplier.name || `ID: ${supplier.id}`}</td>
             <td className="px-4 py-3">{supplier.contact_person}</td>
             <td className="px-4 py-3">{supplier.email}</td>
             <td className="px-4 py-3 text-right">
@@ -2399,7 +2403,7 @@ const ItemsManagementPage: React.FC = () => {
                     options={
                       suppliers?.map((s) => ({
                         value: s.id,
-                        label: `[ID: ${s.id}] ${s.company_name || s.name || "Unnamed Supplier"}`,
+                        label: getSupplierLabel(s),
                       })) || []
                     }
                     value={
@@ -2411,7 +2415,7 @@ const ItemsManagementPage: React.FC = () => {
                               (x) => x.id === itemFormData.supplier_id,
                             );
                             return s
-                              ? `[ID: ${s.id}] ${s.company_name || s.name || "Unnamed"}`
+                              ? getSupplierLabel(s)
                               : "Unknown";
                           })(),
                         }
