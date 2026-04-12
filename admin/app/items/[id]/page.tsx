@@ -38,7 +38,7 @@ import { loadingStyles, successStyles, errorStyles, BASE_URL } from "@/utils/con
 import { Package } from "lucide-react";
 import PageHeader from "@/components/UI/PageHeader";
 
-
+const hasChinese = (str: string) => /[\u4e00-\u9fa5]/.test(str || "");
 
 const StatusIndicator = ({
   value,
@@ -1576,7 +1576,7 @@ const ItemDetailsPage = () => {
                         <div>
                           <div className="flex items-center gap-2">
                             <h4 className="font-bold text-gray-900 line-clamp-1">
-                              {si.supplierName || ""}
+                              {si.supplierName && !hasChinese(si.supplierName) ? si.supplierName : ""}
                             </h4>
                             <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded font-medium">
                               ID: {si.supplierId}
@@ -2149,7 +2149,7 @@ const ItemDetailsPage = () => {
                 <option value="">Choose a supplier...</option>
                 {allSuppliers.map((s) => (
                   <option key={s.id} value={String(s.id)}>
-                    [{s.id}]{s.name ? " " + s.name : ""}
+                    [{s.id}]{s.name && !hasChinese(s.name) ? " " + s.name : ""}
                   </option>
                 ))}
               </select>

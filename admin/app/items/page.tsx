@@ -154,9 +154,12 @@ const ItemsManagementPage: React.FC = () => {
     isActive: "",
   });
 
+  const hasChinese = (str: string) => /[\u4e00-\u9fa5]/.test(str || "");
+
   const getSupplierLabel = (s: any) => {
     const name = s.name || "";
-    return `[ID: ${s.id}]${name ? " " + name : ""}`;
+    const isEnglish = name && !hasChinese(name);
+    return `[ID: ${s.id}]${isEnglish ? " " + name : ""}`;
   };
   const [taricFilters, setTaricFilters] = useState<TaricFilterState>({
     search: "",
