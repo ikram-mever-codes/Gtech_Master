@@ -423,6 +423,10 @@ const ItemsManagementPage: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    setPagination((prev) => ({ ...prev, page: 1 }));
+  }, [filters, activeTab, taricFilters]);
+
+  useEffect(() => {
     fetchData();
     if (activeTab === "items") {
       fetchStatistics();
