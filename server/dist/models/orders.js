@@ -16,6 +16,7 @@ const order_items_1 = require("./order_items");
 const categories_1 = require("./categories");
 const suppliers_1 = require("./suppliers");
 const cargos_1 = require("./cargos");
+const customers_1 = require("./customers");
 let Order = class Order {
 };
 exports.Order = Order;
@@ -28,9 +29,14 @@ __decorate([
     __metadata("design:type", String)
 ], Order.prototype, "order_no", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ type: "varchar", length: 50, nullable: true }),
+    (0, typeorm_1.Column)({ type: "uuid", nullable: true }),
     __metadata("design:type", String)
 ], Order.prototype, "customer_id", void 0);
+__decorate([
+    (0, typeorm_1.ManyToOne)(() => customers_1.Customer, { nullable: true }),
+    (0, typeorm_1.JoinColumn)({ name: "customer_id" }),
+    __metadata("design:type", customers_1.Customer)
+], Order.prototype, "customer", void 0);
 __decorate([
     (0, typeorm_1.Column)({ type: "int", nullable: true }),
     __metadata("design:type", Number)

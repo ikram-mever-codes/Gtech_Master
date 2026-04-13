@@ -312,7 +312,7 @@ const ItemDetailsPage = () => {
     return eanWithoutCheck + checkDigit;
   };
 
-  const handleLinkSupplier = () => {
+  const handleLinkSupplier = async () => {
     if (!selectedSupplierToLink || !itemData) return;
 
     const supplier = allSuppliers.find(
@@ -352,13 +352,12 @@ const ItemDetailsPage = () => {
 
     setIsLinkSupplierModalOpen(false);
     setSelectedSupplierToLink("");
-    toast.success(
-      "Supplier source added to list. Remember to save changes.",
-      successStyles,
-    );
+    
+    await handleUpdateItem(updated);
+    toast.success("Supplier source linked successfully", successStyles);
   };
 
-  const handleRemoveSupplier = (linkId: number) => {
+  const handleRemoveSupplier = async (linkId: number) => {
     if (!itemData) return;
     const link = itemData.supplierItems?.find(si => si.id === linkId);
     if (link?.isDefault) {
@@ -366,10 +365,14 @@ const ItemDetailsPage = () => {
       return;
     }
 
-    setItemData({
+    const updated: ItemDetails = {
       ...itemData,
       supplierItems: itemData.supplierItems.filter(si => si.id !== linkId)
-    });
+    };
+    setItemData(updated);
+    
+    await handleUpdateItem(updated);
+    toast.success("Supplier source removed successfully", successStyles);
   };
 
   const handleQualityFormChange = (
@@ -1605,7 +1608,7 @@ const ItemDetailsPage = () => {
                         {editMode && (
                           <div className="flex items-center gap-2">
                             <button
-                              onClick={() => {
+                              onClick={async () => {
                                 const updated = { ...itemData };
                                 updated.supplierItems = updated.supplierItems.map(
                                   (x: any) => ({
@@ -1614,6 +1617,8 @@ const ItemDetailsPage = () => {
                                   }),
                                 );
                                 setItemData(updated);
+                                await handleUpdateItem(updated);
+                                toast.success("Default supplier source updated", successStyles);
                               }}
                               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${si.isDefault
                                 ? "bg-blue-600 text-white"

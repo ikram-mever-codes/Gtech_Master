@@ -34,6 +34,9 @@ const invoice_1 = require("../models/invoice");
 const cargos_1 = require("../models/cargos");
 const orders_1 = require("../models/orders");
 const order_items_1 = require("../models/order_items");
+const tarics_1 = require("../models/tarics");
+const cargo_orders_1 = require("../models/cargo_orders");
+const typeorm_1 = require("typeorm");
 class InvoiceController {
 }
 exports.InvoiceController = InvoiceController;
@@ -428,10 +431,108 @@ InvoiceController.getAllInvoices = (req, res, next) => __awaiter(void 0, void 0,
     const invoiceRepository = database_1.AppDataSource.getRepository(invoice_1.Invoice);
     try {
         const invoices = yield invoiceRepository.find({
-            relations: ["customer", "items"],
+            relations: ["customer", "customer.businessDetails", "customer.starCustomerDetails", "items"],
             order: { invoiceDate: "DESC" },
         });
-        return res.status(200).json({ success: true, data: invoices });
+        const orderNumbers = invoices.map((i) => i.orderNumber).filter(Boolean);
+        const orders = yield database_1.AppDataSource.getRepository(orders_1.Order).find({
+            where: { order_no: (0, typeorm_1.In)(orderNumbers) },
+            relations: ["cargo", "cargo.customer"]
+        });
+        const orderIds = orders.map((o) => o.id);
+        const orderToCargoMap = new Map();
+        if (orderIds.length > 0) {
+            const cargoOrders = yield database_1.AppDataSource.getRepository(cargo_orders_1.CargoOrder).find({
+                where: { order_id: (0, typeorm_1.In)(orderIds) },
+                relations: ["cargo", "order", "cargo.customer"],
+            });
+            cargoOrders.forEach((co) => {
+                if (co.cargo && co.order) {
+                    orderToCargoMap.set(co.order.order_no, co.cargo);
+                }
+            });
+        }
+        const allCargos = yield database_1.AppDataSource.getRepository(cargos_1.Cargo).find();
+        allCargos.forEach((c) => {
+            if (c.cargo_no) {
+                orderToCargoMap.set(c.cargo_no, c);
+            }
+        });
+        orders.forEach((o) => {
+            if (o.cargo && !orderToCargoMap.has(o.order_no)) {
+                orderToCargoMap.set(o.order_no, o.cargo);
+            }
+        });
+        const orderItemsRaw = yield database_1.AppDataSource.manager.query(`
+        SELECT order_id, cargo_id, SUM(qty) as total_qty, COUNT(id) as count_items
+        FROM order_item
+        GROUP BY order_id, cargo_id
+      `);
+        const orderItemSummaryByOrderId = new Map();
+        const orderItemSummaryByCargoId = new Map();
+        orderItemsRaw.forEach((row) => {
+            if (row.order_id) {
+                const current = orderItemSummaryByOrderId.get(row.order_id) || { total_qty: 0, count_items: 0 };
+                orderItemSummaryByOrderId.set(row.order_id, {
+                    total_qty: current.total_qty + Number(row.total_qty),
+                    count_items: current.count_items + Number(row.count_items)
+                });
+            }
+            if (row.cargo_id) {
+                const current = orderItemSummaryByCargoId.get(row.cargo_id) || { total_qty: 0, count_items: 0 };
+                orderItemSummaryByCargoId.set(row.cargo_id, {
+                    total_qty: current.total_qty + Number(row.total_qty),
+                    count_items: current.count_items + Number(row.count_items)
+                });
+            }
+        });
+        const orderIdMap = new Map();
+        orders.forEach(o => orderIdMap.set(o.order_no, o.id));
+        const data = invoices.map((inv) => {
+            var _b;
+            const cargo = orderToCargoMap.get(inv.orderNumber);
+            let customItemCount = 0;
+            let customTotalQty = 0;
+            if (cargo && orderItemSummaryByCargoId.has(cargo.id)) {
+                const stats = orderItemSummaryByCargoId.get(cargo.id);
+                customItemCount = stats.count_items;
+                customTotalQty = stats.total_qty;
+            }
+            else if (inv.orderNumber && orderIdMap.has(inv.orderNumber)) {
+                const orderId = orderIdMap.get(inv.orderNumber);
+                if (orderItemSummaryByOrderId.has(orderId)) {
+                    const stats = orderItemSummaryByOrderId.get(orderId);
+                    customItemCount = stats.count_items;
+                    customTotalQty = stats.total_qty;
+                }
+            }
+            const cargoNo = (cargo === null || cargo === void 0 ? void 0 : cargo.cargo_no) || (inv.orderNumber && !orderIdMap.has(inv.orderNumber) ? inv.orderNumber : undefined);
+            return Object.assign(Object.assign({}, inv), { bill_to: "GTech-Warehouse", ship_to: (cargo === null || cargo === void 0 ? void 0 : cargo.ship_to_company_name) ||
+                    (cargo === null || cargo === void 0 ? void 0 : cargo.ship_to_display_name) ||
+                    ((_b = inv.customer) === null || _b === void 0 ? void 0 : _b.companyName) ||
+                    "-", customItemCount,
+                customTotalQty, cargoNo: cargoNo || inv.orderNumber });
+        })
+            .filter(inv => {
+            if (req.query.status === 'draft') {
+                return inv.customItemCount > 0;
+            }
+            return true;
+        });
+        const finalDataMap = new Map();
+        data.forEach(inv => {
+            const key = inv.cargoNo || inv.orderNumber;
+            if (!finalDataMap.has(key)) {
+                finalDataMap.set(key, inv);
+            }
+            else {
+                const existing = finalDataMap.get(key);
+                if (inv.orderNumber === inv.cargoNo) {
+                    finalDataMap.set(key, inv);
+                }
+            }
+        });
+        return res.status(200).json({ success: true, data: Array.from(finalDataMap.values()) });
     }
     catch (error) {
         console.error(error);
@@ -488,7 +589,8 @@ InvoiceController.getInvoiceExpandedDetails = (req, res, next) => __awaiter(void
         }
         const orderNumber = invoice.orderNumber;
         let orderItems = [];
-        const cargo = yield cargoRepository.findOne({
+        let cargo = null;
+        cargo = yield cargoRepository.findOne({
             where: { cargo_no: orderNumber },
         });
         if (cargo) {
@@ -508,35 +610,102 @@ InvoiceController.getInvoiceExpandedDetails = (req, res, next) => __awaiter(void
                 });
             }
         }
-        const taricGroupsMap = new Map();
+        const getEffectiveTaricCode = (oi) => {
+            var _b, _c;
+            const itemTaricCode = ((_c = (_b = oi.item) === null || _b === void 0 ? void 0 : _b.taric) === null || _c === void 0 ? void 0 : _c.code) || "";
+            const isProjectItem = !itemTaricCode || itemTaricCode === "0" || itemTaricCode === "0000000000";
+            if (isProjectItem && oi.set_taric_code) {
+                return oi.set_taric_code.toString();
+            }
+            return itemTaricCode || "unknown";
+        };
+        const getGroupKey = (oi) => {
+            var _b, _c;
+            if (oi.set_taric_code) {
+                return `set_${oi.set_taric_code}`;
+            }
+            const taricId = (_c = (_b = oi.item) === null || _b === void 0 ? void 0 : _b.taric) === null || _c === void 0 ? void 0 : _c.id;
+            return taricId ? `taric_${taricId}` : "unknown";
+        };
+        const manualTaricCodes = [];
         orderItems.forEach((oi) => {
-            const item = oi.item;
-            const taric = item === null || item === void 0 ? void 0 : item.taric;
-            const taricId = (taric === null || taric === void 0 ? void 0 : taric.id) || "unknown";
-            if (!taricGroupsMap.has(taricId)) {
-                taricGroupsMap.set(taricId, {
-                    taricId,
-                    taricNameEn: (taric === null || taric === void 0 ? void 0 : taric.name_en) || "Unknown",
-                    taricCode: (taric === null || taric === void 0 ? void 0 : taric.code) || "-",
-                    dutyRate: (taric === null || taric === void 0 ? void 0 : taric.duty_rate) || 0,
-                    totalQty: 0,
-                    totalPrice: 0,
-                    unitPrice: (item === null || item === void 0 ? void 0 : item.RMB_Price) || 0,
+            if (oi.set_taric_code) {
+                const codes = oi.set_taric_code.split("/");
+                codes.forEach((c) => {
+                    if (c && c.trim())
+                        manualTaricCodes.push(c.trim());
                 });
             }
-            const group = taricGroupsMap.get(taricId);
+        });
+        const uniqueManualCodes = [...new Set(manualTaricCodes)];
+        const manualTarics = uniqueManualCodes.length > 0
+            ? yield database_1.AppDataSource.getRepository(tarics_1.Taric).find({ where: { code: (0, typeorm_1.In)(uniqueManualCodes) } })
+            : [];
+        const manualTaricMap = new Map(manualTarics.map(t => [t.code, t]));
+        const taricGroupsMap = new Map();
+        orderItems.forEach((oi) => {
+            var _b, _c;
+            const item = oi.item;
+            const taric = item === null || item === void 0 ? void 0 : item.taric;
+            const itemTaricCode = (taric === null || taric === void 0 ? void 0 : taric.code) || "";
+            const isProjectItem = !itemTaricCode || itemTaricCode === "0" || itemTaricCode === "0000000000";
+            const groupKey = getGroupKey(oi);
+            if (!taricGroupsMap.has(groupKey)) {
+                let displayCode = ((_c = (_b = oi.item) === null || _b === void 0 ? void 0 : _b.taric) === null || _c === void 0 ? void 0 : _c.code) || "-";
+                let displayName = (taric === null || taric === void 0 ? void 0 : taric.name_en) || (isProjectItem ? "Project Item" : "Unknown");
+                let displayRate = (taric === null || taric === void 0 ? void 0 : taric.duty_rate) || 0;
+                if (oi.set_taric_code) {
+                    displayCode = `${oi.set_taric_code}`;
+                    const codes = displayCode.split("/");
+                    const targetCode = codes.length > 1 ? codes[1].trim() : codes[0].trim();
+                    const mTaric = manualTaricMap.get(targetCode);
+                    if (mTaric) {
+                        displayName = mTaric.name_en || displayName;
+                        displayRate = mTaric.duty_rate !== undefined ? mTaric.duty_rate : displayRate;
+                    }
+                }
+                taricGroupsMap.set(groupKey, {
+                    taricId: groupKey,
+                    taricNameEn: displayName,
+                    taricCode: displayCode,
+                    dutyRate: displayRate,
+                    totalQty: 0,
+                    totalPrice: 0,
+                    unitPrice: (oi === null || oi === void 0 ? void 0 : oi.eur_special_price) || (oi === null || oi === void 0 ? void 0 : oi.price) || (item === null || item === void 0 ? void 0 : item.price) || 0,
+                    isProjectItem,
+                });
+            }
+            const group = taricGroupsMap.get(groupKey);
             group.totalQty += oi.qty || 0;
-            group.totalPrice += (oi.qty || 0) * ((item === null || item === void 0 ? void 0 : item.RMB_Price) || 0);
+            const currentPrice = (oi === null || oi === void 0 ? void 0 : oi.eur_special_price) || (oi === null || oi === void 0 ? void 0 : oi.price) || (item === null || item === void 0 ? void 0 : item.price) || 0;
+            group.totalPrice += (oi.qty || 0) * (Number(currentPrice) || 0);
         });
         const taricGroups = Array.from(taricGroupsMap.values());
+        const sortedItems = [...orderItems]
+            .map((oi) => {
+            var _b, _c, _d, _e;
+            return (Object.assign(Object.assign({}, oi), { v: (((_b = oi.item) === null || _b === void 0 ? void 0 : _b.length) * ((_c = oi.item) === null || _c === void 0 ? void 0 : _c.width) * ((_d = oi.item) === null || _d === void 0 ? void 0 : _d.height)) / 1000 || 0, w: ((_e = oi.item) === null || _e === void 0 ? void 0 : _e.weight) || 0, _effectiveTaricCode: getEffectiveTaricCode(oi) }));
+        })
+            .sort((a, b) => {
+            var _b, _c;
+            const codeCompare = a._effectiveTaricCode.localeCompare(b._effectiveTaricCode);
+            if (codeCompare !== 0)
+                return codeCompare;
+            return (((_b = a.item) === null || _b === void 0 ? void 0 : _b.item_name) || "").localeCompare(((_c = b.item) === null || _c === void 0 ? void 0 : _c.item_name) || "");
+        });
+        const orderNosInCargo = [...new Set(orderItems.map((oi) => { var _b; return (_b = oi.order) === null || _b === void 0 ? void 0 : _b.order_no; }).filter(Boolean))];
         return res.json({
             success: true,
             data: {
                 invoice,
-                detailedItems: orderItems.map((oi) => {
-                    var _b, _c, _d, _e;
-                    return (Object.assign(Object.assign({}, oi), { v: (((_b = oi.item) === null || _b === void 0 ? void 0 : _b.length) * ((_c = oi.item) === null || _c === void 0 ? void 0 : _c.width) * ((_d = oi.item) === null || _d === void 0 ? void 0 : _d.height)) / 1000 || 0, w: ((_e = oi.item) === null || _e === void 0 ? void 0 : _e.weight) || 0 }));
-                }),
+                cargo: cargo ? {
+                    id: cargo.id,
+                    cargo_no: cargo.cargo_no,
+                    ship_to: cargo.ship_to_company_name || cargo.ship_to_display_name || null,
+                    bill_to: cargo.bill_to_company_name || cargo.bill_to_display_name || null,
+                } : null,
+                orderNosInCargo,
+                detailedItems: sortedItems,
                 taricGroups,
             },
         });

@@ -15,7 +15,7 @@ let WarehouseItem = class WarehouseItem {
 };
 exports.WarehouseItem = WarehouseItem;
 __decorate([
-    (0, typeorm_1.PrimaryColumn)(),
+    (0, typeorm_1.PrimaryGeneratedColumn)(),
     __metadata("design:type", Number)
 ], WarehouseItem.prototype, "id", void 0);
 __decorate([
@@ -87,5 +87,5 @@ __decorate([
     __metadata("design:type", Date)
 ], WarehouseItem.prototype, "updated_at", void 0);
 exports.WarehouseItem = WarehouseItem = __decorate([
-    (0, typeorm_1.Entity)()
+    (0, typeorm_1.Entity)("warehouse_item")
 ], WarehouseItem);

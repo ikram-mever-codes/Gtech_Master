@@ -6,7 +6,7 @@ const authorized_1 = require("../middlewares/authorized");
 const users_1 = require("../models/users");
 const router = (0, express_1.Router)();
 router.use(authorized_1.authenticateUser);
-router.use((0, authorized_1.authorize)(users_1.UserRole.SALES));
+router.use((0, authorized_1.authorize)(users_1.UserRole.SALES, users_1.UserRole.PURCHASING));
 router.post("/", contact_controllers_1.createContactPerson);
 router.get("/", contact_controllers_1.getAllContactPersons);
 router.get("/statistics", contact_controllers_1.getContactPersonStatistics);

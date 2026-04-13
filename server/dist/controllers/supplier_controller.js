@@ -36,13 +36,13 @@ const getAllSuppliers = (req, res, next) => __awaiter(void 0, void 0, void 0, fu
         let whereClause = {};
         if (search) {
             whereClause = [
-                { name: (0, typeorm_1.Like)(`%${search}%`) },
-                { name_cn: (0, typeorm_1.Like)(`%${search}%`) },
-                { company_name: (0, typeorm_1.Like)(`%${search}%`) },
-                { email: (0, typeorm_1.Like)(`%${search}%`) },
-                { contact_person: (0, typeorm_1.Like)(`%${search}%`) },
-                { city: (0, typeorm_1.Like)(`%${search}%`) },
-                { province: (0, typeorm_1.Like)(`%${search}%`) },
+                { name: (0, typeorm_1.ILike)(`%${search}%`) },
+                { name_cn: (0, typeorm_1.ILike)(`%${search}%`) },
+                { company_name: (0, typeorm_1.ILike)(`%${search}%`) },
+                { email: (0, typeorm_1.ILike)(`%${search}%`) },
+                { contact_person: (0, typeorm_1.ILike)(`%${search}%`) },
+                { city: (0, typeorm_1.ILike)(`%${search}%`) },
+                { province: (0, typeorm_1.ILike)(`%${search}%`) },
             ];
         }
         const [suppliers, totalRecords] = yield supplierRepo.findAndCount({

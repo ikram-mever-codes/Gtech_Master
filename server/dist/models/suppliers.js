@@ -137,11 +137,6 @@ __decorate([
     __metadata("design:type", Array)
 ], Supplier.prototype, "parents", void 0);
 __decorate([
-    (0, typeorm_1.ManyToOne)(() => Supplier, (supplier) => supplier.parents),
-    (0, typeorm_1.JoinColumn)({ name: "supplier_id" }),
-    __metadata("design:type", Supplier)
-], Supplier.prototype, "supplier", void 0);
-__decorate([
     (0, typeorm_1.CreateDateColumn)(),
     __metadata("design:type", Date)
 ], Supplier.prototype, "created_at", void 0);

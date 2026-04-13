@@ -24,7 +24,7 @@ router.put("/change-password", authenticateCustomer_1.authenticateCustomer, cust
 // Profile Management
 router.put("/me", authenticateCustomer_1.authenticateCustomer, multer_1.uploadSingleFile, customer_controllers_1.editCustomerProfile);
 // For admins and Sales team
-router.get("/all", authorized_1.authenticateUser, (0, authorized_1.authorize)(users_1.UserRole.SALES), customer_controllers_1.getAllCustomers);
+router.get("/all", authorized_1.authenticateUser, (0, authorized_1.authorize)(users_1.UserRole.SALES, users_1.UserRole.PURCHASING), customer_controllers_1.getAllCustomers);
 router.get("/single/:customerId", (req, res, next) => {
     var _a;
     if ((_a = req.cookies) === null || _a === void 0 ? void 0 : _a.token) {
@@ -46,5 +46,5 @@ router.get("/single/:customerId", (req, res, next) => {
         (0, authenticateCustomer_1.authenticateCustomer)(req, res, next);
     }
 }, customer_controllers_1.getSingleUser);
-router.put("/:customerId/status", authorized_1.authenticateUser, (0, authorized_1.authorize)(users_1.UserRole.SALES), customer_controllers_1.updateCustomerStatus);
+router.put("/:customerId/status", authorized_1.authenticateUser, (0, authorized_1.authorize)(users_1.UserRole.SALES, users_1.UserRole.PURCHASING), customer_controllers_1.updateCustomerStatus);
 exports.default = router;

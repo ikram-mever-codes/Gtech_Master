@@ -12,7 +12,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.StarCustomerDetails = void 0;
 const typeorm_1 = require("typeorm");
 const customers_1 = require("./customers");
-const invoice_1 = require("./invoice");
 const inquiry_1 = require("./inquiry");
 let StarCustomerDetails = class StarCustomerDetails {
 };
@@ -145,10 +144,6 @@ __decorate([
     (0, typeorm_1.Column)({ nullable: true }),
     __metadata("design:type", Date)
 ], StarCustomerDetails.prototype, "deletedAt", void 0);
-__decorate([
-    (0, typeorm_1.OneToMany)(() => invoice_1.Invoice, (invoice) => invoice.customer),
-    __metadata("design:type", Array)
-], StarCustomerDetails.prototype, "invoices", void 0);
 __decorate([
     (0, typeorm_1.CreateDateColumn)(),
     __metadata("design:type", Date)

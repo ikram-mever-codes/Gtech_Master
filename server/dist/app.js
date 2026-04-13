@@ -29,6 +29,7 @@ const cargo_routes_1 = __importDefault(require("./routes/cargo_routes"));
 const cargo_type_routes_1 = __importDefault(require("./routes/cargo_type_routes"));
 const etl_routes_1 = __importDefault(require("./routes/etl_routes"));
 const supplier_order_routes_1 = __importDefault(require("./routes/supplier_order_routes"));
+const system_routes_1 = __importDefault(require("./routes/system_routes"));
 const app = (0, express_1.default)();
 const corsOptions = {
     origin: [
@@ -71,6 +72,7 @@ app.use("/api/v1/cargos", cargo_routes_1.default);
 app.use("/api/v1/cargo-types", cargo_type_routes_1.default);
 app.use("/api/v1/etl", etl_routes_1.default);
 app.use("/api/v1/supplier-orders", supplier_order_routes_1.default);
+app.use("/api/v1/system", system_routes_1.default);
 const __uploads_dirname = path_1.default.resolve();
 app.use("/uploads", express_1.default.static(path_1.default.join(__uploads_dirname, "/uploads")));
 app.use(errorMiddleware_1.default);

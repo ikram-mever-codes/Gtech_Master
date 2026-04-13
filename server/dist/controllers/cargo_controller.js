@@ -20,7 +20,7 @@ var __rest = (this && this.__rest) || function (s, e) {
     return t;
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getCargoOrders = exports.removeOrderFromCargo = exports.assignOrdersToCargo = exports.deleteCargo = exports.updateCargo = exports.createCargo = exports.getCargoById = exports.getAllCargos = void 0;
+exports.getCargoOrders = exports.removeOrderFromCargo = exports.assignOrdersToCargo = exports.deleteCargo = exports.updateCargo = exports.createCargo = exports.getCargoById = exports.getAllCargos = exports.generateInvoicesForOrders = void 0;
 const database_1 = require("../config/database");
 const cargos_1 = require("../models/cargos");
 const cargo_orders_1 = require("../models/cargo_orders");
@@ -28,105 +28,202 @@ const orders_1 = require("../models/orders");
 const order_items_1 = require("../models/order_items");
 const invoice_1 = require("../models/invoice");
 const customers_1 = require("../models/customers");
+const tarics_1 = require("../models/tarics");
 const typeorm_1 = require("typeorm");
-const generateInvoicesForOrders = (orderIds) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b, _c, _d, _e, _f, _g, _h;
-    if (!orderIds || orderIds.length === 0)
-        return;
+const generateInvoicesForOrders = (orderIds_1, ...args_1) => __awaiter(void 0, [orderIds_1, ...args_1], void 0, function* (orderIds, cargoIds = []) {
+    var _a;
     try {
         const orderRepo = database_1.AppDataSource.getRepository(orders_1.Order);
         const orderItemRepo = database_1.AppDataSource.getRepository(order_items_1.OrderItem);
         const invoiceRepo = database_1.AppDataSource.getRepository(invoice_1.Invoice);
         const invoiceItemRepo = database_1.AppDataSource.getRepository(invoice_1.InvoiceItem);
         const customerRepo = database_1.AppDataSource.getRepository(customers_1.Customer);
-        for (const orderId of orderIds) {
-            const order = yield orderRepo.findOne({ where: { id: orderId } });
-            if (!order) {
-                console.warn(`[Invoice] Order ${orderId} not found, skipping.`);
-                continue;
-            }
-            const existingInvoice = yield invoiceRepo.findOne({ where: { orderNumber: order.order_no } });
-            if (existingInvoice) {
-                yield invoiceItemRepo.delete({ invoice: { id: existingInvoice.id } });
-                yield invoiceRepo.remove(existingInvoice);
-            }
-            let customer = null;
-            if (order.customer_id) {
-                customer = yield customerRepo.findOne({ where: { id: order.customer_id } });
-                if (!customer) {
-                    console.warn(`[Invoice] customer_id=${order.customer_id} not found in DB for order ${order.order_no}, proceeding without customer.`);
+        const cargoRepo = database_1.AppDataSource.getRepository(cargos_1.Cargo);
+        const cargoNumbers = new Set();
+        const orderNumbers = new Set();
+        if (cargoIds.length > 0) {
+            const cargos = yield cargoRepo.find({ where: { id: (0, typeorm_1.In)(cargoIds) } });
+            cargos.forEach(c => c.cargo_no && cargoNumbers.add(c.cargo_no));
+        }
+        if (orderIds.length > 0) {
+            const orders = yield orderRepo.find({
+                where: { id: (0, typeorm_1.In)(orderIds) },
+                relations: ["orderItems", "orderItems.cargo"]
+            });
+            for (const order of orders) {
+                orderNumbers.add(order.order_no);
+                if (order.orderItems) {
+                    for (const oi of order.orderItems) {
+                        if (oi.cargo_id && ((_a = oi.cargo) === null || _a === void 0 ? void 0 : _a.cargo_no)) {
+                            cargoNumbers.add(oi.cargo.cargo_no);
+                        }
+                    }
                 }
             }
-            else {
-                console.info(`[Invoice] Order ${order.order_no} has no customer_id (ETL order), creating invoice without customer.`);
-            }
-            const orderItems = yield orderItemRepo.find({
-                where: { order_id: order.id },
-                relations: ["item", "item.taric"]
-            });
-            if (orderItems.length === 0) {
-                console.warn(`[Invoice] Order ${order.order_no} has no items, skipping.`);
+        }
+        for (const cargoNo of Array.from(cargoNumbers)) {
+            const cargo = yield cargoRepo.findOne({ where: { cargo_no: cargoNo }, relations: ["customer"] });
+            if (!cargo)
                 continue;
-            }
-            let netTotal = 0;
-            let taxAmount = 0;
-            let grossTotal = 0;
-            const invoice = invoiceRepo.create(Object.assign(Object.assign({ invoiceNumber: `INV-${Date.now().toString().slice(-6)}-${order.id}`, orderNumber: order.order_no, invoiceDate: new Date(), deliveryDate: order.date_delivery ? new Date(order.date_delivery) : new Date(), netTotal: 0, taxAmount: 0, grossTotal: 0, paidAmount: 0, outstandingAmount: 0, paymentMethod: "Bank Transfer", shippingMethod: "Standard" }, (customer ? { customer } : {})), { status: "draft" }));
-            const savedInvoice = yield invoiceRepo.save(invoice);
-            const invoiceItemEntities = [];
-            for (const oi of orderItems) {
-                const quantity = oi.qty || 1;
-                const unitPrice = oi.price || oi.rmb_special_price || 0;
-                const netPrice = quantity * unitPrice;
-                const itemTaxRate = ((_b = (_a = oi.item) === null || _a === void 0 ? void 0 : _a.taric) === null || _b === void 0 ? void 0 : _b.duty_rate) ? Number(oi.item.taric.duty_rate) : 19;
-                const itemTax = (netPrice * itemTaxRate) / 100;
-                const grossPrice = netPrice + itemTax;
-                netTotal += netPrice;
-                taxAmount += itemTax;
-                grossTotal += grossPrice;
-                const invItem = invoiceItemRepo.create({
-                    quantity,
-                    articleNumber: ((_d = (_c = oi.item) === null || _c === void 0 ? void 0 : _c.ean) === null || _d === void 0 ? void 0 : _d.toString()) || ((_e = oi.item) === null || _e === void 0 ? void 0 : _e.model) || ((_g = (_f = oi.item) === null || _f === void 0 ? void 0 : _f.ItemID_DE) === null || _g === void 0 ? void 0 : _g.toString()) || "Unknown",
-                    description: ((_h = oi.item) === null || _h === void 0 ? void 0 : _h.item_name) || "Unknown Item",
-                    unitPrice,
-                    netPrice,
-                    taxRate: itemTaxRate,
-                    taxAmount: itemTax,
-                    grossPrice,
-                    invoice: savedInvoice,
-                });
-                invoiceItemEntities.push(invItem);
-            }
-            yield invoiceItemRepo.save(invoiceItemEntities);
-            savedInvoice.netTotal = netTotal;
-            savedInvoice.taxAmount = taxAmount;
-            savedInvoice.grossTotal = grossTotal;
-            savedInvoice.outstandingAmount = grossTotal;
-            yield invoiceRepo.save(savedInvoice);
-            console.log(`[Invoice] Created invoice ${savedInvoice.invoiceNumber} for order ${order.order_no}${customer ? '' : ' (no customer)'}`);
+            const items = yield orderItemRepo.find({
+                where: { cargo_id: cargo.id },
+                relations: ["item", "item.taric", "order"]
+            });
+            yield syncInvoiceRecord(cargoNo, items, cargo.customer || null, invoiceRepo, invoiceItemRepo, customerRepo);
+        }
+        for (const orderNo of Array.from(orderNumbers)) {
+            const items = yield orderItemRepo.find({
+                where: {
+                    order: { order_no: orderNo },
+                    cargo_id: (0, typeorm_1.IsNull)()
+                },
+                relations: ["item", "item.taric", "order"]
+            });
+            const order = yield orderRepo.findOne({ where: { order_no: orderNo }, relations: ["customer"] });
+            if (!order)
+                continue;
+            yield syncInvoiceRecord(orderNo, items, order.customer || null, invoiceRepo, invoiceItemRepo, customerRepo);
         }
     }
     catch (e) {
-        console.error("Failed to generate invoices for orders", e);
+        console.error("Failed to sync invoices", e);
     }
+});
+exports.generateInvoicesForOrders = generateInvoicesForOrders;
+const syncInvoiceRecord = (orderNumber, items, customer, invoiceRepo, invoiceItemRepo, customerRepo) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b, _c, _d, _e, _f, _g, _h;
+    let invoice = yield invoiceRepo.findOne({ where: { orderNumber }, relations: ["items"] });
+    if (!invoice && items.length === 0)
+        return;
+    if (invoice) {
+        yield invoiceItemRepo.delete({ invoice: { id: invoice.id } });
+    }
+    else {
+        invoice = invoiceRepo.create({
+            invoiceNumber: `INV-${orderNumber.startsWith("MA") ? orderNumber : "C-" + orderNumber}-${Date.now().toString().slice(-4)}`,
+            orderNumber: orderNumber,
+            invoiceDate: new Date(),
+            deliveryDate: new Date(),
+            status: "draft",
+            customer,
+            netTotal: 0,
+            taxAmount: 0,
+            grossTotal: 0,
+            paidAmount: 0,
+            outstandingAmount: 0,
+            paymentMethod: "Bank Transfer",
+            shippingMethod: "Cargo",
+        });
+        yield invoiceRepo.save(invoice);
+    }
+    let netTotal = 0;
+    let taxAmount = 0;
+    let grossTotal = 0;
+    const invoiceItems = [];
+    const manualTaricCodes = [];
+    items.forEach(oi => {
+        if (oi.set_taric_code) {
+            const parts = oi.set_taric_code.split("/");
+            manualTaricCodes.push(parts[parts.length - 1].trim());
+        }
+    });
+    const uniqueCodes = [...new Set(manualTaricCodes)];
+    const manualTaricsList = uniqueCodes.length > 0
+        ? yield database_1.AppDataSource.getRepository(tarics_1.Taric).find({ where: { code: (0, typeorm_1.In)(uniqueCodes) } })
+        : [];
+    const manualTaricMap = new Map(manualTaricsList.map(t => [t.code, t]));
+    for (const oi of items) {
+        const quantity = oi.qty || 1;
+        const unitPrice = oi.eur_special_price || oi.price || oi.rmb_special_price || 0;
+        const netPrice = quantity * unitPrice;
+        let itemTaxRate = ((_b = (_a = oi.item) === null || _a === void 0 ? void 0 : _a.taric) === null || _b === void 0 ? void 0 : _b.duty_rate) !== undefined ? Number((_d = (_c = oi.item) === null || _c === void 0 ? void 0 : _c.taric) === null || _d === void 0 ? void 0 : _d.duty_rate) : 19;
+        let itemDescription = ((_e = oi.item) === null || _e === void 0 ? void 0 : _e.item_name) || "Unknown Item";
+        if (oi.set_taric_code) {
+            const parts = oi.set_taric_code.split("/");
+            const targetCode = parts[parts.length - 1].trim();
+            const mTaric = manualTaricMap.get(targetCode);
+            if (mTaric) {
+                itemTaxRate = mTaric.duty_rate !== undefined ? Number(mTaric.duty_rate) : itemTaxRate;
+                itemDescription = mTaric.name_en || itemDescription;
+            }
+        }
+        const itemTax = (netPrice * itemTaxRate) / 100;
+        const total = netPrice + itemTax;
+        netTotal += netPrice;
+        taxAmount += itemTax;
+        grossTotal += total;
+        invoiceItems.push(invoiceItemRepo.create({
+            quantity,
+            articleNumber: ((_g = (_f = oi.item) === null || _f === void 0 ? void 0 : _f.ean) === null || _g === void 0 ? void 0 : _g.toString()) || ((_h = oi.item) === null || _h === void 0 ? void 0 : _h.model) || "Unknown",
+            description: itemDescription,
+            unitPrice,
+            netPrice,
+            taxRate: itemTaxRate,
+            taxAmount: itemTax,
+            grossPrice: total,
+            invoice,
+        }));
+    }
+    if (invoiceItems.length > 0) {
+        yield invoiceItemRepo.save(invoiceItems);
+    }
+    else if (invoice === null || invoice === void 0 ? void 0 : invoice.id) {
+        yield invoiceRepo.delete(invoice.id);
+        return;
+    }
+    invoice.netTotal = netTotal;
+    invoice.taxAmount = taxAmount;
+    invoice.grossTotal = grossTotal;
+    invoice.outstandingAmount = Math.max(0, grossTotal - (invoice.paidAmount || 0));
+    invoice.updatedAt = new Date();
+    if (customer)
+        invoice.customer = customer;
+    yield invoiceRepo.save(invoice);
 });
 const getAllCargos = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const cargoRepo = database_1.AppDataSource.getRepository(cargos_1.Cargo);
-        const { page = 1, limit = 50, search = "" } = req.query;
+        const { page = 1, limit = 50, search = "", unassignedOnly = "false", status = "", availableOnly = "false" } = req.query;
         const pageNum = Math.max(1, Number(page));
-        const limitNum = Math.max(1, Math.min(100, Number(limit)));
+        const limitNum = Math.max(1, Math.min(1000, Number(limit)));
         const skip = (pageNum - 1) * limitNum;
-        const whereConditions = [];
-        if (search) {
-            whereConditions.push({ cargo_no: (0, typeorm_1.Like)(`%${search}%`) }, { note: (0, typeorm_1.Like)(`%${search}%`) }, { remark: (0, typeorm_1.Like)(`%${search}%`) }, { cargo_status: (0, typeorm_1.Like)(`%${search}%`) });
+        const qb = cargoRepo.createQueryBuilder("cargo");
+        if (status) {
+            const statuses = status.split(",").map((s) => s.trim());
+            qb.andWhere("cargo.cargo_status IN (:...statuses)", { statuses });
         }
-        const [cargos, total] = yield cargoRepo.findAndCount({
-            where: whereConditions.length > 0 ? whereConditions : undefined,
-            order: { id: "DESC" },
-            skip,
-            take: limitNum,
-        });
+        if (availableOnly === "true") {
+            qb.andWhere("cargo.cargo_status != 'Shipped'");
+            qb.leftJoin(invoice_1.Invoice, "invoice", "invoice.orderNumber = cargo.cargo_no");
+            qb.andWhere("(invoice.id IS NULL OR invoice.status NOT IN ('sent', 'paid', 'overdue', 'cancelled'))");
+        }
+        if (search) {
+            qb.andWhere("(cargo.cargo_no LIKE :search OR cargo.note LIKE :search OR cargo.remark LIKE :search OR cargo.cargo_status LIKE :search)", { search: `%${search}%` });
+        }
+        if (unassignedOnly === "true") {
+            qb.andWhere(qb => {
+                const subQuery = qb.subQuery()
+                    .select("o.cargo_id")
+                    .from(orders_1.Order, "o")
+                    .where("o.cargo_id IS NOT NULL")
+                    .getQuery();
+                return "cargo.id NOT IN " + subQuery;
+            });
+            qb.andWhere(qb => {
+                const subQuery = qb.subQuery()
+                    .select("co.cargo_id")
+                    .from(cargo_orders_1.CargoOrder, "co")
+                    .where("co.cargo_id IS NOT NULL")
+                    .getQuery();
+                return "cargo.id NOT IN " + subQuery;
+            });
+        }
+        const [cargos, total] = yield qb
+            .orderBy("cargo.id", "DESC")
+            .groupBy("cargo.id")
+            .skip(skip)
+            .take(limitNum)
+            .getManyAndCount();
         res.status(200).json({
             success: true,
             data: cargos,
@@ -192,7 +289,7 @@ const createCargo = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
                 order_id: orderId,
             }));
             yield cargoOrderRepo.save(cargoOrderEntries);
-            yield generateInvoicesForOrders(orders);
+            yield (0, exports.generateInvoicesForOrders)(orders);
         }
         res.status(201).json({
             success: true,
@@ -232,7 +329,7 @@ const updateCargo = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
                     order_id: orderId,
                 }));
                 yield cargoOrderRepo.save(cargoOrderEntries);
-                yield generateInvoicesForOrders(orders);
+                yield (0, exports.generateInvoicesForOrders)(orders);
             }
         }
         res.status(200).json({
@@ -291,9 +388,10 @@ const assignOrdersToCargo = (req, res, next) => __awaiter(void 0, void 0, void 0
             return;
         }
         const cargoOrderRepo = database_1.AppDataSource.getRepository(cargo_orders_1.CargoOrder);
+        const { isSplitMove } = req.body;
         const existing = yield cargoOrderRepo.find({ where: { cargo_id: cargo.id } });
         const existingIds = new Set(existing.map((e) => e.order_id));
-        const newEntries = orderIds
+        const newEntries = validOrderIds
             .filter((oid) => !existingIds.has(oid))
             .map((oid) => cargoOrderRepo.create({
             cargo_id: cargo.id,
@@ -303,15 +401,28 @@ const assignOrdersToCargo = (req, res, next) => __awaiter(void 0, void 0, void 0
             yield cargoOrderRepo.save(newEntries);
         }
         const orderItemRepo = database_1.AppDataSource.getRepository(order_items_1.OrderItem);
-        if (validOrderIds.length > 0) {
-            yield orderItemRepo
-                .createQueryBuilder()
-                .update(order_items_1.OrderItem)
-                .set({ cargo_id: cargo.id })
-                .where("order_id IN (:...validOrderIds)", { validOrderIds })
-                .execute();
+        const orderRepo = database_1.AppDataSource.getRepository(orders_1.Order);
+        if (validOrderIds.length > 0 && !isSplitMove) {
+            const orders = yield orderRepo.find({ where: { id: (0, typeorm_1.In)(validOrderIds) } });
+            for (const order of orders) {
+                const oldCargoId = order.cargo_id;
+                const qb = orderItemRepo
+                    .createQueryBuilder()
+                    .update(order_items_1.OrderItem)
+                    .set({ cargo_id: cargo.id })
+                    .where("order_id = :orderId", { orderId: order.id });
+                if (oldCargoId) {
+                    qb.andWhere("cargo_id = :oldCargoId", { oldCargoId });
+                }
+                else {
+                    qb.andWhere("cargo_id IS NULL");
+                }
+                yield qb.execute();
+                order.cargo_id = cargo.id;
+                yield orderRepo.save(order);
+            }
         }
-        yield generateInvoicesForOrders(validOrderIds);
+        yield (0, exports.generateInvoicesForOrders)(validOrderIds);
         res.status(200).json({
             success: true,
             message: `Assigned ${newEntries.length} order(s) to cargo`,

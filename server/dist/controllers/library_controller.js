@@ -1,4 +1,37 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -15,12 +48,11 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.getFileStats = exports.updateFile = exports.deleteFile = exports.getFileById = exports.getFiles = exports.uploadFile = void 0;
 const library_1 = require("../models/library");
 const database_1 = require("../config/database");
-const cloudinary_1 = __importDefault(require("../config/cloudinary"));
+const cloudinary_1 = __importStar(require("../config/cloudinary"));
 const fs_1 = __importDefault(require("fs"));
 const users_1 = require("../models/users");
 const customers_1 = require("../models/customers");
 const errorHandler_1 = __importDefault(require("../utils/errorHandler"));
-// Helper function to determine file type from mime type
 const getFileType = (mimeType) => {
     if (mimeType.startsWith("image/"))
         return library_1.FileType.IMAGE;
@@ -40,28 +72,24 @@ const getFileType = (mimeType) => {
         return library_1.FileType.ARCHIVE;
     return library_1.FileType.OTHER;
 };
-// Upload single file
 const uploadFile = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     try {
-        const { description, tags, isPublic, customerId } = req.body;
+        const { description, tags, isPublic, customerId, itemId } = req.body;
         const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.id;
         if (!req.file) {
             return next(new errorHandler_1.default("No file uploaded", 400));
         }
-        // Validate file exists
         if (!fs_1.default.existsSync(req.file.path)) {
             return next(new errorHandler_1.default("File not found", 404));
         }
         const fileRepository = database_1.AppDataSource.getRepository(library_1.LibraryFile);
         const userRepository = database_1.AppDataSource.getRepository(users_1.User);
         const customerRepository = database_1.AppDataSource.getRepository(customers_1.Customer);
-        // Get user who uploaded
         let uploadedBy = null;
         if (userId) {
             uploadedBy = yield userRepository.findOne({ where: { id: userId } });
         }
-        // Get customer if provided
         let customer = null;
         if (customerId) {
             customer = yield customerRepository.findOne({
@@ -70,30 +98,43 @@ const uploadFile = (req, res, next) => __awaiter(void 0, void 0, void 0, functio
         }
         let cloudinaryResult;
         try {
-            // Upload to Cloudinary
-            cloudinaryResult = yield cloudinary_1.default.uploader.upload(req.file.path, {
-                folder: "library",
-                resource_type: "auto",
-            });
-            // Generate thumbnail for images
+            const isCloudinaryConfigured = process.env.CLOUDINARY_CLOUD_NAME &&
+                process.env.CLOUDINARY_API_KEY &&
+                process.env.CLOUDINARY_API_SECRET;
+            let fileUrl = "";
             let thumbnailUrl = undefined;
-            if (req.file.mimetype.startsWith("image/")) {
-                const thumbnail = yield cloudinary_1.default.uploader.upload(req.file.path, {
-                    folder: "library/thumbnails",
-                    width: 300,
-                    height: 200,
-                    crop: "fill",
+            if (isCloudinaryConfigured) {
+                const isDocument = !req.file.mimetype.startsWith("image/") && !req.file.mimetype.startsWith("video/");
+                cloudinaryResult = yield cloudinary_1.default.uploader.upload(req.file.path, {
+                    folder: "library",
+                    resource_type: isDocument ? "raw" : "auto",
                 });
-                thumbnailUrl = thumbnail.secure_url;
+                fileUrl = cloudinaryResult.secure_url;
+                if (req.file.mimetype.startsWith("image/")) {
+                    const thumbnail = yield cloudinary_1.default.uploader.upload(req.file.path, {
+                        folder: "library/thumbnails",
+                        width: 300,
+                        height: 200,
+                        crop: "fill",
+                    });
+                    thumbnailUrl = thumbnail.secure_url;
+                }
             }
-            // Create file record
+            else {
+                const protocol = req.protocol;
+                const host = req.get("host");
+                fileUrl = `${protocol}://${host}/uploads/${req.file.filename}`;
+                if (req.file.mimetype.startsWith("image/")) {
+                    thumbnailUrl = fileUrl;
+                }
+            }
             const file = fileRepository.create({
                 filename: req.file.filename || "",
                 originalName: req.file.originalname,
                 fileSize: req.file.size,
                 mimeType: req.file.mimetype,
                 fileType: getFileType(req.file.mimetype),
-                url: cloudinaryResult.secure_url,
+                url: fileUrl,
                 thumbnailUrl,
                 description: description || null,
                 tags: tags ? tags.split(",").map((tag) => tag.trim()) : [],
@@ -102,22 +143,24 @@ const uploadFile = (req, res, next) => __awaiter(void 0, void 0, void 0, functio
                 uploadedById: userId || null,
                 customer,
                 customerId: customerId || null,
+                itemId: itemId ? parseInt(itemId) : null,
             });
             yield fileRepository.save(file);
-            // Delete local file after successful upload
-            fs_1.default.unlinkSync(req.file.path);
+            if (isCloudinaryConfigured) {
+                fs_1.default.unlinkSync(req.file.path);
+            }
             return res.status(201).json({
                 success: true,
                 message: "File uploaded successfully",
-                data: file,
+                data: Object.assign(Object.assign({}, file), { url: (0, cloudinary_1.signCloudinaryPdfUrl)(file.url) }),
             });
         }
         catch (uploadError) {
-            // Clean up local file if upload failed
+            console.error("Upload error details:", uploadError);
             if (fs_1.default.existsSync(req.file.path)) {
                 fs_1.default.unlinkSync(req.file.path);
             }
-            return next(new errorHandler_1.default("Failed to upload file to cloud", 500));
+            return next(new errorHandler_1.default(`Failed to upload file: ${uploadError.message}`, 500));
         }
     }
     catch (error) {
@@ -125,16 +168,14 @@ const uploadFile = (req, res, next) => __awaiter(void 0, void 0, void 0, functio
     }
 });
 exports.uploadFile = uploadFile;
-// Get all files (with filters)
 const getFiles = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b;
     try {
-        const { type, search, customerId, isPublic, page = 1, limit = 20, } = req.query;
+        const { type, search, customerId, itemId, isPublic, page = 1, limit = 20, } = req.query;
         const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.id;
         const userRole = (_b = req.user) === null || _b === void 0 ? void 0 : _b.role;
         const fileRepository = database_1.AppDataSource.getRepository(library_1.LibraryFile);
         const query = fileRepository.createQueryBuilder("file");
-        // Apply filters
         if (type) {
             query.andWhere("file.fileType = :type", { type });
         }
@@ -144,25 +185,24 @@ const getFiles = (req, res, next) => __awaiter(void 0, void 0, void 0, function*
         if (customerId) {
             query.andWhere("file.customerId = :customerId", { customerId });
         }
-        // Regular users can only see public files or their own files
+        if (itemId) {
+            query.andWhere("file.itemId = :itemId", { itemId });
+        }
         if (userRole !== "ADMIN" && userRole !== "MANAGER") {
             query.andWhere("(file.isPublic = :isPublic OR file.uploadedById = :userId)", { isPublic: true, userId });
         }
         else if (isPublic !== undefined) {
-            // Admins/Managers can filter by isPublic if specified
             query.andWhere("file.isPublic = :isPublic", {
                 isPublic: isPublic === "true",
             });
         }
-        // Pagination
         const skip = (parseInt(page) - 1) * parseInt(limit);
         query.skip(skip).take(parseInt(limit));
-        // Order by upload date
         query.orderBy("file.uploadedAt", "DESC");
         const [files, total] = yield query.getManyAndCount();
         return res.status(200).json({
             success: true,
-            data: files,
+            data: files.map(file => (Object.assign(Object.assign({}, file), { url: (0, cloudinary_1.signCloudinaryPdfUrl)(file.url) }))),
             pagination: {
                 page: parseInt(page),
                 limit: parseInt(limit),
@@ -176,7 +216,6 @@ const getFiles = (req, res, next) => __awaiter(void 0, void 0, void 0, function*
     }
 });
 exports.getFiles = getFiles;
-// Get single file by ID
 const getFileById = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b;
     try {
@@ -194,7 +233,6 @@ const getFileById = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
         if (!file) {
             return next(new errorHandler_1.default("File not found", 404));
         }
-        // Check access permissions
         if (userRole !== "ADMIN" &&
             userRole !== "MANAGER" &&
             !file.isPublic &&
@@ -203,7 +241,7 @@ const getFileById = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
         }
         return res.status(200).json({
             success: true,
-            data: file,
+            data: Object.assign(Object.assign({}, file), { url: (0, cloudinary_1.signCloudinaryPdfUrl)(file.url) }),
         });
     }
     catch (error) {
@@ -211,7 +249,6 @@ const getFileById = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
     }
 });
 exports.getFileById = getFileById;
-// Delete file
 const deleteFile = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b, _c, _d;
     try {
@@ -226,19 +263,26 @@ const deleteFile = (req, res, next) => __awaiter(void 0, void 0, void 0, functio
         if (!file) {
             return next(new errorHandler_1.default("File not found", 404));
         }
-        // Check permissions: Only admin/manager or file owner can delete
         if (userRole !== "ADMIN" &&
             userRole !== "MANAGER" &&
             file.uploadedById !== userId) {
             return next(new errorHandler_1.default("Access denied", 403));
         }
-        // Delete from Cloudinary
         try {
-            const publicId = (_c = file.url.split("/").pop()) === null || _c === void 0 ? void 0 : _c.split(".")[0];
-            if (publicId) {
-                yield cloudinary_1.default.uploader.destroy(`library/${publicId}`);
+            const isRaw = file.url.includes("/raw/upload/");
+            if (isRaw) {
+                const splitUrl = file.url.split("/library/");
+                if (splitUrl.length > 1) {
+                    const publicIdWithExt = splitUrl[1];
+                    yield cloudinary_1.default.uploader.destroy(`library/${publicIdWithExt}`, { resource_type: "raw" });
+                }
             }
-            // Delete thumbnail if exists
+            else {
+                const publicId = (_c = file.url.split("/").pop()) === null || _c === void 0 ? void 0 : _c.split(".")[0];
+                if (publicId) {
+                    yield cloudinary_1.default.uploader.destroy(`library/${publicId}`);
+                }
+            }
             if (file.thumbnailUrl) {
                 const thumbPublicId = (_d = file.thumbnailUrl.split("/").pop()) === null || _d === void 0 ? void 0 : _d.split(".")[0];
                 if (thumbPublicId) {
@@ -248,9 +292,7 @@ const deleteFile = (req, res, next) => __awaiter(void 0, void 0, void 0, functio
         }
         catch (cloudinaryError) {
             console.error("Cloudinary deletion error:", cloudinaryError);
-            // Continue with database deletion even if cloudinary fails
         }
-        // Delete from database
         yield fileRepository.delete(fileId);
         return res.status(200).json({
             success: true,
@@ -262,7 +304,6 @@ const deleteFile = (req, res, next) => __awaiter(void 0, void 0, void 0, functio
     }
 });
 exports.deleteFile = deleteFile;
-// Update file metadata
 const updateFile = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b;
     try {
@@ -278,13 +319,11 @@ const updateFile = (req, res, next) => __awaiter(void 0, void 0, void 0, functio
         if (!file) {
             return next(new errorHandler_1.default("File not found", 404));
         }
-        // Check permissions: Only admin/manager or file owner can update
         if (userRole !== "ADMIN" &&
             userRole !== "MANAGER" &&
             file.uploadedById !== userId) {
             return next(new errorHandler_1.default("Access denied", 403));
         }
-        // Update fields
         if (description !== undefined)
             file.description = description;
         if (tags !== undefined) {
@@ -307,7 +346,6 @@ const updateFile = (req, res, next) => __awaiter(void 0, void 0, void 0, functio
     }
 });
 exports.updateFile = updateFile;
-// Get file statistics
 const getFileStats = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const fileRepository = database_1.AppDataSource.getRepository(library_1.LibraryFile);

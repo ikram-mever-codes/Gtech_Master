@@ -78,6 +78,9 @@ const cargos_1 = require("../models/cargos");
 const cargo_orders_1 = require("../models/cargo_orders");
 const cargo_types_1 = require("../models/cargo_types");
 const supplier_orders_1 = require("../models/supplier_orders");
+const dbUtils_1 = require("../utils/dbUtils");
+const sales_prices_1 = require("../models/sales_prices");
+const purchase_prices_1 = require("../models/purchase_prices");
 dotenv_1.default.config();
 exports.AppDataSource = new typeorm_1.DataSource({
     type: "postgres",
@@ -101,6 +104,8 @@ exports.AppDataSource = new typeorm_1.DataSource({
         list_1.ListCreator,
         inquiry_1.Inquiry,
         inquiry_1.DeliveryAddress,
+        sales_prices_1.SalesPrice,
+        purchase_prices_1.PurchasePrice,
         list_1.UserCreator,
         bussiness_1.Business,
         requested_items_1.RequestedItem,
@@ -183,9 +188,9 @@ const initializeDatabase = () => __awaiter(void 0, void 0, void 0, function* () 
             console.log("Migrations executed successfully");
         }
         yield bootstrapAdminUser();
-        // Seed database with initial data
         const { seedDatabase } = yield Promise.resolve().then(() => __importStar(require("../services/seedDatabase")));
         yield seedDatabase();
+        yield (0, dbUtils_1.fixSequences)();
         return exports.AppDataSource;
     }
     catch (error) {
