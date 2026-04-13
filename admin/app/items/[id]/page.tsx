@@ -1836,7 +1836,7 @@ const ItemDetailsPage = () => {
                                     View
                                   </button>
                                   <a
-                                    href={finalUrl.includes('cloudinary')
+                                    href={finalUrl.includes('cloudinary') && !finalUrl.includes('/raw/')
                                       ? finalUrl.replace('/upload/', '/upload/fl_attachment/')
                                       : finalUrl}
                                     download={attachment.originalName || attachment.filename}

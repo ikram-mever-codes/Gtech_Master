@@ -12,6 +12,7 @@ import { ItemQuality } from "../models/item_qualities";
 import { Supplier } from "../models/suppliers";
 import { SupplierItem } from "../models/supplier_items";
 import { LibraryFile } from "../models/library";
+import { signCloudinaryPdfUrl } from "../config/cloudinary";
 import {
   Like,
   Between,
@@ -578,7 +579,7 @@ export const getItemById = async (
         id: file.id,
         filename: file.filename,
         originalName: file.originalName,
-        url: file.url,
+        url: signCloudinaryPdfUrl(file.url),
         fileType: file.fileType,
         uploadedAt: file.uploadedAt,
       })),

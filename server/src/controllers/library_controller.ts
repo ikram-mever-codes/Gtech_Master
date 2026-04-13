@@ -2,7 +2,7 @@
 import { Request, Response, NextFunction } from "express";
 import { LibraryFile, FileType } from "../models/library";
 import { AppDataSource } from "../config/database";
-import cloudinary from "../config/cloudinary";
+import cloudinary, { signCloudinaryPdfUrl } from "../config/cloudinary";
 import fs from "fs";
 import { User } from "../models/users";
 import { Customer } from "../models/customers";
@@ -126,7 +126,7 @@ export const uploadFile = async (
       return res.status(201).json({
         success: true,
         message: "File uploaded successfully",
-        data: file,
+        data: { ...file, url: signCloudinaryPdfUrl(file.url) },
       });
     } catch (uploadError: any) {
       console.error("Upload error details:", uploadError);
@@ -199,7 +199,7 @@ export const getFiles = async (
 
     return res.status(200).json({
       success: true,
-      data: files,
+      data: files.map(file => ({ ...file, url: signCloudinaryPdfUrl(file.url) })),
       pagination: {
         page: parseInt(page as string),
         limit: parseInt(limit as string),
@@ -247,7 +247,7 @@ export const getFileById = async (
 
     return res.status(200).json({
       success: true,
-      data: file,
+      data: { ...file, url: signCloudinaryPdfUrl(file.url) },
     });
   } catch (error) {
     return next(error);
