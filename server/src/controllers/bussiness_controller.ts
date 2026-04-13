@@ -683,6 +683,8 @@ export const createBusiness = async (
           | "Yes"
           | "No"
           | "Unsure";
+        businessDetails.check_timestamp = new Date();
+        businessDetails.check_by = user;
         businessDetails.address = address ? address.trim() : undefined;
         businessDetails.website = normalizedWebsite || undefined;
         businessDetails.description = description
@@ -831,7 +833,7 @@ export const createBusiness = async (
     const businessResponse = {
       id: finalCustomer.id,
       displayName: finalCustomer.companyName,
-      companyName: finalCustomer.legalName,
+      companyName: finalCustomer.companyName,
       name: finalCustomer.companyName,
       legalName: finalCustomer.legalName,
       email: finalCustomer.email,
@@ -991,16 +993,56 @@ export const updateBusiness = async (
       }
     }
 
+    const newCompanyName = name !== undefined ? name.trim() : (displayName !== undefined ? displayName.trim() : undefined);
+    if (newCompanyName !== undefined && newCompanyName !== customer.companyName) {
+      const existingCustomerWithName = await customerRepository
+        .createQueryBuilder("customer")
+        .where("LOWER(customer.companyName) = LOWER(:companyName)", {
+          companyName: newCompanyName,
+        })
+        .getOne();
+
+      if (existingCustomerWithName && existingCustomerWithName.id !== id) {
+        return next(
+          new ErrorHandler(
+            "A business with this display name already exists",
+            400
+          )
+        );
+      }
+    }
+
+    if (updateData.website !== undefined && updateData.website !== customer.businessDetails?.website) {
+      const normalizedWebsite = updateData.website ? normalizeWebsite(updateData.website) : null;
+      if (normalizedWebsite) {
+        const existingBusinessWithWebsite = await businessDetailsRepository
+          .createQueryBuilder("businessDetails")
+          .leftJoinAndSelect("businessDetails.customer", "cust")
+          .where("businessDetails.website = :website", {
+            website: normalizedWebsite,
+          })
+          .getOne();
+
+        if (existingBusinessWithWebsite && existingBusinessWithWebsite.customer?.id !== id) {
+          return next(
+            new ErrorHandler("A business with this website already exists", 400)
+          );
+        }
+      }
+    }
+
     const result = await AppDataSource.transaction(
       async (transactionalEntityManager) => {
-        if (displayName !== undefined) {
+        if (name !== undefined) {
+          customer.companyName = name.trim();
+        } else if (displayName !== undefined) {
           customer.companyName = displayName.trim();
         }
-        if (name !== undefined) {
-          customer.legalName = name.trim();
+        if (updateData.companyName !== undefined) {
+          customer.legalName = updateData.companyName.trim();
         }
         if (contactEmail !== undefined) {
-          customer.contactEmail = contactEmail.trim().toLowerCase();
+          customer.contactEmail = contactEmail.trim() ? contactEmail.trim().toLowerCase() : undefined;
         }
         if (contactPhoneNumber !== undefined) {
           customer.contactPhoneNumber = contactPhoneNumber.trim();
@@ -1032,8 +1074,11 @@ export const updateBusiness = async (
             businessDetails.longitude = sanitizeNumber(updateData.longitude);
           if (updateData.phoneNumber !== undefined)
             businessDetails.contactPhone = updateData.phoneNumber.trim();
-          if (updateData.email !== undefined)
-            businessDetails.email = updateData.email.trim().toLowerCase();
+          if (updateData.email !== undefined) {
+            const trimmedEmail = updateData.email.trim() ? updateData.email.trim().toLowerCase() : undefined;
+            businessDetails.email = trimmedEmail;
+            customer.email = trimmedEmail;
+          }
           if (updateData.googleMapsUrl !== undefined)
             businessDetails.googleMapsUrl = updateData.googleMapsUrl.trim();
           if (updateData.category !== undefined)
@@ -1213,8 +1258,8 @@ export const updateBusiness = async (
     const businessResponse = {
       id: finalCustomer.id,
       displayName: finalCustomer.companyName,
-      companyName: finalCustomer.legalName,
-      name: finalCustomer.legalName,
+      companyName: finalCustomer.companyName,
+      name: finalCustomer.companyName,
       legalName: finalCustomer.legalName,
       email: finalCustomer.email,
       contactEmail: finalCustomer.contactEmail,
@@ -1327,7 +1372,7 @@ export const getBusinessById = async (
       id: customer.id,
       displayName: customer.companyName,
       legalName: customer.legalName,
-      name: customer.legalName,
+      name: customer.companyName,
       email: customer.email,
       contactEmail: customer.contactEmail,
       contactPhoneNumber: customer.contactPhoneNumber,
@@ -1563,7 +1608,7 @@ export const getAllBusinesses = async (
         companyName: customer.companyName,
         displayName: customer.companyName,
         legalName: customer.legalName,
-        name: customer.legalName,
+        name: customer.companyName,
         email: customer.email,
         contactEmail: customer.contactEmail,
         contactPhoneNumber: customer.contactPhoneNumber,

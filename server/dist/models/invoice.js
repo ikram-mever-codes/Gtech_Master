@@ -84,7 +84,7 @@ __decorate([
     __metadata("design:type", Date)
 ], Invoice.prototype, "closedAt", void 0);
 __decorate([
-    (0, typeorm_1.ManyToOne)(() => customers_1.Customer, (customer) => { var _a; return (_a = customer.starCustomerDetails) === null || _a === void 0 ? void 0 : _a.invoices; }, { nullable: true }),
+    (0, typeorm_1.ManyToOne)(() => customers_1.Customer, (customer) => customer.invoices, { nullable: true }),
     (0, typeorm_1.JoinColumn)(),
     __metadata("design:type", Object)
 ], Invoice.prototype, "customer", void 0);

@@ -12,9 +12,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.getCategories = void 0;
 const database_1 = require("../config/database");
 const categories_1 = require("../models/categories");
-// ────────────────────────────────────────────────
-//              CATEGORY MANAGEMENT
-// ────────────────────────────────────────────────
 const getCategories = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const categoryRepo = database_1.AppDataSource.getRepository(categories_1.Category);
@@ -24,7 +21,10 @@ const getCategories = (req, res, next) => __awaiter(void 0, void 0, void 0, func
             "c.id",
             "c.name",
         ]);
-        const categories = yield qb.orderBy("c.id", "DESC").getMany();
+        const categories = yield qb
+            .where("c.name NOT ILIKE :prefix", { prefix: "Imported%" })
+            .orderBy("c.id", "DESC")
+            .getMany();
         return res.status(200).json({
             success: true,
             data: categories,

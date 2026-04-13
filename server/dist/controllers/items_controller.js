@@ -12,7 +12,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.exportItemsToCSV = exports.bulkUpsertTarics = exports.getTaricStatistics = exports.searchTarics = exports.deleteTaric = exports.updateTaric = exports.createTaric = exports.getTaricById = exports.getAllTarics = exports.deleteQualityCriterion = exports.updateQualityCriterion = exports.createQualityCriterion = exports.getItemQualityCriteria = exports.updateItemVariations = exports.getItemVariations = exports.updateWarehouseStock = exports.getWarehouseItems = exports.searchParents = exports.deleteParent = exports.updateParent = exports.createParent = exports.getParentById = exports.getParents = exports.searchItems = exports.getItemStatistics = exports.bulkUpdateItems = exports.toggleItemStatus = exports.deleteItem = exports.updateItem = exports.createItem = exports.getItemById = exports.getItems = void 0;
+exports.exportNewItemsToCSV = exports.getNewItems = exports.exportItemsToCSV = exports.bulkUpsertTarics = exports.getTaricStatistics = exports.searchTarics = exports.deleteTaric = exports.updateTaric = exports.createTaric = exports.getTaricById = exports.getAllTarics = exports.deleteQualityCriterion = exports.updateQualityCriterion = exports.createQualityCriterion = exports.getItemQualityCriteria = exports.updateItemVariations = exports.getItemVariations = exports.updateWarehouseStock = exports.getWarehouseItems = exports.searchParents = exports.deleteParent = exports.updateParent = exports.createParent = exports.getParentById = exports.getParents = exports.resetUpdatedFlag = exports.searchItems = exports.getItemStatistics = exports.bulkUpdateItems = exports.toggleItemStatus = exports.deleteItem = exports.syncTransferPrices = exports.updateItem = exports.createItem = exports.getItemById = exports.getItems = exports.feedTransferPrices = void 0;
 const database_1 = require("../config/database");
 const items_1 = require("../models/items");
 const parents_1 = require("../models/parents");
@@ -24,63 +24,232 @@ const order_items_1 = require("../models/order_items");
 const item_qualities_1 = require("../models/item_qualities");
 const suppliers_1 = require("../models/suppliers");
 const supplier_items_1 = require("../models/supplier_items");
+const library_1 = require("../models/library");
+const cloudinary_1 = require("../config/cloudinary");
 const typeorm_1 = require("typeorm");
 const errorHandler_1 = __importDefault(require("../utils/errorHandler"));
-const misDb_1 = require("../config/misDb");
+// MIS sync removed — TARIC operations are local-only
+// import { pool } from "../config/misDb";
 const users_1 = require("../models/users");
 const dataFilter_1 = require("../utils/dataFilter");
+const getRMBPriceFromSupplier = (itemId) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const supplierItemRepository = database_1.AppDataSource.getRepository(supplier_items_1.SupplierItem);
+        const supplierItem = yield supplierItemRepository.findOne({
+            where: { item_id: itemId },
+        });
+        return (supplierItem === null || supplierItem === void 0 ? void 0 : supplierItem.price_rmb) || null;
+    }
+    catch (error) {
+        console.error(`Error fetching RMB_Price for item ${itemId}:`, error);
+        return null;
+    }
+});
+const calculateTransferPrice = (rmbPrice) => {
+    const FACTOR = 1.15;
+    return parseFloat((rmbPrice * FACTOR).toFixed(2));
+};
+/**
+ * Feeds transfer prices for all items belonging to the 'STD' category.
+ * Can be triggered via a button or a cron job.
+ */
+const feedTransferPrices = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const itemRepo = database_1.AppDataSource.getRepository(items_1.Item);
+        const supplierItemRepo = database_1.AppDataSource.getRepository(supplier_items_1.SupplierItem);
+        const categoryRepo = database_1.AppDataSource.getRepository(categories_1.Category);
+        // 1. Identify the 'STD' category ID
+        const stdCategory = yield categoryRepo.findOne({ where: { name: "STD" } });
+        if (!stdCategory) {
+            return next(new errorHandler_1.default("STD Category not found in system", 404));
+        }
+        // 2. Get all items in STD category
+        const items = yield itemRepo.find({ where: { cat_id: stdCategory.id } });
+        let updatedCount = 0;
+        for (const item of items) {
+            const supplierItem = yield supplierItemRepo.findOne({
+                where: { item_id: item.id },
+            });
+            if (supplierItem && supplierItem.price_rmb) {
+                const newPrice = calculateTransferPrice(supplierItem.price_rmb);
+                // Only update if the price actually changed
+                if (item.transfer_price_EUR !== newPrice) {
+                    item.transfer_price_EUR = newPrice;
+                    item.is_updated = true; // Mark for sync if applicable
+                    yield itemRepo.save(item);
+                    updatedCount++;
+                }
+            }
+        }
+        return res.status(200).json({
+            success: true,
+            message: `Successfully updated transfer prices for ${updatedCount} items.`,
+        });
+    }
+    catch (error) {
+        return next(error);
+    }
+});
+exports.feedTransferPrices = feedTransferPrices;
 const getItems = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const itemRepository = database_1.AppDataSource.getRepository(items_1.Item);
-        const { page = "1", limit = "50", search = "", status = "", category = "", supplier = "", isActive = "", sortBy = "created_at", sortOrder = "DESC", parentId, taricId, } = req.query;
-        const pageNum = parseInt(page);
-        const limitNum = parseInt(limit);
+        const parentRepository = database_1.AppDataSource.getRepository(parents_1.Parent);
+        const taricRepository = database_1.AppDataSource.getRepository(tarics_1.Taric);
+        const categoryRepository = database_1.AppDataSource.getRepository(categories_1.Category);
+        const supplierRepository = database_1.AppDataSource.getRepository(suppliers_1.Supplier);
+        const warehouseRepository = database_1.AppDataSource.getRepository(warehouse_items_1.WarehouseItem);
+        const { page = "1", limit = "50", search = "", status = "", category = "", supplier = "", isActive = "", sortBy = "created_at", sortOrder = "DESC", parentId, taricId, isNew, eanSearch, } = req.query;
+        let pageNum = parseInt(page);
+        if (isNaN(pageNum))
+            pageNum = 1;
+        let limitNum = parseInt(limit);
+        if (isNaN(limitNum))
+            limitNum = 50;
         const skip = (pageNum - 1) * limitNum;
-        const whereConditions = {};
+        const queryBuilder = itemRepository
+            .createQueryBuilder("item")
+            .skip(skip)
+            .take(limitNum);
+        if (eanSearch) {
+            const eanStr = eanSearch.trim();
+            queryBuilder.andWhere("item.ean ILIKE :eanSearch", {
+                eanSearch: `%${eanStr}%`,
+            });
+        }
         if (search) {
-            whereConditions.item_name = (0, typeorm_1.ILike)(`%${search}%`);
+            const searchStr = search.trim();
+            queryBuilder.andWhere("(item.item_name ILIKE :search OR item.item_name_cn ILIKE :search OR item.ean ILIKE :search OR item.model ILIKE :search)", { search: `%${searchStr}%` });
+            const parsedId = parseInt(searchStr);
+            if (!isNaN(parsedId) && parsedId <= 2147483647) {
+                queryBuilder.orWhere("item.id = :id", { id: parsedId });
+            }
         }
         if (isActive) {
-            whereConditions.isActive = isActive;
+            queryBuilder.andWhere("item.isActive = :isActive", { isActive });
         }
         if (category) {
-            whereConditions.cat_id = parseInt(category);
+            const categoryValue = category.trim();
+            queryBuilder.leftJoin("item.category", "cat");
+            if (!isNaN(parseInt(categoryValue))) {
+                queryBuilder.andWhere("(item.cat_id = :catId OR TRIM(cat.name) ILIKE :catNameExact)", {
+                    catId: parseInt(categoryValue),
+                    catNameExact: categoryValue,
+                });
+            }
+            else {
+                queryBuilder.andWhere("TRIM(cat.name) ILIKE :catNameExact", {
+                    catNameExact: categoryValue,
+                });
+            }
+        }
+        if (supplier) {
+            queryBuilder.andWhere("item.supplier_id = :supplierId", {
+                supplierId: parseInt(supplier),
+            });
         }
         if (parentId) {
-            whereConditions.parent_id = parseInt(parentId);
+            queryBuilder.andWhere("item.parent_id = :parentId", {
+                parentId: parseInt(parentId),
+            });
         }
         if (taricId) {
-            whereConditions.taric_id = parseInt(taricId);
+            queryBuilder.andWhere("item.taric_id = :taricId", {
+                taricId: parseInt(taricId),
+            });
         }
-        const relations = ["parent", "taric", "category", "supplier"];
-        const totalRecords = yield itemRepository.count({ where: whereConditions });
-        const items = yield itemRepository.find({
-            where: whereConditions,
-            relations,
-            order: {
-                [sortBy]: sortOrder === "DESC" ? "DESC" : "ASC",
-            },
-            skip,
-            take: limitNum,
+        if (isNew === "Y") {
+            queryBuilder.andWhere("item.is_new = :isNew", { isNew: "Y" });
+        }
+        queryBuilder.orderBy(`item.${sortBy}`, sortOrder === "DESC" ? "DESC" : "ASC");
+        const totalRecords = yield queryBuilder.getCount();
+        const items = yield queryBuilder.getMany();
+        const itemIds = items.map((item) => item.id);
+        const itemIdDEs = items
+            .map((item) => item.ItemID_DE)
+            .filter((id) => id !== undefined && id !== null);
+        let warehouseItems = [];
+        if (itemIds.length > 0) {
+            const warehouseQuery = warehouseRepository.createQueryBuilder("wi");
+            if (itemIdDEs.length > 0) {
+                warehouseQuery.where("(wi.ItemID_DE IN (:...itemIdDEs) OR wi.item_id IN (:...itemIds))", { itemIdDEs, itemIds });
+            }
+            else {
+                warehouseQuery.where("wi.item_id IN (:...itemIds)", { itemIds });
+            }
+            warehouseItems = yield warehouseQuery.getMany();
+        }
+        const warehouseByItemIdDE = new Map();
+        const warehouseByItemId = new Map();
+        warehouseItems.forEach((wi) => {
+            if (wi.ItemID_DE) {
+                warehouseByItemIdDE.set(wi.ItemID_DE, wi);
+            }
+            if (wi.item_id) {
+                warehouseByItemId.set(wi.item_id, wi);
+            }
         });
-        const formattedItems = items.map((item) => {
-            var _a, _b, _c, _d, _e, _f;
-            return ({
+        // Fetch RMB_Price for all items from supplier_items
+        const rmbPriceMap = new Map();
+        for (const item of items) {
+            const rmbPrice = yield getRMBPriceFromSupplier(item.id);
+            rmbPriceMap.set(item.id, rmbPrice);
+        }
+        const formattedItems = yield Promise.all(items.map((item) => __awaiter(void 0, void 0, void 0, function* () {
+            let parentData = null;
+            if (item.parent_id) {
+                parentData = yield parentRepository.findOne({
+                    where: { id: item.parent_id },
+                    select: ["id", "de_no", "name_de", "name_en", "name_cn"],
+                });
+            }
+            let taricData = null;
+            if (item.taric_id) {
+                taricData = yield taricRepository.findOne({
+                    where: { id: item.taric_id },
+                    select: ["id", "code", "description_de"],
+                });
+            }
+            let categoryData = null;
+            if (item.cat_id) {
+                categoryData = yield categoryRepository.findOne({
+                    where: { id: item.cat_id },
+                    select: ["id", "name"],
+                });
+            }
+            let supplierData = null;
+            if (item.supplier_id) {
+                supplierData = yield supplierRepository.findOne({
+                    where: { id: item.supplier_id },
+                    select: ["id", "name", "company_name"],
+                });
+            }
+            let warehouseData = null;
+            if (item.ItemID_DE) {
+                warehouseData = warehouseByItemIdDE.get(item.ItemID_DE);
+            }
+            if (!warehouseData) {
+                warehouseData = warehouseByItemId.get(item.id);
+            }
+            const ean = item.ean || (warehouseData === null || warehouseData === void 0 ? void 0 : warehouseData.ean) || null;
+            const rmbPrice = rmbPriceMap.get(item.id) || null;
+            return {
                 id: item.id,
-                de_no: ((_a = item.parent) === null || _a === void 0 ? void 0 : _a.de_no) || null,
-                name_de: ((_b = item.parent) === null || _b === void 0 ? void 0 : _b.name_de) || null,
-                name_en: ((_c = item.parent) === null || _c === void 0 ? void 0 : _c.name_en) || null,
-                name_cn: ((_d = item.parent) === null || _d === void 0 ? void 0 : _d.name_cn) || null,
+                de_no: (warehouseData === null || warehouseData === void 0 ? void 0 : warehouseData.item_no_de) || (parentData === null || parentData === void 0 ? void 0 : parentData.de_no) || null,
+                name_de: (parentData === null || parentData === void 0 ? void 0 : parentData.name_de) || null,
+                name_en: (parentData === null || parentData === void 0 ? void 0 : parentData.name_en) || null,
+                name_cn: (parentData === null || parentData === void 0 ? void 0 : parentData.name_cn) || null,
                 item_name: item.item_name,
                 item_name_cn: item.item_name_cn,
-                ean: item.ean,
+                ean: ean,
+                ItemID_DE: item.ItemID_DE || null,
                 is_active: item.isActive,
-                parent_id: item.parent_id,
-                taric_id: item.taric_id,
-                category_id: item.cat_id,
-                category: ((_e = item.category) === null || _e === void 0 ? void 0 : _e.name) || null,
-                supplier_id: item.supplier_id,
-                supplier_name: ((_f = item.supplier) === null || _f === void 0 ? void 0 : _f.name) || null,
+                parent_id: item.parent_id || null,
+                taric_id: item.taric_id || null,
+                category_id: item.cat_id || null,
+                category: (categoryData === null || categoryData === void 0 ? void 0 : categoryData.name) || null,
+                supplier_id: item.supplier_id || null,
+                supplier_name: (supplierData === null || supplierData === void 0 ? void 0 : supplierData.company_name) || (supplierData === null || supplierData === void 0 ? void 0 : supplierData.name) || null,
                 weight: item.weight,
                 length: item.length,
                 width: item.width,
@@ -88,10 +257,30 @@ const getItems = (req, res, next) => __awaiter(void 0, void 0, void 0, function*
                 remark: item.remark,
                 model: item.model,
                 painPoints: item.painPoints || [],
+                taric_code: (taricData === null || taricData === void 0 ? void 0 : taricData.code) || null,
+                taric_description: (taricData === null || taricData === void 0 ? void 0 : taricData.description_de) || null,
+                is_updated: item.is_updated,
+                is_new: item.is_new,
+                rmb_price: rmbPrice,
+                warehouse_data: warehouseData
+                    ? {
+                        id: warehouseData.id,
+                        item_no_de: warehouseData.item_no_de,
+                        item_name_de: warehouseData.item_name_de,
+                        item_name_en: warehouseData.item_name_en,
+                        stock_qty: warehouseData.stock_qty,
+                        msq: warehouseData.msq,
+                        buffer: warehouseData.buffer,
+                        is_stock_item: warehouseData.is_stock_item,
+                        is_SnSI: warehouseData.is_SnSI,
+                        ship_class: warehouseData.ship_class,
+                    }
+                    : null,
                 created_at: item.created_at,
                 updated_at: item.updated_at,
-            });
-        });
+                synced_at: item.synced_at,
+            };
+        })));
         const user = req.user;
         const filteredData = (0, dataFilter_1.filterDataByRole)(formattedItems, (user === null || user === void 0 ? void 0 : user.role) || users_1.UserRole.STAFF);
         return res.status(200).json({
@@ -111,11 +300,20 @@ const getItems = (req, res, next) => __awaiter(void 0, void 0, void 0, function*
 });
 exports.getItems = getItems;
 const getItemById = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14, _15;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _0, _1, _2, _3, _4, _5, _6;
     try {
         const { id } = req.params;
         if (!id) {
             return next(new errorHandler_1.default("Item ID is required", 400));
+        }
+        if (id === "tarics" ||
+            id === "stats" ||
+            id === "parents" ||
+            id === "warehouse") {
+            return next();
+        }
+        if (isNaN(parseInt(id))) {
+            return next(new errorHandler_1.default("Valid numeric Item ID is required", 400));
         }
         const itemRepository = database_1.AppDataSource.getRepository(items_1.Item);
         const warehouseRepository = database_1.AppDataSource.getRepository(warehouse_items_1.WarehouseItem);
@@ -130,49 +328,101 @@ const getItemById = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
         if (!item) {
             return next(new errorHandler_1.default("Item not found", 404));
         }
-        const warehouseItems = yield warehouseRepository.find({
-            where: { item_id: parseInt(id) },
-        });
-        const variationValues = yield variationRepository.find({
-            where: { item_id: parseInt(id) },
-        });
-        const qualityCriteria = yield qualityRepository.find({
-            where: { item_id: parseInt(id) },
-        });
-        const supplierItem = yield supplierItemRepository.findOne({
-            where: { item_id: parseInt(id) },
-        });
-        // const orderItems = await orderItemRepository.find({
-        //   where: { item: parseInt(id) },
-        //   relations: ["order"],
-        // });
+        let warehouseItems = [];
+        try {
+            if (item.ItemID_DE) {
+                warehouseItems = yield warehouseRepository.find({
+                    where: { ItemID_DE: item.ItemID_DE },
+                });
+            }
+            if (warehouseItems.length === 0) {
+                warehouseItems = yield warehouseRepository.find({
+                    where: { item_id: parseInt(id) },
+                });
+            }
+        }
+        catch (e) {
+            console.warn("warehouse_items table not available:", e.message);
+        }
+        let variationValues = [];
+        try {
+            variationValues = yield variationRepository.find({
+                where: { item_id: parseInt(id) },
+            });
+        }
+        catch (e) {
+            console.warn("variation_values table not available:", e.message);
+        }
+        let qualityCriteria = [];
+        try {
+            qualityCriteria = yield qualityRepository.find({
+                where: { item_id: parseInt(id) },
+            });
+        }
+        catch (e) {
+            console.warn("item_qualities table not available:", e.message);
+        }
+        let supplierItems = [];
+        try {
+            supplierItems = yield supplierItemRepository.find({
+                where: { item_id: parseInt(id) },
+                relations: ["supplier"],
+            });
+        }
+        catch (e) {
+            console.warn("supplier_items table not available:", e.message);
+        }
+        const primaryWarehouseItem = warehouseItems[0] || null;
+        let attachments = [];
+        try {
+            const libraryRepository = database_1.AppDataSource.getRepository(library_1.LibraryFile);
+            attachments = yield libraryRepository.find({
+                where: { itemId: parseInt(id) },
+            });
+        }
+        catch (e) {
+            console.warn("library_files table not available:", e.message);
+        }
+        const de_no = (primaryWarehouseItem === null || primaryWarehouseItem === void 0 ? void 0 : primaryWarehouseItem.item_no_de) || ((_a = item.parent) === null || _a === void 0 ? void 0 : _a.de_no) || "";
+        const ean = item.ean || (primaryWarehouseItem === null || primaryWarehouseItem === void 0 ? void 0 : primaryWarehouseItem.ean) || "";
+        const rmbPrice = yield getRMBPriceFromSupplier(parseInt(id));
         const formattedItem = {
             id: item.id,
-            itemNo: `${item.id} / ${((_a = item.parent) === null || _a === void 0 ? void 0 : _a.de_no) || ""}`,
+            de_no: de_no,
+            is_new: item.is_new || "N",
+            itemNo: `${item.id} / ${de_no}`,
+            item_name: item.item_name || "",
+            is_active: item.isActive || "N",
+            created_at: item.created_at,
             name: item.item_name || "",
             nameCN: item.item_name_cn || "",
-            ean: ((_b = item.ean) === null || _b === void 0 ? void 0 : _b.toString()) || "",
-            category: ((_c = item.category) === null || _c === void 0 ? void 0 : _c.name) || "STD",
+            ean: (ean === null || ean === void 0 ? void 0 : ean.toString()) || "",
+            category: ((_b = item.category) === null || _b === void 0 ? void 0 : _b.name) || "STD",
+            category_id: item.cat_id,
             model: item.model || "",
             remark: item.remark || "",
             supplier_id: item.supplier_id,
-            supplier_name: ((_d = item.supplier) === null || _d === void 0 ? void 0 : _d.name) || "",
+            supplier_name: ((_c = item.supplier) === null || _c === void 0 ? void 0 : _c.company_name) || ((_d = item.supplier) === null || _d === void 0 ? void 0 : _d.name) || "",
             painPoints: item.painPoints || [],
             isActive: item.isActive === "Y",
+            is_updated: item.is_updated,
+            transfer_price: item.transfer_price_EUR
+                ? Number(item.transfer_price_EUR).toFixed(2)
+                : "null",
             parent: {
-                noDE: ((_e = item.parent) === null || _e === void 0 ? void 0 : _e.de_no) || "NONE",
-                nameDE: ((_f = item.parent) === null || _f === void 0 ? void 0 : _f.name_de) || "NONE",
-                nameEN: ((_g = item.parent) === null || _g === void 0 ? void 0 : _g.name_en) || "NONE",
+                noDE: ((_e = item.parent) === null || _e === void 0 ? void 0 : _e.de_no) || item.parent_no_de || "",
+                nameDE: ((_f = item.parent) === null || _f === void 0 ? void 0 : _f.name_de) || "",
+                nameEN: ((_g = item.parent) === null || _g === void 0 ? void 0 : _g.name_en) || "",
                 isActive: ((_h = item.parent) === null || _h === void 0 ? void 0 : _h.is_active) === "Y",
                 isSpecialItem: ((_j = item.parent) === null || _j === void 0 ? void 0 : _j.is_NwV) === "Y",
                 priceEUR: 0,
-                priceRMB: 0,
+                priceRMB: rmbPrice || 0,
                 isEURSpecial: item.is_eur_special || "N",
                 isRMBSpecial: item.is_rmb_special || "N",
                 isDimensionSpecial: item.is_dimension_special || "N",
             },
             dimensions: {
-                isbn: ((_k = item.ISBN) === null || _k === void 0 ? void 0 : _k.toString()) || "1",
+                isbn: ((_k = item.ISBN) === null || _k === void 0 ? void 0 : _k.toString()) || "0",
                 weight: ((_l = item.weight) === null || _l === void 0 ? void 0 : _l.toString()) || "0",
                 length: ((_m = item.length) === null || _m === void 0 ? void 0 : _m.toString()) || "0",
                 width: ((_o = item.width) === null || _o === void 0 ? void 0 : _o.toString()) || "0",
@@ -203,24 +453,25 @@ const getItemById = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
                 isPU: item.is_pu_item === 1,
                 isNPR: item.is_npr || "N",
                 isNew: item.is_new || "N",
-                warehouseItem: ((_0 = (_z = warehouseItems[0]) === null || _z === void 0 ? void 0 : _z.id) === null || _0 === void 0 ? void 0 : _0.toString()) || "",
-                idDE: ((_1 = item.ItemID_DE) === null || _1 === void 0 ? void 0 : _1.toString()) || "",
-                noDE: item.parent_no_de || "",
-                nameDE: ((_2 = item.parent) === null || _2 === void 0 ? void 0 : _2.name_de) || "",
-                nameEN: ((_3 = item.parent) === null || _3 === void 0 ? void 0 : _3.name_en) || "",
+                warehouseItem: ((_z = primaryWarehouseItem === null || primaryWarehouseItem === void 0 ? void 0 : primaryWarehouseItem.id) === null || _z === void 0 ? void 0 : _z.toString()) || "",
+                idDE: ((_0 = item.ItemID_DE) === null || _0 === void 0 ? void 0 : _0.toString()) || "",
+                noDE: (primaryWarehouseItem === null || primaryWarehouseItem === void 0 ? void 0 : primaryWarehouseItem.item_no_de) || item.parent_no_de || "",
+                nameDE: (primaryWarehouseItem === null || primaryWarehouseItem === void 0 ? void 0 : primaryWarehouseItem.item_name_de) || ((_1 = item.parent) === null || _1 === void 0 ? void 0 : _1.name_de) || "",
+                nameEN: (primaryWarehouseItem === null || primaryWarehouseItem === void 0 ? void 0 : primaryWarehouseItem.item_name_en) || ((_2 = item.parent) === null || _2 === void 0 ? void 0 : _2.name_en) || "",
                 isActive: item.isActive === "Y",
-                isStock: warehouseItems.some((wi) => wi.stock_qty > 0),
+                isStock: warehouseItems.some((wi) => (wi.stock_qty || 0) > 0),
                 qty: warehouseItems
-                    .reduce((sum, wi) => sum + wi.stock_qty, 0)
+                    .reduce((sum, wi) => sum + (wi.stock_qty || 0), 0)
                     .toString(),
-                msq: ((_5 = (_4 = warehouseItems[0]) === null || _4 === void 0 ? void 0 : _4.msq) === null || _5 === void 0 ? void 0 : _5.toString()) || "0",
-                isNAO: ((_6 = warehouseItems[0]) === null || _6 === void 0 ? void 0 : _6.is_no_auto_order) === "Y",
-                buffer: ((_8 = (_7 = warehouseItems[0]) === null || _7 === void 0 ? void 0 : _7.buffer) === null || _8 === void 0 ? void 0 : _8.toString()) || "0",
-                isSnSI: ((_9 = warehouseItems[0]) === null || _9 === void 0 ? void 0 : _9.is_SnSI) === "Y",
-                foq: ((_10 = item.FOQ) === null || _10 === void 0 ? void 0 : _10.toString()) || "0",
-                fsq: ((_11 = item.FSQ) === null || _11 === void 0 ? void 0 : _11.toString()) || "0",
-                rmbPrice: ((_12 = item.RMB_Price) === null || _12 === void 0 ? void 0 : _12.toString()) || "0",
+                msq: ((_3 = primaryWarehouseItem === null || primaryWarehouseItem === void 0 ? void 0 : primaryWarehouseItem.msq) === null || _3 === void 0 ? void 0 : _3.toString()) || "0",
+                isNAO: (primaryWarehouseItem === null || primaryWarehouseItem === void 0 ? void 0 : primaryWarehouseItem.is_no_auto_order) === "Y",
+                buffer: ((_4 = primaryWarehouseItem === null || primaryWarehouseItem === void 0 ? void 0 : primaryWarehouseItem.buffer) === null || _4 === void 0 ? void 0 : _4.toString()) || "0",
+                isSnSI: (primaryWarehouseItem === null || primaryWarehouseItem === void 0 ? void 0 : primaryWarehouseItem.is_SnSI) === "Y",
+                foq: ((_5 = item.FOQ) === null || _5 === void 0 ? void 0 : _5.toString()) || "0",
+                fsq: ((_6 = item.FSQ) === null || _6 === void 0 ? void 0 : _6.toString()) || "0",
+                rmbPrice: (rmbPrice === null || rmbPrice === void 0 ? void 0 : rmbPrice.toString()) || "0",
                 isDimensionSpecial: item.is_dimension_special || "N",
+                pixPath: item.pix_path || "",
                 suppCat: item.supp_cat || "",
             },
             qualityCriteria: qualityCriteria.map((qc) => ({
@@ -231,28 +482,60 @@ const getItemById = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
                 description: qc.description || "",
                 descriptionCN: qc.description_cn || "",
             })),
-            attachments: [],
+            attachments: attachments.map((file) => ({
+                id: file.id,
+                filename: file.filename,
+                originalName: file.originalName,
+                url: (0, cloudinary_1.signCloudinaryPdfUrl)(file.url),
+                fileType: file.fileType,
+                uploadedAt: file.uploadedAt,
+            })),
             pictures: {
                 shopPicture: item.photo || "",
                 ebayPictures: item.pix_path_eBay || "",
+                pixPath: item.pix_path || "",
             },
-            supplierItem: supplierItem ? {
-                priceRMB: ((_13 = supplierItem.price_rmb) === null || _13 === void 0 ? void 0 : _13.toString()) || "0",
-                isPO: supplierItem.is_po || "No",
-                moq: ((_14 = supplierItem.moq) === null || _14 === void 0 ? void 0 : _14.toString()) || "0",
-                interval: ((_15 = supplierItem.oi) === null || _15 === void 0 ? void 0 : _15.toString()) || "0",
-                leadTime: supplierItem.lead_time || "",
-                noteCN: supplierItem.note_cn || "",
-                url: supplierItem.url || "",
-            } : {
-                priceRMB: "0",
-                isPO: "No",
-                moq: "0",
-                interval: "0",
-                leadTime: "",
-                noteCN: "",
-                url: "",
-            },
+            supplierItems: supplierItems.map((si) => {
+                var _a, _b, _c, _d, _e;
+                return ({
+                    id: si.id,
+                    supplierId: si.supplier_id,
+                    supplierName: ((_a = si.supplier) === null || _a === void 0 ? void 0 : _a.company_name) || ((_b = si.supplier) === null || _b === void 0 ? void 0 : _b.name) || "Unknown",
+                    priceRMB: ((_c = si.price_rmb) === null || _c === void 0 ? void 0 : _c.toString()) || "0",
+                    isPO: si.is_po || "No",
+                    moq: ((_d = si.moq) === null || _d === void 0 ? void 0 : _d.toString()) || "0",
+                    interval: ((_e = si.oi) === null || _e === void 0 ? void 0 : _e.toString()) || "0",
+                    leadTime: si.lead_time || "",
+                    noteCN: si.note_cn || "",
+                    url: si.url || "",
+                    isDefault: si.is_default === "Y",
+                });
+            }),
+            // Keep single supplierItem for backwards compatibility (the default one)
+            supplierItem: (() => {
+                var _a, _b, _c, _d, _e;
+                const defaultSi = supplierItems.find(si => si.is_default === 'Y') || supplierItems[0];
+                return defaultSi ? {
+                    id: defaultSi.id,
+                    supplierId: defaultSi.supplier_id,
+                    supplierName: ((_a = defaultSi.supplier) === null || _a === void 0 ? void 0 : _a.company_name) || ((_b = defaultSi.supplier) === null || _b === void 0 ? void 0 : _b.name) || "Unknown",
+                    priceRMB: ((_c = defaultSi.price_rmb) === null || _c === void 0 ? void 0 : _c.toString()) || "0",
+                    isPO: defaultSi.is_po || "No",
+                    moq: ((_d = defaultSi.moq) === null || _d === void 0 ? void 0 : _d.toString()) || "0",
+                    interval: ((_e = defaultSi.oi) === null || _e === void 0 ? void 0 : _e.toString()) || "0",
+                    leadTime: defaultSi.lead_time || "",
+                    noteCN: defaultSi.note_cn || "",
+                    url: defaultSi.url || "",
+                } : {
+                    priceRMB: "0",
+                    isPO: "No",
+                    moq: "0",
+                    interval: "0",
+                    leadTime: "",
+                    noteCN: "",
+                    url: "",
+                };
+            })(),
             nprRemarks: item.npr_remark || "",
         };
         const user = req.user;
@@ -273,45 +556,63 @@ const createItem = (req, res, next) => __awaiter(void 0, void 0, void 0, functio
         const parentRepository = database_1.AppDataSource.getRepository(parents_1.Parent);
         const taricRepository = database_1.AppDataSource.getRepository(tarics_1.Taric);
         const categoryRepository = database_1.AppDataSource.getRepository(categories_1.Category);
-        const { item_name, item_name_cn, ean, parent_id, taric_id, cat_id, weight, length, width, height, supplier_id, remark, model, RMB_Price, price, currency, isActive = "Y", is_qty_dividable = "Y", is_npr = "N", is_eur_special = "N", is_rmb_special = "N", painPoints = [], } = req.body;
+        let { item_name, item_name_cn, ean, parent_id, taric_id, cat_id, weight, length, width, height, supplier_id, remark, model, RMB_Price, price, currency, isActive = "Y", is_qty_dividable = "Y", is_npr = "N", is_eur_special = "N", is_rmb_special = "N", painPoints = [], item_no_de, item_name_de, } = req.body;
         if (!item_name || !parent_id) {
             return next(new errorHandler_1.default("Item name and parent ID are required", 400));
         }
         if (supplier_id) {
-            const supplierRepo = database_1.AppDataSource.getRepository(suppliers_1.Supplier);
-            const supplier = yield supplierRepo.findOne({ where: { id: supplier_id } });
-            if (!supplier) {
+            const supplier = yield database_1.AppDataSource.getRepository(suppliers_1.Supplier).findOne({
+                where: { id: supplier_id },
+            });
+            if (!supplier)
                 return next(new errorHandler_1.default("Supplier not found", 404));
-            }
         }
         const parent = yield parentRepository.findOne({ where: { id: parent_id } });
-        if (!parent) {
+        if (!parent)
             return next(new errorHandler_1.default("Parent not found", 404));
-        }
         if (taric_id) {
             const taric = yield taricRepository.findOne({ where: { id: taric_id } });
-            if (!taric) {
+            if (!taric)
                 return next(new errorHandler_1.default("Taric not found", 404));
-            }
         }
+        let category = null;
         if (cat_id) {
-            const category = yield categoryRepository.findOne({
-                where: { id: cat_id },
-            });
-            if (!category) {
+            category = yield categoryRepository.findOne({ where: { id: cat_id } });
+            if (!category)
                 return next(new errorHandler_1.default("Category not found", 404));
-            }
         }
-        if (ean) {
-            const existingItem = yield itemRepository.findOne({ where: { ean } });
-            if (existingItem) {
-                return next(new errorHandler_1.default("Item with this EAN already exists", 400));
+        if (!ean || ean.trim() === "") {
+            const prefix = "789";
+            const timestamp = (Date.now() % 1000000).toString().padStart(6, "0");
+            const random = Math.floor(Math.random() * 1000000).toString().padStart(6, "0");
+            const baseNumber = (timestamp + random).slice(0, 9);
+            const eanWithoutCheck = prefix + baseNumber;
+            let sum = 0;
+            for (let i = 0; i < eanWithoutCheck.length; i++) {
+                const digit = parseInt(eanWithoutCheck[i]);
+                sum += i % 2 === 0 ? digit * 1 : digit * 3;
             }
+            const remainder = sum % 10;
+            const checkDigit = remainder === 0 ? 0 : 10 - remainder;
+            ean = eanWithoutCheck + checkDigit;
+        }
+        else {
+            const existingItem = yield itemRepository.findOne({
+                where: { ean: ean.toString() },
+            });
+            if (existingItem)
+                return next(new errorHandler_1.default("Item with this EAN already exists", 400));
+        }
+        // --- TRANSFER PRICE LOGIC ---
+        let finalPrice = price ? parseFloat(price) : null;
+        const finalRMB = RMB_Price ? parseFloat(RMB_Price) : null;
+        if ((category === null || category === void 0 ? void 0 : category.name) === "STD" && finalRMB) {
+            finalPrice = calculateTransferPrice(finalRMB);
         }
         const newItem = itemRepository.create({
             item_name,
             item_name_cn,
-            ean: ean ? BigInt(ean) : null,
+            ean: ean ? ean.toString() : null,
             parent_id,
             taric_id,
             cat_id,
@@ -322,8 +623,8 @@ const createItem = (req, res, next) => __awaiter(void 0, void 0, void 0, functio
             height: height ? parseFloat(height) : null,
             remark,
             model,
-            RMB_Price: RMB_Price ? parseFloat(RMB_Price) : null,
-            price: price ? parseFloat(price) : null,
+            RMB_Price: finalRMB,
+            price: finalPrice,
             currency,
             isActive,
             is_qty_dividable,
@@ -331,35 +632,53 @@ const createItem = (req, res, next) => __awaiter(void 0, void 0, void 0, functio
             is_eur_special,
             is_rmb_special,
             painPoints,
+            is_new: "Y",
+            is_updated: false,
             created_at: new Date(),
             updated_at: new Date(),
         });
         yield itemRepository.save(newItem);
-        const warehouseRepository = database_1.AppDataSource.getRepository(warehouse_items_1.WarehouseItem);
-        const warehouseItem = warehouseRepository.create({
-            item_id: newItem.id,
-            item_no_de: parent.de_no,
-            item_name_de: item_name,
-            item_name_en: item_name,
-            stock_qty: 0,
-            msq: 0,
-            buffer: 0,
-            is_active: "Y",
-            is_stock_item: "N",
-            created_at: new Date(),
-        });
-        yield warehouseRepository.save(warehouseItem);
+        try {
+            if (supplier_id) {
+                const supplierItemRepository = database_1.AppDataSource.getRepository(supplier_items_1.SupplierItem);
+                const supplierItem = supplierItemRepository.create({
+                    item_id: newItem.id,
+                    supplier_id: supplier_id,
+                    price_rmb: finalRMB || 0,
+                    is_default: "Y",
+                    is_po: "No",
+                    oi: 0,
+                    moq: 1,
+                });
+                yield supplierItemRepository.save(supplierItem);
+            }
+        }
+        catch (err) {
+            console.warn("Supplier item creation failed:", err);
+        }
+        try {
+            const warehouseRepository = database_1.AppDataSource.getRepository(warehouse_items_1.WarehouseItem);
+            const warehouseItem = warehouseRepository.create({
+                item_id: newItem.id,
+                item_no_de: item_no_de || parent.de_no,
+                item_name_de: item_name_de || item_name,
+                item_name_en: item_name,
+                stock_qty: 0,
+                msq: 0,
+                buffer: 0,
+                is_active: "Y",
+                is_stock_item: "N",
+                created_at: new Date(),
+            });
+            yield warehouseRepository.save(warehouseItem);
+        }
+        catch (err) {
+            console.warn("Warehouse creation failed:", err);
+        }
         return res.status(201).json({
             success: true,
             message: "Item created successfully",
-            data: {
-                id: newItem.id,
-                item_name: newItem.item_name,
-                ean: newItem.ean,
-                parent_id: newItem.parent_id,
-                supplier_id: newItem.supplier_id,
-                isActive: newItem.isActive,
-            },
+            data: newItem,
         });
     }
     catch (error) {
@@ -368,18 +687,18 @@ const createItem = (req, res, next) => __awaiter(void 0, void 0, void 0, functio
 });
 exports.createItem = createItem;
 const updateItem = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b, _c, _d;
     try {
         const { id } = req.params;
         const itemRepository = database_1.AppDataSource.getRepository(items_1.Item);
         const supplierItemRepository = database_1.AppDataSource.getRepository(supplier_items_1.SupplierItem);
         const warehouseRepository = database_1.AppDataSource.getRepository(warehouse_items_1.WarehouseItem);
-        if (!id) {
+        const categoryRepository = database_1.AppDataSource.getRepository(categories_1.Category);
+        if (!id)
             return next(new errorHandler_1.default("Item ID is required", 400));
-        }
         const item = yield itemRepository.findOne({ where: { id: parseInt(id) } });
-        if (!item) {
+        if (!item)
             return next(new errorHandler_1.default("Item not found", 404));
-        }
         const updatableFields = [
             "item_name",
             "item_name_cn",
@@ -408,7 +727,6 @@ const updateItem = (req, res, next) => __awaiter(void 0, void 0, void 0, functio
             "FOQ",
             "FSQ",
             "ISBN",
-            "RMB_Price",
             "many_components",
             "effort_rating",
             "is_pu_item",
@@ -417,74 +735,156 @@ const updateItem = (req, res, next) => __awaiter(void 0, void 0, void 0, functio
             "supp_cat",
             "ItemID_DE",
             "painPoints",
+            "price",
         ];
+        let hasChanges = false;
         updatableFields.forEach((field) => {
             const value = req.body[field];
             if (value !== undefined) {
-                if (field === "ean") {
-                    if (value && value.toString().trim() !== "") {
-                        item[field] = BigInt(value);
-                    }
-                    else {
-                        item[field] = null;
-                    }
-                }
-                else {
-                    item[field] = value;
+                const currentValue = item[field];
+                let newValue = field === "ean" ? (value ? value.toString() : null) : value;
+                if (currentValue != newValue) {
+                    hasChanges = true;
+                    item[field] = newValue;
                 }
             }
         });
-        item.updated_at = new Date();
-        yield itemRepository.save(item);
         const supplierItemData = req.body.supplierItem;
-        if (supplierItemData) {
-            const supplierItem = yield supplierItemRepository.findOne({ where: { item_id: item.id } });
-            if (supplierItem) {
-                if (supplierItemData.price_rmb !== undefined)
-                    supplierItem.price_rmb = parseFloat(supplierItemData.price_rmb);
-                if (supplierItemData.is_po !== undefined)
-                    supplierItem.is_po = supplierItemData.is_po;
-                if (supplierItemData.moq !== undefined)
-                    supplierItem.moq = parseInt(supplierItemData.moq);
-                if (supplierItemData.oi !== undefined)
-                    supplierItem.oi = parseInt(supplierItemData.oi);
-                if (supplierItemData.lead_time !== undefined)
-                    supplierItem.lead_time = supplierItemData.lead_time;
-                if (supplierItemData.note_cn !== undefined)
-                    supplierItem.note_cn = supplierItemData.note_cn;
-                if (supplierItemData.url !== undefined)
-                    supplierItem.url = supplierItemData.url;
-                yield supplierItemRepository.save(supplierItem);
+        const supplierItemsData = req.body.supplierItems;
+        if (supplierItemsData && Array.isArray(supplierItemsData)) {
+            const existingSupplierItems = yield supplierItemRepository.find({
+                where: { item_id: item.id }
+            });
+            const incomingIds = supplierItemsData.filter(si => si.id > 0).map(si => si.id);
+            for (const existing of existingSupplierItems) {
+                if (!incomingIds.includes(existing.id)) {
+                    yield supplierItemRepository.delete(existing.id);
+                }
             }
+            for (const siData of supplierItemsData) {
+                if (siData.id > 0) {
+                    yield supplierItemRepository.update(siData.id, {
+                        is_default: siData.isDefault ? "Y" : "N",
+                    });
+                }
+                else if (siData.id < 0 && siData.supplierId) {
+                    const newSI = supplierItemRepository.create({
+                        item_id: item.id,
+                        supplier_id: siData.supplierId,
+                        is_default: siData.isDefault ? "Y" : "N",
+                        price_rmb: parseFloat(siData.priceRMB) || 0,
+                        moq: parseInt(siData.moq) || 0,
+                        lead_time: siData.leadTime || "",
+                    });
+                    yield supplierItemRepository.save(newSI);
+                }
+            }
+            hasChanges = true;
+        }
+        const category = yield categoryRepository.findOne({
+            where: { id: item.cat_id },
+        });
+        let currentRMBPrice = null;
+        if (supplierItemData) {
+            let supplierItem = yield supplierItemRepository.findOne({
+                where: { item_id: item.id },
+            });
+            if (supplierItem) {
+                let sChanges = false;
+                if (supplierItemData.price_rmb !== undefined) {
+                    const newRMB = parseFloat(supplierItemData.price_rmb);
+                    if (supplierItem.price_rmb !== newRMB) {
+                        supplierItem.price_rmb = newRMB;
+                        currentRMBPrice = newRMB;
+                        sChanges = true;
+                    }
+                }
+                if (supplierItemData.is_po !== undefined) {
+                    supplierItem.is_po = supplierItemData.is_po;
+                    sChanges = true;
+                }
+                if (supplierItemData.moq !== undefined) {
+                    supplierItem.moq = parseInt(supplierItemData.moq);
+                    sChanges = true;
+                }
+                if (supplierItemData.oi !== undefined) {
+                    supplierItem.oi = parseInt(supplierItemData.oi);
+                    sChanges = true;
+                }
+                if (supplierItemData.lead_time !== undefined) {
+                    supplierItem.lead_time = supplierItemData.lead_time;
+                    sChanges = true;
+                }
+                if (supplierItemData.url !== undefined) {
+                    supplierItem.url = supplierItemData.url;
+                    sChanges = true;
+                }
+                if (sChanges) {
+                    yield supplierItemRepository.save(supplierItem);
+                    hasChanges = true;
+                }
+            }
+            else {
+                const newSI = supplierItemRepository.create({
+                    item_id: item.id,
+                    supplier_id: toInt(req.body.supplier_id) || 0,
+                    price_rmb: toNum(supplierItemData.price_rmb),
+                    is_po: supplierItemData.is_po || "No",
+                    moq: toInt(supplierItemData.moq),
+                    oi: toInt(supplierItemData.oi),
+                    lead_time: supplierItemData.lead_time || "",
+                    url: supplierItemData.url || "",
+                });
+                yield supplierItemRepository.save(newSI);
+                currentRMBPrice = newSI.price_rmb;
+                hasChanges = true;
+            }
+        }
+        if ((category === null || category === void 0 ? void 0 : category.name) === "STD") {
+            if (currentRMBPrice === null) {
+                const existingSI = yield supplierItemRepository.findOne({
+                    where: { item_id: item.id },
+                });
+                currentRMBPrice = (existingSI === null || existingSI === void 0 ? void 0 : existingSI.price_rmb) || null;
+            }
+            if (currentRMBPrice) {
+                const calculated = calculateTransferPrice(Number(currentRMBPrice));
+                if (item.price !== calculated) {
+                    item.price = calculated;
+                    hasChanges = true;
+                }
+            }
+        }
+        if (hasChanges) {
+            item.is_updated = true;
+            item.updated_at = new Date();
+            yield itemRepository.save(item);
         }
         const warehouseItemData = req.body.warehouseItemData;
         if (warehouseItemData) {
-            const warehouseItem = yield warehouseRepository.findOne({ where: { item_id: item.id } });
+            let warehouseItem = yield warehouseRepository.findOne({
+                where: { item_id: item.id },
+            });
             if (warehouseItem) {
-                if (warehouseItemData.is_stock_item !== undefined)
-                    warehouseItem.is_stock_item = warehouseItemData.is_stock_item;
-                if (warehouseItemData.is_active !== undefined)
-                    warehouseItem.is_active = warehouseItemData.is_active;
-                if (warehouseItemData.msq !== undefined)
-                    warehouseItem.msq = parseFloat(warehouseItemData.msq);
-                if (warehouseItemData.is_no_auto_order !== undefined)
-                    warehouseItem.is_no_auto_order = warehouseItemData.is_no_auto_order;
-                if (warehouseItemData.buffer !== undefined)
-                    warehouseItem.buffer = parseInt(warehouseItemData.buffer);
-                if (warehouseItemData.is_SnSI !== undefined)
-                    warehouseItem.is_SnSI = warehouseItemData.is_SnSI;
+                Object.assign(warehouseItem, {
+                    is_stock_item: (_a = warehouseItemData.is_stock_item) !== null && _a !== void 0 ? _a : warehouseItem.is_stock_item,
+                    is_active: (_b = warehouseItemData.is_active) !== null && _b !== void 0 ? _b : warehouseItem.is_active,
+                    msq: warehouseItemData.msq
+                        ? parseFloat(warehouseItemData.msq)
+                        : warehouseItem.msq,
+                    buffer: warehouseItemData.buffer
+                        ? parseInt(warehouseItemData.buffer)
+                        : warehouseItem.buffer,
+                    item_no_de: (_c = warehouseItemData.item_no_de) !== null && _c !== void 0 ? _c : warehouseItem.item_no_de,
+                    item_name_de: (_d = warehouseItemData.item_name_de) !== null && _d !== void 0 ? _d : warehouseItem.item_name_de,
+                });
                 yield warehouseRepository.save(warehouseItem);
             }
         }
         return res.status(200).json({
             success: true,
             message: "Item updated successfully",
-            data: {
-                id: item.id,
-                item_name: item.item_name,
-                isActive: item.isActive,
-                updated_at: item.updated_at,
-            },
+            data: item,
         });
     }
     catch (error) {
@@ -492,6 +892,52 @@ const updateItem = (req, res, next) => __awaiter(void 0, void 0, void 0, functio
     }
 });
 exports.updateItem = updateItem;
+const syncTransferPrices = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const itemRepo = database_1.AppDataSource.getRepository(items_1.Item);
+        const categoryRepo = database_1.AppDataSource.getRepository(categories_1.Category);
+        const supplierItemRepo = database_1.AppDataSource.getRepository(supplier_items_1.SupplierItem);
+        const stdCategory = yield categoryRepo.findOne({ where: { name: "STD" } });
+        if (!stdCategory)
+            return next(new errorHandler_1.default("STD Category not found", 404));
+        const items = yield itemRepo.find({ where: { supp_cat: "STD" } });
+        console.log(items);
+        let count = 0;
+        for (const item of items) {
+            const sItem = yield supplierItemRepo.findOne({
+                where: { item_id: item.id },
+            });
+            if (sItem && sItem.price_rmb) {
+                const newTransferPrice = calculateTransferPrice(sItem.price_rmb);
+                if (item.transfer_price_EUR !== newTransferPrice) {
+                    item.transfer_price_EUR = newTransferPrice;
+                    item.is_updated = true;
+                    yield itemRepo.save(item);
+                    count++;
+                }
+            }
+        }
+        return res
+            .status(200)
+            .json({ success: true, message: `Updated ${count} transfer prices.` });
+    }
+    catch (error) {
+        next(error);
+    }
+});
+exports.syncTransferPrices = syncTransferPrices;
+const toNum = (val) => {
+    if (val === null || val === undefined || val === "")
+        return null;
+    const n = parseFloat(val);
+    return isNaN(n) ? null : n;
+};
+const toInt = (val) => {
+    if (val === null || val === undefined || val === "")
+        return null;
+    const n = parseInt(val);
+    return isNaN(n) ? null : n;
+};
 const deleteItem = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { id } = req.params;
@@ -515,15 +961,42 @@ const deleteItem = (req, res, next) => __awaiter(void 0, void 0, void 0, functio
             return next(new errorHandler_1.default("Cannot delete item. There is stock in warehouse. Please clear stock first.", 400));
         }
         yield database_1.AppDataSource.transaction((transactionalEntityManager) => __awaiter(void 0, void 0, void 0, function* () {
-            yield transactionalEntityManager.delete(warehouse_items_1.WarehouseItem, {
-                item_id: parseInt(id),
-            });
-            yield transactionalEntityManager.delete(variation_values_1.VariationValue, {
-                item_id: parseInt(id),
-            });
-            yield transactionalEntityManager.delete(item_qualities_1.ItemQuality, {
-                item_id: parseInt(id),
-            });
+            yield transactionalEntityManager
+                .createQueryBuilder()
+                .delete()
+                .from(warehouse_items_1.WarehouseItem)
+                .where("item_id = :itemId", { itemId: parseInt(id) })
+                .execute();
+            yield transactionalEntityManager
+                .createQueryBuilder()
+                .delete()
+                .from(variation_values_1.VariationValue)
+                .where("item_id = :itemId", { itemId: parseInt(id) })
+                .execute();
+            yield transactionalEntityManager
+                .createQueryBuilder()
+                .delete()
+                .from(item_qualities_1.ItemQuality)
+                .where("item_id = :itemId", { itemId: parseInt(id) })
+                .execute();
+            yield transactionalEntityManager
+                .createQueryBuilder()
+                .delete()
+                .from(supplier_items_1.SupplierItem)
+                .where("item_id = :itemId", { itemId: parseInt(id) })
+                .execute();
+            yield transactionalEntityManager
+                .createQueryBuilder()
+                .delete()
+                .from(library_1.LibraryFile)
+                .where('"itemId" = :itemId', { itemId: parseInt(id) })
+                .execute();
+            yield transactionalEntityManager
+                .createQueryBuilder()
+                .delete()
+                .from(order_items_1.OrderItem)
+                .where("item_id = :itemId", { itemId: parseInt(id) })
+                .execute();
             yield transactionalEntityManager.delete(items_1.Item, parseInt(id));
         }));
         return res.status(200).json({
@@ -551,15 +1024,20 @@ const toggleItemStatus = (req, res, next) => __awaiter(void 0, void 0, void 0, f
         if (!item) {
             return next(new errorHandler_1.default("Item not found", 404));
         }
-        item.isActive = isActive ? "Y" : "N";
-        item.updated_at = new Date();
-        yield itemRepository.save(item);
+        const newStatus = isActive ? "Y" : "N";
+        if (item.isActive !== newStatus) {
+            item.isActive = newStatus;
+            item.is_updated = true;
+            item.updated_at = new Date();
+            yield itemRepository.save(item);
+        }
         return res.status(200).json({
             success: true,
             message: `Item ${isActive ? "activated" : "deactivated"} successfully`,
             data: {
                 id: item.id,
                 isActive: item.isActive,
+                is_updated: item.is_updated,
             },
         });
     }
@@ -584,14 +1062,23 @@ const bulkUpdateItems = (req, res, next) => __awaiter(void 0, void 0, void 0, fu
                 where: { id: parseInt(id) },
             });
             if (item) {
+                let hasChanges = false;
                 Object.keys(updates).forEach((key) => {
                     if (key in item && key !== "id") {
-                        item[key] = updates[key];
+                        const currentValue = item[key];
+                        const newValue = updates[key];
+                        if (currentValue !== newValue) {
+                            hasChanges = true;
+                            item[key] = newValue;
+                        }
                     }
                 });
-                item.updated_at = new Date();
-                yield itemRepository.save(item);
-                updatedItems.push(item);
+                if (hasChanges) {
+                    item.is_updated = true;
+                    item.updated_at = new Date();
+                    yield itemRepository.save(item);
+                    updatedItems.push(item);
+                }
             }
         }
         return res.status(200).json({
@@ -603,6 +1090,7 @@ const bulkUpdateItems = (req, res, next) => __awaiter(void 0, void 0, void 0, fu
                     id: item.id,
                     item_name: item.item_name,
                     isActive: item.isActive,
+                    is_updated: item.is_updated,
                 })),
             },
         });
@@ -620,11 +1108,23 @@ const getItemStatistics = (req, res, next) => __awaiter(void 0, void 0, void 0, 
         const activeItems = yield itemRepository.count({
             where: { isActive: "Y" },
         });
-        const itemsWithStock = yield warehouseRepository
-            .createQueryBuilder("warehouse")
-            .select("COUNT(DISTINCT warehouse.item_id)", "count")
-            .where("warehouse.stock_qty > 0")
-            .getRawOne();
+        const itemsNeedingSync = yield itemRepository.count({
+            where: { is_updated: true },
+        });
+        const itemsPendingNew = yield itemRepository.count({
+            where: { is_new: "Y" },
+        });
+        let itemsWithStock = { count: 0 };
+        try {
+            itemsWithStock = (yield warehouseRepository
+                .createQueryBuilder("warehouse")
+                .select("COUNT(DISTINCT warehouse.item_id)", "count")
+                .where("warehouse.stock_qty > 0")
+                .getRawOne()) || { count: 0 };
+        }
+        catch (e) {
+            console.warn("Could not fetch warehouse stock statistics:", e.message);
+        }
         const itemsByCategory = yield itemRepository
             .createQueryBuilder("item")
             .leftJoin("item.category", "category")
@@ -640,6 +1140,8 @@ const getItemStatistics = (req, res, next) => __awaiter(void 0, void 0, void 0, 
                 activeItems,
                 inactiveItems: totalItems - activeItems,
                 itemsWithStock: parseInt(itemsWithStock.count) || 0,
+                itemsNeedingSync,
+                itemsPendingNew,
                 itemsByCategory,
             },
         });
@@ -666,6 +1168,7 @@ const searchItems = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
             .orWhere("item.ean::text ILIKE :search", { search: searchTerm })
             .orWhere("parent.name_de ILIKE :search", { search: searchTerm })
             .orWhere("parent.name_en ILIKE :search", { search: searchTerm })
+            .orWhere("CAST(item.id AS TEXT) ILIKE :search", { search: searchTerm })
             .orderBy("item.created_at", "DESC")
             .take(parseInt(limit))
             .getMany();
@@ -680,6 +1183,7 @@ const searchItems = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
                 ean: item.ean,
                 category: ((_d = item.category) === null || _d === void 0 ? void 0 : _d.name) || null,
                 is_active: item.isActive,
+                is_updated: item.is_updated,
             });
         });
         return res.status(200).json({
@@ -692,6 +1196,32 @@ const searchItems = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
     }
 });
 exports.searchItems = searchItems;
+// ==================== ADDITIONAL SYNC UTILITY FUNCTION ====================
+const resetUpdatedFlag = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { ids } = req.body;
+        const itemRepository = database_1.AppDataSource.getRepository(items_1.Item);
+        if (ids && Array.isArray(ids) && ids.length > 0) {
+            yield itemRepository.update({ id: (0, typeorm_1.In)(ids) }, { is_updated: false });
+            return res.status(200).json({
+                success: true,
+                message: `Reset is_updated flag for ${ids.length} items`,
+            });
+        }
+        else {
+            // Reset all items if no specific IDs provided
+            yield itemRepository.update({}, { is_updated: false });
+            return res.status(200).json({
+                success: true,
+                message: "Reset is_updated flag for all items",
+            });
+        }
+    }
+    catch (error) {
+        return next(error);
+    }
+});
+exports.resetUpdatedFlag = resetUpdatedFlag;
 const getParents = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const parentRepository = database_1.AppDataSource.getRepository(parents_1.Parent);
@@ -699,18 +1229,49 @@ const getParents = (req, res, next) => __awaiter(void 0, void 0, void 0, functio
         const pageNum = parseInt(page);
         const limitNum = parseInt(limit);
         const skip = (pageNum - 1) * limitNum;
-        const whereConditions = {};
+        let whereConditions = {};
         if (search) {
-            whereConditions.name_de = (0, typeorm_1.ILike)(`%${search}%`);
+            const searchStr = search;
+            whereConditions = [
+                { name_de: (0, typeorm_1.ILike)(`%${searchStr}%`) },
+                { name_en: (0, typeorm_1.ILike)(`%${searchStr}%`) },
+                { name_cn: (0, typeorm_1.ILike)(`%${searchStr}%`) },
+                { de_no: (0, typeorm_1.ILike)(`%${searchStr}%`) },
+            ];
+            const parsedId = parseInt(searchStr);
+            if (!isNaN(parsedId) && parsedId <= 2147483647) {
+                whereConditions.push({ id: parsedId });
+            }
+        }
+        else {
+            whereConditions = {};
         }
         if (isActive) {
-            whereConditions.is_active = isActive;
+            const activeFilter = { is_active: isActive };
+            if (Array.isArray(whereConditions)) {
+                whereConditions = whereConditions.map((cond) => (Object.assign(Object.assign({}, cond), activeFilter)));
+            }
+            else {
+                whereConditions.is_active = isActive;
+            }
         }
         if (supplierId) {
-            whereConditions.supplier_id = parseInt(supplierId);
+            const supplierFilter = { supplier_id: parseInt(supplierId) };
+            if (Array.isArray(whereConditions)) {
+                whereConditions = whereConditions.map((cond) => (Object.assign(Object.assign({}, cond), supplierFilter)));
+            }
+            else {
+                whereConditions.supplier_id = parseInt(supplierId);
+            }
         }
         if (taricId) {
-            whereConditions.taric_id = parseInt(taricId);
+            const taricFilter = { taric_id: parseInt(taricId) };
+            if (Array.isArray(whereConditions)) {
+                whereConditions = whereConditions.map((cond) => (Object.assign(Object.assign({}, cond), taricFilter)));
+            }
+            else {
+                whereConditions.taric_id = parseInt(taricId);
+            }
         }
         const relations = ["taric", "supplier", "items"];
         const totalRecords = yield parentRepository.count({
@@ -1043,6 +1604,9 @@ const getWarehouseItems = (req, res, next) => __awaiter(void 0, void 0, void 0, 
             })
                 .orWhere("warehouse.item_no_de ILIKE :search", {
                 search: `%${search}%`,
+            })
+                .orWhere("CAST(warehouse.id AS TEXT) ILIKE :search", {
+                search: `%${search}%`,
             });
         }
         if (hasStock === "true") {
@@ -1234,9 +1798,19 @@ const getItemQualityCriteria = (req, res, next) => __awaiter(void 0, void 0, voi
             where: { item_id: parseInt(itemId) },
             order: { created_at: "ASC" },
         });
+        const formattedCriteria = criteria.map((qc) => ({
+            id: qc.id,
+            itemId: qc.item_id,
+            name: qc.name || "",
+            picture: qc.picture || "",
+            description: qc.description || "",
+            descriptionCN: qc.description_cn || "",
+            created_at: qc.created_at,
+            updated_at: qc.updated_at,
+        }));
         return res.status(200).json({
             success: true,
-            data: criteria,
+            data: formattedCriteria,
         });
     }
     catch (error) {
@@ -1303,7 +1877,8 @@ const updateQualityCriterion = (req, res, next) => __awaiter(void 0, void 0, voi
             criterion.picture = picture;
         if (description !== undefined)
             criterion.description = description;
-        // if (description_cn !== undefined) criterion.description_cn = description_cn;
+        if (description_cn !== undefined)
+            criterion.description_cn = description_cn;
         criterion.updated_at = new Date();
         yield qualityRepository.save(criterion);
         return res.status(200).json({
@@ -1345,21 +1920,29 @@ const getAllTarics = (req, res, next) => __awaiter(void 0, void 0, void 0, funct
     try {
         const taricRepository = database_1.AppDataSource.getRepository(tarics_1.Taric);
         const { page = "1", limit = "30", search = "", code = "", name = "", sortBy = "id", sortOrder = "ASC", } = req.query;
-        const pageNum = parseInt(page);
-        const limitNum = parseInt(limit);
+        let pageNum = parseInt(page);
+        if (isNaN(pageNum))
+            pageNum = 1;
+        let limitNum = parseInt(limit);
+        if (isNaN(limitNum))
+            limitNum = 30;
         const skip = (pageNum - 1) * limitNum;
-        const whereConditions = {};
+        let whereConditions = {};
         if (search) {
-            whereConditions.code = (0, typeorm_1.ILike)(`%${search}%`);
-            whereConditions.name_de = (0, typeorm_1.ILike)(`%${search}%`);
-            whereConditions.name_en = (0, typeorm_1.ILike)(`%${search}%`);
-            whereConditions.name_cn = (0, typeorm_1.ILike)(`%${search}%`);
+            whereConditions = [
+                { code: (0, typeorm_1.ILike)(`%${search}%`) },
+                { name_de: (0, typeorm_1.ILike)(`%${search}%`) },
+                { name_en: (0, typeorm_1.ILike)(`%${search}%`) },
+                { name_cn: (0, typeorm_1.ILike)(`%${search}%`) },
+            ];
         }
-        if (code) {
-            whereConditions.code = (0, typeorm_1.ILike)(`%${code}%`);
-        }
-        if (name) {
-            whereConditions.name_de = (0, typeorm_1.ILike)(`%${name}%`);
+        else {
+            if (code) {
+                whereConditions.code = (0, typeorm_1.ILike)(`%${code}%`);
+            }
+            if (name) {
+                whereConditions.name_de = (0, typeorm_1.ILike)(`%${name}%`);
+            }
         }
         const totalRecords = yield taricRepository.count({
             where: whereConditions,
@@ -1478,79 +2061,7 @@ const getTaricById = (req, res, next) => __awaiter(void 0, void 0, void 0, funct
     }
 });
 exports.getTaricById = getTaricById;
-const syncTaricToMIS = (taricData, operation) => __awaiter(void 0, void 0, void 0, function* () {
-    let connection;
-    try {
-        connection = yield misDb_1.pool.getConnection();
-        const convertUndefinedToNull = (value) => {
-            return value === undefined ? null : value;
-        };
-        if (operation === "create") {
-            const query = `
-        INSERT INTO tarics   
-        (id, code, reguler_artikel, duty_rate, name_de, description_de, name_en, description_en, name_cn, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `;
-            yield connection.execute(query, [
-                convertUndefinedToNull(taricData.id),
-                convertUndefinedToNull(taricData.code),
-                convertUndefinedToNull(taricData.reguler_artikel) || "Y",
-                convertUndefinedToNull(taricData.duty_rate) || 0,
-                convertUndefinedToNull(taricData.name_de),
-                convertUndefinedToNull(taricData.description_de),
-                convertUndefinedToNull(taricData.name_en),
-                convertUndefinedToNull(taricData.description_en),
-                convertUndefinedToNull(taricData.name_cn),
-                convertUndefinedToNull(taricData.created_at) || new Date(),
-                convertUndefinedToNull(taricData.updated_at) || new Date(),
-            ]);
-        }
-        else if (operation === "update") {
-            const query = `
-        UPDATE tarics SET
-          code = ?,
-          reguler_artikel = ?,
-          duty_rate = ?,
-          name_de = ?,
-          description_de = ?,
-          name_en = ?,
-          description_en = ?,
-          name_cn = ?,
-          updated_at = ?
-        WHERE code = ?
-      `;
-            yield connection.execute(query, [
-                convertUndefinedToNull(taricData.code),
-                convertUndefinedToNull(taricData.reguler_artikel) || "Y",
-                convertUndefinedToNull(taricData.duty_rate) || 0,
-                convertUndefinedToNull(taricData.name_de),
-                convertUndefinedToNull(taricData.description_de),
-                convertUndefinedToNull(taricData.name_en),
-                convertUndefinedToNull(taricData.description_en),
-                convertUndefinedToNull(taricData.name_cn),
-                convertUndefinedToNull(taricData.updated_at) || new Date(),
-                convertUndefinedToNull(taricData.originalCode) ||
-                    convertUndefinedToNull(taricData.code),
-            ]);
-        }
-        else if (operation === "delete") {
-            const query = `DELETE FROM tarics WHERE code = ?`;
-            yield connection.execute(query, [convertUndefinedToNull(taricData.code)]);
-        }
-    }
-    catch (error) {
-        console.error("Error syncing to MIS database:", error);
-        const errorMessage = (error === null || error === void 0 ? void 0 : error.message) || (error === null || error === void 0 ? void 0 : error.code) || JSON.stringify(error) || "Unknown MySQL error";
-        throw new Error(`Failed to sync TARIC to MIS: ${errorMessage}`);
-    }
-    finally {
-        if (connection) {
-            connection.release();
-        }
-    }
-});
 const createTaric = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    let connection;
     try {
         const taricRepository = database_1.AppDataSource.getRepository(tarics_1.Taric);
         const { code, name_de, name_en, name_cn, description_de, description_en, reguler_artikel = "Y", duty_rate = 0, } = req.body;
@@ -1580,28 +2091,9 @@ const createTaric = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
             updated_at: new Date(),
         });
         yield taricRepository.save(newTaric);
-        try {
-            yield syncTaricToMIS({
-                id: nextId,
-                code,
-                name_de,
-                name_en,
-                name_cn,
-                description_de,
-                description_en,
-                reguler_artikel,
-                duty_rate,
-                created_at: newTaric.created_at,
-                updated_at: newTaric.updated_at,
-            }, "create");
-        }
-        catch (misError) {
-            yield taricRepository.delete(newTaric.id);
-            return next(new errorHandler_1.default(`TARIC created locally but failed to sync to MIS: ${misError.message}`, 500));
-        }
         return res.status(201).json({
             success: true,
-            message: "TARIC created successfully and synced to MIS",
+            message: "TARIC created successfully",
             data: {
                 id: newTaric.id,
                 code: newTaric.code,
@@ -1617,7 +2109,6 @@ const createTaric = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
 });
 exports.createTaric = createTaric;
 const updateTaric = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    let connection;
     try {
         const { id } = req.params;
         const taricRepository = database_1.AppDataSource.getRepository(tarics_1.Taric);
@@ -1630,7 +2121,6 @@ const updateTaric = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
         if (!taric) {
             return next(new errorHandler_1.default("TARIC not found", 404));
         }
-        const originalCode = taric.code;
         const updatableFields = [
             "code",
             "name_de",
@@ -1641,6 +2131,14 @@ const updateTaric = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
             "reguler_artikel",
             "duty_rate",
         ];
+        if (req.body.code !== undefined && req.body.code !== taric.code) {
+            const existingTaric = yield taricRepository.findOne({
+                where: { code: req.body.code },
+            });
+            if (existingTaric) {
+                return next(new errorHandler_1.default("TARIC with this code already exists", 400));
+            }
+        }
         updatableFields.forEach((field) => {
             if (req.body[field] !== undefined) {
                 taric[field] = req.body[field];
@@ -1648,19 +2146,9 @@ const updateTaric = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
         });
         taric.updated_at = new Date();
         yield taricRepository.save(taric);
-        try {
-            yield syncTaricToMIS(Object.assign(Object.assign({}, taric), { originalCode }), "update");
-        }
-        catch (misError) {
-            yield taricRepository.save(Object.assign(Object.assign(Object.assign({}, taric), { code: originalCode }), Object.fromEntries(Object.entries(req.body).map(([key, value]) => [
-                key,
-                taric[key],
-            ]))));
-            return next(new errorHandler_1.default(`TARIC updated locally but failed to sync to MIS: ${misError.message}`, 500));
-        }
         return res.status(200).json({
             success: true,
-            message: "TARIC updated successfully and synced to MIS",
+            message: "TARIC updated successfully",
             data: {
                 id: taric.id,
                 code: taric.code,
@@ -1675,7 +2163,6 @@ const updateTaric = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
 });
 exports.updateTaric = updateTaric;
 const deleteTaric = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    let connection;
     try {
         const { id } = req.params;
         if (!id) {
@@ -1699,21 +2186,10 @@ const deleteTaric = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
         if (relatedItems > 0 || relatedParents > 0) {
             return next(new errorHandler_1.default("Cannot delete TARIC. It has related items or parents. Please reassign them first.", 400));
         }
-        const taricCode = taric.code || null;
-        if (!taricCode) {
-            return next(new errorHandler_1.default("Cannot delete TARIC: code is missing", 400));
-        }
         yield taricRepository.delete(parseInt(id));
-        try {
-            yield syncTaricToMIS({ code: taricCode }, "delete");
-        }
-        catch (misError) {
-            yield taricRepository.save(taric);
-            return next(new errorHandler_1.default(`TARIC deleted locally but failed to sync to MIS: ${misError.message}`, 500));
-        }
         return res.status(200).json({
             success: true,
-            message: "TARIC deleted successfully and synced from MIS",
+            message: "TARIC deleted successfully",
         });
     }
     catch (error) {
@@ -1867,14 +2343,40 @@ exports.bulkUpsertTarics = bulkUpsertTarics;
 const exportItemsToCSV = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m;
     try {
+        const { type = "updated" } = req.query;
         const itemRepository = database_1.AppDataSource.getRepository(items_1.Item);
         const warehouseRepository = database_1.AppDataSource.getRepository(warehouse_items_1.WarehouseItem);
         const variationRepository = database_1.AppDataSource.getRepository(variation_values_1.VariationValue);
+        const supplierItemRepository = database_1.AppDataSource.getRepository(supplier_items_1.SupplierItem);
+        let whereClause = { is_updated: true };
+        if (type === "new") {
+            whereClause = { is_new: "Y" };
+        }
         const items = yield itemRepository.find({
+            where: whereClause,
             relations: ["parent", "taric", "category"],
             order: {
                 id: "ASC",
             },
+        });
+        if (items.length === 0) {
+            return res.status(200).json({
+                success: true,
+                message: `No ${type} items need to be synced`,
+                data: [],
+            });
+        }
+        // Fetch all supplier items for the items we're exporting
+        const itemIds = items.map((item) => item.id);
+        const supplierItems = yield supplierItemRepository.find({
+            where: { item_id: (0, typeorm_1.In)(itemIds) },
+        });
+        // Create a map for quick lookup of RMB_Price by item_id
+        const rmbPriceMap = new Map();
+        supplierItems.forEach((supplierItem) => {
+            if (supplierItem.price_rmb) {
+                rmbPriceMap.set(supplierItem.item_id, supplierItem.price_rmb);
+            }
         });
         const formatDate = (date) => {
             if (!date)
@@ -1882,10 +2384,18 @@ const exportItemsToCSV = (req, res, next) => __awaiter(void 0, void 0, void 0, f
             const d = new Date(date);
             return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}:${String(d.getSeconds()).padStart(2, "0")}`;
         };
-        const getWarehouseData = (itemId) => __awaiter(void 0, void 0, void 0, function* () {
-            const warehouseItems = yield warehouseRepository.find({
-                where: { item_id: itemId },
-            });
+        const getWarehouseData = (itemId, itemIdDE) => __awaiter(void 0, void 0, void 0, function* () {
+            let warehouseItems = [];
+            if (itemIdDE) {
+                warehouseItems = yield warehouseRepository.find({
+                    where: { ItemID_DE: itemIdDE },
+                });
+            }
+            if (warehouseItems.length === 0) {
+                warehouseItems = yield warehouseRepository.find({
+                    where: { item_id: itemId },
+                });
+            }
             return warehouseItems[0] || null;
         });
         const getVariationValues = (itemId) => __awaiter(void 0, void 0, void 0, function* () {
@@ -1894,8 +2404,8 @@ const exportItemsToCSV = (req, res, next) => __awaiter(void 0, void 0, void 0, f
             });
             return variations[0] || null;
         });
-        const getPriceColumns = (item) => {
-            const basePrice = item.RMB_Price || 0;
+        const getPriceColumns = (rmbPrice) => {
+            const basePrice = rmbPrice || 0;
             const priceLevels = [1, 2, 5, 10, 25, 50, 100, 200, 500, 1000, 2000];
             return priceLevels.map((level) => {
                 let discount = 0;
@@ -1992,11 +2502,14 @@ const exportItemsToCSV = (req, res, next) => __awaiter(void 0, void 0, void 0, f
         ];
         const csvRows = [];
         csvRows.push(headers.join(";"));
+        const updatedItemIds = [];
         for (const item of items) {
             try {
-                const warehouseData = yield getWarehouseData(item.id);
+                const warehouseData = yield getWarehouseData(item.id, item.ItemID_DE);
                 const variationData = yield getVariationValues(item.id);
-                const priceColumns = getPriceColumns(item);
+                // Get RMB_Price from the map (from supplier_items)
+                const rmbPrice = rmbPriceMap.get(item.id) || 0;
+                const priceColumns = getPriceColumns(rmbPrice);
                 const parent = item.parent;
                 const volume = ((item.length || 0) * (item.width || 0) * (item.height || 0)) / 1000;
                 const bulkQuantities = [2, 5, 10, 25, 50, 100, 200, 500, 1000, 2000];
@@ -2037,23 +2550,18 @@ const exportItemsToCSV = (req, res, next) => __awaiter(void 0, void 0, void 0, f
                     "0",
                     "0",
                     ((_j = warehouseData === null || warehouseData === void 0 ? void 0 : warehouseData.buffer) === null || _j === void 0 ? void 0 : _j.toString()) || "0",
-                    Number(item.RMB_Price || 0)
-                        .toFixed(2)
-                        .replace(".", ","),
+                    rmbPrice.toFixed(2).replace(".", ","),
+                    // Using RMB_Price from supplier_items
                     "Y",
                     ((_k = item.many_components) === null || _k === void 0 ? void 0 : _k.toString()) || "1",
                     ((_l = item.effort_rating) === null || _l === void 0 ? void 0 : _l.toString()) || "3",
-                    Number(item.RMB_Price || 0)
-                        .toFixed(2)
-                        .replace(".", ","),
+                    rmbPrice.toFixed(2).replace(".", ","), // Using RMB_Price from supplier_items
                     volume.toFixed(2).replace(".", ","),
                     "0,00",
                     "0,00",
                     "0,00",
                     "0,00",
-                    Number(item.RMB_Price || 0)
-                        .toFixed(2)
-                        .replace(".", ","),
+                    rmbPrice.toFixed(2).replace(".", ","), // Using RMB_Price from supplier_items
                     ...priceColumns,
                     ...bulkQuantities.map((qty) => qty.toString()),
                     "19",
@@ -2077,9 +2585,21 @@ const exportItemsToCSV = (req, res, next) => __awaiter(void 0, void 0, void 0, f
                     return stringValue;
                 });
                 csvRows.push(formattedRow.join(";"));
+                updatedItemIds.push(item.id);
             }
             catch (itemError) {
                 console.error(`Error processing item ${item.id}:`, itemError);
+            }
+        }
+        // After successful CSV generation, reset flags
+        if (updatedItemIds.length > 0) {
+            if (type === "new") {
+                yield itemRepository.update({ id: (0, typeorm_1.In)(updatedItemIds) }, { is_new: "N" });
+                console.log(`Reset is_new flag for ${updatedItemIds.length} items`);
+            }
+            else {
+                yield itemRepository.update({ id: (0, typeorm_1.In)(updatedItemIds) }, { is_updated: false });
+                console.log(`Reset is_updated flag for ${updatedItemIds.length} items`);
             }
         }
         const csvContent = csvRows.join("\n");
@@ -2099,3 +2619,348 @@ const exportItemsToCSV = (req, res, next) => __awaiter(void 0, void 0, void 0, f
     }
 });
 exports.exportItemsToCSV = exportItemsToCSV;
+const getNewItems = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const itemRepository = database_1.AppDataSource.getRepository(items_1.Item);
+        const parentRepository = database_1.AppDataSource.getRepository(parents_1.Parent);
+        const categoryRepository = database_1.AppDataSource.getRepository(categories_1.Category);
+        const supplierRepository = database_1.AppDataSource.getRepository(suppliers_1.Supplier);
+        const warehouseRepository = database_1.AppDataSource.getRepository(warehouse_items_1.WarehouseItem);
+        const { page = "1", limit = "50", search = "" } = req.query;
+        let pageNum = parseInt(page);
+        if (isNaN(pageNum))
+            pageNum = 1;
+        let limitNum = parseInt(limit);
+        if (isNaN(limitNum))
+            limitNum = 50;
+        const skip = (pageNum - 1) * limitNum;
+        const queryBuilder = itemRepository
+            .createQueryBuilder("item")
+            .where("item.is_new = :isNew", { isNew: "Y" })
+            .skip(skip)
+            .take(limitNum)
+            .orderBy("item.created_at", "DESC");
+        if (search) {
+            const searchStr = search;
+            queryBuilder.andWhere("(item.item_name ILIKE :search OR item.ean ILIKE :search)", { search: `%${searchStr}%` });
+        }
+        const totalRecords = yield queryBuilder.getCount();
+        const items = yield queryBuilder.getMany();
+        const formattedItems = yield Promise.all(items.map((item) => __awaiter(void 0, void 0, void 0, function* () {
+            const parentData = item.parent_id
+                ? yield parentRepository.findOne({
+                    where: { id: item.parent_id },
+                    select: ["id", "de_no", "name_de", "name_en"],
+                })
+                : null;
+            const categoryData = item.cat_id
+                ? yield categoryRepository.findOne({
+                    where: { id: item.cat_id },
+                    select: ["id", "name"],
+                })
+                : null;
+            const supplierData = item.supplier_id
+                ? yield supplierRepository.findOne({
+                    where: { id: item.supplier_id },
+                    select: ["id", "name", "company_name"],
+                })
+                : null;
+            let warehouseData = null;
+            if (item.ItemID_DE) {
+                const wdList = yield warehouseRepository.find({
+                    where: { ItemID_DE: item.ItemID_DE },
+                });
+                warehouseData = wdList[0] || null;
+            }
+            if (!warehouseData) {
+                const wdList = yield warehouseRepository.find({
+                    where: { item_id: item.id },
+                });
+                warehouseData = wdList[0] || null;
+            }
+            const ean = item.ean || (warehouseData === null || warehouseData === void 0 ? void 0 : warehouseData.ean) || null;
+            return {
+                id: item.id,
+                de_no: (warehouseData === null || warehouseData === void 0 ? void 0 : warehouseData.item_no_de) || (parentData === null || parentData === void 0 ? void 0 : parentData.de_no) || null,
+                name_de: (parentData === null || parentData === void 0 ? void 0 : parentData.name_de) || null,
+                name_en: (parentData === null || parentData === void 0 ? void 0 : parentData.name_en) || null,
+                item_name: item.item_name,
+                item_name_cn: item.item_name_cn,
+                ean,
+                is_active: item.isActive,
+                is_new: item.is_new,
+                is_updated: item.is_updated,
+                category: (categoryData === null || categoryData === void 0 ? void 0 : categoryData.name) || null,
+                supplier_name: (supplierData === null || supplierData === void 0 ? void 0 : supplierData.company_name) || (supplierData === null || supplierData === void 0 ? void 0 : supplierData.name) || null,
+                created_at: item.created_at,
+                updated_at: item.updated_at,
+                synced_at: item.synced_at,
+            };
+        })));
+        return res.status(200).json({
+            success: true,
+            data: formattedItems,
+            pagination: {
+                page: pageNum,
+                limit: limitNum,
+                totalRecords,
+                totalPages: Math.ceil(totalRecords / limitNum),
+            },
+        });
+    }
+    catch (error) {
+        return next(error);
+    }
+});
+exports.getNewItems = getNewItems;
+const exportNewItemsToCSV = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m;
+    try {
+        const itemRepository = database_1.AppDataSource.getRepository(items_1.Item);
+        const warehouseRepository = database_1.AppDataSource.getRepository(warehouse_items_1.WarehouseItem);
+        const variationRepository = database_1.AppDataSource.getRepository(variation_values_1.VariationValue);
+        const supplierItemRepository = database_1.AppDataSource.getRepository(supplier_items_1.SupplierItem);
+        const items = yield itemRepository.find({
+            where: { is_new: "Y" },
+            relations: ["parent", "taric", "category"],
+            order: { id: "ASC" },
+        });
+        if (items.length === 0) {
+            return res.status(200).json({
+                success: true,
+                message: "No new items to export",
+                data: [],
+            });
+        }
+        const itemIds = items.map((item) => item.id);
+        const supplierItems = yield supplierItemRepository.find({
+            where: { item_id: (0, typeorm_1.In)(itemIds) },
+        });
+        const rmbPriceMap = new Map();
+        supplierItems.forEach((si) => {
+            if (si.price_rmb)
+                rmbPriceMap.set(si.item_id, si.price_rmb);
+        });
+        const formatDate = (date) => {
+            if (!date)
+                return "";
+            const d = new Date(date);
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}:${String(d.getSeconds()).padStart(2, "0")}`;
+        };
+        const getWarehouseData = (itemId, itemIdDE) => __awaiter(void 0, void 0, void 0, function* () {
+            let wItems = [];
+            if (itemIdDE) {
+                wItems = yield warehouseRepository.find({
+                    where: { ItemID_DE: itemIdDE },
+                });
+            }
+            if (wItems.length === 0) {
+                wItems = yield warehouseRepository.find({ where: { item_id: itemId } });
+            }
+            return wItems[0] || null;
+        });
+        const getVariationValues = (itemId) => __awaiter(void 0, void 0, void 0, function* () {
+            const variations = yield variationRepository.find({
+                where: { item_id: itemId },
+            });
+            return variations[0] || null;
+        });
+        const getPriceColumns = (rmbPrice) => {
+            const basePrice = rmbPrice || 0;
+            const priceLevels = [1, 2, 5, 10, 25, 50, 100, 200, 500, 1000, 2000];
+            return priceLevels.map((level) => {
+                let discount = 0;
+                if (level >= 1000)
+                    discount = 0.3;
+                else if (level >= 500)
+                    discount = 0.25;
+                else if (level >= 200)
+                    discount = 0.2;
+                else if (level >= 100)
+                    discount = 0.15;
+                else if (level >= 50)
+                    discount = 0.1;
+                else if (level >= 25)
+                    discount = 0.05;
+                return (basePrice * (1 - discount)).toFixed(2).replace(".", ",");
+            });
+        };
+        const headers = [
+            "Timestamp",
+            "EAN",
+            "Parent No DE",
+            "Item No DE",
+            "Sup_cat",
+            "Item Name DE",
+            "Variation DE 1",
+            "Value DE",
+            "Variation DE 2",
+            "Value DE 2",
+            "Variation DE 3",
+            "Value DE 3",
+            "Item Name EN",
+            "Item Name",
+            "Variation EN 1",
+            "Value EN",
+            "Variation EN 2",
+            "Value EN 2",
+            "Variation EN 3",
+            "Value EN 3",
+            "Code",
+            "ISBN",
+            "Width",
+            "Height",
+            "Length",
+            "Weight",
+            "Shipping Weight",
+            "Shipping Class",
+            "Is Qty Dividable",
+            "Is Stock Item",
+            "FOQ",
+            "FSQ",
+            "MSQ",
+            "MOQ Result",
+            "Interval",
+            "Buffer Result",
+            "Price RMB",
+            "Y/N",
+            "Many Components",
+            "Effort Rating",
+            "EK Net",
+            "Item Volume (dm³)",
+            "Freight Costs Volume",
+            "Freight Costs Weight",
+            "Freight Costs",
+            "Import Duty Charge (EUR)",
+            "SP_eBay",
+            "SP_DE_NET_1",
+            "SP_DE_NET_2",
+            "SP_DE_NET_5",
+            "SP_DE_NET_10",
+            "SP_DE_NET_25",
+            "SP_DE_NET_50",
+            "SP_DE_NET_100",
+            "SP_DE_NET_200",
+            "SP_DE_NET_500",
+            "SP_DE_NET_1000",
+            "SP_DE_NET_2000",
+            "BulkQty_2",
+            "BulkQty_5",
+            "BulkQty_10",
+            "BulkQty_25",
+            "BulkQty_50",
+            "BulkQty_100",
+            "BulkQty_200",
+            "BulkQty_500",
+            "BulkQty_1000",
+            "BulkQty_2000",
+            "USt %",
+            "Dummy-Bild01",
+            "Image Path EAN",
+            "Image Path eBay",
+            "Max Quantity",
+        ];
+        const csvRows = [];
+        csvRows.push(headers.join(";"));
+        const exportedIds = [];
+        for (const item of items) {
+            try {
+                const warehouseData = yield getWarehouseData(item.id, item.ItemID_DE);
+                const variationData = yield getVariationValues(item.id);
+                const rmbPrice = rmbPriceMap.get(item.id) || 0;
+                const priceColumns = getPriceColumns(rmbPrice);
+                const parent = item.parent;
+                const volume = ((item.length || 0) * (item.width || 0) * (item.height || 0)) / 1000;
+                const bulkQuantities = [2, 5, 10, 25, 50, 100, 200, 500, 1000, 2000];
+                const rowData = [
+                    formatDate(item.created_at || new Date()),
+                    ((_a = item.ean) === null || _a === void 0 ? void 0 : _a.toString()) || "",
+                    (parent === null || parent === void 0 ? void 0 : parent.de_no) || "NONE",
+                    ((_b = item.ItemID_DE) === null || _b === void 0 ? void 0 : _b.toString()) || item.id.toString(),
+                    item.supp_cat || ((_c = item.category) === null || _c === void 0 ? void 0 : _c.name) || "STD",
+                    item.item_name || (parent === null || parent === void 0 ? void 0 : parent.name_de) || "",
+                    (parent === null || parent === void 0 ? void 0 : parent.var_de_1) || "",
+                    (variationData === null || variationData === void 0 ? void 0 : variationData.value_de) || "",
+                    (parent === null || parent === void 0 ? void 0 : parent.var_de_2) || "",
+                    (variationData === null || variationData === void 0 ? void 0 : variationData.value_de_2) || "",
+                    (parent === null || parent === void 0 ? void 0 : parent.var_de_3) || "",
+                    (variationData === null || variationData === void 0 ? void 0 : variationData.value_de_3) || "",
+                    item.item_name_cn || (parent === null || parent === void 0 ? void 0 : parent.name_en) || "",
+                    item.item_name || (parent === null || parent === void 0 ? void 0 : parent.name_en) || "",
+                    (parent === null || parent === void 0 ? void 0 : parent.var_en_1) || "",
+                    (variationData === null || variationData === void 0 ? void 0 : variationData.value_en) || "",
+                    (parent === null || parent === void 0 ? void 0 : parent.var_en_2) || "",
+                    (variationData === null || variationData === void 0 ? void 0 : variationData.value_en_2) || "",
+                    (parent === null || parent === void 0 ? void 0 : parent.var_en_3) || "",
+                    (variationData === null || variationData === void 0 ? void 0 : variationData.value_en_3) || "",
+                    ((_d = item.taric) === null || _d === void 0 ? void 0 : _d.code) || "",
+                    ((_e = item.ISBN) === null || _e === void 0 ? void 0 : _e.toString()) || "0",
+                    (item.width || 0).toFixed(1).replace(".", ","),
+                    (item.height || 0).toFixed(1).replace(".", ","),
+                    (item.length || 0).toFixed(1).replace(".", ","),
+                    (item.weight || 0).toFixed(2).replace(".", ","),
+                    (item.weight || 0).toFixed(4).replace(".", ","),
+                    (warehouseData === null || warehouseData === void 0 ? void 0 : warehouseData.ship_class) || "1",
+                    item.is_qty_dividable || "Y",
+                    (warehouseData === null || warehouseData === void 0 ? void 0 : warehouseData.is_stock_item) || "N",
+                    ((_f = item.FOQ) === null || _f === void 0 ? void 0 : _f.toString()) || "0",
+                    ((_g = item.FSQ) === null || _g === void 0 ? void 0 : _g.toString()) || "0",
+                    ((_h = warehouseData === null || warehouseData === void 0 ? void 0 : warehouseData.msq) === null || _h === void 0 ? void 0 : _h.toString()) || "0",
+                    "0",
+                    "0",
+                    ((_j = warehouseData === null || warehouseData === void 0 ? void 0 : warehouseData.buffer) === null || _j === void 0 ? void 0 : _j.toString()) || "0",
+                    rmbPrice.toFixed(2).replace(".", ","),
+                    "Y",
+                    ((_k = item.many_components) === null || _k === void 0 ? void 0 : _k.toString()) || "1",
+                    ((_l = item.effort_rating) === null || _l === void 0 ? void 0 : _l.toString()) || "3",
+                    rmbPrice.toFixed(2).replace(".", ","),
+                    volume.toFixed(2).replace(".", ","),
+                    "0,00",
+                    "0,00",
+                    "0,00",
+                    "0,00",
+                    rmbPrice.toFixed(2).replace(".", ","),
+                    ...priceColumns,
+                    ...bulkQuantities.map((qty) => qty.toString()),
+                    "19",
+                    ((_m = item.photo) === null || _m === void 0 ? void 0 : _m.split("\\").pop()) || "DummyPicture.jpg",
+                    item.pix_path || "",
+                    item.pix_path_eBay || "",
+                    "10000",
+                ];
+                const formattedRow = rowData.map((value) => {
+                    if (value === null || value === undefined)
+                        return "";
+                    const s = value.toString();
+                    if (s.includes(";") || s.includes("\n") || s.includes('"')) {
+                        return `"${s.replace(/"/g, '""')}"`;
+                    }
+                    return s;
+                });
+                csvRows.push(formattedRow.join(";"));
+                exportedIds.push(item.id);
+            }
+            catch (itemError) {
+                console.error(`Error processing new item ${item.id}:`, itemError);
+            }
+        }
+        // After successful CSV generation, set is_new = 'N' for all exported items
+        if (exportedIds.length > 0) {
+            yield itemRepository.update({ id: (0, typeorm_1.In)(exportedIds) }, { is_new: "N" });
+            console.log(`Set is_new='N' for ${exportedIds.length} new items after export`);
+        }
+        const csvContent = csvRows.join("\n");
+        const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, "-");
+        res.setHeader("Content-Type", "text/csv; charset=utf-8");
+        res.setHeader("Content-Disposition", `attachment; filename=new_items_${timestamp}.csv`);
+        res.setHeader("Content-Length", Buffer.byteLength(csvContent, "utf8"));
+        res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+        const bom = "\uFEFF";
+        return res.status(200).send(bom + csvContent);
+    }
+    catch (error) {
+        console.error("Error exporting new items CSV:", error);
+        return next(error);
+    }
+});
+exports.exportNewItemsToCSV = exportNewItemsToCSV;

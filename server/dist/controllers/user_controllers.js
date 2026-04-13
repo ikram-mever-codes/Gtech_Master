@@ -47,12 +47,16 @@ const createUser = (req, res, next) => __awaiter(void 0, void 0, void 0, functio
         const hashedPassword = yield bcryptjs_1.default.hash(tempPassword, 10);
         const emailVerificationCode = Math.floor(100000 + Math.random() * 900000).toString();
         const emailVerificationExp = new Date(Date.now() + 24 * 60 * 60 * 1000);
+        let finalAssignedResources = assignedResources || [];
+        if (role === users_1.UserRole.PURCHASING && !finalAssignedResources.includes("Orders")) {
+            finalAssignedResources.push("Orders");
+        }
         const user = userRepository.create({
             name,
             email,
             password: hashedPassword,
             role,
-            assignedResources: assignedResources || [],
+            assignedResources: finalAssignedResources,
             phoneNumber: phoneNumber || null,
             country: country || null,
             gender: gender || null,
@@ -67,9 +71,16 @@ const createUser = (req, res, next) => __awaiter(void 0, void 0, void 0, functio
             isEmailVerified: false,
         });
         yield userRepository.save(user);
-        if (permissions && permissions.length > 0) {
+        const finalPermissions = permissions || [];
+        if (role === users_1.UserRole.PURCHASING && !finalPermissions.find((p) => p.resource === "Orders")) {
+            finalPermissions.push({
+                resource: "Orders",
+                actions: ["create", "read", "update", "delete"]
+            });
+        }
+        if (finalPermissions.length > 0) {
             const permissionRepository = database_1.AppDataSource.getRepository(permissions_1.Permission);
-            const permissionEntities = permissions.map((perm) => permissionRepository.create({
+            const permissionEntities = finalPermissions.map((perm) => permissionRepository.create({
                 resource: perm.resource,
                 actions: perm.actions,
                 user,
@@ -145,6 +156,7 @@ const verifyEmail = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
 });
 exports.verifyEmail = verifyEmail;
 const login = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
     try {
         const { email, password } = req.body;
         if (!email || !password) {
@@ -172,13 +184,19 @@ const login = (req, res, next) => __awaiter(void 0, void 0, void 0, function* ()
             return next(new errorHandler_1.default("Your account has been disabled. Please contact support.", 403));
         }
         const token = jsonwebtoken_1.default.sign({ id: user.id, role: user.role }, process.env.JWT_SECRET);
+        const cleanRes = (user.assignedResources || []).map(r => r.trim()).filter(r => r.length > 0);
+        const derivedRes = ((_a = user.permissions) === null || _a === void 0 ? void 0 : _a.map(p => p.resource.trim())) || [];
+        let finalResources = Array.from(new Set([...cleanRes, ...derivedRes]));
+        if (user.role === users_1.UserRole.PURCHASING && !finalResources.includes("Orders")) {
+            finalResources.push("Orders");
+        }
         const userData = {
             id: user.id,
             name: user.name,
             email: user.email,
             role: user.role,
             permissions: user.permissions,
-            assignedResources: user.assignedResources,
+            assignedResources: finalResources,
             avatar: user.avatar,
             partnerName: user.partnerName,
             emergencyContact: user.emergencyContact,
@@ -229,7 +247,10 @@ const getMe = (req, res, next) => __awaiter(void 0, void 0, void 0, function* ()
         }
         const cleanResources = (user.assignedResources || []).map(r => r.trim()).filter(r => r.length > 0);
         const derivedResources = ((_a = user.permissions) === null || _a === void 0 ? void 0 : _a.map(p => p.resource.trim())) || [];
-        const finalResources = Array.from(new Set([...cleanResources, ...derivedResources]));
+        let finalResources = Array.from(new Set([...cleanResources, ...derivedResources]));
+        if (user.role === users_1.UserRole.PURCHASING && !finalResources.includes("Orders")) {
+            finalResources.push("Orders");
+        }
         const userData = {
             id: user.id,
             name: user.name,
@@ -469,8 +490,11 @@ const getUserById = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
             return next(new errorHandler_1.default("User not found", 404));
         }
         const cleanResources = (user.assignedResources || []).map(r => r.trim()).filter(r => r.length > 0);
-        const derivedResources = ((_a = user.permissions) === null || _a === void 0 ? void 0 : _a.map(p => p.resource)) || [];
-        const finalResources = cleanResources.length > 0 ? cleanResources : Array.from(new Set(derivedResources));
+        const derivedResources = ((_a = user.permissions) === null || _a === void 0 ? void 0 : _a.map(p => p.resource.trim())) || [];
+        let finalResources = cleanResources.length > 0 ? cleanResources : Array.from(new Set(derivedResources));
+        if (user.role === users_1.UserRole.PURCHASING && !finalResources.includes("Orders")) {
+            finalResources.push("Orders");
+        }
         const userData = {
             id: user.id,
             name: user.name,
@@ -830,7 +854,7 @@ const updateUser = (req, res, next) => __awaiter(void 0, void 0, void 0, functio
     try {
         const { userId } = req.params;
         const id = userId;
-        const { name, email, role, assignedResources, permissions, phoneNumber, gender, dateOfBirth, address, country, partnerName, emergencyContact, joiningDate, isLoginEnabled, } = req.body;
+        const { name, email, role, assignedResources, permissions, phoneNumber, gender, dateOfBirth, address, country, partnerName, emergencyContact, joiningDate, isLoginEnabled, password, } = req.body;
         if (!id) {
             return next(new errorHandler_1.default("User ID is required", 400));
         }
@@ -861,7 +885,10 @@ const updateUser = (req, res, next) => __awaiter(void 0, void 0, void 0, functio
             user.name = name;
             user.email = email;
             user.role = role;
-            const rawResources = Array.isArray(assignedResources) ? assignedResources : [];
+            let rawResources = Array.isArray(assignedResources) ? assignedResources : [];
+            if (role === users_1.UserRole.PURCHASING && !rawResources.includes('Orders')) {
+                rawResources.push('Orders');
+            }
             user.assignedResources = rawResources.map((r) => r.trim()).filter((r) => r.length > 0);
             user.phoneNumber = phoneNumber || null;
             user.gender = gender || null;
@@ -876,15 +903,22 @@ const updateUser = (req, res, next) => __awaiter(void 0, void 0, void 0, functio
                 user.joiningDate = joiningDate || null;
             if (isLoginEnabled !== undefined)
                 user.isLoginEnabled = isLoginEnabled;
-            // Save user first
+            if (password) {
+                const hashedPassword = yield bcryptjs_1.default.hash(password, 10);
+                user.password = hashedPassword;
+            }
             yield tUserRepo.save(user);
-            // Handle Permissions if provided
             if (permissions) {
-                // Delete existing for this user
                 yield tPermRepo.delete({ user: { id: user.id } });
-                // Save new ones if any
-                if (permissions.length > 0) {
-                    const permissionEntities = permissions.map((perm) => tPermRepo.create({
+                const finalPermissions = Array.isArray(permissions) ? permissions : [];
+                if (role === users_1.UserRole.PURCHASING && !finalPermissions.find((p) => p.resource === "Orders")) {
+                    finalPermissions.push({
+                        resource: "Orders",
+                        actions: ["create", "read", "update", "delete"]
+                    });
+                }
+                if (finalPermissions.length > 0) {
+                    const permissionEntities = finalPermissions.map((perm) => tPermRepo.create({
                         resource: String(perm.resource).trim(),
                         actions: Array.isArray(perm.actions)
                             ? perm.actions.map((a) => String(a).trim())
@@ -895,7 +929,6 @@ const updateUser = (req, res, next) => __awaiter(void 0, void 0, void 0, functio
                 }
             }
         }));
-        // Fetch the update state to confirm and return
         const updatedUser = yield userRepository.findOne({
             where: { id: user.id },
             relations: ["permissions"],

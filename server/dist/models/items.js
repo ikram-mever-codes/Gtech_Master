@@ -16,6 +16,9 @@ const tarics_1 = require("./tarics");
 const categories_1 = require("./categories");
 const order_items_1 = require("./order_items");
 const suppliers_1 = require("./suppliers");
+const library_1 = require("./library");
+const purchase_prices_1 = require("./purchase_prices");
+const sales_prices_1 = require("./sales_prices");
 let Item = class Item {
 };
 exports.Item = Item;
@@ -48,8 +51,8 @@ __decorate([
     __metadata("design:type", String)
 ], Item.prototype, "supp_cat", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ type: "bigint", nullable: true }),
-    __metadata("design:type", Number)
+    (0, typeorm_1.Column)({ type: "varchar", length: 50, nullable: true }),
+    __metadata("design:type", String)
 ], Item.prototype, "ean", void 0);
 __decorate([
     (0, typeorm_1.Column)({ nullable: true }),
@@ -103,10 +106,6 @@ __decorate([
     (0, typeorm_1.Column)({ type: "text", nullable: true }),
     __metadata("design:type", String)
 ], Item.prototype, "remark", void 0);
-__decorate([
-    (0, typeorm_1.Column)({ type: "decimal", precision: 10, scale: 2, nullable: true }),
-    __metadata("design:type", Number)
-], Item.prototype, "RMB_Price", void 0);
 __decorate([
     (0, typeorm_1.Column)({ type: "decimal", precision: 10, scale: 2, nullable: true }),
     __metadata("design:type", Number)
@@ -180,6 +179,36 @@ __decorate([
     __metadata("design:type", Number)
 ], Item.prototype, "supplier_id", void 0);
 __decorate([
+    (0, typeorm_1.Column)({ type: "boolean", default: false }),
+    __metadata("design:type", Boolean)
+], Item.prototype, "is_updated", void 0);
+__decorate([
+    (0, typeorm_1.Column)({
+        name: "transfer_price (EUR)",
+        type: "decimal",
+        precision: 10,
+        scale: 4,
+        nullable: true,
+    }),
+    __metadata("design:type", Number)
+], Item.prototype, "transfer_price_EUR", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "char", length: 1, default: "N" }),
+    __metadata("design:type", String)
+], Item.prototype, "is_special_transfer_price", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "char", length: 1, default: "N" }),
+    __metadata("design:type", String)
+], Item.prototype, "is_special_purchase_price_RMB", void 0);
+__decorate([
+    (0, typeorm_1.OneToMany)(() => purchase_prices_1.PurchasePrice, (pp) => pp.item),
+    __metadata("design:type", Array)
+], Item.prototype, "purchasePrices", void 0);
+__decorate([
+    (0, typeorm_1.OneToMany)(() => sales_prices_1.SalesPrice, (sp) => sp.item),
+    __metadata("design:type", Array)
+], Item.prototype, "salesPrices", void 0);
+__decorate([
     (0, typeorm_1.CreateDateColumn)(),
     __metadata("design:type", Date)
 ], Item.prototype, "synced_at", void 0);
@@ -215,6 +244,10 @@ __decorate([
     (0, typeorm_1.OneToMany)(() => order_items_1.OrderItem, (orderItem) => orderItem.item),
     __metadata("design:type", Array)
 ], Item.prototype, "orderItems", void 0);
+__decorate([
+    (0, typeorm_1.OneToMany)(() => library_1.LibraryFile, (file) => file.itemId),
+    __metadata("design:type", Array)
+], Item.prototype, "attachments", void 0);
 exports.Item = Item = __decorate([
     (0, typeorm_1.Entity)()
 ], Item);

@@ -12,6 +12,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.MySQLToPostgresMigrator = void 0;
 const promise_1 = __importDefault(require("mysql2/promise"));
 const database_1 = require("../config/database");
 const categories_1 = require("../models/categories");
@@ -112,38 +113,35 @@ class DataSanitizer {
 class MySQLToPostgresMigrator {
     constructor() {
         this.batchSize = 100;
-        // Store ID mappings between MySQL and PostgreSQL
         this.itemIdMap = new Map();
+        this.itemIdMapByDE = new Map();
         this.categoryIdMap = new Map();
-        this.orderIdMap = new Map(); // Add this for order references
+        this.orderIdMap = new Map();
+        this.orderNoMap = new Map();
         this.mysqlPool = promise_1.default.createPool(dbConfig);
     }
     migrateAllData() {
         return __awaiter(this, void 0, void 0, function* () {
             try {
                 console.log("🚀 Starting migration from MySQL to PostgreSQL...");
-                // Initialize TypeORM connection
                 if (!database_1.AppDataSource.isInitialized) {
                     yield database_1.AppDataSource.initialize();
                     console.log("✅ PostgreSQL connection initialized");
                 }
-                // Clear existing data and disable foreign key checks
                 yield this.clearExistingData(true);
-                // Migrate in proper order - referenced tables first
                 console.log("\n📊 Migrating referenced tables first...");
                 yield this.migrateCategories();
                 yield this.migrateSuppliers();
                 yield this.migrateTarics();
                 yield this.migrateParents();
                 yield this.migrateItems();
-                yield this.migrateOrders(); // Need to migrate orders before order_items
+                yield this.migrateOrders();
                 console.log("\n📊 Migrating dependent tables...");
                 yield this.migrateWarehouseItems();
                 yield this.migrateVariationValues();
                 yield this.migrateItemQualities();
                 yield this.migrateOrderItems();
                 yield this.migrateSupplierItems();
-                // Re-enable foreign key checks at the end
                 yield this.enableForeignKeys();
                 console.log("\n🎉 Migration completed successfully!");
             }
@@ -162,9 +160,7 @@ class MySQLToPostgresMigrator {
             const queryRunner = database_1.AppDataSource.createQueryRunner();
             try {
                 yield queryRunner.connect();
-                // Disable foreign key checks
                 yield queryRunner.query('SET session_replication_role = "replica"');
-                // Clear tables in reverse order (child tables first)
                 yield queryRunner.query("DELETE FROM supplier_item");
                 yield queryRunner.query("DELETE FROM order_item");
                 yield queryRunner.query("DELETE FROM item_quality");
@@ -235,9 +231,9 @@ class MySQLToPostgresMigrator {
             const connection = yield this.mysqlPool.getConnection();
             try {
                 const [rows] = yield connection.execute(`
-        SELECT id, is_ignored_value, name, de_cat, created_at, updated_at 
-        FROM categories
-      `);
+          SELECT id, is_ignored_value, name, de_cat, created_at, updated_at 
+          FROM categories
+        `);
                 const categoryRepository = database_1.AppDataSource.getRepository(categories_1.Category);
                 const categories = rows;
                 this.categoryIdMap.clear();
@@ -269,13 +265,13 @@ class MySQLToPostgresMigrator {
             const connection = yield this.mysqlPool.getConnection();
             try {
                 const [rows] = yield connection.execute(`
-        SELECT id, order_type_id, name, name_cn, company_name, extra_note, 
-               min_order_value, is_fully_prepared, is_tax_included, is_freight_included,
-               province, city, street, full_address, contact_person, phone, mobile,
-               email, website, bank_name, account_number, beneficiary, deposit,
-               bbgd, bagd, percentage, percentage2, percentage3, created_at, updated_at
-        FROM suppliers
-      `);
+          SELECT id, order_type_id, name, name_cn, company_name, extra_note, 
+                min_order_value, is_fully_prepared, is_tax_included, is_freight_included,
+                province, city, street, full_address, contact_person, phone, mobile,
+                email, website, bank_name, account_number, beneficiary, deposit,
+                bbgd, bagd, percentage, percentage2, percentage3, created_at, updated_at
+          FROM suppliers
+        `);
                 const supplierRepository = database_1.AppDataSource.getRepository(suppliers_1.Supplier);
                 const suppliers = rows;
                 yield this.processInBatches(suppliers, (row) => __awaiter(this, void 0, void 0, function* () {
@@ -328,10 +324,10 @@ class MySQLToPostgresMigrator {
             const connection = yield this.mysqlPool.getConnection();
             try {
                 const [rows] = yield connection.execute(`
-        SELECT id, code, reguler_artikel, duty_rate, name_de, description_de,
-               name_en, description_en, name_cn, created_at, updated_at
-        FROM tarics
-      `);
+          SELECT id, code, reguler_artikel, duty_rate, name_de, description_de,
+                name_en, description_en, name_cn, created_at, updated_at
+          FROM tarics
+        `);
                 const taricRepository = database_1.AppDataSource.getRepository(tarics_1.Taric);
                 const tarics = rows;
                 yield this.processInBatches(tarics, (row) => __awaiter(this, void 0, void 0, function* () {
@@ -365,15 +361,14 @@ class MySQLToPostgresMigrator {
             const connection = yield this.mysqlPool.getConnection();
             try {
                 const [rows] = yield connection.execute(`
-        SELECT id, taric_id, supplier_id, de_id, de_no, is_active, name_de, name_en,
-               name_cn, var_de_1, var_de_2, var_de_3, var_en_1, var_en_2, var_en_3,
-               is_NwV, parent_rank, is_var_unilingual, created_at, updated_at
-        FROM parents
-      `);
+          SELECT id, taric_id, supplier_id, de_id, de_no, is_active, name_de, name_en,
+                name_cn, var_de_1, var_de_2, var_de_3, var_en_1, var_en_2, var_en_3,
+                is_NwV, parent_rank, is_var_unilingual, created_at, updated_at
+          FROM parents
+        `);
                 const parentRepository = database_1.AppDataSource.getRepository(parents_1.Parent);
                 const parents = rows;
                 yield this.processInBatches(parents, (row) => __awaiter(this, void 0, void 0, function* () {
-                    // Handle foreign keys - set to null if 0 or invalid
                     const taricId = DataSanitizer.sanitizeNumber(row.taric_id);
                     const supplierId = DataSanitizer.sanitizeNumber(row.supplier_id);
                     const finalTaricId = taricId > 0 ? taricId : null;
@@ -417,18 +412,19 @@ class MySQLToPostgresMigrator {
             const connection = yield this.mysqlPool.getConnection();
             try {
                 const [rows] = yield connection.execute(`
-        SELECT id, parent_id, ItemID_DE, parent_no_de, is_dimension_special, 
-               model, supp_cat, ean, taric_id, weight, width, height, length,
-               item_name, item_name_cn, FOQ, FSQ, is_qty_dividable, ISBN, 
-               cat_id, remark, RMB_Price, photo, pix_path, pix_path_eBay,
-               is_npr, npr_remark, many_components, effort_rating, is_rmb_special,
-               is_eur_special, is_pu_item, is_meter_item, is_new, isActive,
-               note, synced_at, created_at, updated_at
-        FROM items
-      `);
+          SELECT id, parent_id, ItemID_DE, parent_no_de, is_dimension_special,
+                model, supp_cat, ean, taric_id, weight, width, height, length,
+                item_name, item_name_cn, FOQ, FSQ, is_qty_dividable, ISBN,
+                cat_id, remark, RMB_Price, photo, pix_path, pix_path_eBay,
+                is_npr, npr_remark, many_components, effort_rating, is_rmb_special,
+                is_eur_special, is_pu_item, is_meter_item, is_new, isActive,
+                note, synced_at, created_at, updated_at
+          FROM items
+        `);
                 const itemRepository = database_1.AppDataSource.getRepository(items_1.Item);
                 const items = rows;
                 this.itemIdMap.clear();
+                this.itemIdMapByDE.clear();
                 let successCount = 0;
                 let errorCount = 0;
                 for (let i = 0; i < items.length; i += this.batchSize) {
@@ -436,11 +432,9 @@ class MySQLToPostgresMigrator {
                     for (const row of batch) {
                         try {
                             const mysqlId = DataSanitizer.sanitizeNumber(row.id);
-                            // Handle ALL foreign keys properly
                             const parentId = DataSanitizer.sanitizeNumber(row.parent_id);
                             const taricId = DataSanitizer.sanitizeNumber(row.taric_id);
                             const catId = DataSanitizer.sanitizeNumber(row.cat_id);
-                            // Check if category exists in our map
                             const finalCatId = catId > 0 && this.categoryIdMap.has(catId) ? catId : null;
                             const finalParentId = parentId > 0 ? parentId : null;
                             const finalTaricId = taricId > 0 ? taricId : null;
@@ -467,6 +461,8 @@ class MySQLToPostgresMigrator {
                                 cat_id: finalCatId,
                                 remark: DataSanitizer.sanitizeString(row.remark, 1000, ""),
                                 RMB_Price: DataSanitizer.sanitizeDecimalWithScale(row.RMB_Price, 10, 2),
+                                price: DataSanitizer.sanitizeDecimalWithScale(row.RMB_Price, 10, 2),
+                                currency: "CNY",
                                 photo: DataSanitizer.sanitizeString(row.photo, 255, ""),
                                 pix_path: DataSanitizer.sanitizeString(row.pix_path, 1000, ""),
                                 pix_path_eBay: DataSanitizer.sanitizeString(row.pix_path_eBay, 1000, ""),
@@ -487,13 +483,16 @@ class MySQLToPostgresMigrator {
                             });
                             const savedItem = yield itemRepository.save(item);
                             this.itemIdMap.set(mysqlId, savedItem.id);
+                            const itemIdDE = DataSanitizer.sanitizeNumber(row.ItemID_DE);
+                            if (itemIdDE > 0) {
+                                this.itemIdMapByDE.set(itemIdDE, savedItem.id);
+                            }
                             successCount++;
                         }
                         catch (error) {
                             errorCount++;
                             if (error.message.includes("foreign key constraint")) {
                                 console.log(`   FK Error on item ${row.id}: Setting cat_id to null`);
-                                // Try again with cat_id set to null
                                 try {
                                     const mysqlId = DataSanitizer.sanitizeNumber(row.id);
                                     const parentId = DataSanitizer.sanitizeNumber(row.parent_id);
@@ -510,6 +509,8 @@ class MySQLToPostgresMigrator {
                                         supp_cat: DataSanitizer.sanitizeString(row.supp_cat, 3, ""),
                                         ean: DataSanitizer.sanitizeBigInt(row.ean),
                                         taric_id: finalTaricId,
+                                        price: DataSanitizer.sanitizeDecimalWithScale(row.price, 10, 2),
+                                        currency: DataSanitizer.sanitizeString(row.currency, 10, "CNY"),
                                         weight: DataSanitizer.sanitizeFloat(row.weight),
                                         width: DataSanitizer.sanitizeFloat(row.width),
                                         height: DataSanitizer.sanitizeFloat(row.height),
@@ -520,7 +521,7 @@ class MySQLToPostgresMigrator {
                                         FSQ: DataSanitizer.sanitizeDecimalWithScale(row.FSQ, 10, 0),
                                         is_qty_dividable: DataSanitizer.sanitizeString(row.is_qty_dividable, 1, "Y"),
                                         ISBN: DataSanitizer.sanitizeNumber(row.ISBN, 0),
-                                        cat_id: null, // FORCE NULL
+                                        cat_id: null,
                                         remark: DataSanitizer.sanitizeString(row.remark, 1000, ""),
                                         RMB_Price: DataSanitizer.sanitizeDecimalWithScale(row.RMB_Price, 10, 2),
                                         photo: DataSanitizer.sanitizeString(row.photo, 255, ""),
@@ -573,18 +574,22 @@ class MySQLToPostgresMigrator {
             const connection = yield this.mysqlPool.getConnection();
             try {
                 const [rows] = yield connection.execute(`
-        SELECT id, order_no, category_id, status, comment, date_created, date_emailed,
-               date_delivery, created_at, updated_at
-        FROM orders
-      `);
+          SELECT id, order_no, category_id, status, comment, date_created, date_emailed,
+                date_delivery, created_at, updated_at
+          FROM orders
+        `);
                 const orderRepository = database_1.AppDataSource.getRepository(orders_1.Order);
                 const orders = rows;
                 this.orderIdMap.clear();
+                this.orderNoMap.clear();
                 yield this.processInBatches(orders, (row) => __awaiter(this, void 0, void 0, function* () {
                     const mysqlId = DataSanitizer.sanitizeNumber(row.id);
                     const order = orderRepository.create({
                         id: mysqlId,
                         order_no: DataSanitizer.sanitizeString(row.order_no, 255, ""),
+                        customer_id: null,
+                        supplier_id: null,
+                        cargo_id: null,
                         category_id: DataSanitizer.sanitizeNumber(row.category_id),
                         status: DataSanitizer.sanitizeNumber(row.status),
                         comment: DataSanitizer.sanitizeString(row.comment, undefined, ""),
@@ -594,8 +599,11 @@ class MySQLToPostgresMigrator {
                         created_at: DataSanitizer.sanitizeDate(row.created_at) || new Date(),
                         updated_at: DataSanitizer.sanitizeDate(row.updated_at) || new Date(),
                     });
-                    yield orderRepository.save(order);
-                    this.orderIdMap.set(mysqlId, mysqlId);
+                    const savedOrder = yield orderRepository.save(order);
+                    this.orderIdMap.set(mysqlId, savedOrder.id);
+                    if (row.order_no) {
+                        this.orderNoMap.set(String(row.order_no).trim(), savedOrder.id);
+                    }
                 }), "orders");
             }
             catch (error) {
@@ -612,11 +620,11 @@ class MySQLToPostgresMigrator {
             const connection = yield this.mysqlPool.getConnection();
             try {
                 const [rows] = yield connection.execute(`
-        SELECT id, item_id, ItemID_DE, category_id, ean, item_no_de, item_name_de,
-               item_name_en, is_no_auto_order, is_active, stock_qty, msq, buffer,
-               is_stock_item, is_SnSI, ship_class, created_at, updated_at
-        FROM warehouse_items
-      `);
+          SELECT id, item_id, ItemID_DE, category_id, ean, item_no_de, item_name_de,
+                item_name_en, is_no_auto_order, is_active, stock_qty, msq, buffer,
+                is_stock_item, is_SnSI, ship_class, created_at, updated_at
+          FROM warehouse_items
+        `);
                 const warehouseItemRepository = database_1.AppDataSource.getRepository(warehouse_items_1.WarehouseItem);
                 const warehouseItems = rows;
                 let successCount = 0;
@@ -633,14 +641,13 @@ class MySQLToPostgresMigrator {
                                 console.log(`   Skipping warehouse item ${row.id}: Item ${mysqlItemId} not found`);
                                 continue;
                             }
-                            // Handle ALL foreign keys - force category_id to null to avoid FK errors
                             const categoryId = DataSanitizer.sanitizeNumber(row.category_id);
-                            const finalCategoryId = null; // Force null for all warehouse items
+                            const finalCategoryId = null;
                             const warehouseItem = warehouseItemRepository.create({
                                 id: DataSanitizer.sanitizeNumber(row.id),
                                 item_id: postgresItemId,
                                 ItemID_DE: DataSanitizer.sanitizeNumber(row.ItemID_DE),
-                                category_id: finalCategoryId, // Always null to avoid FK errors
+                                category_id: finalCategoryId,
                                 ean: DataSanitizer.sanitizeEAN(row.ean),
                                 item_no_de: DataSanitizer.sanitizeString(row.item_no_de, 100, ""),
                                 item_name_de: DataSanitizer.sanitizeString(row.item_name_de, 500, "-"),
@@ -662,7 +669,6 @@ class MySQLToPostgresMigrator {
                         catch (error) {
                             errorCount++;
                             console.log(`   Error on warehouse item ${row.id}: ${error.message}`);
-                            // Skip warehouse items that fail - they might have other FK constraints
                         }
                     }
                 }
@@ -682,10 +688,10 @@ class MySQLToPostgresMigrator {
             const connection = yield this.mysqlPool.getConnection();
             try {
                 const [rows] = yield connection.execute(`
-        SELECT id, item_id, value_de, value_de_2, value_de_3, value_en, value_en_2,
-               value_en_3, created_at, updated_at
-        FROM variation_values
-      `);
+          SELECT id, item_id, value_de, value_de_2, value_de_3, value_en, value_en_2,
+                value_en_3, created_at, updated_at
+          FROM variation_values
+        `);
                 const variationValueRepository = database_1.AppDataSource.getRepository(variation_values_1.VariationValue);
                 const variationValues = rows;
                 let successCount = 0;
@@ -738,10 +744,10 @@ class MySQLToPostgresMigrator {
             const connection = yield this.mysqlPool.getConnection();
             try {
                 const [rows] = yield connection.execute(`
-        SELECT id, item_id, picture, name_cn, name, description, full_description,
-               confirmed, created_at, updated_at
-        FROM item_qualities
-      `);
+          SELECT id, item_id, picture, name_cn, name, description, full_description,
+                confirmed, created_at, updated_at
+          FROM item_qualities
+        `);
                 const itemQualityRepository = database_1.AppDataSource.getRepository(item_qualities_1.ItemQuality);
                 const itemQualities = rows;
                 let successCount = 0;
@@ -790,14 +796,15 @@ class MySQLToPostgresMigrator {
     }
     migrateOrderItems() {
         return __awaiter(this, void 0, void 0, function* () {
+            var _a, _b, _c, _d;
             console.log("📋 Migrating order items...");
             const connection = yield this.mysqlPool.getConnection();
             try {
                 const [rows] = yield connection.execute(`
-        SELECT id, master_id, ItemID_DE, order_no, qty, remark_de, qty_delivered,
-               created_at, updated_at
-        FROM order_items
-      `);
+          SELECT id, master_id, ItemID_DE, order_no, qty, remark_de, qty_delivered,
+                created_at, updated_at
+          FROM order_items
+        `);
                 const orderItemRepository = database_1.AppDataSource.getRepository(order_items_1.OrderItem);
                 const orderItems = rows;
                 let successCount = 0;
@@ -807,24 +814,48 @@ class MySQLToPostgresMigrator {
                     const batch = orderItems.slice(i, i + this.batchSize);
                     for (const row of batch) {
                         try {
-                            const mysqlItemId = DataSanitizer.sanitizeNumber(row.ItemID_DE);
-                            const postgresItemId = this.itemIdMap.get(mysqlItemId);
+                            const mysqlItemIdDE = DataSanitizer.sanitizeNumber(row.ItemID_DE);
+                            let postgresItemId = (_b = (_a = this.itemIdMapByDE.get(mysqlItemIdDE)) !== null && _a !== void 0 ? _a : this.itemIdMap.get(mysqlItemIdDE)) !== null && _b !== void 0 ? _b : null;
                             if (!postgresItemId) {
-                                skippedCount++;
-                                console.log(`   Skipping order item ${row.id}: Item ${mysqlItemId} not found`);
-                                continue;
+                                const itemRepo = database_1.AppDataSource.getRepository(items_1.Item);
+                                const dbItem = yield itemRepo.findOne({
+                                    where: { ItemID_DE: mysqlItemIdDE },
+                                });
+                                if (dbItem) {
+                                    postgresItemId = dbItem.id;
+                                }
+                                else {
+                                    console.log(`   Warning: order item ${row.id} references ItemID_DE=${mysqlItemIdDE} which was not found in Postgres — inserting with item_id=null`);
+                                }
                             }
-                            // Handle order_id foreign key - check if order exists
-                            const orderId = DataSanitizer.sanitizeNumber(row.order_no);
-                            const finalOrderId = orderId > 0 && this.orderIdMap.has(orderId) ? orderId : null;
+                            const mysqlOrderNo = DataSanitizer.sanitizeString(row.order_no);
+                            const postgresOrderId = this.orderNoMap.get(mysqlOrderNo) || null;
                             const orderItem = orderItemRepository.create({
                                 id: DataSanitizer.sanitizeNumber(row.id),
                                 master_id: DataSanitizer.sanitizeString(row.master_id, 25, ""),
-                                ItemID_DE: postgresItemId,
-                                order_id: finalOrderId,
+                                item_id: postgresItemId,
+                                ItemID_DE: mysqlItemIdDE,
+                                order_id: postgresOrderId,
                                 qty: DataSanitizer.sanitizeNumber(row.qty),
                                 remark_de: DataSanitizer.sanitizeString(row.remark_de, undefined, ""),
                                 qty_delivered: DataSanitizer.sanitizeNumber(row.qty_delivered),
+                                category_id: null,
+                                rmb_special_price: 0,
+                                eur_special_price: 0,
+                                price: 0,
+                                currency: "CNY",
+                                taric_id: null,
+                                set_taric_code: null,
+                                status: "NSO",
+                                remarks_cn: "",
+                                problems: "",
+                                qty_label: DataSanitizer.sanitizeNumber(row.qty),
+                                qty_split: 0,
+                                supplier_order_id: null,
+                                ref_no: "",
+                                cargo_id: null,
+                                printed: "N",
+                                cargo_date: DataSanitizer.sanitizeDate(row.cargo_date),
                                 created_at: DataSanitizer.sanitizeDate(row.created_at) || new Date(),
                                 updated_at: DataSanitizer.sanitizeDate(row.updated_at) || new Date(),
                             });
@@ -834,19 +865,16 @@ class MySQLToPostgresMigrator {
                         catch (error) {
                             errorCount++;
                             console.log(`   Error on order item ${row.id}: ${error.message}`);
-                            // If it's a foreign key error, try with null order_id
                             if (error.message.includes("foreign key constraint")) {
                                 try {
-                                    const mysqlItemId = DataSanitizer.sanitizeNumber(row.ItemID_DE);
-                                    const postgresItemId = this.itemIdMap.get(mysqlItemId);
-                                    if (!postgresItemId) {
-                                        continue;
-                                    }
+                                    const retryItemIdDE = DataSanitizer.sanitizeNumber(row.ItemID_DE);
+                                    const retryItemId = (_d = (_c = this.itemIdMapByDE.get(retryItemIdDE)) !== null && _c !== void 0 ? _c : this.itemIdMap.get(retryItemIdDE)) !== null && _d !== void 0 ? _d : null;
                                     const orderItem = orderItemRepository.create({
                                         id: DataSanitizer.sanitizeNumber(row.id),
                                         master_id: DataSanitizer.sanitizeString(row.master_id, 25, ""),
-                                        ItemID_DE: postgresItemId,
-                                        order_id: null, // Force null
+                                        item_id: retryItemId,
+                                        ItemID_DE: retryItemIdDE,
+                                        order_id: null,
                                         qty: DataSanitizer.sanitizeNumber(row.qty),
                                         remark_de: DataSanitizer.sanitizeString(row.remark_de, undefined, ""),
                                         qty_delivered: DataSanitizer.sanitizeNumber(row.qty_delivered),
@@ -881,10 +909,10 @@ class MySQLToPostgresMigrator {
             const connection = yield this.mysqlPool.getConnection();
             try {
                 const [rows] = yield connection.execute(`
-        SELECT id, item_id, supplier_id, is_default, moq, oi, price_rmb, url,
-               note_cn, is_po, lead_time, updated_by, created_at, updated_at
-        FROM supplier_items
-      `);
+          SELECT id, item_id, supplier_id, is_default, moq, oi, price_rmb, url,
+                note_cn, is_po, lead_time, updated_by, created_at, updated_at
+          FROM supplier_items
+        `);
                 const supplierItemRepository = database_1.AppDataSource.getRepository(supplier_items_1.SupplierItem);
                 const supplierItems = rows;
                 let successCount = 0;
@@ -900,7 +928,6 @@ class MySQLToPostgresMigrator {
                                 skippedCount++;
                                 continue;
                             }
-                            // Handle supplier_id foreign key - set to null if 0 or invalid
                             const supplierId = DataSanitizer.sanitizeNumber(row.supplier_id);
                             const finalSupplierId = supplierId > 0 ? supplierId : null;
                             const supplierItem = supplierItemRepository.create({
@@ -920,12 +947,17 @@ class MySQLToPostgresMigrator {
                                 updated_at: DataSanitizer.sanitizeDate(row.updated_at) || new Date(),
                             });
                             yield supplierItemRepository.save(supplierItem);
+                            if (supplierItem.is_default === "Y" && finalSupplierId) {
+                                const itemRepo = database_1.AppDataSource.getRepository(items_1.Item);
+                                yield itemRepo.update(postgresItemId, {
+                                    supplier_id: finalSupplierId,
+                                });
+                            }
                             successCount++;
                         }
                         catch (error) {
                             errorCount++;
                             console.log(`   Error on supplier item ${row.id}: ${error.message}`);
-                            // If it's a foreign key error, try with null supplier_id
                             if (error.message.includes("foreign key constraint")) {
                                 try {
                                     const mysqlItemId = DataSanitizer.sanitizeNumber(row.item_id);
@@ -936,7 +968,7 @@ class MySQLToPostgresMigrator {
                                     const supplierItem = supplierItemRepository.create({
                                         id: DataSanitizer.sanitizeNumber(row.id),
                                         item_id: postgresItemId,
-                                        supplier_id: null, // Force null
+                                        supplier_id: null,
                                         is_default: DataSanitizer.sanitizeBoolean(row.is_default, ["Y", "y", "1", "true"], "Y"),
                                         moq: DataSanitizer.sanitizeNumber(row.moq),
                                         oi: DataSanitizer.sanitizeNumber(row.oi, 0),
@@ -971,20 +1003,4 @@ class MySQLToPostgresMigrator {
         });
     }
 }
-// Migration runner
-function runMigration() {
-    return __awaiter(this, void 0, void 0, function* () {
-        const migrator = new MySQLToPostgresMigrator();
-        try {
-            yield migrator.migrateAllData();
-            console.log("\n🎊 Migration finished successfully!");
-            console.log("💡 Invalid foreign key references have been set to null.");
-        }
-        catch (error) {
-            console.error("\n💥 Migration failed completely:", error);
-            process.exit(1);
-        }
-    });
-}
-// Run the migration
-runMigration().catch(console.error);
+exports.MySQLToPostgresMigrator = MySQLToPostgresMigrator;

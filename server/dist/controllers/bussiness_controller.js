@@ -48,7 +48,6 @@ const bulkImportBusinesses = (req, res, next) => __awaiter(void 0, void 0, void 
     var _a;
     try {
         const { businesses, source = exports.BUSINESS_SOURCE.GOOGLE_MAPS } = req.body;
-        // Validate input
         if (!businesses || !Array.isArray(businesses)) {
             return next(new errorHandler_1.default("Businesses array is required", 400));
         }
@@ -58,7 +57,6 @@ const bulkImportBusinesses = (req, res, next) => __awaiter(void 0, void 0, void 
         console.log(`Starting bulk import of ${businesses.length} businesses from source: ${source}...`);
         const customerRepository = database_1.AppDataSource.getRepository(customers_1.Customer);
         const businessDetailsRepository = database_1.AppDataSource.getRepository(business_details_1.BusinessDetails);
-        // Initialize results tracking
         const results = {
             total: businesses.length,
             imported: 0,
@@ -71,18 +69,14 @@ const bulkImportBusinesses = (req, res, next) => __awaiter(void 0, void 0, void 
             startTime: new Date(),
             endTime: null,
         };
-        // Helper function to extract first word for companyName
         const extractFirstWord = (businessName) => {
             if (!businessName)
                 return "";
             return businessName.split(" ")[0] || businessName;
         };
-        // Batch check for existing businesses - more efficient
         const businessesToCheck = [];
-        // First pass: validate and normalize all businesses
         for (let i = 0; i < businesses.length; i++) {
             const businessData = businesses[i];
-            // Skip completely invalid entries
             if (!businessData.name || !businessData.address) {
                 results.skippedInvalidData++;
                 results.errorsList.push({
@@ -91,11 +85,9 @@ const bulkImportBusinesses = (req, res, next) => __awaiter(void 0, void 0, void 
                 });
                 continue;
             }
-            // Normalize data for duplicate checking (only company name and website)
             const normalizedWebsite = businessData.website
                 ? normalizeWebsite(businessData.website)
                 : null;
-            // Use first word for duplicate checking of company names
             const companyNameFirstWord = extractFirstWord(businessData.name);
             const normalizedCompanyName = companyNameFirstWord.trim().toLowerCase();
             businessesToCheck.push({
@@ -105,16 +97,12 @@ const bulkImportBusinesses = (req, res, next) => __awaiter(void 0, void 0, void 
                 normalizedCompanyName,
             });
         }
-        // Batch query for existing businesses to check duplicates efficiently
         const existingBusinessesByWebsite = new Map();
         const existingBusinessesByName = new Map();
-        // Get all unique websites and names to check
         const websitesToCheck = businessesToCheck
             .filter((b) => b.normalizedWebsite)
             .map((b) => b.normalizedWebsite);
-        // Use first words for name checking
         const namesToCheck = businessesToCheck.map((b) => b.normalizedCompanyName);
-        // Query existing businesses by website
         if (websitesToCheck.length > 0) {
             const existingByWebsite = yield businessDetailsRepository
                 .createQueryBuilder("businessDetails")
@@ -136,7 +124,6 @@ const bulkImportBusinesses = (req, res, next) => __awaiter(void 0, void 0, void 
                 }
             });
         }
-        // Query existing customers by company name (using first word matching)
         if (namesToCheck.length > 0) {
             const existingByName = yield customerRepository
                 .createQueryBuilder("customer")
@@ -157,7 +144,6 @@ const bulkImportBusinesses = (req, res, next) => __awaiter(void 0, void 0, void 
                 });
             });
         }
-        // Process each business and separate duplicates from new entries
         const customersToSave = [];
         const seenInBatch = {
             websites: new Set(),
@@ -167,28 +153,23 @@ const bulkImportBusinesses = (req, res, next) => __awaiter(void 0, void 0, void 
             const { index, data: businessData, normalizedWebsite, normalizedCompanyName, } = businessToCheck;
             let duplicateReason = "";
             let existingRecord = null;
-            // Check for duplicates in current batch
             if (normalizedWebsite && seenInBatch.websites.has(normalizedWebsite)) {
                 duplicateReason = "Duplicate website in current batch";
             }
             else if (seenInBatch.names.has(normalizedCompanyName)) {
                 duplicateReason = "Duplicate company name in current batch";
             }
-            // Check against existing database records
             if (!duplicateReason) {
-                // Check by website
                 if (normalizedWebsite &&
                     existingBusinessesByWebsite.has(normalizedWebsite)) {
                     duplicateReason = "Website already exists in database";
                     existingRecord = existingBusinessesByWebsite.get(normalizedWebsite);
                 }
-                // Check by company name (first word)
                 else if (existingBusinessesByName.has(normalizedCompanyName)) {
                     duplicateReason = "Company name already exists in database";
                     existingRecord = existingBusinessesByName.get(normalizedCompanyName);
                 }
             }
-            // If duplicate found, add to results and skip
             if (duplicateReason) {
                 results.duplicates++;
                 results.duplicateEntries.push({
@@ -208,14 +189,11 @@ const bulkImportBusinesses = (req, res, next) => __awaiter(void 0, void 0, void 
                 continue;
             }
             try {
-                // Create new customer entity
                 const customer = new customers_1.Customer();
-                // Assign complete business name to legalName and first word to companyName
                 const completeBusinessName = businessData.name.trim();
                 const companyNameFirstWord = extractFirstWord(completeBusinessName);
-                // Required fields for Customer
-                customer.legalName = completeBusinessName; // Complete business name
-                customer.companyName = companyNameFirstWord; // First word only
+                customer.legalName = completeBusinessName;
+                customer.companyName = companyNameFirstWord;
                 customer.email = businessData.email
                     ? businessData.email.trim().toLowerCase()
                     : `${companyNameFirstWord
@@ -230,13 +208,10 @@ const bulkImportBusinesses = (req, res, next) => __awaiter(void 0, void 0, void 
                     : businessData.phoneNumber
                         ? businessData.phoneNumber.trim()
                         : "";
-                // Optional fields for Customer
                 customer.avatar = businessData.avatar
                     ? businessData.avatar.trim()
                     : undefined;
-                // Create BusinessDetails
                 const businessDetails = new business_details_1.BusinessDetails();
-                // Map business data to BusinessDetails
                 businessDetails.businessSource = businessData.businessSource || source;
                 businessDetails.longitude = sanitizeNumber(businessData.longitude);
                 businessDetails.latitude = sanitizeNumber(businessData.latitude);
@@ -274,7 +249,6 @@ const bulkImportBusinesses = (req, res, next) => __awaiter(void 0, void 0, void 
                 businessDetails.category = businessData.category
                     ? businessData.category.trim()
                     : undefined;
-                // Handle category tags if provided
                 if (businessData.categoryTags &&
                     Array.isArray(businessData.categoryTags)) {
                     businessDetails.additionalCategories = businessData.categoryTags
@@ -298,7 +272,6 @@ const bulkImportBusinesses = (req, res, next) => __awaiter(void 0, void 0, void 
                 businessDetails.isStarBusiness = false;
                 businessDetails.isStarCustomer = false;
                 customer.businessDetails = businessDetails;
-                // Add to batch tracking (only website and company name)
                 if (normalizedWebsite) {
                     seenInBatch.websites.add(normalizedWebsite);
                 }
@@ -321,11 +294,9 @@ const bulkImportBusinesses = (req, res, next) => __awaiter(void 0, void 0, void 
                 console.error(`Error processing business at index ${index}:`, error);
             }
         }
-        // Save all non-duplicate customers
         if (customersToSave.length > 0) {
             try {
                 console.log(`Attempting to save ${customersToSave.length} new businesses to database...`);
-                // Save in chunks to avoid parameter limits
                 const CHUNK_SIZE = 50;
                 const savedCustomers = [];
                 for (let i = 0; i < customersToSave.length; i += CHUNK_SIZE) {
@@ -348,7 +319,6 @@ const bulkImportBusinesses = (req, res, next) => __awaiter(void 0, void 0, void 
                     }
                     catch (chunkError) {
                         console.error(`Error saving chunk ${Math.floor(i / CHUNK_SIZE) + 1}:`, chunkError);
-                        // Try to save individually to identify specific problematic records
                         for (const customer of chunk) {
                             try {
                                 const saved = yield customerRepository.save(customer);
@@ -393,7 +363,6 @@ const bulkImportBusinesses = (req, res, next) => __awaiter(void 0, void 0, void 
             errors: results.errors,
             source: source,
         });
-        // Always return success with detailed results
         return res.status(200).json({
             success: true,
             message: `Bulk import completed. ${results.imported} new businesses imported, ${results.duplicates} duplicates found.`,
@@ -581,7 +550,6 @@ const createBusiness = (req, res, next) => __awaiter(void 0, void 0, void 0, fun
             businessDetails.additionalCategories = additionalCategories || [];
             businessDetails.customer = savedCustomer;
             const savedBusinessDetails = yield transactionalEntityManager.save(business_details_1.BusinessDetails, businessDetails);
-            // Create StarBusinessDetails if device maker is "Yes" OR if conditions are met for automatic promotion
             if (isDeviceMaker === "Yes" || shouldBeStarBusiness) {
                 const starBusiness = new star_business_details_1.StarBusinessDetails();
                 if (starBusinessDetails) {
@@ -710,7 +678,7 @@ const createBusiness = (req, res, next) => __awaiter(void 0, void 0, void 0, fun
 });
 exports.createBusiness = createBusiness;
 const updateBusiness = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _j;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l;
     try {
         const { id } = req.params;
         const updateData = req.body;
@@ -756,6 +724,33 @@ const updateBusiness = (req, res, next) => __awaiter(void 0, void 0, void 0, fun
             });
             if (existingCustomer && existingCustomer.id !== id) {
                 return next(new errorHandler_1.default("A business with this email already exists", 400));
+            }
+        }
+        if (displayName !== undefined && displayName.trim() !== customer.companyName) {
+            const trimmedDisplayName = displayName.trim();
+            const existingCustomerWithName = yield customerRepository
+                .createQueryBuilder("customer")
+                .where("LOWER(customer.companyName) = LOWER(:companyName)", {
+                companyName: trimmedDisplayName,
+            })
+                .getOne();
+            if (existingCustomerWithName && existingCustomerWithName.id !== id) {
+                return next(new errorHandler_1.default("A business with this display name already exists", 400));
+            }
+        }
+        if (updateData.website !== undefined && updateData.website !== ((_c = customer.businessDetails) === null || _c === void 0 ? void 0 : _c.website)) {
+            const normalizedWebsite = updateData.website ? normalizeWebsite(updateData.website) : null;
+            if (normalizedWebsite) {
+                const existingBusinessWithWebsite = yield businessDetailsRepository
+                    .createQueryBuilder("businessDetails")
+                    .leftJoinAndSelect("businessDetails.customer", "cust")
+                    .where("businessDetails.website = :website", {
+                    website: normalizedWebsite,
+                })
+                    .getOne();
+                if (existingBusinessWithWebsite && ((_d = existingBusinessWithWebsite.customer) === null || _d === void 0 ? void 0 : _d.id) !== id) {
+                    return next(new errorHandler_1.default("A business with this website already exists", 400));
+                }
             }
         }
         const result = yield database_1.AppDataSource.transaction((transactionalEntityManager) => __awaiter(void 0, void 0, void 0, function* () {
@@ -806,7 +801,6 @@ const updateBusiness = (req, res, next) => __awaiter(void 0, void 0, void 0, fun
                 if (updateData.additionalCategories !== undefined)
                     businessDetails.additionalCategories =
                         updateData.additionalCategories;
-                // Update device maker status
                 if (isDeviceMaker !== undefined) {
                     businessDetails.isDeviceMaker = isDeviceMaker;
                     businessDetails.check_timestamp = new Date();
@@ -814,10 +808,8 @@ const updateBusiness = (req, res, next) => __awaiter(void 0, void 0, void 0, fun
                 }
                 yield transactionalEntityManager.save(business_details_1.BusinessDetails, businessDetails);
             }
-            // Handle StarBusinessDetails updates
             if ((isDeviceMaker === "Yes" || shouldBeStarBusiness) &&
                 !customer.starBusinessDetails) {
-                // Create new star business details
                 const starBusiness = new star_business_details_1.StarBusinessDetails();
                 if (starBusinessDetails) {
                     starBusiness.inSeries = starBusinessDetails.inSeries || false;
@@ -832,19 +824,15 @@ const updateBusiness = (req, res, next) => __awaiter(void 0, void 0, void 0, fun
                 customer.starBusinessDetails = savedStarBusiness;
             }
             else if (customer.starBusinessDetails && starBusinessDetails) {
-                // Update existing star business details
                 Object.assign(customer.starBusinessDetails, starBusinessDetails);
                 yield transactionalEntityManager.save(star_business_details_1.StarBusinessDetails, customer.starBusinessDetails);
             }
-            // Handle StarCustomerDetails updates
             let tempPassword;
             let defaultList;
             if (isStarCustomer && !customer.starCustomerDetails) {
-                // Create new star customer details
                 const starCustomerDetails = new star_customer_details_1.StarCustomerDetails();
                 tempPassword = generateTempPassword();
                 starCustomerDetails.password = yield bcryptjs_1.default.hash(tempPassword, 10);
-                // Set delivery address from business details
                 if (customer.businessDetails) {
                     starCustomerDetails.deliveryPostalCode =
                         customer.businessDetails.postalCode || "";
@@ -856,23 +844,19 @@ const updateBusiness = (req, res, next) => __awaiter(void 0, void 0, void 0, fun
                 starCustomerDetails.customer = customer;
                 const savedStarCustomerDetails = yield transactionalEntityManager.save(star_customer_details_1.StarCustomerDetails, starCustomerDetails);
                 customer.starCustomerDetails = savedStarCustomerDetails;
-                // Create default list for the new star customer
                 defaultList = new list_1.List();
                 defaultList.name = `Default`;
                 defaultList.description = `Default list for ${customer.companyName}`;
                 defaultList.customer = customer;
                 defaultList.status = list_1.LIST_STATUS.ACTIVE;
                 defaultList = yield transactionalEntityManager.save(list_1.List, defaultList);
-                // Update customer email for star customer
                 customer.email = starCustomerEmail.trim().toLowerCase();
                 customer.contactEmail = starCustomerEmail.trim().toLowerCase();
             }
-            // Update customer stage based on current state - UPDATED LOGIC
             if (isStarCustomer) {
                 customer.stage = "star_customer";
             }
             else if (shouldBeStarBusiness) {
-                // AUTOMATIC PROMOTION TO STAR BUSINESS
                 customer.stage = customer.starCustomerDetails
                     ? "star_customer"
                     : "star_business";
@@ -886,7 +870,6 @@ const updateBusiness = (req, res, next) => __awaiter(void 0, void 0, void 0, fun
             else {
                 customer.stage = "business";
             }
-            // Save customer
             yield transactionalEntityManager.save(customers_1.Customer, customer);
             return {
                 customer,
@@ -894,11 +877,10 @@ const updateBusiness = (req, res, next) => __awaiter(void 0, void 0, void 0, fun
                 defaultList,
                 isDeviceMakerChanged,
                 isStarCustomerChanged,
-                shouldBeStarBusiness, // Return this flag for response message
+                shouldBeStarBusiness,
             };
         }));
         const { tempPassword, defaultList, isDeviceMakerChanged: deviceMakerChanged, isStarCustomerChanged: starCustomerChanged, } = result;
-        // Send email if upgrading to star customer - USING ALISHA'S PROPOSED TEXT
         if (isStarCustomer && tempPassword) {
             const loginLink = `${process.env.STAR_URL}/login`;
             const portalLink = "https://stars.gtech.de/potis";
@@ -926,7 +908,6 @@ const updateBusiness = (req, res, next) => __awaiter(void 0, void 0, void 0, fun
                 html: message,
             });
         }
-        // Fetch updated customer with all relations
         const finalCustomer = yield customerRepository.findOne({
             where: { id },
             relations: [
@@ -940,8 +921,7 @@ const updateBusiness = (req, res, next) => __awaiter(void 0, void 0, void 0, fun
         if (!finalCustomer) {
             return next(new errorHandler_1.default("Business not found after update", 404));
         }
-        // RETURN RESPONSE WITH PROPER FIELD MAPPING
-        const businessResponse = Object.assign(Object.assign({ id: finalCustomer.id, displayName: finalCustomer.companyName, companyName: finalCustomer.legalName, name: finalCustomer.legalName, legalName: finalCustomer.legalName, email: finalCustomer.email, contactEmail: finalCustomer.contactEmail, contactPhoneNumber: finalCustomer.contactPhoneNumber, stage: finalCustomer.stage }, finalCustomer.businessDetails), { check_by: ((_c = finalCustomer.businessDetails) === null || _c === void 0 ? void 0 : _c.check_by)
+        const businessResponse = Object.assign(Object.assign({ id: finalCustomer.id, displayName: finalCustomer.companyName, companyName: finalCustomer.legalName, name: finalCustomer.legalName, legalName: finalCustomer.legalName, email: finalCustomer.email, contactEmail: finalCustomer.contactEmail, contactPhoneNumber: finalCustomer.contactPhoneNumber, stage: finalCustomer.stage }, finalCustomer.businessDetails), { check_by: ((_e = finalCustomer.businessDetails) === null || _e === void 0 ? void 0 : _e.check_by)
                 ? {
                     id: finalCustomer.businessDetails.check_by.id,
                     name: finalCustomer.businessDetails.check_by.name,
@@ -964,16 +944,12 @@ const updateBusiness = (req, res, next) => __awaiter(void 0, void 0, void 0, fun
                         }
                         : undefined,
                 }
-                : undefined, 
-            // Include default list if just created
-            defaultList: defaultList
+                : undefined, defaultList: defaultList
                 ? {
                     id: defaultList.id,
                     name: defaultList.name,
                 }
-                : undefined, 
-            // Backward compatibility fields
-            website: (_d = finalCustomer.businessDetails) === null || _d === void 0 ? void 0 : _d.website, hasWebsite: !!((_e = finalCustomer.businessDetails) === null || _e === void 0 ? void 0 : _e.website), phoneNumber: (_f = finalCustomer.businessDetails) === null || _f === void 0 ? void 0 : _f.contactPhone, businessEmail: (_g = finalCustomer.businessDetails) === null || _g === void 0 ? void 0 : _g.email, status: exports.BUSINESS_STATUS.ACTIVE, source: (_h = finalCustomer.businessDetails) === null || _h === void 0 ? void 0 : _h.businessSource, isDeviceMaker: (_j = finalCustomer.businessDetails) === null || _j === void 0 ? void 0 : _j.isDeviceMaker, isStarCustomer: !!finalCustomer.starCustomerDetails, createdAt: finalCustomer.createdAt, updatedAt: finalCustomer.updatedAt });
+                : undefined, website: (_f = finalCustomer.businessDetails) === null || _f === void 0 ? void 0 : _f.website, hasWebsite: !!((_g = finalCustomer.businessDetails) === null || _g === void 0 ? void 0 : _g.website), phoneNumber: (_h = finalCustomer.businessDetails) === null || _h === void 0 ? void 0 : _h.contactPhone, businessEmail: (_j = finalCustomer.businessDetails) === null || _j === void 0 ? void 0 : _j.email, status: exports.BUSINESS_STATUS.ACTIVE, source: (_k = finalCustomer.businessDetails) === null || _k === void 0 ? void 0 : _k.businessSource, isDeviceMaker: (_l = finalCustomer.businessDetails) === null || _l === void 0 ? void 0 : _l.isDeviceMaker, isStarCustomer: !!finalCustomer.starCustomerDetails, createdAt: finalCustomer.createdAt, updatedAt: finalCustomer.updatedAt });
         let successMessage = "Business updated successfully";
         if (isStarCustomer && tempPassword) {
             successMessage =
@@ -1208,7 +1184,7 @@ const getAllBusinesses = (req, res, next) => __awaiter(void 0, void 0, void 0, f
         const businesses = customers.map((customer) => {
             var _a, _b, _c, _d, _e;
             const _f = customer.businessDetails || {}, { id: businessId } = _f, businessDetailsWithoutId = __rest(_f, ["id"]);
-            return Object.assign(Object.assign({ id: customer.id, displayName: customer.companyName, legalName: customer.legalName, name: customer.legalName, email: customer.email, contactEmail: customer.contactEmail, contactPhoneNumber: customer.contactPhoneNumber, stage: customer.stage }, businessDetailsWithoutId), { website: (_a = customer.businessDetails) === null || _a === void 0 ? void 0 : _a.website, hasWebsite: !!((_b = customer.businessDetails) === null || _b === void 0 ? void 0 : _b.website), phoneNumber: (_c = customer.businessDetails) === null || _c === void 0 ? void 0 : _c.contactPhone, businessEmail: (_d = customer.businessDetails) === null || _d === void 0 ? void 0 : _d.email, status: exports.BUSINESS_STATUS.ACTIVE, source: (_e = customer.businessDetails) === null || _e === void 0 ? void 0 : _e.businessSource, createdAt: customer.createdAt, updatedAt: customer.updatedAt });
+            return Object.assign(Object.assign({ id: customer.id, companyName: customer.companyName, displayName: customer.companyName, legalName: customer.legalName, name: customer.legalName, email: customer.email, contactEmail: customer.contactEmail, contactPhoneNumber: customer.contactPhoneNumber, stage: customer.stage }, businessDetailsWithoutId), { website: (_a = customer.businessDetails) === null || _a === void 0 ? void 0 : _a.website, hasWebsite: !!((_b = customer.businessDetails) === null || _b === void 0 ? void 0 : _b.website), phoneNumber: (_c = customer.businessDetails) === null || _c === void 0 ? void 0 : _c.contactPhone, businessEmail: (_d = customer.businessDetails) === null || _d === void 0 ? void 0 : _d.email, status: exports.BUSINESS_STATUS.ACTIVE, source: (_e = customer.businessDetails) === null || _e === void 0 ? void 0 : _e.businessSource, createdAt: customer.createdAt, updatedAt: customer.updatedAt });
         });
         return res.status(200).json({
             success: true,

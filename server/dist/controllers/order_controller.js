@@ -12,7 +12,8 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.splitOrderItem = exports.updateOrderItemStatus = exports.generateLabelPDF = exports.deleteOrder = exports.getOrderById = exports.getAllOrders = exports.updateOrder = exports.createOrder = void 0;
+exports.updateOrderItemPrice = exports.splitOrderItem = exports.updateOrderItemLabel = exports.updateOrderItemStatus = exports.generateLabelPDF = exports.deleteOrder = exports.getOrderById = exports.getAllOrders = exports.updateOrder = exports.createOrder = void 0;
+const typeorm_1 = require("typeorm");
 const pdfkit_1 = __importDefault(require("pdfkit"));
 const bwip_js_1 = __importDefault(require("bwip-js"));
 const path_1 = __importDefault(require("path"));
@@ -21,6 +22,10 @@ const database_1 = require("../config/database");
 const orders_1 = require("../models/orders");
 const order_items_1 = require("../models/order_items");
 const items_1 = require("../models/items");
+const warehouse_items_1 = require("../models/warehouse_items");
+const cargo_orders_1 = require("../models/cargo_orders");
+const supplier_items_1 = require("../models/supplier_items");
+const cargo_controller_1 = require("./cargo_controller");
 const padorder_no = (n) => `MA${String(n).padStart(4, "0")}`;
 const parseorder_noNumber = (order_no) => {
     const m = /^MA(\d+)$/i.exec((order_no || "").trim());
@@ -30,6 +35,7 @@ const parseorder_noNumber = (order_no) => {
     return Number.isFinite(num) ? num : null;
 };
 const createOrder = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b, _c, _d, _e, _f;
     const queryRunner = database_1.AppDataSource.createQueryRunner();
     try {
         yield queryRunner.connect();
@@ -65,12 +71,19 @@ const createOrder = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
         });
         yield orderRepo.save(order);
         const itemRepo = queryRunner.manager.getRepository(items_1.Item);
+        const supplierItemRepo = queryRunner.manager.getRepository(supplier_items_1.SupplierItem);
         const itemIds = items.map((it) => Number(it.item_id));
         const dbItems = yield itemRepo
             .createQueryBuilder("i")
             .where("i.id IN (:...itemIds)", { itemIds })
             .getMany();
         const itemMap = new Map(dbItems.map((i) => [i.id, i]));
+        // Fetch RMB_Price from supplier_items for all items
+        const supplierItems = yield supplierItemRepo
+            .createQueryBuilder("si")
+            .where("si.item_id IN (:...itemIds)", { itemIds })
+            .getMany();
+        const rmbPriceMap = new Map(supplierItems.map((si) => [si.item_id, si.price_rmb]));
         const lines = items.map((it) => {
             var _a;
             const item_id = Number(it.item_id);
@@ -82,12 +95,13 @@ const createOrder = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
                 throw new errorHandler_1.default("Invalid qty in items[]", 400);
             }
             const dbItem = itemMap.get(item_id);
+            const rmbPrice = rmbPriceMap.get(item_id);
             return orderItemsRepo.create({
                 order_id: order.id,
                 item_id,
                 qty,
                 remark_de: it.remark_de,
-                rmb_special_price: dbItem === null || dbItem === void 0 ? void 0 : dbItem.RMB_Price,
+                rmb_special_price: rmbPrice, // Use RMB_Price from supplier_items
                 price: dbItem === null || dbItem === void 0 ? void 0 : dbItem.price,
                 currency: dbItem === null || dbItem === void 0 ? void 0 : dbItem.currency,
                 taric_id: dbItem === null || dbItem === void 0 ? void 0 : dbItem.taric_id,
@@ -100,19 +114,30 @@ const createOrder = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
         });
         yield orderItemsRepo.save(lines);
         yield queryRunner.commitTransaction();
+        const finalOrder = yield queryRunner.manager.getRepository(orders_1.Order).findOne({
+            where: { id: order.id },
+            relations: ["cargo", "cargo.customer", "customer", "supplier"],
+        });
         return res.status(201).json({
             success: true,
             message: "Order created successfully",
             data: {
-                id: order.id,
-                order_no: order.order_no,
-                category_id: order.category_id,
-                customer_id: order.customer_id,
-                supplier_id: order.supplier_id,
-                status: order.status,
-                comment: order.comment,
-                created_at: order.created_at,
-                updated_at: order.updated_at,
+                id: finalOrder.id,
+                order_no: finalOrder.order_no,
+                category_id: finalOrder.category_id,
+                customer_id: finalOrder.customer_id,
+                customer_name: ((_b = (_a = finalOrder.cargo) === null || _a === void 0 ? void 0 : _a.customer) === null || _b === void 0 ? void 0 : _b.companyName) ||
+                    ((_c = finalOrder.cargo) === null || _c === void 0 ? void 0 : _c.bill_to_display_name) ||
+                    ((_d = finalOrder.customer) === null || _d === void 0 ? void 0 : _d.companyName) ||
+                    "No Customer",
+                supplier_id: finalOrder.supplier_id,
+                supplier_name: ((_e = finalOrder.supplier) === null || _e === void 0 ? void 0 : _e.company_name) ||
+                    ((_f = finalOrder.supplier) === null || _f === void 0 ? void 0 : _f.name) ||
+                    "Unassigned",
+                status: finalOrder.status,
+                comment: finalOrder.comment,
+                created_at: finalOrder.created_at,
+                updated_at: finalOrder.updated_at,
                 items: lines.map((oi) => ({
                     id: oi.id,
                     order_id: oi.order_id,
@@ -129,18 +154,19 @@ const createOrder = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
         try {
             yield queryRunner.rollbackTransaction();
         }
-        catch (_a) { }
+        catch (_g) { }
         return next(error);
     }
     finally {
         try {
             yield queryRunner.release();
         }
-        catch (_b) { }
+        catch (_h) { }
     }
 });
 exports.createOrder = createOrder;
 const updateOrder = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b, _c, _d, _e, _f;
     const queryRunner = database_1.AppDataSource.createQueryRunner();
     try {
         const { orderId } = req.params;
@@ -186,12 +212,19 @@ const updateOrder = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
                 .where("order_id = :order_id", { order_id: order.id })
                 .execute();
             const itemRepo = queryRunner.manager.getRepository(items_1.Item);
+            const supplierItemRepo = queryRunner.manager.getRepository(supplier_items_1.SupplierItem);
             const itemIds = items.map((it) => Number(it.item_id));
             const dbItems = yield itemRepo
                 .createQueryBuilder("i")
                 .where("i.id IN (:...itemIds)", { itemIds })
                 .getMany();
             const itemMap = new Map(dbItems.map((i) => [i.id, i]));
+            // Fetch RMB_Price from supplier_items for all items
+            const supplierItems = yield supplierItemRepo
+                .createQueryBuilder("si")
+                .where("si.item_id IN (:...itemIds)", { itemIds })
+                .getMany();
+            const rmbPriceMap = new Map(supplierItems.map((si) => [si.item_id, si.price_rmb]));
             const newLines = items.map((it) => {
                 var _a;
                 const item_id = Number(it.item_id);
@@ -201,12 +234,13 @@ const updateOrder = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
                 if (!Number.isFinite(qty) || qty <= 0)
                     throw new errorHandler_1.default("Invalid qty in items[]", 400);
                 const dbItem = itemMap.get(item_id);
+                const rmbPrice = rmbPriceMap.get(item_id);
                 return orderItemsRepo.create({
                     order_id: order.id,
                     item_id,
                     qty,
                     remark_de: it.remark_de,
-                    rmb_special_price: dbItem === null || dbItem === void 0 ? void 0 : dbItem.RMB_Price,
+                    rmb_special_price: rmbPrice, // Use RMB_Price from supplier_items
                     price: dbItem === null || dbItem === void 0 ? void 0 : dbItem.price,
                     currency: dbItem === null || dbItem === void 0 ? void 0 : dbItem.currency,
                     taric_id: dbItem === null || dbItem === void 0 ? void 0 : dbItem.taric_id,
@@ -220,7 +254,10 @@ const updateOrder = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
             yield orderItemsRepo.save(newLines);
         }
         yield queryRunner.commitTransaction();
-        const freshOrder = yield orderRepo.findOne({ where: { id: order.id } });
+        const finalOrder = yield orderRepo.findOne({
+            where: { id: order.id },
+            relations: ["cargo", "cargo.customer", "customer", "supplier"],
+        });
         const freshItems = yield orderItemsRepo.find({
             where: { order_id: order.id },
         });
@@ -228,15 +265,22 @@ const updateOrder = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
             success: true,
             message: "Order updated successfully",
             data: {
-                id: freshOrder.id,
-                order_no: freshOrder.order_no,
-                category_id: freshOrder.category_id,
-                customer_id: freshOrder.customer_id,
-                supplier_id: freshOrder.supplier_id,
-                status: freshOrder.status,
-                comment: freshOrder.comment,
-                created_at: freshOrder.created_at,
-                updated_at: freshOrder.updated_at,
+                id: finalOrder.id,
+                order_no: finalOrder.order_no,
+                category_id: finalOrder.category_id,
+                customer_id: finalOrder.customer_id,
+                customer_name: ((_b = (_a = finalOrder.cargo) === null || _a === void 0 ? void 0 : _a.customer) === null || _b === void 0 ? void 0 : _b.companyName) ||
+                    ((_c = finalOrder.cargo) === null || _c === void 0 ? void 0 : _c.bill_to_display_name) ||
+                    ((_d = finalOrder.customer) === null || _d === void 0 ? void 0 : _d.companyName) ||
+                    "No Customer",
+                supplier_id: finalOrder.supplier_id,
+                supplier_name: ((_e = finalOrder.supplier) === null || _e === void 0 ? void 0 : _e.company_name) ||
+                    ((_f = finalOrder.supplier) === null || _f === void 0 ? void 0 : _f.name) ||
+                    "Unassigned",
+                status: finalOrder.status,
+                comment: finalOrder.comment,
+                created_at: finalOrder.created_at,
+                updated_at: finalOrder.updated_at,
                 items: freshItems.map((oi) => ({
                     id: oi.id,
                     order_id: oi.order_id,
@@ -253,26 +297,34 @@ const updateOrder = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
         try {
             yield queryRunner.rollbackTransaction();
         }
-        catch (_a) { }
+        catch (_g) { }
         return next(error);
     }
     finally {
         try {
             yield queryRunner.release();
         }
-        catch (_b) { }
+        catch (_h) { }
     }
 });
 exports.updateOrder = updateOrder;
 const getAllOrders = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const orderRepo = database_1.AppDataSource.getRepository(orders_1.Order);
+        const warehouseRepo = database_1.AppDataSource.getRepository(warehouse_items_1.WarehouseItem);
         const { search = "", status = "" } = (req.query || {});
         const qb = orderRepo
             .createQueryBuilder("o")
             .leftJoinAndSelect("o.orderItems", "oi")
             .leftJoinAndSelect("oi.item", "item")
-            .orderBy("o.created_at", "DESC")
+            .leftJoinAndSelect("item.taric", "taric")
+            .leftJoinAndSelect("o.supplier", "s")
+            .leftJoinAndSelect("item.supplier", "item_supplier")
+            .leftJoinAndSelect("o.cargo", "cargo")
+            .leftJoinAndSelect("cargo.customer", "cust")
+            .leftJoinAndSelect("o.customer", "orderCust")
+            .orderBy("o.date_emailed", "DESC")
+            .addOrderBy("o.created_at", "DESC")
             .addOrderBy("o.id", "DESC")
             .addOrderBy("oi.id", "ASC");
         if (search) {
@@ -286,10 +338,105 @@ const getAllOrders = (req, res, next) => __awaiter(void 0, void 0, void 0, funct
             qb.where("o.status = :status", { status });
         }
         const orders = yield qb.getMany();
-        const mappedOrders = orders.map((order) => (Object.assign(Object.assign({}, order), { items: (order.orderItems || []).map((oi) => {
-                const itemDetails = oi.item;
-                return Object.assign(Object.assign({}, oi), { ItemID_DE: (oi === null || oi === void 0 ? void 0 : oi.ItemID_DE) || "-", item_id: oi.item_id || (itemDetails === null || itemDetails === void 0 ? void 0 : itemDetails.id), ean: (itemDetails === null || itemDetails === void 0 ? void 0 : itemDetails.ean) || "-", item_name: (itemDetails === null || itemDetails === void 0 ? void 0 : itemDetails.item_name) || ((oi === null || oi === void 0 ? void 0 : oi.ItemID_DE) ? `Unknown (DE: ${oi.ItemID_DE})` : "Unknown Item"), model: (itemDetails === null || itemDetails === void 0 ? void 0 : itemDetails.model) || "-", price: oi.price || (itemDetails === null || itemDetails === void 0 ? void 0 : itemDetails.price) || 0, currency: oi.currency || (itemDetails === null || itemDetails === void 0 ? void 0 : itemDetails.currency) || "CNY", item: itemDetails });
-            }), orderItems: undefined })));
+        const itemIds = [];
+        const itemIdDEs = [];
+        orders.forEach((order) => {
+            var _a;
+            (_a = order.orderItems) === null || _a === void 0 ? void 0 : _a.forEach((oi) => {
+                var _a;
+                if (oi.item_id)
+                    itemIds.push(oi.item_id);
+                if (oi.ItemID_DE)
+                    itemIdDEs.push(oi.ItemID_DE);
+                if ((_a = oi.item) === null || _a === void 0 ? void 0 : _a.id)
+                    itemIds.push(oi.item.id);
+            });
+        });
+        const warehouseItems = yield warehouseRepo
+            .createQueryBuilder("wi")
+            .where("wi.item_id IN (:...itemIds)", {
+            itemIds: itemIds.length ? itemIds : [0],
+        })
+            .orWhere("wi.ItemID_DE IN (:...itemIdDEs)", {
+            itemIdDEs: itemIdDEs.length ? itemIdDEs : [0],
+        })
+            .getMany();
+        const warehouseByItemId = new Map();
+        const warehouseByItemIdDE = new Map();
+        warehouseItems.forEach((wi) => {
+            if (wi.item_id)
+                warehouseByItemId.set(wi.item_id, wi);
+            if (wi.ItemID_DE)
+                warehouseByItemIdDE.set(wi.ItemID_DE, wi);
+        });
+        const itemRepo = database_1.AppDataSource.getRepository(items_1.Item);
+        const fallbackItems = yield itemRepo.find({
+            where: {
+                ItemID_DE: (0, typeorm_1.In)(itemIdDEs.filter((id) => id !== undefined && id !== null)),
+            },
+            relations: ["supplier", "taric"],
+        });
+        const itemByDE = new Map();
+        fallbackItems.forEach((item) => {
+            if (item.ItemID_DE)
+                itemByDE.set(item.ItemID_DE, item);
+        });
+        // Fetch RMB_Price from supplier_items for all items
+        const supplierItemRepo = database_1.AppDataSource.getRepository(supplier_items_1.SupplierItem);
+        const supplierItems = yield supplierItemRepo.find({
+            where: { item_id: (0, typeorm_1.In)(itemIds.length ? itemIds : [0]) },
+        });
+        const rmbPriceMap = new Map(supplierItems.map((si) => [si.item_id, si.price_rmb]));
+        const mappedOrders = orders.map((order) => {
+            var _a, _b, _c, _d, _e, _f;
+            return (Object.assign(Object.assign({}, order), { supplier_name: ((_a = order.supplier) === null || _a === void 0 ? void 0 : _a.company_name) || ((_b = order.supplier) === null || _b === void 0 ? void 0 : _b.name) || "Unassigned", customer_name: ((_d = (_c = order.cargo) === null || _c === void 0 ? void 0 : _c.customer) === null || _d === void 0 ? void 0 : _d.companyName) ||
+                    ((_e = order.cargo) === null || _e === void 0 ? void 0 : _e.bill_to_display_name) ||
+                    ((_f = order.customer) === null || _f === void 0 ? void 0 : _f.companyName) ||
+                    "No Customer", items: (order.orderItems || []).map((oi) => {
+                    var _a, _b, _c, _d, _e;
+                    const itemDetails = oi.item || (oi.ItemID_DE ? itemByDE.get(oi.ItemID_DE) : null);
+                    console.log(itemDetails);
+                    let warehouseItem = null;
+                    if (oi.item_id) {
+                        warehouseItem = warehouseByItemId.get(oi.item_id);
+                    }
+                    if (!warehouseItem && oi.ItemID_DE) {
+                        warehouseItem = warehouseByItemIdDE.get(oi.ItemID_DE);
+                    }
+                    if (!warehouseItem && (itemDetails === null || itemDetails === void 0 ? void 0 : itemDetails.id)) {
+                        warehouseItem = warehouseByItemId.get(itemDetails.id);
+                    }
+                    const resolvedSupplierName = ((_a = itemDetails === null || itemDetails === void 0 ? void 0 : itemDetails.supplier) === null || _a === void 0 ? void 0 : _a.company_name) ||
+                        ((_b = itemDetails === null || itemDetails === void 0 ? void 0 : itemDetails.supplier) === null || _b === void 0 ? void 0 : _b.name) ||
+                        ((_c = order.supplier) === null || _c === void 0 ? void 0 : _c.company_name) ||
+                        ((_d = order.supplier) === null || _d === void 0 ? void 0 : _d.name) ||
+                        null;
+                    // Get RMB_Price from supplier_items
+                    const rmbPrice = rmbPriceMap.get(oi.item_id || (itemDetails === null || itemDetails === void 0 ? void 0 : itemDetails.id) || 0) || 0;
+                    // Determine the price to use (priority: rmb_price from supplier_items > item.price)
+                    const finalPrice = rmbPrice > 0 ? rmbPrice : (itemDetails === null || itemDetails === void 0 ? void 0 : itemDetails.price) || oi.price || 0;
+                    return Object.assign(Object.assign({}, oi), { de_no: (warehouseItem === null || warehouseItem === void 0 ? void 0 : warehouseItem.item_no_de) || "-", ItemID_DE: (oi === null || oi === void 0 ? void 0 : oi.ItemID_DE) || "-", item_id: oi.item_id || (itemDetails === null || itemDetails === void 0 ? void 0 : itemDetails.id), ean: (itemDetails === null || itemDetails === void 0 ? void 0 : itemDetails.ean) || (warehouseItem === null || warehouseItem === void 0 ? void 0 : warehouseItem.ean) || "-", remark_de: oi.remark_de, remark_cn: oi.remarks_cn, remark_en: (itemDetails === null || itemDetails === void 0 ? void 0 : itemDetails.remark) || "", item_name: (itemDetails === null || itemDetails === void 0 ? void 0 : itemDetails.item_name) ||
+                            (warehouseItem === null || warehouseItem === void 0 ? void 0 : warehouseItem.item_name_en) ||
+                            (warehouseItem === null || warehouseItem === void 0 ? void 0 : warehouseItem.item_name_de) ||
+                            ((oi === null || oi === void 0 ? void 0 : oi.ItemID_DE) ? `Unknown (DE: ${oi.ItemID_DE})` : "Unknown Item"), model: (itemDetails === null || itemDetails === void 0 ? void 0 : itemDetails.model) || "-", price: finalPrice, currency: "CNY", taric_id: oi.taric_id || (itemDetails === null || itemDetails === void 0 ? void 0 : itemDetails.taric_id), taric_code: oi.set_taric_code || ((_e = itemDetails === null || itemDetails === void 0 ? void 0 : itemDetails.taric) === null || _e === void 0 ? void 0 : _e.code) || "-", supplier_id: (itemDetails === null || itemDetails === void 0 ? void 0 : itemDetails.supplier_id) || order.supplier_id, supplier_name: resolvedSupplierName || "Unassigned", rmb_price: rmbPrice, item: itemDetails, warehouse_data: warehouseItem
+                            ? {
+                                id: warehouseItem.id,
+                                item_no_de: warehouseItem.item_no_de,
+                                item_name_de: warehouseItem.item_name_de,
+                                item_name_en: warehouseItem.item_name_en,
+                                stock_qty: warehouseItem.stock_qty,
+                                msq: warehouseItem.msq,
+                                buffer: warehouseItem.buffer,
+                                is_stock_item: warehouseItem.is_stock_item,
+                                is_SnSI: warehouseItem.is_SnSI,
+                                ship_class: warehouseItem.ship_class,
+                                is_active: warehouseItem.is_active,
+                                is_no_auto_order: warehouseItem.is_no_auto_order,
+                                category_id: warehouseItem.category_id,
+                            }
+                            : null });
+                }), orderItems: undefined }));
+        });
         return res.status(200).json({
             success: true,
             data: mappedOrders,
@@ -302,45 +449,97 @@ const getAllOrders = (req, res, next) => __awaiter(void 0, void 0, void 0, funct
 });
 exports.getAllOrders = getAllOrders;
 const getOrderById = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b, _c, _d, _e, _f, _g;
     try {
         const { orderId } = req.params;
         if (!orderId)
             return next(new errorHandler_1.default("Order ID is required", 400));
         const orderRepository = database_1.AppDataSource.getRepository(orders_1.Order);
         const orderItemsRepository = database_1.AppDataSource.getRepository(order_items_1.OrderItem);
+        const supplierItemRepository = database_1.AppDataSource.getRepository(supplier_items_1.SupplierItem);
         const order = yield orderRepository.findOne({
             where: { id: Number(orderId) },
+            relations: [
+                "orderItems",
+                "orderItems.item",
+                "orderItems.item.taric",
+                "supplier",
+                "category",
+                "cargo",
+                "cargo.customer",
+                "customer",
+            ],
         });
         if (!order)
             return next(new errorHandler_1.default("Order not found", 404));
-        const lines = yield orderItemsRepository.find({
-            where: { order_id: order.id },
+        // Get all item IDs from order items
+        const itemIds = (order.orderItems || [])
+            .map((oi) => { var _a; return oi.item_id || ((_a = oi.item) === null || _a === void 0 ? void 0 : _a.id); })
+            .filter((id) => id !== undefined && id !== null);
+        // Fetch RMB_Price from supplier_items for all items
+        const supplierItems = yield supplierItemRepository.find({
+            where: { item_id: (0, typeorm_1.In)(itemIds.length ? itemIds : [0]) },
         });
-        return res.status(200).json({
-            success: true,
-            data: {
-                id: order.id,
-                order_no: order.order_no,
-                category_id: order.category_id,
-                customer_id: order.customer_id,
-                supplier_id: order.supplier_id,
-                status: order.status,
-                comment: order.comment,
-                created_at: order.created_at,
-                updated_at: order.updated_at,
-                items: lines.map((oi) => ({
+        const rmbPriceMap = new Map(supplierItems.map((si) => [si.item_id, si.price_rmb]));
+        const result = {
+            id: order.id,
+            order_no: order.order_no,
+            category_id: order.category_id,
+            category_name: (_a = order.category) === null || _a === void 0 ? void 0 : _a.name,
+            customer_id: order.customer_id,
+            customer_name: ((_c = (_b = order.cargo) === null || _b === void 0 ? void 0 : _b.customer) === null || _c === void 0 ? void 0 : _c.companyName) ||
+                ((_d = order.cargo) === null || _d === void 0 ? void 0 : _d.bill_to_display_name) ||
+                ((_e = order.customer) === null || _e === void 0 ? void 0 : _e.companyName) ||
+                "No Customer",
+            supplier_id: order.supplier_id,
+            supplier_name: ((_f = order.supplier) === null || _f === void 0 ? void 0 : _f.company_name) || ((_g = order.supplier) === null || _g === void 0 ? void 0 : _g.name),
+            status: order.status,
+            comment: order.comment,
+            created_at: order.created_at,
+            updated_at: order.updated_at,
+            items: yield Promise.all((order.orderItems || []).map((oi) => __awaiter(void 0, void 0, void 0, function* () {
+                var _a;
+                let item = oi.item;
+                if (!item && oi.ItemID_DE) {
+                    item = yield database_1.AppDataSource.getRepository(items_1.Item).findOne({
+                        where: { ItemID_DE: oi.ItemID_DE },
+                        relations: ["taric"],
+                    });
+                }
+                const rmbPrice = rmbPriceMap.get(oi.item_id || (item === null || item === void 0 ? void 0 : item.id) || 0) || 0;
+                // Determine the price to use (priority: rmb_price from supplier_items > item.price)
+                const finalPrice = rmbPrice > 0 ? rmbPrice : (item === null || item === void 0 ? void 0 : item.price) || oi.price || 0;
+                return {
                     id: oi.id,
                     order_id: oi.order_id,
-                    item_id: oi.item_id,
+                    item_id: oi.item_id || (item === null || item === void 0 ? void 0 : item.id),
+                    ItemID_DE: oi.ItemID_DE,
                     qty: oi.qty,
+                    qty_delivered: oi.qty_delivered,
+                    qty_label: oi.qty_label,
                     remark_de: oi.remark_de,
-                    price: oi.price,
-                    currency: oi.currency,
-                })),
-            },
+                    remarks_cn: oi.remarks_cn,
+                    status: oi.status,
+                    price: finalPrice, // Use price from supplier_items (rmb_price) or fallback to item price
+                    currency: "CNY", // RMB_Price is always in CNY
+                    ean: (item === null || item === void 0 ? void 0 : item.ean) || oi.ean,
+                    taric_id: oi.taric_id || (item === null || item === void 0 ? void 0 : item.taric_id),
+                    taric_code: oi.set_taric_code || ((_a = item === null || item === void 0 ? void 0 : item.taric) === null || _a === void 0 ? void 0 : _a.code) || "-",
+                    itemName: (item === null || item === void 0 ? void 0 : item.item_name) ||
+                        (oi.ItemID_DE ? `Unknown (DE: ${oi.ItemID_DE})` : "Unknown"),
+                    rmb_price: rmbPrice, // Add RMB_Price from supplier_items
+                    item: item,
+                };
+            }))),
+        };
+        console.log(`[BACKEND] getOrderById(${orderId}) result:`, JSON.stringify(result, null, 2).substring(0, 1000) + "...");
+        return res.status(200).json({
+            success: true,
+            data: result,
         });
     }
     catch (error) {
+        console.error("Error in getOrderById:", error);
         return next(error);
     }
 });
@@ -389,20 +588,35 @@ const deleteOrder = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
 });
 exports.deleteOrder = deleteOrder;
 const generateLabelPDF = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b, _c, _d;
+    var _a, _b, _c, _d, _e, _f;
     try {
         const { itemId } = req.params;
         const orderItemRepo = database_1.AppDataSource.getRepository(order_items_1.OrderItem);
         const orderRepo = database_1.AppDataSource.getRepository(orders_1.Order);
+        const warehouseItemRepo = database_1.AppDataSource.getRepository(warehouse_items_1.WarehouseItem);
         const item = yield orderItemRepo.findOne({
             where: { id: Number(itemId) },
             relations: ["item"],
         });
         if (!item)
             return next(new errorHandler_1.default("Item not found", 404));
+        const warehouseItem = yield warehouseItemRepo.findOne({
+            where: { ItemID_DE: item.ItemID_DE },
+        });
         const order = yield orderRepo.findOne({ where: { id: item.order_id } });
-        const doc = new pdfkit_1.default({ size: [252, 102], margin: 0 });
-        const logoPath = path_1.default.join(__dirname, "../../public/logo.png");
+        const doc = new pdfkit_1.default({ size: [252, 110], margin: 0 });
+        const logo = path_1.default.join(__dirname, "../../public/logo.png");
+        const k1 = path_1.default.join(__dirname, "../../public/k1.png");
+        const k2 = path_1.default.join(__dirname, "../../public/k2.png");
+        let logoPath = logo;
+        if ((((_a = item.item) === null || _a === void 0 ? void 0 : _a.item_name) && item.item.item_name.includes("K011111")) ||
+            ((_b = item.remarks_cn) === null || _b === void 0 ? void 0 : _b.includes("K011111"))) {
+            logoPath = k1;
+        }
+        else if ((((_c = item.item) === null || _c === void 0 ? void 0 : _c.item_name) && item.item.item_name.includes("K022222")) ||
+            ((_d = item.remarks_cn) === null || _d === void 0 ? void 0 : _d.includes("K022222"))) {
+            logoPath = k2;
+        }
         res.setHeader("Content-Type", "application/pdf");
         res.setHeader("Content-Disposition", `attachment; filename=label_${item.id}.pdf`);
         doc.pipe(res);
@@ -417,25 +631,35 @@ const generateLabelPDF = (req, res, next) => __awaiter(void 0, void 0, void 0, f
         doc.text("ItemNoW", colA, row1LabelY);
         doc.text("Order No / Qty", colB, row1LabelY);
         doc.text("Qty", colD, row1LabelY);
-        doc.font("Helvetica-Bold").fontSize(14);
-        const itemID = ((_b = (_a = item === null || item === void 0 ? void 0 : item.item) === null || _a === void 0 ? void 0 : _a.ItemID_DE) === null || _b === void 0 ? void 0 : _b.toString()) || "N/A";
-        doc.text(itemID, valColA, row1ValueY);
+        doc.font("Helvetica-Bold").fontSize(10);
+        /**
+         * ITEM NO DE TRUNCATION
+         * If length > 10, take first 10 chars and add "..."
+         */
+        let itemNoDE = (warehouseItem === null || warehouseItem === void 0 ? void 0 : warehouseItem.item_no_de) || "N/A";
+        if (itemNoDE.length > 10) {
+            itemNoDE = itemNoDE.substring(0, 10) + "...";
+        }
+        doc.text(itemNoDE, valColA, row1ValueY, {
+            width: 68,
+            lineBreak: false,
+        });
         const orderNo = (order === null || order === void 0 ? void 0 : order.order_no) || "N/A";
         doc.text(orderNo, colB, row1ValueY);
-        doc.text(`${item.qty || 0}`, colD, row1ValueY);
+        doc.text(`${item.qty_label || 0}`, colD, row1ValueY);
         const orderNoWidth = doc.widthOfString(orderNo);
         doc
             .font("Helvetica")
             .fontSize(9)
-            .text(`/${item.qty_label}`, colB + orderNoWidth + 2, row1ValueY + 4);
+            .text(`/${item.qty}`, colB + orderNoWidth + 2, row1ValueY + 4);
         try {
-            doc.image(logoPath, colLogo, 8, { width: 40 });
+            doc.image(logoPath, colLogo, 14, { width: 40 });
         }
         catch (e) {
             console.error("Logo missing at path:", logoPath);
         }
         doc.font("Helvetica").fontSize(8).fillColor("#222222");
-        const description = ((_c = item.item) === null || _c === void 0 ? void 0 : _c.item_name) || "No description available";
+        const description = ((_e = item.item) === null || _e === void 0 ? void 0 : _e.item_name) || "No description available";
         doc.text(description, valColA, 42, {
             width: 180,
             height: 20,
@@ -454,22 +678,28 @@ const generateLabelPDF = (req, res, next) => __awaiter(void 0, void 0, void 0, f
             .font("Helvetica-Oblique")
             .fontSize(6.5)
             .text("RemarkW", colA, bottomSectionY + 22);
-        const barcodeValue = ((_d = item.item.ean) === null || _d === void 0 ? void 0 : _d.toString()) || "";
-        try {
-            const barcodeBuffer = yield bwip_js_1.default.toBuffer({
-                bcid: "code128",
-                text: barcodeValue,
-                scale: 2,
-                height: 10,
-                includetext: true,
-                textsize: 10,
-                textgaps: 4,
-                textxalign: "center",
-            });
-            doc.image(barcodeBuffer, 145, 62, { width: 100 });
-        }
-        catch (barcodeErr) {
-            console.error("Barcode generation failed:", barcodeErr);
+        doc
+            .font("Helvetica")
+            .fontSize(8)
+            .text(item.remark_de || "/", valColA, bottomSectionY + 30);
+        const barcodeValue = ((_f = warehouseItem === null || warehouseItem === void 0 ? void 0 : warehouseItem.ean) === null || _f === void 0 ? void 0 : _f.toString()) || "";
+        if (barcodeValue) {
+            try {
+                const barcodeBuffer = yield bwip_js_1.default.toBuffer({
+                    bcid: "code128",
+                    text: barcodeValue,
+                    scale: 2,
+                    height: 10,
+                    includetext: true,
+                    textsize: 10,
+                    textgaps: 4,
+                    textxalign: "center",
+                });
+                doc.image(barcodeBuffer, 145, 62, { width: 100 });
+            }
+            catch (barcodeErr) {
+                console.error("Barcode generation failed:", barcodeErr);
+            }
         }
         doc.end();
     }
@@ -485,10 +715,13 @@ const updateOrderItemStatus = (req, res, next) => __awaiter(void 0, void 0, void
         const orderItemsRepo = database_1.AppDataSource.getRepository(order_items_1.OrderItem);
         const orderItem = yield orderItemsRepo.findOne({
             where: { id: Number(id) },
+            relations: ["order"],
         });
         if (!orderItem) {
             return next(new errorHandler_1.default("Order Item not found", 404));
         }
+        const oldCargoId = orderItem.cargo_id;
+        const newCargoId = body.cargo_id;
         Object.keys(body).forEach((key) => {
             if (key === "supplier_order_id" && body[key] === null) {
                 orderItem.supplier_order_id = undefined;
@@ -499,6 +732,12 @@ const updateOrderItemStatus = (req, res, next) => __awaiter(void 0, void 0, void
         });
         orderItem.updated_at = new Date();
         yield orderItemsRepo.save(orderItem);
+        const cargoIdsToRefresh = [];
+        if (oldCargoId)
+            cargoIdsToRefresh.push(Number(oldCargoId));
+        if (newCargoId)
+            cargoIdsToRefresh.push(Number(newCargoId));
+        yield (0, cargo_controller_1.generateInvoicesForOrders)([Number(orderItem.order_id)], cargoIdsToRefresh);
         return res.status(200).json({
             success: true,
             message: "Order item updated successfully",
@@ -510,11 +749,40 @@ const updateOrderItemStatus = (req, res, next) => __awaiter(void 0, void 0, void
     }
 });
 exports.updateOrderItemStatus = updateOrderItemStatus;
+const updateOrderItemLabel = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { id } = req.params;
+        const { splitQty, remarks_cn } = req.body;
+        const orderItemsRepo = database_1.AppDataSource.getRepository(order_items_1.OrderItem);
+        const orderItem = yield orderItemsRepo.findOne({
+            where: { id: Number(id) },
+        });
+        if (!orderItem) {
+            return next(new errorHandler_1.default("Order item not found", 404));
+        }
+        orderItem.qty_label = Number(splitQty) || 0;
+        if (remarks_cn !== undefined) {
+            orderItem.remarks_cn = remarks_cn;
+        }
+        orderItem.updated_at = new Date();
+        yield orderItemsRepo.save(orderItem);
+        return res.status(200).json({
+            success: true,
+            message: "Label quantity and review updated successfully",
+            data: orderItem,
+        });
+    }
+    catch (error) {
+        console.error("Error in updateOrderItemLabel:", error);
+        return next(error);
+    }
+});
+exports.updateOrderItemLabel = updateOrderItemLabel;
 const splitOrderItem = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     const queryRunner = database_1.AppDataSource.createQueryRunner();
     try {
         const { id } = req.params;
-        const { splitQty } = req.body;
+        const { splitQty, targetCargoId, remarks_cn } = req.body;
         if (!splitQty || splitQty <= 0) {
             return next(new errorHandler_1.default("Split quantity must be greater than 0", 400));
         }
@@ -523,6 +791,7 @@ const splitOrderItem = (req, res, next) => __awaiter(void 0, void 0, void 0, fun
         const orderItemsRepo = queryRunner.manager.getRepository(order_items_1.OrderItem);
         const orderItem = yield orderItemsRepo.findOne({
             where: { id: Number(id) },
+            relations: ["order"],
         });
         if (!orderItem) {
             throw new errorHandler_1.default("Order item not found", 404);
@@ -530,20 +799,43 @@ const splitOrderItem = (req, res, next) => __awaiter(void 0, void 0, void 0, fun
         if (splitQty >= (orderItem.qty || 0)) {
             throw new errorHandler_1.default("Split quantity must be less than current quantity", 400);
         }
-        const newItem = orderItemsRepo.create(Object.assign(Object.assign({}, orderItem), { id: undefined, qty: splitQty, created_at: new Date(), updated_at: new Date() }));
+        const newItem = orderItemsRepo.create(Object.assign(Object.assign({}, orderItem), { id: undefined, qty: splitQty, cargo_id: targetCargoId || orderItem.cargo_id, remarks_cn: remarks_cn || orderItem.remarks_cn, created_at: new Date(), updated_at: new Date() }));
         orderItem.qty = (orderItem.qty || 0) - splitQty;
         orderItem.updated_at = new Date();
         yield orderItemsRepo.save(orderItem);
         yield orderItemsRepo.save(newItem);
+        if (targetCargoId) {
+            const cargoOrderRepo = queryRunner.manager.getRepository(cargo_orders_1.CargoOrder);
+            const existingLink = yield cargoOrderRepo.findOne({
+                where: {
+                    cargo_id: Number(targetCargoId),
+                    order_id: Number(orderItem.order_id),
+                },
+            });
+            if (!existingLink) {
+                yield cargoOrderRepo.save(cargoOrderRepo.create({
+                    cargo_id: Number(targetCargoId),
+                    order_id: Number(orderItem.order_id),
+                }));
+            }
+        }
         yield queryRunner.commitTransaction();
+        const cargoIdsToRefresh = [];
+        if (orderItem.cargo_id)
+            cargoIdsToRefresh.push(Number(orderItem.cargo_id));
+        if (targetCargoId)
+            cargoIdsToRefresh.push(Number(targetCargoId));
+        yield (0, cargo_controller_1.generateInvoicesForOrders)([Number(orderItem.order_id)], cargoIdsToRefresh);
         return res.status(200).json({
             success: true,
             message: "Order item split successfully",
-            data: { original: orderItem, new: newItem },
+            data: { original: orderItem, split: newItem },
         });
     }
     catch (error) {
-        yield queryRunner.rollbackTransaction();
+        if (queryRunner.isTransactionActive) {
+            yield queryRunner.rollbackTransaction();
+        }
         return next(error);
     }
     finally {
@@ -551,3 +843,34 @@ const splitOrderItem = (req, res, next) => __awaiter(void 0, void 0, void 0, fun
     }
 });
 exports.splitOrderItem = splitOrderItem;
+const updateOrderItemPrice = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { id } = req.params;
+        const { eur_special_price } = req.body;
+        if (eur_special_price === undefined) {
+            return next(new errorHandler_1.default("eur_special_price is required", 400));
+        }
+        const orderItemsRepo = database_1.AppDataSource.getRepository(order_items_1.OrderItem);
+        const orderItem = yield orderItemsRepo.findOne({
+            where: { id: Number(id) },
+        });
+        if (!orderItem) {
+            return next(new errorHandler_1.default("Order Item not found", 404));
+        }
+        orderItem.eur_special_price = Number(eur_special_price);
+        orderItem.updated_at = new Date();
+        yield orderItemsRepo.save(orderItem);
+        if (orderItem.order_id) {
+            yield (0, cargo_controller_1.generateInvoicesForOrders)([Number(orderItem.order_id)], orderItem.cargo_id ? [Number(orderItem.cargo_id)] : []);
+        }
+        return res.status(200).json({
+            success: true,
+            message: "Order item price updated successfully",
+            data: orderItem,
+        });
+    }
+    catch (error) {
+        return next(error);
+    }
+});
+exports.updateOrderItemPrice = updateOrderItemPrice;

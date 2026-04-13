@@ -6,13 +6,10 @@ const authorized_1 = require("../middlewares/authorized");
 const users_1 = require("../models/users");
 const router = (0, express_1.Router)();
 router.use(authorized_1.authenticateUser);
-// Restricted to Admin and Sales
-router.use((0, authorized_1.authorize)(users_1.UserRole.SALES));
-// Bulk operations
+router.use((0, authorized_1.authorize)(users_1.UserRole.SALES, users_1.UserRole.PURCHASING));
 router.post("/bulk-import", bussiness_controller_1.bulkImportBusinesses);
 router.post("/bulk-delete", authorized_1.isAdmin, bussiness_controller_1.bulkDeleteBusinesses);
 router.post("/bulk-update-status", bussiness_controller_1.bulkUpdateStatus);
-// CRUD operations
 router.post("/", bussiness_controller_1.createBusiness);
 router.get("/", bussiness_controller_1.getAllBusinesses);
 router.get("/statistics", bussiness_controller_1.getBusinessStatistics);

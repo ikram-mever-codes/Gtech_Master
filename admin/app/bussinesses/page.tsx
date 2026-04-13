@@ -302,9 +302,7 @@ const BusinessSearchPage: React.FC = () => {
     const data = await deleteBusiness(id);
 
     if (data.success) {
-      setBusinesses((prevBusinesses) =>
-        prevBusinesses.filter((business) => business.id !== id)
-      );
+      fetchBusinesses();
       setSelectedBusinesses((prevSelected) => {
         const newSelected = new Set(prevSelected);
         newSelected.delete(id);

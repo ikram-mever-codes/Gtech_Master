@@ -15,7 +15,7 @@ let ItemQuality = class ItemQuality {
 };
 exports.ItemQuality = ItemQuality;
 __decorate([
-    (0, typeorm_1.PrimaryColumn)(),
+    (0, typeorm_1.PrimaryGeneratedColumn)(),
     __metadata("design:type", Number)
 ], ItemQuality.prototype, "id", void 0);
 __decorate([
@@ -27,21 +27,17 @@ __decorate([
     __metadata("design:type", String)
 ], ItemQuality.prototype, "picture", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ type: "varchar", length: 50, nullable: true }),
-    __metadata("design:type", String)
-], ItemQuality.prototype, "name_cn", void 0);
-__decorate([
-    (0, typeorm_1.Column)({ type: "varchar", length: 50, nullable: true }),
+    (0, typeorm_1.Column)({ type: "varchar", length: 150, nullable: true }),
     __metadata("design:type", String)
 ], ItemQuality.prototype, "name", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ type: "varchar", length: 255, nullable: true }),
+    (0, typeorm_1.Column)({ type: "text", nullable: true }),
     __metadata("design:type", String)
 ], ItemQuality.prototype, "description", void 0);
 __decorate([
     (0, typeorm_1.Column)({ type: "text", nullable: true }),
     __metadata("design:type", String)
-], ItemQuality.prototype, "full_description", void 0);
+], ItemQuality.prototype, "description_cn", void 0);
 __decorate([
     (0, typeorm_1.Column)({ type: "int", nullable: true }),
     __metadata("design:type", Number)

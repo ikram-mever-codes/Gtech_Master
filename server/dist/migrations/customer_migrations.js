@@ -105,6 +105,6 @@ const migrateExistingCustomers = () => __awaiter(void 0, void 0, void 0, functio
     }
 });
 exports.migrateExistingCustomers = migrateExistingCustomers;
-if (require.main === module) {
-    (0, exports.migrateExistingCustomers)();
-}
+// if (require.main === module) {
+//   migrateExistingCustomers();
+// }

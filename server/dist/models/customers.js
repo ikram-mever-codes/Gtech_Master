@@ -11,11 +11,30 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Customer = void 0;
 const typeorm_1 = require("typeorm");
+const invoice_1 = require("./invoice");
 const business_details_1 = require("./business_details");
 const star_business_details_1 = require("./star_business_details");
 const star_customer_details_1 = require("./star_customer_details");
 const inquiry_1 = require("./inquiry");
 let Customer = class Customer {
+    populateDetails() {
+        if (this.businessDetails) {
+            this.city = this.city || this.businessDetails.city;
+            this.postalCode = this.postalCode || this.businessDetails.postalCode;
+            this.addressLine1 = this.addressLine1 || this.businessDetails.address;
+            this.country = this.country || this.businessDetails.country;
+        }
+        if (this.starCustomerDetails) {
+            this.city = this.city || this.starCustomerDetails.deliveryCity;
+            this.postalCode =
+                this.postalCode || this.starCustomerDetails.deliveryPostalCode;
+            this.addressLine1 =
+                this.addressLine1 || this.starCustomerDetails.deliveryAddressLine1;
+            this.country =
+                this.country || this.starCustomerDetails.deliveryCountry;
+            this.taxNumber = this.taxNumber || this.starCustomerDetails.taxNumber;
+        }
+    }
     constructor(partial) {
         if (partial) {
             Object.assign(this, partial);
@@ -60,6 +79,30 @@ __decorate([
     __metadata("design:type", String)
 ], Customer.prototype, "contactPhoneNumber", void 0);
 __decorate([
+    (0, typeorm_1.Column)({ nullable: true }),
+    __metadata("design:type", String)
+], Customer.prototype, "taxNumber", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ nullable: true }),
+    __metadata("design:type", String)
+], Customer.prototype, "addressLine1", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ nullable: true }),
+    __metadata("design:type", String)
+], Customer.prototype, "addressLine2", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ nullable: true }),
+    __metadata("design:type", String)
+], Customer.prototype, "city", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ nullable: true }),
+    __metadata("design:type", String)
+], Customer.prototype, "postalCode", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ nullable: true }),
+    __metadata("design:type", String)
+], Customer.prototype, "country", void 0);
+__decorate([
     (0, typeorm_1.OneToOne)(() => business_details_1.BusinessDetails, { nullable: true, cascade: true }),
     (0, typeorm_1.JoinColumn)(),
     __metadata("design:type", business_details_1.BusinessDetails)
@@ -75,6 +118,10 @@ __decorate([
     __metadata("design:type", star_customer_details_1.StarCustomerDetails)
 ], Customer.prototype, "starCustomerDetails", void 0);
 __decorate([
+    (0, typeorm_1.OneToMany)(() => invoice_1.Invoice, (invoice) => invoice.customer),
+    __metadata("design:type", Array)
+], Customer.prototype, "invoices", void 0);
+__decorate([
     (0, typeorm_1.OneToMany)(() => inquiry_1.Inquiry, (inquiry) => inquiry.customer),
     __metadata("design:type", inquiry_1.Inquiry)
 ], Customer.prototype, "inquiries", void 0);
@@ -86,6 +133,12 @@ __decorate([
     (0, typeorm_1.UpdateDateColumn)(),
     __metadata("design:type", Date)
 ], Customer.prototype, "updatedAt", void 0);
+__decorate([
+    (0, typeorm_1.AfterLoad)(),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", void 0)
+], Customer.prototype, "populateDetails", null);
 exports.Customer = Customer = __decorate([
     (0, typeorm_1.Entity)(),
     __metadata("design:paramtypes", [Object])

@@ -21,7 +21,7 @@ __decorate([
     __metadata("design:type", Number)
 ], Taric.prototype, "id", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ type: "varchar", length: 11, nullable: true }),
+    (0, typeorm_1.Column)({ type: "varchar", length: 11, nullable: true, unique: true }),
     __metadata("design:type", String)
 ], Taric.prototype, "code", void 0);
 __decorate([
