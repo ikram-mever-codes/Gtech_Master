@@ -73,9 +73,10 @@ export const uploadFile = async (
       let thumbnailUrl = undefined;
 
       if (isCloudinaryConfigured) {
+        const isDocument = !req.file.mimetype.startsWith("image/") && !req.file.mimetype.startsWith("video/");
         cloudinaryResult = await cloudinary.uploader.upload(req.file.path, {
           folder: "library",
-          resource_type: "auto",
+          resource_type: isDocument ? "raw" : "auto",
         });
         fileUrl = cloudinaryResult.secure_url;
 
@@ -283,9 +284,18 @@ export const deleteFile = async (
     }
 
     try {
-      const publicId = file.url.split("/").pop()?.split(".")[0];
-      if (publicId) {
-        await cloudinary.uploader.destroy(`library/${publicId}`);
+      const isRaw = file.url.includes("/raw/upload/");
+      if (isRaw) {
+        const splitUrl = file.url.split("/library/");
+        if (splitUrl.length > 1) {
+          const publicIdWithExt = splitUrl[1];
+          await cloudinary.uploader.destroy(`library/${publicIdWithExt}`, { resource_type: "raw" });
+        }
+      } else {
+        const publicId = file.url.split("/").pop()?.split(".")[0];
+        if (publicId) {
+          await cloudinary.uploader.destroy(`library/${publicId}`);
+        }
       }
 
       if (file.thumbnailUrl) {
