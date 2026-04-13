@@ -206,16 +206,13 @@ export const deleteBusiness = async (id: string) => {
     const response = await api.delete(`/businesses/${id}`);
     toast.dismiss();
     toast.success("Business deleted successfully", successStyles);
-    return response.data;
+    return response;
   } catch (error) {
     handleApiError(error, "Failed to delete business");
     throw error;
   }
 };
 
-// ======================== Bulk Operations ========================
-
-// Bulk import businesses
 export const bulkImportBusinesses = async (payload: BulkImportPayload) => {
   try {
     toast.loading(
@@ -336,14 +333,14 @@ export const formatBusinessAddress = (business: Business): string => {
   return business.address
     ? business.address
     : [
-        business.address,
-        business.city,
-        business.state,
-        business.postalCode,
-        business.country,
-      ]
-        .filter((part) => part && part.trim() !== "")
-        .join(", ");
+      business.address,
+      business.city,
+      business.state,
+      business.postalCode,
+      business.country,
+    ]
+      .filter((part) => part && part.trim() !== "")
+      .join(", ");
 };
 
 // Check if business needs verification

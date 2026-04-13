@@ -1819,9 +1819,25 @@ const ItemDetailsPage = () => {
                           return (
                             <tr key={index} className="hover:bg-gray-50">
                               <td className="px-4 py-3 text-sm text-gray-900 font-medium">
-                                <div className="flex items-center gap-2">
-                                  <DocumentIcon className="h-4 w-4 text-gray-400" />
-                                  {attachment.originalName || attachment.filename || "Unnamed Attachment"}
+                                <div className="flex items-center gap-3">
+                                  {finalUrl.toLowerCase().match(/\.(pdf|jpg|jpeg|png|webp|gif)$/) ? (
+                                    <div className="h-10 w-10 min-w-[40px] rounded border border-gray-200 overflow-hidden bg-gray-50 flex items-center justify-center">
+                                      <img
+                                        src={finalUrl.replace('/upload/', '/upload/w_100,h_100,c_fill,g_auto,pg_1/')}
+                                        alt="preview"
+                                        className="h-full w-full object-cover"
+                                        onError={(e) => {
+                                          (e.target as HTMLImageElement).style.display = 'none';
+                                          (e.target as HTMLImageElement).parentElement!.innerHTML = '<svg class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>';
+                                        }}
+                                      />
+                                    </div>
+                                  ) : (
+                                    <DocumentIcon className="h-8 w-8 text-gray-400" />
+                                  )}
+                                  <span className="truncate max-w-[200px]" title={attachment.originalName || attachment.filename}>
+                                    {attachment.originalName || attachment.filename || "Unnamed Attachment"}
+                                  </span>
                                 </div>
                               </td>
                               <td className="px-4 py-3 text-sm text-gray-500">
