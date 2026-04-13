@@ -144,7 +144,7 @@ export const getItems = async (
 
     if (eanSearch) {
       const eanStr = (eanSearch as string).trim();
-      queryBuilder.andWhere("item.ean ILIKE :eanSearch", {
+      queryBuilder.andWhere("TRIM(CAST(item.ean AS TEXT)) ILIKE :eanSearch", {
         eanSearch: `%${eanStr}%`,
       });
     }
