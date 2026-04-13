@@ -137,16 +137,17 @@ export const getItems = async (
     if (isNaN(limitNum)) limitNum = 50;
     const skip = (pageNum - 1) * limitNum;
 
-    const queryBuilder = itemRepository
-      .createQueryBuilder("item")
-      .skip(skip)
-      .take(limitNum);
+    const queryBuilder = itemRepository.createQueryBuilder("item");
 
     if (eanSearch) {
-      const eanStr = (eanSearch as string).trim();
-      queryBuilder.andWhere("TRIM(CAST(item.ean AS TEXT)) ILIKE :eanSearch", {
-        eanSearch: `%${eanStr}%`,
-      });
+      const eanStr = (eanSearch as string).replace(/\s+/g, ""); // Remove all spaces
+      queryBuilder.andWhere(
+        "(REPLACE(CAST(item.ean AS TEXT), ' ', '') ILIKE :eanExact OR item.ean ILIKE :eanPartial)",
+        {
+          eanExact: `%${eanStr}%`,
+          eanPartial: `%${eanStr}%`,
+        },
+      );
     }
 
     if (search) {
@@ -211,6 +212,7 @@ export const getItems = async (
     );
 
     const totalRecords = await queryBuilder.getCount();
+    queryBuilder.skip(skip).take(limitNum);
     const items = await queryBuilder.getMany();
 
     const itemIds = items.map((item) => item.id);

@@ -622,26 +622,34 @@ export class InvoiceController {
       });
 
       const orderItemsRaw = await AppDataSource.manager.query(`
-        SELECT order_id, cargo_id, SUM(qty) as total_qty, COUNT(id) as count_items
-        FROM order_item
-        GROUP BY order_id, cargo_id
+        SELECT 
+          oi.order_id, 
+          oi.cargo_id, 
+          SUM(oi.qty) as total_qty, 
+          COUNT(oi.id) as count_items,
+          SUM(oi.qty * COALESCE(oi.eur_special_price, oi.price, i.price, 0)) as total_price
+        FROM order_item oi
+        LEFT JOIN item i ON i.id = oi.item_id
+        GROUP BY oi.order_id, oi.cargo_id
       `);
 
       const orderItemSummaryByOrderId = new Map();
       const orderItemSummaryByCargoId = new Map();
       orderItemsRaw.forEach((row: any) => {
         if (row.order_id) {
-          const current = orderItemSummaryByOrderId.get(row.order_id) || { total_qty: 0, count_items: 0 };
+          const current = orderItemSummaryByOrderId.get(row.order_id) || { total_qty: 0, count_items: 0, total_price: 0 };
           orderItemSummaryByOrderId.set(row.order_id, {
             total_qty: current.total_qty + Number(row.total_qty),
-            count_items: current.count_items + Number(row.count_items)
+            count_items: current.count_items + Number(row.count_items),
+            total_price: current.total_price + Number(row.total_price)
           });
         }
         if (row.cargo_id) {
-          const current = orderItemSummaryByCargoId.get(row.cargo_id) || { total_qty: 0, count_items: 0 };
+          const current = orderItemSummaryByCargoId.get(row.cargo_id) || { total_qty: 0, count_items: 0, total_price: 0 };
           orderItemSummaryByCargoId.set(row.cargo_id, {
             total_qty: current.total_qty + Number(row.total_qty),
-            count_items: current.count_items + Number(row.count_items)
+            count_items: current.count_items + Number(row.count_items),
+            total_price: current.total_price + Number(row.total_price)
           });
         }
       });
@@ -651,20 +659,22 @@ export class InvoiceController {
 
       const data = invoices.map((inv) => {
         const cargo = orderToCargoMap.get(inv.orderNumber);
-
         let customItemCount = 0;
         let customTotalQty = 0;
+        let calculatedGrossTotal = Number(inv.grossTotal) || 0;
 
         if (cargo && orderItemSummaryByCargoId.has(cargo.id)) {
           const stats = orderItemSummaryByCargoId.get(cargo.id);
           customItemCount = stats.count_items;
           customTotalQty = stats.total_qty;
+          if (calculatedGrossTotal === 0) calculatedGrossTotal = stats.total_price;
         } else if (inv.orderNumber && orderIdMap.has(inv.orderNumber)) {
           const orderId = orderIdMap.get(inv.orderNumber);
           if (orderItemSummaryByOrderId.has(orderId)) {
             const stats = orderItemSummaryByOrderId.get(orderId);
             customItemCount = stats.count_items;
             customTotalQty = stats.total_qty;
+            if (calculatedGrossTotal === 0) calculatedGrossTotal = stats.total_price;
           }
         }
 
@@ -789,7 +799,7 @@ export class InvoiceController {
       if (cargo) {
         orderItems = await orderItemRepository.find({
           where: { cargo_id: cargo.id },
-          relations: ["item", "item.taric", "order"],
+          relations: ["item", "item.taric", "item.purchasePrices", "order"],
         });
       } else {
         const order = await orderRepository.findOne({
@@ -798,7 +808,7 @@ export class InvoiceController {
         if (order) {
           orderItems = await orderItemRepository.find({
             where: { order_id: order.id },
-            relations: ["item", "item.taric", "order"],
+            relations: ["item", "item.taric", "item.purchasePrices", "order"],
           });
         }
       }
@@ -882,12 +892,31 @@ export class InvoiceController {
       const taricGroups = Array.from(taricGroupsMap.values());
 
       const sortedItems = [...orderItems]
-        .map((oi: any) => ({
-          ...oi,
-          v: (oi.item?.length * oi.item?.width * oi.item?.height) / 1000 || 0,
-          w: oi.item?.weight || 0,
-          _effectiveTaricCode: getEffectiveTaricCode(oi),
-        }))
+        .map((oi: any) => {
+          const item = oi.item;
+          // EAN Fallback
+          const ean = item?.ean || "-";
+          
+          // EUR Price Fallback (Special price -> order price -> master price)
+          const eurPrice = oi.eur_special_price || oi.price || item?.price || 0;
+          
+          // RMB Price (Supplier Price)
+          let rmbPrice = oi.rmb_special_price || 0;
+          if (!rmbPrice && item?.purchasePrices?.length > 0) {
+            // Find the first purchase price (supplier price)
+            rmbPrice = item.purchasePrices[0].unit_price_cny;
+          }
+
+          return {
+            ...oi,
+            v: (item?.length * item?.width * item?.height) / 1000 || 0,
+            w: item?.weight || 0,
+            _effectiveTaricCode: getEffectiveTaricCode(oi),
+            _fallbackEan: ean,
+            _fallbackRmb: rmbPrice,
+            _fallbackEk: eurPrice
+          };
+        })
         .sort((a, b) => {
           const codeCompare = a._effectiveTaricCode.localeCompare(b._effectiveTaricCode);
           if (codeCompare !== 0) return codeCompare;

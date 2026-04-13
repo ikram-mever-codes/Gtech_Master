@@ -1799,8 +1799,7 @@ const InvoiceListPage: React.FC = () => {
                                                   },
                                                   {
                                                     header: "EAN",
-                                                    render: (it: any) =>
-                                                      it.item?.ean || "-",
+                                                    render: (it: any) => it._fallbackEan || it.item?.ean || "-",
                                                     width: "110px",
                                                   },
                                                   {
@@ -1837,27 +1836,15 @@ const InvoiceListPage: React.FC = () => {
                                                   },
                                                   {
                                                     header: "RMB",
-                                                    render: (it: any) =>
-                                                      it.rmb_special_price ||
-                                                      "0",
+                                                    render: (it: any) => it.rmb_special_price || it._fallbackRmb || "0",
                                                     width: "60px",
                                                     align: "center",
                                                   },
                                                   {
                                                     header: "EK",
-                                                    render: (it: any) =>
-                                                      it.eur_special_price &&
-                                                      Number(
-                                                        it.eur_special_price,
-                                                      ) > 0 ? (
-                                                        <span className="font-bold text-[#10B981]">
-                                                          {Number(
-                                                            it.eur_special_price,
-                                                          ).toFixed(2)}
-                                                        </span>
-                                                      ) : (
-                                                        "0"
-                                                      ),
+                                                    render: (it: any) => (it.eur_special_price || it._fallbackEk) ? (
+                                                        <span className="font-bold text-[#10B981]">{Number(it.eur_special_price || it._fallbackEk).toFixed(2)}</span>
+                                                    ) : "0",
                                                     width: "80px",
                                                     align: "center",
                                                   },
@@ -1951,8 +1938,7 @@ const InvoiceListPage: React.FC = () => {
                                                   },
                                                   {
                                                     header: "EAN",
-                                                    render: (it: any) =>
-                                                      it.item?.ean,
+                                                    render: (it: any) => it._fallbackEan || it.item?.ean || "-",
                                                     width: "110px",
                                                   },
                                                   {
@@ -2031,27 +2017,15 @@ const InvoiceListPage: React.FC = () => {
                                                   },
                                                   {
                                                     header: "RMB",
-                                                    render: (it: any) =>
-                                                      it.rmb_special_price ||
-                                                      "0",
+                                                    render: (it: any) => it.rmb_special_price || it._fallbackRmb || "0",
                                                     width: "45px",
                                                     align: "center",
                                                   },
                                                   {
                                                     header: "EK",
-                                                    render: (it: any) =>
-                                                      it.eur_special_price &&
-                                                      Number(
-                                                        it.eur_special_price,
-                                                      ) > 0 ? (
-                                                        <span className="font-bold text-[#10B981]">
-                                                          {Number(
-                                                            it.eur_special_price,
-                                                          ).toFixed(2)}
-                                                        </span>
-                                                      ) : (
-                                                        "0"
-                                                      ),
+                                                    render: (it: any) => (it.eur_special_price || it._fallbackEk) ? (
+                                                        <span className="font-bold text-[#10B981]">{Number(it.eur_special_price || it._fallbackEk).toFixed(2)}</span>
+                                                    ) : "0",
                                                     width: "65px",
                                                     align: "center",
                                                   },
