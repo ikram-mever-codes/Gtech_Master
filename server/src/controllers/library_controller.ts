@@ -72,8 +72,9 @@ export const uploadFile = async (
       let fileUrl = "";
       let thumbnailUrl = undefined;
 
-      if (isCloudinaryConfigured) {
-        const isDocument = !req.file.mimetype.startsWith("image/") && !req.file.mimetype.startsWith("video/");
+      const isPdf = req.file.mimetype === "application/pdf";
+
+      if (isCloudinaryConfigured && !isPdf) {
         cloudinaryResult = await cloudinary.uploader.upload(req.file.path, {
           folder: "library",
           resource_type: "auto",
@@ -90,7 +91,7 @@ export const uploadFile = async (
           thumbnailUrl = thumbnail.secure_url;
         }
       } else {
-        const protocol = req.protocol;
+        const protocol = req.protocol === "https" || req.get("x-forwarded-proto") === "https" ? "https" : "http";
         const host = req.get("host");
         fileUrl = `${protocol}://${host}/uploads/${req.file.filename}`;
 
@@ -119,7 +120,7 @@ export const uploadFile = async (
 
       await fileRepository.save(file);
 
-      if (isCloudinaryConfigured) {
+      if (isCloudinaryConfigured && !isPdf) {
         fs.unlinkSync(req.file.path);
       }
 

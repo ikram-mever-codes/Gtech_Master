@@ -18,10 +18,6 @@ export const signCloudinaryPdfUrl = (url: string) => {
     if (url.includes("/raw/upload/") && url.toLowerCase().endsWith(".pdf")) {
       finalUrl = url.replace("/raw/upload/", "/image/upload/");
     }
-    if (finalUrl.includes("/s--") && finalUrl.includes("--/")) {
-      const reg = /\/s--[a-zA-Z0-9_-]+--\//;
-      finalUrl = finalUrl.replace(reg, "/");
-    }
 
     return finalUrl;
   } catch (err) {
