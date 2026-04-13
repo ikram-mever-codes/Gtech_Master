@@ -1417,7 +1417,7 @@ const InvoiceListPage: React.FC = () => {
                                                 [`pdf-${invoice.id}`]: true,
                                               }));
                                               await downloadCommercialInvoice(
-                                                invoice.orderNumber,
+                                                invoice.id,
                                               );
                                             } catch (error) {
                                               console.error(

@@ -1083,71 +1083,64 @@ export const generateCommercialInvoicePDF = async (
   next: NextFunction,
 ) => {
   try {
-    const { orderId } = req.params;
+    const { invoiceId } = req.params; // Changed parameter name to reflect intent
 
-    // FIX: Removed Number() conversion because your DB uses UUIDs (strings)
-    if (!orderId || typeof orderId !== "string") {
-      return next(new ErrorHandler("Invalid Order ID format.", 400));
+    if (!invoiceId || typeof invoiceId !== "string") {
+      return next(new ErrorHandler("Invalid Invoice ID format.", 400));
     }
 
-    const orderRepository = AppDataSource.getRepository(Order);
-    const order = await orderRepository.findOne({
-      where: { order_no: orderId }, // 'as any' bypasses strict type check for UUID string vs Number
-      relations: [
-        "customer",
-        "cargo",
-        "cargo.customer",
-        "orderItems",
-        "orderItems.item",
-        "orderItems.item.taric",
-      ],
-    });
+    const invoiceRepository = AppDataSource.getRepository(Invoice);
 
-    if (!order) {
+    // Fetch permanent data from Invoice table to handle deleted orders
+    const invoice = await invoiceRepository.findOne({
+      where: { id: invoiceId },
+      relations: ["customer", "items"],
+    });
+    console.log(`[BACKEND] Fetched invoice for ID ${invoiceId}:`, invoice);
+
+    if (!invoice) {
       return res
         .status(404)
-        .json({ success: false, message: "Order not found" });
+        .json({ success: false, message: "Invoice not found" });
     }
 
-    const cargo = order.cargo;
-    const items = order.orderItems || [];
+    const customer = invoice.customer;
+    const invoiceItems = invoice.items || [];
 
-    // --- Dynamic Data Mapping ---
+    // --- Dynamic Data Mapping from Permanent Invoice Record ---
     const data = {
-      invoiceNo: order.order_no || "N/A",
-      date: order.date_created || new Date().toISOString().split("T")[0],
-      cargoNo: cargo?.cargo_no || "N/A",
-      customerID: order.customer?.id?.slice(0, 8) || "7",
+      invoiceNo: invoice.invoiceNumber || "N/A",
+      date: invoice.invoiceDate
+        ? new Date(invoice.invoiceDate).toISOString().split("T")[0]
+        : "N/A",
+      cargoNo: invoice.orderNumber || "N/A", // Using orderNumber as fallback for Cargo
+      customerID: customer?.id?.slice(0, 8) || "7",
       billTo: {
-        name:
-          cargo?.bill_to_company_name || order.customer?.companyName || "N/A",
-        contact:
-          cargo?.bill_to_contact_person || order.customer?.legalName || "-",
-        street:
-          cargo?.bill_to_full_address || order.customer?.addressLine1 || "N/A",
-        city: `${cargo?.bill_to_postal_code || order.customer?.postalCode || ""} ${cargo?.bill_to_city || order.customer?.city || ""}`,
-        country: cargo?.bill_to_country || order.customer?.country || "Germany",
-        phone:
-          cargo?.bill_to_phone_no ||
-          order.customer?.contactPhoneNumber ||
-          "N/A",
-        eori: cargo?.bill_to_tax_no || "DE977540238364617",
+        name: customer?.companyName || "N/A",
+        contact: customer?.legalName || "-",
+        street: customer?.addressLine1 || "N/A",
+        city: `${customer?.postalCode || ""} ${customer?.city || ""}`,
+        country: customer?.country || "Germany",
+        phone: customer?.contactPhoneNumber || "N/A",
+        eori: customer?.taxNumber || "DE977540238364617",
       },
       shipTo: {
-        company: cargo?.ship_to_company_name || "GoodBytz GmbH",
-        contact: cargo?.ship_to_contact_person || "Lucas Marks",
-        street: cargo?.ship_to_full_address || "Werner-Otto-Strasse 13g",
-        city: `${cargo?.ship_to_postal_code || "22179"}, ${cargo?.ship_to_city || "Hamburg"}`,
-        country: cargo?.ship_to_country || "Germany",
-        phone: cargo?.ship_to_contact_phone || "+4940239684026",
+        // Since order/cargo might be deleted, fallback to customer delivery info if available
+        company: customer?.companyName || "N/A",
+        contact: customer?.legalName || "-",
+        street: customer?.addressLine1 || "N/A",
+        city: `${customer?.postalCode || ""} ${customer?.city || ""}`,
+        country: customer?.country || "Germany",
+        phone: customer?.contactPhoneNumber || "N/A",
       },
-      lineItems: items.map((oi, index) => ({
+      // Map stored InvoiceItems to the line items
+      lineItems: invoiceItems.map((item, index) => ({
         no: index + 1,
-        desc: oi.item?.item_name || "Unknown Item",
-        hs: oi.set_taric_code || oi.item?.taric?.code || "n/a",
-        qty: oi.qty || 0,
-        unit: Number(oi.price || 0).toFixed(3),
-        price: (Number(oi.qty || 0) * Number(oi.price || 0)).toFixed(2),
+        desc: item.description || "Unknown Item",
+        hs: item.articleNumber || "n/a",
+        qty: item.quantity || 0,
+        unit: Number(item.unitPrice || 0).toFixed(3),
+        price: Number(item.netPrice || 0).toFixed(2),
       })),
       waybill: "1149458284",
     };
@@ -1156,10 +1149,7 @@ export const generateCommercialInvoicePDF = async (
       (sum, it) => sum + Number(it.qty),
       0,
     );
-    const subTotal = data.lineItems.reduce(
-      (sum, it) => sum + Number(it.price),
-      0,
-    );
+    const subTotal = Number(invoice.netTotal || 0);
     const freightCost = 292.0;
     const grandTotal = (subTotal + freightCost).toFixed(2);
 
@@ -1171,7 +1161,7 @@ export const generateCommercialInvoicePDF = async (
     );
     doc.pipe(res);
 
-    // --- Header ---
+    // --- Header Branding ---
     doc
       .fillColor("#777777")
       .font("Helvetica")
@@ -1187,7 +1177,7 @@ export const generateCommercialInvoicePDF = async (
       .lineWidth(1)
       .stroke();
 
-    // --- Addresses ---
+    // Addresses [cite: 3, 5]
     doc.fontSize(8.5).fillColor("#666666");
     doc.text(
       "GTech Industries Limited:   3A, 12/F, Kaiser Centre, N. 18 Centre Street, Sai Ying Pun, Hong Kong",
@@ -1226,7 +1216,7 @@ export const generateCommercialInvoicePDF = async (
       .text(data.shipTo.country, 240, 195)
       .text(data.shipTo.phone, 240, 210);
 
-    // --- Meta Data ---
+    // Meta Data [cite: 19-22]
     doc
       .font("Helvetica")
       .fontSize(11)
@@ -1369,9 +1359,13 @@ export const generateCommercialInvoicePDF = async (
       .text("Contact: lili", col2X, footerY + 24)
       .text("info@gtech-industries.net", col2X, footerY + 36);
 
-    const logoPath = path.join(__dirname, "../../assets/logo.png");
+    const logoPath = path.join(__dirname, "../../public/logo.png");
     try {
-      doc.image(logoPath, 450, footerY - 5, { width: 100 });
+      doc.image(logoPath, 450, footerY - 5, { width: 60 });
+      doc
+        .fontSize(14)
+        .font("Helvetica-Bold")
+        .text("GTech", 450, footerY + 45);
     } catch (e) {
       doc
         .fontSize(16)

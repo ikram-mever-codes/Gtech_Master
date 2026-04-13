@@ -20,7 +20,7 @@ const router: any = express.Router();
 router.use(authenticateUser);
 
 router.get(
-  "/:orderId/commercial-invoice",
+  "/:invoiceId/commercial-invoice",
   // authorize(UserRole.SALES, UserRole.PURCHASING),
   generateCommercialInvoicePDF,
 );
