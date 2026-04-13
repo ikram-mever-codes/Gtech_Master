@@ -10,25 +10,20 @@ cloudinary.config({
 });
 
 export const signCloudinaryPdfUrl = (url: string) => {
-  if (!url || !url.includes("cloudinary.com") || !url.toLowerCase().endsWith(".pdf")) return url;
+  if (!url || !url.includes("cloudinary.com")) return url;
 
   try {
-    const isRaw = url.includes("/raw/upload/");
-    const urlParts = url.split("/upload/");
-    if (urlParts.length !== 2) return url;
+    let finalUrl = url;
 
-    let publicId = urlParts[1];
-    // Remove version (e.g. v1776065981/)
-    const versionRegex = /^v\d+\//;
-    if (versionRegex.test(publicId)) {
-      publicId = publicId.replace(versionRegex, "");
+    if (url.includes("/raw/upload/") && url.toLowerCase().endsWith(".pdf")) {
+      finalUrl = url.replace("/raw/upload/", "/image/upload/");
+    }
+    if (finalUrl.includes("/s--") && finalUrl.includes("--/")) {
+      const reg = /\/s--[a-zA-Z0-9_-]+--\//;
+      finalUrl = finalUrl.replace(reg, "/");
     }
 
-    return cloudinary.url(publicId, {
-      secure: true,
-      resource_type: isRaw ? "raw" : "image",
-      sign_url: true,
-    });
+    return finalUrl;
   } catch (err) {
     return url;
   }

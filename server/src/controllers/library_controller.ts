@@ -76,7 +76,7 @@ export const uploadFile = async (
         const isDocument = !req.file.mimetype.startsWith("image/") && !req.file.mimetype.startsWith("video/");
         cloudinaryResult = await cloudinary.uploader.upload(req.file.path, {
           folder: "library",
-          resource_type: isDocument ? "raw" : "auto",
+          resource_type: "auto",
         });
         fileUrl = cloudinaryResult.secure_url;
 

@@ -299,15 +299,16 @@ const BusinessSearchPage: React.FC = () => {
       return;
     }
 
-    const data = await deleteBusiness(id);
-
-    if (data.success) {
-      fetchBusinesses();
+    try {
+      await deleteBusiness(id);
+      setBusinesses((prev) => prev.filter((b) => b.id !== id));
       setSelectedBusinesses((prevSelected) => {
         const newSelected = new Set(prevSelected);
         newSelected.delete(id);
         return newSelected;
       });
+      fetchBusinesses();
+    } catch {
     }
   };
   const handleSelectBusiness = (id: string) => {
