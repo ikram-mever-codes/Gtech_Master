@@ -12,6 +12,8 @@ import { Item } from "../models/items";
 import { Taric } from "../models/tarics";
 import { CargoOrder } from "../models/cargo_orders";
 import { In } from "typeorm";
+import { getRMBPriceFromSupplier } from "./items_controller";
+import { WarehouseItem } from "../models/warehouse_items";
 
 export class InvoiceController {
   static createInvoice = async (
@@ -891,20 +893,25 @@ export class InvoiceController {
 
       const taricGroups = Array.from(taricGroupsMap.values());
 
-      const sortedItems = [...orderItems]
-        .map((oi: any) => {
+      const itemsWithFallbacks = await Promise.all([...orderItems]
+        .map(async (oi: any) => {
           const item = oi.item;
-          // EAN Fallback
-          const ean = item?.ean || "-";
-          
-          // EUR Price Fallback (Special price -> order price -> master price)
-          const eurPrice = oi.eur_special_price || oi.price || item?.price || 0;
-          
-          // RMB Price (Supplier Price)
+
+          let ean = item?.ean || "-";
+          if (ean === "-" && item?.id) {
+            const wi = await AppDataSource.getRepository(WarehouseItem).findOne({
+              where: { item_id: item.id }
+            });
+            if (wi?.ean) ean = wi.ean;
+          }
+
           let rmbPrice = oi.rmb_special_price || 0;
-          if (!rmbPrice && item?.purchasePrices?.length > 0) {
-            // Find the first purchase price (supplier price)
-            rmbPrice = item.purchasePrices[0].unit_price_cny;
+          if (!rmbPrice && item?.id) {
+            rmbPrice = (await getRMBPriceFromSupplier(item.id)) || 0;
+          }
+          let eurPrice = oi.eur_special_price || oi.price || item?.price || 0;
+          if (!eurPrice && rmbPrice) {
+            eurPrice = rmbPrice * 0.13;
           }
 
           return {
@@ -916,12 +923,13 @@ export class InvoiceController {
             _fallbackRmb: rmbPrice,
             _fallbackEk: eurPrice
           };
-        })
-        .sort((a, b) => {
-          const codeCompare = a._effectiveTaricCode.localeCompare(b._effectiveTaricCode);
-          if (codeCompare !== 0) return codeCompare;
-          return (a.item?.item_name || "").localeCompare(b.item?.item_name || "");
-        });
+        }));
+
+      const sortedItems = itemsWithFallbacks.sort((a: any, b: any) => {
+        const codeCompare = (a._effectiveTaricCode || "").localeCompare(b._effectiveTaricCode || "");
+        if (codeCompare !== 0) return codeCompare;
+        return (a.item?.item_name || "").localeCompare(b.item?.item_name || "");
+      });
 
       const orderNosInCargo = [...new Set(orderItems.map((oi: any) => oi.order?.order_no).filter(Boolean))];
 

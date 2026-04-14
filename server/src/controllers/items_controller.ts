@@ -21,6 +21,7 @@ import {
   Not,
   IsNull,
   ILike,
+  Brackets,
 } from "typeorm";
 import ErrorHandler from "../utils/errorHandler";
 // MIS sync removed — TARIC operations are local-only
@@ -29,7 +30,7 @@ import { UserRole } from "../models/users";
 import { filterDataByRole } from "../utils/dataFilter";
 import { AuthorizedRequest } from "../middlewares/authorized";
 
-const getRMBPriceFromSupplier = async (
+export const getRMBPriceFromSupplier = async (
   itemId: number,
 ): Promise<number | null> => {
   try {
@@ -64,13 +65,10 @@ export const feedTransferPrices = async (
     const supplierItemRepo = AppDataSource.getRepository(SupplierItem);
     const categoryRepo = AppDataSource.getRepository(Category);
 
-    // 1. Identify the 'STD' category ID
     const stdCategory = await categoryRepo.findOne({ where: { name: "STD" } });
     if (!stdCategory) {
       return next(new ErrorHandler("STD Category not found in system", 404));
     }
-
-    // 2. Get all items in STD category
     const items = await itemRepo.find({ where: { cat_id: stdCategory.id } });
 
     let updatedCount = 0;
@@ -83,10 +81,9 @@ export const feedTransferPrices = async (
       if (supplierItem && supplierItem.price_rmb) {
         const newPrice = calculateTransferPrice(supplierItem.price_rmb);
 
-        // Only update if the price actually changed
         if (item.transfer_price_EUR !== newPrice) {
           item.transfer_price_EUR = newPrice;
-          item.is_updated = true; // Mark for sync if applicable
+          item.is_updated = true;
           await itemRepo.save(item);
           updatedCount++;
         }
@@ -140,21 +137,31 @@ export const getItems = async (
     const queryBuilder = itemRepository.createQueryBuilder("item");
 
     if (eanSearch) {
-      const eanStr = (eanSearch as string).replace(/\s+/g, ""); // Remove all spaces
+      const eanStr = (eanSearch as string).replace(/\s+/g, "");
+      console.log(`[DEBUG] EAN Search triggered for: ${eanStr}`);
       queryBuilder.andWhere(
-        "(REPLACE(CAST(item.ean AS TEXT), ' ', '') ILIKE :eanExact OR item.ean ILIKE :eanPartial)",
-        {
-          eanExact: `%${eanStr}%`,
-          eanPartial: `%${eanStr}%`,
-        },
+        new Brackets((qb) => {
+          qb.where("REPLACE(CAST(item.ean AS TEXT), ' ', '') ILIKE :ean", { ean: `%${eanStr}%` })
+            .orWhere(
+              "EXISTS (SELECT 1 FROM warehouse_item wi WHERE (wi.item_id = item.id OR (wi.\"ItemID_DE\" = item.\"ItemID_DE\" AND item.\"ItemID_DE\" IS NOT NULL)) AND (REPLACE(CAST(wi.ean AS TEXT), ' ', '') ILIKE :ean))",
+              { ean: `%${eanStr}%` }
+            );
+        })
       );
     }
 
     if (search) {
       const searchStr = (search as string).trim();
       queryBuilder.andWhere(
-        "(item.item_name ILIKE :search OR item.item_name_cn ILIKE :search OR item.ean ILIKE :search OR item.model ILIKE :search)",
-        { search: `%${searchStr}%` },
+        new Brackets((qb) => {
+          qb.where(
+            "(item.item_name ILIKE :search OR item.item_name_cn ILIKE :search OR item.ean ILIKE :search OR item.model ILIKE :search)",
+            { search: `%${searchStr}%` }
+          ).orWhere(
+            "EXISTS (SELECT 1 FROM warehouse_item wi WHERE (wi.item_id = item.id OR (wi.\"ItemID_DE\" = item.\"ItemID_DE\" AND item.\"ItemID_DE\" IS NOT NULL)) AND (wi.ean ILIKE :search OR wi.item_no_de ILIKE :search))",
+            { search: `%${searchStr}%` }
+          );
+        })
       );
 
       const parsedId = parseInt(searchStr);
@@ -212,6 +219,9 @@ export const getItems = async (
     );
 
     const totalRecords = await queryBuilder.getCount();
+    if (eanSearch || search) {
+      console.log(`[DEBUG] Search found ${totalRecords} records.`);
+    }
     queryBuilder.skip(skip).take(limitNum);
     const items = await queryBuilder.getMany();
 
@@ -606,7 +616,6 @@ export const getItemById = async (
         isDefault: si.is_default === "Y",
       })),
 
-      // Keep single supplierItem for backwards compatibility (the default one)
       supplierItem: (() => {
         const defaultSi = supplierItems.find(si => si.is_default === 'Y') || supplierItems[0];
         return defaultSi ? {
@@ -1418,7 +1427,6 @@ export const searchItems = async (
   }
 };
 
-// ==================== ADDITIONAL SYNC UTILITY FUNCTION ====================
 export const resetUpdatedFlag = async (
   req: Request,
   res: Response,
@@ -1435,7 +1443,6 @@ export const resetUpdatedFlag = async (
         message: `Reset is_updated flag for ${ids.length} items`,
       });
     } else {
-      // Reset all items if no specific IDs provided
       await itemRepository.update({}, { is_updated: false });
       return res.status(200).json({
         success: true,
@@ -2880,13 +2887,10 @@ export const exportItemsToCSV = async (
       });
     }
 
-    // Fetch all supplier items for the items we're exporting
     const itemIds = items.map((item) => item.id);
     const supplierItems = await supplierItemRepository.find({
       where: { item_id: In(itemIds) },
     });
-
-    // Create a map for quick lookup of RMB_Price by item_id
     const rmbPriceMap = new Map<number, number>();
     supplierItems.forEach((supplierItem) => {
       if (supplierItem.price_rmb) {
@@ -3074,17 +3078,16 @@ export const exportItemsToCSV = async (
           "0",
           warehouseData?.buffer?.toString() || "0",
           rmbPrice.toFixed(2).replace(".", ","),
-          // Using RMB_Price from supplier_items
           "Y",
           item.many_components?.toString() || "1",
           item.effort_rating?.toString() || "3",
-          rmbPrice.toFixed(2).replace(".", ","), // Using RMB_Price from supplier_items
+          rmbPrice.toFixed(2).replace(".", ","),
           volume.toFixed(2).replace(".", ","),
           "0,00",
           "0,00",
           "0,00",
           "0,00",
-          rmbPrice.toFixed(2).replace(".", ","), // Using RMB_Price from supplier_items
+          rmbPrice.toFixed(2).replace(".", ","),
           ...priceColumns,
           ...bulkQuantities.map((qty) => qty.toString()),
           "19",
@@ -3120,7 +3123,6 @@ export const exportItemsToCSV = async (
       }
     }
 
-    // After successful CSV generation, reset flags
     if (updatedItemIds.length > 0) {
       if (type === "new") {
         await itemRepository.update(
@@ -3509,7 +3511,6 @@ export const exportNewItemsToCSV = async (
       }
     }
 
-    // After successful CSV generation, set is_new = 'N' for all exported items
     if (exportedIds.length > 0) {
       await itemRepository.update({ id: In(exportedIds) }, { is_new: "N" });
       console.log(
