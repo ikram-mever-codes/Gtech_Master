@@ -706,7 +706,7 @@ const BusinessSearchPage: React.FC = () => {
           ) : (
             <>
               <div className="overflow-x-auto w-full">
-                <table className="min-w-full w-max border-collapse">
+                <table className="min-w-full border-collapse">
                   <thead className="bg-gray-50 border-b border-gray-200">
                     <tr>
                       <th className="p-4">
@@ -720,31 +720,31 @@ const BusinessSearchPage: React.FC = () => {
                           className="w-4 h-4 text-primary focus:ring-primary border-gray-300 rounded"
                         />
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                      <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                         Business Name
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                      <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                         Address
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                      <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                         Website
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                      <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                         Device Maker
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                      <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                         Check Date+ Time
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                      <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                         Stage
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                      <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                         Tags
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                      <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                         Added On
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                      <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                         Actions
                       </th>
                     </tr>
@@ -766,7 +766,7 @@ const BusinessSearchPage: React.FC = () => {
                           />
                         </td>
                         <td
-                          className="px-4 py-3 cursor-pointer"
+                          className="px-3 py-3 cursor-pointer"
                           onClick={() => {
                             router.push(
                               `/bussinesses/new?businessId=${business.id}&view=true`
@@ -774,13 +774,13 @@ const BusinessSearchPage: React.FC = () => {
                           }}
                         >
                           <div>
-                            <p className="font-medium w-[200px] text-gray-900">
+                            <p className="font-medium w-[150px] truncate text-gray-900" title={business.name}>
                               {business.name}
                             </p>
                           </div>
                         </td>
                         <td
-                          className="px-4 py-3 cursor-pointer"
+                          className="px-3 py-3 cursor-pointer"
                           onClick={() => {
                             router.push(
                               `/bussinesses/new?businessId=${business.id}&view=true`
@@ -788,7 +788,7 @@ const BusinessSearchPage: React.FC = () => {
                           }}
                         >
                           <div className="text-sm">
-                            <p className="text-gray-900 w-[200px]">
+                            <p className="text-gray-900 w-[150px] truncate">
                               {(() => {
                                 const hasPostalCode =
                                   business.postalCode &&
@@ -824,7 +824,7 @@ const BusinessSearchPage: React.FC = () => {
                             </p>
                           </div>
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-3 py-3">
                           {business.website ? (
                             <a
                               href={`https://${business.website}`}
@@ -842,7 +842,7 @@ const BusinessSearchPage: React.FC = () => {
                           )}
                         </td>
                         <td
-                          className="px-4 py-3 text-center cursor-pointer"
+                          className="px-3 py-3 text-center cursor-pointer"
                           onClick={() => {
                             router.push(
                               `/bussinesses/new?businessId=${business.id}&view=true`
@@ -852,7 +852,7 @@ const BusinessSearchPage: React.FC = () => {
                           {business.isDeviceMaker}
                         </td>
                         <td
-                          className="px-4 py-3 cursor-pointer"
+                          className="px-3 py-3 cursor-pointer"
                           onClick={() => {
                             router.push(
                               `/bussinesses/new?businessId=${business.id}&view=true`
@@ -862,7 +862,7 @@ const BusinessSearchPage: React.FC = () => {
                           {formatDateTime(business.check_timestamp)}
                         </td>
                         <td
-                          className="px-4 py-3 cursor-pointer"
+                          className="px-3 py-3 cursor-pointer"
                           onClick={() => {
                             router.push(
                               `/bussinesses/new?businessId=${business.id}&view=true`
@@ -881,9 +881,9 @@ const BusinessSearchPage: React.FC = () => {
                             <span className="text-gray-400">-</span>
                           )}
                         </td>
-                        <td className="px-4 py-3"></td>
+                        <td className="px-3 py-3"></td>
                         <td
-                          className="px-4 py-3 cursor-pointer"
+                          className="px-3 py-3 cursor-pointer"
                           onClick={() => {
                             router.push(
                               `/bussinesses/new?businessId=${business.id}&view=true`
@@ -897,7 +897,7 @@ const BusinessSearchPage: React.FC = () => {
                               : "-"}
                           </div>
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-3 py-3">
                           {user?.role === UserRole.ADMIN && (
                             <button
                               onClick={(e) => {
