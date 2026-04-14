@@ -32,7 +32,7 @@ export class SupplierItem {
   @Column({ type: "int", default: 0 })
   oi!: number;
 
-  @Column({ type: "decimal", precision: 10, scale: 2, nullable: true }) // FIXED: double precision → decimal
+  @Column({ type: "decimal", precision: 10, scale: 2, nullable: true })
   price_rmb?: number;
 
   @Column({ type: "varchar", length: 1000, nullable: true })
