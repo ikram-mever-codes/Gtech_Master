@@ -1819,9 +1819,9 @@ const ItemDetailsPage = () => {
                           return (
                             <tr key={index} className="hover:bg-gray-50">
                               <td className="px-4 py-3 text-sm text-gray-900 font-medium">
-                                <div className="flex items-center gap-3">
+                                <div className="flex items-start gap-3 py-1">
                                   {finalUrl.toLowerCase().match(/\.(pdf|jpg|jpeg|png|webp|gif)$/) ? (
-                                    <div className="h-10 w-10 min-w-[40px] rounded border border-gray-200 overflow-hidden bg-gray-50 flex items-center justify-center">
+                                    <div className="h-10 w-10 min-w-[40px] rounded border border-gray-200 overflow-hidden bg-gray-50 flex items-center justify-center mt-0.5">
                                       <img
                                         src={finalUrl.replace('/upload/', '/upload/w_100,h_100,c_fill,g_auto,pg_1/')}
                                         alt="preview"
@@ -1833,9 +1833,9 @@ const ItemDetailsPage = () => {
                                       />
                                     </div>
                                   ) : (
-                                    <DocumentIcon className="h-8 w-8 text-gray-400" />
+                                    <DocumentIcon className="h-8 w-8 text-gray-400 mt-0.5" />
                                   )}
-                                  <span className="truncate max-w-[200px]" title={attachment.originalName || attachment.filename}>
+                                  <span className="whitespace-normal break-all" title={attachment.originalName || attachment.filename}>
                                     {attachment.originalName || attachment.filename || "Unnamed Attachment"}
                                   </span>
                                 </div>

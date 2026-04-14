@@ -17,7 +17,6 @@ import { User } from "./users";
 import { AppDataSource } from "../config/database";
 import { ContactPerson } from "./contact_person";
 
-// Enums
 export enum LIST_STATUS {
   ACTIVE = "active",
   DISABLED = "disabled",
@@ -44,7 +43,6 @@ export const DELIVERY_STATUS = {
   RETURNED: "Returned",
 } as const;
 
-// Enhanced Activity Log Interface
 interface ActivityLog {
   id: string;
   message: string;
@@ -73,7 +71,6 @@ interface DeliveryInfo {
   cargoStatus?: string;
 }
 
-// Field Change Tracking Interface
 interface FieldChange {
   field: string;
   oldValue: any;
@@ -86,7 +83,6 @@ interface FieldChange {
   acknowledgedAt?: Date;
 }
 
-// List Creator entities (simplified)
 @Entity()
 @TableInheritance({ column: { type: "varchar", name: "creatorType" } })
 export abstract class ListCreator {
@@ -147,11 +143,9 @@ export class List {
   @OneToMany(() => ListItem, (item) => item.list, { cascade: true })
   items!: ListItem[];
 
-  // Simplified activity logs - stored as JSON
   @Column({ type: "json", nullable: true })
   activityLogs!: ActivityLog[];
 
-  // Field change tracking for acknowledgment system
   @Column({ type: "json", nullable: true })
   pendingChanges!: FieldChange[];
 
@@ -186,7 +180,6 @@ export class List {
     }
   }
 
-  // Simple method to add activity log
   addActivityLog(
     message: string,
     userRole: USER_ROLE,
@@ -217,7 +210,6 @@ export class List {
     this.activityLogs = [...this.activityLogs, log];
   }
 
-  // Track field changes for acknowledgment system
   trackFieldChange(
     field: string,
     oldValue: any,
@@ -227,7 +219,7 @@ export class List {
     itemId?: string
   ): void {
     if (userRole === USER_ROLE.ADMIN) {
-      return; // Admin changes don't need tracking for acknowledgment
+      return;
     }
 
     this.pendingChanges = this.pendingChanges || [];
@@ -242,7 +234,6 @@ export class List {
       changeStatus: CHANGE_STATUS.PENDING,
     };
 
-    // Remove any existing pending changes for the same field and item
     this.pendingChanges = this.pendingChanges.filter(
       (change: any) => !(change.field === field && change.itemId === itemId)
     );
@@ -250,7 +241,6 @@ export class List {
     this.pendingChanges.push(change);
   }
 
-  // Log field changes with tracking for acknowledgment
   logFieldChange(
     field: string,
     oldValue: any,
@@ -273,18 +263,15 @@ export class List {
       newValue
     );
 
-    // Track for acknowledgment system
     this.trackFieldChange(field, oldValue, newValue, userRole, userId, itemId);
   }
 
-  // Get unacknowledged customer changes
   getUnacknowledgedCustomerChanges(): ActivityLog[] {
     return (this.activityLogs || []).filter(
       (log) => log.userRole === USER_ROLE.CUSTOMER && !log.acknowledged
     );
   }
 
-  // Get pending field changes that need acknowledgment
   getPendingFieldChanges(): FieldChange[] {
     return (this.pendingChanges || []).filter(
       (change) =>
@@ -293,7 +280,6 @@ export class List {
     );
   }
 
-  // Acknowledge customer changes
   acknowledgeCustomerChanges(adminUserId: string, logIds?: string[]): void {
     if (!this.activityLogs) return;
 
@@ -311,7 +297,6 @@ export class List {
       }
     });
 
-    // Also update pending changes
     if (this.pendingChanges) {
       this.pendingChanges.forEach((change) => {
         if (
@@ -328,12 +313,9 @@ export class List {
         }
       });
 
-      // Clean up acknowledged changes after a while (optional)
       this.cleanupAcknowledgedChanges();
     }
   }
-
-  // Acknowledge specific field changes
   acknowledgeFieldChanges(adminUserId: string, fieldChanges: string[]): void {
     if (!this.pendingChanges) return;
 
@@ -349,7 +331,6 @@ export class List {
       }
     });
 
-    // Update corresponding activity logs
     if (this.activityLogs) {
       this.activityLogs.forEach((log) => {
         if (
@@ -367,7 +348,6 @@ export class List {
     }
   }
 
-  // Helper method to get log IDs for a field change
   private getLogIdsForFieldChange(change: FieldChange): string[] {
     if (!this.activityLogs) return [];
 
@@ -381,7 +361,6 @@ export class List {
       .map((log) => log.id);
   }
 
-  // Clean up acknowledged changes (keep only recent ones)
   private cleanupAcknowledgedChanges(): void {
     const oneWeekAgo = new Date();
     oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
@@ -393,19 +372,15 @@ export class List {
     );
   }
 
-  // Get activity logs for a specific item
   getItemActivityLogs(itemId: string): ActivityLog[] {
     return (this.activityLogs || []).filter((log) => log.itemId === itemId);
   }
-
-  // Get pending changes for a specific item
   getItemPendingChanges(itemId: string): FieldChange[] {
     return (this.pendingChanges || []).filter(
       (change: any) => change.itemId === itemId
     );
   }
 
-  // Get all activity logs sorted by timestamp (newest first)
   getAllActivityLogs(): ActivityLog[] {
     return (this.activityLogs || []).sort(
       (a, b) =>
@@ -413,7 +388,6 @@ export class List {
     );
   }
 
-  // Check if list has any pending changes
   hasPendingChanges(): boolean {
     return this.getPendingFieldChanges().length > 0;
   }
@@ -474,7 +448,6 @@ export class ListItem {
   @UpdateDateColumn()
   updatedAt!: Date;
 
-  // Enhanced updateField method with change tracking
   updateField(
     field: keyof ListItem,
     newValue: any,
@@ -487,10 +460,8 @@ export class ListItem {
       return false;
     }
 
-    // Update the field
     (this as any)[field] = newValue;
 
-    // Log the change in the parent list
     if (this.list) {
       this.list.logFieldChange(
         field as string,
@@ -506,7 +477,6 @@ export class ListItem {
     return true;
   }
 
-  // Update multiple fields at once
   updateFields(
     updates: Partial<ListItem>,
     userRole: USER_ROLE,
@@ -525,7 +495,6 @@ export class ListItem {
     return changedFields;
   }
 
-  // Update delivery information with change tracking
   updateDelivery(
     period: string,
     deliveryData: Partial<DeliveryInfo>,
@@ -535,7 +504,6 @@ export class ListItem {
     this.deliveries = this.deliveries || {};
     const currentDelivery = this.deliveries[period] || {};
 
-    // Track changes for logging
     const changes: string[] = [];
 
     Object.entries(deliveryData).forEach(([key, newValue]) => {
@@ -549,7 +517,6 @@ export class ListItem {
       }
     });
 
-    // Update the delivery
     this.deliveries[period] = {
       ...currentDelivery,
       ...deliveryData,
@@ -557,7 +524,6 @@ export class ListItem {
         deliveryData.status || currentDelivery.status || DELIVERY_STATUS.OPEN,
     };
 
-    // Log the delivery changes
     if (changes.length > 0 && this.list) {
       const message = `${userRole} updated delivery for period ${period}: ${changes.join(
         ", "
@@ -570,7 +536,6 @@ export class ListItem {
         `delivery_${period}`
       );
 
-      // Track delivery changes for acknowledgment
       if (userRole === USER_ROLE.CUSTOMER) {
         this.list.trackFieldChange(
           `delivery_${period}`,
@@ -584,7 +549,6 @@ export class ListItem {
     }
   }
 
-  // Get unacknowledged fields for this item
   getUnacknowledgedFields(): Set<string> {
     const unacknowledgedFields = new Set<string>();
     const pendingChanges = this.list?.getItemPendingChanges(this.id) || [];
@@ -598,7 +562,6 @@ export class ListItem {
     return unacknowledgedFields;
   }
 
-  // Check if a specific field has pending changes
   hasPendingFieldChange(field: string): boolean {
     const pendingChanges = this.list?.getItemPendingChanges(this.id) || [];
     return pendingChanges.some(
@@ -607,7 +570,6 @@ export class ListItem {
     );
   }
 
-  // Get the latest unacknowledged value for a field
   getLatestUnacknowledgedChange(field: string): any {
     const pendingChanges = this.list?.getItemPendingChanges(this.id) || [];
 
@@ -625,28 +587,21 @@ export class ListItem {
     return relevantChanges.length > 0 ? relevantChanges[0] : null;
   }
 
-  // Get all activity logs for this item
   getActivityLogs(): ActivityLog[] {
     return this.list?.getItemActivityLogs(this.id) || [];
   }
-
-  // Get all pending changes for this item
   getPendingChanges(): FieldChange[] {
     return this.list?.getItemPendingChanges(this.id) || [];
   }
 
-  // Check if this item has unacknowledged customer changes
   hasUnacknowledgedCustomerChanges(): boolean {
     return this.getPendingChanges().length > 0;
   }
-
-  // Check if this item has any pending changes for highlighting
   needsAttention(): boolean {
     return this.hasUnacknowledgedCustomerChanges();
   }
 }
 
-// Enhanced Utility functions
 export function formatActivityMessage(
   username: USER_ROLE,
   field: string,
@@ -667,7 +622,6 @@ export function getItemsWithUnacknowledgedChanges(list: List): ListItem[] {
   );
 }
 
-// New utility functions for the acknowledgment system
 export function getPendingChangesByField(
   list: List
 ): Map<string, FieldChange[]> {

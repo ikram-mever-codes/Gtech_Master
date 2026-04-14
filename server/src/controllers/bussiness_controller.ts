@@ -576,6 +576,7 @@ export const createBusiness = async (
     const normalizedWebsite = website ? normalizeWebsite(website) : null;
 
     if (normalizedWebsite) {
+      console.log(`[DEBUG] Checking website uniqueness: ${normalizedWebsite}`);
       const existingBusinessWithWebsite = await businessDetailsRepository
         .createQueryBuilder("businessDetails")
         .leftJoinAndSelect("businessDetails.customer", "customer")
@@ -585,6 +586,7 @@ export const createBusiness = async (
         .getOne();
 
       if (existingBusinessWithWebsite) {
+        console.warn(`[DEBUG] Duplicate website found: ${normalizedWebsite}`);
         return next(
           new ErrorHandler("A business with this website already exists", 400)
         );
@@ -592,6 +594,7 @@ export const createBusiness = async (
     }
 
     const trimmedDisplayName = dbCompanyName.trim();
+    console.log(`[DEBUG] Checking display name uniqueness: ${trimmedDisplayName}`);
     const existingCustomerWithName = await customerRepository
       .createQueryBuilder("customer")
       .where("LOWER(customer.companyName) = LOWER(:companyName)", {
@@ -600,6 +603,7 @@ export const createBusiness = async (
       .getOne();
 
     if (existingCustomerWithName) {
+      console.warn(`[DEBUG] Duplicate display name found: ${trimmedDisplayName}`);
       return next(
         new ErrorHandler(
           "A business with this display name already exists",
@@ -610,13 +614,28 @@ export const createBusiness = async (
 
     const emailToCheck = isStarCustomer ? starCustomerEmail : finalEmail;
     if (emailToCheck) {
+      const trimmedEmail = emailToCheck.trim().toLowerCase();
+      console.log(`[DEBUG] Checking email uniqueness: ${trimmedEmail}`);
+
       const existingCustomerWithEmail = await customerRepository.findOne({
-        where: { email: emailToCheck.trim().toLowerCase() },
+        where: { email: trimmedEmail },
       });
 
       if (existingCustomerWithEmail) {
+        console.warn(`[DEBUG] Duplicate email found in Customer table: ${trimmedEmail}`);
         return next(
           new ErrorHandler("A business with this email already exists", 400)
+        );
+      }
+
+      const existingBusinessWithEmail = await businessDetailsRepository.findOne({
+        where: { email: trimmedEmail },
+      });
+
+      if (existingBusinessWithEmail) {
+        console.warn(`[DEBUG] Duplicate email found in BusinessDetails table: ${trimmedEmail}`);
+        return next(
+          new ErrorHandler("This email is already associated with another business's details", 400)
         );
       }
     }
