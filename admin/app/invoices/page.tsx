@@ -1830,30 +1830,36 @@ const InvoiceListPage: React.FC = () => {
                                                       <span className="font-bold">
                                                         {it.qty}
                                                       </span>
-                                                    ),
-                                                    width: "60px",
-                                                    align: "center",
-                                                  },
-                                                  {
-                                                    header: "RMB",
-                                                    render: (it: any) => it.rmb_special_price || it._fallbackRmb || "0",
-                                                    width: "60px",
-                                                    align: "center",
-                                                  },
-                                                  {
-                                                    header: "EK",
-                                                    render: (it: any) => (it.eur_special_price || it._fallbackEk) ? (
-                                                        <span className="font-bold text-[#10B981]">{Number(it.eur_special_price || it._fallbackEk).toFixed(2)}</span>
-                                                    ) : "0",
-                                                    width: "80px",
-                                                    align: "center",
-                                                  },
-                                                ]
-                                              : [
-                                                  {
-                                                    header: "ID",
-                                                    render: (it: any) => (
-                                                      <div className="flex flex-col gap-1.5 p-1">
+                                                     ),
+                                                     width: "60px",
+                                                     align: "center",
+                                                   },
+                                                   {
+                                                     header: "EUR",
+                                                     render: (it: any) => it.eur_special_price || it._fallbackEk || "0",
+                                                     width: "60px",
+                                                     align: "center",
+                                                   },
+                                                   {
+                                                     header: "EK",
+                                                     render: (it: any) => {
+                                                       const unitPrice = Number(it.eur_special_price || it._fallbackEk) || 0;
+                                                       const totalPrice = (it.qty || 0) * unitPrice;
+                                                       return (
+                                                         <span className="font-bold text-[#10B981]">
+                                                           {totalPrice.toFixed(2)}
+                                                         </span>
+                                                       );
+                                                     },
+                                                     width: "80px",
+                                                     align: "center",
+                                                   },
+                                                 ]
+                                               : [
+                                                   {
+                                                     header: "ID",
+                                                     render: (it: any) => (
+                                                       <div className="flex flex-col gap-1.5 p-1">
                                                         <div className="px-2 py-1 bg-[#495057] text-white text-[10px] font-bold rounded-[4px] text-center mb-1 flex items-center justify-center gap-1.5">
                                                           <FileText className="w-3 h-3" />{" "}
                                                           {it.id}
@@ -2015,23 +2021,29 @@ const InvoiceListPage: React.FC = () => {
                                                     width: "60px",
                                                     align: "center",
                                                   },
-                                                  {
-                                                    header: "RMB",
-                                                    render: (it: any) => it.rmb_special_price || it._fallbackRmb || "0",
-                                                    width: "45px",
-                                                    align: "center",
-                                                  },
-                                                  {
-                                                    header: "EK",
-                                                    render: (it: any) => (it.eur_special_price || it._fallbackEk) ? (
-                                                        <span className="font-bold text-[#10B981]">{Number(it.eur_special_price || it._fallbackEk).toFixed(2)}</span>
-                                                    ) : "0",
-                                                    width: "65px",
-                                                    align: "center",
-                                                  },
-                                                  {
-                                                    header: "Action",
-                                                    render: (it: any) =>
+                                                   {
+                                                     header: "EUR",
+                                                     render: (it: any) => it.eur_special_price || it._fallbackEk || "0",
+                                                     width: "45px",
+                                                     align: "center",
+                                                   },
+                                                   {
+                                                     header: "EK",
+                                                     render: (it: any) => {
+                                                       const unitPrice = Number(it.eur_special_price || it._fallbackEk) || 0;
+                                                       const totalPrice = (it.qty || 0) * unitPrice;
+                                                       return (
+                                                         <span className="font-bold text-[#10B981]">
+                                                           {totalPrice.toFixed(2)}
+                                                         </span>
+                                                       );
+                                                     },
+                                                     width: "65px",
+                                                     align: "center",
+                                                   },
+                                                   {
+                                                     header: "Action",
+                                                     render: (it: any) =>
                                                       it.item
                                                         ?.is_eur_special ===
                                                         "Y" &&
