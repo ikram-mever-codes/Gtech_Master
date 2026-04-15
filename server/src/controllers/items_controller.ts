@@ -46,15 +46,38 @@ export const getRMBPriceFromSupplier = async (
   }
 };
 
-const calculateTransferPrice = (rmbPrice: number): number => {
-  const FACTOR = 1.15;
-  return parseFloat((rmbPrice * FACTOR).toFixed(2));
+const calculateTransferPrice = (
+  rmbPrice: number,
+  categoryName: string,
+): number => {
+  // Logic for GTR, GBL, PRO, ERS
+  const flatCategories = ["GTR", "GBL", "PRO", "ERS"];
+
+  if (flatCategories.includes(categoryName)) {
+    return parseFloat(((rmbPrice / 7) * 1.5).toFixed(2));
+  }
+
+  // Tiered logic for STD
+  let multiplier: number;
+
+  if (rmbPrice < 0.25) multiplier = 2.5;
+  else if (rmbPrice < 0.5) multiplier = 2.25;
+  else if (rmbPrice < 1) multiplier = 2;
+  else if (rmbPrice < 2) multiplier = 1.9;
+  else if (rmbPrice < 4) multiplier = 1.8;
+  else if (rmbPrice < 8) multiplier = 1.7;
+  else if (rmbPrice < 14) multiplier = 1.6;
+  else if (rmbPrice < 28) multiplier = 1.5;
+  else multiplier = 1.45; // For prices >= 28
+
+  return parseFloat(((rmbPrice * multiplier) / 7).toFixed(2));
 };
 
 /**
  * Feeds transfer prices for all items belonging to the 'STD' category.
  * Can be triggered via a button or a cron job.
  */
+
 export const feedTransferPrices = async (
   req: Request,
   res: Response,
@@ -65,12 +88,28 @@ export const feedTransferPrices = async (
     const supplierItemRepo = AppDataSource.getRepository(SupplierItem);
     const categoryRepo = AppDataSource.getRepository(Category);
 
-    const stdCategory = await categoryRepo.findOne({ where: { name: "STD" } });
-    if (!stdCategory) {
-      return next(new ErrorHandler("STD Category not found in system", 404));
+    // 1. Fetch all target categories at once
+    const targetCategoryNames = ["STD", "GTR", "GBL", "PRO", "ERS"];
+    const categories = await categoryRepo.find({
+      where: { name: In(targetCategoryNames) },
+    });
+    if (categories.length === 0) {
+      return next(
+        new ErrorHandler("No matching categories found in system", 404),
+      );
     }
-    const items = await itemRepo.find({ where: { cat_id: stdCategory.id } });
 
+    // Map ID to Name for quick lookup in the loop
+    const categoryMap = new Map(categories.map((c) => [c.de_cat, c.name]));
+
+    const categoryIds = Array.from(categoryMap.keys());
+    console.log(categoryIds);
+
+    // 2. Fetch all items belonging to these categories
+    const items = await itemRepo.find({
+      where: { supp_cat: In(targetCategoryNames) },
+    });
+    console.log(items);
     let updatedCount = 0;
 
     for (const item of items) {
@@ -79,8 +118,12 @@ export const feedTransferPrices = async (
       });
 
       if (supplierItem && supplierItem.price_rmb) {
-        const newPrice = calculateTransferPrice(supplierItem.price_rmb);
+        const newPrice = calculateTransferPrice(
+          supplierItem.price_rmb,
+          item.supp_cat || "",
+        );
 
+        // Update only if the price has actually changed
         if (item.transfer_price_EUR !== newPrice) {
           item.transfer_price_EUR = newPrice;
           item.is_updated = true;
@@ -141,12 +184,13 @@ export const getItems = async (
       console.log(`[DEBUG] EAN Search triggered for: ${eanStr}`);
       queryBuilder.andWhere(
         new Brackets((qb) => {
-          qb.where("REPLACE(CAST(item.ean AS TEXT), ' ', '') ILIKE :ean", { ean: `%${eanStr}%` })
-            .orWhere(
-              "EXISTS (SELECT 1 FROM warehouse_item wi WHERE (wi.item_id = item.id OR (wi.\"ItemID_DE\" = item.\"ItemID_DE\" AND item.\"ItemID_DE\" IS NOT NULL)) AND (REPLACE(CAST(wi.ean AS TEXT), ' ', '') ILIKE :ean))",
-              { ean: `%${eanStr}%` }
-            );
-        })
+          qb.where("REPLACE(CAST(item.ean AS TEXT), ' ', '') ILIKE :ean", {
+            ean: `%${eanStr}%`,
+          }).orWhere(
+            'EXISTS (SELECT 1 FROM warehouse_item wi WHERE (wi.item_id = item.id OR (wi."ItemID_DE" = item."ItemID_DE" AND item."ItemID_DE" IS NOT NULL)) AND (REPLACE(CAST(wi.ean AS TEXT), \' \', \'\') ILIKE :ean))',
+            { ean: `%${eanStr}%` },
+          );
+        }),
       );
     }
 
@@ -156,12 +200,12 @@ export const getItems = async (
         new Brackets((qb) => {
           qb.where(
             "(item.item_name ILIKE :search OR item.item_name_cn ILIKE :search OR item.ean ILIKE :search OR item.model ILIKE :search)",
-            { search: `%${searchStr}%` }
+            { search: `%${searchStr}%` },
           ).orWhere(
-            "EXISTS (SELECT 1 FROM warehouse_item wi WHERE (wi.item_id = item.id OR (wi.\"ItemID_DE\" = item.\"ItemID_DE\" AND item.\"ItemID_DE\" IS NOT NULL)) AND (wi.ean ILIKE :search OR wi.item_no_de ILIKE :search))",
-            { search: `%${searchStr}%` }
+            'EXISTS (SELECT 1 FROM warehouse_item wi WHERE (wi.item_id = item.id OR (wi."ItemID_DE" = item."ItemID_DE" AND item."ItemID_DE" IS NOT NULL)) AND (wi.ean ILIKE :search OR wi.item_no_de ILIKE :search))',
+            { search: `%${searchStr}%` },
           );
-        })
+        }),
       );
 
       const parsedId = parseInt(searchStr);
@@ -321,7 +365,7 @@ export const getItems = async (
           parent_id: item.parent_id || null,
           taric_id: item.taric_id || null,
           category_id: item.cat_id || null,
-          category: categoryData?.name || null,
+          category: item?.supp_cat || null,
           supplier_id: item.supplier_id || null,
           supplier_name:
             supplierData?.company_name || supplierData?.name || null,
@@ -340,17 +384,17 @@ export const getItems = async (
 
           warehouse_data: warehouseData
             ? {
-              id: warehouseData.id,
-              item_no_de: warehouseData.item_no_de,
-              item_name_de: warehouseData.item_name_de,
-              item_name_en: warehouseData.item_name_en,
-              stock_qty: warehouseData.stock_qty,
-              msq: warehouseData.msq,
-              buffer: warehouseData.buffer,
-              is_stock_item: warehouseData.is_stock_item,
-              is_SnSI: warehouseData.is_SnSI,
-              ship_class: warehouseData.ship_class,
-            }
+                id: warehouseData.id,
+                item_no_de: warehouseData.item_no_de,
+                item_name_de: warehouseData.item_name_de,
+                item_name_en: warehouseData.item_name_en,
+                stock_qty: warehouseData.stock_qty,
+                msq: warehouseData.msq,
+                buffer: warehouseData.buffer,
+                is_stock_item: warehouseData.is_stock_item,
+                is_SnSI: warehouseData.is_SnSI,
+                ship_class: warehouseData.ship_class,
+              }
             : null,
 
           created_at: item.created_at,
@@ -605,7 +649,8 @@ export const getItemById = async (
       supplierItems: supplierItems.map((si: any) => ({
         id: si.id,
         supplierId: si.supplier_id,
-        supplierName: si.supplier?.company_name || si.supplier?.name || "Unknown",
+        supplierName:
+          si.supplier?.company_name || si.supplier?.name || "Unknown",
         priceRMB: si.price_rmb?.toString() || "0",
         isPO: si.is_po || "No",
         moq: si.moq?.toString() || "0",
@@ -617,27 +662,33 @@ export const getItemById = async (
       })),
 
       supplierItem: (() => {
-        const defaultSi = supplierItems.find(si => si.is_default === 'Y') || supplierItems[0];
-        return defaultSi ? {
-          id: defaultSi.id,
-          supplierId: defaultSi.supplier_id,
-          supplierName: defaultSi.supplier?.company_name || defaultSi.supplier?.name || "Unknown",
-          priceRMB: defaultSi.price_rmb?.toString() || "0",
-          isPO: defaultSi.is_po || "No",
-          moq: defaultSi.moq?.toString() || "0",
-          interval: defaultSi.oi?.toString() || "0",
-          leadTime: defaultSi.lead_time || "",
-          noteCN: defaultSi.note_cn || "",
-          url: defaultSi.url || "",
-        } : {
-          priceRMB: "0",
-          isPO: "No",
-          moq: "0",
-          interval: "0",
-          leadTime: "",
-          noteCN: "",
-          url: "",
-        };
+        const defaultSi =
+          supplierItems.find((si) => si.is_default === "Y") || supplierItems[0];
+        return defaultSi
+          ? {
+              id: defaultSi.id,
+              supplierId: defaultSi.supplier_id,
+              supplierName:
+                defaultSi.supplier?.company_name ||
+                defaultSi.supplier?.name ||
+                "Unknown",
+              priceRMB: defaultSi.price_rmb?.toString() || "0",
+              isPO: defaultSi.is_po || "No",
+              moq: defaultSi.moq?.toString() || "0",
+              interval: defaultSi.oi?.toString() || "0",
+              leadTime: defaultSi.lead_time || "",
+              noteCN: defaultSi.note_cn || "",
+              url: defaultSi.url || "",
+            }
+          : {
+              priceRMB: "0",
+              isPO: "No",
+              moq: "0",
+              interval: "0",
+              leadTime: "",
+              noteCN: "",
+              url: "",
+            };
       })(),
 
       nprRemarks: item.npr_remark || "",
@@ -726,7 +777,9 @@ export const createItem = async (
     if (!ean || ean.trim() === "") {
       const prefix = "789";
       const timestamp = (Date.now() % 1000000).toString().padStart(6, "0");
-      const random = Math.floor(Math.random() * 1000000).toString().padStart(6, "0");
+      const random = Math.floor(Math.random() * 1000000)
+        .toString()
+        .padStart(6, "0");
       const baseNumber = (timestamp + random).slice(0, 9);
       const eanWithoutCheck = prefix + baseNumber;
 
@@ -751,7 +804,7 @@ export const createItem = async (
     const finalRMB = RMB_Price ? parseFloat(RMB_Price) : null;
 
     if (category?.name === "STD" && finalRMB) {
-      finalPrice = calculateTransferPrice(finalRMB);
+      finalPrice = calculateTransferPrice(finalRMB, category.name);
     }
 
     const newItem = itemRepository.create({
@@ -787,7 +840,8 @@ export const createItem = async (
 
     try {
       if (supplier_id) {
-        const supplierItemRepository = AppDataSource.getRepository(SupplierItem);
+        const supplierItemRepository =
+          AppDataSource.getRepository(SupplierItem);
         const supplierItem = supplierItemRepository.create({
           item_id: newItem.id,
           supplier_id: supplier_id,
@@ -909,10 +963,12 @@ export const updateItem = async (
     const supplierItemsData = req.body.supplierItems;
     if (supplierItemsData && Array.isArray(supplierItemsData)) {
       const existingSupplierItems = await supplierItemRepository.find({
-        where: { item_id: item.id }
+        where: { item_id: item.id },
       });
 
-      const incomingIds = supplierItemsData.filter(si => si.id > 0).map(si => si.id);
+      const incomingIds = supplierItemsData
+        .filter((si) => si.id > 0)
+        .map((si) => si.id);
 
       for (const existing of existingSupplierItems) {
         if (!incomingIds.includes(existing.id)) {
@@ -1013,7 +1069,10 @@ export const updateItem = async (
       }
 
       if (currentRMBPrice) {
-        const calculated = calculateTransferPrice(Number(currentRMBPrice));
+        const calculated = calculateTransferPrice(
+          Number(currentRMBPrice),
+          category.name,
+        );
         if (item.price !== calculated) {
           item.price = calculated;
           hasChanges = true;
@@ -1084,7 +1143,10 @@ export const syncTransferPrices = async (
         where: { item_id: item.id },
       });
       if (sItem && sItem.price_rmb) {
-        const newTransferPrice = calculateTransferPrice(sItem.price_rmb);
+        const newTransferPrice = calculateTransferPrice(
+          sItem.price_rmb,
+          item.category?.name || "STD",
+        );
         if (item.transfer_price_EUR !== newTransferPrice) {
           item.transfer_price_EUR = newTransferPrice;
           item.is_updated = true;
@@ -1558,9 +1620,9 @@ export const getParents = async (
       supplier_id: parent.supplier_id,
       supplier: parent.supplier
         ? {
-          id: parent.supplier.id,
-          name: parent.supplier.name,
-        }
+            id: parent.supplier.id,
+            name: parent.supplier.name,
+          }
         : null,
       item_count: parent.items?.length || 0,
       created_at: parent.created_at,
@@ -1636,17 +1698,17 @@ export const getParentById = async (
       is_active: parent.is_active,
       taric: parent.taric
         ? {
-          id: parent.taric.id,
-          code: parent.taric.code,
-          name_de: parent.taric.name_de,
-        }
+            id: parent.taric.id,
+            code: parent.taric.code,
+            name_de: parent.taric.name_de,
+          }
         : null,
       supplier: parent.supplier
         ? {
-          id: parent.supplier.id,
-          name: parent.supplier.name,
-          contact_person: parent.supplier.contact_person,
-        }
+            id: parent.supplier.id,
+            name: parent.supplier.name,
+            contact_person: parent.supplier.contact_person,
+          }
         : null,
       variations: {
         de: [parent.var_de_1, parent.var_de_2, parent.var_de_3].filter(Boolean),
@@ -3201,23 +3263,23 @@ export const getNewItems = async (
       items.map(async (item) => {
         const parentData = item.parent_id
           ? await parentRepository.findOne({
-            where: { id: item.parent_id },
-            select: ["id", "de_no", "name_de", "name_en"],
-          })
+              where: { id: item.parent_id },
+              select: ["id", "de_no", "name_de", "name_en"],
+            })
           : null;
 
         const categoryData = item.cat_id
           ? await categoryRepository.findOne({
-            where: { id: item.cat_id },
-            select: ["id", "name"],
-          })
+              where: { id: item.cat_id },
+              select: ["id", "name"],
+            })
           : null;
 
         const supplierData = item.supplier_id
           ? await supplierRepository.findOne({
-            where: { id: item.supplier_id },
-            select: ["id", "name", "company_name"],
-          })
+              where: { id: item.supplier_id },
+              select: ["id", "name", "company_name"],
+            })
           : null;
 
         let warehouseData: any = null;
