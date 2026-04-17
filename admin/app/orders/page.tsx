@@ -169,6 +169,11 @@ const tabs = [
     description: "Orders with suppliers",
   },
   {
+    id: "purchase_order",
+    label: "Purchase order",
+    description: "List of created PO for all Suppliers",
+  },
+  {
     id: "problems",
     label: "Problems",
     description: "Manage order problems and label reprints",
@@ -777,6 +782,7 @@ const OrderPage = () => {
   >(null);
   const [loadingSupplierOrders, setLoadingSupplierOrders] = useState(false);
   const [supplierOrderSearch, setSupplierOrderSearch] = useState("");
+  const [poSearch, setPoSearch] = useState("");
 
   const [itemsAll, setItemsAll] = useState<Item[]>([]);
   const [itemsByCategory, setItemsByCategory] = useState<Item[]>([]);
@@ -890,6 +896,26 @@ const OrderPage = () => {
     }
     await downloadItemLabel(row.id);
   };
+
+  const purchaseOrdersList = useMemo(() => {
+    return supplierOrdersList.filter((so) => {
+      const hasPurchasedItems = so.items?.some((it: any) => {
+        const st = (it.status || "").toLowerCase().trim();
+        return st === "purchased" || st === "purchase";
+      });
+      if (!hasPurchasedItems && so.is_po_created !== 1) return false;
+
+      const searchLower = poSearch.toLowerCase();
+      const poNo = `PO${new Date(so.created_at).getFullYear().toString().slice(-2)}${String(so.id).padStart(3, "0")}`;
+      return (
+        !poSearch ||
+        String(so.id).includes(poSearch) ||
+        poNo.toLowerCase().includes(searchLower) ||
+        so.supplier?.company_name?.toLowerCase().includes(searchLower) ||
+        so.remark?.toLowerCase().includes(searchLower)
+      );
+    });
+  }, [supplierOrdersList, poSearch]);
 
   const labelPrintItems = useMemo(() => {
     const list: any[] = [];
@@ -1313,6 +1339,8 @@ const OrderPage = () => {
         search: supplierOrderSearch,
       });
       if (res.success) setSupplierOrdersList(res.data);
+      else if (Array.isArray(res.data)) setSupplierOrdersList(res.data);
+      else if (Array.isArray(res)) setSupplierOrdersList(res);
     } catch (e) {
       console.error(e);
     } finally {
@@ -1348,7 +1376,8 @@ const OrderPage = () => {
   };
 
   useEffect(() => {
-    if (activeTab === "supplier_orders") fetchSupplierOrders();
+    if (activeTab === "supplier_orders" || activeTab === "purchase_order")
+      fetchSupplierOrders();
   }, [activeTab, fetchSupplierOrders]);
 
   const handleCustomerChange = (customer_id: string) =>
@@ -1743,12 +1772,15 @@ const OrderPage = () => {
   const defaultAction = (
     <div className="flex gap-2">
       <button
-        onClick={fetchOrders}
-        disabled={loadingOrders}
+        onClick={() => {
+          fetchOrders();
+          fetchSupplierOrders();
+        }}
+        disabled={loadingOrders || loadingSupplierOrders}
         className="px-3 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-[4px] hover:bg-gray-50 transition-all flex items-center gap-2 disabled:opacity-50"
       >
         <ArrowPathIcon
-          className={`h-4 w-4 ${loadingOrders ? "animate-spin" : ""}`}
+          className={`h-4 w-4 ${loadingOrders || loadingSupplierOrders ? "animate-spin" : ""}`}
         />
         Refresh
       </button>
@@ -1769,6 +1801,7 @@ const OrderPage = () => {
     order_items: defaultAction,
     nso: defaultAction,
     supplier_orders: defaultAction,
+    purchase_order: defaultAction,
     problems: defaultAction,
     label_print: defaultAction,
   };
@@ -1868,8 +1901,19 @@ const OrderPage = () => {
                                   key={it.id || idx}
                                   className="border-b border-gray-50 hover:bg-gray-50 transition-colors"
                                 >
-                                  <td className="px-3 py-2 font-bold text-blue-600">
-                                    {it._order_no || "-"}
+                                  <td className="px-3 py-2 font-bold">
+                                    <button
+                                      onClick={() => {
+                                        const targetOrder = {
+                                          id: it.order_id,
+                                          order_no: it._order_no,
+                                        };
+                                        openView(targetOrder);
+                                      }}
+                                      className="text-blue-600 hover:underline"
+                                    >
+                                      {it._order_no || "-"}
+                                    </button>
                                   </td>
                                   <td className="px-3 py-2 text-gray-600">
                                     {ean}
@@ -1948,10 +1992,17 @@ const OrderPage = () => {
                                       e.stopPropagation();
                                       handleCreateSupplierOrderFromNSO(row);
                                     }}
-                                    className="bg-[#059669] text-white px-4 py-2 rounded-[4px] flex items-center gap-2 text-xs font-bold hover:bg-green-700 transition shadow-md"
+                                    disabled={row.supplier_id === 0}
+                                    className={`${
+                                      row.supplier_id === 0
+                                        ? "bg-gray-400 cursor-not-allowed opacity-75"
+                                        : "bg-[#059669] hover:bg-green-700"
+                                    } text-white px-4 py-2 rounded-[4px] flex items-center gap-2 text-xs font-bold transition shadow-md`}
                                   >
                                     <PlusCircleIcon className="h-5 w-5" />
-                                    Supplier order
+                                    {row.supplier_id === 0
+                                      ? "Set Supplier"
+                                      : "Supplier order"}
                                   </button>
                                 </div>
                               ),
@@ -2023,10 +2074,17 @@ const OrderPage = () => {
                                       e.stopPropagation();
                                       handleCreateSupplierOrderFromNSO(row);
                                     }}
-                                    className="bg-[#059669] text-white px-4 py-2 rounded-[4px] flex items-center gap-2 text-xs font-bold hover:bg-green-700 transition shadow-md"
+                                    disabled={row.supplier_id === 0}
+                                    className={`${
+                                      row.supplier_id === 0
+                                        ? "bg-gray-400 cursor-not-allowed opacity-75"
+                                        : "bg-[#059669] hover:bg-green-700"
+                                    } text-white px-4 py-2 rounded-[4px] flex items-center gap-2 text-xs font-bold transition shadow-md`}
                                   >
                                     <PlusCircleIcon className="h-5 w-5" />
-                                    Supplier order
+                                    {row.supplier_id === 0
+                                      ? "Set Supplier"
+                                      : "Supplier order"}
                                   </button>
                                 </div>
                               ),
@@ -2523,6 +2581,153 @@ const OrderPage = () => {
                     expandedSupplierOrderId === row.id ? "bg-blue-50/30" : ""
                   }
                   emptyMessage="No Supplier Orders Found"
+                />
+              </div>
+            ) : activeTab === "purchase_order" ? (
+              <div className="p-4 bg-gray-50/30 min-h-[600px]">
+                <div className="flex justify-between items-center mb-6 gap-4">
+                  <div className="flex gap-2 items-center">
+                    <button
+                      onClick={() => setActiveTab("orders")}
+                      className="bg-[#059669] text-white px-4 py-2 rounded-[4px] text-xs font-bold hover:bg-green-700 transition shadow-md"
+                    >
+                      Back
+                    </button>
+                    <div className="relative">
+                      <MagnifyingGlassIcon className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                      <input
+                        type="text"
+                        placeholder="Search purchase order..."
+                        className="pl-9 pr-4 py-2 border border-gray-200 rounded-[4px] text-xs w-64 focus:ring-2 focus:ring-blue-500 transition"
+                        value={poSearch}
+                        onChange={(e) => setPoSearch(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <div className="text-[#059669] font-bold text-lg">
+                    List of created PO for all Suppliers
+                  </div>
+                </div>
+                <DataTable
+                  data={purchaseOrdersList}
+                  columns={[
+                    {
+                      header: "ID",
+                      width: "60px",
+                      render: (row) => <span className="font-semibold">{row.id}</span>,
+                      align: "center",
+                    },
+                    {
+                      header: "Date created",
+                      width: "120px",
+                      render: (row) => (
+                        <div className="text-center text-[11px]">
+                          {new Date(row.created_at).toLocaleDateString()}
+                          <br />
+                          {new Date(row.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                        </div>
+                      ),
+                      align: "center",
+                    },
+                    {
+                      header: "PO No.",
+                      width: "100px",
+                      render: (row) => (
+                        <span className="text-[#059669] font-bold">
+                          {`PO${new Date(row.created_at).getFullYear().toString().slice(-2)}${String(row.id).padStart(3, "0")}`}
+                        </span>
+                      ),
+                      align: "center",
+                    },
+                    {
+                      header: "SOID",
+                      width: "80px",
+                      render: (row) => row.id,
+                      align: "center",
+                    },
+                    {
+                      header: "Supplier",
+                      width: "250px",
+                      render: (row) => (
+                        <div className="font-medium text-gray-700">
+                          {row.supplier_id} - {row.supplier?.company_name || "-"}
+                        </div>
+                      ),
+                      align: "left",
+                    },
+                    {
+                      header: "Description",
+                      width: "300px",
+                      render: (row) => {
+                        const items = row.items || [];
+                        const desc = items.map((i: any) => i.item?.item_name || i.item?.name).filter(Boolean).join(", ");
+                        return <div className="line-clamp-2 text-[10px] text-gray-500">{desc || row.remark || "-"}</div>;
+                      },
+                      align: "left",
+                    },
+                    {
+                      header: "Total RMB",
+                      width: "100px",
+                      render: (row) => {
+                        const total = (row.items || []).reduce((sum: number, it: any) => {
+                          const p = it.price || it.rmb_special_price || 0;
+                          return sum + (Number(p) * (it.qty || 0));
+                        }, 0);
+                        return <span className="font-bold">¥ {total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>;
+                      },
+                      align: "right",
+                    },
+                    {
+                      header: "Status",
+                      width: "100px",
+                      render: (row) => {
+                        const allPurchased = row.items?.every((it: any) => {
+                          const st = (it.status || "").toLowerCase().trim();
+                          return st === "purchased" || st === "purchase";
+                        });
+                        return (
+                          <div className="flex flex-col items-center">
+                            <span className="text-green-600 font-bold text-[10px] uppercase">
+                              {allPurchased ? "Purchased" : "Partially"}
+                            </span>
+                            <span className="text-green-600 font-bold text-[10px] uppercase">
+                              {allPurchased ? "Order" : "Purchased"}
+                            </span>
+                          </div>
+                        );
+                      },
+                      align: "center",
+                    },
+                    {
+                      header: "Actions",
+                      width: "250px",
+                      align: "center",
+                      render: (row) => (
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => openEdit(row as any)}
+                            className="bg-[#059669] text-white px-3 py-1 rounded-[4px] text-[10px] font-bold hover:bg-green-700 transition"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => toast.success("PO Closed")}
+                            className="bg-red-600 text-white px-3 py-1 rounded-[4px] text-[10px] font-bold hover:bg-red-700 transition"
+                          >
+                            Close
+                          </button>
+                          <button
+                            onClick={() => toast.success("PO Downloading...")}
+                            className="bg-green-700 text-white px-3 py-1 rounded-[4px] text-[10px] font-bold hover:bg-green-800 transition"
+                          >
+                            Download
+                          </button>
+                        </div>
+                      ),
+                    },
+                  ]}
+                  loading={loadingSupplierOrders}
+                  emptyMessage="No Purchase Orders Found"
                 />
               </div>
             ) : activeTab === "problems" ? (

@@ -345,6 +345,7 @@ const ItemDetailsPage = () => {
 
     const updated: ItemDetails = {
       ...itemData,
+      supplier_id: newLink.isDefault ? supplier.id : itemData.supplier_id,
       supplierItems: [...(itemData.supplierItems || []), newLink],
     };
 
@@ -728,6 +729,11 @@ const ItemDetailsPage = () => {
         setItemData(prev => prev ? ({ ...prev, ean: finalEan }) : null);
       }
 
+      if (!updatedData.supplier_id || updatedData.supplier_id === 0) {
+        toast.error("Supplier is required", errorStyles);
+        return;
+      }
+
       const payload: any = {
         item_name: updatedData.name,
         item_name_cn: updatedData.nameCN,
@@ -982,6 +988,18 @@ const ItemDetailsPage = () => {
                   options={categories.map((c: any) => ({
                     label: c.name,
                     value: c.id.toString(),
+                  }))}
+                  editMode={editMode}
+                  itemData={itemData}
+                  setItemData={setItemData}
+                />
+                <SelectInfoRow
+                  label="Supplier"
+                  value={itemData.supplier_id?.toString() ?? ""}
+                  field="supplier_id"
+                  options={allSuppliers.map((s: any) => ({
+                    label: `[ID: ${s.id}] ${!hasChinese(s.name) ? s.name : s.company_name || ""}`,
+                    value: s.id.toString(),
                   }))}
                   editMode={editMode}
                   itemData={itemData}
@@ -1610,6 +1628,7 @@ const ItemDetailsPage = () => {
                             <button
                               onClick={async () => {
                                 const updated = { ...itemData };
+                                updated.supplier_id = si.supplierId;
                                 updated.supplierItems = updated.supplierItems.map(
                                   (x: any) => ({
                                     ...x,
