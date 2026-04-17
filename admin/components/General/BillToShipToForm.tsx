@@ -80,6 +80,14 @@ const BillToShipToForm: React.FC<BillToShipToFormProps> = ({
         if (selectedCustomer) {
             onBatchChange({
                 ship_to_company_name: selectedCustomer.companyName || "",
+                ship_to_display_name: selectedCustomer.companyName || "",
+                ship_to_contact_person: selectedCustomer.legalName || "",
+                ship_to_contact_phone: selectedCustomer.contactPhoneNumber || "",
+                ship_to_country: selectedCustomer.deliveryCountry || selectedCustomer.country || "",
+                ship_to_city: selectedCustomer.deliveryCity || selectedCustomer.city || "",
+                ship_to_postal_code: selectedCustomer.deliveryPostalCode || selectedCustomer.postalCode || "",
+                ship_to_full_address: (selectedCustomer.deliveryAddressLine1 || selectedCustomer.addressLine1 || "") + 
+                    (selectedCustomer.deliveryAddressLine2 || selectedCustomer.addressLine2 ? " " + (selectedCustomer.deliveryAddressLine2 || selectedCustomer.addressLine2) : ""),
             });
         }
     }, [selectedCustomer]);
