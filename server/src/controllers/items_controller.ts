@@ -109,6 +109,7 @@ export const feedTransferPrices = async (
     const items = await itemRepo.find({
       where: { supp_cat: In(targetCategoryNames) },
     });
+    
     console.log(items);
     let updatedCount = 0;
 
