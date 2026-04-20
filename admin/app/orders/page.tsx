@@ -59,7 +59,7 @@ import {
   getSupplierItems,
   type Supplier,
 } from "@/api/suppliers";
-import { getItems, updateItem } from "@/api/items";
+import { getItems } from "@/api/items";
 import { getCategories } from "@/api/categories";
 import CustomButton from "@/components/UI/CustomButton";
 import CustomModal from "@/components/UI/CustomModal";
@@ -155,7 +155,7 @@ type OrdersTableProps = {
   onSplit: (row: any) => void;
   onEanClick: (itemId: string, rowData: any) => void;
   suppliers: any[];
-  onAssignSupplier: (orderItemId: number | string, supplierId: number, baseItemId: number | string) => Promise<void>;
+  onAssignSupplier: (itemId: number | string, supplierId: number) => Promise<void>;
 };
 
 const tabs = [
@@ -371,130 +371,125 @@ function OrdersTable({
       },
       align: "center",
     },
-  {
-    header: "Supplier",
-    width: "180px",
-    render: (row) => {
-      const itemDetails = itemById.get(String(row.item_id));
-      const sid = row.supplier_id || row.item?.supplier_id || itemDetails?.supplier_id;
-      let resolvedName = sid ? getSupplierName?.(sid) : null;
+    {
+      header: "Supplier",
+      width: "180px",
+      render: (row) => {
+        const itemDetails = itemById.get(String(row.item_id));
+        const sid = row.supplier_id || row.item?.supplier_id || itemDetails?.supplier_id;
+        let resolvedName = sid ? getSupplierName?.(sid) : null;
 
-      if (!resolvedName || resolvedName === "-") resolvedName = null;
+        if (!resolvedName || resolvedName === "-") resolvedName = null;
 
-      const joinedSupplierName = itemDetails?.supplier_name;
-      const joinedNameClean =
-        joinedSupplierName &&
-          joinedSupplierName !== "Unassigned" &&
-          !hasChinese(joinedSupplierName)
-          ? joinedSupplierName
-          : null;
+        const joinedSupplierName = itemDetails?.supplier_name;
+        const joinedNameClean =
+          joinedSupplierName &&
+            joinedSupplierName !== "Unassigned" &&
+            !hasChinese(joinedSupplierName)
+            ? joinedSupplierName
+            : null;
 
-      const sname =
-        resolvedName ||
-        joinedNameClean ||
-        (row.supplier_name && row.supplier_name !== "Unassigned"
-          ? row.supplier_name
-          : null) ||
-        (row.item?.supplier_name && row.item?.supplier_name !== "Unassigned"
-          ? row.item?.supplier_name
-          : null);
+        const sname =
+          resolvedName ||
+          joinedNameClean ||
+          (row.supplier_name && row.supplier_name !== "Unassigned"
+            ? row.supplier_name
+            : null) ||
+          (row.item?.supplier_name && row.item?.supplier_name !== "Unassigned"
+            ? row.item?.supplier_name
+            : null);
 
-      if (editingSupplierId === row.id) {
-        const supplierOptions = suppliers.map(s => {
-          let englishName = !hasChinese(s.name) ? s.name : (!hasChinese(s.company_name) ? s.company_name : null);
-          let finalName = englishName || s.company_name || s.name || s.name_cn || `Supplier #${s.id}`;
+        if (editingSupplierId === row.id) {
+          const supplierOptions = suppliers.map(s => {
+            let englishName = !hasChinese(s.name) ? s.name : (!hasChinese(s.company_name) ? s.company_name : null);
+            let finalName = englishName || s.company_name || s.name || s.name_cn || `Supplier #${s.id}`;
 
-          return {
-            value: s.id,
-            label: `[ID: ${s.id}] ${finalName}`
-          };
-        });
+            return {
+              value: s.id,
+              label: `[ID: ${s.id}] ${finalName}`
+            };
+          });
+
+          return (
+            <div
+              className="w-[260px]"
+              onClick={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
+            >
+              <Select
+                autoFocus
+                menuPortalTarget={document.body}
+                styles={{
+                  menuPortal: base => ({ ...base, zIndex: 9999 }),
+                  control: (base) => ({
+                    ...base,
+                    minHeight: '34px',
+                    fontSize: '11px',
+                    borderColor: '#cbd5e1',
+                    boxShadow: 'none',
+                    '&:hover': { borderColor: '#94a3b8' }
+                  }),
+                  option: (base, state) => ({
+                    ...base,
+                    fontSize: '11px',
+                    backgroundColor: state.isFocused ? '#f1f5f9' : 'white',
+                    color: '#334155',
+                    cursor: 'pointer'
+                  }),
+                  menu: (base) => ({
+                    ...base,
+                    boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)',
+                    border: '1px solid #e2e8f0'
+                  })
+                }}
+                placeholder="Search supplier..."
+                options={supplierOptions}
+                onChange={async (opt: any) => {
+                  if (opt) {
+                    await onAssignSupplier(row.id, opt.value);
+                  }
+                  setEditingSupplierId(null);
+                }}
+                onBlur={() => setEditingSupplierId(null)}
+              />
+            </div>
+          );
+        }
 
         return (
           <div
-            className="w-[260px]"
-            onClick={(e) => e.stopPropagation()}
-            onMouseDown={(e) => e.stopPropagation()}
+            className="flex items-center gap-2"
+            onClick={(e) => {
+              if (!sname || sname === "Unassigned") {
+              }
+            }}
           >
-            <Select
-              autoFocus
-              menuPortalTarget={document.body}
-              styles={{
-                menuPortal: base => ({ ...base, zIndex: 9999 }),
-                control: (base) => ({
-                  ...base,
-                  minHeight: '34px',
-                  fontSize: '11px',
-                  borderColor: '#cbd5e1',
-                  boxShadow: 'none',
-                  '&:hover': { borderColor: '#94a3b8' }
-                }),
-                option: (base, state) => ({
-                  ...base,
-                  fontSize: '11px',
-                  backgroundColor: state.isFocused ? '#f1f5f9' : 'white',
-                  color: '#334155',
-                  cursor: 'pointer'
-                }),
-                menu: (base) => ({
-                  ...base,
-                  boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)',
-                  border: '1px solid #e2e8f0'
-                })
-              }}
-              placeholder="Search supplier..."
-              options={supplierOptions}
-              onChange={async (opt: any) => {
-                if (opt) {
-                  const sId = opt.value;
-                  setEditingSupplierId(null);
-                  await onAssignSupplier(row.id, sId, row.item_id);
-                } else {
-                  setEditingSupplierId(null);
-                }
-              }}
-              onBlur={() => setEditingSupplierId(null)}
-            />
-          </div>
-        );
-      }
-
-      return (
-        <div 
-          className="flex items-center gap-2"
-          onClick={(e) => {
-            if (!sname || sname === "Unassigned") {
-               // If unassigned, any click in this cell might be intended for the button
-               // But we only want to trigger editing if the button is clicked or if it's unassigned
-            }
-          }}
-        >
-          <div className="truncate max-w-[120px] font-medium text-gray-700">
-            {sname ? (
-              sname
-            ) : sid && sid !== "0" && sid !== 0 ? (
-              <span className="text-gray-600 text-[10px]">{row.supplier_name}</span>
-            ) : (
-              <span className="text-gray-400 text-[10px] italic">Unassigned</span>
+            <div className="truncate max-w-[120px] font-medium text-gray-700">
+              {sname ? (
+                sname
+              ) : sid && sid !== "0" && sid !== 0 ? (
+                <span className="text-gray-600 text-[10px]">{row.supplier_name}</span>
+              ) : (
+                <span className="text-gray-400 text-[10px] italic">Unassigned</span>
+              )}
+            </div>
+            {(!sname || sname === "Unassigned") && (
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setEditingSupplierId(row.id);
+                }}
+                onMouseDown={(e) => e.stopPropagation()}
+                className="bg-blue-600 text-white px-2 py-1 rounded text-[10px] font-bold hover:bg-blue-700 transition-all whitespace-nowrap shadow-sm hover:shadow-md"
+              >
+                Set Supplier
+              </button>
             )}
           </div>
-          {(!sname || sname === "Unassigned") && (
-            <button
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                setEditingSupplierId(row.id);
-              }}
-              onMouseDown={(e) => e.stopPropagation()}
-              className="bg-blue-600 text-white px-2 py-1 rounded text-[10px] font-bold hover:bg-blue-700 transition-all whitespace-nowrap shadow-sm hover:shadow-md"
-            >
-              Set Supplier
-            </button>
-          )}
-        </div>
-      );
+        );
+      },
     },
-  },
     { header: "Order No.", width: "80px", render: (row) => row.order_no },
     {
       header: "Remarks",
@@ -1871,17 +1866,10 @@ const OrderPage = () => {
     fetchOrders();
   };
 
-  const handleAssignSupplier = async (orderItemId: number | string, supplierId: number, baseItemId: number | string) => {
+  const handleAssignSupplier = async (itemId: number | string, supplierId: number) => {
     try {
-      await updateOrderItemStatus(orderItemId, { supplier_id: supplierId });
-      
-      // Also update the base item to make this the default supplier
-      if (baseItemId && baseItemId !== "0") {
-        await updateItem(Number(baseItemId), { supplier_id: supplierId });
-      }
-      
-      // Refresh both orders and items to ensure UI is in sync
-      await Promise.all([fetchOrders(), fetchAllItems()]);
+      await updateOrderItemStatus(itemId, { supplier_id: supplierId });
+      fetchOrders();
     } catch (error) {
       console.error("Failed to assign supplier:", error);
     }
