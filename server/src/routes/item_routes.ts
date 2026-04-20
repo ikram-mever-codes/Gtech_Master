@@ -37,6 +37,7 @@ import {
   feedTransferPrices,
   getNewItems,
   exportNewItemsToCSV,
+  syncSuppCatWithCategoryName,
 } from "../controllers/items_controller";
 import { authenticateUser, authorize } from "../middlewares/authorized";
 import { AppDataSource } from "../config/database";
@@ -47,6 +48,7 @@ import { Item } from "../models/items";
 const router: any = express.Router();
 
 router.get("/pricing/transfer-prices", feedTransferPrices);
+router.get("/cat/fix", syncSuppCatWithCategoryName);
 
 router.get("/", getItems);
 router.post("/", createItem);
@@ -59,7 +61,9 @@ router.get("/new-items/count", async (req: Request, res: Response) => {
     const count = await itemRepository.count({ where: { is_new: "Y" } });
     res.json({ success: true, data: { count } });
   } catch (error) {
-    res.status(500).json({ success: false, message: "Failed to get new items count" });
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to get new items count" });
   }
 });
 router.get("/stats/statistics", getItemStatistics);
@@ -124,5 +128,4 @@ router.get("/:itemId/quality", getItemQualityCriteria);
 router.post("/:itemId/quality", createQualityCriterion);
 router.put("/quality/:id", updateQualityCriterion);
 router.delete("/quality/:id", deleteQualityCriterion);
-
 export default router;

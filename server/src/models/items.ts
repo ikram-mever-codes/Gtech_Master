@@ -37,8 +37,8 @@ export class Item {
   @Column({ type: "varchar", length: 100, nullable: true })
   model?: string;
 
-  @Column({ type: "varchar", length: 3, nullable: true })
-  supp_cat?: string;
+  @Column({ type: "varchar", length: 50, nullable: true })
+  supp_cat: string;
 
   @Column({ type: "varchar", length: 50, nullable: true })
   ean?: string;

@@ -3615,3 +3615,59 @@ export const exportNewItemsToCSV = async (
     return next(error);
   }
 };
+
+export const syncSuppCatWithCategoryName = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const itemRepo = AppDataSource.getRepository(Item);
+
+    // 1. Fetch items where the supp_cat doesn't match the linked Category name
+    // We use a query builder with a join to find discrepancies efficiently
+    const itemsWithMismatches = await itemRepo
+      .createQueryBuilder("item")
+      .leftJoinAndSelect("item.category", "category")
+      .where("item.supp_cat IS NULL") // Case 1: Missing category label
+      .orWhere("item.supp_cat != category.name") // Case 2: Incorrect category label
+      .getMany();
+
+    if (itemsWithMismatches.length === 0) {
+      return res.status(200).json({
+        success: true,
+        message: "No category mismatches found. All items are in sync.",
+      });
+    }
+
+    let updatedCount = 0;
+    const updatePromises = itemsWithMismatches.map(async (item) => {
+      if (item.category && item.category.name) {
+        const oldCat = item.supp_cat;
+        const newCat = item.category.name;
+
+        // Perform the reassignment
+        item.supp_cat = newCat;
+        item.is_updated = true; // Flag for external syncs if needed
+
+        console.log(
+          `[FIX] Item ID ${item.id}: Reassigning supp_cat from "${oldCat}" to "${newCat}"`,
+        );
+
+        await itemRepo.save(item);
+        updatedCount++;
+      }
+    });
+
+    await Promise.all(updatePromises);
+
+    return res.status(200).json({
+      success: true,
+      message: `Successfully synchronized categories for ${updatedCount} items.`,
+      details: `Audit found ${itemsWithMismatches.length} items with mismatches.`,
+    });
+  } catch (error) {
+    console.error("Error during category sync:", error);
+    return next(error);
+  }
+};
