@@ -153,9 +153,9 @@ type OrdersTableProps = {
   activeTab: string;
   itemById: Map<string, Item>;
   onSplit: (row: any) => void;
-  onEanClick: (itemId: string, rowData: any) => void;
   suppliers: any[];
   onAssignSupplier: (itemId: number | string, supplierId: number, baseItemId?: number | string) => Promise<void>;
+  router: any;
 };
 
 const tabs = [
@@ -284,9 +284,9 @@ function OrdersTable({
   activeTab,
   itemById,
   onSplit,
-  onEanClick,
   suppliers,
   onAssignSupplier,
+  router,
 }: OrdersTableProps) {
   const [editingSupplierId, setEditingSupplierId] = useState<number | string | null>(null);
 
@@ -320,8 +320,11 @@ function OrdersTable({
             onClick={(e) => {
               e.stopPropagation();
               const itemId = row.item_id || row.item?.id;
-              if (itemId) onEanClick(String(itemId), row);
-              else toast.error("Item details not found");
+              if (itemId) {
+                router.push(`/items/${itemId}`);
+              } else {
+                toast.error("Item details not found");
+              }
             }}
             className="text-blue-600 hover:underline font-bold text-xs"
           >
@@ -355,7 +358,17 @@ function OrdersTable({
       header: "Price",
       width: "80px",
       render: (row) => {
-        const val = row.price ?? row.item?.price ?? row.rmb_special_price ?? 0;
+        const val = row.rmb_special_price || row.rmb_price || row.item?.rmb_price || row.item?.rmb_special_price || row.item?.RMB_Price || row.item?.others?.rmbPrice || row.price || row.item?.price || 0;
+        console.log(`[DEBUG] Item: ${row.item?.item_name || row.item?.name || 'Unknown'}, RMB fields:`, {
+          rmb_special_price: row.rmb_special_price,
+          rmb_price: row.rmb_price,
+          item_rmb_price: row.item?.rmb_price,
+          item_RMB_Price: row.item?.RMB_Price,
+          item_others_rmbPrice: row.item?.others?.rmbPrice,
+          price: row.price,
+          item_price: row.item?.price,
+          val: val
+        });
         return <div className="font-semibold">{Number(val).toFixed(2)}</div>;
       },
     },
@@ -365,7 +378,7 @@ function OrdersTable({
       width: "80px",
       render: (row) => {
         const p = Number(
-          row.price ?? row.rmb_special_price ?? row.item?.price ?? 0,
+          row.rmb_special_price || row.rmb_price || row.item?.rmb_price || row.item?.rmb_special_price || row.item?.RMB_Price || row.item?.others?.rmbPrice || row.price || row.item?.price || 0,
         );
         return !isNaN(p) ? (p * row.qty).toFixed(2) : "0.00";
       },
@@ -1144,14 +1157,14 @@ const OrderPage = () => {
         const rawStatus = (item.status || "").trim().toUpperCase();
         if (rawStatus && rawStatus !== "NSO" && rawStatus !== "SO") return;
         const itemDetails = itemById.get(String(item.item_id));
-        
+
         let sId = 0;
         const o_sid = Number(o.supplier_id || 0);
         const i_sid = Number(itemDetails?.supplier_id || 0);
-        
+
         // Only use IDs that exist in our current supplier list
         const isRecognized = (id: number) => id > 0 && suppliers.some(s => Number(s.id) === id);
-        
+
         if (isRecognized(o_sid)) {
           sId = o_sid;
         } else if (isRecognized(i_sid)) {
@@ -1884,18 +1897,18 @@ const OrderPage = () => {
     try {
       // 1. Update the specific order item
       await updateOrderItemStatus(orderItemId, { supplier_id: supplierId });
-      
+
       // 2. Update the base item's default supplier for persistence
       if (baseItemId) {
         await updateItem(Number(baseItemId), { supplier_id: supplierId });
       }
-      
+
       // 3. Refresh all relevant data to ensure UI is in sync
       await Promise.all([
         fetchOrders(),
         fetchAllItems()
       ]);
-      
+
       toast.success("Supplier assigned successfully");
     } catch (error) {
       console.error("Failed to assign supplier:", error);
@@ -2346,7 +2359,16 @@ const OrderPage = () => {
                                         NSO
                                       </button>
                                     )}
-                                    <span className="text-blue-600 hover:underline cursor-pointer font-semibold text-[10px]">
+                                    <span
+                                      className="text-blue-600 hover:underline cursor-pointer font-semibold text-[10px]"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        const itemId = item.item_id || item.item?.id;
+                                        if (itemId) {
+                                          router.push(`/items/${itemId}`);
+                                        }
+                                      }}
+                                    >
                                       {details?.ean || "-"}
                                     </span>
                                   </div>
@@ -2451,10 +2473,15 @@ const OrderPage = () => {
                                   String(item.id),
                                 );
                                 const p =
-                                  det?.price ||
-                                  item.price ||
                                   det?.rmb_special_price ||
                                   item.rmb_special_price ||
+                                  item.rmb_price ||
+                                  item.item?.rmb_price ||
+                                  item.item?.rmb_special_price ||
+                                  item.item?.RMB_Price ||
+                                  item.item?.others?.rmbPrice ||
+                                  det?.price ||
+                                  item.price ||
                                   "-";
                                 const c = item.currency || "CNY";
                                 return p !== "-" ? p : "0";
@@ -2469,10 +2496,15 @@ const OrderPage = () => {
                                   String(item.id),
                                 );
                                 const p =
-                                  det?.price ||
-                                  item.price ||
                                   det?.rmb_special_price ||
                                   item.rmb_special_price ||
+                                  item.rmb_price ||
+                                  item.item?.rmb_price ||
+                                  item.item?.rmb_special_price ||
+                                  item.item?.RMB_Price ||
+                                  item.item?.others?.rmbPrice ||
+                                  det?.price ||
+                                  item.price ||
                                   0;
                                 return (Number(p) * (item.qty || 0)).toFixed(2);
                               },
@@ -2485,10 +2517,15 @@ const OrderPage = () => {
                                         String(it.id),
                                       );
                                       const p =
-                                        det?.price ||
-                                        it.price ||
                                         det?.rmb_special_price ||
                                         it.rmb_special_price ||
+                                        it.rmb_price ||
+                                        it.item?.rmb_price ||
+                                        it.item?.rmb_special_price ||
+                                        it.item?.RMB_Price ||
+                                        it.item?.others?.rmbPrice ||
+                                        det?.price ||
+                                        it.price ||
                                         0;
                                       return acc + Number(p) * (it.qty || 0);
                                     }, 0)
@@ -3093,8 +3130,10 @@ const OrderPage = () => {
                       {
                         header: "Price",
                         width: "70px",
-                        render: (row) =>
-                          row.price || row.rmb_special_price || "0",
+                        render: (row) => {
+                          const val = row.rmb_special_price || row.rmb_price || row.item?.rmb_price || row.item?.rmb_special_price || row.item?.RMB_Price || row.item?.others?.rmbPrice || row.price || row.item?.price || 0;
+                          return Number(val).toFixed(2);
+                        },
                         align: "center",
                       },
                       {
@@ -3193,11 +3232,15 @@ const OrderPage = () => {
                               .includes(reprintSearch.toLowerCase());
 
                           return (
-                            <span
-                              className={`font-medium ${isHighlighted ? "text-[#059669] font-bold" : "text-gray-600"}`}
+                            <button
+                              onClick={() => {
+                                const itemId = row.item_id || row.item?.id;
+                                if (itemId) router.push(`/items/${itemId}`);
+                              }}
+                              className={`font-medium hover:underline ${isHighlighted ? "text-[#059669] font-bold" : "text-blue-600"}`}
                             >
                               {ean}
-                            </span>
+                            </button>
                           );
                         },
                         align: "center",
@@ -3356,57 +3399,7 @@ const OrderPage = () => {
                     setSplitQty(Math.floor(Number(row.qty || 0) / 2) || 1);
                     setShowSPModal(true);
                   }}
-                  onEanClick={(itemId, row) => {
-                    const cachedItem = itemById.get(String(itemId));
-                    const sid = row.supplier_id || row.item?.supplier_id || cachedItem?.supplier_id;
-
-                    const resolvedName = sid ? getSupplierName(sid) : null;
-                    const joinedName = row.supplier_name || row.item?.supplier_name || cachedItem?.supplier_name;
-                    const sname = (resolvedName && resolvedName !== "-") ? resolvedName : (joinedName && joinedName !== "Unassigned" ? joinedName : "Unassigned");
-
-                    const baseOrder = row.parentOrder || {};
-                    const parentOrder = {
-                      ...baseOrder,
-                      id: row.order_id || baseOrder.id,
-                      order_no: row.order_no || baseOrder.order_no,
-                      status: row.order_status || baseOrder.status,
-                      category_id: row.category_id || baseOrder.category_id,
-                      comment: row.comment || baseOrder.comment,
-                      supplier_id: sid,
-                      supplier_name: sname
-                    };
-                    const singleViewItem = {
-                      item_id: String(itemId),
-                      itemName:
-                        row.item_name ||
-                        row.itemName ||
-                        row.item?.item_name ||
-                        cachedItem?.item_name ||
-                        cachedItem?.name ||
-                        "Unknown Item",
-                      qty: row.qty,
-                      qty_label: row.qty_label,
-                      remark_de: row.remark_de || "",
-                      remarks_cn: row.remarks_cn || "",
-                      remark_en: row.remark_en || "",
-                      ean:
-                        row.ean ||
-                        row.item?.ean ||
-                        cachedItem?.ean ||
-                        "-",
-                      price: row.price || cachedItem?.price || 0,
-                      currency: row.currency || cachedItem?.currency || "CNY",
-                      status: row.item_status || row.status || "NSO",
-                      item: row.item || cachedItem || null,
-                      taric_code: row.taric_code || row.item?.taric?.code || "-",
-                      supplier_id: sid,
-                      supplier_name: sname,
-                      supplier_order_id: row.supplier_order_id,
-                    };
-                    setViewOrder(parentOrder);
-                    setViewItems([singleViewItem]);
-                    setShowViewModal(true);
-                  }}
+                  router={router}
                 />
               </>
             )}
