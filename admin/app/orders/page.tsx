@@ -59,7 +59,7 @@ import {
   getSupplierItems,
   type Supplier,
 } from "@/api/suppliers";
-import { getItems } from "@/api/items";
+import { getItems, updateItem } from "@/api/items";
 import { getCategories } from "@/api/categories";
 import CustomButton from "@/components/UI/CustomButton";
 import CustomModal from "@/components/UI/CustomModal";
@@ -69,6 +69,8 @@ import { ShoppingCart } from "lucide-react";
 import { useSelector } from "react-redux";
 import { RootState } from "@/app/Redux/store";
 import { UserRole } from "@/utils/interfaces";
+
+const hasChinese = (str: string) => /[\u4e00-\u9fa5]/.test(str || "");
 
 type Item = {
   id: string | number;
@@ -85,6 +87,7 @@ type Item = {
   taric?: any;
   price?: number;
   currency?: string;
+  supplier_name?: string;
 };
 type Customer = {
   id: string | number;
@@ -120,6 +123,7 @@ type OrderItemRow = {
   customer_id?: string;
   supplier_order_id?: number | string;
   taric_code?: string;
+  supplier_name?: string;
 };
 
 type Mode = "create" | "edit" | "convert";
@@ -149,6 +153,9 @@ type OrdersTableProps = {
   activeTab: string;
   itemById: Map<string, Item>;
   onSplit: (row: any) => void;
+  onEanClick: (itemId: string, rowData: any) => void;
+  suppliers: any[];
+  onAssignSupplier: (orderItemId: number | string, supplierId: number, baseItemId: number | string) => Promise<void>;
 };
 
 const tabs = [
@@ -277,7 +284,12 @@ function OrdersTable({
   activeTab,
   itemById,
   onSplit,
+  onEanClick,
+  suppliers,
+  onAssignSupplier,
 }: OrdersTableProps) {
+  const [editingSupplierId, setEditingSupplierId] = useState<number | string | null>(null);
+
   const isOrderItems = activeTab === "order_items";
   console.log("OrdersTable debug:", {
     activeTab,
@@ -295,8 +307,28 @@ function OrdersTable({
     },
     {
       header: "EAN",
-      width: "80px",
-      render: (row) => row.ean || row.item?.ean || "-",
+      width: "120px",
+      render: (row) => {
+        const ean =
+          row.ean ||
+          row.item?.ean ||
+          itemById.get(String(row.item_id))?.ean ||
+          "-";
+        if (!ean || ean === "-") return "-";
+        return (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              const itemId = row.item_id || row.item?.id;
+              if (itemId) onEanClick(String(itemId), row);
+              else toast.error("Item details not found");
+            }}
+            className="text-blue-600 hover:underline font-bold text-xs"
+          >
+            {ean}
+          </button>
+        );
+      },
     },
     {
       header: "Item name",
@@ -339,34 +371,130 @@ function OrdersTable({
       },
       align: "center",
     },
-    {
-      header: "Supplier",
-      width: "100px",
-      render: (row) => {
-        const sid = row.supplier_id || row.item?.supplier_id;
-        let resolvedName = sid ? getSupplierName?.(sid) : null;
-        if (!resolvedName || resolvedName === "-") resolvedName = null;
+  {
+    header: "Supplier",
+    width: "180px",
+    render: (row) => {
+      const itemDetails = itemById.get(String(row.item_id));
+      const sid = row.supplier_id || row.item?.supplier_id || itemDetails?.supplier_id;
+      let resolvedName = sid ? getSupplierName?.(sid) : null;
 
-        const sname =
-          resolvedName ||
-          (row.supplier_name && row.supplier_name !== "Unassigned"
-            ? row.supplier_name
-            : null) ||
-          (row.item?.supplier_name && row.item?.supplier_name !== "Unassigned"
-            ? row.item?.supplier_name
-            : null);
+      if (!resolvedName || resolvedName === "-") resolvedName = null;
+
+      const joinedSupplierName = itemDetails?.supplier_name;
+      const joinedNameClean =
+        joinedSupplierName &&
+          joinedSupplierName !== "Unassigned" &&
+          !hasChinese(joinedSupplierName)
+          ? joinedSupplierName
+          : null;
+
+      const sname =
+        resolvedName ||
+        joinedNameClean ||
+        (row.supplier_name && row.supplier_name !== "Unassigned"
+          ? row.supplier_name
+          : null) ||
+        (row.item?.supplier_name && row.item?.supplier_name !== "Unassigned"
+          ? row.item?.supplier_name
+          : null);
+
+      if (editingSupplierId === row.id) {
+        const supplierOptions = suppliers.map(s => {
+          let englishName = !hasChinese(s.name) ? s.name : (!hasChinese(s.company_name) ? s.company_name : null);
+          let finalName = englishName || s.company_name || s.name || s.name_cn || `Supplier #${s.id}`;
+
+          return {
+            value: s.id,
+            label: `[ID: ${s.id}] ${finalName}`
+          };
+        });
 
         return (
-          <div className="truncate">
-            {sname ? (
-              sname
-            ) : (
-              <span className="text-gray-400 text-xs">Unassigned</span>
-            )}
+          <div
+            className="w-[260px]"
+            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <Select
+              autoFocus
+              menuPortalTarget={document.body}
+              styles={{
+                menuPortal: base => ({ ...base, zIndex: 9999 }),
+                control: (base) => ({
+                  ...base,
+                  minHeight: '34px',
+                  fontSize: '11px',
+                  borderColor: '#cbd5e1',
+                  boxShadow: 'none',
+                  '&:hover': { borderColor: '#94a3b8' }
+                }),
+                option: (base, state) => ({
+                  ...base,
+                  fontSize: '11px',
+                  backgroundColor: state.isFocused ? '#f1f5f9' : 'white',
+                  color: '#334155',
+                  cursor: 'pointer'
+                }),
+                menu: (base) => ({
+                  ...base,
+                  boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)',
+                  border: '1px solid #e2e8f0'
+                })
+              }}
+              placeholder="Search supplier..."
+              options={supplierOptions}
+              onChange={async (opt: any) => {
+                if (opt) {
+                  const sId = opt.value;
+                  setEditingSupplierId(null);
+                  await onAssignSupplier(row.id, sId, row.item_id);
+                } else {
+                  setEditingSupplierId(null);
+                }
+              }}
+              onBlur={() => setEditingSupplierId(null)}
+            />
           </div>
         );
-      },
+      }
+
+      return (
+        <div 
+          className="flex items-center gap-2"
+          onClick={(e) => {
+            if (!sname || sname === "Unassigned") {
+               // If unassigned, any click in this cell might be intended for the button
+               // But we only want to trigger editing if the button is clicked or if it's unassigned
+            }
+          }}
+        >
+          <div className="truncate max-w-[120px] font-medium text-gray-700">
+            {sname ? (
+              sname
+            ) : sid && sid !== "0" && sid !== 0 ? (
+              <span className="text-gray-600 text-[10px]">{row.supplier_name}</span>
+            ) : (
+              <span className="text-gray-400 text-[10px] italic">Unassigned</span>
+            )}
+          </div>
+          {(!sname || sname === "Unassigned") && (
+            <button
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setEditingSupplierId(row.id);
+              }}
+              onMouseDown={(e) => e.stopPropagation()}
+              className="bg-blue-600 text-white px-2 py-1 rounded text-[10px] font-bold hover:bg-blue-700 transition-all whitespace-nowrap shadow-sm hover:shadow-md"
+            >
+              Set Supplier
+            </button>
+          )}
+        </div>
+      );
     },
+  },
     { header: "Order No.", width: "80px", render: (row) => row.order_no },
     {
       header: "Remarks",
@@ -994,7 +1122,13 @@ const OrderPage = () => {
   const getSupplierName = useCallback(
     (supplierId: any) => {
       const s = suppliers.find((c) => String(c.id) === String(supplierId));
-      return s ? s.company_name || s.name || s.name_cn || "-" : "-";
+
+      if (!s) return "-";
+
+      if (s.name && !hasChinese(s.name)) return s.name;
+      if (s.company_name && !hasChinese(s.company_name)) return s.company_name;
+
+      return s.company_name || s.name || s.name_cn || `Supplier #${s.id}`;
     },
     [suppliers],
   );
@@ -1230,7 +1364,7 @@ const OrderPage = () => {
 
   const fetchCustomers = useCallback(async () => {
     try {
-      const response = await getAllCustomers();
+      const response = await getAllCustomers({ limit: 1000 });
       const data = response?.data ?? response;
       const arr = Array.isArray(data) ? data : data?.customers || [];
       setCustomers(arr);
@@ -1242,7 +1376,7 @@ const OrderPage = () => {
 
   const fetchSuppliers = useCallback(async () => {
     try {
-      const response = await getAllSuppliers();
+      const response = await getAllSuppliers({ limit: 1000 });
       const data = response?.data ?? response;
       const arr = Array.isArray(data) ? data : data?.suppliers || [];
       setSuppliers(arr);
@@ -1255,7 +1389,7 @@ const OrderPage = () => {
   const fetchAllItems = useCallback(async () => {
     try {
       setLoadingItemsAll(true);
-      const response = await getItems();
+      const response = await getItems({ limit: 10000 });
       const data = response?.data ?? response;
       const arr = Array.isArray(data) ? data : data?.items || [];
       setItemsAll(arr);
@@ -1322,6 +1456,10 @@ const OrderPage = () => {
     fetchCargos();
   }, [fetchCustomers, fetchCategories, fetchSuppliers, fetchAllItems]);
 
+  useEffect(() => {
+    console.log("DEBUG: Suppliers count in state:", suppliers.length);
+  }, [suppliers]);
+
   const fetchCargos = useCallback(async () => {
     try {
       const res = await getAllCargos({ limit: 1000, availableOnly: true });
@@ -1361,9 +1499,12 @@ const OrderPage = () => {
     if (!pendingNsoGroup) return;
     setShowSupplierConfirm(false);
     try {
+      const sid = Number(pendingNsoGroup.supplier_id);
+      const cid = Number(pendingNsoGroup.category_id);
+
       await createSupplierOrder({
-        supplier_id: pendingNsoGroup.supplier_id,
-        order_type_id: pendingNsoGroup.category_id,
+        supplier_id: sid > 0 ? sid : null,
+        order_type_id: cid > 0 ? cid : null,
         item_ids: pendingNsoGroup.items.map((i: any) => i.id),
       });
       await fetchOrders();
@@ -1730,6 +1871,22 @@ const OrderPage = () => {
     fetchOrders();
   };
 
+  const handleAssignSupplier = async (orderItemId: number | string, supplierId: number, baseItemId: number | string) => {
+    try {
+      await updateOrderItemStatus(orderItemId, { supplier_id: supplierId });
+      
+      // Also update the base item to make this the default supplier
+      if (baseItemId && baseItemId !== "0") {
+        await updateItem(Number(baseItemId), { supplier_id: supplierId });
+      }
+      
+      // Refresh both orders and items to ensure UI is in sync
+      await Promise.all([fetchOrders(), fetchAllItems()]);
+    } catch (error) {
+      console.error("Failed to assign supplier:", error);
+    }
+  };
+
   const nsoOrders = useMemo(
     () => orders.filter((o: any) => !o.supplier_id),
     [orders],
@@ -1747,11 +1904,12 @@ const OrderPage = () => {
         order_no: o.order_no,
         order_status: o.status,
         item_status: i.status || "NSO",
-        supplier_id: o.supplier_id,
+        supplier_id: i.supplier_id || i.item?.supplier_id || o.supplier_id,
         category_id: o.category_id,
         comment: o.comment,
       })),
     );
+
     if (!orderNoFilter) return allItems;
     return allItems.filter((i) =>
       String(i.order_no).toLowerCase().includes(orderNoFilter.toLowerCase()),
@@ -1993,11 +2151,10 @@ const OrderPage = () => {
                                       handleCreateSupplierOrderFromNSO(row);
                                     }}
                                     disabled={row.supplier_id === 0}
-                                    className={`${
-                                      row.supplier_id === 0
-                                        ? "bg-gray-400 cursor-not-allowed opacity-75"
-                                        : "bg-[#059669] hover:bg-green-700"
-                                    } text-white px-4 py-2 rounded-[4px] flex items-center gap-2 text-xs font-bold transition shadow-md`}
+                                    className={`${row.supplier_id === 0
+                                      ? "bg-gray-400 cursor-not-allowed opacity-75"
+                                      : "bg-[#059669] hover:bg-green-700"
+                                      } text-white px-4 py-2 rounded-[4px] flex items-center gap-2 text-xs font-bold transition shadow-md`}
                                   >
                                     <PlusCircleIcon className="h-5 w-5" />
                                     {row.supplier_id === 0
@@ -2075,11 +2232,10 @@ const OrderPage = () => {
                                       handleCreateSupplierOrderFromNSO(row);
                                     }}
                                     disabled={row.supplier_id === 0}
-                                    className={`${
-                                      row.supplier_id === 0
-                                        ? "bg-gray-400 cursor-not-allowed opacity-75"
-                                        : "bg-[#059669] hover:bg-green-700"
-                                    } text-white px-4 py-2 rounded-[4px] flex items-center gap-2 text-xs font-bold transition shadow-md`}
+                                    className={`${row.supplier_id === 0
+                                      ? "bg-gray-400 cursor-not-allowed opacity-75"
+                                      : "bg-[#059669] hover:bg-green-700"
+                                      } text-white px-4 py-2 rounded-[4px] flex items-center gap-2 text-xs font-bold transition shadow-md`}
                                   >
                                     <PlusCircleIcon className="h-5 w-5" />
                                     {row.supplier_id === 0
@@ -3177,10 +3333,63 @@ const OrderPage = () => {
                   }}
                   activeTab={activeTab}
                   itemById={itemById}
+                  suppliers={suppliers}
+                  onAssignSupplier={handleAssignSupplier}
                   onSplit={(row) => {
                     setSelectedItem(row);
                     setSplitQty(Math.floor(Number(row.qty || 0) / 2) || 1);
                     setShowSPModal(true);
+                  }}
+                  onEanClick={(itemId, row) => {
+                    const cachedItem = itemById.get(String(itemId));
+                    const sid = row.supplier_id || row.item?.supplier_id || cachedItem?.supplier_id;
+
+                    const resolvedName = sid ? getSupplierName(sid) : null;
+                    const joinedName = row.supplier_name || row.item?.supplier_name || cachedItem?.supplier_name;
+                    const sname = (resolvedName && resolvedName !== "-") ? resolvedName : (joinedName && joinedName !== "Unassigned" ? joinedName : "Unassigned");
+
+                    const baseOrder = row.parentOrder || {};
+                    const parentOrder = {
+                      ...baseOrder,
+                      id: row.order_id || baseOrder.id,
+                      order_no: row.order_no || baseOrder.order_no,
+                      status: row.order_status || baseOrder.status,
+                      category_id: row.category_id || baseOrder.category_id,
+                      comment: row.comment || baseOrder.comment,
+                      supplier_id: sid,
+                      supplier_name: sname
+                    };
+                    const singleViewItem = {
+                      item_id: String(itemId),
+                      itemName:
+                        row.item_name ||
+                        row.itemName ||
+                        row.item?.item_name ||
+                        cachedItem?.item_name ||
+                        cachedItem?.name ||
+                        "Unknown Item",
+                      qty: row.qty,
+                      qty_label: row.qty_label,
+                      remark_de: row.remark_de || "",
+                      remarks_cn: row.remarks_cn || "",
+                      remark_en: row.remark_en || "",
+                      ean:
+                        row.ean ||
+                        row.item?.ean ||
+                        cachedItem?.ean ||
+                        "-",
+                      price: row.price || cachedItem?.price || 0,
+                      currency: row.currency || cachedItem?.currency || "CNY",
+                      status: row.item_status || row.status || "NSO",
+                      item: row.item || cachedItem || null,
+                      taric_code: row.taric_code || row.item?.taric?.code || "-",
+                      supplier_id: sid,
+                      supplier_name: sname,
+                      supplier_order_id: row.supplier_order_id,
+                    };
+                    setViewOrder(parentOrder);
+                    setViewItems([singleViewItem]);
+                    setShowViewModal(true);
                   }}
                 />
               </>
@@ -3318,11 +3527,23 @@ const OrderPage = () => {
                   {
                     header: "EAN",
                     width: "120px",
-                    render: (row) => (
-                      <span className="text-blue-600 font-semibold">
-                        {row.ean || "-"}
-                      </span>
-                    ),
+                    render: (row) => {
+                      const ean = row.ean || row.item?.ean || "-";
+                      if (!ean || ean === "-") return "-";
+                      return (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const itemId = row.item_id || row.item?.id;
+                            if (itemId) router.push(`/items/${itemId}`);
+                            else toast.error("Item details not found");
+                          }}
+                          className="text-blue-600 hover:underline font-bold"
+                        >
+                          {ean}
+                        </button>
+                      );
+                    },
                     align: "center",
                   },
                   {
@@ -3383,6 +3604,12 @@ const OrderPage = () => {
                     width: "100px",
                     render: (row) =>
                       row.taric_code || row.item?.taric?.code || "-",
+                    align: "center",
+                  },
+                  {
+                    header: "Supplier",
+                    width: "120px",
+                    render: (row) => row.supplier_name || getSupplierName(row.supplier_id) || "-",
                     align: "center",
                   },
                 ]}

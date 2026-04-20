@@ -19,8 +19,8 @@ export type SupplierOrder = {
 };
 
 export const createSupplierOrder = async (data: {
-    supplier_id?: number;
-    order_type_id?: number;
+    supplier_id?: number | null;
+    order_type_id?: number | null;
     item_ids: number[];
     remark?: string;
     ref_no?: string;
