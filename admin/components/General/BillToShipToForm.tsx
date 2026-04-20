@@ -79,6 +79,7 @@ const BillToShipToForm: React.FC<BillToShipToFormProps> = ({
     useEffect(() => {
         if (selectedCustomer) {
             onBatchChange({
+                customer_type: "Other Customer",
                 ship_to_company_name: selectedCustomer.companyName || "",
                 ship_to_display_name: selectedCustomer.companyName || "",
                 ship_to_contact_person: selectedCustomer.legalName || "",
@@ -86,7 +87,7 @@ const BillToShipToForm: React.FC<BillToShipToFormProps> = ({
                 ship_to_country: selectedCustomer.deliveryCountry || selectedCustomer.country || selectedCustomer.businessDetails?.country || "",
                 ship_to_city: selectedCustomer.deliveryCity || selectedCustomer.city || selectedCustomer.businessDetails?.city || "",
                 ship_to_postal_code: selectedCustomer.deliveryPostalCode || selectedCustomer.postalCode || selectedCustomer.businessDetails?.postalCode || "",
-                ship_to_full_address: (selectedCustomer.deliveryAddressLine1 || selectedCustomer.addressLine1 || selectedCustomer.businessDetails?.address || "") + 
+                ship_to_full_address: (selectedCustomer.deliveryAddressLine1 || selectedCustomer.addressLine1 || selectedCustomer.address || selectedCustomer.businessDetails?.address || "") + 
                     (selectedCustomer.deliveryAddressLine2 || selectedCustomer.addressLine2 ? " " + (selectedCustomer.deliveryAddressLine2 || selectedCustomer.addressLine2) : ""),
             });
         }

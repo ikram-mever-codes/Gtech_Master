@@ -13,18 +13,41 @@ export const createSupplierOrder = async (req: Request, res: Response, next: Nex
         await queryRunner.connect();
         await queryRunner.startTransaction();
 
-        const { supplier_id, order_type_id, item_ids, remark, ref_no } = req.body;
+        const { item_ids, remark, ref_no } = req.body;
+        let { supplier_id, order_type_id } = req.body;
 
         if (!Array.isArray(item_ids) || item_ids.length === 0) {
             throw new ErrorHandler("item_ids[] is required", 400);
         }
 
+        supplier_id = (Number(supplier_id) > 0) ? Number(supplier_id) : null;
+        order_type_id = (Number(order_type_id) > 0) ? Number(order_type_id) : null;
+
         const supplierOrderRepo = queryRunner.manager.getRepository(SupplierOrder);
         const orderItemsRepo = queryRunner.manager.getRepository(OrderItem);
 
+        // Validate supplier_id
+        if (supplier_id) {
+            const supplierRepo = queryRunner.manager.getRepository(Supplier);
+            const supplierExists = await supplierRepo.findOneBy({ id: supplier_id });
+            if (!supplierExists) {
+                supplier_id = null;
+            }
+        }
+
+        // Validate order_type_id (Category)
+        if (order_type_id) {
+            const { Category } = await import("../models/categories");
+            const categoryRepo = queryRunner.manager.getRepository(Category);
+            const categoryExists = await categoryRepo.findOneBy({ id: order_type_id });
+            if (!categoryExists) {
+                order_type_id = null;
+            }
+        }
+
         const supplierOrder = supplierOrderRepo.create({
-            supplier_id: supplier_id || null,
-            order_type_id: order_type_id || null,
+            supplier_id,
+            order_type_id,
             remark: remark || null,
             ref_no: ref_no || null,
             paid: "N",
