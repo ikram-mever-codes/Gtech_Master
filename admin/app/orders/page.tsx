@@ -59,7 +59,7 @@ import {
   getSupplierItems,
   type Supplier,
 } from "@/api/suppliers";
-import { getItems } from "@/api/items";
+import { getItems, updateItem } from "@/api/items";
 import { getCategories } from "@/api/categories";
 import CustomButton from "@/components/UI/CustomButton";
 import CustomModal from "@/components/UI/CustomModal";
@@ -155,7 +155,7 @@ type OrdersTableProps = {
   onSplit: (row: any) => void;
   onEanClick: (itemId: string, rowData: any) => void;
   suppliers: any[];
-  onAssignSupplier: (itemId: number | string, supplierId: number) => Promise<void>;
+  onAssignSupplier: (itemId: number | string, supplierId: number, baseItemId?: number | string) => Promise<void>;
 };
 
 const tabs = [
@@ -418,12 +418,21 @@ function OrdersTable({
             >
               <Select
                 autoFocus
-                menuPortalTarget={document.body}
+                menuPortalTarget={typeof document !== "undefined" ? document.body : null}
+                options={supplierOptions}
+                onChange={async (opt: any) => {
+                  setEditingSupplierId(null);
+                  if (opt) {
+                    await onAssignSupplier(row.id, opt.value, row.item_id);
+                  }
+                }}
+                onBlur={() => setEditingSupplierId(null)}
                 styles={{
-                  menuPortal: base => ({ ...base, zIndex: 9999 }),
+                  menuPortal: (base) => ({ ...base, zIndex: 9999 }),
                   control: (base) => ({
                     ...base,
                     minHeight: '34px',
+                    height: '34px',
                     fontSize: '11px',
                     borderColor: '#cbd5e1',
                     boxShadow: 'none',
@@ -439,18 +448,10 @@ function OrdersTable({
                   menu: (base) => ({
                     ...base,
                     boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)',
-                    border: '1px solid #e2e8f0'
-                  })
+                    border: '1px solid #e2e8f0',
+                    zIndex: 9999
+                  }),
                 }}
-                placeholder="Search supplier..."
-                options={supplierOptions}
-                onChange={async (opt: any) => {
-                  if (opt) {
-                    await onAssignSupplier(row.id, opt.value);
-                  }
-                  setEditingSupplierId(null);
-                }}
-                onBlur={() => setEditingSupplierId(null)}
               />
             </div>
           );
@@ -1143,9 +1144,21 @@ const OrderPage = () => {
         const rawStatus = (item.status || "").trim().toUpperCase();
         if (rawStatus && rawStatus !== "NSO" && rawStatus !== "SO") return;
         const itemDetails = itemById.get(String(item.item_id));
-        const sId = o.supplier_id || itemDetails?.supplier_id || 0;
+        
+        let sId = 0;
+        const o_sid = Number(o.supplier_id || 0);
+        const i_sid = Number(itemDetails?.supplier_id || 0);
+        
+        // Only use IDs that exist in our current supplier list
+        const isRecognized = (id: number) => id > 0 && suppliers.some(s => Number(s.id) === id);
+        
+        if (isRecognized(o_sid)) {
+          sId = o_sid;
+        } else if (isRecognized(i_sid)) {
+          sId = i_sid;
+        }
 
-        const sid = Number(sId);
+        const sid = sId;
         const catId = Number(o.category_id || 0);
         const groupKey = `${sid}_${catId}`;
 
@@ -1494,16 +1507,17 @@ const OrderPage = () => {
     if (!pendingNsoGroup) return;
     setShowSupplierConfirm(false);
     try {
-      const sid = Number(pendingNsoGroup.supplier_id);
-      const cid = Number(pendingNsoGroup.category_id);
+      const sid = Number(pendingNsoGroup.supplier_id || 0);
+      const cid = Number(pendingNsoGroup.category_id || 0);
 
       await createSupplierOrder({
         supplier_id: sid > 0 ? sid : null,
         order_type_id: cid > 0 ? cid : null,
-        item_ids: pendingNsoGroup.items.map((i: any) => i.id),
+        item_ids: pendingNsoGroup.items.map((i: any) => Number(i.id)),
       });
       await fetchOrders();
       await fetchSupplierOrders();
+      await fetchAllItems();
     } catch (e) {
       console.error(e);
     } finally {
@@ -1866,12 +1880,26 @@ const OrderPage = () => {
     fetchOrders();
   };
 
-  const handleAssignSupplier = async (itemId: number | string, supplierId: number) => {
+  const handleAssignSupplier = async (orderItemId: number | string, supplierId: number, baseItemId?: number | string) => {
     try {
-      await updateOrderItemStatus(itemId, { supplier_id: supplierId });
-      fetchOrders();
+      // 1. Update the specific order item
+      await updateOrderItemStatus(orderItemId, { supplier_id: supplierId });
+      
+      // 2. Update the base item's default supplier for persistence
+      if (baseItemId) {
+        await updateItem(Number(baseItemId), { supplier_id: supplierId });
+      }
+      
+      // 3. Refresh all relevant data to ensure UI is in sync
+      await Promise.all([
+        fetchOrders(),
+        fetchAllItems()
+      ]);
+      
+      toast.success("Supplier assigned successfully");
     } catch (error) {
       console.error("Failed to assign supplier:", error);
+      toast.error("Failed to assign supplier");
     }
   };
 

@@ -1623,7 +1623,7 @@ export const getAllBusinesses = async (
         customer.businessDetails || {};
 
       return {
-        id: customer.id, // This will now be customer.id
+        id: customer.id,
         companyName: customer.companyName,
         displayName: customer.companyName,
         legalName: customer.legalName,
@@ -1632,12 +1632,17 @@ export const getAllBusinesses = async (
         contactEmail: customer.contactEmail,
         contactPhoneNumber: customer.contactPhoneNumber,
         stage: customer.stage,
-        ...businessDetailsWithoutId, // Spread without the id
+        ...businessDetailsWithoutId,
+        address: customer.businessDetails?.address,
+        city: customer.businessDetails?.city,
+        state: customer.businessDetails?.state,
+        country: customer.businessDetails?.country,
+        postalCode: customer.businessDetails?.postalCode,
         website: customer.businessDetails?.website,
         hasWebsite: !!customer.businessDetails?.website,
         phoneNumber: customer.businessDetails?.contactPhone,
         businessEmail: customer.businessDetails?.email,
-        status: BUSINESS_STATUS.ACTIVE, // Default status
+        status: BUSINESS_STATUS.ACTIVE,
         source: customer.businessDetails?.businessSource,
         createdAt: customer.createdAt,
         updatedAt: customer.updatedAt,
@@ -1663,7 +1668,6 @@ export const getAllBusinesses = async (
   }
 };
 
-// 7. Bulk Delete Businesses
 export const bulkDeleteBusinesses = async (
   req: Request,
   res: Response,
@@ -1692,7 +1696,6 @@ export const bulkDeleteBusinesses = async (
   }
 };
 
-// 8. Search Businesses by Location
 export const searchBusinessesByLocation = async (
   req: Request,
   res: Response,
@@ -1712,7 +1715,6 @@ export const searchBusinessesByLocation = async (
 
     const customerRepository = AppDataSource.getRepository(Customer);
 
-    // Haversine formula for distance calculation in kilometers
     const customers = await customerRepository
       .createQueryBuilder("customer")
       .leftJoinAndSelect("customer.businessDetails", "businessDetails")
@@ -1729,7 +1731,6 @@ export const searchBusinessesByLocation = async (
       .limit(lim)
       .getRawMany();
 
-    // Transform response
     const businesses = customers.map((raw: any) => ({
       id: raw.customer_id,
       name: raw.customer_companyName,
@@ -1740,7 +1741,6 @@ export const searchBusinessesByLocation = async (
       stage: raw.customer_stage,
       ...raw.businessDetails,
       distance: raw.distance,
-      // Backward compatibility fields
       website: raw.businessDetails_website,
       hasWebsite: !!raw.businessDetails_website,
       phoneNumber: raw.businessDetails_contactPhone,
