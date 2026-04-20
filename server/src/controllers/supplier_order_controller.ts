@@ -26,11 +26,22 @@ export const createSupplierOrder = async (req: Request, res: Response, next: Nex
         const supplierOrderRepo = queryRunner.manager.getRepository(SupplierOrder);
         const orderItemsRepo = queryRunner.manager.getRepository(OrderItem);
 
+        // Validate supplier_id
         if (supplier_id) {
             const supplierRepo = queryRunner.manager.getRepository(Supplier);
             const supplierExists = await supplierRepo.findOneBy({ id: supplier_id });
             if (!supplierExists) {
                 supplier_id = null;
+            }
+        }
+
+        // Validate order_type_id (Category)
+        if (order_type_id) {
+            const { Category } = await import("../models/categories");
+            const categoryRepo = queryRunner.manager.getRepository(Category);
+            const categoryExists = await categoryRepo.findOneBy({ id: order_type_id });
+            if (!categoryExists) {
+                order_type_id = null;
             }
         }
 

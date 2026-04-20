@@ -1361,7 +1361,6 @@ export const updateBusiness = async (
   }
 };
 
-// Get Business By ID (also updated to include starBusinessDetails)
 export const getBusinessById = async (
   req: Request,
   res: Response,
@@ -1386,7 +1385,6 @@ export const getBusinessById = async (
       return next(new ErrorHandler("Business not found", 404));
     }
 
-    // Transform response
     const businessResponse = {
       id: customer.id,
       displayName: customer.companyName,
@@ -1399,7 +1397,6 @@ export const getBusinessById = async (
       businessDetails: customer.businessDetails
         ? {
           ...customer.businessDetails,
-          // Include check_by user details if present
           check_by: customer.businessDetails.check_by
             ? {
               id: customer.businessDetails.check_by.id,
@@ -1448,7 +1445,6 @@ export const getBusinessById = async (
           updatedAt: customer.starCustomerDetails.updatedAt,
         }
         : undefined,
-      // Backward compatibility fields
       website: customer.businessDetails?.website,
       hasWebsite: !!customer.businessDetails?.website,
       phoneNumber: customer.businessDetails?.contactPhone,
@@ -1529,8 +1525,8 @@ export const getAllBusinesses = async (
       minRating,
       maxRating,
       verified,
-      sortBy = "createdAt", // Add sortBy parameter
-      sortOrder = "DESC", // Add sortOrder parameter with DESC as default
+      sortBy = "createdAt",
+      sortOrder = "DESC",
     } = req.query;
 
     const pageNum = parseInt(page as string);
@@ -1542,7 +1538,6 @@ export const getAllBusinesses = async (
       .createQueryBuilder("customer")
       .leftJoinAndSelect("customer.businessDetails", "businessDetails");
 
-    // Apply filters
     if (search) {
       queryBuilder.andWhere(
         "(customer.companyName LIKE :search OR customer.legalName LIKE :search OR customer.email LIKE :search OR businessDetails.description LIKE :search OR businessDetails.address LIKE :search OR businessDetails.email LIKE :search OR businessDetails.contactPhone LIKE :search)",
@@ -1550,7 +1545,6 @@ export const getAllBusinesses = async (
       );
     }
 
-    // BusinessDetails filters
     if (postalCode) {
       queryBuilder.andWhere("businessDetails.postalCode = :postalCode", {
         postalCode: postalCode.toString().trim().toUpperCase(),
@@ -1605,17 +1599,14 @@ export const getAllBusinesses = async (
       });
     }
 
-    // Get total count
     const total = await queryBuilder.getCount();
 
-    // Apply sorting - default is by createdAt DESC (newest first)
     const orderByField =
       sortBy === "name" ? "customer.companyName" : "customer.createdAt";
     const orderDirection = sortOrder === "ASC" ? "ASC" : "DESC";
 
     queryBuilder.orderBy(orderByField, orderDirection);
 
-    // Get paginated results
     const customers = await queryBuilder.skip(skip).take(limitNum).getMany();
 
     const businesses = customers.map((customer) => {
@@ -1762,7 +1753,6 @@ export const searchBusinessesByLocation = async (
   }
 };
 
-// 9. Get Business Statistics
 export const getBusinessStatistics = async (
   req: Request,
   res: Response,
@@ -1791,7 +1781,6 @@ export const getBusinessStatistics = async (
       .andWhere("businessDetails.website IS NULL")
       .getCount();
 
-    // Count by source
     const sourceCounts = await businessDetailsRepository
       .createQueryBuilder("businessDetails")
       .innerJoin("businessDetails.customer", "customer")
@@ -1801,7 +1790,6 @@ export const getBusinessStatistics = async (
       .orderBy("count", "DESC")
       .getRawMany();
 
-    // Count by country
     const countryCounts = await businessDetailsRepository
       .createQueryBuilder("businessDetails")
       .innerJoin("businessDetails.customer", "customer")
@@ -1828,7 +1816,6 @@ export const getBusinessStatistics = async (
   }
 };
 
-// 10. Update Business Status in Bulk
 export const bulkUpdateStatus = async (
   req: Request,
   res: Response,
@@ -1840,9 +1827,6 @@ export const bulkUpdateStatus = async (
     if (!ids || !Array.isArray(ids) || ids.length === 0) {
       return next(new ErrorHandler("Array of business IDs is required", 400));
     }
-
-    // For now, we'll just return success since status is handled differently in new structure
-    // You might want to map status to stage or handle it differently based on your business logic
 
     return res.status(200).json({
       success: true,
@@ -1885,7 +1869,6 @@ export const deleteBusiness = async (
       return next(new ErrorHandler("Business not found", 404));
     }
 
-    // Check for contact persons and requested items ONLY
     if (customer.starBusinessDetails) {
       const starBusinessDetails = await AppDataSource.getRepository(
         StarBusinessDetails
@@ -1914,25 +1897,20 @@ export const deleteBusiness = async (
       }
     }
 
-    // SIMPLE FOCUSED APPROACH - Just handle list_creator and delete customer
     const queryRunner = AppDataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
 
     try {
-      // DISABLE CONSTRAINTS
       await queryRunner.query("SET session_replication_role = replica;");
 
-      // 1. Delete list_creator records FIRST (this is the main blocker)
       await queryRunner.query(
         `DELETE FROM list_creator WHERE "customerId" = $1`,
         [id]
       );
 
-      // 2. Delete customer
       await queryRunner.query(`DELETE FROM customer WHERE id = $1`, [id]);
 
-      // RE-ENABLE CONSTRAINTS
       await queryRunner.query("SET session_replication_role = DEFAULT;");
 
       await queryRunner.commitTransaction();
