@@ -82,11 +82,11 @@ const BillToShipToForm: React.FC<BillToShipToFormProps> = ({
                 ship_to_company_name: selectedCustomer.companyName || "",
                 ship_to_display_name: selectedCustomer.companyName || "",
                 ship_to_contact_person: selectedCustomer.legalName || "",
-                ship_to_contact_phone: selectedCustomer.contactPhoneNumber || "",
-                ship_to_country: selectedCustomer.deliveryCountry || selectedCustomer.country || "",
-                ship_to_city: selectedCustomer.deliveryCity || selectedCustomer.city || "",
-                ship_to_postal_code: selectedCustomer.deliveryPostalCode || selectedCustomer.postalCode || "",
-                ship_to_full_address: (selectedCustomer.deliveryAddressLine1 || selectedCustomer.addressLine1 || "") + 
+                ship_to_contact_phone: selectedCustomer.contactPhoneNumber || selectedCustomer.phoneNumber || selectedCustomer.contactPhone || selectedCustomer.businessDetails?.contactPhone || selectedCustomer.businessDetails?.phoneNumber || "",
+                ship_to_country: selectedCustomer.deliveryCountry || selectedCustomer.country || selectedCustomer.businessDetails?.country || "",
+                ship_to_city: selectedCustomer.deliveryCity || selectedCustomer.city || selectedCustomer.businessDetails?.city || "",
+                ship_to_postal_code: selectedCustomer.deliveryPostalCode || selectedCustomer.postalCode || selectedCustomer.businessDetails?.postalCode || "",
+                ship_to_full_address: (selectedCustomer.deliveryAddressLine1 || selectedCustomer.addressLine1 || selectedCustomer.businessDetails?.address || "") + 
                     (selectedCustomer.deliveryAddressLine2 || selectedCustomer.addressLine2 ? " " + (selectedCustomer.deliveryAddressLine2 || selectedCustomer.addressLine2) : ""),
             });
         }
