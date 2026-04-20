@@ -463,6 +463,7 @@ export const getItemById = async (
       relations: ["parent", "taric", "category", "supplier"],
     });
 
+    console.log(item);
     if (!item) {
       return next(new ErrorHandler("Item not found", 404));
     }
