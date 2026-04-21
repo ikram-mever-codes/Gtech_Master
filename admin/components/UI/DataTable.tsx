@@ -92,7 +92,13 @@ export function DataTable<T>({
                                 <React.Fragment key={(row as any).id || (row as any)._id || idx}>
                                     <tr
                                         className={`hover:bg-gray-50 transition-colors ${getRowClassName ? getRowClassName(row, idx) : ""} ${onRowClick ? "cursor-pointer" : ""}`}
-                                        onClick={() => onRowClick && onRowClick(row, idx)}
+                                        onClick={(e) => {
+                                            if (!onRowClick) return;
+                                            const target = e.target as HTMLElement;
+                                            const interactive = target.closest('button, a, input, select, textarea');
+                                            if (interactive) return;
+                                            onRowClick(row, idx);
+                                        }}
                                     >
                                         {columns.map((c, i) => (
                                             <td

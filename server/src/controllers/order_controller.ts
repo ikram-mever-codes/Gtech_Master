@@ -85,7 +85,6 @@ export const createOrder = async (
       .getMany();
     const itemMap = new Map(dbItems.map((i) => [i.id, i]));
 
-    // Fetch RMB_Price from supplier_items for all items
     const supplierItems = await supplierItemRepo
       .createQueryBuilder("si")
       .where("si.item_id IN (:...itemIds)", { itemIds })
@@ -113,7 +112,7 @@ export const createOrder = async (
         item_id,
         qty,
         remark_de: it.remark_de,
-        rmb_special_price: rmbPrice, // Use RMB_Price from supplier_items
+        rmb_special_price: rmbPrice,
         price: dbItem?.price,
         currency: dbItem?.currency,
         taric_id: dbItem?.taric_id,
@@ -170,12 +169,12 @@ export const createOrder = async (
   } catch (error) {
     try {
       await queryRunner.rollbackTransaction();
-    } catch {}
+    } catch { }
     return next(error);
   } finally {
     try {
       await queryRunner.release();
-    } catch {}
+    } catch { }
   }
 };
 
@@ -255,7 +254,6 @@ export const updateOrder = async (
         .getMany();
       const itemMap = new Map(dbItems.map((i) => [i.id, i]));
 
-      // Fetch RMB_Price from supplier_items for all items
       const supplierItems = await supplierItemRepo
         .createQueryBuilder("si")
         .where("si.item_id IN (:...itemIds)", { itemIds })
@@ -281,7 +279,7 @@ export const updateOrder = async (
           item_id,
           qty,
           remark_de: it.remark_de,
-          rmb_special_price: rmbPrice, // Use RMB_Price from supplier_items
+          rmb_special_price: rmbPrice,
           price: dbItem?.price,
           currency: dbItem?.currency,
           taric_id: dbItem?.taric_id,
@@ -342,12 +340,12 @@ export const updateOrder = async (
   } catch (error) {
     try {
       await queryRunner.rollbackTransaction();
-    } catch {}
+    } catch { }
     return next(error);
   } finally {
     try {
       await queryRunner.release();
-    } catch {}
+    } catch { }
   }
 };
 
@@ -431,7 +429,6 @@ export const getAllOrders = async (
       if (item.ItemID_DE) itemByDE.set(item.ItemID_DE, item);
     });
 
-    // Fetch RMB_Price from supplier_items for all items
     const supplierItemRepo = AppDataSource.getRepository(SupplierItem);
     const supplierItems = await supplierItemRepo.find({
       where: { item_id: In(itemIds.length ? itemIds : [0]) },
@@ -471,11 +468,9 @@ export const getAllOrders = async (
           order.supplier?.name ||
           null;
 
-        // Get RMB_Price from supplier_items
         const rmbPrice =
           rmbPriceMap.get(oi.item_id || itemDetails?.id || 0) || 0;
 
-        // Determine the price to use (priority: rmb_price from supplier_items > item.price)
         const finalPrice =
           rmbPrice > 0 ? rmbPrice : itemDetails?.price || oi.price || 0;
 
@@ -494,30 +489,30 @@ export const getAllOrders = async (
             warehouseItem?.item_name_de ||
             (oi?.ItemID_DE ? `Unknown (DE: ${oi.ItemID_DE})` : "Unknown Item"),
           model: itemDetails?.model || "-",
-          price: finalPrice, // Use price from supplier_items (rmb_price) or fallback to item price
-          currency: "CNY", // RMB_Price is always in CNY
+          price: finalPrice,
+          currency: "CNY",
           taric_id: oi.taric_id || itemDetails?.taric_id,
           taric_code: oi.set_taric_code || itemDetails?.taric?.code || "-",
           supplier_id: itemDetails?.supplier_id || order.supplier_id,
           supplier_name: resolvedSupplierName || "Unassigned",
-          rmb_price: rmbPrice, // Add RMB_Price from supplier_items
+          rmb_price: rmbPrice,
           item: itemDetails,
           warehouse_data: warehouseItem
             ? {
-                id: warehouseItem.id,
-                item_no_de: warehouseItem.item_no_de,
-                item_name_de: warehouseItem.item_name_de,
-                item_name_en: warehouseItem.item_name_en,
-                stock_qty: warehouseItem.stock_qty,
-                msq: warehouseItem.msq,
-                buffer: warehouseItem.buffer,
-                is_stock_item: warehouseItem.is_stock_item,
-                is_SnSI: warehouseItem.is_SnSI,
-                ship_class: warehouseItem.ship_class,
-                is_active: warehouseItem.is_active,
-                is_no_auto_order: warehouseItem.is_no_auto_order,
-                category_id: warehouseItem.category_id,
-              }
+              id: warehouseItem.id,
+              item_no_de: warehouseItem.item_no_de,
+              item_name_de: warehouseItem.item_name_de,
+              item_name_en: warehouseItem.item_name_en,
+              stock_qty: warehouseItem.stock_qty,
+              msq: warehouseItem.msq,
+              buffer: warehouseItem.buffer,
+              is_stock_item: warehouseItem.is_stock_item,
+              is_SnSI: warehouseItem.is_SnSI,
+              ship_class: warehouseItem.ship_class,
+              is_active: warehouseItem.is_active,
+              is_no_auto_order: warehouseItem.is_no_auto_order,
+              category_id: warehouseItem.category_id,
+            }
             : null,
         };
       }),
@@ -553,6 +548,7 @@ export const getOrderById = async (
         "orderItems",
         "orderItems.item",
         "orderItems.item.taric",
+        "orderItems.item.supplier",
         "supplier",
         "category",
         "cargo",
@@ -563,12 +559,10 @@ export const getOrderById = async (
 
     if (!order) return next(new ErrorHandler("Order not found", 404));
 
-    // Get all item IDs from order items
     const itemIds = (order.orderItems || [])
       .map((oi) => oi.item_id || oi.item?.id)
       .filter((id) => id !== undefined && id !== null);
 
-    // Fetch RMB_Price from supplier_items for all items
     const supplierItems = await supplierItemRepository.find({
       where: { item_id: In(itemIds.length ? itemIds : [0]) },
     });
@@ -605,9 +599,21 @@ export const getOrderById = async (
 
           const rmbPrice = rmbPriceMap.get(oi.item_id || item?.id || 0) || 0;
 
-          // Determine the price to use (priority: rmb_price from supplier_items > item.price)
           const finalPrice =
             rmbPrice > 0 ? rmbPrice : item?.price || oi.price || 0;
+
+          const resolvedSupplierId =
+            (oi as any).supplier_id ||
+            item?.supplier_id ||
+            order.supplier_id ||
+            null;
+
+          const resolvedSupplierName =
+            item?.supplier?.company_name ||
+            item?.supplier?.name ||
+            order.supplier?.company_name ||
+            order.supplier?.name ||
+            null;
 
           return {
             id: oi.id,
@@ -619,16 +625,19 @@ export const getOrderById = async (
             qty_label: oi.qty_label,
             remark_de: oi.remark_de,
             remarks_cn: oi.remarks_cn,
+            remark_en: item?.remark || "",
             status: oi.status,
-            price: finalPrice, // Use price from supplier_items (rmb_price) or fallback to item price
-            currency: "CNY", // RMB_Price is always in CNY
+            price: finalPrice,
+            currency: "CNY",
             ean: item?.ean || oi.ean,
             taric_id: oi.taric_id || item?.taric_id,
             taric_code: oi.set_taric_code || item?.taric?.code || "-",
+            supplier_id: resolvedSupplierId,
+            supplier_name: resolvedSupplierName,
             itemName:
               item?.item_name ||
               (oi.ItemID_DE ? `Unknown (DE: ${oi.ItemID_DE})` : "Unknown"),
-            rmb_price: rmbPrice, // Add RMB_Price from supplier_items
+            rmb_price: rmbPrice,
             item: item,
           };
         }),
@@ -690,12 +699,12 @@ export const deleteOrder = async (
   } catch (error) {
     try {
       await queryRunner.rollbackTransaction();
-    } catch {}
+    } catch { }
     return next(error);
   } finally {
     try {
       await queryRunner.release();
-    } catch {}
+    } catch { }
   }
 };
 
@@ -1083,7 +1092,7 @@ export const generateCommercialInvoicePDF = async (
   next: NextFunction,
 ) => {
   try {
-    const { invoiceId } = req.params; // Changed parameter name to reflect intent
+    const { invoiceId } = req.params;
 
     if (!invoiceId || typeof invoiceId !== "string") {
       return next(new ErrorHandler("Invalid Invoice ID format.", 400));
@@ -1091,7 +1100,6 @@ export const generateCommercialInvoicePDF = async (
 
     const invoiceRepository = AppDataSource.getRepository(Invoice);
 
-    // Fetch permanent data from Invoice table to handle deleted orders
     const invoice = await invoiceRepository.findOne({
       where: { id: invoiceId },
       relations: ["customer", "items"],
@@ -1107,13 +1115,12 @@ export const generateCommercialInvoicePDF = async (
     const customer = invoice.customer;
     const invoiceItems = invoice.items || [];
 
-    // --- Dynamic Data Mapping from Permanent Invoice Record ---
     const data = {
       invoiceNo: invoice.invoiceNumber || "N/A",
       date: invoice.invoiceDate
         ? new Date(invoice.invoiceDate).toISOString().split("T")[0]
         : "N/A",
-      cargoNo: invoice.orderNumber || "N/A", // Using orderNumber as fallback for Cargo
+      cargoNo: invoice.orderNumber || "N/A",
       customerID: customer?.id?.slice(0, 8) || "7",
       billTo: {
         name: customer?.companyName || "N/A",
@@ -1125,7 +1132,6 @@ export const generateCommercialInvoicePDF = async (
         eori: customer?.taxNumber || "DE977540238364617",
       },
       shipTo: {
-        // Since order/cargo might be deleted, fallback to customer delivery info if available
         company: customer?.companyName || "N/A",
         contact: customer?.legalName || "-",
         street: customer?.addressLine1 || "N/A",
@@ -1133,7 +1139,6 @@ export const generateCommercialInvoicePDF = async (
         country: customer?.country || "Germany",
         phone: customer?.contactPhoneNumber || "N/A",
       },
-      // Map stored InvoiceItems to the line items
       lineItems: invoiceItems.map((item, index) => ({
         no: index + 1,
         desc: item.description || "Unknown Item",
@@ -1161,7 +1166,6 @@ export const generateCommercialInvoicePDF = async (
     );
     doc.pipe(res);
 
-    // --- Header Branding ---
     doc
       .fillColor("#777777")
       .font("Helvetica")
@@ -1177,7 +1181,6 @@ export const generateCommercialInvoicePDF = async (
       .lineWidth(1)
       .stroke();
 
-    // Addresses [cite: 3, 5]
     doc.fontSize(8.5).fillColor("#666666");
     doc.text(
       "GTech Industries Limited:   3A, 12/F, Kaiser Centre, N. 18 Centre Street, Sai Ying Pun, Hong Kong",
@@ -1191,7 +1194,6 @@ export const generateCommercialInvoicePDF = async (
     );
     doc.text("中国安徽省马鞍山市博望区博望汇盛广场西大丰冶金厂", 40, 94);
 
-    // --- Bill To / Ship To ---
     doc
       .fillColor("black")
       .font("Helvetica-Bold")
@@ -1216,7 +1218,6 @@ export const generateCommercialInvoicePDF = async (
       .text(data.shipTo.country, 240, 195)
       .text(data.shipTo.phone, 240, 210);
 
-    // Meta Data [cite: 19-22]
     doc
       .font("Helvetica")
       .fontSize(11)
@@ -1244,7 +1245,6 @@ export const generateCommercialInvoicePDF = async (
       .font("Helvetica-Bold")
       .text("Commercial Invoice", 0, 280, { align: "center" });
 
-    // --- Table Layout ---
     const tableTop = 320;
     doc
       .moveTo(40, tableTop)
@@ -1281,14 +1281,12 @@ export const generateCommercialInvoicePDF = async (
       itemY += 25;
     });
 
-    // Freight Row
     doc.text((data.lineItems.length + 1).toString(), 40, itemY);
     doc.text("Freight cost", 75, itemY);
     doc.text("n/a", 340, itemY).text("n/a", 425, itemY).text("n/a", 470, itemY);
     doc.text(freightCost.toFixed(2), 515, itemY, { align: "right" });
     itemY += 25;
 
-    // --- Total Row ---
     doc
       .moveTo(340, itemY)
       .lineTo(555, itemY)
@@ -1307,7 +1305,6 @@ export const generateCommercialInvoicePDF = async (
       underline: true,
     });
 
-    // --- Footer Section ---
     doc
       .fontSize(9)
       .font("Helvetica-Bold")
