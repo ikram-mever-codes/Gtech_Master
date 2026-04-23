@@ -18,7 +18,7 @@ export type DataTableProps<T> = {
     getRowClassName?: (row: T, index: number) => string;
     renderRowDetails?: (row: T, index: number) => React.ReactNode;
     expandedRowId?: string | number | null;
-    onRowClick?: (row: T, index: number) => void;
+    onRowClick?: (row: T, index: number, event: React.MouseEvent) => void;
     headerClassName?: string;
     thClassName?: string;
     tdClassName?: string;
@@ -95,9 +95,9 @@ export function DataTable<T>({
                                         onClick={(e) => {
                                             if (!onRowClick) return;
                                             const target = e.target as HTMLElement;
-                                            const interactive = target.closest('button, a, input, select, textarea');
+                                            const interactive = target.closest('button, a, input, select, textarea, [role="button"], .interactive');
                                             if (interactive) return;
-                                            onRowClick(row, idx);
+                                            onRowClick(row, idx, e);
                                         }}
                                     >
                                         {columns.map((c, i) => (

@@ -318,7 +318,8 @@ function OrdersTable({
           <button
             onClick={(e) => {
               e.stopPropagation();
-              const itemId = row.item_id || row.item?.id;
+              e.preventDefault();
+              const itemId = row.item_id || row.item?.id || (row as any).id;
               if (itemId) {
                 router.push(`/items/${itemId}`);
               } else {
@@ -869,8 +870,13 @@ function OrdersTable({
         const isExpress = (row.comment || "").toLowerCase().includes("express");
         return isExpress ? "bg-red-50" : "";
       }}
-      onRowClick={(row) => {
+      onRowClick={(row, idx, e) => {
         console.log("Row clicked:", row);
+        const target = e.target as HTMLElement;
+        if (target.closest('button, a, input, select, textarea, [role="button"], .interactive')) {
+          return;
+        }
+
         if (isOrderItems) {
           const targetOrder = row.parentOrder || {
             id: row.order_id,
@@ -1032,7 +1038,6 @@ const OrderPage = () => {
     }
     await downloadItemLabel(row.id);
   };
-
   const purchaseOrdersList = useMemo(() => {
     return supplierOrdersList.filter((so) => {
       const isPurchaseOrder = so.order_type?.name === "Purchase Order";
@@ -2359,16 +2364,7 @@ const OrderPage = () => {
                                         NSO
                                       </button>
                                     )}
-                                    <span
-                                      className="text-blue-600 hover:underline cursor-pointer font-semibold text-[10px]"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        const itemId = item.item_id || item.item?.id;
-                                        if (itemId) {
-                                          router.push(`/items/${itemId}`);
-                                        }
-                                      }}
-                                    >
+                                    <span className="font-semibold text-[10px] text-gray-600">
                                       {details?.ean || "-"}
                                     </span>
                                   </div>
@@ -3233,8 +3229,10 @@ const OrderPage = () => {
 
                           return (
                             <button
-                              onClick={() => {
-                                const itemId = row.item_id || row.item?.id;
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                e.preventDefault();
+                                const itemId = row.item_id || row.item?.id || (row as any).id;
                                 if (itemId) router.push(`/items/${itemId}`);
                               }}
                               className={`font-medium hover:underline ${isHighlighted ? "text-[#059669] font-bold" : "text-blue-600"}`}
@@ -3544,17 +3542,9 @@ const OrderPage = () => {
                       const ean = row.ean || row.item?.ean || "-";
                       if (!ean || ean === "-") return "-";
                       return (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            const itemId = row.item_id || row.item?.id;
-                            if (itemId) router.push(`/items/${itemId}`);
-                            else toast.error("Item details not found");
-                          }}
-                          className="text-blue-600 hover:underline font-bold"
-                        >
+                        <span className="text-gray-900 font-bold">
                           {ean}
-                        </button>
+                        </span>
                       );
                     },
                     align: "center",
