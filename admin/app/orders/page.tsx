@@ -17,7 +17,6 @@ import {
   EyeIcon,
   DocumentTextIcon,
   XMarkIcon,
-  ArrowUturnRightIcon,
   ArrowUturnLeftIcon,
   MagnifyingGlassIcon,
   ArrowRightIcon,
@@ -1036,11 +1035,8 @@ const OrderPage = () => {
 
   const purchaseOrdersList = useMemo(() => {
     return supplierOrdersList.filter((so) => {
-      const hasPurchasedItems = so.items?.some((it: any) => {
-        const st = (it.status || "").toLowerCase().trim();
-        return st === "purchased" || st === "purchase";
-      });
-      if (!hasPurchasedItems && so.is_po_created !== 1) return false;
+      const isPurchaseOrder = so.order_type?.name === "Purchase Order";
+      if (!isPurchaseOrder) return false;
 
       const searchLower = poSearch.toLowerCase();
       const poNo = `PO${new Date(so.created_at).getFullYear().toString().slice(-2)}${String(so.id).padStart(3, "0")}`;
@@ -1162,7 +1158,6 @@ const OrderPage = () => {
         const o_sid = Number(o.supplier_id || 0);
         const i_sid = Number(itemDetails?.supplier_id || 0);
 
-        // Only use IDs that exist in our current supplier list
         const isRecognized = (id: number) => id > 0 && suppliers.some(s => Number(s.id) === id);
 
         if (isRecognized(o_sid)) {
@@ -1741,11 +1736,17 @@ const OrderPage = () => {
           lines.map((l: any) => {
             const id = String(l.item_id ?? "");
             const item = itemById.get(id);
+            const resolvedSupplierId =
+              l.supplier_id ||
+              l.item?.supplier_id ||
+              item?.supplier_id ||
+              null;
             return {
               item_id: id,
               itemName:
                 l.item_name ||
                 l.itemName ||
+                l.item?.item_name ||
                 item?.item_name ||
                 item?.name ||
                 "Unknown item",
@@ -1754,11 +1755,13 @@ const OrderPage = () => {
               remark_de: String(l.remark_de ?? ""),
               remarks_cn: String(l.remarks_cn ?? ""),
               remark_en: String(l.remark_en ?? ""),
-              ean: l.ean || item?.ean || "-",
+              ean: l.ean || l.item?.ean || item?.ean || "-",
               price: l.price || item?.price || 0,
               currency: l.currency || item?.currency || "CNY",
               status: l.status || "NSO",
               item: l.item || item || null,
+              supplier_id: resolvedSupplierId,
+              taric_code: l.taric_code || l.item?.taric?.code || item?.taric || null,
             };
           }),
         );
@@ -1895,15 +1898,12 @@ const OrderPage = () => {
 
   const handleAssignSupplier = async (orderItemId: number | string, supplierId: number, baseItemId?: number | string) => {
     try {
-      // 1. Update the specific order item
       await updateOrderItemStatus(orderItemId, { supplier_id: supplierId });
 
-      // 2. Update the base item's default supplier for persistence
       if (baseItemId) {
         await updateItem(Number(baseItemId), { supplier_id: supplierId });
       }
 
-      // 3. Refresh all relevant data to ensure UI is in sync
       await Promise.all([
         fetchOrders(),
         fetchAllItems()
@@ -2316,7 +2316,7 @@ const OrderPage = () => {
                   </div>
                 </div>
                 <DataTable
-                  data={supplierOrdersList}
+                  data={supplierOrdersList.filter(so => so.order_type?.name === "Purchase Order")}
                   expandedRowId={expandedSupplierOrderId}
                   renderRowDetails={(row) => {
                     const items = (row as any).items || [];
@@ -3513,7 +3513,11 @@ const OrderPage = () => {
                   Supplier
                 </label>
                 <p className="text-gray-900 font-bold">
-                  {(viewOrder as any).supplier_name || "-"}
+                  {(viewOrder as any).supplier_name ||
+                    ((viewOrder as any).supplier_id
+                      ? getSupplierName((viewOrder as any).supplier_id)
+                      : null) ||
+                    "Unassigned"}
                 </p>
               </div>
             </div>
@@ -3618,7 +3622,12 @@ const OrderPage = () => {
                   {
                     header: "Supplier",
                     width: "120px",
-                    render: (row) => row.supplier_name || getSupplierName(row.supplier_id) || "-",
+                    render: (row) => {
+                      const sid = (row as any).supplier_id ||
+                        (row as any).item?.supplier_id;
+                      const name = sid ? getSupplierName(sid) : null;
+                      return name && name !== "-" ? name : "-";
+                    },
                     align: "center",
                   },
                 ]}

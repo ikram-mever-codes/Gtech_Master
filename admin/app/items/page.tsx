@@ -160,6 +160,23 @@ const ItemsManagementPage: React.FC = () => {
     search: "",
   });
 
+  const [debouncedFilters, setDebouncedFilters] = useState<FilterState>(filters);
+  const [debouncedTaricFilters, setDebouncedTaricFilters] = useState<TaricFilterState>(taricFilters);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedFilters(filters);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [filters]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedTaricFilters(taricFilters);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [taricFilters]);
+
   const [showTaricModal, setShowTaricModal] = useState(false);
   const [taricModalMode, setTaricModalMode] = useState<"create" | "edit">(
     "create",
@@ -347,10 +364,10 @@ const ItemsManagementPage: React.FC = () => {
           const itemsResponse: any = await getItems({
             page: pagination.page,
             limit: pagination.limit,
-            search: filters.search,
-            isActive: filters.isActive,
-            category: filters.category,
-            eanSearch: filters.eanSearch,
+            search: debouncedFilters.search,
+            isActive: debouncedFilters.isActive,
+            category: debouncedFilters.category,
+            eanSearch: debouncedFilters.eanSearch,
           });
           setItems(itemsResponse.data);
           setPagination(itemsResponse.pagination);
@@ -360,8 +377,8 @@ const ItemsManagementPage: React.FC = () => {
           const parentsResponse: any = await getParents({
             page: pagination.page,
             limit: pagination.limit,
-            search: filters.search,
-            isActive: filters.isActive,
+            search: debouncedFilters.search,
+            isActive: debouncedFilters.isActive,
           });
           setParents(parentsResponse.data);
           setPagination(parentsResponse.pagination);
@@ -371,8 +388,8 @@ const ItemsManagementPage: React.FC = () => {
           const warehouseResponse: any = await getWarehouseItems({
             page: pagination.page,
             limit: pagination.limit,
-            search: filters.search,
-            hasStock: filters.status,
+            search: debouncedFilters.search,
+            hasStock: debouncedFilters.status,
           });
           setWarehouseItems(warehouseResponse.data);
           setPagination(warehouseResponse.pagination);
@@ -382,7 +399,7 @@ const ItemsManagementPage: React.FC = () => {
           const taricsResponse: any = await getAllTarics({
             page: pagination.page,
             limit: pagination.limit,
-            search: taricFilters.search,
+            search: debouncedTaricFilters.search,
           });
           setTarics(taricsResponse.data);
           setPagination(taricsResponse.pagination);
@@ -392,7 +409,7 @@ const ItemsManagementPage: React.FC = () => {
           const suppliersResponse: any = await getAllSuppliers({
             page: pagination.page,
             limit: pagination.limit,
-            search: filters.search,
+            search: debouncedFilters.search,
           });
           setSuppliers(suppliersResponse.data);
           if (suppliersResponse.pagination) {
@@ -405,7 +422,7 @@ const ItemsManagementPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [activeTab, pagination.page, pagination.limit, filters, taricFilters]);
+  }, [activeTab, pagination.page, pagination.limit, debouncedFilters, debouncedTaricFilters]);
 
   const fetchStatistics = useCallback(async () => {
     try {
@@ -418,7 +435,7 @@ const ItemsManagementPage: React.FC = () => {
 
   useEffect(() => {
     setPagination((prev) => ({ ...prev, page: 1 }));
-  }, [filters, activeTab, taricFilters]);
+  }, [debouncedFilters, activeTab, debouncedTaricFilters]);
 
   useEffect(() => {
     fetchData();
@@ -888,19 +905,20 @@ const ItemsManagementPage: React.FC = () => {
     }
   };
 
-  const getFilteredData = () => {
+  const filteredData = useMemo(() => {
     const data = getCurrentData();
+    const currentFilters = activeTab === "tarics" ? debouncedTaricFilters : debouncedFilters;
 
     return data.filter((item) => {
       const it = item as any;
 
-      if (activeTab === "items" && filters.eanSearch) {
-        const eanMatches = matchesEANSearch(it.ean, filters.eanSearch);
+      if (activeTab === "items" && debouncedFilters.eanSearch) {
+        const eanMatches = matchesEANSearch(it.ean, debouncedFilters.eanSearch);
         if (!eanMatches) return false;
       }
 
-      if (filters.search) {
-        const searchLower = filters.search.toLowerCase();
+      if (currentFilters.search) {
+        const searchLower = currentFilters.search.toLowerCase();
         const matchesGlobal =
           it.id?.toString().includes(searchLower) ||
           it.name?.toLowerCase().includes(searchLower) ||
@@ -908,24 +926,25 @@ const ItemsManagementPage: React.FC = () => {
           it.item_name?.toLowerCase().includes(searchLower) ||
           it.item_no_de?.toLowerCase().includes(searchLower) ||
           it.name_en?.toLowerCase().includes(searchLower) ||
-          matchesEANSearch(it.ean, filters.search);
+          matchesEANSearch(it.ean, currentFilters.search);
 
         if (!matchesGlobal) return false;
       }
 
-      if (filters.isActive && it.is_active?.trim() !== filters.isActive.trim())
-        return false;
-      if (
-        filters.category &&
-        it.category?.toString().trim().toLowerCase() !==
-          filters.category.trim().toLowerCase()
-      )
-        return false;
+      if (activeTab !== "tarics") {
+        if (debouncedFilters.isActive && it.is_active?.trim() !== debouncedFilters.isActive.trim())
+          return false;
+        if (
+          debouncedFilters.category &&
+          it.category?.toString().trim().toLowerCase() !==
+            debouncedFilters.category.trim().toLowerCase()
+        )
+          return false;
+      }
 
       return true;
     });
-  };
-  const filteredData = getFilteredData();
+  }, [items, parents, warehouseItems, tarics, suppliers, activeTab, debouncedFilters, debouncedTaricFilters]);
 
   const renderTableHeaders = () => {
     switch (activeTab) {
