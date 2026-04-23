@@ -318,7 +318,8 @@ function OrdersTable({
           <button
             onClick={(e) => {
               e.stopPropagation();
-              const itemId = row.item_id || row.item?.id;
+              e.preventDefault();
+              const itemId = row.item_id || row.item?.id || row.id;
               if (itemId) {
                 router.push(`/items/${itemId}`);
               } else {
@@ -869,8 +870,13 @@ function OrdersTable({
         const isExpress = (row.comment || "").toLowerCase().includes("express");
         return isExpress ? "bg-red-50" : "";
       }}
-      onRowClick={(row) => {
+      onRowClick={(row, idx, e) => {
         console.log("Row clicked:", row);
+        const target = e.target as HTMLElement;
+        if (target.closest('button, a, input, select, textarea, [role="button"], .interactive')) {
+          return;
+        }
+
         if (isOrderItems) {
           const targetOrder = row.parentOrder || {
             id: row.order_id,
@@ -1032,7 +1038,6 @@ const OrderPage = () => {
     }
     await downloadItemLabel(row.id);
   };
-
   const purchaseOrdersList = useMemo(() => {
     return supplierOrdersList.filter((so) => {
       const isPurchaseOrder = so.order_type?.name === "Purchase Order";
