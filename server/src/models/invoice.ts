@@ -63,11 +63,9 @@ export class Invoice {
   @Column({ nullable: true })
   closedAt?: Date;
 
-  @ManyToOne(
-    () => Customer,
-    (customer) => customer.invoices,
-    { nullable: true }
-  )
+  @ManyToOne(() => Customer, (customer) => customer.invoices, {
+    nullable: true,
+  })
   @JoinColumn()
   customer?: Customer | null;
 
