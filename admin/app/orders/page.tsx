@@ -319,7 +319,7 @@ function OrdersTable({
             onClick={(e) => {
               e.stopPropagation();
               e.preventDefault();
-              const itemId = row.item_id || row.item?.id || row.id;
+              const itemId = row.item_id || row.item?.id || (row as any).id;
               if (itemId) {
                 router.push(`/items/${itemId}`);
               } else {
@@ -3552,7 +3552,8 @@ const OrderPage = () => {
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            const itemId = row.item_id || row.item?.id;
+                            e.preventDefault();
+                            const itemId = row.item_id || row.item?.id || (row as any).id;
                             if (itemId) router.push(`/items/${itemId}`);
                             else toast.error("Item details not found");
                           }}
