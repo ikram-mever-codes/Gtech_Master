@@ -1035,11 +1035,8 @@ const OrderPage = () => {
 
   const purchaseOrdersList = useMemo(() => {
     return supplierOrdersList.filter((so) => {
-      const hasPurchasedItems = so.items?.some((it: any) => {
-        const st = (it.status || "").toLowerCase().trim();
-        return st === "purchased" || st === "purchase";
-      });
-      if (!hasPurchasedItems && so.is_po_created !== 1) return false;
+      const isPurchaseOrder = so.order_type?.name === "Purchase Order";
+      if (!isPurchaseOrder) return false;
 
       const searchLower = poSearch.toLowerCase();
       const poNo = `PO${new Date(so.created_at).getFullYear().toString().slice(-2)}${String(so.id).padStart(3, "0")}`;
@@ -2319,7 +2316,7 @@ const OrderPage = () => {
                   </div>
                 </div>
                 <DataTable
-                  data={supplierOrdersList}
+                  data={supplierOrdersList.filter(so => so.order_type?.name === "Purchase Order")}
                   expandedRowId={expandedSupplierOrderId}
                   renderRowDetails={(row) => {
                     const items = (row as any).items || [];
