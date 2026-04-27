@@ -518,7 +518,7 @@ const CombinedInquiriesPageContent = () => {
 
   const fetchCustomers = async () => {
     try {
-      const response = await getAllCustomers();
+      const response = await getAllCustomers({ limit: 1000 });
       if (response?.data) {
         const customers = Array.isArray(response.data)
           ? response.data

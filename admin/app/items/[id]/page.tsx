@@ -353,7 +353,7 @@ const ItemDetailsPage = () => {
 
     setIsLinkSupplierModalOpen(false);
     setSelectedSupplierToLink("");
-    
+
     await handleUpdateItem(updated);
     toast.success("Supplier source linked successfully", successStyles);
   };
@@ -371,7 +371,7 @@ const ItemDetailsPage = () => {
       supplierItems: itemData.supplierItems.filter(si => si.id !== linkId)
     };
     setItemData(updated);
-    
+
     await handleUpdateItem(updated);
     toast.success("Supplier source removed successfully", successStyles);
   };
@@ -1732,17 +1732,17 @@ const ItemDetailsPage = () => {
                             {criteria.name}
                           </td>
                           <td className="px-4 py-3 text-sm">
-                              {criteria.picture ? (
-                                <button
-                                  onClick={() =>
-                                    window.open(getCorrectUrl(criteria.picture).replace('/upload/fl_attachment/', '/upload/'), "_blank")
-                                  }
-                                  className="text-blue-600 hover:text-blue-800"
-                                  title="View Picture"
-                                >
-                                  <EyeIcon className="h-5 w-5" />
-                                </button>
-                              ) : (
+                            {criteria.picture ? (
+                              <button
+                                onClick={() =>
+                                  window.open(getCorrectUrl(criteria.picture).replace('/upload/fl_attachment/', '/upload/'), "_blank")
+                                }
+                                className="text-blue-600 hover:text-blue-800"
+                                title="View Picture"
+                              >
+                                <EyeIcon className="h-5 w-5" />
+                              </button>
+                            ) : (
                               <span className="text-gray-400">—</span>
                             )}
                           </td>

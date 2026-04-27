@@ -603,7 +603,7 @@ const InvoiceListPage: React.FC = () => {
   const fetchCustomers = async () => {
     try {
       setLoading(true);
-      const response: any = await getAllCustomers();
+      const response: any = await getAllCustomers({ limit: 1000 });
       if (response?.data?.businesses) {
         setCustomers(response.data.businesses);
       } else if (Array.isArray(response?.data)) {

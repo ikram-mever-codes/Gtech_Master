@@ -2079,7 +2079,7 @@ const AdminAllItemsPage = () => {
         });
 
         try {
-          const allCustomersResponse = await getAllCustomers();
+          const allCustomersResponse = await getAllCustomers({ limit: 1000 });
           if (allCustomersResponse && allCustomersResponse.data) {
             const allCustomers = Array.isArray(allCustomersResponse.data) ? allCustomersResponse.data : allCustomersResponse.data?.customers || [];
 
@@ -2104,7 +2104,7 @@ const AdminAllItemsPage = () => {
         setLists(allListsData);
       } else {
         try {
-          const allCustomersResponse = await getAllCustomers();
+          const allCustomersResponse = await getAllCustomers({ limit: 1000 });
           if (allCustomersResponse && allCustomersResponse.data) {
             const allCustomersArr = Array.isArray(allCustomersResponse.data) ? allCustomersResponse.data : allCustomersResponse.data?.customers || [];
             const formattedCustomers = allCustomersArr.map((customer: any) => ({

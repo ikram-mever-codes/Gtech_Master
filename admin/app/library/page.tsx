@@ -47,7 +47,6 @@ import { LibraryBig } from "lucide-react";
 import PageHeader from "@/components/UI/PageHeader";
 
 const LibraryPage: React.FC = () => {
-  // State management
   const [files, setFiles] = useState<LibraryFile[]>([]);
   const [allFiles, setAllFiles] = useState<LibraryFile[]>([]);
   const [loading, setLoading] = useState(false);
@@ -67,13 +66,10 @@ const LibraryPage: React.FC = () => {
   const { user } = useSelector((state: RootState) => state.user);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Add state for customers
   const [customers, setCustomers] = useState<any[]>([]);
   const [loadingCustomers, setLoadingCustomers] = useState(false);
 
   const itemsPerPage = 20;
-
-  // Filter state
   const [filters, setFilters] = useState<FileFilters>({
     search: "",
     type: "",
@@ -84,7 +80,6 @@ const LibraryPage: React.FC = () => {
     sortOrder: "DESC",
   });
 
-  // Upload form state
   const [uploadForm, setUploadForm] = useState({
     description: "",
     tags: "",
@@ -92,19 +87,17 @@ const LibraryPage: React.FC = () => {
     customerId: "",
   });
 
-  // Edit form state
   const [editForm, setEditForm] = useState({
     description: "",
     tags: "",
     isPublic: true,
   });
 
-  // Fetch customers on component mount
   useEffect(() => {
     const fetchCustomers = async () => {
       setLoadingCustomers(true);
       try {
-        const response = await getAllCustomers();
+        const response = await getAllCustomers({ limit: 1000 });
         if (response?.data?.data) {
           setCustomers(response.data.data);
         }
@@ -118,7 +111,6 @@ const LibraryPage: React.FC = () => {
     fetchCustomers();
   }, []);
 
-  // Fetch files
   const fetchFiles = useCallback(async () => {
     setLoading(true);
     try {
@@ -135,7 +127,6 @@ const LibraryPage: React.FC = () => {
     }
   }, [filters]);
 
-  // Fetch statistics
   const fetchStatistics = async () => {
     try {
       const response = await getFileStats();
@@ -152,7 +143,6 @@ const LibraryPage: React.FC = () => {
     fetchStatistics();
   }, [fetchFiles]);
 
-  // Handle file selection
   const handleFileSelect = (fileId: string) => {
     const newSelected = new Set(selectedFiles);
     if (newSelected.has(fileId)) {
@@ -163,7 +153,6 @@ const LibraryPage: React.FC = () => {
     setSelectedFiles(newSelected);
   };
 
-  // Handle file upload
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -184,7 +173,6 @@ const LibraryPage: React.FC = () => {
         await uploadFile(formData);
       }
 
-      // Reset form and close modal
       setUploadForm({
         description: "",
         tags: "",
@@ -193,7 +181,6 @@ const LibraryPage: React.FC = () => {
       });
       setShowUploadModal(false);
 
-      // Refresh files list
       fetchFiles();
       fetchStatistics();
     } catch (error) {
@@ -206,7 +193,6 @@ const LibraryPage: React.FC = () => {
     }
   };
 
-  // Handle file deletion
   const handleDeleteFile = async (fileId: string) => {
     if (window.confirm("Are you sure you want to delete this file?")) {
       try {
@@ -219,7 +205,6 @@ const LibraryPage: React.FC = () => {
     }
   };
 
-  // Handle file update
   const handleUpdateFile = async (fileId: string) => {
     try {
       await updateFile(fileId, {
@@ -235,13 +220,10 @@ const LibraryPage: React.FC = () => {
     }
   };
 
-  // Handle file preview
   const handlePreview = (file: LibraryFile) => {
     setPreviewFile(file);
     setShowPreviewModal(true);
   };
-
-  // Format file size
   const formatFileSize = (bytes: number): string => {
     if (bytes === 0) return "0 Bytes";
     const k = 1024;
@@ -250,7 +232,6 @@ const LibraryPage: React.FC = () => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
   };
 
-  // Get file icon based on type
   const getFileIcon = (fileType: string) => {
     switch (fileType) {
       case "IMAGE":
@@ -270,7 +251,6 @@ const LibraryPage: React.FC = () => {
     }
   };
 
-  // Get file type color
   const getFileTypeColor = (fileType: string) => {
     const colors: Record<string, string> = {
       IMAGE: "bg-blue-100 text-blue-800",
@@ -284,7 +264,6 @@ const LibraryPage: React.FC = () => {
     return colors[fileType] || colors.OTHER;
   };
 
-  // Handle bulk download
   const handleBulkDownload = () => {
     if (selectedFiles.size === 0) {
       toast.error("No files selected");
@@ -299,7 +278,6 @@ const LibraryPage: React.FC = () => {
     });
   };
 
-  // Handle bulk delete
   const handleBulkDelete = async () => {
     if (selectedFiles.size === 0) {
       toast.error("No files selected");
@@ -324,7 +302,6 @@ const LibraryPage: React.FC = () => {
     }
   };
 
-  // Render file preview
   const renderPreview = () => {
     if (!previewFile) return null;
 
@@ -796,8 +773,8 @@ const LibraryPage: React.FC = () => {
                         key={pageNum}
                         onClick={() => setCurrentPage(pageNum)}
                         className={`px-3 py-1 text-sm rounded-lg transition-all ${currentPage === pageNum
-                            ? "bg-gray-600 text-white"
-                            : "bg-white/80 backdrop-blur-sm border border-gray-300/80 hover:bg-white/60"
+                          ? "bg-gray-600 text-white"
+                          : "bg-white/80 backdrop-blur-sm border border-gray-300/80 hover:bg-white/60"
                           }`}
                       >
                         {pageNum}
@@ -810,8 +787,8 @@ const LibraryPage: React.FC = () => {
                       <button
                         onClick={() => setCurrentPage(totalPages)}
                         className={`px-3 py-1 text-sm rounded-lg transition-all ${currentPage === totalPages
-                            ? "bg-gray-600 text-white"
-                            : "bg-white/80 backdrop-blur-sm border border-gray-300/80 hover:bg-white/60"
+                          ? "bg-gray-600 text-white"
+                          : "bg-white/80 backdrop-blur-sm border border-gray-300/80 hover:bg-white/60"
                           }`}
                       >
                         {totalPages}
