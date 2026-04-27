@@ -10,6 +10,9 @@ const errorMiddleware = (
   const status = err instanceof ErrorHandler ? err.status : 500;
   const success = err instanceof ErrorHandler ? err.success : false;
   console.log(err);
+  if (res.headersSent) {
+    return next(err);
+  }
   return res.status(status).json({
     success,
     message: err.message || "Internal Server Error",

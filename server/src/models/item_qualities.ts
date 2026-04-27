@@ -38,4 +38,8 @@ export class ItemQuality {
 
   @UpdateDateColumn()
   updated_at!: Date;
+
+  @ManyToOne(() => Item, (item) => item.qualityCriteria)
+  @JoinColumn({ name: "item_id" })
+  item!: Item;
 }

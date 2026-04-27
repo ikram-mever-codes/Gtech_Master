@@ -1,14 +1,6 @@
-import React, { ReactNode } from "react";
+import React from "react";
 import { XMarkIcon } from "@heroicons/react/24/outline";
-
-interface CustomModalProps {
-    isOpen: boolean;
-    onClose: () => void;
-    title: string;
-    children: ReactNode;
-    footer?: ReactNode;
-    width?: string;
-}
+import { CustomModalProps } from "@/next.config";
 
 const CustomModal: React.FC<CustomModalProps> = ({
     isOpen,

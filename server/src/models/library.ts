@@ -6,9 +6,11 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   ManyToOne,
+  JoinColumn,
 } from "typeorm";
 import { User } from "./users";
 import { Customer } from "./customers";
+import { Item } from "./items";
 
 export enum FileType {
   IMAGE = "IMAGE",
@@ -32,7 +34,7 @@ export class LibraryFile {
   originalName!: string;
 
   @Column()
-  fileSize!: number; // in bytes
+  fileSize!: number;
 
   @Column()
   mimeType!: string;
@@ -72,6 +74,10 @@ export class LibraryFile {
 
   @Column({ nullable: true })
   itemId?: number;
+
+  @ManyToOne(() => Item, (item) => item.attachments)
+  @JoinColumn({ name: "itemId" })
+  item?: Item;
 
   @CreateDateColumn()
   uploadedAt!: Date;
