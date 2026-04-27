@@ -190,7 +190,7 @@ const CargosTab: React.FC<CargosTabProps> = ({ customers: externalCustomers }) =
     const fetchCustomersIfNeeded = useCallback(async () => {
         if (externalCustomers && externalCustomers.length > 0) return;
         try {
-            const response = await getAllCustomers();
+            const response = await getAllCustomers({ limit: 1000 });
             const data = response?.data ?? response;
             let arr = [];
             if (Array.isArray(data)) {

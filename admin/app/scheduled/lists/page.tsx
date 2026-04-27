@@ -87,14 +87,12 @@ import { toast } from "react-hot-toast";
 import { api, handleApiError } from "@/utils/api";
 import { getAllCustomers } from "@/api/customers";
 
-// Customer view item component
+
 const CustomerViewItem = ({ customer, onViewLists, router }: any) => {
-  // State for more menu
 
   const [menuAnchor, setMenuAnchor] = useState<any>(null);
   const menuOpen = Boolean(menuAnchor);
 
-  // Format date nicely
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return new Intl.DateTimeFormat("en-US", {
@@ -221,7 +219,7 @@ const AdminCustomersPage = () => {
       }
       setError(null);
 
-      const response = await getAllCustomers();
+      const response = await getAllCustomers({ limit: 1000 });
       setCustomers(response?.data || []);
     } catch (error) {
       console.error("Failed to fetch customers:", error);

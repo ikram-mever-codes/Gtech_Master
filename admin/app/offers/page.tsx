@@ -204,12 +204,12 @@ const OffersPage: React.FC = () => {
 
   const fetchCustomers = async () => {
     try {
-      const response = await getAllCustomers();
+      const response = await getAllCustomers({ limit: 1000 });
       if (response?.data) {
         setCustomers(
           Array.isArray(response.data)
             ? response.data
-            : response.data.customers || [],
+            : response.data.customers || response.data.businesses || [],
         );
       }
     } catch (error) {

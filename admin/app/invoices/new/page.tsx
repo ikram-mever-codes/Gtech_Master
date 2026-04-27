@@ -125,7 +125,7 @@ const InvoiceGenerator: React.FC = () => {
   const loadCustomers = async () => {
     try {
       setLoadingCustomers(true);
-      const response = await getAllCustomers();
+      const response = await getAllCustomers({ limit: 1000 });
       if (response && response.data) {
         if (Array.isArray(response.data.businesses)) {
           setCustomers(response.data.businesses);
