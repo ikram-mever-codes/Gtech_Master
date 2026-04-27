@@ -48,7 +48,9 @@ import {
 import {
   createSupplierOrder,
   getAllSupplierOrders,
+  updateSupplierOrder,
   deleteSupplierOrder,
+  downloadPurchaseOrder,
   type SupplierOrder,
 } from "@/api/supplier_orders";
 
@@ -978,6 +980,14 @@ const OrderPage = () => {
   const [selectedItem, setSelectedItem] = useState<any>(null);
   const [splitQty, setSplitQty] = useState<number>(0);
   const [remarksCN, setRemarksCN] = useState("");
+  const [poForm, setPoForm] = useState({
+    po_description: "",
+    comment_items: "",
+    comment_attachments: "",
+    comment_quality: "",
+    comment_delivery_left: "",
+    comment_delivery_right: "",
+  });
 
   const itemById = useMemo(() => {
     const map = new Map<string, Item>();
@@ -1626,20 +1636,49 @@ const OrderPage = () => {
       prev.map((x) => (x.item_id === item_id ? { ...x, qty } : x)),
     );
   };
-
   const handleUpdateOrderItemRemark = (item_id: string, remark_de: string) => {
     setOrderItems((prev) =>
       prev.map((x) => (x.item_id === item_id ? { ...x, remark_de } : x)),
     );
   };
-
+  const handleSavePO = async () => {
+    if (!selectedOrder) return;
+    try {
+      await updateSupplierOrder(selectedOrder.id, {
+        ...poForm,
+        items: orderItems,
+      });
+      setShowModal(false);
+      fetchSupplierOrders();
+      toast.success("Purchase Order updated successfully");
+    } catch (e) {
+      console.error(e);
+      toast.error("Failed to update Purchase Order");
+    }
+  };
   const openCreate = () => {
     resetForm();
     setMode("create");
     setShowModal(true);
   };
-
   const openEdit = async (order: Order) => {
+    if (activeTab === "purchase_order") {
+      const so = order as any;
+      setMode("edit");
+      setSelectedOrder(so);
+      setPoForm({
+        po_description: so.po_description || "",
+        comment_items: so.comment_items || "",
+        comment_attachments: so.comment_attachments || "",
+        comment_quality: so.comment_quality || "",
+        comment_delivery_left: so.comment_delivery_left || "",
+        comment_delivery_right: so.comment_delivery_right || "",
+      });
+      setOrderItems(so.items || []);
+      setShowModal(true);
+      return;
+    }
+
     setMode("edit");
     setSelectedOrder(order);
     setShowModal(true);
@@ -1734,6 +1773,9 @@ const OrderPage = () => {
     try {
       const detailRes: any = await getOrderById(order.id);
       const detail = detailRes?.data ?? detailRes;
+      if (detail && detail.id) {
+        setViewOrder(detail);
+      }
       const lines = detail?.items ?? detail?.data?.items ?? [];
 
       if (Array.isArray(lines)) {
@@ -1766,6 +1808,13 @@ const OrderPage = () => {
               status: l.status || "NSO",
               item: l.item || item || null,
               supplier_id: resolvedSupplierId,
+              supplier_name:
+                l.supplier_name ||
+                l.item?.supplier?.company_name ||
+                l.item?.supplier?.name ||
+                (item as any)?.supplier?.company_name ||
+                (item as any)?.supplier?.name ||
+                null,
               taric_code: l.taric_code || l.item?.taric?.code || item?.taric || null,
             };
           }),
@@ -2852,7 +2901,7 @@ const OrderPage = () => {
                     },
                     {
                       header: "Supplier",
-                      width: "250px",
+                      width: "150px",
                       render: (row) => (
                         <div className="font-medium text-gray-700">
                           {row.supplier_id} - {row.supplier?.company_name || "-"}
@@ -2862,7 +2911,7 @@ const OrderPage = () => {
                     },
                     {
                       header: "Description",
-                      width: "300px",
+                      width: "180px",
                       render: (row) => {
                         const items = row.items || [];
                         const desc = items.map((i: any) => i.item?.item_name || i.item?.name).filter(Boolean).join(", ");
@@ -2905,7 +2954,7 @@ const OrderPage = () => {
                     },
                     {
                       header: "Actions",
-                      width: "250px",
+                      width: "200px",
                       align: "center",
                       render: (row) => (
                         <div className="flex gap-2">
@@ -2922,7 +2971,10 @@ const OrderPage = () => {
                             Close
                           </button>
                           <button
-                            onClick={() => toast.success("PO Downloading...")}
+                            onClick={() => {
+                              console.log("Download button clicked for SO ID:", row.id);
+                              downloadPurchaseOrder(row.id);
+                            }}
                             className="bg-green-700 text-white px-3 py-1 rounded-[4px] text-[10px] font-bold hover:bg-green-800 transition"
                           >
                             Download
@@ -3511,11 +3563,11 @@ const OrderPage = () => {
                   Supplier
                 </label>
                 <p className="text-gray-900 font-bold">
-                  {(viewOrder as any).supplier_name ||
-                    ((viewOrder as any).supplier_id
+                  {(viewOrder as any).supplier_name && (viewOrder as any).supplier_name !== "Unassigned"
+                    ? (viewOrder as any).supplier_name
+                    : (viewOrder as any).supplier_id
                       ? getSupplierName((viewOrder as any).supplier_id)
-                      : null) ||
-                    "Unassigned"}
+                      : "Unassigned"}
                 </p>
               </div>
             </div>
@@ -3613,8 +3665,11 @@ const OrderPage = () => {
                     header: "Supplier",
                     width: "120px",
                     render: (row) => {
-                      const sid = (row as any).supplier_id ||
-                        (row as any).item?.supplier_id;
+                      const nameFromBackend = (row as any).supplier_name;
+                      if (nameFromBackend && nameFromBackend !== "-" && nameFromBackend !== "Unassigned") {
+                        return nameFromBackend;
+                      }
+                      const sid = (row as any).supplier_id || (row as any).item?.supplier_id;
                       const name = sid ? getSupplierName(sid) : null;
                       return name && name !== "-" ? name : "-";
                     },
@@ -3628,242 +3683,257 @@ const OrderPage = () => {
       )}
 
       {showModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-bold text-gray-900">
-                  {mode === "convert"
-                    ? "CONVERT ORDER"
-                    : mode === "edit"
-                      ? "Edit Order"
-                      : isTab2
-                        ? "Create Customer Order"
-                        : "Create New Order"}
-                </h2>
-
+        <CustomModal
+          isOpen={showModal}
+          onClose={closeModal}
+          width={activeTab === "purchase_order" ? "max-w-6xl" : "max-w-4xl"}
+          title={
+            activeTab === "purchase_order"
+              ? "PURCHASE ORDER"
+              : mode === "convert"
+                ? "CONVERT ORDER"
+                : mode === "edit"
+                  ? "Edit Order"
+                  : isTab2
+                    ? "Create Customer Order"
+                    : "Create New Order"
+          }
+          footer={
+            activeTab === "purchase_order" ? (
+              <div className="flex gap-3">
                 <button
                   onClick={closeModal}
-                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                  className="px-6 py-2 rounded-lg border border-gray-200 text-gray-600 font-semibold hover:bg-gray-50 transition-all"
                 >
-                  <XMarkIcon className="h-5 w-5" />
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSavePO}
+                  className="px-6 py-2 rounded-lg bg-[#059669] text-white font-semibold hover:bg-green-700 shadow-md transition-all"
+                >
+                  Save Purchase Order
                 </button>
               </div>
-
+            ) : (
+              <div className="flex gap-3">
+                <button
+                  onClick={closeModal}
+                  className="px-6 py-2 rounded-lg border border-gray-200 text-gray-600 font-semibold hover:bg-gray-50 transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={mode === "edit" ? handleUpdateOrder : handleCreateOrder}
+                  className="px-6 py-2 rounded-lg bg-[#059669] text-white font-semibold hover:bg-green-700 shadow-md transition-all font-bold"
+                >
+                  {mode === "edit" ? "Update Order" : "Create Order"}
+                </button>
+              </div>
+            )
+          }
+        >
+          {activeTab === "purchase_order" ? (
+            <div className="space-y-6">
+              <div className="overflow-x-auto rounded-lg border border-gray-200">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-[#f8f9fa]">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-200">#</th>
+                      <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-200">ID Supplier name</th>
+                      <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-200">ID - Item name</th>
+                      <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-200">Model</th>
+                      <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-200 w-[80px]">QTY</th>
+                      <th className="px-4 py-3 text-right text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-200 w-[100px]">Price (RMB)</th>
+                      <th className="px-4 py-3 text-right text-xs font-bold text-gray-700 uppercase tracking-wider w-[120px]">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {orderItems.map((item, idx) => {
+                      const price = Number(item.price || 0);
+                      const qty = Number(item.qty || 0);
+                      const total = price * qty;
+                      const sid = item.supplier_id || (item.item as any)?.supplier_id || (selectedOrder as any)?.supplier_id;
+                      const sname = item.supplier_name || (item.item as any)?.supplier?.company_name || (selectedOrder as any)?.supplier?.company_name || "-";
+                      return (
+                        <tr key={idx} className="hover:bg-gray-50/50">
+                          <td className="px-4 py-2 text-sm text-gray-600 border-r border-gray-200">{idx + 1}</td>
+                          <td className="px-4 py-2 text-sm text-gray-700 border-r border-gray-200 font-medium">{sid} - {sname}</td>
+                          <td className="px-4 py-2 text-sm text-gray-600 border-r border-gray-200">
+                            <div className="font-semibold text-gray-800">{item.item_id}</div>
+                            <div className="text-[11px] leading-tight text-gray-500">{item.itemName || (item.item as any)?.item_name || (item.item as any)?.name}</div>
+                          </td>
+                          <td className="px-2 py-1 border-r border-gray-200">
+                            <input
+                              type="text"
+                              value={item.remark_de || ""}
+                              onChange={(e) => handleUpdateOrderItemRemark(item.item_id, e.target.value)}
+                              className="w-full px-2 py-1 text-xs border border-gray-200 rounded focus:ring-1 focus:ring-green-500 focus:border-green-500"
+                              placeholder="Model / Remark..."
+                            />
+                          </td>
+                          <td className="px-2 py-1 border-r border-gray-200">
+                            <input
+                              type="number"
+                              value={item.qty}
+                              onChange={(e) => handleUpdateOrderItemQty(item.item_id, Number(e.target.value))}
+                              className="w-full px-2 py-1 text-xs border border-gray-200 rounded text-center font-bold"
+                            />
+                          </td>
+                          <td className="px-4 py-2 text-sm text-right text-gray-700 border-r border-gray-200 font-medium">
+                            {price.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                          </td>
+                          <td className="px-4 py-2 text-sm text-right text-gray-900 font-bold bg-gray-50/30">
+                            {total.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                    <tr className="bg-gray-50 font-bold">
+                      <td colSpan={6} className="px-4 py-3 text-center text-sm text-gray-800 uppercase tracking-wider border-r border-gray-200">Grand total</td>
+                      <td className="px-4 py-3 text-sm text-right text-[#059669] text-lg">
+                        {orderItems.reduce((acc, it) => acc + (Number(it.price || 0) * Number(it.qty || 0)), 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4">
+                {[
+                  { label: "Description", key: "po_description" },
+                  { label: "Comment below item table", key: "comment_items" },
+                  { label: "Comment below attachments", key: "comment_attachments" },
+                  { label: "Comment below quality criteria", key: "comment_quality" },
+                  { label: "Comment below delivery", key: "comment_delivery_left" },
+                  { label: "Comment below delivery", key: "comment_delivery_right" },
+                ].map((field) => (
+                  <div key={field.key} className="space-y-2">
+                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider">{field.label}</label>
+                    <textarea
+                      value={(poForm as any)[field.key]}
+                      onChange={(e) => setPoForm(prev => ({ ...prev, [field.key]: e.target.value }))}
+                      rows={4}
+                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white shadow-sm transition-all"
+                      placeholder={`Enter ${field.label.toLowerCase()}...`}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
               {isConvertMode && (
                 <div className="mb-4 rounded-[4px] border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
                   <b>Note</b>. All other fields are locked. Only <b>QTY</b> and{" "}
                   <b>Item remark</b> is editable.
                 </div>
               )}
-
-              <div className="space-y-4">
-                <div className="flex gap-4">
-                  <div className="flex-1">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Select Category:
-                    </label>
+              <div className="flex gap-4">
+                <div className="flex-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Select Category:</label>
+                  <select
+                    value={form.category_id}
+                    onChange={(e) => handleCategoryChange(e.target.value)}
+                    disabled={lockAllExceptQty}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:bg-gray-50"
+                  >
+                    <option value="">Select Category</option>
+                    {categories.map((cat) => <option key={cat.id} value={String(cat.id)}>{cat.name}</option>)}
+                  </select>
+                </div>
+                <div className="flex-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">{isTab1 ? "Select Supplier:" : "Select Customer:"}</label>
+                  {isTab1 ? (
                     <select
-                      value={form.category_id}
-                      onChange={(e) => handleCategoryChange(e.target.value)}
+                      value={form.supplier_id}
+                      onChange={(e) => handleSupplierChange(e.target.value)}
                       disabled={lockAllExceptQty}
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:bg-gray-50"
                     >
-                      <option value="">Select Category</option>
-                      {categories.map((cat) => (
-                        <option key={cat.id} value={String(cat.id)}>
-                          {cat.name}
-                        </option>
-                      ))}
+                      <option value="">Select Supplier</option>
+                      {suppliers.map((s) => <option key={s.id} value={String(s.id)}>{s.company_name || s.name || "Unnamed Supplier"}</option>)}
                     </select>
-                  </div>
-
-                  <div className="flex-1">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      {isTab1 ? "Select Supplier:" : "Select Customer:"}
-                    </label>
-                    {isTab1 ? (
-                      <select
-                        value={form.supplier_id}
-                        onChange={(e) => handleSupplierChange(e.target.value)}
-                        disabled={lockAllExceptQty}
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:bg-gray-50"
-                      >
-                        <option value="">Select Supplier</option>
-                        {suppliers.map((s) => (
-                          <option key={s.id} value={String(s.id)}>
-                            {s.company_name || s.name || "Unnamed Supplier"}
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      <select
-                        value={form.customer_id}
-                        onChange={(e) => handleCustomerChange(e.target.value)}
-                        disabled={lockAllExceptQty}
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:bg-gray-50"
-                      >
-                        <option value="">Select Customer</option>
-                        {customers.map((customer) => (
-                          <option key={customer.id} value={String(customer.id)}>
-                            {customer.companyName}
-                          </option>
-                        ))}
-                      </select>
-                    )}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Select Item then quantity:
-                  </label>
-                  <ItemSelectorWithQuantity
-                    items={effectiveItems}
-                    selectedItemId={selectedItemId}
-                    onItemChange={setSelectedItemId}
-                    onAdd={handleAddItemToOrder}
-                    disabled={lockAllExceptQty || loadingItems}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Comment:
-                  </label>
-                  <textarea
-                    value={form.comment}
-                    onChange={(e) =>
-                      setForm((prev) => ({ ...prev, comment: e.target.value }))
-                    }
-                    disabled={lockAllExceptQty}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:bg-gray-50"
-                    placeholder="Enter order comment..."
-                    rows={3}
-                  />
-                </div>
-
-                {orderItems.length > 0 && (
-                  <div className="mt-3 overflow-x-auto">
-                    <table className="min-w-full bg-white border border-gray-200 rounded-[4px] shadow-md">
-                      <thead className="bg-gray-100">
-                        <tr>
-                          <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-b">
-                            ID
-                          </th>
-                          <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-b w-[120px]">
-                            Item name
-                          </th>
-                          <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-b">
-                            Qty
-                          </th>
-                          <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-b">
-                            Item remark
-                          </th>
-                          <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-b">
-                            Price
-                          </th>
-                          <th className="px-4 py-2 text-center text-sm font-medium text-gray-700 border-b">
-                            Action
-                          </th>
-                        </tr>
-                      </thead>
-
-                      <tbody>
-                        {orderItems.map((row) => (
-                          <tr key={row.item_id} className="hover:bg-gray-50">
-                            <td className="px-4 py-2 text-sm text-gray-700 border-b">
-                              {row.item_id}
-                            </td>
-                            <td className="px-4 py-2 text-sm text-gray-700 border-b">
-                              <div className="line-clamp-2 leading-tight max-w-[120px]">
-                                {row.itemName}
-                              </div>
-                            </td>
-
-                            <td className="px-4 py-2 text-sm text-gray-700 border-b">
-                              <input
-                                type="number"
-                                min={1}
-                                value={row.qty}
-                                onChange={(e) =>
-                                  handleUpdateOrderItemQty(
-                                    row.item_id,
-                                    Number(e.target.value),
-                                  )
-                                }
-                                className="w-20 px-2 py-1 text-sm border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500 focus:border-transparent"
-                              />
-                            </td>
-
-                            <td className="px-4 py-2 text-sm text-gray-700 border-b">
-                              <input
-                                type="text"
-                                value={row.remark_de}
-                                onChange={(e) =>
-                                  handleUpdateOrderItemRemark(
-                                    row.item_id,
-                                    String(e.target.value),
-                                  )
-                                }
-                                className="w-full px-2 py-1 text-sm border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:bg-gray-50"
-                              />
-                            </td>
-
-                            <td className="px-4 py-2 text-sm text-gray-700 border-b whitespace-nowrap">
-                              {row.price || 0}
-                            </td>
-
-                            <td className="px-4 py-2 text-sm text-gray-700 border-b text-center">
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  handleRemoveOrderItem(row.item_id)
-                                }
-                                disabled={lockAllExceptQty}
-                                className="inline-flex items-center gap-1 px-3 py-1.5 text-sm bg-red-600 text-white rounded-[4px] hover:bg-red-500 disabled:opacity-50"
-                              >
-                                <TrashIcon className="h-4 w-4" />
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-
-                <div className="flex justify-end gap-2 pt-4">
-                  <button
-                    onClick={closeModal}
-                    className="px-4 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-[4px] hover:bg-gray-50 transition-all"
-                  >
-                    Cancel
-                  </button>
-
-                  <CustomButton
-                    gradient={true}
-                    disabled={!canSubmit}
-                    onClick={
-                      mode === "convert"
-                        ? handleConvertOrder
-                        : mode === "edit"
-                          ? handleUpdateOrder
-                          : handleCreateOrder
-                    }
-                    className="px-6 py-2 text-sm bg-[#059669] text-white rounded-[4px] hover:bg-green-700 transition-all shadow-md font-bold disabled:opacity-50"
-                  >
-                    {mode === "convert"
-                      ? "CONVERT ORDER"
-                      : mode === "edit"
-                        ? "Update Order"
-                        : "Create Order"}
-                  </CustomButton>
+                  ) : (
+                    <select
+                      value={form.customer_id}
+                      onChange={(e) => handleCustomerChange(e.target.value)}
+                      disabled={lockAllExceptQty}
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:bg-gray-50"
+                    >
+                      <option value="">Select Customer</option>
+                      {customers.map((customer) => <option key={customer.id} value={String(customer.id)}>{customer.companyName}</option>)}
+                    </select>
+                  )}
                 </div>
               </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Select Item then quantity:</label>
+                <ItemSelectorWithQuantity
+                  items={effectiveItems}
+                  selectedItemId={selectedItemId}
+                  onItemChange={setSelectedItemId}
+                  onAdd={handleAddItemToOrder}
+                  disabled={lockAllExceptQty || loadingItems}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Comment:</label>
+                <textarea
+                  value={form.comment}
+                  onChange={(e) => setForm((prev) => ({ ...prev, comment: e.target.value }))}
+                  disabled={lockAllExceptQty}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:bg-gray-50"
+                  placeholder="Enter order comment..."
+                  rows={3}
+                />
+              </div>
+              {orderItems.length > 0 && (
+                <div className="mt-3 overflow-x-auto">
+                  <table className="min-w-full bg-white border border-gray-200 rounded-[4px] shadow-md">
+                    <thead className="bg-gray-100">
+                      <tr>
+                        <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-b">ID</th>
+                        <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-b w-[120px]">Item name</th>
+                        <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-b">Qty</th>
+                        <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-b">Item remark</th>
+                        <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-b">Price</th>
+                        <th className="px-4 py-2 text-center text-sm font-medium text-gray-700 border-b">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {orderItems.map((row) => (
+                        <tr key={row.item_id} className="hover:bg-gray-50">
+                          <td className="px-4 py-2 text-sm text-gray-700 border-b">{row.item_id}</td>
+                          <td className="px-4 py-2 text-sm text-gray-700 border-b"><div className="line-clamp-2 leading-tight max-w-[120px]">{row.itemName}</div></td>
+                          <td className="px-4 py-2 text-sm text-gray-700 border-b">
+                            <input
+                              type="number"
+                              min={1}
+                              value={row.qty}
+                              onChange={(e) => handleUpdateOrderItemQty(row.item_id, Number(e.target.value))}
+                              className="w-16 px-2 py-1 border border-gray-300 rounded-[4px]"
+                            />
+                          </td>
+                          <td className="px-4 py-2 text-sm text-gray-700 border-b">
+                            <input
+                              type="text"
+                              value={row.remark_de}
+                              onChange={(e) => handleUpdateOrderItemRemark(row.item_id, e.target.value)}
+                              className="w-full px-2 py-1 border border-gray-300 rounded-[4px]"
+                            />
+                          </td>
+                          <td className="px-4 py-2 text-sm text-gray-700 border-b">{row.price} {row.currency}</td>
+                          <td className="px-4 py-2 text-center border-b">
+                            <button onClick={() => handleRemoveOrderItem(row.item_id)} className="text-red-500 hover:text-red-700"><TrashIcon className="h-5 w-5" /></button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
-          </div>
-        </div>
+          )}
+        </CustomModal>
       )}
       {isEditQtyModalOpen && editQtyItem && (
         <CustomModal

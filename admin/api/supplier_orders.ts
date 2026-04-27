@@ -1,6 +1,11 @@
 import { api, handleApiError } from "../utils/api";
 import { toast } from "react-hot-toast";
-import { loadingStyles, successStyles } from "@/utils/constants";
+import {
+    errorStyles,
+    loadingStyles,
+    successStyles,
+} from "@/utils/constants";
+import { parseBlobError, downloadBlob } from "../utils/blobUtils";
 
 export type SupplierOrder = {
     id: number;
@@ -11,6 +16,12 @@ export type SupplierOrder = {
     paid: string;
     remark?: string;
     is_po_created: number;
+    po_description?: string;
+    comment_items?: string;
+    comment_attachments?: string;
+    comment_quality?: string;
+    comment_delivery_left?: string;
+    comment_delivery_right?: string;
     created_at: string;
     updated_at: string;
     supplier?: any;
@@ -81,5 +92,31 @@ export const updateSupplierOrder = async (id: number, data: Partial<SupplierOrde
         toast.dismiss();
         handleApiError(error);
         throw error;
+    }
+};
+
+export const downloadPurchaseOrder = async (id: number) => {
+    try {
+        toast.loading("Generating Purchase Order PDF...", loadingStyles);
+
+        const res = await api.get(`/supplier-orders/${id}/pdf`, {
+            responseType: "blob"
+        });
+
+        toast.dismiss();
+
+        if (res.data.type === "application/json") {
+            const errorData = await parseBlobError(res.data);
+            throw new Error(errorData.message || "Failed to generate PDF");
+        }
+
+        downloadBlob(res.data, `PurchaseOrder_${id}.pdf`);
+        toast.success("Purchase Order downloaded!", successStyles);
+    } catch (error: any) {
+        toast.dismiss();
+        console.error("[DOWNLOAD_ERROR]", error);
+
+        const message = error.response?.data?.message || error.message || "Failed to download Purchase Order";
+        toast.error(message, errorStyles);
     }
 };

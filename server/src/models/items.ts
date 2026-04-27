@@ -16,6 +16,7 @@ import { Supplier } from "./suppliers";
 import { LibraryFile } from "./library";
 import { PurchasePrice } from "./purchase_prices";
 import { SalesPrice } from "./sales_prices";
+import { ItemQuality } from "./item_qualities";
 
 @Entity()
 export class Item {
@@ -188,6 +189,9 @@ export class Item {
   @OneToMany(() => OrderItem, (orderItem) => orderItem.item)
   orderItems: OrderItem[];
 
-  @OneToMany(() => LibraryFile, (file) => file.itemId)
-  attachments: LibraryFile[];
+  @OneToMany(() => LibraryFile, (file) => file.item)
+  attachments!: LibraryFile[];
+
+  @OneToMany(() => ItemQuality, (quality) => quality.item)
+  qualityCriteria!: ItemQuality[];
 }

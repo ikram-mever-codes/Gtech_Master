@@ -38,6 +38,24 @@ export class SupplierOrder {
     @Column({ type: "int", default: 0 })
     is_po_created!: number;
 
+    @Column({ type: "text", nullable: true })
+    po_description?: string;
+
+    @Column({ type: "text", nullable: true })
+    comment_items?: string;
+
+    @Column({ type: "text", nullable: true })
+    comment_attachments?: string;
+
+    @Column({ type: "text", nullable: true })
+    comment_quality?: string;
+
+    @Column({ type: "text", nullable: true })
+    comment_delivery_left?: string;
+
+    @Column({ type: "text", nullable: true })
+    comment_delivery_right?: string;
+
     @CreateDateColumn()
     created_at!: Date;
 

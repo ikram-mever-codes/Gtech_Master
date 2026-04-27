@@ -5,6 +5,7 @@ import { SupplierOrder } from "../models/supplier_orders";
 import { OrderItem } from "../models/order_items";
 import { Supplier } from "../models/suppliers";
 import { In } from "typeorm";
+import { generatePurchaseOrderPDFBuffer } from "../services/pdfService";
 
 export const createSupplierOrder = async (req: Request, res: Response, next: NextFunction) => {
     const queryRunner = AppDataSource.createQueryRunner();
@@ -26,7 +27,6 @@ export const createSupplierOrder = async (req: Request, res: Response, next: Nex
         const supplierOrderRepo = queryRunner.manager.getRepository(SupplierOrder);
         const orderItemsRepo = queryRunner.manager.getRepository(OrderItem);
 
-        // Validate supplier_id
         if (supplier_id) {
             const supplierRepo = queryRunner.manager.getRepository(Supplier);
             const supplierExists = await supplierRepo.findOneBy({ id: supplier_id });
@@ -35,7 +35,6 @@ export const createSupplierOrder = async (req: Request, res: Response, next: Nex
             }
         }
 
-        // Validate order_type_id (Category)
         if (order_type_id) {
             const { Category } = await import("../models/categories");
             const categoryRepo = queryRunner.manager.getRepository(Category);
@@ -139,7 +138,21 @@ export const updateSupplierOrder = async (req: Request, res: Response, next: Nex
         let so = await repo.findOneBy({ id: Number(id) });
         if (!so) throw new ErrorHandler("Supplier order not found", 404);
 
-        const { supplier_id, order_type_id, ref_no, paid, remark, send2cargo, is_po_created } = req.body;
+        const {
+            supplier_id,
+            order_type_id,
+            ref_no,
+            paid,
+            remark,
+            send2cargo,
+            is_po_created,
+            po_description,
+            comment_items,
+            comment_attachments,
+            comment_quality,
+            comment_delivery_left,
+            comment_delivery_right
+        } = req.body;
 
         if (supplier_id !== undefined) so.supplier_id = supplier_id;
         if (order_type_id !== undefined) so.order_type_id = order_type_id;
@@ -148,6 +161,12 @@ export const updateSupplierOrder = async (req: Request, res: Response, next: Nex
         if (remark !== undefined) so.remark = remark;
         if (send2cargo !== undefined) so.send2cargo = send2cargo;
         if (is_po_created !== undefined) so.is_po_created = is_po_created;
+        if (po_description !== undefined) so.po_description = po_description;
+        if (comment_items !== undefined) so.comment_items = comment_items;
+        if (comment_attachments !== undefined) so.comment_attachments = comment_attachments;
+        if (comment_quality !== undefined) so.comment_quality = comment_quality;
+        if (comment_delivery_left !== undefined) so.comment_delivery_left = comment_delivery_left;
+        if (comment_delivery_right !== undefined) so.comment_delivery_right = comment_delivery_right;
 
         await repo.save(so);
 
@@ -187,5 +206,40 @@ export const deleteSupplierOrder = async (req: Request, res: Response, next: Nex
         return next(error);
     } finally {
         try { await queryRunner.release(); } catch { }
+    }
+};
+
+export const generatePurchaseOrderPDF = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const { id } = req.params;
+        const repo = AppDataSource.getRepository(SupplierOrder);
+
+        const so = await repo.findOne({
+            where: { id: Number(id) },
+            relations: [
+                "supplier",
+                "order_type",
+                "items",
+                "items.item",
+                "items.item.attachments",
+                "items.item.qualityCriteria"
+            ],
+        });
+
+        if (!so) throw new ErrorHandler("Purchase Order not found", 404);
+
+        const buffer = await generatePurchaseOrderPDFBuffer(so);
+
+        res.setHeader("Content-Type", "application/pdf");
+        res.setHeader("Content-Disposition", `attachment; filename=PurchaseOrder_${so.id}.pdf`);
+        return res.send(buffer);
+
+    } catch (error) {
+        console.error("[PDF_CONTROLLER_ERROR]", error);
+        if (!res.headersSent) {
+            return next(error);
+        } else {
+            return res.end();
+        }
     }
 };
