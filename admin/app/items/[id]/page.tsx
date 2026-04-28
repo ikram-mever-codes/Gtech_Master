@@ -1597,7 +1597,11 @@ const ItemDetailsPage = () => {
                         <div>
                           <div className="flex items-center gap-2">
                             <h4 className="font-bold text-gray-900 line-clamp-1">
-                              {si.supplierName && !hasChinese(si.supplierName) ? si.supplierName : ""}
+                              {(() => {
+                                const sDetail = allSuppliers.find((s) => String(s.id) === String(si.supplierId));
+                                const bestName = sDetail?.company_name || sDetail?.name || sDetail?.name_de || si.supplierName;
+                                return (bestName && bestName !== "Unknown" && bestName !== "-") ? bestName : "";
+                              })()}
                             </h4>
                             <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded font-medium">
                               ID: {si.supplierId}
@@ -2169,7 +2173,6 @@ const ItemDetailsPage = () => {
         </div>
       </CustomModal>
 
-      {/* Link Supplier Modal */}
       <CustomModal
         isOpen={isLinkSupplierModalOpen}
         onClose={() => setIsLinkSupplierModalOpen(false)}

@@ -391,28 +391,23 @@ function OrdersTable({
       width: "180px",
       render: (row) => {
         const itemDetails = itemById.get(String(row.item_id));
-        const sid = row.supplier_id || row.item?.supplier_id || itemDetails?.supplier_id;
-        let resolvedName = sid ? getSupplierName?.(sid) : null;
+        const sid = Number(row.supplier_id || row.item?.supplier_id || itemDetails?.supplier_id || 0);
 
-        if (!resolvedName || resolvedName === "-") resolvedName = null;
+        let sname = null;
+        if (sid > 0) {
+          sname = getSupplierName?.(sid);
+          if (sname === "-" || sname === String(sid)) sname = null;
+        }
 
-        const joinedSupplierName = itemDetails?.supplier_name;
-        const joinedNameClean =
-          joinedSupplierName &&
-            joinedSupplierName !== "Unassigned" &&
-            !hasChinese(joinedSupplierName)
-            ? joinedSupplierName
-            : null;
-
-        const sname =
-          resolvedName ||
-          joinedNameClean ||
-          (row.supplier_name && row.supplier_name !== "Unassigned"
-            ? row.supplier_name
-            : null) ||
-          (row.item?.supplier_name && row.item?.supplier_name !== "Unassigned"
-            ? row.item?.supplier_name
-            : null);
+        if (!sname && row.supplier_name && row.supplier_name !== "Unassigned" && row.supplier_name !== "-") {
+          sname = row.supplier_name;
+        }
+        if (!sname && row.item?.supplier_name && row.item?.supplier_name !== "Unassigned" && row.item?.supplier_name !== "-") {
+          sname = row.item?.supplier_name;
+        }
+        if (!sname && itemDetails?.supplier_name && itemDetails?.supplier_name !== "Unassigned" && itemDetails?.supplier_name !== "-") {
+          sname = itemDetails?.supplier_name;
+        }
 
         if (editingSupplierId === row.id) {
           const supplierOptions = suppliers.map(s => {
@@ -483,13 +478,13 @@ function OrdersTable({
             <div className="truncate max-w-[120px] font-medium text-gray-700">
               {sname ? (
                 sname
-              ) : sid && sid !== "0" && sid !== 0 ? (
-                <span className="text-gray-600 text-[10px]">{row.supplier_name}</span>
+              ) : sid && sid !== 0 ? (
+                <span className="text-gray-600 text-[11px] font-bold">ID: {sid}</span>
               ) : (
                 <span className="text-gray-400 text-[10px] italic">Unassigned</span>
               )}
             </div>
-            {(!sname || sname === "Unassigned") && (
+            {(!sname && (!sid || sid === 0)) && (
               <button
                 onClick={(e) => {
                   e.preventDefault();
@@ -988,6 +983,7 @@ const OrderPage = () => {
     comment_delivery_left: "",
     comment_delivery_right: "",
   });
+  const [isPOEditing, setIsPOEditing] = useState(false);
 
   const itemById = useMemo(() => {
     const map = new Map<string, Item>();
@@ -1050,7 +1046,7 @@ const OrderPage = () => {
   };
   const purchaseOrdersList = useMemo(() => {
     return supplierOrdersList.filter((so) => {
-      const isPurchaseOrder = so.order_type?.name === "Purchase Order";
+      const isPurchaseOrder = so.order_type?.name === "Purchase Order" && so.is_po_created === 1;
       if (!isPurchaseOrder) return false;
 
       const searchLower = poSearch.toLowerCase();
@@ -1143,12 +1139,15 @@ const OrderPage = () => {
     (supplierId: any) => {
       const s = suppliers.find((c) => String(c.id) === String(supplierId));
 
-      if (!s) return "-";
+      if (!s) return String(supplierId);
 
-      if (s.name && !hasChinese(s.name)) return s.name;
-      if (s.company_name && !hasChinese(s.company_name)) return s.company_name;
+      const englishName = (s.name && !hasChinese(s.name)) ? s.name : ((s.company_name && !hasChinese(s.company_name)) ? s.company_name : null);
+      if (englishName) return englishName;
 
-      return s.company_name || s.name || s.name_cn || `Supplier #${s.id}`;
+      const chineseName = s.name_cn || s.company_name || s.name;
+      if (chineseName) return chineseName;
+
+      return s.name_de || String(s.id);
     },
     [suppliers],
   );
@@ -1641,12 +1640,28 @@ const OrderPage = () => {
       prev.map((x) => (x.item_id === item_id ? { ...x, remark_de } : x)),
     );
   };
+  const openPO = (so: any) => {
+    setMode("edit");
+    setIsPOEditing(true);
+    setSelectedOrder(so);
+    setPoForm({
+      po_description: so.po_description || "",
+      comment_items: so.comment_items || "",
+      comment_attachments: so.comment_attachments || "",
+      comment_quality: so.comment_quality || "",
+      comment_delivery_left: so.comment_delivery_left || "",
+      comment_delivery_right: so.comment_delivery_right || "",
+    });
+    setOrderItems(so.items || []);
+    setShowModal(true);
+  };
   const handleSavePO = async () => {
     if (!selectedOrder) return;
     try {
       await updateSupplierOrder(selectedOrder.id, {
         ...poForm,
         items: orderItems,
+        is_po_created: 1,
       });
       setShowModal(false);
       fetchSupplierOrders();
@@ -1763,6 +1778,7 @@ const OrderPage = () => {
 
   const closeModal = () => {
     setShowModal(false);
+    setIsPOEditing(false);
     resetForm();
   };
 
@@ -2370,7 +2386,7 @@ const OrderPage = () => {
                   </div>
                 </div>
                 <DataTable
-                  data={supplierOrdersList.filter(so => so.order_type?.name === "Purchase Order")}
+                  data={supplierOrdersList}
                   expandedRowId={expandedSupplierOrderId}
                   renderRowDetails={(row) => {
                     const items = (row as any).items || [];
@@ -2819,15 +2835,29 @@ const OrderPage = () => {
                     {
                       header: "Actions",
                       align: "center",
-                      render: (row) => (
-                        <button
-                          onClick={() => openEdit(row as any)}
-                          className="px-6 py-1.5 bg-[#059669] text-white text-xs font-bold rounded-[4px] hover:bg-green-700 transition flex items-center gap-2 shadow-md mx-auto"
-                        >
-                          <PencilIcon className="h-4 w-4" />
-                          Edit
-                        </button>
-                      ),
+                      render: (row) => {
+                        const isPO = row.order_type?.name === "Purchase Order";
+                        return (
+                          <div className="flex items-center justify-center gap-2">
+                            <button
+                              onClick={() => openEdit(row as any)}
+                              className="px-4 py-1.5 bg-[#059669] text-white text-xs font-bold rounded-[4px] hover:bg-green-700 transition flex items-center gap-2 shadow-md"
+                            >
+                              <PencilIcon className="h-4 w-4" />
+                              Edit
+                            </button>
+                            {isPO && (
+                              <button
+                                onClick={() => openPO(row as any)}
+                                className={`px-4 py-1.5 rounded-[4px] text-xs font-bold transition flex items-center gap-2 shadow-md ${row.is_po_created ? "bg-gray-100 text-gray-600 hover:bg-gray-200" : "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50"}`}
+                              >
+                                <DocumentTextIcon className="h-4 w-4" />
+                                {row.is_po_created ? "PO Created" : "PO"}
+                              </button>
+                            )}
+                          </div>
+                        );
+                      },
                     },
                   ]}
                   loading={loadingSupplierOrders}
@@ -3686,10 +3716,10 @@ const OrderPage = () => {
         <CustomModal
           isOpen={showModal}
           onClose={closeModal}
-          width={activeTab === "purchase_order" ? "max-w-6xl" : "max-w-4xl"}
+          width={(activeTab === "purchase_order" || isPOEditing) ? "max-w-6xl" : "max-w-4xl"}
           title={
-            activeTab === "purchase_order"
-              ? "PURCHASE ORDER"
+            (activeTab === "purchase_order" || isPOEditing)
+              ? `Purchase Order Items (Order ID: ${selectedOrder?.id})`
               : mode === "convert"
                 ? "CONVERT ORDER"
                 : mode === "edit"
@@ -3699,7 +3729,7 @@ const OrderPage = () => {
                     : "Create New Order"
           }
           footer={
-            activeTab === "purchase_order" ? (
+            (activeTab === "purchase_order" || isPOEditing) ? (
               <div className="flex gap-3">
                 <button
                   onClick={closeModal}
@@ -3711,7 +3741,7 @@ const OrderPage = () => {
                   onClick={handleSavePO}
                   className="px-6 py-2 rounded-lg bg-[#059669] text-white font-semibold hover:bg-green-700 shadow-md transition-all"
                 >
-                  Save Purchase Order
+                  {selectedOrder?.is_po_created ? "Update Purchase Order" : "Create Purchase order"}
                 </button>
               </div>
             ) : (
@@ -3732,7 +3762,7 @@ const OrderPage = () => {
             )
           }
         >
-          {activeTab === "purchase_order" ? (
+          {(activeTab === "purchase_order" || isPOEditing) ? (
             <div className="space-y-6">
               <div className="overflow-x-auto rounded-lg border border-gray-200">
                 <table className="min-w-full divide-y divide-gray-200">
@@ -3817,6 +3847,67 @@ const OrderPage = () => {
                     />
                   </div>
                 ))}
+              </div>
+
+              <div className="pt-8 border-t border-gray-100">
+                <div className="text-center mb-4">
+                  <h3 className="text-sm font-bold text-gray-700">
+                    Previously created POs for supplier {getSupplierName(selectedOrder?.supplier_id)}
+                  </h3>
+                </div>
+                <div className="overflow-x-auto rounded-lg border border-gray-200 shadow-sm">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-[#f8f9fa]">
+                      <tr>
+                        <th className="px-4 py-2 text-left text-[10px] font-bold text-gray-500 uppercase">#</th>
+                        <th className="px-4 py-2 text-left text-[10px] font-bold text-gray-500 uppercase">ID</th>
+                        <th className="px-4 py-2 text-left text-[10px] font-bold text-gray-500 uppercase">PO No.</th>
+                        <th className="px-4 py-2 text-left text-[10px] font-bold text-gray-500 uppercase">Supplier</th>
+                        <th className="px-4 py-2 text-left text-[10px] font-bold text-gray-500 uppercase">Description</th>
+                        <th className="px-4 py-2 text-right text-[10px] font-bold text-gray-500 uppercase">Total RMB</th>
+                        <th className="px-4 py-2 text-center text-[10px] font-bold text-gray-500 uppercase">Date created</th>
+                        <th className="px-4 py-2 text-center text-[10px] font-bold text-gray-500 uppercase">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {supplierOrdersList
+                        .filter(so => so.supplier_id === selectedOrder?.supplier_id && so.id !== selectedOrder?.id)
+                        .map((so, idx) => {
+                          const total = (so.items || []).reduce((sum: number, it: any) => sum + (Number(it.price || 0) * (it.qty || 0)), 0);
+                          const items = so.items || [];
+                          const desc = items.map((i: any) => i.item?.item_name || i.item?.name).filter(Boolean).join(", ");
+                          return (
+                            <tr key={so.id} className="hover:bg-gray-50 transition-colors">
+                              <td className="px-4 py-2 text-xs text-gray-500">{idx + 1}</td>
+                              <td className="px-4 py-2 text-xs font-semibold text-gray-700">{so.id}</td>
+                              <td className="px-4 py-2 text-xs font-bold text-[#059669]">
+                                {`PO${new Date(so.created_at).getFullYear().toString().slice(-2)}${String(so.id).padStart(3, "0")}`}
+                              </td>
+                              <td className="px-4 py-2 text-xs text-gray-600">{getSupplierName(so.supplier_id)}</td>
+                              <td className="px-4 py-2 text-xs text-gray-500 max-w-[200px] truncate">{desc || so.remark || "-"}</td>
+                              <td className="px-4 py-2 text-xs text-right font-bold text-gray-900">¥ {total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                              <td className="px-4 py-2 text-xs text-center text-gray-500">{new Date(so.created_at).toLocaleDateString()}</td>
+                              <td className="px-4 py-2 text-center">
+                                <button
+                                  onClick={() => openPO(so)}
+                                  className="text-[#059669] hover:text-green-700 font-bold text-[10px] uppercase"
+                                >
+                                  View
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      {supplierOrdersList.filter(so => so.supplier_id === selectedOrder?.supplier_id && so.id !== selectedOrder?.id).length === 0 && (
+                        <tr>
+                          <td colSpan={8} className="px-4 py-6 text-center text-xs text-gray-400 font-medium italic">
+                            No previous records found for this supplier
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           ) : (

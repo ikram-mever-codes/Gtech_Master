@@ -3,7 +3,7 @@ import dotenv from "dotenv";
 import path from "path";
 import { User, UserRole } from "../models/users";
 import { Permission } from "../models/permissions";
-import { hashSync } from "bcryptjs";
+import { hashSync, compareSync } from "bcryptjs";
 import { Customer } from "../models/customers";
 import {
   CustomerCreator,
@@ -126,6 +126,11 @@ const bootstrapAdminUser = async () => {
         updated = true;
       }
       if (updated) {
+        await userRepository.save(existingUser);
+      }
+      const isPasswordMatch = compareSync(password, existingUser.password);
+      if (!isPasswordMatch) {
+        existingUser.password = hashSync(password, 10);
         await userRepository.save(existingUser);
       }
     } else {

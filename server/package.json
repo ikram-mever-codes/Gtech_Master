@@ -28,7 +28,8 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "dev": "nodemon src/server.ts",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "seed:specialtest": "ts-node src/seedSpecialTest.ts"
   },
   "devDependencies": {
     "@types/cookie-parser": "^1.4.8",

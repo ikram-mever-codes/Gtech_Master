@@ -6,6 +6,7 @@ export type Supplier = {
     order_type_id?: number;
     name?: string;
     name_cn?: string;
+    name_de?: string;
     company_name?: string;
     extra_note?: string;
     min_order_value?: number;

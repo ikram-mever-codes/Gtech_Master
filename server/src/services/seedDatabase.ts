@@ -121,6 +121,11 @@ export const seedDatabase = async () => {
                     de_cat: "MAT",
                     is_ignored_value: "N",
                 },
+                {
+                    name: "Purchase Order",
+                    de_cat: "PO",
+                    is_ignored_value: "N",
+                },
             ];
 
             for (const catData of categories) {

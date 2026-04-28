@@ -26,14 +26,20 @@ export async function generatePurchaseOrderPDFBuffer(so: SupplierOrder): Promise
 
     const fetchImage = (url: string | undefined): Promise<Buffer> => {
         return new Promise((resolve, reject) => {
-            if (!url || typeof url !== 'string' || !url.startsWith("http")) {
+            if (!url || typeof url !== 'string') {
                 return reject(new Error("Invalid or empty URL"));
             }
 
-            const agent = new https.Agent({ rejectUnauthorized: false });
-            const client = url.startsWith("https") ? https : http;
+            let finalUrl = url;
+            if (!url.startsWith("http")) {
+                const baseUrl = process.env.API_URL?.replace("/api/v1", "") || "http://localhost:1000";
+                finalUrl = `${baseUrl}${url}`;
+            }
 
-            client.get(url, { agent: url.startsWith("https") ? agent : undefined }, (res) => {
+            const agent = new https.Agent({ rejectUnauthorized: false });
+            const client = finalUrl.startsWith("https") ? https : http;
+
+            client.get(finalUrl, { agent: finalUrl.startsWith("https") ? agent : undefined }, (res) => {
                 if (res.statusCode !== 200) {
                     return reject(new Error(`Status ${res.statusCode}`));
                 }
@@ -173,33 +179,33 @@ export async function generatePurchaseOrderPDFBuffer(so: SupplierOrder): Promise
                 itemY += 20;
 
                 for (const att of attachments) {
-                    checkSpace(120);
+                    checkSpace(400);
                     try {
                         const img = await fetchImage(att.url);
-                        doc.image(img, cols[0], itemY, { width: 100 });
-                        itemY += 110;
+                        doc.image(img, cols[0], itemY, { fit: [515, 350], align: 'center' });
+                        itemY += 365;
                     } catch (e) {
                         doc.fillColor("#999999").font("Helvetica-Oblique").fontSize(9).text("[ Image Not Available ]", cols[0], itemY);
-                        itemY += 15;
+                        itemY += 20;
                     }
-                    doc.fillColor("#333333").font("Helvetica").fontSize(9).text(`Attachment: ${att.description || att.filename || "No description"}`, cols[0], itemY);
-                    itemY += 20;
+                    doc.fillColor("#333333").font("Helvetica").fontSize(10).text(`Attachment: ${att.description || att.filename || "No description"}`, cols[0], itemY);
+                    itemY += 30;
                 }
 
                 for (const qc of qualityCriteria) {
-                    checkSpace(120);
+                    checkSpace(430);
                     try {
                         const img = await fetchImage(qc.picture);
-                        doc.image(img, cols[0], itemY, { width: 100 });
-                        itemY += 110;
+                        doc.image(img, cols[0], itemY, { fit: [515, 350], align: 'center' });
+                        itemY += 365;
                     } catch (e) {
                         doc.fillColor("#999999").font("Helvetica-Oblique").fontSize(9).text("[ Image Not Available ]", cols[0], itemY);
-                        itemY += 15;
+                        itemY += 20;
                     }
-                    doc.fillColor("#333333").font("Helvetica-Bold").fontSize(9).text(`Quality Criteria: ${qc.name || "N/A"}`, cols[0], itemY);
-                    itemY += 12;
-                    doc.font("Helvetica").text(qc.description || "No description", cols[0], itemY, { width: 500 });
-                    itemY += 25;
+                    doc.fillColor("#333333").font("Helvetica-Bold").fontSize(10).text(`Quality Criteria: ${qc.name || "N/A"}`, cols[0], itemY);
+                    itemY += 15;
+                    doc.font("Helvetica").fontSize(10).text(qc.description || "No description", cols[0], itemY, { width: 515 });
+                    itemY += doc.heightOfString(qc.description || "No description", { width: 515 }) + 25;
                 }
                 itemY += 10;
             }
