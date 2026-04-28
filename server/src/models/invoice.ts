@@ -9,6 +9,7 @@ import {
   JoinColumn,
 } from "typeorm";
 import { Customer } from "./customers";
+import { Item } from "./items";
 
 @Entity()
 export class Invoice {
@@ -88,13 +89,16 @@ export class InvoiceItem {
 
   @Column()
   quantity!: number;
+
   @Column({ nullable: true })
   articleNumber?: string;
 
   @Column()
   description!: string;
+
   @Column({ type: "decimal", precision: 10, scale: 2 })
   unitPrice!: number;
+
   @Column({ type: "decimal", precision: 10, scale: 2 })
   netPrice!: number;
 
@@ -106,6 +110,13 @@ export class InvoiceItem {
 
   @Column({ type: "decimal", precision: 10, scale: 2 })
   grossPrice!: number;
+
+  @Column({ type: "int", nullable: true })
+  item_id?: number | null;
+
+  @ManyToOne(() => Item, { nullable: true, eager: false })
+  @JoinColumn({ name: "item_id" })
+  item?: Item | null;
 
   @ManyToOne(() => Invoice, (invoice) => invoice.items)
   invoice!: Invoice;
