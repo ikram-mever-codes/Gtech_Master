@@ -6,7 +6,7 @@ import { initializeDatabase } from "./config/database";
 import { getConnection } from "./config/misDb";
 import ErrorHandler from "./utils/errorHandler";
 
-const PORT = process.env.PORT || 1001;
+const PORT = process.env.PORT || 1000;
 
 const startServer = async () => {
   try {
