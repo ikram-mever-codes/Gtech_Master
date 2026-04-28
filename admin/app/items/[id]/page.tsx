@@ -995,7 +995,7 @@ const ItemDetailsPage = () => {
                 />
                 <SelectInfoRow
                   label="Supplier"
-                  value={itemData.supplier_id?.toString() ?? ""}
+                  value={(itemData.supplier_id || itemData.supplierItems?.find((si: any) => si.isDefault)?.supplierId)?.toString() ?? ""}
                   field="supplier_id"
                   options={allSuppliers.map((s: any) => ({
                     label: `[ID: ${s.id}] ${!hasChinese(s.name) ? s.name : s.company_name || ""}`,

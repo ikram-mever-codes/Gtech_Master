@@ -827,7 +827,7 @@ const BusinessSearchPage: React.FC = () => {
                         <td className="px-3 py-3">
                           {business.website ? (
                             <a
-                              href={`https://${business.website}`}
+                              href={business.website.startsWith("http://") || business.website.startsWith("https://") ? business.website : `https://${business.website}`}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="text-primary hover:underline flex items-center gap-1"
