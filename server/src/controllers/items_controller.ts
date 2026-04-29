@@ -24,8 +24,6 @@ import {
   Brackets,
 } from "typeorm";
 import ErrorHandler from "../utils/errorHandler";
-// MIS sync removed — TARIC operations are local-only
-// import { pool } from "../config/misDb";
 import { UserRole } from "../models/users";
 import { filterDataByRole } from "../utils/dataFilter";
 import { AuthorizedRequest } from "../middlewares/authorized";
@@ -50,14 +48,12 @@ const calculateTransferPrice = (
   rmbPrice: number,
   categoryName: string,
 ): number => {
-  // Logic for GTR, GBL, PRO, ERS
   const flatCategories = ["GTR", "GBL", "PRO", "ERS"];
 
   if (flatCategories.includes(categoryName)) {
     return parseFloat(((rmbPrice / 7) * 1.5).toFixed(2));
   }
 
-  // Tiered logic for STD
   let multiplier: number;
 
   if (rmbPrice < 0.25) multiplier = 2.5;
@@ -68,15 +64,10 @@ const calculateTransferPrice = (
   else if (rmbPrice < 8) multiplier = 1.7;
   else if (rmbPrice < 14) multiplier = 1.6;
   else if (rmbPrice < 28) multiplier = 1.5;
-  else multiplier = 1.45; // For prices >= 28
+  else multiplier = 1.45;
 
   return parseFloat(((rmbPrice * multiplier) / 7).toFixed(2));
 };
-
-/**
- * Feeds transfer prices for all items belonging to the 'STD' category.
- * Can be triggered via a button or a cron job.
- */
 
 export const feedTransferPrices = async (
   req: Request,
@@ -88,7 +79,6 @@ export const feedTransferPrices = async (
     const supplierItemRepo = AppDataSource.getRepository(SupplierItem);
     const categoryRepo = AppDataSource.getRepository(Category);
 
-    // 1. Fetch all target categories at once
     const targetCategoryNames = ["STD", "GTR", "GBL", "PRO", "ERS"];
     const categories = await categoryRepo.find({
       where: { name: In(targetCategoryNames) },
@@ -99,13 +89,10 @@ export const feedTransferPrices = async (
       );
     }
 
-    // Map ID to Name for quick lookup in the loop
     const categoryMap = new Map(categories.map((c) => [c.de_cat, c.name]));
 
     const categoryIds = Array.from(categoryMap.keys());
     console.log(categoryIds);
-
-    // 2. Fetch all items belonging to these categories
     const items = await itemRepo.find({
       where: { supp_cat: In(targetCategoryNames) },
     });
@@ -124,7 +111,6 @@ export const feedTransferPrices = async (
           item.supp_cat || "",
         );
 
-        // Update only if the price has actually changed
         if (item.transfer_price_EUR !== newPrice) {
           item.transfer_price_EUR = newPrice;
           item.is_updated = true;
@@ -300,11 +286,29 @@ export const getItems = async (
       }
     });
 
-    // Fetch RMB_Price for all items from supplier_items
     const rmbPriceMap = new Map<number, number | null>();
     for (const item of items) {
       const rmbPrice = await getRMBPriceFromSupplier(item.id);
       rmbPriceMap.set(item.id, rmbPrice);
+    }
+
+    const missingSupplierIds = items.filter(i => !i.supplier_id).map(i => i.id);
+    const defaultSIMap = new Map<number, { id: number; name: string | null; company_name: string | null }>();
+    if (missingSupplierIds.length > 0) {
+      try {
+        const supplierItemRepo = AppDataSource.getRepository(SupplierItem);
+        const defaultSIs = await supplierItemRepo.find({
+          where: { item_id: In(missingSupplierIds), is_default: "Y" },
+          relations: ["supplier"],
+        });
+        defaultSIs.forEach((si: any) => {
+          defaultSIMap.set(si.item_id, {
+            id: si.supplier_id,
+            name: si.supplier?.name || null,
+            company_name: si.supplier?.company_name || null,
+          });
+        });
+      } catch (_) { }
     }
 
     const formattedItems = await Promise.all(
@@ -333,12 +337,15 @@ export const getItems = async (
           });
         }
 
-        let supplierData = null;
+        let supplierData: any = null;
+        const effectiveSupplierId = item.supplier_id || defaultSIMap.get(item.id)?.id || null;
         if (item.supplier_id) {
           supplierData = await supplierRepository.findOne({
             where: { id: item.supplier_id },
             select: ["id", "name", "company_name"],
           });
+        } else if (defaultSIMap.has(item.id)) {
+          supplierData = defaultSIMap.get(item.id);
         }
 
         let warehouseData = null;
@@ -367,7 +374,7 @@ export const getItems = async (
           taric_id: item.taric_id || null,
           category_id: item.cat_id || null,
           category: item?.supp_cat || null,
-          supplier_id: item.supplier_id || null,
+          supplier_id: effectiveSupplierId,
           supplier_name:
             supplierData?.company_name || supplierData?.name || null,
           weight: item.weight,
@@ -801,7 +808,6 @@ export const createItem = async (
         return next(new ErrorHandler("Item with this EAN already exists", 400));
     }
 
-    // --- TRANSFER PRICE LOGIC ---
     let finalPrice = price ? parseFloat(price) : null;
     const finalRMB = RMB_Price ? parseFloat(RMB_Price) : null;
 
@@ -3110,7 +3116,6 @@ export const exportItemsToCSV = async (
         const warehouseData = await getWarehouseData(item.id, item.ItemID_DE);
         const variationData = await getVariationValues(item.id);
 
-        // Get RMB_Price from the map (from supplier_items)
         const rmbPrice = rmbPriceMap.get(item.id) || 0;
         const priceColumns = getPriceColumns(rmbPrice);
 

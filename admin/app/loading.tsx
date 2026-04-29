@@ -4,7 +4,7 @@ import { Box, CircularProgress, Typography, useTheme } from "@mui/material";
 
 /**
  * @param {Object} props
- * @param {"full" | "container" | "inline"} props.type - Type of loader
+ * @param {"full" | "container" | "inline"} props.type
  * @param {string} props.text - Optional text to display
  * @param {Object} props.sx - Additional styles
  */
