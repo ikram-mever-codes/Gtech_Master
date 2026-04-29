@@ -432,10 +432,21 @@ export const getAllOrders = async (
     const supplierItemRepo = AppDataSource.getRepository(SupplierItem);
     const supplierItems = await supplierItemRepo.find({
       where: { item_id: In(itemIds.length ? itemIds : [0]) },
+      relations: ["supplier"],
     });
     const rmbPriceMap = new Map(
       supplierItems.map((si) => [si.item_id, si.price_rmb]),
     );
+
+    const defaultSupplierMap = new Map<number, { id: number; name: string | null }>();
+    supplierItems.forEach((si) => {
+      if (si.is_default === "Y" && si.supplier) {
+        defaultSupplierMap.set(si.item_id, {
+          id: si.supplier_id,
+          name: si.supplier.company_name || si.supplier.name || null,
+        });
+      }
+    });
 
     const mappedOrders = orders.map((order) => ({
       ...order,
@@ -461,9 +472,14 @@ export const getAllOrders = async (
           warehouseItem = warehouseByItemId.get(itemDetails.id);
         }
 
+        const defaultSup = defaultSupplierMap.get(
+          oi.item_id || itemDetails?.id || 0,
+        );
+
         const resolvedSupplierName =
           itemDetails?.supplier?.company_name ||
           itemDetails?.supplier?.name ||
+          defaultSup?.name ||
           order.supplier?.company_name ||
           order.supplier?.name ||
           null;
@@ -493,7 +509,8 @@ export const getAllOrders = async (
           currency: "CNY",
           taric_id: oi.taric_id || itemDetails?.taric_id,
           taric_code: oi.set_taric_code || itemDetails?.taric?.code || "-",
-          supplier_id: itemDetails?.supplier_id || order.supplier_id,
+          supplier_id:
+            itemDetails?.supplier_id || defaultSup?.id || order.supplier_id,
           supplier_name: resolvedSupplierName || "Unassigned",
           rmb_price: rmbPrice,
           item: itemDetails,
@@ -565,10 +582,21 @@ export const getOrderById = async (
 
     const supplierItems = await supplierItemRepository.find({
       where: { item_id: In(itemIds.length ? itemIds : [0]) },
+      relations: ["supplier"],
     });
     const rmbPriceMap = new Map(
       supplierItems.map((si) => [si.item_id, si.price_rmb]),
     );
+
+    const defaultSupplierMap = new Map<number, { id: number; name: string | null }>();
+    supplierItems.forEach((si) => {
+      if (si.is_default === "Y" && si.supplier) {
+        defaultSupplierMap.set(si.item_id, {
+          id: si.supplier_id,
+          name: si.supplier.company_name || si.supplier.name || null,
+        });
+      }
+    });
 
     const result = {
       id: order.id,
@@ -602,15 +630,21 @@ export const getOrderById = async (
           const finalPrice =
             rmbPrice > 0 ? rmbPrice : item?.price || oi.price || 0;
 
+          const defaultSup = defaultSupplierMap.get(
+            oi.item_id || item?.id || 0,
+          );
+
           const resolvedSupplierId =
             (oi as any).supplier_id ||
             item?.supplier_id ||
+            defaultSup?.id ||
             order.supplier_id ||
             null;
 
           const resolvedSupplierName =
             item?.supplier?.company_name ||
             item?.supplier?.name ||
+            defaultSup?.name ||
             order.supplier?.company_name ||
             order.supplier?.name ||
             null;
@@ -1112,6 +1146,11 @@ export const generateCommercialInvoicePDF = async (
         .json({ success: false, message: "Invoice not found" });
     }
 
+    const cargoRepository = AppDataSource.getRepository(Cargo);
+    const cargo = await cargoRepository.findOne({
+      where: { cargo_no: invoice.orderNumber },
+    });
+
     const customer = invoice.customer;
     const invoiceItems = invoice.items || [];
 
@@ -1123,21 +1162,33 @@ export const generateCommercialInvoicePDF = async (
       cargoNo: invoice.orderNumber || "N/A",
       customerID: customer?.id?.slice(0, 8) || "7",
       billTo: {
-        name: customer?.companyName || "N/A",
-        contact: customer?.legalName || "-",
-        street: customer?.addressLine1 || "N/A",
-        city: `${customer?.postalCode || ""} ${customer?.city || ""}`,
-        country: customer?.country || "Germany",
-        phone: customer?.contactPhoneNumber || "N/A",
-        eori: customer?.taxNumber || "DE977540238364617",
+        name:
+          cargo?.bill_to_display_name ||
+          cargo?.bill_to_company_name ||
+          customer?.companyName ||
+          "N/A",
+        contact: cargo?.bill_to_contact_person || customer?.legalName || "-",
+        street: cargo?.bill_to_full_address || customer?.addressLine1 || "N/A",
+        city: cargo?.bill_to_city
+          ? `${cargo.bill_to_postal_code || ""} ${cargo.bill_to_city}`
+          : `${customer?.postalCode || ""} ${customer?.city || ""}`,
+        country: cargo?.bill_to_country || customer?.country || "Germany",
+        phone: cargo?.bill_to_phone_no || customer?.contactPhoneNumber || "N/A",
+        eori: cargo?.bill_to_tax_no || customer?.taxNumber || "DE977540238364617",
       },
       shipTo: {
-        company: customer?.companyName || "N/A",
-        contact: customer?.legalName || "-",
-        street: customer?.addressLine1 || "N/A",
-        city: `${customer?.postalCode || ""} ${customer?.city || ""}`,
-        country: customer?.country || "Germany",
-        phone: customer?.contactPhoneNumber || "N/A",
+        company:
+          cargo?.ship_to_display_name ||
+          cargo?.ship_to_company_name ||
+          customer?.companyName ||
+          "N/A",
+        contact: cargo?.ship_to_contact_person || customer?.legalName || "-",
+        street: cargo?.ship_to_full_address || customer?.addressLine1 || "N/A",
+        city: cargo?.ship_to_city
+          ? `${cargo.ship_to_postal_code || ""} ${cargo.ship_to_city}`
+          : `${customer?.postalCode || ""} ${customer?.city || ""}`,
+        country: cargo?.ship_to_country || customer?.country || "Germany",
+        phone: cargo?.ship_to_contact_phone || customer?.contactPhoneNumber || "N/A",
       },
       lineItems: await Promise.all(invoiceItems.map(async (item, index) => {
         let unitPrice = Number(item.unitPrice);
@@ -1160,7 +1211,7 @@ export const generateCommercialInvoicePDF = async (
               if (found?.transfer_price_EUR) {
                 unitPrice = Number(found.transfer_price_EUR);
               }
-            } catch (_) {}
+            } catch (_) { }
           }
         }
 
@@ -1202,9 +1253,16 @@ export const generateCommercialInvoicePDF = async (
       .font("Helvetica")
       .fontSize(22)
       .text("GTech Industries Limited", 40, 20, { align: "right" });
-    doc.fontSize(11).text("Engineering ✔ Design ✔ Manufacturing ✔", 40, 48, {
-      align: "right",
-    });
+    const tickColor = "#777777";
+    doc.fontSize(11).fillColor("#777777");
+    doc.text("Engineering", 325, 48);
+    doc.save().translate(387, 48).scale(0.8).moveTo(0, 5).lineTo(3, 8).lineTo(8, 0).strokeColor(tickColor).lineWidth(2).stroke().restore();
+
+    doc.text("Design", 412, 48);
+    doc.save().translate(448, 48).scale(0.8).moveTo(0, 5).lineTo(3, 8).lineTo(8, 0).strokeColor(tickColor).lineWidth(2).stroke().restore();
+
+    doc.text("Manufacturing", 473, 48);
+    doc.save().translate(546, 48).scale(0.8).moveTo(0, 5).lineTo(3, 8).lineTo(8, 0).strokeColor(tickColor).lineWidth(2).stroke().restore();
     doc
       .moveTo(40, 65)
       .lineTo(555, 65)
@@ -1366,15 +1424,15 @@ export const generateCommercialInvoicePDF = async (
       .text("DHL Express, 30kg total", 100, remarkY + 32)
       .text("2parcels", 100, remarkY + 48)
       .text(`WAYBILL ${data.waybill}`, 100, remarkY + 64);
-    doc.text(
+    doc.fontSize(9).text(
       "We hereby confirm that no raw material from Russia were used",
       100,
-      remarkY + 98,
+      700,
     );
     doc.text(
       "in the production of the goods mentioned in this invoice.",
       100,
-      remarkY + 114,
+      712,
     );
 
     const footerY = 730;
