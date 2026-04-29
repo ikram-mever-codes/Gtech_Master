@@ -11,12 +11,10 @@ import { Inquiry } from "../models/inquiry";
 import { RequestedItem } from "../models/requested_items";
 import { Customer } from "../models/customers";
 
-// Fixed imports with type safety
 type ValidatorModule = any;
 type TransformerModule = any;
 type CanvasModule = any;
 
-// Mock types for missing modules (you should install these packages)
 interface ValidationError {
   property: string;
   constraints?: { [key: string]: string };
@@ -24,23 +22,21 @@ interface ValidationError {
 
 type ClassConstructor<T> = new (...args: any[]) => T;
 
-// Helper functions to handle missing modules
 const getValidator = (): ValidatorModule => {
   try {
     return require("class-validator");
   } catch {
-    // Mock implementation if module is not installed
     return {
-      IsDate: () => () => {},
-      IsEnum: () => () => {},
-      IsNumber: () => () => {},
-      IsObject: () => () => {},
-      IsOptional: () => () => {},
-      IsString: () => () => {},
-      Max: () => () => {},
-      Min: () => () => {},
-      IsBoolean: () => () => {},
-      IsArray: () => () => {},
+      IsDate: () => () => { },
+      IsEnum: () => () => { },
+      IsNumber: () => () => { },
+      IsObject: () => () => { },
+      IsOptional: () => () => { },
+      IsString: () => () => { },
+      Max: () => () => { },
+      Min: () => () => { },
+      IsBoolean: () => () => { },
+      IsArray: () => () => { },
       validate: async () => [],
     };
   }
@@ -50,9 +46,8 @@ const getTransformer = (): TransformerModule => {
   try {
     return require("class-transformer");
   } catch {
-    // Mock implementation if module is not installed
     return {
-      Type: () => () => {},
+      Type: () => () => { },
       plainToInstance: <T>(cls: ClassConstructor<T>, plain: any): T =>
         plain as T,
     };
@@ -63,14 +58,12 @@ const getCanvas = (): CanvasModule => {
   try {
     return require("canvas");
   } catch {
-    // Mock implementation if module is not installed
     return {
       createCanvas: () => ({ width: 0, height: 0, getContext: () => ({}) }),
     };
   }
 };
 
-// Import modules using helper functions
 const {
   IsDate,
   IsEnum,
@@ -169,7 +162,6 @@ export class CreateOfferDto {
     contactPhone?: string;
   };
 
-  // Unit pricing settings for offer
   @IsOptional()
   @IsBoolean()
   useUnitPrices?: boolean;
@@ -298,7 +290,6 @@ export class UpdateOfferDto {
   @Min(0)
   totalAmount?: number;
 
-  // Unit pricing settings for offer
   @IsOptional()
   @IsBoolean()
   useUnitPrices?: boolean;
@@ -457,13 +448,11 @@ export class OfferController {
     try {
       const { inquiryId } = request.params;
 
-      // Transform and create DTO instance with explicit options
       const createOfferDto = plainToInstance(CreateOfferDto, request.body, {
         excludeExtraneousValues: false,
         enableImplicitConversion: true,
       });
 
-      // Check if DTO was properly created
       if (!createOfferDto || typeof createOfferDto !== "object") {
         return response.status(400).json({
           success: false,
@@ -471,7 +460,6 @@ export class OfferController {
         });
       }
 
-      // Validate DTO with options
       const errors: ValidationError[] = await validate(createOfferDto, {
         whitelist: true,
         forbidNonWhitelisted: false,
@@ -487,7 +475,6 @@ export class OfferController {
         });
       }
 
-      // Find inquiry with requests and customer
       const inquiry = await this.inquiryRepository.findOne({
         where: { id: inquiryId },
         relations: ["customer", "requests", "contactPerson"],
@@ -500,7 +487,6 @@ export class OfferController {
         });
       }
 
-      // Get customer data
       const customer = inquiry.customer;
       if (!customer) {
         return response.status(404).json({
@@ -509,10 +495,8 @@ export class OfferController {
         });
       }
 
-      // Generate offer number
       const offerNumber = await this.generateOfferNumber();
 
-      // Create inquiry snapshot
       const inquirySnapshot = {
         id: inquiry.id,
         name: inquiry.name,
@@ -524,7 +508,6 @@ export class OfferController {
         requestsCount: inquiry.requests?.length || 0,
       };
 
-      // Create customer snapshot
       const customerSnapshot: CustomerSnapshot = {
         id: customer.id,
         companyName: customer.companyName,
@@ -542,22 +525,17 @@ export class OfferController {
         additionalInfo: "Additional Info",
       };
 
-      // Process default unit prices if provided
       const defaultUnitPrices = createOfferDto.useUnitPrices
         ? createOfferDto.defaultUnitPrices || this.createDefaultUnitPrices()
         : [];
 
-      // Create offer
       const offer = this.offerRepository.create({
         offerNumber,
         title: createOfferDto.title || `Offer for ${inquiry.name}`,
         inquiry: inquiry,
         inquiryId: inquiry.id,
-        // Inquiry snapshot
         inquirySnapshot,
-        // Customer snapshot
         customerSnapshot,
-        // Delivery address (default to customer address, can be changed)
         deliveryAddress: createOfferDto.deliveryAddress || {
           street: "Street Address",
           city: customer.businessDetails?.city,
@@ -567,11 +545,10 @@ export class OfferController {
           contactName: customer.legalName || customer.companyName,
           contactPhone: customer.contactPhoneNumber,
         },
-        // Offer details
         status: "Draft",
         validUntil:
           createOfferDto.validUntil ||
-          new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days default
+          new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
         termsConditions: createOfferDto.termsConditions,
         deliveryTerms: createOfferDto.deliveryTerms,
         paymentTerms: createOfferDto.paymentTerms,
@@ -582,34 +559,27 @@ export class OfferController {
         shippingCost: createOfferDto.shippingCost || 0,
         notes: createOfferDto.notes,
         internalNotes: createOfferDto.internalNotes,
-        // Assembly specific
         isAssembly: inquiry.isAssembly,
         assemblyName: createOfferDto.assemblyName || inquiry.name,
         assemblyDescription:
           createOfferDto.assemblyDescription || inquiry.description,
         assemblyNotes: createOfferDto.assemblyNotes,
-        // Unit pricing at offer level
         useUnitPrices: createOfferDto.useUnitPrices || false,
         unitPriceDecimalPlaces: createOfferDto.unitPriceDecimalPlaces || 3,
         totalPriceDecimalPlaces: createOfferDto.totalPriceDecimalPlaces || 2,
         maxUnitPriceColumns: createOfferDto.maxUnitPriceColumns || 3,
         defaultUnitPrices,
         revision: 1,
-        // Initialize totals
         subtotal: 0,
         taxAmount: 0,
         totalAmount: 0,
       });
 
-      // Save offer first to get ID
       const savedOffer = await this.offerRepository.save(offer);
-
-      // Create line items from requests
       let lineItems: OfferLineItem[] = [];
       let position = 1;
 
       if (inquiry.isAssembly) {
-        // For assembly offers, create main assembly item
         const assemblyLineItem = this.lineItemRepository.create({
           offer: savedOffer,
           offerId: savedOffer.id,
@@ -619,10 +589,8 @@ export class OfferController {
           isAssemblyItem: true,
           isEstimated: inquiry.isEstimated,
           notes: savedOffer.assemblyNotes,
-          // Copy purchase price from inquiry if available
           purchasePrice: inquiry.purchasePrice,
           purchaseCurrency: inquiry.purchasePriceCurrency,
-          // Set initial prices based on offer's unit pricing mode
           quantityPrices: [],
           unitPrices: savedOffer.useUnitPrices
             ? this.createDefaultUnitPrices()
@@ -631,11 +599,8 @@ export class OfferController {
         });
         lineItems.push(assemblyLineItem);
 
-        // Save assembly item first to get its ID
         const savedAssemblyItem =
           await this.lineItemRepository.save(assemblyLineItem);
-
-        // Add components as hidden items
         if (inquiry.requests && inquiry.requests.length > 0) {
           for (const request of inquiry.requests) {
             const componentItem = this.lineItemRepository.create({
@@ -658,7 +623,6 @@ export class OfferController {
               isEstimated: request.isEstimated,
               parentItemId: savedAssemblyItem.id,
               notes: request.comment,
-              // Components don't have customer-facing prices
               quantityPrices: [],
               unitPrices: [],
               lineTotal: 0,
@@ -667,10 +631,8 @@ export class OfferController {
           }
         }
       } else {
-        // For non-assembly offers, create line items for each request
         if (inquiry.requests && inquiry.requests.length > 0) {
           for (const request of inquiry.requests) {
-            // Create unit prices for line item based on offer settings
             const lineItemUnitPrices = savedOffer.useUnitPrices
               ? this.createDefaultUnitPrices()
               : [];
@@ -693,7 +655,6 @@ export class OfferController {
               position: position++,
               isEstimated: request.isEstimated,
               notes: request.comment,
-              // Set initial prices based on offer's unit pricing mode
               quantityPrices: [],
               unitPrices: lineItemUnitPrices,
               lineTotal: 0,
@@ -703,15 +664,11 @@ export class OfferController {
         }
       }
 
-      // Save all line items
       if (lineItems.length > 0) {
         await this.lineItemRepository.save(lineItems);
       }
-
-      // Calculate initial totals
       await this.calculateOfferTotals(savedOffer.id);
 
-      // Return complete offer with relations
       const completeOffer = await this.offerRepository.findOne({
         where: { id: savedOffer.id },
         relations: ["lineItems", "inquiry", "inquiry.customer"],
@@ -769,8 +726,6 @@ export class OfferController {
     try {
       const { offerId } = request.params;
       const { lineItemId } = request.query;
-
-      // 1. Transform and Validate DTO
       const conversionData = plainToInstance(
         ConvertInquiryToItemDto,
         request.body,
@@ -787,13 +742,10 @@ export class OfferController {
         });
       }
 
-      // 2. Initialize Repositories
       const offerRepository = AppDataSource.getRepository(Offer);
       const itemRepository = AppDataSource.getRepository(Item);
       const taricRepository = AppDataSource.getRepository(Taric);
       const lineItemRepository = AppDataSource.getRepository(OfferLineItem);
-
-      // 3. Find Offer with Relations
       const offer = await offerRepository.findOne({
         where: { id: offerId },
         relations: ["lineItems", "inquiry"],
@@ -806,10 +758,8 @@ export class OfferController {
         });
       }
 
-      // 4. Extract Source Data (Assembly vs Single Line Item)
       let sourceData: any;
       if (offer.isAssembly) {
-        // Find the specific assembly header item among line items
         const assemblyItem = offer.lineItems?.find((li) => li.isAssemblyItem);
 
         sourceData = {
@@ -841,7 +791,6 @@ export class OfferController {
           photo: offer.inquiry?.image || "",
         };
       } else {
-        // Find specific line item via query param OR grab the first one
         const targetLineItem = lineItemId
           ? offer.lineItems.find((li) => li.id === lineItemId)
           : offer.lineItems[0];
@@ -855,12 +804,9 @@ export class OfferController {
         sourceData = targetLineItem;
       }
 
-      // 5. Generate Item Identifiers
       const itemId = await ItemGenerator.generateItemId();
       const ean = ItemGenerator.generateEAN(itemId);
       let taric: any = null;
-
-      // 6. Handle Taric Logic
       if (conversionData.taricId) {
         taric = await taricRepository.findOne({
           where: { id: conversionData.taricId },
@@ -886,7 +832,6 @@ export class OfferController {
         taric = await ItemGenerator.createTaricForItem(sourceData.itemName);
       }
 
-      // 7. Map Data to Item Entity
       const itemData: any = {
         id: itemId,
         ean: ean,
@@ -904,7 +849,6 @@ export class OfferController {
         note: conversionData.note || offer.internalNotes || sourceData.notes,
         RMB_Price: conversionData.RMBPrice || sourceData.purchasePrice || 0,
         cat_id: conversionData.catId || null,
-        // Fixed system values
         is_dimension_special: "N",
         is_qty_dividable: "Y",
         ISBN: 0,
@@ -919,14 +863,11 @@ export class OfferController {
         parent: null,
       };
 
-      // 8. Final Save and Status Update
       const item = itemRepository.create(itemData);
       const savedItem = await itemRepository.save(item);
 
       offer.status = "Accepted";
       await offerRepository.save(offer);
-
-      // 9. Send Response
       return response.status(201).json({
         success: true,
         message: "Offer successfully converted to Item",
@@ -959,7 +900,6 @@ export class OfferController {
 
       let subtotal = 0;
 
-      // Calculate subtotal from line items (excluding components)
       const customerItems =
         offer.lineItems?.filter((item: OfferLineItem) => !item.isComponent) ||
         [];
@@ -972,7 +912,6 @@ export class OfferController {
           item.unitPrices &&
           item.unitPrices.length > 0
         ) {
-          // Calculate from active unit price based on offer's unit pricing setting
           const activeUnitPrice = item.unitPrices.find(
             (up: UnitPrice) => up.isActive,
           );
@@ -980,7 +919,6 @@ export class OfferController {
             lineTotal = activeUnitPrice.totalPrice || 0;
           }
         } else if (item.quantityPrices && item.quantityPrices.length > 0) {
-          // Calculate from active quantity price (legacy)
           const activePrice = item.quantityPrices.find(
             (qp: QuantityPrice) => qp.isActive,
           );
@@ -988,13 +926,11 @@ export class OfferController {
             lineTotal = activePrice.total || 0;
           }
         } else if (item.basePrice && item.baseQuantity) {
-          // Calculate from base price if no unit prices
           const quantity = parseFloat(item.baseQuantity) || 1;
           const price = parseFloat(item.basePrice.toString()) || 0;
           lineTotal = quantity * price;
         }
 
-        // Update line total if calculated
         if (lineTotal > 0 && item.lineTotal !== lineTotal) {
           item.lineTotal = lineTotal;
           await this.lineItemRepository.save(item);
@@ -1003,7 +939,6 @@ export class OfferController {
         subtotal += lineTotal;
       }
 
-      // Apply discount
       let total = subtotal;
 
       if (offer.discountPercentage && offer.discountPercentage > 0) {
@@ -1022,13 +957,10 @@ export class OfferController {
       const taxAmount = total * taxRate;
       const totalWithTax = total + taxAmount;
 
-      // FIX: Use proper number formatting to avoid invalid strings
       const formatNumber = (num: number): number => {
-        // Ensure we have a valid number
         if (isNaN(num) || !isFinite(num)) {
           return 0;
         }
-        // Round to 2 decimal places and return as number
         return Math.round(num * 100) / 100;
       };
 
@@ -1042,7 +974,6 @@ export class OfferController {
     }
   }
 
-  // Helper function to process unit prices
   private processUnitPrices(
     unitPricesDto: UnitPriceDto[],
     totalPriceDecimalPlaces: number = 2,
@@ -1084,7 +1015,6 @@ export class OfferController {
         .leftJoinAndSelect("offer.inquiry", "inquiry")
         .orderBy("offer.createdAt", "DESC");
 
-      // Apply filters
       if (inquiryId) {
         queryBuilder.andWhere("offer.inquiryId = :inquiryId", { inquiryId });
       }
@@ -1112,10 +1042,8 @@ export class OfferController {
         .take(Number(limit))
         .getManyAndCount();
 
-      // Ensure totals are calculated for each offer
       for (const offer of offers) {
         if (offer.subtotal === 0 && offer.totalAmount === 0) {
-          // Recalculate totals if they appear to be zero
           await this.calculateOfferTotals(offer.id);
         }
       }
@@ -1160,10 +1088,8 @@ export class OfferController {
         });
       }
 
-      // Recalculate totals if they appear to be zero
       if (offer.subtotal === 0 && offer.totalAmount === 0) {
         await this.calculateOfferTotals(offer.id);
-        // Refetch offer with updated totals
         const updatedOffer = await this.offerRepository.findOne({
           where: { id },
           relations: ["lineItems"],
@@ -1175,7 +1101,6 @@ export class OfferController {
         }
       }
 
-      // Calculate which price is active for each line item based on offer's unit pricing mode
       if (offer.lineItems) {
         offer.lineItems = offer.lineItems.map((item: any) => {
           let activePrice = null;
@@ -1217,15 +1142,10 @@ export class OfferController {
     try {
       const { id } = request.params;
 
-      // Get raw body first for custom processing
       const rawBody = request.body;
 
-      console.log("Raw body received:", JSON.stringify(rawBody, null, 2));
-
-      // Transform numeric fields from German format to standard numeric
       const processedBody = {
         ...rawBody,
-        // Only process fields that are actually being sent
         discountPercentage:
           rawBody.discountPercentage !== undefined
             ? this.cleanNumberForDB(rawBody.discountPercentage)
@@ -1238,7 +1158,6 @@ export class OfferController {
           rawBody.shippingCost !== undefined
             ? this.cleanNumberForDB(rawBody.shippingCost)
             : undefined,
-        // ONLY process subtotal/taxAmount/totalAmount if they're being sent
         subtotal:
           rawBody.subtotal !== undefined
             ? this.cleanNumberForDB(rawBody.subtotal)
@@ -1253,9 +1172,6 @@ export class OfferController {
             : undefined,
       };
 
-      console.log("Processed body:", JSON.stringify(processedBody, null, 2));
-
-      // Get the offer FIRST to see what's already in the database
       const offer = await this.offerRepository.findOne({
         where: { id },
         relations: ["lineItems"],
@@ -1277,7 +1193,6 @@ export class OfferController {
         shippingCost: offer.shippingCost,
       });
 
-      // Transform and create DTO instance with explicit options
       const updateOfferDto = plainToInstance(UpdateOfferDto, processedBody, {
         excludeExtraneousValues: false,
         enableImplicitConversion: true,
@@ -1288,7 +1203,6 @@ export class OfferController {
         JSON.stringify(updateOfferDto, null, 2),
       );
 
-      // Check if DTO was properly created
       if (!updateOfferDto || typeof updateOfferDto !== "object") {
         return response.status(400).json({
           success: false,
@@ -1296,7 +1210,6 @@ export class OfferController {
         });
       }
 
-      // Validate DTO with options
       const errors: ValidationError[] = await validate(updateOfferDto, {
         whitelist: true,
         forbidNonWhitelisted: false,
@@ -1312,13 +1225,10 @@ export class OfferController {
         });
       }
 
-      // Check if unit pricing mode is changing
       const unitPricingChanged =
         updateOfferDto.useUnitPrices !== undefined &&
         updateOfferDto.useUnitPrices !== offer.useUnitPrices;
 
-      // CLEAN ALL NUMERIC FIELDS IN THE EXISTING OFFER FIRST
-      // This is the key fix: clean the existing database values
       if (offer.subtotal && typeof offer.subtotal === "string") {
         console.log("Cleaning existing subtotal from DB:", offer.subtotal);
         offer.subtotal = this.cleanNumberForDB(offer.subtotal) || 0;
@@ -1337,8 +1247,6 @@ export class OfferController {
         offer.totalAmount = this.cleanNumberForDB(offer.totalAmount) || 0;
       }
 
-      // Update only the fields that are being sent in the request
-      // DO NOT include subtotal/taxAmount/totalAmount unless they're in the request
       const fieldsToUpdate = [
         "title",
         "status",
@@ -1362,7 +1270,6 @@ export class OfferController {
         }
       });
 
-      // Only update numeric fields if they're in the request
       if (updateOfferDto.discountPercentage !== undefined) {
         offer.discountPercentage =
           this.cleanNumberForDB(updateOfferDto.discountPercentage) || 0;
@@ -1378,7 +1285,6 @@ export class OfferController {
           this.cleanNumberForDB(updateOfferDto.shippingCost) || 0;
       }
 
-      // Only update subtotal/taxAmount/totalAmount if they're explicitly in the request
       if (updateOfferDto.subtotal !== undefined) {
         offer.subtotal = this.cleanNumberForDB(updateOfferDto.subtotal) || 0;
       }
@@ -1401,10 +1307,7 @@ export class OfferController {
         type_totalAmount: typeof offer.totalAmount,
       });
 
-      // Save the offer
       const updatedOffer = await this.offerRepository.save(offer);
-
-      // If unit pricing mode changed, update line items
       if (unitPricingChanged && offer.lineItems) {
         await this.updateLineItemsForUnitPricingChange(
           offer.id,
@@ -1412,7 +1315,6 @@ export class OfferController {
         );
       }
 
-      // Recalculate totals if pricing-related fields changed
       if (
         updateOfferDto.shippingCost !== undefined ||
         updateOfferDto.discountPercentage !== undefined ||
@@ -1438,7 +1340,6 @@ export class OfferController {
     } catch (error: any) {
       console.error("Error updating offer:", error);
 
-      // Log full error details
       if (error) {
         console.error("SQL Error details:", {
           query: error.query,
@@ -2363,9 +2264,8 @@ export class OfferController {
 
       return response.status(200).json({
         success: true,
-        message: `Unit prices ${
-          useUnitPrices ? "enabled" : "disabled"
-        } successfully for entire offer`,
+        message: `Unit prices ${useUnitPrices ? "enabled" : "disabled"
+          } successfully for entire offer`,
         data: updatedOffer,
       });
     } catch (error) {
@@ -2846,8 +2746,7 @@ export class OfferController {
 
       if (offer.useUnitPrices) {
         doc.text(
-          `Pricing Mode: Unit Pricing (${
-            offer.maxUnitPriceColumns || 3
+          `Pricing Mode: Unit Pricing (${offer.maxUnitPriceColumns || 3
           } columns)`,
         );
       }
