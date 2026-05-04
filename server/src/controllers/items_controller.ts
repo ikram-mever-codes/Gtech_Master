@@ -2961,6 +2961,8 @@ export const exportItemsToCSV = async (
       },
     });
 
+    console.log(`[CSV Export] Found ${items.length} items to export for type: ${type}`);
+
     if (items.length === 0) {
       return res.status(200).json({
         success: true,
@@ -3112,7 +3114,7 @@ export const exportItemsToCSV = async (
         const warehouseData = await getWarehouseData(item.id, item.ItemID_DE);
         const variationData = await getVariationValues(item.id);
 
-        const rmbPrice = rmbPriceMap.get(item.id) || 0;
+        const rmbPrice = Number(rmbPriceMap.get(item.id)) || 0;
         const priceColumns = getPriceColumns(rmbPrice);
 
         const parent = item.parent;
@@ -3172,7 +3174,7 @@ export const exportItemsToCSV = async (
           ...priceColumns,
           ...bulkQuantities.map((qty) => qty.toString()),
           "19",
-          item.photo?.split("\\").pop() || "DummyPicture.jpg",
+          item.photo ? item.photo.split("\\").pop() : "DummyPicture.jpg",
           item.pix_path || "",
           item.pix_path_eBay || "",
           "10000",
@@ -3199,8 +3201,9 @@ export const exportItemsToCSV = async (
 
         csvRows.push(formattedRow.join(";"));
         updatedItemIds.push(item.id);
-      } catch (itemError) {
-        console.error(`Error processing item ${item.id}:`, itemError);
+        console.log(`[CSV Export] Successfully processed item ID: ${item.id}`);
+      } catch (itemError: any) {
+        console.error(`[CSV Export] FAILED processing item ${item.id}:`, itemError.message);
       }
     }
 
@@ -3232,6 +3235,7 @@ export const exportItemsToCSV = async (
     res.setHeader("Expires", "0");
     res.setHeader("X-Content-Type-Options", "nosniff");
 
+    console.log(`[CSV Export] Finished loop. Total rows collected: ${csvRows.length}`);
     const bom = "\uFEFF";
     return res.status(200).send(bom + csvContent);
   } catch (error) {
@@ -3512,7 +3516,7 @@ export const exportNewItemsToCSV = async (
       try {
         const warehouseData = await getWarehouseData(item.id, item.ItemID_DE);
         const variationData = await getVariationValues(item.id);
-        const rmbPrice = rmbPriceMap.get(item.id) || 0;
+        const rmbPrice = Number(rmbPriceMap.get(item.id)) || 0;
         const priceColumns = getPriceColumns(rmbPrice);
         const parent = item.parent;
         const volume =
@@ -3570,7 +3574,7 @@ export const exportNewItemsToCSV = async (
           ...priceColumns,
           ...bulkQuantities.map((qty) => qty.toString()),
           "19",
-          item.photo?.split("\\").pop() || "DummyPicture.jpg",
+          item.photo ? item.photo.split("\\").pop() : "DummyPicture.jpg",
           item.pix_path || "",
           item.pix_path_eBay || "",
           "10000",

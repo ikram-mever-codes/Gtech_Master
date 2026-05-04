@@ -1366,7 +1366,6 @@ export class OfferController {
     }
   }
 
-  // SIMPLIFIED cleanNumberForDB method
   private cleanNumberForDB(value: any): number | undefined {
     if (value === null || value === undefined || value === "") {
       return undefined;
@@ -1374,24 +1373,18 @@ export class OfferController {
 
     console.log(`cleanNumberForDB input: ${value}, type: ${typeof value}`);
 
-    // If it's already a number, return it
     if (typeof value === "number") {
       return isNaN(value) ? 0 : value;
     }
 
     const str = String(value);
 
-    // SPECIAL CASE: Handle "00.000.000" format
     if (str === "00.000.000" || str === "0.000.000") {
       console.log("Converting German zero format to 0");
       return 0;
     }
-
-    // Remove all dots (they're thousand separators in German format)
-    // Replace comma with dot (German decimal separator)
     const cleaned = str.replace(/\./g, "").replace(",", ".");
 
-    // Parse to number
     const num = parseFloat(cleaned);
 
     console.log(`Result: ${num}`);
@@ -1411,13 +1404,11 @@ export class OfferController {
       const updates = [];
       for (const lineItem of lineItems) {
         if (useUnitPrices) {
-          // Enable unit prices: ensure line item has unit prices
           if (!lineItem.unitPrices || lineItem.unitPrices.length === 0) {
             lineItem.unitPrices = this.createDefaultUnitPrices();
             updates.push(lineItem);
           }
         } else {
-          // Disable unit prices: clear unit prices (keep quantity prices if they exist)
           lineItem.unitPrices = [];
           updates.push(lineItem);
         }
@@ -1442,7 +1433,6 @@ export class OfferController {
         request.body,
       );
 
-      // Validate DTO
       const errors: ValidationError[] = await validate(updateLineItemDto);
       if (errors.length > 0) {
         return response.status(400).json({
@@ -1476,31 +1466,26 @@ export class OfferController {
         });
       }
 
-      // Process unit prices if provided (use offer's decimal places)
       if (updateLineItemDto.unitPrices && offer.useUnitPrices) {
         const processedUnitPrices = this.processUnitPrices(
           updateLineItemDto.unitPrices,
           offer.totalPriceDecimalPlaces || 2,
         );
 
-        // Ensure only one is active
         const activeCount = processedUnitPrices.filter(
           (up) => up.isActive,
         ).length;
         if (activeCount > 1) {
-          // Keep only the first one active
           processedUnitPrices.forEach((up, index) => {
             up.isActive = index === 0;
           });
         } else if (activeCount === 0 && processedUnitPrices.length > 0) {
-          // Set first one as active if none are active
           processedUnitPrices[0].isActive = true;
         }
 
         updateLineItemDto.unitPrices = processedUnitPrices;
       }
 
-      // If quantityPrices are being updated (legacy), ensure only one is active
       if (updateLineItemDto.quantityPrices && !offer.useUnitPrices) {
         updateLineItemDto.quantityPrices = updateLineItemDto.quantityPrices.map(
           (qp: any) => ({
@@ -1509,12 +1494,10 @@ export class OfferController {
           }),
         );
 
-        // Ensure only one price is active
         const activeCount = updateLineItemDto.quantityPrices.filter(
           (qp: any) => qp.isActive,
         ).length;
         if (activeCount > 1) {
-          // Keep only the first one active
           updateLineItemDto.quantityPrices =
             updateLineItemDto.quantityPrices.map((qp: any, index: number) => ({
               ...qp,
@@ -1524,15 +1507,10 @@ export class OfferController {
           activeCount === 0 &&
           updateLineItemDto.quantityPrices.length > 0
         ) {
-          // Set first one as active if none are active
           updateLineItemDto.quantityPrices[0].isActive = true;
         }
       }
-
-      // Update line item fields
       Object.assign(lineItem, updateLineItemDto);
-
-      // Calculate line total based on offer's unit pricing mode
       if (
         offer.useUnitPrices &&
         updateLineItemDto.unitPrices &&
@@ -1570,7 +1548,6 @@ export class OfferController {
 
       const updatedLineItem = await this.lineItemRepository.save(lineItem);
 
-      // Recalculate offer totals
       await this.calculateOfferTotals(offerId);
 
       return response.status(200).json({
@@ -1587,7 +1564,6 @@ export class OfferController {
     }
   }
 
-  // Add unit price to line item
   async addUnitPrice(request: Request, response: Response) {
     try {
       const { lineItemId } = request.params;
@@ -1620,7 +1596,6 @@ export class OfferController {
         });
       }
 
-      // Initialize or update unitPrices array
       let unitPrices = lineItem.unitPrices || [];
       const qty = parseFloat(quantity) || 0;
       const price = parseFloat(unitPrice) || 0;
@@ -1630,7 +1605,6 @@ export class OfferController {
       );
       const now = new Date();
 
-      // If setting as active, deactivate others
       if (isActive) {
         unitPrices = unitPrices.map((up: UnitPrice) => ({
           ...up,
@@ -1651,7 +1625,6 @@ export class OfferController {
 
       unitPrices.push(newUnitPrice);
 
-      // Sort by quantity
       unitPrices.sort(
         (a: UnitPrice, b: UnitPrice) =>
           parseFloat(a.quantity) - parseFloat(b.quantity),
@@ -1659,19 +1632,16 @@ export class OfferController {
 
       lineItem.unitPrices = unitPrices;
 
-      // Update line total from active price
       const activeUnitPrice = unitPrices.find((up: UnitPrice) => up.isActive);
       if (activeUnitPrice) {
         lineItem.lineTotal = activeUnitPrice.totalPrice;
       } else if (unitPrices.length > 0) {
-        // If no active price, use the first one
         lineItem.unitPrices[0].isActive = true;
         lineItem.lineTotal = lineItem.unitPrices[0].totalPrice;
       }
 
       const updatedLineItem = await this.lineItemRepository.save(lineItem);
 
-      // Recalculate offer totals
       if (lineItem.offerId) {
         await this.calculateOfferTotals(lineItem.offerId);
       }
@@ -1690,7 +1660,6 @@ export class OfferController {
     }
   }
 
-  // Add quantity-price to line item (legacy)
   async addQuantityPrice(request: Request, response: Response) {
     try {
       const { lineItemId } = request.params;
@@ -1724,11 +1693,9 @@ export class OfferController {
         });
       }
 
-      // Initialize or update quantityPrices array
       let quantityPrices = lineItem.quantityPrices || [];
       const total = parseFloat(quantity) * parseFloat(price);
 
-      // If setting as active, deactivate others
       if (isActive) {
         quantityPrices = quantityPrices.map((qp: any) => ({
           ...qp,
@@ -1743,26 +1710,22 @@ export class OfferController {
         total,
       });
 
-      // Sort by quantity
       quantityPrices.sort(
         (a: any, b: any) => parseFloat(a.quantity) - parseFloat(b.quantity),
       );
 
       lineItem.quantityPrices = quantityPrices;
 
-      // Update line total from active price
       const activePrice = quantityPrices.find((qp: any) => qp.isActive);
       if (activePrice) {
         lineItem.lineTotal = activePrice.total;
       } else if (quantityPrices.length > 0) {
-        // If no active price, use the first one
         lineItem.quantityPrices[0].isActive = true;
         lineItem.lineTotal = lineItem.quantityPrices[0].total;
       }
 
       const updatedLineItem = await this.lineItemRepository.save(lineItem);
 
-      // Recalculate offer totals
       if (lineItem.offerId) {
         await this.calculateOfferTotals(lineItem.offerId);
       }
@@ -1781,7 +1744,6 @@ export class OfferController {
     }
   }
 
-  // Bulk update line items (for copy/paste from spreadsheet)
   async bulkUpdateLineItems(request: Request, response: Response) {
     try {
       const { offerId } = request.params;
@@ -1790,7 +1752,6 @@ export class OfferController {
         request.body,
       );
 
-      // Validate DTO
       const errors: ValidationError[] = await validate(bulkUpdateDto);
       if (errors.length > 0) {
         return response.status(400).json({
@@ -1830,7 +1791,6 @@ export class OfferController {
             continue;
           }
 
-          // Update only allowed fields
           if (itemUpdate.quantityPrices !== undefined) {
             lineItem.quantityPrices = itemUpdate.quantityPrices.map(
               (qp: any) => ({
@@ -1865,7 +1825,6 @@ export class OfferController {
         }
       }
 
-      // Recalculate offer totals
       await this.calculateOfferTotals(offerId);
 
       return response.status(200).json({
@@ -1885,7 +1844,6 @@ export class OfferController {
     }
   }
 
-  // Copy/paste prices from spreadsheet
   async copyPastePrices(request: Request, response: Response) {
     try {
       const { offerId } = request.params;
@@ -1909,7 +1867,6 @@ export class OfferController {
         });
       }
 
-      // Parse tab-separated values
       const rows = data
         .trim()
         .split("\n")
@@ -1927,18 +1884,15 @@ export class OfferController {
         order: { position: "ASC" },
       });
 
-      // Map rows to line items
       const updates = [];
       for (let i = 1; i < rows.length && i - 1 < lineItems.length; i++) {
         const row = rows[i];
         const lineItem = lineItems[i - 1];
 
-        // Expecting format: Item Name | Quantity 1 | Price 1 | Quantity 2 | Price 2 | ...
         if (row.length >= 3) {
           const unitPrices: UnitPriceDto[] = [];
           const now = new Date();
 
-          // Start from column 1 (skip item name at column 0)
           for (let j = 1; j < row.length - 1; j += 2) {
             const quantity = row[j]?.trim();
             const unitPrice = parseFloat(row[j + 1]?.trim() || "0");
@@ -1956,7 +1910,7 @@ export class OfferController {
                 quantity,
                 unitPrice,
                 totalPrice,
-                isActive: j === 1, // First price is active by default
+                isActive: j === 1,
               });
             }
           }
@@ -1969,13 +1923,11 @@ export class OfferController {
                 updatedAt: now,
               }));
 
-              // Calculate line total from active price
               const activeUnitPrice = unitPrices.find((up) => up.isActive);
               if (activeUnitPrice) {
                 lineItem.lineTotal = activeUnitPrice.totalPrice || 0;
               }
             } else {
-              // Convert to quantity prices if unit pricing is not enabled
               lineItem.quantityPrices = unitPrices.map(
                 (upDto: UnitPriceDto) => ({
                   quantity: upDto.quantity,
@@ -1985,7 +1937,6 @@ export class OfferController {
                 }),
               );
 
-              // Calculate line total from active price
               const activePrice = lineItem.quantityPrices.find(
                 (qp: any) => qp.isActive,
               );
@@ -1998,7 +1949,6 @@ export class OfferController {
         }
       }
 
-      // Save all updates
       if (updates.length > 0) {
         await this.lineItemRepository.save(updates);
         await this.calculateOfferTotals(offerId);
@@ -2072,7 +2022,6 @@ export class OfferController {
           });
         }
 
-        // Update all unit prices, set only the selected one as active
         const now = new Date();
         lineItem.unitPrices = lineItem.unitPrices.map(
           (up: UnitPrice, i: number) => ({
@@ -2082,7 +2031,6 @@ export class OfferController {
           }),
         );
 
-        // Update line total from active price
         const activeUnitPrice = lineItem.unitPrices[index];
         lineItem.lineTotal = activeUnitPrice.totalPrice;
       } else {
@@ -2108,7 +2056,6 @@ export class OfferController {
           });
         }
 
-        // Update all prices, set only the selected one as active
         lineItem.quantityPrices = lineItem.quantityPrices.map(
           (qp: any, i: number) => ({
             ...qp,
@@ -2116,14 +2063,12 @@ export class OfferController {
           }),
         );
 
-        // Update line total from active price
         const activePrice = lineItem.quantityPrices[index];
         lineItem.lineTotal = activePrice.total;
       }
 
       const updatedLineItem = await this.lineItemRepository.save(lineItem);
 
-      // Recalculate offer totals
       if (lineItem.offerId) {
         await this.calculateOfferTotals(lineItem.offerId);
       }
@@ -2165,20 +2110,15 @@ export class OfferController {
         });
       }
 
-      // FIX: Clean up corrupted numeric values before updating
       const cleanNumericValue = (value: any): number => {
         if (value === null || value === undefined) {
           return 0;
         }
-
-        // If it's already a number, return it
         if (typeof value === "number" && !isNaN(value)) {
           return value;
         }
 
-        // If it's a string, try to parse it
         if (typeof value === "string") {
-          // Remove any non-numeric characters except dots and minus signs
           const cleaned = value.replace(/[^0-9.-]/g, "");
           const parsed = parseFloat(cleaned);
           return isNaN(parsed) ? 0 : parsed;
@@ -2187,7 +2127,6 @@ export class OfferController {
         return 0;
       };
 
-      // Clean up existing corrupted values
       offer.subtotal = cleanNumericValue(offer.subtotal);
       offer.taxAmount = cleanNumericValue(offer.taxAmount);
       offer.totalAmount = cleanNumericValue(offer.totalAmount);
@@ -2197,25 +2136,19 @@ export class OfferController {
       const previousUseUnitPrices = offer.useUnitPrices;
       offer.useUnitPrices = useUnitPrices;
 
-      // Set default values if enabling unit prices
       if (useUnitPrices) {
         if (!offer.unitPriceDecimalPlaces) offer.unitPriceDecimalPlaces = 3;
         if (!offer.totalPriceDecimalPlaces) offer.totalPriceDecimalPlaces = 2;
         if (!offer.maxUnitPriceColumns) offer.maxUnitPriceColumns = 3;
-
-        // Initialize default unit prices if not exist
         if (!offer.defaultUnitPrices || offer.defaultUnitPrices.length === 0) {
           offer.defaultUnitPrices = this.createDefaultUnitPrices();
         }
       }
 
-      // FIX: Save with only the fields we want to update
       const updateData: any = {
         useUnitPrices: offer.useUnitPrices,
         updatedAt: new Date(),
       };
-
-      // Only include numeric fields if they are valid numbers
       if (typeof offer.subtotal === "number" && !isNaN(offer.subtotal)) {
         updateData.subtotal = offer.subtotal;
       }
@@ -2238,14 +2171,10 @@ export class OfferController {
         updateData.defaultUnitPrices = offer.defaultUnitPrices;
       }
 
-      // Use update instead of save to have more control
       await this.offerRepository.update(offerId, updateData);
 
-      // Update line items when unit pricing mode changes
       if (previousUseUnitPrices !== useUnitPrices) {
         await this.updateLineItemsForUnitPricingChange(offerId, useUnitPrices);
-
-        // Recalculate totals - but first fix any corrupted line item values
         try {
           await this.calculateOfferTotals(offerId);
         } catch (calcError) {
@@ -2253,11 +2182,9 @@ export class OfferController {
             "Error calculating totals after toggling unit prices:",
             calcError,
           );
-          // Don't fail the entire operation
         }
       }
 
-      // Fetch the updated offer
       const updatedOffer = await this.offerRepository.findOne({
         where: { id: offerId },
       });
@@ -2276,7 +2203,6 @@ export class OfferController {
       });
     }
   }
-  // Bulk update unit prices for all line items in an offer
   async bulkUpdateOfferUnitPrices(request: Request, response: Response) {
     try {
       const { offerId } = request.params;
@@ -2307,24 +2233,19 @@ export class OfferController {
         });
       }
 
-      // Process unit prices with offer's decimal places
       const processedUnitPrices = this.processUnitPrices(
         unitPrices,
         offer.totalPriceDecimalPlaces || 2,
       );
-
-      // Update offer's default unit prices
       offer.defaultUnitPrices = processedUnitPrices;
       await this.offerRepository.save(offer);
 
-      // Update unit prices for all non-component line items
       const lineItems = await this.lineItemRepository.find({
         where: { offerId, isComponent: false },
       });
 
       const updates = [];
       for (const lineItem of lineItems) {
-        // Preserve existing unit price values
         const existingUnitPrices = lineItem.unitPrices || [];
         const updatedUnitPrices = processedUnitPrices.map(
           (newUp: UnitPrice) => {
@@ -2348,7 +2269,6 @@ export class OfferController {
 
         lineItem.unitPrices = updatedUnitPrices;
 
-        // Update line total from active price
         const activeUnitPrice = updatedUnitPrices.find(
           (up: UnitPrice) => up.isActive,
         );
@@ -2363,7 +2283,6 @@ export class OfferController {
         await this.lineItemRepository.save(updates);
       }
 
-      // Recalculate offer totals
       await this.calculateOfferTotals(offerId);
 
       return response.status(200).json({
@@ -2379,8 +2298,6 @@ export class OfferController {
       });
     }
   }
-
-  // Sync unit prices across all line items in an offer
   async syncUnitPricesAcrossOffer(request: Request, response: Response) {
     try {
       const { offerId } = request.params;
@@ -2403,18 +2320,15 @@ export class OfferController {
         });
       }
 
-      // Get offer's default unit prices or create default ones
       const templateUnitPrices =
         offer.defaultUnitPrices || this.createDefaultUnitPrices();
 
-      // Update unit prices for all non-component line items
       const lineItems = await this.lineItemRepository.find({
         where: { offerId, isComponent: false },
       });
 
       const updates = [];
       for (const lineItem of lineItems) {
-        // Preserve existing unit price values
         const existingUnitPrices = lineItem.unitPrices || [];
         const updatedUnitPrices = templateUnitPrices.map(
           (templateUp: UnitPrice) => {
@@ -2439,14 +2353,12 @@ export class OfferController {
 
         lineItem.unitPrices = updatedUnitPrices;
 
-        // Update line total from active price
         const activeUnitPrice = updatedUnitPrices.find(
           (up: UnitPrice) => up.isActive,
         );
         if (activeUnitPrice) {
           lineItem.lineTotal = activeUnitPrice.totalPrice;
         } else if (updatedUnitPrices.length > 0) {
-          // Set first as active if none active
           lineItem.unitPrices[0].isActive = true;
           lineItem.lineTotal = lineItem.unitPrices[0].totalPrice;
         }
@@ -2458,7 +2370,6 @@ export class OfferController {
         await this.lineItemRepository.save(updates);
       }
 
-      // Recalculate offer totals
       await this.calculateOfferTotals(offerId);
 
       return response.status(200).json({
@@ -2475,7 +2386,6 @@ export class OfferController {
     }
   }
 
-  // Create offer revision
   async createRevision(request: Request, response: Response) {
     try {
       const { id } = request.params;
@@ -2493,10 +2403,8 @@ export class OfferController {
         });
       }
 
-      // Generate new offer number
       const newOfferNumber = await this.generateOfferNumber();
 
-      // Create new offer as revision
       const newOffer = this.offerRepository.create({
         ...originalOffer,
         id: undefined,
@@ -2512,12 +2420,9 @@ export class OfferController {
         lineItems: undefined,
       });
 
-      // Apply any updates from DTO
       Object.assign(newOffer, createOfferDto);
 
       const savedOffer = await this.offerRepository.save(newOffer);
-
-      // Duplicate line items
       if (originalOffer.lineItems && originalOffer.lineItems.length > 0) {
         const newLineItems = originalOffer.lineItems.map((lineItem: any) => {
           return this.lineItemRepository.create({
@@ -2568,12 +2473,9 @@ export class OfferController {
         where: { status: "Rejected" },
       });
 
-      // Get offers with unit pricing enabled
       const offersWithUnitPricing = await this.offerRepository.count({
         where: { useUnitPrices: true },
       });
-
-      // Get recent offers
       const recentOffers = await this.offerRepository.find({
         order: { createdAt: "DESC" },
         take: 5,
@@ -2629,7 +2531,6 @@ export class OfferController {
         });
       }
 
-      // Helper function to safely format dates
       const formatDate = (dateValue: any): string => {
         if (!dateValue) return "N/A";
         const date =
@@ -2638,7 +2539,6 @@ export class OfferController {
         return date.toLocaleDateString();
       };
 
-      // Helper function to get safe number value
       const getSafeNumber = (numValue: any): number => {
         if (numValue === null || numValue === undefined || numValue === "")
           return 0;
@@ -2652,7 +2552,6 @@ export class OfferController {
         return isNaN(num) ? 0 : num;
       };
 
-      // Helper function to format numbers
       const formatNumber = (numValue: any, decimals: number = 2): string => {
         const num = getSafeNumber(numValue);
         const factor = Math.pow(10, decimals);
@@ -2661,7 +2560,6 @@ export class OfferController {
         return rounded < 0 ? `-${fixedNum}` : fixedNum;
       };
 
-      // Calculate totals
       const calculateTotals = (offerData: any) => {
         let subtotal = 0;
 
@@ -2727,14 +2625,10 @@ export class OfferController {
         };
       };
 
-      // Calculate totals
       const totals = calculateTotals(offer);
 
-      // Create PDF document - THIS IS WHERE doc IS DEFINED
       const doc = new PDFDocument({ margin: 50, size: "A4" });
 
-      // Set up PDF content
-      // Header
       doc
         .fontSize(20)
         .text(`OFFER ${offer.offerNumber || "N/A"}`, { align: "center" });
@@ -2752,7 +2646,6 @@ export class OfferController {
       }
       doc.moveDown();
 
-      // Customer Information
       doc.fontSize(14).text("Customer Information:", { underline: true });
       doc.fontSize(11);
       if (offer.customerSnapshot) {
@@ -2783,7 +2676,6 @@ export class OfferController {
       }
       doc.moveDown();
 
-      // Delivery Address
       if (offer.deliveryAddress) {
         try {
           let deliveryAddress;
@@ -2813,7 +2705,6 @@ export class OfferController {
         }
       }
 
-      // Line Items Table
       doc.fontSize(14).text("Offer Positions:", { underline: true });
       doc.moveDown();
 
@@ -2824,7 +2715,6 @@ export class OfferController {
       const priceX = 400;
       const totalX = 500;
 
-      // Table Headers
       doc.fontSize(10);
       doc.text("Pos.", itemX, tableTop);
       doc.text("Description", descX, tableTop);
@@ -2839,7 +2729,6 @@ export class OfferController {
 
       let y = tableTop + 30;
 
-      // Line Items
       if (offer.lineItems && Array.isArray(offer.lineItems)) {
         const customerItems = offer.lineItems.filter(
           (item: any) => !item.isComponent,
@@ -2939,14 +2828,12 @@ export class OfferController {
         }
       }
 
-      // Get safe numeric values for PDF display
       const displaySubtotal = getSafeNumber(totals.subtotal);
       const displayTaxAmount = getSafeNumber(totals.taxAmount);
       const displayTotalAmount = getSafeNumber(totals.totalAmount);
       const displayShippingCost = getSafeNumber(totals.shippingCost);
       const displayDiscountAmount = getSafeNumber(totals.discountAmount);
 
-      // Totals section
       y += 20;
       doc.moveTo(400, y).lineTo(550, y).stroke();
       y += 10;
@@ -2977,7 +2864,6 @@ export class OfferController {
       doc.text("TOTAL:", 400, y);
       doc.text(`€${formatNumber(displayTotalAmount, 2)}`, 500, y);
 
-      // Footer Notes
       y += 40;
       doc.fontSize(10).font("Helvetica");
       doc.text("All prices are net prices.", 50, y);
@@ -3001,7 +2887,6 @@ export class OfferController {
         doc.text(`Notes: ${notes}`, 50, y, { width: 500 });
       }
 
-      // Save PDF to file
       const uploadsDir = path.join(__dirname, "../../uploads/offers");
       if (!fs.existsSync(uploadsDir)) {
         fs.mkdirSync(uploadsDir, { recursive: true });
@@ -3010,23 +2895,16 @@ export class OfferController {
       const pdfFileName = `${offer.offerNumber || "offer"}.pdf`;
       const pdfPath = path.join(uploadsDir, pdfFileName);
 
-      // Create a write stream and pipe the PDF to it
       const writeStream = fs.createWriteStream(pdfPath);
 
-      // Create promise for PDF writing
       const pdfWritePromise = new Promise<void>((resolve, reject) => {
         writeStream.on("finish", resolve);
         writeStream.on("error", reject);
 
-        // Pipe the PDF document to the file stream
         doc.pipe(writeStream);
         doc.end();
       });
-
-      // Wait for PDF to be written
       await pdfWritePromise;
-
-      // Try to update database (optional)
       try {
         offer.pdfPath = `/uploads/offers/${pdfFileName}`;
         offer.pdfGenerated = true;
@@ -3036,7 +2914,6 @@ export class OfferController {
         console.warn("Database update failed but PDF was created:", dbError);
       }
 
-      // Send the PDF file directly
       response.setHeader("Content-Type", "application/pdf");
       response.setHeader(
         "Content-Disposition",
@@ -3048,7 +2925,6 @@ export class OfferController {
     } catch (error: any) {
       console.error("Error generating PDF:", error);
 
-      // Send JSON error response
       return response.status(500).json({
         success: false,
         message: "Internal server error while generating PDF",
@@ -3081,7 +2957,6 @@ export class OfferController {
         });
       }
 
-      // Helper functions
       const formatDate = (dateValue: any): string => {
         if (!dateValue) return "N/A";
         const date =
@@ -3111,10 +2986,8 @@ export class OfferController {
         return rounded < 0 ? `-${fixedNum}` : fixedNum;
       };
 
-      // Create PDF document
       const doc = new PDFDocument({ margin: 50, size: "A4" });
 
-      // Header
       doc
         .fontSize(20)
         .text(`OFFER ${offer.offerNumber || "N/A"}`, { align: "center" });
@@ -3131,7 +3004,6 @@ export class OfferController {
       }
       doc.moveDown();
 
-      // Customer Information
       doc.fontSize(14).text("Customer Information:", { underline: true });
       doc.fontSize(11);
       if (offer.customerSnapshot) {
@@ -3162,7 +3034,6 @@ export class OfferController {
       }
       doc.moveDown();
 
-      // Delivery Address
       if (offer.deliveryAddress) {
         try {
           let deliveryAddress;
@@ -3192,7 +3063,6 @@ export class OfferController {
         }
       }
 
-      // Line Items Table
       doc.fontSize(14).text("Offer Positions:", { underline: true });
       doc.moveDown();
 
@@ -3203,7 +3073,6 @@ export class OfferController {
       const priceX = 400;
       const totalX = 500;
 
-      // Table Headers
       doc.fontSize(10);
       doc.text("Pos.", itemX, tableTop);
       doc.text("Description", descX, tableTop);
@@ -3218,10 +3087,8 @@ export class OfferController {
 
       let y = tableTop + 30;
 
-      // Calculate totals as we render
       let subtotal = 0;
 
-      // Line Items
       if (offer.lineItems && Array.isArray(offer.lineItems)) {
         const customerItems = offer.lineItems.filter(
           (item: any) => !item.isComponent,
@@ -3318,7 +3185,6 @@ export class OfferController {
         });
       }
 
-      // Calculate final totals
       const discount = getSafeNumber(offer.discountAmount || offer.discount);
       let discountedSubtotal = subtotal - discount;
       if (discountedSubtotal < 0) discountedSubtotal = 0;
@@ -3331,7 +3197,6 @@ export class OfferController {
 
       const totalAmount = amountBeforeTax + taxAmount;
 
-      // Totals section
       y += 20;
       doc.moveTo(400, y).lineTo(550, y).stroke();
       y += 10;
@@ -3362,7 +3227,6 @@ export class OfferController {
       doc.text("TOTAL:", 400, y);
       doc.text(`€${formatNumber(totalAmount, 2)}`, 500, y);
 
-      // Footer Notes
       y += 40;
       doc.fontSize(10).font("Helvetica");
       doc.text("All prices are net prices.", 50, y);
@@ -3386,20 +3250,16 @@ export class OfferController {
         doc.text(`Notes: ${notes}`, 50, y, { width: 500 });
       }
 
-      // Set response headers BEFORE piping
       response.setHeader("Content-Type", "application/pdf");
       response.setHeader(
         "Content-Disposition",
         `attachment; filename="Offer-${offer.offerNumber || id}.pdf"`,
       );
 
-      // Pipe PDF directly to response
       doc.pipe(response);
       doc.end();
     } catch (error: any) {
       console.error("Error generating PDF:", error);
-
-      // If headers already sent, we can't send JSON
       if (response.headersSent) {
         return;
       }
@@ -3443,7 +3303,6 @@ export class OfferController {
     }
   }
 
-  // Get offers by inquiry
   async getOffersByInquiry(request: Request, response: Response) {
     try {
       const { inquiryId } = request.params;
@@ -3491,7 +3350,6 @@ export class OfferController {
     }
   }
 
-  // Get offer statuses
   async getOfferStatuses(request: Request, response: Response) {
     try {
       const statuses = [

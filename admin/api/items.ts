@@ -494,6 +494,11 @@ export const exportItemsToCSV = async (
     }
 
     const blob = await response.blob();
+    console.log(`[API Export] Blob size: ${blob.size} bytes`);
+    
+    // Preview the content
+    const text = await blob.text();
+    console.log(`[API Export] Content preview (first 500 chars):`, text.substring(0, 500));
 
     if (blob.size === 0) {
       if (showToast) {
