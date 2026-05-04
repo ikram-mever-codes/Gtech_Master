@@ -8,11 +8,12 @@ import { AppDataSource } from "../config/database";
 import { Order } from "../models/orders";
 import { OrderItem } from "../models/order_items";
 import { Item } from "../models/items";
-import { stat } from "fs";
+import { stat, existsSync } from "fs";
 import { WarehouseItem } from "../models/warehouse_items";
 import { Invoice } from "../models/invoice";
 import { Cargo } from "../models/cargos";
 import { CargoOrder } from "../models/cargo_orders";
+import { Taric } from "../models/tarics";
 import { Customer } from "../models/customers";
 import { SupplierItem } from "../models/supplier_items";
 import { generateInvoicesForOrders } from "./cargo_controller";
@@ -1133,343 +1134,254 @@ export const generateCommercialInvoicePDF = async (
     }
 
     const invoiceRepository = AppDataSource.getRepository(Invoice);
-
     const invoice = await invoiceRepository.findOne({
       where: { id: invoiceId },
       relations: ["customer", "items", "items.item"],
     });
-    console.log(`[BACKEND] Fetched invoice for ID ${invoiceId}:`, invoice);
-
     if (!invoice) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Invoice not found" });
+      return res.status(404).json({ success: false, message: "Invoice not found" });
     }
 
-    const cargoRepository = AppDataSource.getRepository(Cargo);
-    const cargo = await cargoRepository.findOne({
-      where: { cargo_no: invoice.orderNumber },
+    const cargo = await AppDataSource.getRepository(Cargo).findOne({ where: { cargo_no: invoice.orderNumber } });
+
+    const orderItemRepo = AppDataSource.getRepository(OrderItem);
+    let rawOrderItems: any[] = [];
+    if (cargo) {
+      rawOrderItems = await orderItemRepo.find({ where: { cargo_id: cargo.id }, relations: ["item", "item.taric"] });
+    } else {
+      const order = await AppDataSource.getRepository(Order).findOne({ where: { order_no: invoice.orderNumber } });
+      if (order) rawOrderItems = await orderItemRepo.find({ where: { order_id: order.id }, relations: ["item", "item.taric"] });
+    }
+
+    const manualCodes: string[] = [];
+    rawOrderItems.forEach((oi: any) => {
+      if (oi.set_taric_code) oi.set_taric_code.split("/").forEach((c: string) => { if (c.trim()) manualCodes.push(c.trim()); });
+    });
+    const uniqueCodes = [...new Set(manualCodes)];
+    const manualTarics = uniqueCodes.length > 0
+      ? await AppDataSource.getRepository(Taric).find({ where: { code: In(uniqueCodes) } }) : [];
+    const manualTaricMap = new Map(manualTarics.map(t => [t.code, t]));
+
+    const taricGroupsMap = new Map<string, { hsCode: string; desc: string; qty: number; totalPrice: number }>();
+    rawOrderItems.forEach((oi: any) => {
+      const item = oi.item;
+      const taricCode = item?.taric?.code || "";
+      const isProject = !taricCode || taricCode === "0" || taricCode === "0000000000";
+      let groupKey: string; let hsCode: string; let desc: string;
+      if (oi.set_taric_code) {
+        groupKey = `set_${oi.set_taric_code}`;
+        hsCode = oi.set_taric_code;
+        const codes = oi.set_taric_code.split("/");
+        const target = codes.length > 1 ? codes[1].trim() : codes[0].trim();
+        const mt = manualTaricMap.get(target);
+        desc = mt?.name_en || item?.item_name || "Unknown";
+      } else if (item?.taric?.id && !isProject) {
+        groupKey = `taric_${item.taric.id}`;
+        hsCode = taricCode;
+        desc = item.taric.name_en || item.item_name || "Unknown";
+      } else {
+        groupKey = `item_${item?.id || Math.random()}`;
+        hsCode = "n/a";
+        desc = item?.item_name || "Unknown";
+      }
+      const unitPrice = Number(oi.eur_special_price || oi.price || item?.price || 0);
+      const qty = Number(oi.qty || 0);
+      if (!taricGroupsMap.has(groupKey)) taricGroupsMap.set(groupKey, { hsCode, desc, qty: 0, totalPrice: 0 });
+      const g = taricGroupsMap.get(groupKey)!;
+      g.qty += qty;
+      g.totalPrice += qty * unitPrice;
     });
 
+    const groupedItems = Array.from(taricGroupsMap.values());
+
+    type LineItem = { no: number; desc: string; hs: string; qty: number; unit: string; price: string };
+    let lineItems: LineItem[];
+    if (groupedItems.length > 0) {
+      lineItems = groupedItems.map((g, i) => ({
+        no: i + 1, desc: g.desc, hs: g.hsCode,
+        qty: g.qty,
+        unit: g.qty > 0 ? (g.totalPrice / g.qty).toFixed(3) : "0.000",
+        price: g.totalPrice.toFixed(2),
+      }));
+    } else {
+      lineItems = (invoice.items || []).map((item: any, i: number) => ({
+        no: i + 1, desc: item.description || item.item?.item_name || "Unknown Item",
+        hs: item.articleNumber || "n/a", qty: Number(item.quantity || 0),
+        unit: Number(item.unitPrice || 0).toFixed(3), price: Number(item.netPrice || 0).toFixed(2),
+      }));
+    }
+
+    const totalQty = lineItems.reduce((s, it) => s + it.qty, 0);
+    const subTotal = lineItems.reduce((s, it) => s + Number(it.price), 0);
+    const freightCost = 292.0;
+    const grandTotal = (subTotal + freightCost).toFixed(2);
     const customer = invoice.customer;
-    const invoiceItems = invoice.items || [];
+
+    const rawBillName = cargo?.bill_to_display_name || cargo?.bill_to_company_name || customer?.companyName || "N/A";
+    const billToName = rawBillName.replace(/^GTech$/i, "GTech Industries GmbH");
 
     const data = {
       invoiceNo: invoice.invoiceNumber || "N/A",
-      date: invoice.invoiceDate
-        ? new Date(invoice.invoiceDate).toISOString().split("T")[0]
-        : "N/A",
+      date: invoice.invoiceDate ? new Date(invoice.invoiceDate).toISOString().split("T")[0] : "N/A",
       cargoNo: invoice.orderNumber || "N/A",
-      customerID: customer?.id?.slice(0, 8) || "7",
+      customerID: customer?.id?.slice(0, 8) || "N/A",
       billTo: {
-        name:
-          cargo?.bill_to_display_name ||
-          cargo?.bill_to_company_name ||
-          customer?.companyName ||
-          "N/A",
-        contact: cargo?.bill_to_contact_person || customer?.legalName || "-",
-        street: cargo?.bill_to_full_address || customer?.addressLine1 || "N/A",
-        city: cargo?.bill_to_city
-          ? `${cargo.bill_to_postal_code || ""} ${cargo.bill_to_city}`
-          : `${customer?.postalCode || ""} ${customer?.city || ""}`,
+        name: billToName,
+        street: cargo?.bill_to_full_address || customer?.addressLine1 || "",
+        city: cargo?.bill_to_city ? `${cargo.bill_to_postal_code || ""} ${cargo.bill_to_city}` : `${customer?.postalCode || ""} ${customer?.city || ""}`,
         country: cargo?.bill_to_country || customer?.country || "Germany",
-        phone: cargo?.bill_to_phone_no || customer?.contactPhoneNumber || "N/A",
-        eori: cargo?.bill_to_tax_no || customer?.taxNumber || "DE977540238364617",
+        phone: cargo?.bill_to_phone_no || customer?.contactPhoneNumber || "",
+        eori: cargo?.bill_to_tax_no || customer?.taxNumber || "",
       },
       shipTo: {
-        company:
-          cargo?.ship_to_display_name ||
-          cargo?.ship_to_company_name ||
-          customer?.companyName ||
-          "N/A",
-        contact: cargo?.ship_to_contact_person || customer?.legalName || "-",
-        street: cargo?.ship_to_full_address || customer?.addressLine1 || "N/A",
-        city: cargo?.ship_to_city
-          ? `${cargo.ship_to_postal_code || ""} ${cargo.ship_to_city}`
-          : `${customer?.postalCode || ""} ${customer?.city || ""}`,
+        company: cargo?.ship_to_display_name || cargo?.ship_to_company_name || customer?.companyName || "N/A",
+        contact: cargo?.ship_to_contact_person || "-",
+        street: cargo?.ship_to_full_address || customer?.addressLine1 || "",
+        city: cargo?.ship_to_city ? `${cargo.ship_to_postal_code || ""} ${cargo.ship_to_city}` : `${customer?.postalCode || ""} ${customer?.city || ""}`,
         country: cargo?.ship_to_country || customer?.country || "Germany",
-        phone: cargo?.ship_to_contact_phone || customer?.contactPhoneNumber || "N/A",
+        phone: cargo?.ship_to_contact_phone || customer?.contactPhoneNumber || "",
       },
-      lineItems: await Promise.all(invoiceItems.map(async (item, index) => {
-        let unitPrice = Number(item.unitPrice);
-        let qty = Number(item.quantity || 0);
-        let netPrice = Number(item.netPrice);
-
-        if (!unitPrice) {
-          const itemRepo = AppDataSource.getRepository("Item");
-
-          const linkedItem = (item as any).item;
-          if (linkedItem?.transfer_price_EUR) {
-            unitPrice = Number(linkedItem.transfer_price_EUR);
-          }
-          if (!unitPrice && item.description) {
-            try {
-              const { ILike } = await import("typeorm");
-              const found = await itemRepo.findOne({
-                where: { item_name: ILike(item.description.trim()) },
-              }) as any;
-              if (found?.transfer_price_EUR) {
-                unitPrice = Number(found.transfer_price_EUR);
-              }
-            } catch (_) { }
-          }
-        }
-
-        if (!netPrice && unitPrice > 0) {
-          netPrice = unitPrice * qty;
-        }
-
-        return {
-          no: index + 1,
-          desc: item.description || (item as any).item?.item_name || "Unknown Item",
-          hs: item.articleNumber || "n/a",
-          qty,
-          unit: unitPrice.toFixed(3),
-          price: netPrice.toFixed(2),
-        };
-      })),
-      waybill: "1149458284",
     };
 
-
-    const totalQty = data.lineItems.reduce(
-      (sum, it) => sum + Number(it.qty),
-      0,
-    );
-    const subTotal = Number(invoice.netTotal || 0);
-    const freightCost = 292.0;
-    const grandTotal = (subTotal + freightCost).toFixed(2);
-
-    const doc = new PDFDocument({ size: "A4", margin: 40 });
+    const doc = new PDFDocument({ size: "A4", margin: 40, bufferPages: true });
     res.setHeader("Content-Type", "application/pdf");
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename=Invoice_${data.invoiceNo}.pdf`,
-    );
+    res.setHeader("Content-Disposition", `attachment; filename=Invoice_${data.invoiceNo}.pdf`);
     doc.pipe(res);
 
-    doc
-      .fillColor("#777777")
-      .font("Helvetica")
-      .fontSize(22)
-      .text("GTech Industries Limited", 40, 20, { align: "right" });
+    doc.fillColor("#777777").font("Helvetica").fontSize(22).text("GTech Industries Limited", 40, 20, { align: "right" });
     const tickColor = "#777777";
     doc.fontSize(11).fillColor("#777777");
     doc.text("Engineering", 325, 48);
     doc.save().translate(387, 48).scale(0.8).moveTo(0, 5).lineTo(3, 8).lineTo(8, 0).strokeColor(tickColor).lineWidth(2).stroke().restore();
-
     doc.text("Design", 412, 48);
     doc.save().translate(448, 48).scale(0.8).moveTo(0, 5).lineTo(3, 8).lineTo(8, 0).strokeColor(tickColor).lineWidth(2).stroke().restore();
-
     doc.text("Manufacturing", 473, 48);
     doc.save().translate(546, 48).scale(0.8).moveTo(0, 5).lineTo(3, 8).lineTo(8, 0).strokeColor(tickColor).lineWidth(2).stroke().restore();
-    doc
-      .moveTo(40, 65)
-      .lineTo(555, 65)
-      .strokeColor("#cccccc")
-      .lineWidth(1)
-      .stroke();
+    doc.moveTo(40, 65).lineTo(555, 65).strokeColor("#cccccc").lineWidth(1).stroke();
 
     doc.fontSize(9).fillColor("#666666");
-    doc.text(
-      "GTech Industries Limited:   3A, 12/F, Kaiser Centre, N. 18 Centre Street, Sai Ying Pun, Hong Kong",
-      40,
-      75,
-    );
-    doc.text(
-      "GTech Establishment China: West Dafeng Metallurgical Plant, Bowang Huisheng Square, Bowang, Ma'anshan, Anhui",
-      40,
-      88,
-    );
-    doc.text("中国安徽省马鞍山市博望区博望汇盛广场西大丰冶金厂", 40, 101);
+    doc.text("GTech Industries Limited:   3A, 12/F, Kaiser Centre, N. 18 Centre Street, Sai Ying Pun, Hong Kong", 40, 75);
+    doc.text("GTech Establishment China: West Dafeng Metallurgical Plant, Bowang Huisheng Square, Bowang, Ma'anshan, Anhui", 40, 88);
 
-    const isSameAddress =
-      data.billTo.name === data.shipTo.company &&
-      data.billTo.street === data.shipTo.street &&
-      data.billTo.city === data.shipTo.city;
+    const chFont = [
+      "C:\\Windows\\Fonts\\malgun.ttf",
+      "C:\\Windows\\Fonts\\msyh.ttf",
+      "C:\\Windows\\Fonts\\simsun.ttf",
+      "C:\\Windows\\Fonts\\simsunb.ttf",
+      "C:\\Windows\\Fonts\\SimsunExtG.ttf"
+    ].find(p => existsSync(p));
 
-    if (isSameAddress) {
-      doc.font("Helvetica-Bold").fontSize(11).text(data.billTo.name, 40, 130);
-      doc.font("Helvetica").fontSize(10).text(data.billTo.contact, 40, 144);
-      doc
-        .text(data.billTo.street, 40, 163)
-        .text(data.billTo.city, 40, 176)
-        .text(data.billTo.country, 40, 189)
-        .text(data.billTo.phone, 40, 206);
-      doc.font("Helvetica-Bold").text(`EORI: ${data.billTo.eori}`, 40, 222);
-    } else {
-      doc
-        .fillColor("black")
-        .font("Helvetica-Bold")
-        .fontSize(10.5)
-        .text("BILL TO:", 40, 125);
-      doc.text("SHIP TO:", 240, 120);
-
-      doc.font("Helvetica-Bold").fontSize(11).text(data.billTo.name, 40, 142);
-      doc.font("Helvetica").fontSize(10).text(data.billTo.contact, 40, 156);
-      doc
-        .text(data.billTo.street, 40, 175)
-        .text(data.billTo.city, 40, 188)
-        .text(data.billTo.country, 40, 201)
-        .text(data.billTo.phone, 40, 218);
-      doc.font("Helvetica-Bold").text(`EORI: ${data.billTo.eori}`, 40, 235);
-
-      doc.font("Helvetica-Bold").fontSize(11).text(data.shipTo.company, 240, 137);
-      doc.font("Helvetica").fontSize(10).text(data.shipTo.contact, 240, 151);
-      doc
-        .text(data.shipTo.street, 240, 164)
-        .text(data.shipTo.city, 240, 182)
-        .text(data.shipTo.country, 240, 195)
-        .text(data.shipTo.phone, 240, 210);
+    if (chFont) {
+      try {
+        doc.font(chFont).fontSize(9).text("中国安徽省马鞍山市博望区博望汇盛广场西大丰冶金厂区", 152, 101).font("Helvetica");
+      } catch (err) {
+        console.warn("CJK Font rendering failed:", err);
+      }
     }
 
-    doc
-      .font("Helvetica")
-      .fontSize(12)
-      .text("Customer ID: ", 420, 150, { continued: true })
-      .font("Helvetica-Bold")
-      .text(data.customerID);
-    doc
-      .font("Helvetica")
-      .text("Date: ", 420, 180, { continued: true })
-      .font("Helvetica-Bold")
-      .text(data.date);
-    doc
-      .font("Helvetica")
-      .text("Invoice No: ", 420, 210, { continued: true })
-      .font("Helvetica-Bold")
-      .text(data.invoiceNo);
-    doc
-      .font("Helvetica")
-      .text("Cargo No.: ", 420, 240, { continued: true })
-      .font("Helvetica-Bold")
-      .text(data.cargoNo);
-    doc
-      .fontSize(15)
-      .font("Helvetica-Bold")
-      .text("Commercial Invoice", 0, 285, { align: "center" });
-    const tableTop = 320;
-    doc
-      .moveTo(40, tableTop)
-      .lineTo(555, tableTop)
-      .strokeColor("#bb0000")
-      .lineWidth(1.5)
-      .stroke();
+    const isSameAddr = data.billTo.name === data.shipTo.company && data.billTo.street === data.shipTo.street;
+    if (isSameAddr) {
+      doc.fillColor("black").font("Helvetica-Bold").fontSize(11).text(data.billTo.name, 40, 115);
+      doc.font("Helvetica").fontSize(10)
+        .text(data.billTo.street, 40, 130).text(data.billTo.city, 40, 143)
+        .text(data.billTo.country, 40, 156).text(data.billTo.phone, 40, 170);
+      doc.font("Helvetica-Bold").text(`EORI: ${data.billTo.eori}`, 40, 184);
+    } else {
+      doc.fillColor("black").font("Helvetica-Bold").fontSize(10.5).text("BILL TO:", 40, 112).text("SHIP TO:", 240, 112);
+      doc.font("Helvetica-Bold").fontSize(11).text(data.billTo.name, 40, 128);
+      doc.font("Helvetica").fontSize(10)
+        .text(data.billTo.street, 40, 148).text(data.billTo.city, 40, 161)
+        .text(data.billTo.country, 40, 174).text(data.billTo.phone, 40, 188);
+      doc.font("Helvetica-Bold").text(`EORI: ${data.billTo.eori}`, 40, 202);
 
+      doc.font("Helvetica-Bold").fontSize(11).text(data.shipTo.company, 240, 128);
+      doc.font("Helvetica").fontSize(10).text(data.shipTo.contact, 240, 142)
+        .text(data.shipTo.street, 240, 156).text(data.shipTo.city, 240, 172)
+        .text(data.shipTo.country, 240, 185).text(data.shipTo.phone, 240, 198);
+    }
+
+    doc.font("Helvetica").fontSize(12).text("Customer ID: ", 420, 130, { continued: true }).font("Helvetica-Bold").text(data.customerID);
+    doc.font("Helvetica").text("Date: ", 420, 157, { continued: true }).font("Helvetica-Bold").text(data.date);
+    doc.font("Helvetica").text("Invoice No: ", 420, 184, { continued: true }).font("Helvetica-Bold").text(data.invoiceNo);
+    doc.font("Helvetica").text("Cargo No.: ", 420, 211, { continued: true }).font("Helvetica-Bold").text(data.cargoNo);
+    doc.fontSize(15).font("Helvetica-Bold").text("Commercial Invoice", 0, 240, { align: "center" });
+
+    const tableTop = 272;
+    doc.moveTo(40, tableTop).lineTo(555, tableTop).strokeColor("#bb0000").lineWidth(1.5).stroke();
     doc.fontSize(11).font("Helvetica-Bold");
-    doc
-      .text("No", 40, tableTop + 12)
-      .text("Description", 75, tableTop + 12)
-      .text("(EU HS code)", 340, tableTop + 12);
-    doc.text("Qty", 425, tableTop + 6).text("(pcs)", 425, tableTop + 18);
-    doc.text("Unit", 470, tableTop + 6).text("(€)*", 470, tableTop + 18);
-    doc.text("Price", 525, tableTop + 6).text("(€)", 525, tableTop + 18);
+    doc.text("No", 40, tableTop + 10).text("Description", 75, tableTop + 10).text("(EU HS code)", 340, tableTop + 10);
+    doc.text("Qty", 425, tableTop + 4).text("(pcs)", 425, tableTop + 16);
+    doc.text("Unit", 470, tableTop + 4).text("(€)*", 470, tableTop + 16);
+    doc.text("Price", 525, tableTop + 4).text("(€)", 525, tableTop + 16);
+    doc.moveTo(40, tableTop + 32).lineTo(555, tableTop + 32).strokeColor("#cccccc").lineWidth(1).stroke();
 
-    doc
-      .moveTo(40, tableTop + 34)
-      .lineTo(555, tableTop + 34)
-      .strokeColor("#cccccc")
-      .lineWidth(1)
-      .stroke();
+    let itemY = tableTop + 46;
+    const pageH = 841.89;
+    const footerReserve = 130;
+    const rowH = 28;
 
-    let itemY = tableTop + 50;
-    data.lineItems.forEach((item) => {
+    lineItems.forEach((item) => {
+      if (itemY + rowH > pageH - footerReserve) { doc.addPage(); itemY = 50; }
       doc.font("Helvetica").fontSize(11);
       doc.text(item.no.toString(), 40, itemY);
       doc.text(item.desc, 75, itemY, { width: 250 });
-      doc.text(item.hs.toString(), 340, itemY);
+      doc.text(item.hs, 340, itemY);
       doc.text(item.qty.toString(), 425, itemY);
-      doc.text(item.unit.toString(), 463, itemY);
-      doc.text(item.price.toString(), 510, itemY, { align: "right", width: 45 });
-      itemY += 28;
+      doc.text(item.unit, 463, itemY);
+      doc.text(item.price, 510, itemY, { align: "right", width: 45 });
+      itemY += rowH;
     });
 
-    doc.text((data.lineItems.length + 1).toString(), 40, itemY);
+    if (itemY + rowH > pageH - footerReserve) { doc.addPage(); itemY = 50; }
+    doc.font("Helvetica").fontSize(11);
+    doc.text((lineItems.length + 1).toString(), 40, itemY);
     doc.text("Freight cost", 75, itemY);
     doc.text("n/a", 340, itemY).text("n/a", 425, itemY).text("n/a", 470, itemY);
     doc.text(freightCost.toFixed(2), 510, itemY, { align: "right", width: 45 });
-    itemY += 28;
+    itemY += rowH;
 
-    doc
-      .moveTo(340, itemY)
-      .lineTo(555, itemY)
-      .strokeColor("black")
-      .lineWidth(1)
-      .stroke();
+    doc.moveTo(340, itemY).lineTo(555, itemY).strokeColor("black").lineWidth(1).stroke();
     itemY += 12;
-    doc
-      .font("Helvetica-Bold")
-      .fontSize(11)
-      .text("Total :", 360, itemY, { underline: true });
+    doc.font("Helvetica-Bold").fontSize(11).text("Total :", 360, itemY, { underline: true });
     doc.text(totalQty.toString(), 425, itemY, { underline: true });
-    doc.text(`${grandTotal} €`, 485, itemY, {
-      width: 70,
-      align: "right",
-      underline: true,
-    });
+    doc.text(`${grandTotal} €`, 485, itemY, { width: 70, align: "right", underline: true });
 
-    doc
-      .fontSize(10)
-      .font("Helvetica-Bold")
-      .text(
-        "* Unit price is calculated and can have errors from rounding",
-        40,
-        itemY + 48,
-      );
-    const remarkY = itemY + 85;
-    doc.fontSize(11).font("Helvetica").text("Remark:", 40, remarkY);
-    doc.text(`DHL Express, ${data.cargoNo}`, 100, remarkY);
-    doc
-      .text(`Express, ${data.cargoNo}`, 100, remarkY + 16)
-      .text("DHL Express, 30kg total", 100, remarkY + 32)
-      .text("2parcels", 100, remarkY + 48)
-      .text(`WAYBILL ${data.waybill}`, 100, remarkY + 64);
-    doc.fontSize(9).text(
-      "We hereby confirm that no raw material from Russia were used",
-      100,
-      700,
-    );
-    doc.text(
-      "in the production of the goods mentioned in this invoice.",
-      100,
-      712,
-    );
+    itemY += 45;
+    if (itemY + 90 > pageH - footerReserve) { doc.addPage(); itemY = 50; }
+    doc.fontSize(10).font("Helvetica").text("Remark:", 40, itemY);
+    const remarkX = 100;
+    doc.text(`DHL Express, ${data.cargoNo}`, remarkX, itemY);
+    doc.text(`Express, ${data.cargoNo}`, remarkX, itemY + 15);
+    const calcWeight = lineItems.reduce((sum, it) => sum + (it.qty * 0.2), 0);
+    const packageCount = lineItems.length;
+    doc.text(`DHL Express, ${calcWeight.toFixed(1)}kg total`, remarkX, itemY + 30);
+    doc.text(`${packageCount} parcels`, remarkX, itemY + 45);
+    doc.text(`WAYBILL 85 8524 1766`, remarkX, itemY + 60);
 
-    const footerY = 730;
-    doc
-      .moveTo(40, footerY - 10)
-      .lineTo(555, footerY - 10)
-      .strokeColor("#cccccc")
-      .stroke();
-    doc
-      .fontSize(9)
-      .fillColor("#444444")
-      .font("Helvetica-Bold")
-      .text("GTech Industries Limited", 40, footerY);
-    doc
-      .font("Helvetica")
-      .text("Acc. No 478798112483", 40, footerY + 13)
-      .text("Swift Code: DHBKHKHΗ", 40, footerY + 26)
-      .text("DBS Bank (Hong Kong)", 40, footerY + 39);
+    itemY += 95;
+    if (itemY + 30 > pageH - footerReserve) { doc.addPage(); itemY = 50; }
+    doc.fontSize(10).font("Helvetica-Bold").text("* Unit price is calculated and can have errors from rounding", 40, itemY - 20);
+    doc.fontSize(9).font("Helvetica")
+      .text("We hereby confirm that no raw material from Russia were used", 100, itemY)
+      .text("in the production of the goods mentioned in this invoice.", 100, itemY + 12);
 
-    const col2X = 220;
-    doc
-      .text("+86 555 6767 199", col2X, footerY)
-      .text("+86 17355524828", col2X, footerY + 13)
-      .text("Contact: lili", col2X, footerY + 26)
-      .text("info@gtech-industries.net", col2X, footerY + 39);
+    const range = doc.bufferedPageRange();
+    const totalPagesCount = range.count;
+    for (let i = 0; i < totalPagesCount; i++) {
+      doc.switchToPage(i);
+      const fy = 735;
+      doc.moveTo(40, fy - 10).lineTo(555, fy - 10).strokeColor("#cccccc").lineWidth(0.5).stroke();
+      doc.fontSize(9).fillColor("#444444").font("Helvetica-Bold").text("GTech Industries Limited", 40, fy);
+      doc.font("Helvetica")
+        .text("Acc. No 478798112483", 40, fy + 13).text("Swift Code: DHBKHKHH", 40, fy + 26).text("DBS Bank (Hong Kong)", 40, fy + 39);
+      const c2 = 220;
+      doc.text("+86 555 6767 199", c2, fy).text("+86 17355524828", c2, fy + 13).text("Contact: lili", c2, fy + 26).text("info@gtech-industries.net", c2, fy + 39);
+      const logoPath = path.join(process.cwd(), "assets", "logo.png");
+      try { doc.image(logoPath, 425, fy + 2, { width: 115 }); } catch (_) { }
 
-    const logoPath = path.join(process.cwd(), "assets", "logo.png");
-    try {
-      doc.image(logoPath, 425, footerY + 2, { width: 115 });
-    } catch (e) {
-      doc
-        .fontSize(16)
-        .font("Helvetica-Bold")
-        .text("GTech", 450, footerY + 10);
+      doc.fillColor("#000000").fontSize(9).font("Helvetica").text(`${i + 1} / ${totalPagesCount}`, 500, 785, { align: "right", width: 55 });
     }
 
-    doc.fontSize(8).font("Helvetica").text("1/1", 530, 800);
     doc.end();
   } catch (error) {
     next(error);
