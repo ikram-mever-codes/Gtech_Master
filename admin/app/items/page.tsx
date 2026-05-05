@@ -492,8 +492,7 @@ const ItemsManagementPage: React.FC = () => {
 
     setExporting(true);
     try {
-      const result = await exportItemsToCSV(true, type);
-      console.log(`[Frontend] Export response for ${type}:`, result);
+      await exportItemsToCSV(true, type);
       await fetchPendingSyncCount();
       await fetchStatistics();
       await fetchData();
@@ -664,7 +663,6 @@ const ItemsManagementPage: React.FC = () => {
   const handleCreateParent = () => {
     router.push("/parents/new");
   };
-  console.log(parents);
 
   const handleCreateTaric = () => {
     setTaricModalMode("create");
