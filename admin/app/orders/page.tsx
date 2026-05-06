@@ -1181,6 +1181,9 @@ const OrderPage = () => {
         }
 
         const sid = sId;
+
+        if (sid === 0) return;
+
         const catId = Number(o.category_id || 0);
         const groupKey = `${sid}_${catId}`;
 
