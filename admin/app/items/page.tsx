@@ -1587,11 +1587,11 @@ const ItemsManagementPage: React.FC = () => {
           </div>
 
           <div className="flex gap-1.5 items-center">
-            {activeTab === "items" && newItemsCount > 0 && (
+            {activeTab === "items" && (
               <button
                 onClick={handleExportNewItemsCSV}
-                disabled={exportingNew}
-                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all flex items-center gap-1.5 ${exportingNew
+                disabled={exportingNew || newItemsCount === 0}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all flex items-center gap-1.5 ${exportingNew || newItemsCount === 0
                     ? "bg-gray-300 text-gray-500 cursor-not-allowed"
                     : "bg-emerald-600 text-white hover:bg-emerald-700"
                   }`}
