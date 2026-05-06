@@ -2965,8 +2965,6 @@ export const exportItemsToCSV = async (
       },
     });
 
-    console.log(`[CSV Export] Found ${items.length} items to export for type: ${type}`);
-
     if (items.length === 0) {
       return res.status(200).json({
         success: true,
@@ -3205,9 +3203,8 @@ export const exportItemsToCSV = async (
 
         csvRows.push(formattedRow.join(";"));
         updatedItemIds.push(item.id);
-        console.log(`[CSV Export] Successfully processed item ID: ${item.id}`);
-      } catch (itemError: any) {
-        console.error(`[CSV Export] FAILED processing item ${item.id}:`, itemError.message);
+      } catch (itemError) {
+        console.error(`Error processing item ${item.id}:`, itemError);
       }
     }
 
@@ -3239,7 +3236,6 @@ export const exportItemsToCSV = async (
     res.setHeader("Expires", "0");
     res.setHeader("X-Content-Type-Options", "nosniff");
 
-    console.log(`[CSV Export] Finished loop. Total rows collected: ${csvRows.length}`);
     const bom = "\uFEFF";
     return res.status(200).send(bom + csvContent);
   } catch (error) {

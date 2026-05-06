@@ -1694,6 +1694,24 @@ const OrderPage = () => {
       return;
     }
 
+    if (activeTab === "supplier_orders") {
+      const so = order as any;
+      setMode("edit");
+      setIsPOEditing(true);
+      setSelectedOrder(so);
+      setPoForm({
+        po_description: so.po_description || "",
+        comment_items: so.comment_items || "",
+        comment_attachments: so.comment_attachments || "",
+        comment_quality: so.comment_quality || "",
+        comment_delivery_left: so.comment_delivery_left || "",
+        comment_delivery_right: so.comment_delivery_right || "",
+      });
+      setOrderItems(so.items || []);
+      setShowModal(true);
+      return;
+    }
+
     setMode("edit");
     setSelectedOrder(order);
     setShowModal(true);
@@ -2836,7 +2854,7 @@ const OrderPage = () => {
                       header: "Actions",
                       align: "center",
                       render: (row) => {
-                        const isPO = row.order_type?.name === "Purchase Order";
+                        const isPurchaseOrder = row.order_type?.name === "Purchase Order";
                         return (
                           <div className="flex items-center justify-center gap-2">
                             <button
@@ -2846,13 +2864,13 @@ const OrderPage = () => {
                               <PencilIcon className="h-4 w-4" />
                               Edit
                             </button>
-                            {isPO && (
+                            {isPurchaseOrder && (
                               <button
                                 onClick={() => openPO(row as any)}
                                 className={`px-4 py-1.5 rounded-[4px] text-xs font-bold transition flex items-center gap-2 shadow-md ${row.is_po_created ? "bg-gray-100 text-gray-600 hover:bg-gray-200" : "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50"}`}
                               >
                                 <DocumentTextIcon className="h-4 w-4" />
-                                {row.is_po_created ? "PO Created" : "PO"}
+                                {row.is_po_created ? "PO Created" : "Create PO"}
                               </button>
                             )}
                           </div>
