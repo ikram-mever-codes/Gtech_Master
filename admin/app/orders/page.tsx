@@ -892,7 +892,7 @@ function OrdersTable({
   );
 }
 
-const OrderPage = () => {
+const OrderPage: React.FC = () => {
   const { user } = useSelector((state: RootState) => state.user);
 
   const router = useRouter();
@@ -955,6 +955,7 @@ const OrderPage = () => {
     category_id: "",
     supplier_id: "",
     status: "",
+    ref_no: "",
   });
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -984,6 +985,7 @@ const OrderPage = () => {
     comment_delivery_right: "",
   });
   const [isPOEditing, setIsPOEditing] = useState(false);
+  const [isSOEditing, setIsSOEditing] = useState(false);
 
   const itemById = useMemo(() => {
     const map = new Map<string, Item>();
@@ -1273,6 +1275,7 @@ const OrderPage = () => {
       category_id: "",
       supplier_id: "",
       status: "",
+      ref_no: "",
     });
     setSelectedItemId("");
     setOrderItems([]);
@@ -1700,17 +1703,16 @@ const OrderPage = () => {
     if (activeTab === "supplier_orders") {
       const so = order as any;
       setMode("edit");
-      setIsPOEditing(true);
+      setIsSOEditing(true);
       setSelectedOrder(so);
-      setPoForm({
-        po_description: so.po_description || "",
-        comment_items: so.comment_items || "",
-        comment_attachments: so.comment_attachments || "",
-        comment_quality: so.comment_quality || "",
-        comment_delivery_left: so.comment_delivery_left || "",
-        comment_delivery_right: so.comment_delivery_right || "",
+      setForm({
+        supplier_id: String(so.supplier_id || ""),
+        category_id: String(so.order_type_id || ""),
+        ref_no: so.ref_no || "",
+        comment: so.remark || "",
+        status: String(so.status || ""),
+        customer_id: "",
       });
-      setOrderItems(so.items || []);
       setShowModal(true);
       return;
     }
@@ -1721,10 +1723,11 @@ const OrderPage = () => {
 
     setForm({
       category_id: String(order.category_id ?? ""),
-      customer_id: String((order as any).customer_id ?? ""),
+      customer_id: String(order.customer_id ?? ""),
       supplier_id: String(order.supplier_id ?? ""),
       comment: order.comment ?? "",
       status: String(order.status ?? ""),
+      ref_no: "",
     });
 
     const category_id = String(order.category_id ?? "");
@@ -1764,10 +1767,11 @@ const OrderPage = () => {
 
     setForm({
       category_id: String(order.category_id ?? "1"),
-      customer_id: String((order as any).customer_id ?? ""),
+      customer_id: String(order.customer_id ?? ""),
       supplier_id: String(order.supplier_id ?? ""),
       comment: order.comment ?? "",
       status: String(order.status ?? ""),
+      ref_no: "",
     });
 
     const detailRes: any = await getOrderById(order.id);
@@ -1800,6 +1804,7 @@ const OrderPage = () => {
   const closeModal = () => {
     setShowModal(false);
     setIsPOEditing(false);
+    setIsSOEditing(false);
     resetForm();
   };
 
@@ -1922,6 +1927,29 @@ const OrderPage = () => {
     setShowModal(false);
     resetForm();
     fetchOrders();
+  };
+
+  const handleUpdateSO = async () => {
+    if (!selectedOrder?.id) return;
+    try {
+      const isNewTypePO = categories.find(c => String(c.id) === String(form.category_id))?.name === "Purchase Order";
+      const isOldTypePO = selectedOrder?.order_type?.name === "Purchase Order";
+
+      await updateSupplierOrder(selectedOrder.id, {
+        supplier_id: form.supplier_id ? Number(form.supplier_id) : null,
+        order_type_id: form.category_id ? Number(form.category_id) : null,
+        ref_no: form.ref_no || "",
+        remark: form.comment || "",
+        // Agar type change ho raha hai ya pehle PO nahi tha, to isay 0 set karein
+        is_po_created: (isNewTypePO && isOldTypePO) ? (selectedOrder?.is_po_created || 0) : 0,
+      });
+      setShowModal(false);
+      setIsSOEditing(false);
+      resetForm();
+      fetchSupplierOrders();
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   const handleConvertOrder = async () => {
@@ -2619,16 +2647,10 @@ const OrderPage = () => {
                               header: "Status",
                               width: "80px",
                               render: (item: any) => {
-                                const st =
-                                  orderItemDetailsMap.get(String(item.id))
-                                    ?.status ||
-                                  item.status ||
-                                  "SO";
-                                const isPurchased =
-                                  st?.toLowerCase() === "purchased";
+                                const st = "SO";
                                 return (
                                   <span
-                                    className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase ${isPurchased ? "bg-green-100 text-green-700" : "bg-blue-100 text-blue-700"}`}
+                                    className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase bg-blue-100 text-blue-700`}
                                   >
                                     {st}
                                   </span>
@@ -2870,10 +2892,10 @@ const OrderPage = () => {
                             {isPurchaseOrder && (
                               <button
                                 onClick={() => openPO(row as any)}
-                                className={`px-4 py-1.5 rounded-[4px] text-xs font-bold transition flex items-center gap-2 shadow-md ${row.is_po_created ? "bg-gray-100 text-gray-600 hover:bg-gray-200" : "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50"}`}
+                                className={`px-4 py-1.5 rounded-[4px] text-xs font-bold transition flex items-center gap-2 shadow-md ${Number(row.is_po_created) === 1 ? "bg-gray-100 text-gray-600 hover:bg-gray-200" : "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50"}`}
                               >
                                 <DocumentTextIcon className="h-4 w-4" />
-                                {row.is_po_created ? "PO Created" : "Create PO"}
+                                {Number(row.is_po_created) === 1 ? "PO Created" : "Create PO"}
                               </button>
                             )}
                           </div>
@@ -3733,7 +3755,7 @@ const OrderPage = () => {
         </CustomModal>
       )}
 
-      {showModal && (
+      {showModal && !isSOEditing && (
         <CustomModal
           isOpen={showModal}
           onClose={closeModal}
@@ -3941,15 +3963,32 @@ const OrderPage = () => {
               )}
               <div className="flex gap-4">
                 <div className="flex-1">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Select Category:</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    {isTab1 ? "Select Order Type:" : "Select Category:"}
+                  </label>
                   <select
                     value={form.category_id}
                     onChange={(e) => handleCategoryChange(e.target.value)}
                     disabled={lockAllExceptQty}
                     className="w-full px-3 py-2 text-sm border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:bg-gray-50"
                   >
-                    <option value="">Select Category</option>
-                    {categories.map((cat) => <option key={cat.id} value={String(cat.id)}>{cat.name}</option>)}
+                    <option value="">{isTab1 ? "Select Order Type" : "Select Category"}</option>
+                    {categories
+                      .filter((c) => {
+                        if (!isTab1) return true;
+                        const name = c.name?.toLowerCase() || "";
+                        return (
+                          name === "taobao" ||
+                          name === "purchase order" ||
+                          name === "others" ||
+                          name === "1688"
+                        );
+                      })
+                      .map((cat) => (
+                        <option key={cat.id} value={String(cat.id)}>
+                          {cat.name}
+                        </option>
+                      ))}
                   </select>
                 </div>
                 <div className="flex-1">
@@ -4146,6 +4185,103 @@ const OrderPage = () => {
         </CustomModal>
       )}
 
+      {isSOEditing && (
+        <CustomModal
+          isOpen={isSOEditing}
+          onClose={closeModal}
+          width="max-w-xl"
+          title="Update Supplier order"
+          footer={
+            <div className="flex gap-3">
+              <button
+                onClick={closeModal}
+                className="px-6 py-2 rounded-lg border border-gray-200 text-gray-600 font-semibold hover:bg-gray-50 transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleUpdateSO}
+                className="px-6 py-2 rounded-lg bg-[#059669] text-white font-semibold hover:bg-green-700 shadow-md transition-all"
+              >
+                Save changes
+              </button>
+            </div>
+          }
+        >
+          <div className="space-y-6">
+            <div className="text-sm text-gray-500 -mt-2 mb-4">
+              Make changes to this supplier order details.
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-gray-700 ml-1">Select Supplier:</label>
+                <select
+                  value={form.supplier_id}
+                  onChange={(e) => setForm({ ...form, supplier_id: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all outline-none text-sm"
+                >
+                  <option value="">Select Supplier</option>
+                  {suppliers.map((s) => (
+                    <option key={s.id} value={String(s.id)}>
+                      {s.company_name} - {s.id}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-gray-700 ml-1">Select Order Type:</label>
+                <select
+                  value={form.category_id}
+                  onChange={(e) => setForm({ ...form, category_id: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all outline-none text-sm"
+                >
+                  <option value="">Select Order Type</option>
+                  {categories
+                    .filter((c) => {
+                      const name = c.name?.toLowerCase() || "";
+                      return (
+                        name === "taobao" ||
+                        name === "purchase order" ||
+                        name === "others" ||
+                        name === "1688"
+                      );
+                    })
+                    .map((c) => (
+                      <option key={c.id} value={String(c.id)}>
+                        {c.name}
+                      </option>
+                    ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-gray-700 ml-1">Reference No:</label>
+              <input
+                type="text"
+                value={form.ref_no}
+                onChange={(e) => setForm({ ...form, ref_no: e.target.value })}
+                placeholder="Reference number..."
+                className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all outline-none text-sm border-2 border-green-500"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-gray-700 ml-1">Supplier order remark:</label>
+              <textarea
+                value={form.comment}
+                onChange={(e) => setForm({ ...form, comment: e.target.value })}
+                rows={4}
+                className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all outline-none text-sm resize-none"
+                placeholder="."
+              />
+            </div>
+          </div>
+        </CustomModal>
+      )}
+
       {showSPModal && selectedItem && (
         <CustomModal
           isOpen={showSPModal}
@@ -4202,7 +4338,7 @@ const OrderPage = () => {
   );
 };
 
-const OrderPageWrapper = () => (
+const OrderPageWrapper: React.FC = () => (
   <Suspense
     fallback={<div className="p-8 text-center text-gray-400">Loading...</div>}
   >
