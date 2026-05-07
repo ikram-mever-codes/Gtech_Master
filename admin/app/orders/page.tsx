@@ -2665,124 +2665,14 @@ const OrderPage: React.FC = () => {
                                 const det = orderItemDetailsMap.get(
                                   String(item.id),
                                 );
-                                const st = det?.status || item.status || "SO";
-                                const isSO = st?.toUpperCase() === "SO";
-                                const isPurchased =
-                                  st?.toLowerCase() === "purchased";
-
                                 return (
                                   <div className="flex gap-1.5 justify-center flex-wrap w-fit mx-auto">
-                                    {isSO ? (
-                                      <>
-                                        <button
-                                          onClick={() => {
-                                            if (det?.parentOrder)
-                                              openEdit(det.parentOrder);
-                                            else
-                                              toast.error(
-                                                "Could not find parent order to view",
-                                              );
-                                          }}
-                                          className="bg-[#059669] hover:bg-green-700 text-white px-2 py-1 rounded text-[9px] font-bold uppercase flex items-center gap-1 shadow-sm transition-all active:scale-95 whitespace-nowrap"
-                                        >
-                                          <PencilIcon className="h-3 w-3" />{" "}
-                                          Edit
-                                        </button>
-                                        <button
-                                          onClick={() =>
-                                            handlePurchaseItem(item.id)
-                                          }
-                                          className="bg-[#059669] hover:bg-green-700 text-white px-2 py-1 rounded text-[9px] font-bold uppercase flex items-center gap-1 shadow-sm transition-all active:scale-95 whitespace-nowrap"
-                                        >
-                                          <PlusCircleIcon className="h-3 w-3" />{" "}
-                                          Purchase
-                                        </button>
-                                      </>
-                                    ) : isPurchased ? (
-                                      <>
-                                        <button
-                                          onClick={() => {
-                                            if (det?.parentOrder)
-                                              openEdit(det.parentOrder);
-                                            else
-                                              toast.error(
-                                                "Could not find parent order to view",
-                                              );
-                                          }}
-                                          className="bg-[#059669] hover:bg-green-700 text-white px-2 py-1 rounded text-[9px] font-bold uppercase flex items-center gap-1 shadow-sm transition-all active:scale-95 whitespace-nowrap"
-                                        >
-                                          <PencilIcon className="h-3 w-3" />{" "}
-                                          Edit
-                                        </button>
-                                        <button className="bg-orange-500 hover:bg-orange-600 text-white px-2 py-1 rounded text-[9px] font-bold uppercase flex items-center gap-1 shadow-sm transition-all active:scale-95 whitespace-nowrap">
-                                          <EyeIcon className="h-3 w-3" />{" "}
-                                          P_Problem
-                                        </button>
-                                        <button className="bg-purple-500 hover:bg-purple-600 text-white px-2 py-1 rounded text-[9px] font-bold uppercase flex items-center gap-1 shadow-sm transition-all active:scale-95 whitespace-nowrap">
-                                          <DocumentTextIcon className="h-3 w-3" />{" "}
-                                          Ref No.
-                                        </button>
-                                      </>
-                                    ) : (
-                                      /* Default buttons for other statuses if any */
-                                      <>
-                                        <button
-                                          onClick={() => handleEditQty(item)}
-                                          className="bg-slate-600 hover:bg-slate-700 text-white px-2 py-1 rounded text-[9px] font-bold uppercase flex items-center gap-1 shadow-sm transition-all active:scale-95 whitespace-nowrap"
-                                        >
-                                          <PencilIcon className="h-3 w-3" /> QTY
-                                        </button>
-
-                                        <button
-                                          onClick={() => {
-                                            setSelectedItem(item);
-                                            setSplitQty(item.qty_label || item.qty);
-                                            setRemarksCN(item.remarks_cn || "");
-                                            setShowSPModal(true);
-                                          }}
-                                          className="bg-orange-600 hover:bg-orange-700 text-white px-2 py-1 rounded text-[9px] font-bold uppercase flex items-center gap-1 shadow-sm transition-all active:scale-95 whitespace-nowrap"
-                                        >
-                                          <ScissorsIcon className="h-3 w-3" />{" "}
-                                          Label
-                                        </button>
-
-                                        <button
-                                          onClick={() => {
-                                            setSelectedItem(item);
-                                            setTargetCargoId(
-                                              det?.cargo_id || "",
-                                            );
-                                            setShowREModal(true);
-                                          }}
-                                          className="bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded text-[9px] font-bold uppercase flex items-center gap-1 shadow-sm transition-all active:scale-95 whitespace-nowrap"
-                                        >
-                                          <ArrowRightCircleIcon className="h-3 w-3" />{" "}
-                                          ReAssgn
-                                        </button>
-
-                                        <button
-                                          onClick={() => handlePrintLabel(row)}
-                                          className="bg-[#059669] hover:bg-green-700 text-white px-3 py-1.5 rounded-[4px] text-[10px] font-bold uppercase flex items-center gap-1.5 shadow-sm transition-all active:scale-95"
-                                        >
-                                          <PrinterIcon className="h-3.5 w-3.5" />{" "}
-                                          Print
-                                        </button>
-                                        <button
-                                          onClick={() => {
-                                            if (det?.parentOrder)
-                                              openEdit(det.parentOrder);
-                                            else
-                                              toast.error(
-                                                "Could not find parent order to view",
-                                              );
-                                          }}
-                                          className="bg-[#059669] hover:bg-green-700 text-white px-2 py-1 rounded text-[9px] font-bold uppercase flex items-center gap-1 shadow-sm transition-all active:scale-95 whitespace-nowrap"
-                                        >
-                                          <EyeIcon className="h-3 w-3" /> Full
-                                          Order
-                                        </button>
-                                      </>
-                                    )}
+                                    <button
+                                      onClick={() => handleEditQty(item)}
+                                      className="bg-slate-600 hover:bg-slate-700 text-white px-2 py-1 rounded text-[9px] font-bold uppercase flex items-center gap-1 shadow-sm transition-all active:scale-95 whitespace-nowrap"
+                                    >
+                                      <PencilIcon className="h-3 w-3" /> QTY
+                                    </button>
                                   </div>
                                 );
                               },
