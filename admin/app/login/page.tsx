@@ -17,6 +17,7 @@ import { BASE_URL, loadingStyles, successStyles } from "@/utils/constants";
 import toast from "react-hot-toast";
 import { api, handleApiError } from "@/utils/api";
 import { login } from "../Redux/features/userSlice";
+import logo from "@/public/logo.png";
 import axios from "axios";
 import { useRouter } from "next/navigation";
 import { UserRole } from "@/utils/interfaces";
@@ -80,13 +81,14 @@ const Login = () => {
         {/* Form Section */}
         <div className="flex-1 p-12">
           <div className="max-w-md mx-auto">
-            <div className="text-center flex-col  flex justify-center items-center mb-10">
+            <div className="text-center flex justify-center items-center mb-10 w-full">
               <Image
-                src="/logo.png"
+                src={logo}
                 alt="GTech Master System"
                 width={200}
                 height={180}
-                className="mb-4  ml-[50px]"
+                className="mb-4"
+                priority
               />
             </div>
 
