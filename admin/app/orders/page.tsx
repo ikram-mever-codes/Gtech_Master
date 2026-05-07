@@ -1659,12 +1659,18 @@ const OrderPage: React.FC = () => {
       comment_delivery_right: so.comment_delivery_right || "",
     });
     setOrderItems((so.items || []).map((it: any) => {
-      const resolvedPrice = it.price ||
-        it.item?.price_rmb ||
+      const det = orderItemDetailsMap.get(String(it.id));
+      const resolvedPrice =
+        det?.rmb_special_price ||
+        it.rmb_special_price ||
+        it.rmb_price ||
         it.item?.rmb_price ||
+        it.item?.rmb_special_price ||
         it.item?.RMB_Price ||
-        it.item?.unit_price_cny ||
-        it.item?.rmb_special_price || 0;
+        it.item?.others?.rmbPrice ||
+        det?.price ||
+        it.price ||
+        0;
       return {
         ...it,
         price: resolvedPrice
