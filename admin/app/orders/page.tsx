@@ -1658,10 +1658,18 @@ const OrderPage: React.FC = () => {
       comment_delivery_left: so.comment_delivery_left || "",
       comment_delivery_right: so.comment_delivery_right || "",
     });
-    setOrderItems((so.items || []).map((it: any) => ({
-      ...it,
-      price: it.price || it.item?.rmb_price || it.item?.RMB_Price || it.item?.rmb_special_price || it.item?.others?.rmbPrice || 0
-    })));
+    setOrderItems((so.items || []).map((it: any) => {
+      const resolvedPrice = it.price ||
+        it.item?.price_rmb ||
+        it.item?.rmb_price ||
+        it.item?.RMB_Price ||
+        it.item?.unit_price_cny ||
+        it.item?.rmb_special_price || 0;
+      return {
+        ...it,
+        price: resolvedPrice
+      };
+    }));
     setShowModal(true);
   };
   const handleSavePO = async () => {
