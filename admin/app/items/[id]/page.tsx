@@ -774,6 +774,8 @@ const ItemDetailsPage = () => {
           note_cn: updatedData.supplierItem?.noteCN,
           url: updatedData.supplierItem?.url,
         },
+        price: toNum(updatedData.price),
+        transfer_price_EUR: toNum(updatedData.price),
 
         warehouseItemData: {
           is_stock_item: updatedData.others?.isStock ? "Y" : "N",
@@ -958,12 +960,12 @@ const ItemDetailsPage = () => {
                 />
                 <EditableInfoRow
                   label="Transfer Price (EUR)"
-                  value={`€ ${itemData.transfer_price}`}
-                  field="transfer_price_EUR"
+                  value={itemData.price || itemData.transfer_price}
+                  field="price"
                   editMode={editMode}
                   itemData={itemData}
                   setItemData={setItemData}
-                  readOnly={true}
+                  readOnly={false}
                 />
                 <EditableInfoRow
                   label="Item Name"
@@ -1021,13 +1023,13 @@ const ItemDetailsPage = () => {
                   itemData={itemData}
                   setItemData={setItemData}
                 />
-                <InfoRow
+                <EditableInfoRow
                   label="Price (RMB) ¥"
-                  value={
-                    (itemData as any).others?.rmbPrice
-                      ? `¥ ${(itemData as any).others.rmbPrice}`
-                      : "—"
-                  }
+                  value={itemData.supplierItem?.priceRMB || (itemData as any).others?.rmbPrice}
+                  field="supplierItem.priceRMB"
+                  editMode={editMode}
+                  itemData={itemData}
+                  setItemData={setItemData}
                 />
                 <InfoRow label="Active">
                   <StatusIndicator value={itemData.isActive} />

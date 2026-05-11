@@ -1221,10 +1221,10 @@ export const generateCommercialInvoicePDF = async (
     const billToName = rawBillName.replace(/^GTech$/i, "GTech Industries GmbH");
 
     const data = {
-      invoiceNo: invoice.invoiceNumber || "N/A",
+      invoiceNo: (invoice.invoiceNumber || "N/A").replace(/-/g, ""),
       date: invoice.invoiceDate ? new Date(invoice.invoiceDate).toISOString().split("T")[0] : "N/A",
       cargoNo: invoice.orderNumber || "N/A",
-      customerID: customer?.id?.slice(0, 8) || "N/A",
+      customerID: customer ? (parseInt(customer.id.split("-")[0], 16) % 10000).toString() : "N/A",
       billTo: {
         name: billToName,
         street: cargo?.bill_to_full_address || customer?.addressLine1 || "",
@@ -1268,7 +1268,11 @@ export const generateCommercialInvoicePDF = async (
       "C:\\Windows\\Fonts\\msyh.ttf",
       "C:\\Windows\\Fonts\\simsun.ttf",
       "C:\\Windows\\Fonts\\simsunb.ttf",
-      "C:\\Windows\\Fonts\\SimsunExtG.ttf"
+      "C:\\Windows\\Fonts\\SimsunExtG.ttf",
+      "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+      "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
+      "/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf",
+      "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc"
     ].find(p => existsSync(p));
 
     if (chFont) {
@@ -1280,24 +1284,25 @@ export const generateCommercialInvoicePDF = async (
     }
 
     const isSameAddr = data.billTo.name === data.shipTo.company && data.billTo.street === data.shipTo.street;
+    const addrY = 125;
     if (isSameAddr) {
-      doc.fillColor("black").font("Helvetica-Bold").fontSize(11).text(data.billTo.name, 40, 115);
+      doc.fillColor("black").font("Helvetica-Bold").fontSize(11).text(data.billTo.name, 40, addrY);
       doc.font("Helvetica").fontSize(10)
-        .text(data.billTo.street, 40, 130).text(data.billTo.city, 40, 143)
-        .text(data.billTo.country, 40, 156).text(data.billTo.phone, 40, 170);
-      doc.font("Helvetica-Bold").text(`EORI: ${data.billTo.eori}`, 40, 184);
+        .text(data.billTo.street, 40, addrY + 15).text(data.billTo.city, 40, addrY + 28)
+        .text(data.billTo.country, 40, addrY + 41).text(data.billTo.phone, 40, addrY + 55);
+      doc.font("Helvetica-Bold").text(`EORI: ${data.billTo.eori}`, 40, addrY + 69);
     } else {
-      doc.fillColor("black").font("Helvetica-Bold").fontSize(10.5).text("BILL TO:", 40, 112).text("SHIP TO:", 240, 112);
-      doc.font("Helvetica-Bold").fontSize(11).text(data.billTo.name, 40, 128);
+      doc.fillColor("black").font("Helvetica-Bold").fontSize(10.5).text("BILL TO:", 40, addrY - 3).text("SHIP TO:", 240, addrY - 3);
+      doc.font("Helvetica-Bold").fontSize(11).text(data.billTo.name, 40, addrY + 13);
       doc.font("Helvetica").fontSize(10)
-        .text(data.billTo.street, 40, 148).text(data.billTo.city, 40, 161)
-        .text(data.billTo.country, 40, 174).text(data.billTo.phone, 40, 188);
-      doc.font("Helvetica-Bold").text(`EORI: ${data.billTo.eori}`, 40, 202);
+        .text(data.billTo.street, 40, addrY + 33).text(data.billTo.city, 40, addrY + 46)
+        .text(data.billTo.country, 40, addrY + 59).text(data.billTo.phone, 40, addrY + 73);
+      doc.font("Helvetica-Bold").text(`EORI: ${data.billTo.eori}`, 40, addrY + 87);
 
-      doc.font("Helvetica-Bold").fontSize(11).text(data.shipTo.company, 240, 128);
-      doc.font("Helvetica").fontSize(10).text(data.shipTo.contact, 240, 142)
-        .text(data.shipTo.street, 240, 156).text(data.shipTo.city, 240, 172)
-        .text(data.shipTo.country, 240, 185).text(data.shipTo.phone, 240, 198);
+      doc.font("Helvetica-Bold").fontSize(11).text(data.shipTo.company, 240, addrY + 13);
+      doc.font("Helvetica").fontSize(10).text(data.shipTo.contact, 240, addrY + 27)
+        .text(data.shipTo.street, 240, addrY + 41).text(data.shipTo.city, 240, addrY + 57)
+        .text(data.shipTo.country, 240, addrY + 70).text(data.shipTo.phone, 240, addrY + 83);
     }
 
     doc.font("Helvetica").fontSize(12).text("Customer ID: ", 420, 130, { continued: true }).font("Helvetica-Bold").text(data.customerID);
@@ -1340,14 +1345,16 @@ export const generateCommercialInvoicePDF = async (
     doc.text(freightCost.toFixed(2), 510, itemY, { align: "right", width: 45 });
     itemY += rowH;
 
-    doc.moveTo(340, itemY).lineTo(555, itemY).strokeColor("black").lineWidth(1).stroke();
+    doc.moveTo(40, itemY).lineTo(555, itemY).strokeColor("black").lineWidth(1).stroke();
     itemY += 12;
     doc.font("Helvetica-Bold").fontSize(11).text("Total :", 360, itemY, { underline: true });
     doc.text(totalQty.toString(), 425, itemY, { underline: true });
     doc.text(`${grandTotal} €`, 485, itemY, { width: 70, align: "right", underline: true });
 
-    itemY += 45;
-    if (itemY + 90 > pageH - footerReserve) { doc.addPage(); itemY = 50; }
+    itemY += 60;
+    if (itemY + 110 > pageH - footerReserve) { doc.addPage(); itemY = 50; }
+    doc.fontSize(10).font("Helvetica-Bold").text("* Unit price is calculated and can have errors from rounding", 40, itemY);
+    itemY += 40;
     doc.fontSize(10).font("Helvetica").text("Remark:", 40, itemY);
     const remarkX = 100;
     doc.text(`DHL Express, ${data.cargoNo}`, remarkX, itemY);
@@ -1358,9 +1365,8 @@ export const generateCommercialInvoicePDF = async (
     doc.text(`${packageCount} parcels`, remarkX, itemY + 45);
     doc.text(`WAYBILL 85 8524 1766`, remarkX, itemY + 60);
 
-    itemY += 95;
+    itemY += 115;
     if (itemY + 30 > pageH - footerReserve) { doc.addPage(); itemY = 50; }
-    doc.fontSize(10).font("Helvetica-Bold").text("* Unit price is calculated and can have errors from rounding", 40, itemY - 20);
     doc.fontSize(9).font("Helvetica")
       .text("We hereby confirm that no raw material from Russia were used", 100, itemY)
       .text("in the production of the goods mentioned in this invoice.", 100, itemY + 12);

@@ -111,8 +111,9 @@ export const feedTransferPrices = async (
           item.supp_cat || "",
         );
 
-        if (item.transfer_price_EUR !== newPrice) {
+        if (item.transfer_price_EUR !== newPrice || item.price !== newPrice) {
           item.transfer_price_EUR = newPrice;
+          item.price = newPrice;
           item.is_updated = true;
           await itemRepo.save(item);
           updatedCount++;
@@ -389,6 +390,8 @@ export const getItems = async (
           is_updated: item.is_updated,
           is_new: item.is_new,
           rmb_price: rmbPrice,
+          price: item.price,
+          transfer_price_EUR: item.transfer_price_EUR,
 
           warehouse_data: warehouseData
             ? {
@@ -965,6 +968,7 @@ export const updateItem = async (
       "ItemID_DE",
       "painPoints",
       "price",
+      "transfer_price_EUR",
     ];
 
     let hasChanges = false;
@@ -1084,6 +1088,14 @@ export const updateItem = async (
       }
     }
 
+    if (req.body.price !== undefined) {
+      item.transfer_price_EUR = parseFloat(req.body.price);
+      item.price = parseFloat(req.body.price);
+    } else if (req.body.transfer_price_EUR !== undefined) {
+      item.price = parseFloat(req.body.transfer_price_EUR);
+      item.transfer_price_EUR = parseFloat(req.body.transfer_price_EUR);
+    }
+
     if (category?.name === "STD") {
       if (currentRMBPrice === null) {
         const existingSI = await supplierItemRepository.findOne({
@@ -1092,13 +1104,14 @@ export const updateItem = async (
         currentRMBPrice = existingSI?.price_rmb || null;
       }
 
-      if (currentRMBPrice) {
+      if (currentRMBPrice && req.body.price === undefined && req.body.transfer_price_EUR === undefined) {
         const calculated = calculateTransferPrice(
           Number(currentRMBPrice),
           category.name,
         );
         if (item.price !== calculated) {
           item.price = calculated;
+          item.transfer_price_EUR = calculated;
           hasChanges = true;
         }
       }
@@ -1171,8 +1184,9 @@ export const syncTransferPrices = async (
           sItem.price_rmb,
           item.category?.name || "STD",
         );
-        if (item.transfer_price_EUR !== newTransferPrice) {
+        if (item.transfer_price_EUR !== newTransferPrice || item.price !== newTransferPrice) {
           item.transfer_price_EUR = newTransferPrice;
+          item.price = newTransferPrice;
           item.is_updated = true;
           await itemRepo.save(item);
           count++;
