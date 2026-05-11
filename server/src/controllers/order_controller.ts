@@ -1264,15 +1264,19 @@ export const generateCommercialInvoicePDF = async (
     doc.text("GTech Establishment China: West Dafeng Metallurgical Plant, Bowang Huisheng Square, Bowang, Ma'anshan, Anhui", 40, 88);
 
     const chFont = [
-      "C:\\Windows\\Fonts\\malgun.ttf",
       "C:\\Windows\\Fonts\\msyh.ttf",
       "C:\\Windows\\Fonts\\simsun.ttf",
       "C:\\Windows\\Fonts\\simsunb.ttf",
-      "C:\\Windows\\Fonts\\SimsunExtG.ttf",
-      "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+      "C:\\Windows\\Fonts\\malgun.ttf",
       "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
+      "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+      "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
+      "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc",
+      "/usr/share/fonts/truetype/arphic/uming.ttc",
       "/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf",
-      "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc"
+      "/usr/share/fonts/google-noto-cjk-fonts/NotoSansCJK-Regular.ttc",
+      "/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc",
+      "/usr/share/fonts/adobe-source-han-sans-cn-fonts/SourceHanSansCN-Regular.otf",
     ].find(p => existsSync(p));
 
     if (chFont) {
