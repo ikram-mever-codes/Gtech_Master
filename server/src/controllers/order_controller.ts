@@ -1184,7 +1184,11 @@ export const generateCommercialInvoicePDF = async (
         hsCode = "n/a";
         desc = item?.item_name || "Unknown";
       }
-      const unitPrice = Number(oi.eur_special_price || oi.price || item?.price || 0);
+      let unitPrice = 0;
+      if (item?.transfer_price_EUR !== undefined && item?.transfer_price_EUR !== null) unitPrice = Number(item.transfer_price_EUR);
+      else if (oi.eur_special_price !== undefined && oi.eur_special_price !== null) unitPrice = Number(oi.eur_special_price);
+      else if (oi.price !== undefined && oi.price !== null) unitPrice = Number(oi.price);
+      else if (item?.price !== undefined && item?.price !== null) unitPrice = Number(item.price);
       const qty = Number(oi.qty || 0);
       if (!taricGroupsMap.has(groupKey)) taricGroupsMap.set(groupKey, { hsCode, desc, qty: 0, totalPrice: 0 });
       const g = taricGroupsMap.get(groupKey)!;
@@ -1266,17 +1270,18 @@ export const generateCommercialInvoicePDF = async (
     console.log("Searching for CJK fonts...");
     const fontPaths = [
       path.join(process.cwd(), "assets", "chfont.ttf"),
-      "C:\\Windows\\Fonts\\msyh.ttc",
       "C:\\Windows\\Fonts\\simsun.ttc",
-      "C:\\Windows\\Fonts\\simsunb.ttf",
-      "C:\\Windows\\Fonts\\msyh.ttf",
+      "C:\\Windows\\Fonts\\msyh.ttc",
       "C:\\Windows\\Fonts\\simsun.ttf",
-      "C:\\Windows\\Fonts\\SimsunExtG.ttf",
-      "C:\\Windows\\Fonts\\malgun.ttf",
+      "C:\\Windows\\Fonts\\msyh.ttf",
+      "C:\\Windows\\Fonts\\simsunb.ttf",
+      "C:\\Windows\\Fonts\\ARIALUNI.TTF",
+      "C:\\Windows\\Fonts\\arialuni.ttf",
+      "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
       "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
       "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc",
       "/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf",
-      "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
+      "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
     ];
 
     let chFont: string | undefined;
@@ -1290,42 +1295,39 @@ export const generateCommercialInvoicePDF = async (
           if (p.toLowerCase().endsWith(".ttc")) {
             if (p.toLowerCase().includes("msyh")) nameToTry = "Microsoft YaHei";
             else if (p.toLowerCase().includes("simsun")) nameToTry = "SimSun";
+            else if (p.toLowerCase().includes("arialuni")) nameToTry = "Arial Unicode MS";
           }
 
-          if (nameToTry) {
-            testDoc.font(p, nameToTry);
-            chFontName = nameToTry;
-          } else {
-            testDoc.font(p);
-          }
+          if (nameToTry) testDoc.font(p, nameToTry);
+          else testDoc.font(p);
 
-          console.log(`[CJK-DEBUG] Font validated and selected: ${p} ${chFontName ? `(Name: ${chFontName})` : ""}`);
           chFont = p;
+          chFontName = nameToTry;
+          console.log(`[CJK-DEBUG] Successfully validated font: ${p} ${chFontName ? `(${chFontName})` : ""}`);
           break;
         } catch (err: any) {
-          console.log(`[CJK-DEBUG] Font found but failed to load: ${p} - ${err.message}`);
+          console.log(`[CJK-DEBUG] Found font but failed validation: ${p} - ${err.message}`);
         }
-      } else {
-        console.log(`[CJK-DEBUG] Font not found: ${p}`);
       }
     }
 
     if (chFont) {
       try {
-        console.log(`[CJK-DEBUG] Using font: ${chFont} ${chFontName ? `(${chFontName})` : ""}`);
+        console.log(`[CJK-DEBUG] Applying Chinese font: ${chFont} (Name: ${chFontName || 'None'})`);
         const chineseAddress = "中国安徽省马鞍山市博望区博望汇盛广场西大丰冶金厂区";
-        console.log(`[CJK-DEBUG] Text to render: ${chineseAddress}`);
 
         if (chFontName) {
           doc.font(chFont, chFontName).fontSize(9).text(chineseAddress, 152, 101).font("Helvetica");
         } else {
           doc.font(chFont).fontSize(9).text(chineseAddress, 152, 101).font("Helvetica");
         }
+
+        console.log(`[CJK-DEBUG] Chinese address rendered successfully`);
       } catch (err: any) {
-        console.error("[CJK-DEBUG] CJK Font rendering failed during final use:", err.message);
+        console.error("[CJK-DEBUG] Render failed:", err.message);
       }
     } else {
-      console.warn("[CJK-DEBUG] No valid CJK font found in any of the specified paths!");
+      console.warn("[CJK-DEBUG] No CJK font found - Chinese will show as boxes!");
     }
 
     const isSameAddr = data.billTo.name === data.shipTo.company && data.billTo.street === data.shipTo.street;
