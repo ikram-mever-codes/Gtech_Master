@@ -1321,7 +1321,6 @@ export const generateCommercialInvoicePDF = async (
         } else {
           doc.font(chFont).fontSize(9).text(chineseAddress, 152, 101).font("Helvetica");
         }
-        console.log("[CJK-DEBUG] Chinese text rendered successfully");
       } catch (err: any) {
         console.error("[CJK-DEBUG] CJK Font rendering failed during final use:", err.message);
       }
