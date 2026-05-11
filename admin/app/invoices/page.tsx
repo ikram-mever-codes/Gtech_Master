@@ -43,6 +43,7 @@ import PageHeader from "@/components/UI/PageHeader";
 import Link from "next/link";
 import CargosTab from "@/components/cargos/CargosTab";
 import CargoTypesTab from "@/components/cargos/CargoTypesTab";
+import PackingListTab from "./PackingListTab";
 import {
   getAllCustomers,
   CustomerData as APICustomerData,
@@ -2507,17 +2508,8 @@ const InvoiceListPage: React.FC = () => {
         )}
 
         {activeInvTab === "packing_list" && (
-          <div className="bg-white p-6 rounded-[4px] shadow-md border border-gray-200">
-            <h2 className="text-lg font-bold mb-2">Packing List</h2>
-            <p className="text-xs text-gray-500 mb-6">
-              Manage packing lists for invoices.
-            </p>
-            <div className="border-2 border-dashed border-gray-100 rounded-[4px] h-48 flex flex-col items-center justify-center text-gray-300">
-              <FileText className="w-10 h-10 mb-2 opacity-10" />
-              <p className="text-xs">
-                Packing List functionalities will be added here.
-              </p>
-            </div>
+          <div className="bg-white rounded-[4px] border border-[#E9ECEF] p-4 shadow-sm">
+            <PackingListTab />
           </div>
         )}
         {showREModal && selectedItem && (

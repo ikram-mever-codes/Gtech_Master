@@ -1263,24 +1263,69 @@ export const generateCommercialInvoicePDF = async (
     doc.text("GTech Industries Limited:   3A, 12/F, Kaiser Centre, N. 18 Centre Street, Sai Ying Pun, Hong Kong", 40, 75);
     doc.text("GTech Establishment China: West Dafeng Metallurgical Plant, Bowang Huisheng Square, Bowang, Ma'anshan, Anhui", 40, 88);
 
-    const chFont = [
-      "C:\\Windows\\Fonts\\malgun.ttf",
+    console.log("Searching for CJK fonts...");
+    const fontPaths = [
+      path.join(process.cwd(), "assets", "chfont.ttf"),
+      "C:\\Windows\\Fonts\\msyh.ttc",
+      "C:\\Windows\\Fonts\\simsun.ttc",
+      "C:\\Windows\\Fonts\\simsunb.ttf",
       "C:\\Windows\\Fonts\\msyh.ttf",
       "C:\\Windows\\Fonts\\simsun.ttf",
-      "C:\\Windows\\Fonts\\simsunb.ttf",
       "C:\\Windows\\Fonts\\SimsunExtG.ttf",
-      "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
-      "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
+      "C:\\Windows\\Fonts\\malgun.ttf",
+      "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
+      "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc",
       "/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf",
-      "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc"
-    ].find(p => existsSync(p));
+      "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
+    ];
+
+    let chFont: string | undefined;
+    let chFontName: string | undefined;
+
+    for (const p of fontPaths) {
+      if (existsSync(p)) {
+        try {
+          const testDoc = new PDFDocument();
+          let nameToTry: string | undefined;
+          if (p.toLowerCase().endsWith(".ttc")) {
+            if (p.toLowerCase().includes("msyh")) nameToTry = "Microsoft YaHei";
+            else if (p.toLowerCase().includes("simsun")) nameToTry = "SimSun";
+          }
+
+          if (nameToTry) {
+            testDoc.font(p, nameToTry);
+            chFontName = nameToTry;
+          } else {
+            testDoc.font(p);
+          }
+
+          console.log(`[CJK-DEBUG] Font validated and selected: ${p} ${chFontName ? `(Name: ${chFontName})` : ""}`);
+          chFont = p;
+          break;
+        } catch (err: any) {
+          console.log(`[CJK-DEBUG] Font found but failed to load: ${p} - ${err.message}`);
+        }
+      } else {
+        console.log(`[CJK-DEBUG] Font not found: ${p}`);
+      }
+    }
 
     if (chFont) {
       try {
-        doc.font(chFont).fontSize(9).text("中国安徽省马鞍山市博望区博望汇盛广场西大丰冶金厂区", 152, 101).font("Helvetica");
-      } catch (err) {
-        console.warn("CJK Font rendering failed:", err);
+        console.log(`[CJK-DEBUG] Using font: ${chFont} ${chFontName ? `(${chFontName})` : ""}`);
+        const chineseAddress = "中国安徽省马鞍山市博望区博望汇盛广场西大丰冶金厂区";
+        console.log(`[CJK-DEBUG] Text to render: ${chineseAddress}`);
+
+        if (chFontName) {
+          doc.font(chFont, chFontName).fontSize(9).text(chineseAddress, 152, 101).font("Helvetica");
+        } else {
+          doc.font(chFont).fontSize(9).text(chineseAddress, 152, 101).font("Helvetica");
+        }
+      } catch (err: any) {
+        console.error("[CJK-DEBUG] CJK Font rendering failed during final use:", err.message);
       }
+    } else {
+      console.warn("[CJK-DEBUG] No valid CJK font found in any of the specified paths!");
     }
 
     const isSameAddr = data.billTo.name === data.shipTo.company && data.billTo.street === data.shipTo.street;
