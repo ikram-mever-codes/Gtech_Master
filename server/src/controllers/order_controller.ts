@@ -1267,8 +1267,11 @@ export const generateCommercialInvoicePDF = async (
     doc.text("GTech Industries Limited:   3A, 12/F, Kaiser Centre, N. 18 Centre Street, Sai Ying Pun, Hong Kong", 40, 75);
     doc.text("GTech Establishment China: West Dafeng Metallurgical Plant, Bowang Huisheng Square, Bowang, Ma'anshan, Anhui", 40, 88);
 
-    console.log("Searching for CJK fonts...");
+    const serverRoot = path.resolve(__dirname, "..", "..");
+
     const fontPaths = [
+      path.join(serverRoot, "assets", "chfont.ttf"),
+      path.join(serverRoot, "assets", "NotoSansCJK-Regular.ttc"),
       path.join(process.cwd(), "assets", "chfont.ttf"),
       path.join(process.cwd(), "assets", "NotoSansCJK-Regular.ttc"),
       "C:\\Windows\\Fonts\\simsun.ttc",
@@ -1276,8 +1279,6 @@ export const generateCommercialInvoicePDF = async (
       "C:\\Windows\\Fonts\\simsun.ttf",
       "C:\\Windows\\Fonts\\msyh.ttf",
       "C:\\Windows\\Fonts\\simsunb.ttf",
-      "C:\\Windows\\Fonts\\ARIALUNI.TTF",
-      "C:\\Windows\\Fonts\\arialuni.ttf",
       "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
       "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
       "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc",
@@ -1296,11 +1297,15 @@ export const generateCommercialInvoicePDF = async (
           if (p.toLowerCase().endsWith(".ttc")) {
             if (p.toLowerCase().includes("msyh")) nameToTry = "Microsoft YaHei";
             else if (p.toLowerCase().includes("simsun")) nameToTry = "SimSun";
-            else if (p.toLowerCase().includes("arialuni")) nameToTry = "Arial Unicode MS";
           }
 
-          if (nameToTry) testDoc.font(p, nameToTry);
-          else testDoc.font(p);
+          if (p.toLowerCase().includes("noto") || p.toLowerCase().includes("wqy") || p.toLowerCase().includes("droid")) {
+            testDoc.font(p);
+          } else if (nameToTry) {
+            testDoc.font(p, nameToTry);
+          } else {
+            testDoc.font(p);
+          }
 
           chFont = p;
           chFontName = nameToTry;

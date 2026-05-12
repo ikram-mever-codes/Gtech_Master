@@ -124,7 +124,11 @@ export class InvoiceController {
           doc.image(logoPath, leftAlignX, yPos, { width: 100, height: 50 });
         }
 
+        const serverRoot = path.resolve(__dirname, "..", "..");
+
         const fontPaths = [
+          path.join(serverRoot, "assets", "chfont.ttf"),
+          path.join(serverRoot, "assets", "NotoSansCJK-Regular.ttc"),
           path.join(process.cwd(), "assets", "chfont.ttf"),
           path.join(process.cwd(), "assets", "NotoSansCJK-Regular.ttc"),
           "C:\\Windows\\Fonts\\simsun.ttc",
@@ -132,11 +136,11 @@ export class InvoiceController {
           "C:\\Windows\\Fonts\\simsun.ttf",
           "C:\\Windows\\Fonts\\msyh.ttf",
           "C:\\Windows\\Fonts\\simsunb.ttf",
-          "C:\\Windows\\Fonts\\ARIALUNI.TTF",
           "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
           "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
           "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc",
           "/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf",
+          "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
         ];
 
         let chFont: string | undefined;
@@ -149,10 +153,14 @@ export class InvoiceController {
               if (p.toLowerCase().endsWith(".ttc")) {
                 if (p.toLowerCase().includes("msyh")) nameToTry = "Microsoft YaHei";
                 else if (p.toLowerCase().includes("simsun")) nameToTry = "SimSun";
-                else if (p.toLowerCase().includes("arialuni")) nameToTry = "Arial Unicode MS";
               }
-              if (nameToTry) testDoc.font(p, nameToTry);
-              else testDoc.font(p);
+              if (p.toLowerCase().includes("noto") || p.toLowerCase().includes("wqy") || p.toLowerCase().includes("droid")) {
+                testDoc.font(p);
+              } else if (nameToTry) {
+                testDoc.font(p, nameToTry);
+              } else {
+                testDoc.font(p);
+              }
 
               chFont = p;
               chFontName = nameToTry;
