@@ -1270,6 +1270,7 @@ export const generateCommercialInvoicePDF = async (
     console.log("Searching for CJK fonts...");
     const fontPaths = [
       path.join(process.cwd(), "assets", "chfont.ttf"),
+      path.join(process.cwd(), "assets", "NotoSansCJK-Regular.ttc"),
       "C:\\Windows\\Fonts\\simsun.ttc",
       "C:\\Windows\\Fonts\\msyh.ttc",
       "C:\\Windows\\Fonts\\simsun.ttf",
