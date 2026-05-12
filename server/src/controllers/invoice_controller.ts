@@ -124,6 +124,43 @@ export class InvoiceController {
           doc.image(logoPath, leftAlignX, yPos, { width: 100, height: 50 });
         }
 
+        const fontPaths = [
+          path.join(process.cwd(), "assets", "chfont.ttf"),
+          path.join(process.cwd(), "assets", "NotoSansCJK-Regular.ttc"),
+          "C:\\Windows\\Fonts\\simsun.ttc",
+          "C:\\Windows\\Fonts\\msyh.ttc",
+          "C:\\Windows\\Fonts\\simsun.ttf",
+          "C:\\Windows\\Fonts\\msyh.ttf",
+          "C:\\Windows\\Fonts\\simsunb.ttf",
+          "C:\\Windows\\Fonts\\ARIALUNI.TTF",
+          "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
+          "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
+          "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc",
+          "/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf",
+        ];
+
+        let chFont: string | undefined;
+        let chFontName: string | undefined;
+        for (const p of fontPaths) {
+          if (fs.existsSync(p)) {
+            try {
+              const testDoc = new PDFDocument();
+              let nameToTry: string | undefined;
+              if (p.toLowerCase().endsWith(".ttc")) {
+                if (p.toLowerCase().includes("msyh")) nameToTry = "Microsoft YaHei";
+                else if (p.toLowerCase().includes("simsun")) nameToTry = "SimSun";
+                else if (p.toLowerCase().includes("arialuni")) nameToTry = "Arial Unicode MS";
+              }
+              if (nameToTry) testDoc.font(p, nameToTry);
+              else testDoc.font(p);
+
+              chFont = p;
+              chFontName = nameToTry;
+              break;
+            } catch (e) { }
+          }
+        }
+
         doc.fontSize(12).font("Helvetica-Bold");
         doc.text(companyInfo.name, rightAlignX, yPos);
 
@@ -154,6 +191,14 @@ export class InvoiceController {
           leftAlignX,
           yPos
         );
+
+        if (chFont) {
+          try {
+            const chineseAddress = "中国安徽省马鞍山市博望区博望汇盛广场西大丰冶金厂区";
+            if (chFontName) doc.font(chFont, chFontName).fontSize(8).text(chineseAddress, leftAlignX + 220, yPos).font("Helvetica");
+            else doc.font(chFont).fontSize(8).text(chineseAddress, leftAlignX + 220, yPos).font("Helvetica");
+          } catch (e) { }
+        }
 
         yPos += 20;
         doc.fontSize(12).font("Helvetica-Bold");
@@ -260,12 +305,16 @@ export class InvoiceController {
           }
 
           const rowData = [
-            item.quantity?.toString() || "1",
+            Number(item.quantity || 1).toString(),
             item.articleNumber || "",
-            item.description || "",
-            Number(item.netPrice || 0).toFixed(2),
             `${item.taxRate || 19}%`,
-            Number(item.unitPrice || 0).toFixed(2),
+            (() => {
+              let up = 0;
+              if (item.unitPrice !== undefined && item.unitPrice !== null && Number(item.unitPrice) !== 0) up = Number(item.unitPrice);
+              else if (item.item?.transfer_price_EUR !== undefined && item.item?.transfer_price_EUR !== null) up = Number(item.item.transfer_price_EUR);
+              else up = Number(item.unitPrice || 0);
+              return up.toFixed(2);
+            })(),
             Number(item.grossPrice || 0).toFixed(2),
           ];
 
