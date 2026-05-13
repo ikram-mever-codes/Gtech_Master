@@ -18,6 +18,42 @@ import { Customer } from "../models/customers";
 import { SupplierItem } from "../models/supplier_items";
 import { generateInvoicesForOrders } from "./cargo_controller";
 
+const _cjkFontCandidates: string[] = [
+  path.resolve(__dirname, "..", "..", "assets", "NotoSansCJK-Regular.ttc"),
+  path.resolve(__dirname, "..", "assets", "NotoSansCJK-Regular.ttc"),
+  // process.cwd based
+  path.join(process.cwd(), "assets", "NotoSansCJK-Regular.ttc"),
+  path.join(process.cwd(), "server", "assets", "NotoSansCJK-Regular.ttc"),
+  // Linux system paths (AWS / Ubuntu / Docker)
+  "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
+  "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+  "/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc",
+  "/usr/share/fonts/noto/NotoSansCJK-Regular.ttc",
+  "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
+  "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc",
+  "/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf",
+  // Windows fallbacks
+  "C:\\Windows\\Fonts\\msyh.ttc",
+  "C:\\Windows\\Fonts\\simsun.ttc",
+];
+
+export let _cachedCjkFontPath: string | null = null;
+
+(function detectCjkFont() {
+  console.log("[CJK-STARTUP] __dirname      :", __dirname);
+  console.log("[CJK-STARTUP] process.cwd()  :", process.cwd());
+  for (const p of _cjkFontCandidates) {
+    if (existsSync(p)) {
+      _cachedCjkFontPath = p;
+      console.log("[CJK-STARTUP] ✅ Font FOUND   :", p);
+      return;
+    }
+    console.log("[CJK-STARTUP] ✗  Not found   :", p);
+  }
+  console.warn("[CJK-STARTUP] ❌ NO CJK FONT  — Chinese will render as boxes! Copy NotoSansCJK-Regular.ttc to the assets/ folder.");
+})();
+// ─────────────────────────────────────────────────────────────────────────────
+
 const padorder_no = (n: number) => `MA${String(n).padStart(4, "0")}`;
 
 const parseorder_noNumber = (order_no: string) => {
@@ -1267,55 +1303,19 @@ export const generateCommercialInvoicePDF = async (
     doc.text("GTech Industries Limited:   3A, 12/F, Kaiser Centre, N. 18 Centre Street, Sai Ying Pun, Hong Kong", 40, 75);
     doc.text("GTech Establishment China: West Dafeng Metallurgical Plant, Bowang Huisheng Square, Bowang, Ma'anshan, Anhui", 40, 88);
 
-    const serverRoot = path.resolve(__dirname, "..", "..");
-
-    // CJK font list — chfont.ttf intentionally excluded (not a real CJK font, causes boxes)
-    const fontPaths = [
-      path.join(serverRoot, "assets", "NotoSansCJK-Regular.ttc"),
-      path.join(process.cwd(), "assets", "NotoSansCJK-Regular.ttc"),
-      "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
-      "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
-      "/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc",
-      "/usr/share/fonts/noto/NotoSansCJK-Regular.ttc",
-      "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
-      "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc",
-      "/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf",
-      "C:\\Windows\\Fonts\\msyh.ttc",
-      "C:\\Windows\\Fonts\\simsun.ttc",
-    ];
-
-    let chFont: string | undefined;
-
-    for (const p of fontPaths) {
-      if (existsSync(p)) {
-        try {
-          // Register as named font so PDFKit handles TTC collections properly
-          doc.registerFont("CJK", p);
-          console.log(`[CJK-DEBUG] Registered CJK font from: ${p}`);
-          chFont = p;
-          break;
-        } catch (err: any) {
-          console.log(`[CJK-DEBUG] Failed to register font: ${p} — ${err.message}`);
-        }
-      } else {
-        console.log(`[CJK-DEBUG] Not found: ${p}`);
-      }
-    }
-
-    if (!chFont) {
-      console.warn("[CJK-DEBUG] No CJK font found — Chinese characters will render as boxes!");
-    }
-
+    // CJK font — use path cached at startup (see [CJK-STARTUP] logs)
+    const chFont = _cachedCjkFontPath;
     if (chFont) {
       try {
+        doc.registerFont("CJK", chFont);
         const chineseAddress = "中国安徽省马鞍山市博望区博望汇盛广场西大丰冶金厂区";
         doc.font("CJK").fontSize(9).fillColor("#666666").text(chineseAddress, 152, 101, { lineBreak: false });
         doc.font("Helvetica").fillColor("#000000");
-        console.log(`[CJK-DEBUG] Chinese address rendered successfully from: ${chFont}`);
       } catch (err: any) {
-        console.error("[CJK-DEBUG] Render failed:", err.message);
+        console.error("[CJK-PDF] Render failed:", err.message);
       }
     }
+
 
     const isSameAddr = data.billTo.name === data.shipTo.company && data.billTo.street === data.shipTo.street;
     const addrY = 125;
