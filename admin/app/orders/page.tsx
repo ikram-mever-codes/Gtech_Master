@@ -2076,14 +2076,27 @@ const OrderPage: React.FC = () => {
     );
 
     if (!orderNoFilter) return allItems;
+    const s = orderNoFilter.toLowerCase();
     return allItems.filter((i) =>
-      String(i.order_no).toLowerCase().includes(orderNoFilter.toLowerCase()),
+      String(i.order_no).toLowerCase().includes(s) ||
+      String(i.ean || i.item?.ean || "").toLowerCase().includes(s) ||
+      String(i.item_name || i.itemName || i.item?.item_name || "").toLowerCase().includes(s)
+    );
+  }, [orders, orderNoFilter]);
+
+  const filteredOrders = useMemo(() => {
+    if (!orderNoFilter) return orders;
+    const s = orderNoFilter.toLowerCase();
+    return orders.filter((o: any) =>
+      String(o.order_no).toLowerCase().includes(s) ||
+      String(o.id).toLowerCase().includes(s) ||
+      (o.comment || "").toLowerCase().includes(s),
     );
   }, [orders, orderNoFilter]);
 
   const visibleOrders =
     activeTab === "orders"
-      ? orders
+      ? filteredOrders
       : activeTab === "nso"
         ? nsoOrders
         : activeTab === "supplier_orders"
@@ -2093,14 +2106,37 @@ const OrderPage: React.FC = () => {
             : [];
 
   const defaultAction = (
-    <div className="flex gap-2">
+    <div className="flex gap-2 items-center">
+      {(activeTab === "orders" || activeTab === "order_items") && (
+        <div className="relative">
+          <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
+            <MagnifyingGlassIcon className="h-4 w-4 text-gray-400" />
+          </div>
+          <input
+            type="text"
+            placeholder="Search Order No / Details..."
+            value={orderNoFilter}
+            onChange={(e) => setOrderNoFilter(e.target.value)}
+            className="pl-9 pr-8 py-2 text-sm border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-green-500 focus:border-transparent w-64 shadow-sm"
+          />
+          {orderNoFilter && (
+            <button
+              onClick={() => setOrderNoFilter("")}
+              className="absolute inset-y-0 right-2 flex items-center text-gray-400 hover:text-gray-600"
+            >
+              <XMarkIcon className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+      )}
+
       <button
         onClick={() => {
           fetchOrders();
           fetchSupplierOrders();
         }}
         disabled={loadingOrders || loadingSupplierOrders}
-        className="px-3 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-[4px] hover:bg-gray-50 transition-all flex items-center gap-2 disabled:opacity-50"
+        className="px-3 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-[4px] hover:bg-gray-50 transition-all flex items-center gap-2 disabled:opacity-50 h-[38px]"
       >
         <ArrowPathIcon
           className={`h-4 w-4 ${loadingOrders || loadingSupplierOrders ? "animate-spin" : ""}`}
@@ -2111,7 +2147,7 @@ const OrderPage: React.FC = () => {
       <CustomButton
         gradient={true}
         onClick={openCreate}
-        className="px-4 py-2 text-sm bg-[#059669] text-white rounded-[4px] hover:bg-green-700 transition-all shadow-md font-bold flex items-center gap-2"
+        className="px-4 py-2 text-sm bg-[#059669] text-white rounded-[4px] hover:bg-green-700 transition-all shadow-md font-bold flex items-center gap-2 h-[38px]"
       >
         <PlusIcon className="h-4 w-4" />
         New Order
