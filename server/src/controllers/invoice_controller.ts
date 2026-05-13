@@ -126,47 +126,39 @@ export class InvoiceController {
 
         const serverRoot = path.resolve(__dirname, "..", "..");
 
+        // CJK font list — chfont.ttf intentionally excluded (not a real CJK font, causes boxes)
         const fontPaths = [
-          path.join(serverRoot, "assets", "chfont.ttf"),
           path.join(serverRoot, "assets", "NotoSansCJK-Regular.ttc"),
-          path.join(process.cwd(), "assets", "chfont.ttf"),
           path.join(process.cwd(), "assets", "NotoSansCJK-Regular.ttc"),
-          "C:\\Windows\\Fonts\\simsun.ttc",
-          "C:\\Windows\\Fonts\\msyh.ttc",
-          "C:\\Windows\\Fonts\\simsun.ttf",
-          "C:\\Windows\\Fonts\\msyh.ttf",
-          "C:\\Windows\\Fonts\\simsunb.ttf",
           "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
+          "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+          "/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc",
+          "/usr/share/fonts/noto/NotoSansCJK-Regular.ttc",
           "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
           "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc",
           "/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf",
-          "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+          "C:\\Windows\\Fonts\\msyh.ttc",
+          "C:\\Windows\\Fonts\\simsun.ttc",
         ];
 
         let chFont: string | undefined;
-        let chFontName: string | undefined;
         for (const p of fontPaths) {
           if (fs.existsSync(p)) {
             try {
-              const testDoc = new PDFDocument();
-              let nameToTry: string | undefined;
-              if (p.toLowerCase().endsWith(".ttc")) {
-                if (p.toLowerCase().includes("msyh")) nameToTry = "Microsoft YaHei";
-                else if (p.toLowerCase().includes("simsun")) nameToTry = "SimSun";
-              }
-              if (p.toLowerCase().includes("noto") || p.toLowerCase().includes("wqy") || p.toLowerCase().includes("droid")) {
-                testDoc.font(p);
-              } else if (nameToTry) {
-                testDoc.font(p, nameToTry);
-              } else {
-                testDoc.font(p);
-              }
-
+              doc.registerFont("CJK", p);
+              console.log(`[CJK-DEBUG] Registered CJK font from: ${p}`);
               chFont = p;
-              chFontName = nameToTry;
               break;
-            } catch (e) { }
+            } catch (err: any) {
+              console.log(`[CJK-DEBUG] Failed to register: ${p} — ${err.message}`);
+            }
+          } else {
+            console.log(`[CJK-DEBUG] Not found: ${p}`);
           }
+        }
+
+        if (!chFont) {
+          console.warn("[CJK-DEBUG] No CJK font found — Chinese characters will render as boxes!");
         }
 
         doc.fontSize(12).font("Helvetica-Bold");
@@ -203,9 +195,9 @@ export class InvoiceController {
         if (chFont) {
           try {
             const chineseAddress = "中国安徽省马鞍山市博望区博望汇盛广场西大丰冶金厂区";
-            if (chFontName) doc.font(chFont, chFontName).fontSize(8).text(chineseAddress, leftAlignX + 220, yPos).font("Helvetica");
-            else doc.font(chFont).fontSize(8).text(chineseAddress, leftAlignX + 220, yPos).font("Helvetica");
-          } catch (e) { }
+            doc.font("CJK").fontSize(8).text(chineseAddress, leftAlignX + 220, yPos, { lineBreak: false });
+            doc.font("Helvetica");
+          } catch (e) { console.error("[CJK-DEBUG] Render failed:", e); }
         }
 
         yPos += 20;

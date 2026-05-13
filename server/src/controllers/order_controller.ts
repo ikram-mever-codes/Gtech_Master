@@ -1269,71 +1269,52 @@ export const generateCommercialInvoicePDF = async (
 
     const serverRoot = path.resolve(__dirname, "..", "..");
 
+    // CJK font list — chfont.ttf intentionally excluded (not a real CJK font, causes boxes)
     const fontPaths = [
-      path.join(serverRoot, "assets", "chfont.ttf"),
       path.join(serverRoot, "assets", "NotoSansCJK-Regular.ttc"),
-      path.join(process.cwd(), "assets", "chfont.ttf"),
       path.join(process.cwd(), "assets", "NotoSansCJK-Regular.ttc"),
-      "C:\\Windows\\Fonts\\simsun.ttc",
-      "C:\\Windows\\Fonts\\msyh.ttc",
-      "C:\\Windows\\Fonts\\simsun.ttf",
-      "C:\\Windows\\Fonts\\msyh.ttf",
-      "C:\\Windows\\Fonts\\simsunb.ttf",
       "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
+      "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+      "/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc",
+      "/usr/share/fonts/noto/NotoSansCJK-Regular.ttc",
       "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
       "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc",
       "/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf",
-      "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+      "C:\\Windows\\Fonts\\msyh.ttc",
+      "C:\\Windows\\Fonts\\simsun.ttc",
     ];
 
     let chFont: string | undefined;
-    let chFontName: string | undefined;
 
     for (const p of fontPaths) {
       if (existsSync(p)) {
         try {
-          const testDoc = new PDFDocument();
-          let nameToTry: string | undefined;
-          if (p.toLowerCase().endsWith(".ttc")) {
-            if (p.toLowerCase().includes("msyh")) nameToTry = "Microsoft YaHei";
-            else if (p.toLowerCase().includes("simsun")) nameToTry = "SimSun";
-          }
-
-          if (p.toLowerCase().includes("noto") || p.toLowerCase().includes("wqy") || p.toLowerCase().includes("droid")) {
-            testDoc.font(p);
-          } else if (nameToTry) {
-            testDoc.font(p, nameToTry);
-          } else {
-            testDoc.font(p);
-          }
-
+          // Register as named font so PDFKit handles TTC collections properly
+          doc.registerFont("CJK", p);
+          console.log(`[CJK-DEBUG] Registered CJK font from: ${p}`);
           chFont = p;
-          chFontName = nameToTry;
-          console.log(`[CJK-DEBUG] Successfully validated font: ${p} ${chFontName ? `(${chFontName})` : ""}`);
           break;
         } catch (err: any) {
-          console.log(`[CJK-DEBUG] Found font but failed validation: ${p} - ${err.message}`);
+          console.log(`[CJK-DEBUG] Failed to register font: ${p} — ${err.message}`);
         }
+      } else {
+        console.log(`[CJK-DEBUG] Not found: ${p}`);
       }
+    }
+
+    if (!chFont) {
+      console.warn("[CJK-DEBUG] No CJK font found — Chinese characters will render as boxes!");
     }
 
     if (chFont) {
       try {
-        console.log(`[CJK-DEBUG] Applying Chinese font: ${chFont} (Name: ${chFontName || 'None'})`);
         const chineseAddress = "中国安徽省马鞍山市博望区博望汇盛广场西大丰冶金厂区";
-
-        if (chFontName) {
-          doc.font(chFont, chFontName).fontSize(9).text(chineseAddress, 152, 101).font("Helvetica");
-        } else {
-          doc.font(chFont).fontSize(9).text(chineseAddress, 152, 101).font("Helvetica");
-        }
-
-        console.log(`[CJK-DEBUG] Chinese address rendered successfully`);
+        doc.font("CJK").fontSize(9).fillColor("#666666").text(chineseAddress, 152, 101, { lineBreak: false });
+        doc.font("Helvetica").fillColor("#000000");
+        console.log(`[CJK-DEBUG] Chinese address rendered successfully from: ${chFont}`);
       } catch (err: any) {
         console.error("[CJK-DEBUG] Render failed:", err.message);
       }
-    } else {
-      console.warn("[CJK-DEBUG] No CJK font found - Chinese will show as boxes!");
     }
 
     const isSameAddr = data.billTo.name === data.shipTo.company && data.billTo.street === data.shipTo.street;
@@ -1375,7 +1356,8 @@ export const generateCommercialInvoicePDF = async (
 
     let itemY = tableTop + 46;
     const pageH = 841.89;
-    const footerReserve = 130;
+    // footerReserve must be > (pageH - fy) = 841.89-735 = 106.89 — use 160 for safe content margin
+    const footerReserve = 160;
     const rowH = 28;
 
     lineItems.forEach((item) => {
@@ -1419,10 +1401,12 @@ export const generateCommercialInvoicePDF = async (
     doc.text(`WAYBILL 85 8524 1766`, remarkX, itemY + 60);
 
     itemY += 115;
-    if (itemY + 30 > pageH - footerReserve) { doc.addPage(); itemY = 50; }
-    doc.fontSize(9).font("Helvetica")
-      .text("We hereby confirm that no raw material from Russia were used", 100, itemY)
-      .text("in the production of the goods mentioned in this invoice.", 100, itemY + 12);
+    // Ensure "We hereby confirm" text (2 lines ~30px) fits before footer zone
+    if (itemY + 40 > pageH - footerReserve) { doc.addPage(); itemY = 50; }
+    doc.fontSize(9).font("Helvetica").fillColor("#000000")
+      .text("We hereby confirm that no raw material from Russia were used", 100, itemY, { lineBreak: false });
+    itemY += 14;
+    doc.text("in the production of the goods mentioned in this invoice.", 100, itemY, { lineBreak: false });
 
     const range = doc.bufferedPageRange();
     const totalPagesCount = range.count;
