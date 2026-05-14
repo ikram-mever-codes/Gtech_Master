@@ -48,7 +48,6 @@ export let _cachedCjkFontBuffer: Buffer | null = null;
   console.log("[CJK-STARTUP] __dirname      :", __dirname);
   console.log("[CJK-STARTUP] process.cwd()  :", process.cwd());
 
-  // Deep Search: Try to find assets folder in parent directories
   let assetsBase = "";
   let currentDir = __dirname;
   for (let i = 0; i < 5; i++) {
@@ -1441,39 +1440,36 @@ export const generateCommercialInvoicePDF = async (
     itemY += 14;
     doc.text("in the production of the goods mentioned in this invoice.", 100, itemY, { lineBreak: false });
 
+    itemY += 40;
+    if (itemY + 100 > pageH - 50) { doc.addPage(); itemY = 50; }
+
+    doc.moveTo(40, itemY).lineTo(555, itemY).strokeColor("#cccccc").lineWidth(0.5).stroke();
+    itemY += 12;
+    doc.fontSize(8).fillColor("#000000").font("Helvetica-Bold");
+    doc.text("GTech Industries Limited", 40, itemY);
+    doc.fontSize(8).font("Helvetica").fillColor("#444444");
+    doc.text("Acc. No 478798112483", 40, itemY + 12);
+    doc.text("Swift Code: DHBKHKHH", 40, itemY + 24);
+    doc.text("DBS Bank (Hong Kong)", 40, itemY + 36);
+
+    doc.text("+86 555 6767 199", 220, itemY);
+    doc.text("+86 17355524828", 220, itemY + 12);
+    doc.text("Contact: lili", 220, itemY + 24);
+    doc.text("info@gtech-industries.net", 220, itemY + 36);
+
+    const footerLogo = path.join(process.cwd(), "assets", "logo.png");
+    try {
+      if (existsSync(footerLogo)) {
+        doc.image(footerLogo, 420, itemY, { width: 100 });
+      }
+    } catch (e) { }
+
     const range = doc.bufferedPageRange();
     const totalPagesCount = range.count;
     for (let i = 0; i < totalPagesCount; i++) {
       doc.switchToPage(i);
-      
-      // Page numbering at the very bottom
       doc.fontSize(8).fillColor("#999999").font("Helvetica");
       doc.text(`${i + 1} / ${totalPagesCount}`, 500, 810, { align: "right", width: 50 });
-
-      // BANK DETAILS & LOGO - ONLY ON THE LAST PAGE
-      if (i === totalPagesCount - 1) {
-        const fy = 735;
-        doc.moveTo(40, fy).lineTo(555, fy).strokeColor("#cccccc").lineWidth(0.5).stroke();
-        
-        doc.fontSize(8).fillColor("#000000").font("Helvetica-Bold");
-        doc.text("GTech Industries Limited", 40, fy + 12);
-        doc.fontSize(8).font("Helvetica").fillColor("#444444");
-        doc.text("Acc. No 478798112483", 40, fy + 24);
-        doc.text("Swift Code: DHBKHKHH", 40, fy + 36);
-        doc.text("DBS Bank (Hong Kong)", 40, fy + 48);
-
-        doc.text("+86 555 6767 199", 220, fy + 12);
-        doc.text("+86 17355524828", 220, fy + 24);
-        doc.text("Contact: lili", 220, fy + 36);
-        doc.text("info@gtech-industries.net", 220, fy + 48);
-
-        const footerLogo = path.join(process.cwd(), "assets", "logo.png");
-        try {
-          if (existsSync(footerLogo)) {
-            doc.image(footerLogo, 420, fy + 12, { width: 100 });
-          }
-        } catch (e) {}
-      }
     }
 
     doc.end();
