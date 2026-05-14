@@ -986,7 +986,6 @@ export class InvoiceController {
     }
   };
 
-
   static markAsPaid = async (req: Request, res: Response, next: NextFunction) => {
     const invoiceRepository = AppDataSource.getRepository(Invoice);
     try {

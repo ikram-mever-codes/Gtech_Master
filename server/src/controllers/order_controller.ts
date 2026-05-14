@@ -19,20 +19,13 @@ import { SupplierItem } from "../models/supplier_items";
 import { generateInvoicesForOrders } from "./cargo_controller";
 
 const _cjkFontCandidates: string[] = [
-  path.resolve(__dirname, "..", "..", "assets", "NotoSansCJK-Regular.ttf"),
-  path.resolve(__dirname, "..", "..", "assets", "NotoSansCJK-Regular.otf"),
-  path.join(process.cwd(), "assets", "NotoSansCJK-Regular.ttf"),
-  path.join(process.cwd(), "assets", "NotoSansCJK-Regular.otf"),
   path.join(process.cwd(), "assets", "noto-sans-sc", "NotoSansSC-Regular.otf"),
   path.resolve(__dirname, "..", "..", "assets", "noto-sans-sc", "NotoSansSC-Regular.otf"),
+  path.join(process.cwd(), "server", "assets", "noto-sans-sc", "NotoSansSC-Regular.otf"),
+  "/home/ubuntu/Master/server/assets/noto-sans-sc/NotoSansSC-Regular.otf",
+  "/var/www/Master/server/assets/noto-sans-sc/NotoSansSC-Regular.otf",
   "C:\\Windows\\Fonts\\arialuni.ttf",
-  "C:\\Windows\\Fonts\\simhei.ttf",
-  "C:\\Windows\\Fonts\\simkai.ttf",
-  "C:\\Windows\\Fonts\\simsunb.ttf",
-  path.resolve(__dirname, "..", "..", "assets", "NotoSansCJK-Regular.ttc"),
-  path.resolve(__dirname, "..", "assets", "NotoSansCJK-Regular.ttc"),
-  path.join(process.cwd(), "assets", "NotoSansCJK-Regular.ttc"),
-  path.join(process.cwd(), "server", "assets", "NotoSansCJK-Regular.ttc"),
+  "C:\\Windows\\Fonts\\simsun.ttc",
   "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
   "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
   "/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc",
@@ -55,7 +48,26 @@ export let _cachedCjkFontBuffer: Buffer | null = null;
   console.log("[CJK-STARTUP] __dirname      :", __dirname);
   console.log("[CJK-STARTUP] process.cwd()  :", process.cwd());
 
-  for (const p of _cjkFontCandidates) {
+  // Deep Search: Try to find assets folder in parent directories
+  let assetsBase = "";
+  let currentDir = __dirname;
+  for (let i = 0; i < 5; i++) {
+    const testPath = path.join(currentDir, "assets");
+    if (existsSync(testPath)) {
+      assetsBase = testPath;
+      console.log("[CJK-STARTUP] Found assets folder at:", assetsBase);
+      break;
+    }
+    currentDir = path.dirname(currentDir);
+  }
+
+  const finalCandidates = [..._cjkFontCandidates];
+  if (assetsBase) {
+    finalCandidates.unshift(path.join(assetsBase, "noto-sans-sc", "NotoSansSC-Regular.otf"));
+    finalCandidates.unshift(path.join(assetsBase, "NotoSansCJK-Regular.ttf"));
+  }
+
+  for (const p of finalCandidates) {
     if (existsSync(p)) {
       try {
         const testDoc = new PDFDocument();
@@ -66,13 +78,11 @@ export let _cachedCjkFontBuffer: Buffer | null = null;
         console.log("[CJK-STARTUP] ✅ Valid Font Found & Tested:", p);
         return;
       } catch (e: any) {
-        console.log(`[CJK-STARTUP] ✗  Font exists but failed test (${p}):`, e.message);
+        console.log(`[CJK-STARTUP] ✗  Font failed test (${p}):`, e.message);
       }
-    } else {
-      console.log("[CJK-STARTUP] ✗  Not found   :", p);
     }
   }
-  console.warn("[CJK-STARTUP] ❌ NO WORKING CJK FONT FOUND! Chinese will render as boxes.");
+  console.warn("[CJK-STARTUP] ❌ NO WORKING CJK FONT FOUND!");
 })();
 
 const padorder_no = (n: number) => `MA${String(n).padStart(4, "0")}`;
@@ -1435,17 +1445,35 @@ export const generateCommercialInvoicePDF = async (
     const totalPagesCount = range.count;
     for (let i = 0; i < totalPagesCount; i++) {
       doc.switchToPage(i);
-      const fy = 735;
-      doc.moveTo(40, fy - 10).lineTo(555, fy - 10).strokeColor("#cccccc").lineWidth(0.5).stroke();
-      doc.fontSize(9).fillColor("#444444").font("Helvetica-Bold").text("GTech Industries Limited", 40, fy);
-      doc.font("Helvetica")
-        .text("Acc. No 478798112483", 40, fy + 13).text("Swift Code: DHBKHKHH", 40, fy + 26).text("DBS Bank (Hong Kong)", 40, fy + 39);
-      const c2 = 220;
-      doc.text("+86 555 6767 199", c2, fy).text("+86 17355524828", c2, fy + 13).text("Contact: lili", c2, fy + 26).text("info@gtech-industries.net", c2, fy + 39);
-      const logoPath = path.join(process.cwd(), "assets", "logo.png");
-      try { doc.image(logoPath, 425, fy + 2, { width: 115 }); } catch (_) { }
+      
+      // Page numbering at the very bottom
+      doc.fontSize(8).fillColor("#999999").font("Helvetica");
+      doc.text(`${i + 1} / ${totalPagesCount}`, 500, 810, { align: "right", width: 50 });
 
-      doc.fillColor("#000000").fontSize(9).font("Helvetica").text(`${i + 1} / ${totalPagesCount}`, 500, 785, { align: "right", width: 55 });
+      // BANK DETAILS & LOGO - ONLY ON THE LAST PAGE
+      if (i === totalPagesCount - 1) {
+        const fy = 735;
+        doc.moveTo(40, fy).lineTo(555, fy).strokeColor("#cccccc").lineWidth(0.5).stroke();
+        
+        doc.fontSize(8).fillColor("#000000").font("Helvetica-Bold");
+        doc.text("GTech Industries Limited", 40, fy + 12);
+        doc.fontSize(8).font("Helvetica").fillColor("#444444");
+        doc.text("Acc. No 478798112483", 40, fy + 24);
+        doc.text("Swift Code: DHBKHKHH", 40, fy + 36);
+        doc.text("DBS Bank (Hong Kong)", 40, fy + 48);
+
+        doc.text("+86 555 6767 199", 220, fy + 12);
+        doc.text("+86 17355524828", 220, fy + 24);
+        doc.text("Contact: lili", 220, fy + 36);
+        doc.text("info@gtech-industries.net", 220, fy + 48);
+
+        const footerLogo = path.join(process.cwd(), "assets", "logo.png");
+        try {
+          if (existsSync(footerLogo)) {
+            doc.image(footerLogo, 420, fy + 12, { width: 100 });
+          }
+        } catch (e) {}
+      }
     }
 
     doc.end();
