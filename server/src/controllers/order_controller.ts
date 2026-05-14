@@ -21,10 +21,8 @@ import { generateInvoicesForOrders } from "./cargo_controller";
 const _cjkFontCandidates: string[] = [
   path.resolve(__dirname, "..", "..", "assets", "NotoSansCJK-Regular.ttc"),
   path.resolve(__dirname, "..", "assets", "NotoSansCJK-Regular.ttc"),
-  // process.cwd based
   path.join(process.cwd(), "assets", "NotoSansCJK-Regular.ttc"),
   path.join(process.cwd(), "server", "assets", "NotoSansCJK-Regular.ttc"),
-  // Linux system paths (AWS / Ubuntu / Docker)
   "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
   "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
   "/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc",
@@ -32,7 +30,6 @@ const _cjkFontCandidates: string[] = [
   "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
   "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc",
   "/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf",
-  // Windows fallbacks
   "C:\\Windows\\Fonts\\msyh.ttc",
   "C:\\Windows\\Fonts\\simsun.ttc",
 ];
@@ -52,7 +49,6 @@ export let _cachedCjkFontPath: string | null = null;
   }
   console.warn("[CJK-STARTUP] ❌ NO CJK FONT  — Chinese will render as boxes! Copy NotoSansCJK-Regular.ttc to the assets/ folder.");
 })();
-// ─────────────────────────────────────────────────────────────────────────────
 
 const padorder_no = (n: number) => `MA${String(n).padStart(4, "0")}`;
 

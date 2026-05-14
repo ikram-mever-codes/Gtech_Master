@@ -14,6 +14,7 @@ import { CargoOrder } from "../models/cargo_orders";
 import { In } from "typeorm";
 import { getRMBPriceFromSupplier } from "./items_controller";
 import { WarehouseItem } from "../models/warehouse_items";
+import { _cachedCjkFontPath } from "./order_controller";
 
 export class InvoiceController {
   static createInvoice = async (
@@ -124,43 +125,18 @@ export class InvoiceController {
           doc.image(logoPath, leftAlignX, yPos, { width: 100, height: 50 });
         }
 
-        const serverRoot = path.resolve(__dirname, "..", "..");
-
-        // CJK font list — chfont.ttf intentionally excluded (not a real CJK font, causes boxes)
-        const fontPaths = [
-          path.join(serverRoot, "assets", "NotoSansCJK-Regular.ttc"),
-          path.join(process.cwd(), "assets", "NotoSansCJK-Regular.ttc"),
-          "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
-          "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
-          "/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc",
-          "/usr/share/fonts/noto/NotoSansCJK-Regular.ttc",
-          "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
-          "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc",
-          "/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf",
-          "C:\\Windows\\Fonts\\msyh.ttc",
-          "C:\\Windows\\Fonts\\simsun.ttc",
-        ];
-
-        let chFont: string | undefined;
-        for (const p of fontPaths) {
-          if (fs.existsSync(p)) {
-            try {
-              doc.registerFont("CJK", p);
-              console.log(`[CJK-DEBUG] Registered CJK font from: ${p}`);
-              chFont = p;
-              break;
-            } catch (err: any) {
-              console.log(`[CJK-DEBUG] Failed to register: ${p} — ${err.message}`);
-            }
-          } else {
-            console.log(`[CJK-DEBUG] Not found: ${p}`);
-          }
+        // CJK font — use path cached at startup (see order_controller)
+        const chFont = _cachedCjkFontPath;
+        if (chFont) {
+          try {
+            doc.registerFont("CJK", chFont);
+            const chineseAddress = "中国安徽省马鞍山市博望区博望汇盛广场西大丰冶金厂区";
+            doc.font("CJK").fontSize(8).text(chineseAddress, leftAlignX + 220, yPos, { lineBreak: false });
+            doc.font("Helvetica");
+          } catch (e) { console.error("[CJK-DEBUG] Render failed:", e); }
+        } else {
+          console.warn("[CJK-DEBUG] No CJK font path cached — Chinese will show as boxes!");
         }
-
-        if (!chFont) {
-          console.warn("[CJK-DEBUG] No CJK font found — Chinese characters will render as boxes!");
-        }
-
         doc.fontSize(12).font("Helvetica-Bold");
         doc.text(companyInfo.name, rightAlignX, yPos);
 
