@@ -14,7 +14,7 @@ import { CargoOrder } from "../models/cargo_orders";
 import { In } from "typeorm";
 import { getRMBPriceFromSupplier } from "./items_controller";
 import { WarehouseItem } from "../models/warehouse_items";
-import { _cachedCjkFontPath } from "./order_controller";
+import { _cachedCjkFontPath, _cachedCjkFontBuffer } from "./order_controller";
 
 export class InvoiceController {
   static createInvoice = async (
@@ -125,15 +125,19 @@ export class InvoiceController {
           doc.image(logoPath, leftAlignX, yPos, { width: 100, height: 50 });
         }
 
-        // CJK font — use path cached at startup (see order_controller)
-        const chFont = _cachedCjkFontPath;
-        if (chFont) {
+        const fontSource = _cachedCjkFontBuffer || _cachedCjkFontPath;
+        if (fontSource) {
           try {
-            doc.registerFont("CJK", chFont);
             const chineseAddress = "中国安徽省马鞍山市博望区博望汇盛广场西大丰冶金厂区";
-            doc.font("CJK").fontSize(8).text(chineseAddress, leftAlignX + 220, yPos, { lineBreak: false });
+            doc.font(fontSource, 0).fontSize(8).text(chineseAddress, leftAlignX + 220, yPos, { lineBreak: false });
             doc.font("Helvetica");
-          } catch (e) { console.error("[CJK-DEBUG] Render failed:", e); }
+          } catch (e: any) {
+            console.error(`[CJK-DEBUG] Render failed:`, e.message);
+            if (process.platform === "win32") {
+              try { doc.font("C:\\Windows\\Fonts\\msyh.ttc", 0).fontSize(8).text("中国安徽...", leftAlignX + 220, yPos); } catch (e) { }
+            }
+            doc.font("Helvetica");
+          }
         } else {
           console.warn("[CJK-DEBUG] No CJK font path cached — Chinese will show as boxes!");
         }
@@ -168,12 +172,15 @@ export class InvoiceController {
           yPos
         );
 
-        if (chFont) {
+        if (fontSource) {
           try {
             const chineseAddress = "中国安徽省马鞍山市博望区博望汇盛广场西大丰冶金厂区";
-            doc.font("CJK").fontSize(8).text(chineseAddress, leftAlignX + 220, yPos, { lineBreak: false });
+            doc.font(fontSource, 0).fontSize(8).text(chineseAddress, leftAlignX + 220, yPos, { lineBreak: false });
             doc.font("Helvetica");
-          } catch (e) { console.error("[CJK-DEBUG] Render failed:", e); }
+          } catch (e: any) {
+            console.error("[CJK-DEBUG] Render failed:", e.message);
+            doc.font("Helvetica");
+          }
         }
 
         yPos += 20;
@@ -978,7 +985,6 @@ export class InvoiceController {
       return next(error);
     }
   };
-
 
   static markAsPaid = async (req: Request, res: Response, next: NextFunction) => {
     const invoiceRepository = AppDataSource.getRepository(Invoice);

@@ -1957,7 +1957,6 @@ const OrderPage: React.FC = () => {
         order_type_id: form.category_id ? Number(form.category_id) : null,
         ref_no: form.ref_no || "",
         remark: form.comment || "",
-        // Agar type change ho raha hai ya pehle PO nahi tha, to isay 0 set karein
         is_po_created: (isNewTypePO && isOldTypePO) ? (selectedOrder?.is_po_created || 0) : 0,
       });
       setShowModal(false);

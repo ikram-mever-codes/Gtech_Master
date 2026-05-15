@@ -8,7 +8,7 @@ import { AppDataSource } from "../config/database";
 import { Order } from "../models/orders";
 import { OrderItem } from "../models/order_items";
 import { Item } from "../models/items";
-import { stat, existsSync } from "fs";
+import fs, { existsSync } from "fs";
 import { WarehouseItem } from "../models/warehouse_items";
 import { Invoice } from "../models/invoice";
 import { Cargo } from "../models/cargos";
@@ -19,10 +19,13 @@ import { SupplierItem } from "../models/supplier_items";
 import { generateInvoicesForOrders } from "./cargo_controller";
 
 const _cjkFontCandidates: string[] = [
-  path.resolve(__dirname, "..", "..", "assets", "NotoSansCJK-Regular.ttc"),
-  path.resolve(__dirname, "..", "assets", "NotoSansCJK-Regular.ttc"),
-  path.join(process.cwd(), "assets", "NotoSansCJK-Regular.ttc"),
-  path.join(process.cwd(), "server", "assets", "NotoSansCJK-Regular.ttc"),
+  path.join(process.cwd(), "assets", "noto-sans-sc", "NotoSansSC-Regular.otf"),
+  path.resolve(__dirname, "..", "..", "assets", "noto-sans-sc", "NotoSansSC-Regular.otf"),
+  path.join(process.cwd(), "server", "assets", "noto-sans-sc", "NotoSansSC-Regular.otf"),
+  "/home/ubuntu/Master/server/assets/noto-sans-sc/NotoSansSC-Regular.otf",
+  "/var/www/Master/server/assets/noto-sans-sc/NotoSansSC-Regular.otf",
+  "C:\\Windows\\Fonts\\arialuni.ttf",
+  "C:\\Windows\\Fonts\\simsun.ttc",
   "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
   "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
   "/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc",
@@ -31,23 +34,54 @@ const _cjkFontCandidates: string[] = [
   "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc",
   "/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf",
   "C:\\Windows\\Fonts\\msyh.ttc",
+  "C:\\Windows\\Fonts\\msyh.ttf",
+  "C:\\Windows\\Fonts\\msyhl.ttc",
   "C:\\Windows\\Fonts\\simsun.ttc",
+  "C:\\Windows\\Fonts\\simhei.ttf",
+  "C:\\Windows\\Fonts\\msgothic.ttc",
 ];
 
 export let _cachedCjkFontPath: string | null = null;
+export let _cachedCjkFontBuffer: Buffer | null = null;
 
 (function detectCjkFont() {
   console.log("[CJK-STARTUP] __dirname      :", __dirname);
   console.log("[CJK-STARTUP] process.cwd()  :", process.cwd());
-  for (const p of _cjkFontCandidates) {
-    if (existsSync(p)) {
-      _cachedCjkFontPath = p;
-      console.log("[CJK-STARTUP] ✅ Font FOUND   :", p);
-      return;
+
+  let assetsBase = "";
+  let currentDir = __dirname;
+  for (let i = 0; i < 5; i++) {
+    const testPath = path.join(currentDir, "assets");
+    if (existsSync(testPath)) {
+      assetsBase = testPath;
+      console.log("[CJK-STARTUP] Found assets folder at:", assetsBase);
+      break;
     }
-    console.log("[CJK-STARTUP] ✗  Not found   :", p);
+    currentDir = path.dirname(currentDir);
   }
-  console.warn("[CJK-STARTUP] ❌ NO CJK FONT  — Chinese will render as boxes! Copy NotoSansCJK-Regular.ttc to the assets/ folder.");
+
+  const finalCandidates = [..._cjkFontCandidates];
+  if (assetsBase) {
+    finalCandidates.unshift(path.join(assetsBase, "noto-sans-sc", "NotoSansSC-Regular.otf"));
+    finalCandidates.unshift(path.join(assetsBase, "NotoSansCJK-Regular.ttf"));
+  }
+
+  for (const p of finalCandidates) {
+    if (existsSync(p)) {
+      try {
+        const testDoc = new PDFDocument();
+        const buf = fs.readFileSync(p);
+        testDoc.font(buf, 0).text("测试");
+        _cachedCjkFontBuffer = buf;
+        _cachedCjkFontPath = p;
+        console.log("[CJK-STARTUP] ✅ Valid Font Found & Tested:", p);
+        return;
+      } catch (e: any) {
+        console.log(`[CJK-STARTUP] ✗  Font failed test (${p}):`, e.message);
+      }
+    }
+  }
+  console.warn("[CJK-STARTUP] ❌ NO WORKING CJK FONT FOUND!");
 })();
 
 const padorder_no = (n: number) => `MA${String(n).padStart(4, "0")}`;
@@ -1299,16 +1333,20 @@ export const generateCommercialInvoicePDF = async (
     doc.text("GTech Industries Limited:   3A, 12/F, Kaiser Centre, N. 18 Centre Street, Sai Ying Pun, Hong Kong", 40, 75);
     doc.text("GTech Establishment China: West Dafeng Metallurgical Plant, Bowang Huisheng Square, Bowang, Ma'anshan, Anhui", 40, 88);
 
-    // CJK font — use path cached at startup (see [CJK-STARTUP] logs)
-    const chFont = _cachedCjkFontPath;
-    if (chFont) {
+    const fontSource = _cachedCjkFontBuffer || _cachedCjkFontPath;
+    if (fontSource) {
       try {
-        doc.registerFont("CJK", chFont);
         const chineseAddress = "中国安徽省马鞍山市博望区博望汇盛广场西大丰冶金厂区";
-        doc.font("CJK").fontSize(9).fillColor("#666666").text(chineseAddress, 152, 101, { lineBreak: false });
+        doc.font(fontSource, 0).fontSize(9).fillColor("#666666").text(chineseAddress, 152, 101, { lineBreak: false });
         doc.font("Helvetica").fillColor("#000000");
       } catch (err: any) {
-        console.error("[CJK-PDF] Render failed:", err.message);
+        console.error(`[CJK-PDF] Render failed:`, err.message);
+        if (process.platform === "win32") {
+          try {
+            doc.font("C:\\Windows\\Fonts\\msyh.ttc", 0).fontSize(9).text("中国安徽...", 152, 101);
+          } catch (e) { }
+        }
+        doc.font("Helvetica").fillColor("#000000");
       }
     }
 
@@ -1352,8 +1390,7 @@ export const generateCommercialInvoicePDF = async (
 
     let itemY = tableTop + 46;
     const pageH = 841.89;
-    // footerReserve must be > (pageH - fy) = 841.89-735 = 106.89 — use 160 for safe content margin
-    const footerReserve = 160;
+    const footerReserve = 140;
     const rowH = 28;
 
     lineItems.forEach((item) => {
@@ -1382,10 +1419,10 @@ export const generateCommercialInvoicePDF = async (
     doc.text(totalQty.toString(), 425, itemY, { underline: true });
     doc.text(`${grandTotal} €`, 485, itemY, { width: 70, align: "right", underline: true });
 
-    itemY += 60;
+    itemY += 25;
     if (itemY + 110 > pageH - footerReserve) { doc.addPage(); itemY = 50; }
     doc.fontSize(10).font("Helvetica-Bold").text("* Unit price is calculated and can have errors from rounding", 40, itemY);
-    itemY += 40;
+    itemY += 25;
     doc.fontSize(10).font("Helvetica").text("Remark:", 40, itemY);
     const remarkX = 100;
     doc.text(`DHL Express, ${data.cargoNo}`, remarkX, itemY);
@@ -1396,29 +1433,43 @@ export const generateCommercialInvoicePDF = async (
     doc.text(`${packageCount} parcels`, remarkX, itemY + 45);
     doc.text(`WAYBILL 85 8524 1766`, remarkX, itemY + 60);
 
-    itemY += 115;
-    // Ensure "We hereby confirm" text (2 lines ~30px) fits before footer zone
-    if (itemY + 40 > pageH - footerReserve) { doc.addPage(); itemY = 50; }
+    itemY += 80;
+    if (itemY + 30 > pageH - footerReserve) { doc.addPage(); itemY = 50; }
     doc.fontSize(9).font("Helvetica").fillColor("#000000")
       .text("We hereby confirm that no raw material from Russia were used", 100, itemY, { lineBreak: false });
     itemY += 14;
     doc.text("in the production of the goods mentioned in this invoice.", 100, itemY, { lineBreak: false });
 
+    itemY += 40;
+    if (itemY + 100 > pageH - 50) { doc.addPage(); itemY = 50; }
+
+    doc.moveTo(40, itemY).lineTo(555, itemY).strokeColor("#cccccc").lineWidth(0.5).stroke();
+    itemY += 12;
+    doc.fontSize(8).fillColor("#000000").font("Helvetica-Bold");
+    doc.text("GTech Industries Limited", 40, itemY);
+    doc.fontSize(8).font("Helvetica").fillColor("#444444");
+    doc.text("Acc. No 478798112483", 40, itemY + 12);
+    doc.text("Swift Code: DHBKHKHH", 40, itemY + 24);
+    doc.text("DBS Bank (Hong Kong)", 40, itemY + 36);
+
+    doc.text("+86 555 6767 199", 220, itemY);
+    doc.text("+86 17355524828", 220, itemY + 12);
+    doc.text("Contact: lili", 220, itemY + 24);
+    doc.text("info@gtech-industries.net", 220, itemY + 36);
+
+    const footerLogo = path.join(process.cwd(), "assets", "logo.png");
+    try {
+      if (existsSync(footerLogo)) {
+        doc.image(footerLogo, 420, itemY, { width: 100 });
+      }
+    } catch (e) { }
+
     const range = doc.bufferedPageRange();
     const totalPagesCount = range.count;
     for (let i = 0; i < totalPagesCount; i++) {
       doc.switchToPage(i);
-      const fy = 735;
-      doc.moveTo(40, fy - 10).lineTo(555, fy - 10).strokeColor("#cccccc").lineWidth(0.5).stroke();
-      doc.fontSize(9).fillColor("#444444").font("Helvetica-Bold").text("GTech Industries Limited", 40, fy);
-      doc.font("Helvetica")
-        .text("Acc. No 478798112483", 40, fy + 13).text("Swift Code: DHBKHKHH", 40, fy + 26).text("DBS Bank (Hong Kong)", 40, fy + 39);
-      const c2 = 220;
-      doc.text("+86 555 6767 199", c2, fy).text("+86 17355524828", c2, fy + 13).text("Contact: lili", c2, fy + 26).text("info@gtech-industries.net", c2, fy + 39);
-      const logoPath = path.join(process.cwd(), "assets", "logo.png");
-      try { doc.image(logoPath, 425, fy + 2, { width: 115 }); } catch (_) { }
-
-      doc.fillColor("#000000").fontSize(9).font("Helvetica").text(`${i + 1} / ${totalPagesCount}`, 500, 785, { align: "right", width: 55 });
+      doc.fontSize(8).fillColor("#999999").font("Helvetica");
+      doc.text(`${i + 1} / ${totalPagesCount}`, 500, 810, { align: "right", width: 50 });
     }
 
     doc.end();
