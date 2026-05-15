@@ -661,7 +661,13 @@ export class InvoiceController {
           oi.cargo_id, 
           SUM(oi.qty) as total_qty, 
           COUNT(oi.id) as count_items,
-          SUM(oi.qty * COALESCE(oi.eur_special_price, oi.price, i.price, 0)) as total_price
+          SUM(oi.qty * COALESCE(
+            oi.eur_special_price, 
+            oi.price, 
+            i.price, 
+            CASE WHEN oi.rmb_special_price > 0 THEN oi.rmb_special_price * 0.13 ELSE 0 END,
+            0
+          )) as total_price
         FROM order_item oi
         LEFT JOIN item i ON i.id = oi.item_id
         GROUP BY oi.order_id, oi.cargo_id
@@ -905,6 +911,11 @@ export class InvoiceController {
             }
           }
 
+          let unitPrice = oi?.eur_special_price || oi?.price || item?.price || 0;
+          if (!unitPrice && (oi?.rmb_special_price || 0) > 0) {
+            unitPrice = oi.rmb_special_price * 0.13;
+          }
+
           taricGroupsMap.set(groupKey, {
             taricId: groupKey,
             taricNameEn: displayName,
@@ -912,14 +923,17 @@ export class InvoiceController {
             dutyRate: displayRate,
             totalQty: 0,
             totalPrice: 0,
-            unitPrice: oi?.eur_special_price || oi?.price || item?.price || 0,
+            unitPrice: unitPrice,
             isProjectItem,
           });
         }
 
         const group = taricGroupsMap.get(groupKey)!;
         group.totalQty += oi.qty || 0;
-        const currentPrice = oi?.eur_special_price || oi?.price || item?.price || 0;
+        let currentPrice = oi?.eur_special_price || oi?.price || item?.price || 0;
+        if (!currentPrice && (oi?.rmb_special_price || 0) > 0) {
+          currentPrice = oi.rmb_special_price * 0.13;
+        }
         group.totalPrice += (oi.qty || 0) * (Number(currentPrice) || 0);
       });
 

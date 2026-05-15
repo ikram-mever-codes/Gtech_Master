@@ -72,7 +72,6 @@ import { RootState } from "@/app/Redux/store";
 import { UserRole } from "@/utils/interfaces";
 
 const hasChinese = (str: string) => /[\u4e00-\u9fa5]/.test(str || "");
-
 type Item = {
   id: string | number;
   item_name?: string;
