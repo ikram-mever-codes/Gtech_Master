@@ -721,6 +721,9 @@ export class InvoiceController {
 
         const cargoNo = cargo?.cargo_no || (inv.orderNumber && !orderIdMap.has(inv.orderNumber) ? inv.orderNumber : undefined);
 
+        const order = orders.find(o => o.order_no === inv.orderNumber);
+        const orderComment = order?.comment || "";
+
         return {
           ...inv,
           bill_to: "GTech-Warehouse",
@@ -732,6 +735,7 @@ export class InvoiceController {
           customItemCount,
           customTotalQty,
           cargoNo: cargoNo || inv.orderNumber,
+          orderComment,
         };
       })
         .filter(inv => {
@@ -1041,7 +1045,6 @@ export class InvoiceController {
       const cargoNo = invoice.orderNumber || "N/A";
       const dateStr = new Date(invoice.invoiceDate).toISOString().split("T")[0];
 
-      // Header Table
       doc.rect(30, 30, 535, 20).stroke();
       doc.fontSize(10).font("Helvetica-Bold").text("GTech Industries Limited", 30, 37, { align: "center", width: 535 });
 
@@ -1051,30 +1054,35 @@ export class InvoiceController {
       doc.rect(30, 65, 535, 15).fillAndStroke("#f0f0f0", "#000000");
       doc.fillColor("#000000").fontSize(9).font("Helvetica-Bold").text("Packing List", 30, 69, { align: "center", width: 535 });
 
-      // Buyer Info
       doc.rect(30, 80, 420, 15).stroke();
-      doc.fontSize(8).font("Helvetica-Bold").text("Buyer:", 35, 84);
+      doc.fontSize(8).font("Helvetica-Bold").text("Buyer:", 35, 85);
+      doc.moveTo(70, 80).lineTo(70, 95).stroke();
+
       doc.rect(450, 80, 115, 15).stroke();
-      doc.text("Invoice No.:", 455, 84);
-      doc.font("Helvetica").text(invoice.invoiceNumber, 510, 84);
+      doc.text("Invoice No.:", 455, 85);
+      doc.moveTo(505, 80).lineTo(505, 95).stroke();
+      doc.font("Helvetica").text(invoice.invoiceNumber, 510, 85);
 
       doc.rect(30, 95, 420, 20).stroke();
-      doc.fontSize(8).font("Helvetica").text(invoice.customer?.companyName || "N/A", 35, 100);
+      doc.fontSize(8).font("Helvetica").text("GTech Industries GmbH", 35, 102);
+
       doc.rect(450, 95, 115, 20).stroke();
-      doc.font("Helvetica-Bold").text("Cargo No.", 455, 100);
-      doc.font("Helvetica").text(cargoNo, 510, 100);
+      doc.font("Helvetica-Bold").text("Cargo No.", 455, 102);
+      doc.moveTo(505, 95).lineTo(505, 115).stroke();
+      doc.font("Helvetica").text(cargoNo, 510, 102);
 
       doc.rect(30, 115, 420, 15).stroke();
-      doc.text(invoice.customer?.addressLine1 || "", 35, 119);
+      doc.text("Reichshofstr. 137 58239 Schwerte Germany, Tel: +4923043389510", 35, 120);
+
       doc.rect(450, 115, 115, 15).stroke();
-      doc.font("Helvetica-Bold").text("Date:", 455, 119);
-      doc.font("Helvetica").text(dateStr, 510, 119);
+      doc.font("Helvetica-Bold").text("Date:", 455, 120);
+      doc.moveTo(505, 115).lineTo(505, 130).stroke();
+      doc.font("Helvetica").text(dateStr, 510, 120);
 
       doc.rect(30, 130, 420, 15).stroke();
       doc.text("Mr. Markus Entner", 35, 134);
       doc.rect(450, 130, 115, 15).stroke();
 
-      // Main Table Header
       let itemY = 155;
       const colWidths = { desc: 215, qty: 35, client: 45, pack: 55, weight: 60, measure: 65, volume: 55 };
       const colX = {
@@ -1100,6 +1108,15 @@ export class InvoiceController {
       doc.text("B", colX.measure + colWidths.measure / 3, itemY + 19, { width: colWidths.measure / 3, align: "center" });
       doc.text("H", colX.measure + (colWidths.measure / 3) * 2, itemY + 19, { width: colWidths.measure / 3, align: "center" });
       doc.text("Total Volume (cbm)", colX.volume, itemY + 4, { width: colWidths.volume, align: "center" });
+
+      doc.moveTo(colX.qty, itemY).lineTo(colX.qty, itemY + 30).stroke();
+      doc.moveTo(colX.client, itemY).lineTo(colX.client, itemY + 30).stroke();
+      doc.moveTo(colX.pack, itemY).lineTo(colX.pack, itemY + 30).stroke();
+      doc.moveTo(colX.weight, itemY).lineTo(colX.weight, itemY + 30).stroke();
+      doc.moveTo(colX.measure, itemY).lineTo(colX.measure, itemY + 30).stroke();
+      doc.moveTo(colX.measure + colWidths.measure / 3, itemY + 15).lineTo(colX.measure + colWidths.measure / 3, itemY + 30).stroke();
+      doc.moveTo(colX.measure + (colWidths.measure / 3) * 2, itemY + 15).lineTo(colX.measure + (colWidths.measure / 3) * 2, itemY + 30).stroke();
+      doc.moveTo(colX.volume, itemY).lineTo(colX.volume, itemY + 30).stroke();
 
       itemY += 30;
       doc.font("Helvetica");
@@ -1137,7 +1154,6 @@ export class InvoiceController {
         doc.text(item.height?.toString() || "0", colX.measure + (colWidths.measure / 3) * 2, itemY + 8, { width: colWidths.measure / 3, align: "center" });
         doc.text(volume.toFixed(2), colX.volume, itemY + 8, { width: colWidths.volume, align: "center" });
 
-        // Vertical lines
         doc.moveTo(colX.qty, itemY).lineTo(colX.qty, itemY + rowHeight).stroke();
         doc.moveTo(colX.client, itemY).lineTo(colX.client, itemY + rowHeight).stroke();
         doc.moveTo(colX.pack, itemY).lineTo(colX.pack, itemY + rowHeight).stroke();
@@ -1150,7 +1166,6 @@ export class InvoiceController {
         itemY += rowHeight;
       }
 
-      // Totals
       const clients = Object.keys(clientTotals);
       const totalsRowHeight = clients.length * 15;
       doc.rect(30, itemY, 535, totalsRowHeight + 15).stroke();

@@ -2,7 +2,6 @@ import { toast } from "react-hot-toast";
 import { api, handleApiError } from "../utils/api";
 import { loadingStyles, successStyles } from "@/utils/constants";
 
-// Types
 interface InvoiceResponse {
   data: any;
   message: string;
@@ -35,7 +34,6 @@ interface UpdateInvoicePayload extends Partial<CreateInvoicePayload> {
   id: string;
 }
 
-// Invoice Functions
 export const createNewInvoice = async (invoiceData: CreateInvoicePayload) => {
   try {
     toast.loading("Creating invoice...", loadingStyles);
@@ -112,7 +110,6 @@ export const getInvoicesByCustomer = async (customerId: string) => {
   }
 };
 
-// PDF Generation
 export const generateInvoicePdf = async (invoiceId: string) => {
   try {
     toast.loading("Generating PDF...", loadingStyles);
@@ -123,15 +120,11 @@ export const generateInvoicePdf = async (invoiceId: string) => {
     toast.dismiss();
     toast.success("PDF generated successfully", successStyles);
 
-    // Create blob URL for download
-    const url = window.URL.createObjectURL(new Blob([response.data]));
-    const link = document.createElement("a");
-    link.href = url;
-    link.setAttribute("download", `invoice_${invoiceId}.pdf`);
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
+    const blob = new Blob([response.data], { type: "application/pdf" });
+    const url = window.URL.createObjectURL(blob);
+    window.open(url, "_blank");
 
+    setTimeout(() => window.URL.revokeObjectURL(url), 1000);
     return true;
   } catch (error) {
     handleApiError(error, "PDF generation failed");
@@ -139,7 +132,6 @@ export const generateInvoicePdf = async (invoiceId: string) => {
   }
 };
 
-// Email Functions
 export const sendInvoiceEmail = async (invoiceId: string, email?: string) => {
   try {
     toast.loading("Sending invoice...", loadingStyles);
@@ -156,7 +148,6 @@ export const sendInvoiceEmail = async (invoiceId: string, email?: string) => {
   }
 };
 
-// Status Management
 export const markInvoiceAsPaid = async (invoiceId: string) => {
   try {
     toast.loading("Updating invoice status...", loadingStyles);
@@ -212,13 +203,11 @@ export const downloadPackingList = async (id: string, invoiceNo: string) => {
     toast.dismiss();
     toast.success("Packing List generated!", successStyles);
 
-    const url = window.URL.createObjectURL(new Blob([response.data]));
-    const link = document.createElement("a");
-    link.href = url;
-    link.setAttribute("download", `Packing_List_${invoiceNo}.pdf`);
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
+    const blob = new Blob([response.data], { type: "application/pdf" });
+    const url = window.URL.createObjectURL(blob);
+    window.open(url, "_blank");
+
+    setTimeout(() => window.URL.revokeObjectURL(url), 1000);
     return true;
   } catch (error) {
     handleApiError(error, "Failed to generate packing list");

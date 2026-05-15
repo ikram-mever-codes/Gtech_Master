@@ -23,6 +23,7 @@ interface PackingListData {
   items?: any[];
   customItemCount?: number;
   packingListData?: any[];
+  orderComment?: string;
 }
 
 interface PackingItem {
@@ -79,18 +80,24 @@ const PackingListTab: React.FC = () => {
     if (invoice.packingListData && Array.isArray(invoice.packingListData)) {
       setEditItems(invoice.packingListData);
     } else {
-      const items: PackingItem[] = (invoice.items || []).map((it: any, idx: number) => ({
-        id: it.id || idx,
-        description: it.description || it.item?.item_name || "Unknown",
-        qty: Number(it.quantity || it.qty || 0),
-        client: it.item?.customer?.companyName || invoice.customer?.companyName || "",
-        package: `P${idx + 1}`,
-        pType: "Tray",
-        weight: Number(it.item?.weight || 0),
-        length: Number(it.item?.length || 0),
-        width: Number(it.item?.width || 0),
-        height: Number(it.item?.height || 0),
-      }));
+      const items: PackingItem[] = (invoice.items || []).map((it: any, idx: number) => {
+        const baseName = it.description || it.item?.item_name || "Unknown";
+        const remark = it.item?.remark || it.remark_de || invoice.orderComment || "";
+        const description = remark ? `${baseName} - ${remark}` : baseName;
+
+        return {
+          id: it.id || idx,
+          description: description,
+          qty: Number(it.quantity || it.qty || 0),
+          client: it.item?.customer?.companyName || invoice.customer?.companyName || "",
+          package: `P${idx + 1}`,
+          pType: "Tray",
+          weight: Number(it.item?.weight || 0),
+          length: Number(it.item?.length || 0),
+          width: Number(it.item?.width || 0),
+          height: Number(it.item?.height || 0),
+        };
+      });
       setEditItems(items);
     }
     setEditingId(invoice.id);
