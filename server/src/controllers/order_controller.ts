@@ -1440,11 +1440,14 @@ export const generateCommercialInvoicePDF = async (
     itemY += 14;
     doc.text("in the production of the goods mentioned in this invoice.", 100, itemY, { lineBreak: false });
 
-    itemY += 40;
-    if (itemY + 100 > pageH - 50) { doc.addPage(); itemY = 50; }
+    itemY += 20;
+    if (itemY + 80 > pageH - 20) {
+      doc.addPage();
+      itemY = 50;
+    }
 
     doc.moveTo(40, itemY).lineTo(555, itemY).strokeColor("#cccccc").lineWidth(0.5).stroke();
-    itemY += 12;
+    itemY += 10;
     doc.fontSize(8).fillColor("#000000").font("Helvetica-Bold");
     doc.text("GTech Industries Limited", 40, itemY);
     doc.fontSize(8).font("Helvetica").fillColor("#444444");
@@ -1469,7 +1472,7 @@ export const generateCommercialInvoicePDF = async (
     for (let i = 0; i < totalPagesCount; i++) {
       doc.switchToPage(i);
       doc.fontSize(8).fillColor("#999999").font("Helvetica");
-      doc.text(`${i + 1} / ${totalPagesCount}`, 500, 810, { align: "right", width: 50 });
+      doc.text(`${i + 1} / ${totalPagesCount}`, 500, 780, { align: "right", width: 50 });
     }
 
     doc.end();
