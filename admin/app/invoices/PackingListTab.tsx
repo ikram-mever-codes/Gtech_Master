@@ -10,7 +10,7 @@ import {
   ChevronDown,
   Save,
 } from "lucide-react";
-import { getAllInvoices } from "@/api/invoice";
+import { getAllInvoices, updatePackingList, downloadPackingList } from "@/api/invoice";
 import { toast } from "react-hot-toast";
 
 interface PackingListData {
@@ -22,6 +22,7 @@ interface PackingListData {
   status: string;
   items?: any[];
   customItemCount?: number;
+  packingListData?: any[];
 }
 
 interface PackingItem {
@@ -75,19 +76,23 @@ const PackingListTab: React.FC = () => {
       setEditItems([]);
       return;
     }
-    const items: PackingItem[] = (invoice.items || []).map((it: any, idx: number) => ({
-      id: it.id || idx,
-      description: it.description || it.item?.item_name || "Unknown",
-      qty: Number(it.quantity || it.qty || 0),
-      client: invoice.customer?.companyName || "",
-      package: `P${idx + 1}`,
-      pType: "Tray",
-      weight: 0,
-      length: 0,
-      width: 0,
-      height: 0,
-    }));
-    setEditItems(items);
+    if (invoice.packingListData && Array.isArray(invoice.packingListData)) {
+      setEditItems(invoice.packingListData);
+    } else {
+      const items: PackingItem[] = (invoice.items || []).map((it: any, idx: number) => ({
+        id: it.id || idx,
+        description: it.description || it.item?.item_name || "Unknown",
+        qty: Number(it.quantity || it.qty || 0),
+        client: it.item?.customer?.companyName || invoice.customer?.companyName || "",
+        package: `P${idx + 1}`,
+        pType: "Tray",
+        weight: Number(it.item?.weight || 0),
+        length: Number(it.item?.length || 0),
+        width: Number(it.item?.width || 0),
+        height: Number(it.item?.height || 0),
+      }));
+      setEditItems(items);
+    }
     setEditingId(invoice.id);
   };
 
@@ -102,10 +107,27 @@ const PackingListTab: React.FC = () => {
     updateItem(idx, "pType", P_TYPE_OPTIONS[next]);
   };
 
-  const handleSave = () => {
-    toast.success("Packing list saved! (Backend coming soon)");
-    setEditingId(null);
-    setEditItems([]);
+  const handleSave = async () => {
+    if (!editingId) return;
+    try {
+      setLoading(true);
+      await updatePackingList(editingId, editItems);
+      setEditingId(null);
+      setEditItems([]);
+      fetchInvoices();
+    } catch (error) {
+      console.error("Save failed:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDownloadPdf = async (invoice: PackingListData) => {
+    try {
+      await downloadPackingList(invoice.id, invoice.invoiceNumber);
+    } catch (error) {
+      console.error("PDF download failed:", error);
+    }
   };
 
   const editingInvoice = packingLists.find((p) => p.id === editingId);
@@ -181,7 +203,7 @@ const PackingListTab: React.FC = () => {
                           {editingId === item.id ? "Close" : "Edit"}
                         </button>
                         <button
-                          onClick={() => toast.success("PDF feature coming soon!")}
+                          onClick={() => handleDownloadPdf(item)}
                           className="p-1.5 border border-[#DEE2E6] rounded-[4px] hover:bg-red-50 group/pdf transition-all bg-white"
                           title="Print PDF"
                         >

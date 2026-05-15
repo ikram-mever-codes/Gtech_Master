@@ -186,6 +186,46 @@ export const cancelInvoice = async (invoiceId: string) => {
     throw error;
   }
 };
+export const updatePackingList = async (id: string, packingListData: any) => {
+  try {
+    toast.loading("Saving packing list...", loadingStyles);
+    const response = await api.patch<InvoiceResponse>(
+      `/invoices/${id}/packing-list`,
+      { packingListData }
+    );
+    toast.dismiss();
+    toast.success("Packing list saved successfully", successStyles);
+    return response.data;
+  } catch (error) {
+    handleApiError(error, "Failed to save packing list");
+    throw error;
+  }
+};
+
+export const downloadPackingList = async (id: string, invoiceNo: string) => {
+  try {
+    toast.loading("Generating Packing List PDF...", loadingStyles);
+    const response = await api.get(`/invoices/${id}/packing-list/pdf`, {
+      responseType: "blob",
+    });
+
+    toast.dismiss();
+    toast.success("Packing List generated!", successStyles);
+
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", `Packing_List_${invoiceNo}.pdf`);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    return true;
+  } catch (error) {
+    handleApiError(error, "Failed to generate packing list");
+    throw error;
+  }
+};
+
 export const getExpandedInvoiceDetails = async (id: string): Promise<any> => {
   try {
     const res = await api.get(`/invoices/${id}/expanded`);

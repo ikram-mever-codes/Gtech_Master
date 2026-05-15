@@ -73,6 +73,9 @@ export class Invoice {
   @OneToMany(() => InvoiceItem, (item) => item.invoice, { cascade: true })
   items!: InvoiceItem[];
 
+  @Column({ type: "json", nullable: true })
+  packingListData?: any;
+
   @CreateDateColumn()
   createdAt!: Date;
 

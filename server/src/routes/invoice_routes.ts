@@ -23,5 +23,7 @@ router.get(
 );
 router.patch("/:id/paid", authorize(UserRole.SALES), InvoiceController.markAsPaid);
 router.patch("/:id/cancel", authorize(UserRole.SALES), InvoiceController.cancelInvoice);
+router.patch("/:id/packing-list", authorize(UserRole.SALES), InvoiceController.updatePackingListData);
+router.get("/:id/packing-list/pdf", authorize(UserRole.SALES), InvoiceController.downloadPackingListPDF);
 
 export default router;

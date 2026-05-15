@@ -664,6 +664,7 @@ export class InvoiceController {
           SUM(oi.qty * COALESCE(
             oi.eur_special_price, 
             oi.price, 
+            i."transfer_price (EUR)",
             i.price, 
             CASE WHEN oi.rmb_special_price > 0 THEN oi.rmb_special_price * 0.13 ELSE 0 END,
             0
@@ -911,7 +912,7 @@ export class InvoiceController {
             }
           }
 
-          let unitPrice = oi?.eur_special_price || oi?.price || item?.price || 0;
+          let unitPrice = oi?.eur_special_price || oi?.price || item?.transfer_price_EUR || item?.price || 0;
           if (!unitPrice && (oi?.rmb_special_price || 0) > 0) {
             unitPrice = oi.rmb_special_price * 0.13;
           }
@@ -930,7 +931,7 @@ export class InvoiceController {
 
         const group = taricGroupsMap.get(groupKey)!;
         group.totalQty += oi.qty || 0;
-        let currentPrice = oi?.eur_special_price || oi?.price || item?.price || 0;
+        let currentPrice = oi?.eur_special_price || oi?.price || item?.transfer_price_EUR || item?.price || 0;
         if (!currentPrice && (oi?.rmb_special_price || 0) > 0) {
           currentPrice = oi.rmb_special_price * 0.13;
         }
@@ -955,7 +956,7 @@ export class InvoiceController {
           if (!rmbPrice && item?.id) {
             rmbPrice = (await getRMBPriceFromSupplier(item.id)) || 0;
           }
-          let eurPrice = oi.eur_special_price || oi.price || item?.price || 0;
+          let eurPrice = oi.eur_special_price || oi.price || item?.transfer_price_EUR || item?.price || 0;
           if (!eurPrice && rmbPrice) {
             eurPrice = rmbPrice * 0.13;
           }
@@ -994,6 +995,196 @@ export class InvoiceController {
           taricGroups,
         },
       });
+    } catch (error) {
+      console.error(error);
+      return next(error);
+    }
+  };
+
+  static updatePackingListData = async (req: Request, res: Response, next: NextFunction) => {
+    const invoiceRepository = AppDataSource.getRepository(Invoice);
+    try {
+      const { id } = req.params;
+      const { packingListData } = req.body;
+      const invoice = await invoiceRepository.findOne({ where: { id } });
+      if (!invoice) return res.status(404).json({ message: "Invoice not found" });
+
+      invoice.packingListData = packingListData;
+      await invoiceRepository.save(invoice);
+
+      return res.json({ success: true, message: "Packing list data updated successfully" });
+    } catch (error) {
+      console.error(error);
+      return next(error);
+    }
+  };
+
+  static downloadPackingListPDF = async (req: Request, res: Response, next: NextFunction) => {
+    const invoiceRepository = AppDataSource.getRepository(Invoice);
+    try {
+      const { id } = req.params;
+      const invoice = await invoiceRepository.findOne({
+        where: { id },
+        relations: ["customer", "items", "items.item"]
+      });
+
+      if (!invoice) return res.status(404).json({ message: "Invoice not found" });
+
+      const doc = new PDFDocument({ margin: 30, size: "A4" });
+      const filename = `Packing_List_${invoice.invoiceNumber}.pdf`;
+
+      res.setHeader("Content-disposition", `attachment; filename="${filename}"`);
+      res.setHeader("Content-type", "application/pdf");
+      doc.pipe(res);
+
+      const items = invoice.packingListData || [];
+      const cargoNo = invoice.orderNumber || "N/A";
+      const dateStr = new Date(invoice.invoiceDate).toISOString().split("T")[0];
+
+      // Header Table
+      doc.rect(30, 30, 535, 20).stroke();
+      doc.fontSize(10).font("Helvetica-Bold").text("GTech Industries Limited", 30, 37, { align: "center", width: 535 });
+
+      doc.rect(30, 50, 535, 15).stroke();
+      doc.fontSize(8).font("Helvetica").text("Yongxin Road, Bowang Town, Bowang, Maanshan, Anhui, China", 30, 54, { align: "center", width: 535 });
+
+      doc.rect(30, 65, 535, 15).fillAndStroke("#f0f0f0", "#000000");
+      doc.fillColor("#000000").fontSize(9).font("Helvetica-Bold").text("Packing List", 30, 69, { align: "center", width: 535 });
+
+      // Buyer Info
+      doc.rect(30, 80, 420, 15).stroke();
+      doc.fontSize(8).font("Helvetica-Bold").text("Buyer:", 35, 84);
+      doc.rect(450, 80, 115, 15).stroke();
+      doc.text("Invoice No.:", 455, 84);
+      doc.font("Helvetica").text(invoice.invoiceNumber, 510, 84);
+
+      doc.rect(30, 95, 420, 20).stroke();
+      doc.fontSize(8).font("Helvetica").text(invoice.customer?.companyName || "N/A", 35, 100);
+      doc.rect(450, 95, 115, 20).stroke();
+      doc.font("Helvetica-Bold").text("Cargo No.", 455, 100);
+      doc.font("Helvetica").text(cargoNo, 510, 100);
+
+      doc.rect(30, 115, 420, 15).stroke();
+      doc.text(invoice.customer?.addressLine1 || "", 35, 119);
+      doc.rect(450, 115, 115, 15).stroke();
+      doc.font("Helvetica-Bold").text("Date:", 455, 119);
+      doc.font("Helvetica").text(dateStr, 510, 119);
+
+      doc.rect(30, 130, 420, 15).stroke();
+      doc.text("Mr. Markus Entner", 35, 134);
+      doc.rect(450, 130, 115, 15).stroke();
+
+      // Main Table Header
+      let itemY = 155;
+      const colWidths = { desc: 215, qty: 35, client: 45, pack: 55, weight: 60, measure: 65, volume: 55 };
+      const colX = {
+        desc: 30,
+        qty: 30 + colWidths.desc,
+        client: 30 + colWidths.desc + colWidths.qty,
+        pack: 30 + colWidths.desc + colWidths.qty + colWidths.client,
+        weight: 30 + colWidths.desc + colWidths.qty + colWidths.client + colWidths.pack,
+        measure: 30 + colWidths.desc + colWidths.qty + colWidths.client + colWidths.pack + colWidths.weight,
+        volume: 30 + colWidths.desc + colWidths.qty + colWidths.client + colWidths.pack + colWidths.weight + colWidths.measure,
+      };
+
+      doc.rect(30, itemY, 535, 30).stroke();
+      doc.fontSize(8).font("Helvetica-Bold");
+      doc.text("Description of goods", colX.desc, itemY + 10, { width: colWidths.desc, align: "center" });
+      doc.text("QTY", colX.qty, itemY + 10, { width: colWidths.qty, align: "center" });
+      doc.text("Clients", colX.client, itemY + 10, { width: colWidths.client, align: "center" });
+      doc.text("Packages", colX.pack, itemY + 10, { width: colWidths.pack, align: "center" });
+      doc.text("Weight (kg)", colX.weight, itemY + 10, { width: colWidths.weight, align: "center" });
+      doc.text("Measure (cm)", colX.measure, itemY + 4, { width: colWidths.measure, align: "center" });
+      doc.rect(colX.measure, itemY + 15, colWidths.measure, 15).stroke();
+      doc.text("L", colX.measure, itemY + 19, { width: colWidths.measure / 3, align: "center" });
+      doc.text("B", colX.measure + colWidths.measure / 3, itemY + 19, { width: colWidths.measure / 3, align: "center" });
+      doc.text("H", colX.measure + (colWidths.measure / 3) * 2, itemY + 19, { width: colWidths.measure / 3, align: "center" });
+      doc.text("Total Volume (cbm)", colX.volume, itemY + 4, { width: colWidths.volume, align: "center" });
+
+      itemY += 30;
+      doc.font("Helvetica");
+
+      let totalQty = 0;
+      let grandTotalWeight = 0;
+      let grandTotalVolume = 0;
+      const clientTotals: Record<string, { weight: number, volume: number }> = {};
+
+      for (const item of items) {
+        const rowHeight = 25;
+        if (itemY + rowHeight > 750) {
+          doc.addPage();
+          itemY = 50;
+        }
+
+        const volume = (item.length * item.width * item.height) / 1000000;
+        totalQty += Number(item.qty || 0);
+        grandTotalWeight += Number(item.weight || 0);
+        grandTotalVolume += volume;
+
+        const client = item.client || "N/A";
+        if (!clientTotals[client]) clientTotals[client] = { weight: 0, volume: 0 };
+        clientTotals[client].weight += Number(item.weight || 0);
+        clientTotals[client].volume += volume;
+
+        doc.rect(30, itemY, 535, rowHeight).stroke();
+        doc.fontSize(7).text(item.description || "", colX.desc + 5, itemY + 5, { width: colWidths.desc - 10 });
+        doc.fontSize(8).text(item.qty?.toString() || "0", colX.qty, itemY + 8, { width: colWidths.qty, align: "center" });
+        doc.text(client, colX.client, itemY + 8, { width: colWidths.client, align: "center" });
+        doc.text(item.package || "", colX.pack, itemY + 8, { width: colWidths.pack, align: "center" });
+        doc.text(item.weight?.toString() || "0", colX.weight, itemY + 8, { width: colWidths.weight, align: "center" });
+        doc.text(item.length?.toString() || "0", colX.measure, itemY + 8, { width: colWidths.measure / 3, align: "center" });
+        doc.text(item.width?.toString() || "0", colX.measure + colWidths.measure / 3, itemY + 8, { width: colWidths.measure / 3, align: "center" });
+        doc.text(item.height?.toString() || "0", colX.measure + (colWidths.measure / 3) * 2, itemY + 8, { width: colWidths.measure / 3, align: "center" });
+        doc.text(volume.toFixed(2), colX.volume, itemY + 8, { width: colWidths.volume, align: "center" });
+
+        // Vertical lines
+        doc.moveTo(colX.qty, itemY).lineTo(colX.qty, itemY + rowHeight).stroke();
+        doc.moveTo(colX.client, itemY).lineTo(colX.client, itemY + rowHeight).stroke();
+        doc.moveTo(colX.pack, itemY).lineTo(colX.pack, itemY + rowHeight).stroke();
+        doc.moveTo(colX.weight, itemY).lineTo(colX.weight, itemY + rowHeight).stroke();
+        doc.moveTo(colX.measure, itemY).lineTo(colX.measure, itemY + rowHeight).stroke();
+        doc.moveTo(colX.measure + colWidths.measure / 3, itemY + 15).lineTo(colX.measure + colWidths.measure / 3, itemY + rowHeight).stroke();
+        doc.moveTo(colX.measure + (colWidths.measure / 3) * 2, itemY + 15).lineTo(colX.measure + (colWidths.measure / 3) * 2, itemY + rowHeight).stroke();
+        doc.moveTo(colX.volume, itemY).lineTo(colX.volume, itemY + rowHeight).stroke();
+
+        itemY += rowHeight;
+      }
+
+      // Totals
+      const clients = Object.keys(clientTotals);
+      const totalsRowHeight = clients.length * 15;
+      doc.rect(30, itemY, 535, totalsRowHeight + 15).stroke();
+      doc.font("Helvetica-Bold").text("Total", 30, itemY + 5, { width: colWidths.desc, align: "center" });
+      doc.text(totalQty.toString(), colX.qty, itemY + 5, { width: colWidths.qty, align: "center" });
+
+      let currentY = itemY;
+      clients.forEach((client, idx) => {
+        doc.fontSize(8).text(client, colX.client, currentY + 5, { width: colWidths.client, align: "center" });
+        doc.text(`${clientTotals[client].weight.toFixed(2)} kg`, colX.weight, currentY + 5, { width: colWidths.weight, align: "center" });
+        doc.text(`${clientTotals[client].volume.toFixed(2)} m³`, colX.volume, currentY + 5, { width: colWidths.volume, align: "center" });
+        doc.moveTo(colX.client, currentY).lineTo(565, currentY).stroke();
+        currentY += 15;
+      });
+
+      doc.rect(colX.client, currentY, 565 - colX.client, 15).fillAndStroke("#f0f0f0", "#000000");
+      doc.fillColor("#000000").text("Total", colX.client, currentY + 4, { width: colWidths.client, align: "center" });
+      doc.text(`${grandTotalWeight.toFixed(2)} kg`, colX.weight, currentY + 4, { width: colWidths.weight, align: "center" });
+      doc.text(`${grandTotalVolume.toFixed(2)} m³`, colX.volume, currentY + 4, { width: colWidths.volume, align: "center" });
+
+      itemY = currentY + 20;
+      doc.rect(30, itemY, 535, 15).stroke();
+      doc.fontSize(8).font("Helvetica-Bold").text(`No. of packages: ${items.length}`, 35, itemY + 4);
+
+      itemY += 15;
+      doc.rect(30, itemY, 535, 15).stroke();
+      const shippingMarks = clients.join(", ");
+      doc.text(`Shipping Marks: ${shippingMarks}`, 35, itemY + 4);
+
+      itemY += 15;
+      doc.rect(30, itemY, 535, 15).stroke();
+      doc.text("Country of origin: CHINA", 35, itemY + 4);
+
+      doc.end();
     } catch (error) {
       console.error(error);
       return next(error);
