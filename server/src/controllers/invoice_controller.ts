@@ -1053,34 +1053,34 @@ export class InvoiceController {
 
       doc.rect(30, 65, 535, 15).fillAndStroke("#f0f0f0", "#000000");
       doc.fillColor("#000000").fontSize(9).font("Helvetica-Bold").text("Packing List", 30, 69, { align: "center", width: 535 });
-
+      doc.fillColor("#000000");
       doc.rect(30, 80, 420, 15).stroke();
-      doc.fontSize(8).font("Helvetica-Bold").text("Buyer:", 35, 85);
+      doc.fontSize(8).font("Helvetica-Bold").text("Buyer:", 35, 87);
       doc.moveTo(70, 80).lineTo(70, 95).stroke();
 
       doc.rect(450, 80, 115, 15).stroke();
-      doc.text("Invoice No.:", 455, 85);
+      doc.text("Invoice No.:", 455, 87);
       doc.moveTo(505, 80).lineTo(505, 95).stroke();
-      doc.font("Helvetica").text(invoice.invoiceNumber, 510, 85);
+      doc.font("Helvetica").text(invoice.invoiceNumber, 510, 88);
 
       doc.rect(30, 95, 420, 20).stroke();
-      doc.fontSize(8).font("Helvetica").text("GTech Industries GmbH", 35, 102);
+      doc.fontSize(8).font("Helvetica").text("GTech Industries GmbH", 35, 108);
 
       doc.rect(450, 95, 115, 20).stroke();
-      doc.font("Helvetica-Bold").text("Cargo No.", 455, 102);
+      doc.font("Helvetica-Bold").text("Cargo No.", 455, 106);
       doc.moveTo(505, 95).lineTo(505, 115).stroke();
-      doc.font("Helvetica").text(cargoNo, 510, 102);
+      doc.font("Helvetica").text(cargoNo, 510, 108);
 
       doc.rect(30, 115, 420, 15).stroke();
-      doc.text("Reichshofstr. 137 58239 Schwerte Germany, Tel: +4923043389510", 35, 120);
+      doc.text("Reichshofstr. 137 58239 Schwerte Germany, Tel: +4923043389510", 35, 123);
 
       doc.rect(450, 115, 115, 15).stroke();
-      doc.font("Helvetica-Bold").text("Date:", 455, 120);
+      doc.font("Helvetica-Bold").text("Date:", 455, 122);
       doc.moveTo(505, 115).lineTo(505, 130).stroke();
-      doc.font("Helvetica").text(dateStr, 510, 120);
+      doc.font("Helvetica").text(dateStr, 510, 122);
 
       doc.rect(30, 130, 420, 15).stroke();
-      doc.text("Mr. Markus Entner", 35, 134);
+      doc.text("Mr. Markus Entner", 35, 137);
       doc.rect(450, 130, 115, 15).stroke();
 
       let itemY = 155;
@@ -1133,7 +1133,7 @@ export class InvoiceController {
           itemY = 50;
         }
 
-        const volume = (item.length * item.width * item.height) / 1000000;
+        const volume = (Number(item.qty || 0) * Number(item.length || 0) * Number(item.width || 0) * Number(item.height || 0)) / 1000000;
         totalQty += Number(item.qty || 0);
         grandTotalWeight += Number(item.weight || 0);
         grandTotalVolume += volume;

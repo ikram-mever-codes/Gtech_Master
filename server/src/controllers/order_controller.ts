@@ -45,16 +45,12 @@ export let _cachedCjkFontPath: string | null = null;
 export let _cachedCjkFontBuffer: Buffer | null = null;
 
 (function detectCjkFont() {
-  console.log("[CJK-STARTUP] __dirname      :", __dirname);
-  console.log("[CJK-STARTUP] process.cwd()  :", process.cwd());
-
   let assetsBase = "";
   let currentDir = __dirname;
   for (let i = 0; i < 5; i++) {
     const testPath = path.join(currentDir, "assets");
     if (existsSync(testPath)) {
       assetsBase = testPath;
-      console.log("[CJK-STARTUP] Found assets folder at:", assetsBase);
       break;
     }
     currentDir = path.dirname(currentDir);
@@ -74,14 +70,11 @@ export let _cachedCjkFontBuffer: Buffer | null = null;
         testDoc.font(buf, 0).text("测试");
         _cachedCjkFontBuffer = buf;
         _cachedCjkFontPath = p;
-        console.log("[CJK-STARTUP] ✅ Valid Font Found & Tested:", p);
         return;
       } catch (e: any) {
-        console.log(`[CJK-STARTUP] ✗  Font failed test (${p}):`, e.message);
       }
     }
   }
-  console.warn("[CJK-STARTUP] ❌ NO WORKING CJK FONT FOUND!");
 })();
 
 const padorder_no = (n: number) => `MA${String(n).padStart(4, "0")}`;
