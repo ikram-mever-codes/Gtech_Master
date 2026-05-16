@@ -1153,11 +1153,40 @@ const OrderPage: React.FC = () => {
     [suppliers],
   );
 
+  const supplierMap = useMemo(() => {
+    const map = new Map<string, any>();
+    suppliers.forEach((s) => map.set(String(s.id), s));
+    return map;
+  }, [suppliers]);
+
+  const categoryMap = useMemo(() => {
+    const map = new Map<string, any>();
+    categories.forEach((c) => map.set(String(c.id), c));
+    return map;
+  }, [categories]);
+
+  const getSupplierNameOpt = useCallback(
+    (supplierId: any) => {
+      const s = supplierMap.get(String(supplierId));
+      if (!s) return String(supplierId);
+      const englishName = (s.name && !hasChinese(s.name)) ? s.name : ((s.company_name && !hasChinese(s.company_name)) ? s.company_name : null);
+      if (englishName) return englishName;
+      const chineseName = s.name_cn || s.company_name || s.name;
+      if (chineseName) return chineseName;
+      return s.name_de || String(s.id);
+    },
+    [supplierMap],
+  );
+
   const nsoGroups = useMemo(() => {
+    if (loadingOrders) return { express: [], normal: [] };
+    
     const groups = {
       express: new Map<string, any>(),
       normal: new Map<string, any>(),
     };
+
+    const recognizedSet = new Set(suppliers.map(s => String(s.id)));
 
     orders.forEach((o: any) => {
       const isExpress = (o.comment || "").toLowerCase().includes("express");
@@ -1170,19 +1199,16 @@ const OrderPage: React.FC = () => {
         const itemDetails = itemById.get(String(item.item_id));
 
         let sId = 0;
-        const o_sid = Number(o.supplier_id || 0);
-        const i_sid = Number(itemDetails?.supplier_id || 0);
+        const o_sid = String(o.supplier_id || "0");
+        const i_sid = String(itemDetails?.supplier_id || "0");
 
-        const isRecognized = (id: number) => id > 0 && suppliers.some(s => Number(s.id) === id);
-
-        if (isRecognized(o_sid)) {
-          sId = o_sid;
-        } else if (isRecognized(i_sid)) {
-          sId = i_sid;
+        if (o_sid !== "0" && recognizedSet.has(o_sid)) {
+          sId = Number(o_sid);
+        } else if (i_sid !== "0" && recognizedSet.has(i_sid)) {
+          sId = Number(i_sid);
         }
 
         const sid = sId;
-
         if (sid === 0) return;
 
         const catId = Number(o.category_id || 0);
@@ -1192,9 +1218,9 @@ const OrderPage: React.FC = () => {
           targetMap.set(groupKey, {
             id: groupKey,
             supplier_id: sid,
-            supplier_name: sid === 0 ? "Unassigned" : getSupplierName(sid),
+            supplier_name: getSupplierNameOpt(sid),
             order_type:
-              getCategoryName(o.category_id) ||
+              categoryMap.get(String(o.category_id))?.name ||
               (o.category_id ? `Imported ${o.category_id}` : "Taobao"),
             category_id: o.category_id,
             count: 0,
@@ -1224,7 +1250,7 @@ const OrderPage: React.FC = () => {
       express: filterBySearch(Array.from(groups.express.values())),
       normal: filterBySearch(Array.from(groups.normal.values())),
     };
-  }, [orders, itemById, getSupplierName, getCategoryName, nsoSearch]);
+  }, [orders, itemById, supplierMap, categoryMap, getSupplierNameOpt, nsoSearch, loadingOrders, suppliers]);
 
   const isTab1 = activeTab !== "order_items";
   const isTab2 = false;

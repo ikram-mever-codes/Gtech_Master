@@ -1064,23 +1064,23 @@ export class InvoiceController {
       doc.font("Helvetica").text(invoice.invoiceNumber, 510, 88);
 
       doc.rect(30, 95, 420, 20).stroke();
-      doc.fontSize(8).font("Helvetica").text("GTech Industries GmbH", 35, 108);
+      doc.fillColor("#000000").fontSize(8).font("Helvetica").text("GTech Industries GmbH", 35, 101);
 
       doc.rect(450, 95, 115, 20).stroke();
-      doc.font("Helvetica-Bold").text("Cargo No.", 455, 106);
+      doc.fillColor("#000000").font("Helvetica-Bold").text("Cargo No.", 455, 101);
       doc.moveTo(505, 95).lineTo(505, 115).stroke();
-      doc.font("Helvetica").text(cargoNo, 510, 108);
+      doc.font("Helvetica").text(cargoNo, 510, 101);
 
       doc.rect(30, 115, 420, 15).stroke();
-      doc.text("Reichshofstr. 137 58239 Schwerte Germany, Tel: +4923043389510", 35, 123);
+      doc.text("Reichshofstr. 137 58239 Schwerte Germany, Tel: +4923043389510", 35, 119);
 
       doc.rect(450, 115, 115, 15).stroke();
-      doc.font("Helvetica-Bold").text("Date:", 455, 122);
+      doc.font("Helvetica-Bold").text("Date:", 455, 119);
       doc.moveTo(505, 115).lineTo(505, 130).stroke();
-      doc.font("Helvetica").text(dateStr, 510, 122);
+      doc.font("Helvetica").text(dateStr, 510, 119);
 
       doc.rect(30, 130, 420, 15).stroke();
-      doc.text("Mr. Markus Entner", 35, 137);
+      doc.text("Mr. Markus Entner", 35, 134);
       doc.rect(450, 130, 115, 15).stroke();
 
       let itemY = 155;
@@ -1096,7 +1096,7 @@ export class InvoiceController {
       };
 
       doc.rect(30, itemY, 535, 30).stroke();
-      doc.fontSize(8).font("Helvetica-Bold");
+      doc.fillColor("#000000").fontSize(8).font("Helvetica-Bold");
       doc.text("Description of goods", colX.desc, itemY + 10, { width: colWidths.desc, align: "center" });
       doc.text("QTY", colX.qty, itemY + 10, { width: colWidths.qty, align: "center" });
       doc.text("Clients", colX.client, itemY + 10, { width: colWidths.client, align: "center" });
@@ -1144,7 +1144,16 @@ export class InvoiceController {
         clientTotals[client].volume += volume;
 
         doc.rect(30, itemY, 535, rowHeight).stroke();
-        doc.fontSize(7).text(item.description || "", colX.desc + 5, itemY + 5, { width: colWidths.desc - 10 });
+        doc.moveTo(colX.qty, itemY).lineTo(colX.qty, itemY + rowHeight).stroke();
+        doc.moveTo(colX.client, itemY).lineTo(colX.client, itemY + rowHeight).stroke();
+        doc.moveTo(colX.pack, itemY).lineTo(colX.pack, itemY + rowHeight).stroke();
+        doc.moveTo(colX.weight, itemY).lineTo(colX.weight, itemY + rowHeight).stroke();
+        doc.moveTo(colX.measure, itemY).lineTo(colX.measure, itemY + rowHeight).stroke();
+        doc.moveTo(colX.measure + colWidths.measure / 3, itemY).lineTo(colX.measure + colWidths.measure / 3, itemY + rowHeight).stroke();
+        doc.moveTo(colX.measure + (colWidths.measure / 3) * 2, itemY).lineTo(colX.measure + (colWidths.measure / 3) * 2, itemY + rowHeight).stroke();
+        doc.moveTo(colX.volume, itemY).lineTo(colX.volume, itemY + rowHeight).stroke();
+
+        doc.fillColor("#000000").fontSize(7).text(item.description || "", colX.desc + 5, itemY + 5, { width: colWidths.desc - 10 });
         doc.fontSize(8).text(item.qty?.toString() || "0", colX.qty, itemY + 8, { width: colWidths.qty, align: "center" });
         doc.text(client, colX.client, itemY + 8, { width: colWidths.client, align: "center" });
         doc.text(item.package || "", colX.pack, itemY + 8, { width: colWidths.pack, align: "center" });
@@ -1152,16 +1161,7 @@ export class InvoiceController {
         doc.text(item.length?.toString() || "0", colX.measure, itemY + 8, { width: colWidths.measure / 3, align: "center" });
         doc.text(item.width?.toString() || "0", colX.measure + colWidths.measure / 3, itemY + 8, { width: colWidths.measure / 3, align: "center" });
         doc.text(item.height?.toString() || "0", colX.measure + (colWidths.measure / 3) * 2, itemY + 8, { width: colWidths.measure / 3, align: "center" });
-        doc.text(volume.toFixed(2), colX.volume, itemY + 8, { width: colWidths.volume, align: "center" });
-
-        doc.moveTo(colX.qty, itemY).lineTo(colX.qty, itemY + rowHeight).stroke();
-        doc.moveTo(colX.client, itemY).lineTo(colX.client, itemY + rowHeight).stroke();
-        doc.moveTo(colX.pack, itemY).lineTo(colX.pack, itemY + rowHeight).stroke();
-        doc.moveTo(colX.weight, itemY).lineTo(colX.weight, itemY + rowHeight).stroke();
-        doc.moveTo(colX.measure, itemY).lineTo(colX.measure, itemY + rowHeight).stroke();
-        doc.moveTo(colX.measure + colWidths.measure / 3, itemY + 15).lineTo(colX.measure + colWidths.measure / 3, itemY + rowHeight).stroke();
-        doc.moveTo(colX.measure + (colWidths.measure / 3) * 2, itemY + 15).lineTo(colX.measure + (colWidths.measure / 3) * 2, itemY + rowHeight).stroke();
-        doc.moveTo(colX.volume, itemY).lineTo(colX.volume, itemY + rowHeight).stroke();
+        doc.text(volume.toFixed(3), colX.volume, itemY + 8, { width: colWidths.volume, align: "center" });
 
         itemY += rowHeight;
       }

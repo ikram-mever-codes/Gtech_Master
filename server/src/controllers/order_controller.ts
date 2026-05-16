@@ -429,8 +429,7 @@ export const getAllOrders = async (
       .leftJoinAndSelect("o.cargo", "cargo")
       .leftJoinAndSelect("cargo.customer", "cust")
       .leftJoinAndSelect("o.customer", "orderCust")
-      .orderBy("o.date_emailed", "DESC")
-      .addOrderBy("o.created_at", "DESC")
+      .orderBy("o.date_created", "DESC")
       .addOrderBy("o.id", "DESC")
       .addOrderBy("oi.id", "ASC");
 
