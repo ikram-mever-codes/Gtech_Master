@@ -258,45 +258,100 @@ export const getItems = async (
     const items = await queryBuilder.getMany();
 
     const itemIds = items.map((item) => item.id);
-    const parentIds = [...new Set(items.map((i) => i.parent_id).filter(Boolean) as number[])];
-    const taricIds = [...new Set(items.map((i) => i.taric_id).filter(Boolean) as number[])];
-    const catIds = [...new Set(items.map((i) => i.cat_id).filter(Boolean) as number[])];
-    const itemSupplierIds = [...new Set(items.map((i) => i.supplier_id).filter(Boolean) as number[])];
+    const parentIds = [
+      ...new Set(items.map((i) => i.parent_id).filter(Boolean) as number[]),
+    ];
+    const taricIds = [
+      ...new Set(items.map((i) => i.taric_id).filter(Boolean) as number[]),
+    ];
+    const catIds = [
+      ...new Set(items.map((i) => i.cat_id).filter(Boolean) as number[]),
+    ];
+    const itemSupplierIds = [
+      ...new Set(items.map((i) => i.supplier_id).filter(Boolean) as number[]),
+    ];
 
-    const [parents, tarics, cats, suppliersList, warehouseItems, supplierItems] = await Promise.all([
-      parentIds.length > 0 ? parentRepository.find({ where: { id: In(parentIds) }, select: ["id", "de_no", "name_de", "name_en", "name_cn"] }) : Promise.resolve([]),
-      taricIds.length > 0 ? taricRepository.find({ where: { id: In(taricIds) }, select: ["id", "code", "description_de"] }) : Promise.resolve([]),
-      catIds.length > 0 ? categoryRepository.find({ where: { id: In(catIds) }, select: ["id", "name"] }) : Promise.resolve([]),
-      itemSupplierIds.length > 0 ? supplierRepository.find({ where: { id: In(itemSupplierIds) }, select: ["id", "name", "company_name"] }) : Promise.resolve([]),
-      itemIds.length > 0 ? warehouseRepository.find({ 
-        where: [
-          { item_id: In(itemIds) },
-          { ItemID_DE: In(items.map(i => i.ItemID_DE).filter(Boolean) as number[]) }
-        ] 
-      }) : Promise.resolve([]),
-      itemIds.length > 0 ? AppDataSource.getRepository(SupplierItem).find({ where: { item_id: In(itemIds) } }) : Promise.resolve([])
+    const [
+      parents,
+      tarics,
+      cats,
+      suppliersList,
+      warehouseItems,
+      supplierItems,
+    ] = await Promise.all([
+      parentIds.length > 0
+        ? parentRepository.find({
+            where: { id: In(parentIds) },
+            select: ["id", "de_no", "name_de", "name_en", "name_cn"],
+          })
+        : Promise.resolve([]),
+      taricIds.length > 0
+        ? taricRepository.find({
+            where: { id: In(taricIds) },
+            select: ["id", "code", "description_de"],
+          })
+        : Promise.resolve([]),
+      catIds.length > 0
+        ? categoryRepository.find({
+            where: { id: In(catIds) },
+            select: ["id", "name"],
+          })
+        : Promise.resolve([]),
+      itemSupplierIds.length > 0
+        ? supplierRepository.find({
+            where: { id: In(itemSupplierIds) },
+            select: ["id", "name", "company_name"],
+          })
+        : Promise.resolve([]),
+      itemIds.length > 0
+        ? warehouseRepository.find({
+            where: [
+              { item_id: In(itemIds) },
+              {
+                ItemID_DE: In(
+                  items.map((i) => i.ItemID_DE).filter(Boolean) as number[],
+                ),
+              },
+            ],
+          })
+        : Promise.resolve([]),
+      itemIds.length > 0
+        ? AppDataSource.getRepository(SupplierItem).find({
+            where: { item_id: In(itemIds) },
+          })
+        : Promise.resolve([]),
     ]);
 
-    const parentMap = new Map(parents.map(p => [p.id, p]));
-    const taricMap = new Map(tarics.map(t => [t.id, t]));
-    const catMap = new Map(cats.map(c => [c.id, c]));
-    const supplierMap = new Map(suppliersList.map(s => [s.id, s]));
-    const rmbPriceMap = new Map(supplierItems.map(si => [si.item_id, si.price_rmb]));
-    const warehouseByItemId = new Map(warehouseItems.filter(wi => wi.item_id).map(wi => [wi.item_id, wi]));
-    const warehouseByItemIdDE = new Map(warehouseItems.filter(wi => wi.ItemID_DE).map(wi => [wi.ItemID_DE, wi]));
+    const parentMap = new Map(parents.map((p) => [p.id, p]));
+    const taricMap = new Map(tarics.map((t) => [t.id, t]));
+    const catMap = new Map(cats.map((c) => [c.id, c]));
+    const supplierMap = new Map(suppliersList.map((s) => [s.id, s]));
+    const rmbPriceMap = new Map(
+      supplierItems.map((si) => [si.item_id, si.price_rmb]),
+    );
+    const warehouseByItemId = new Map(
+      warehouseItems.filter((wi) => wi.item_id).map((wi) => [wi.item_id, wi]),
+    );
+    const warehouseByItemIdDE = new Map(
+      warehouseItems
+        .filter((wi) => wi.ItemID_DE)
+        .map((wi) => [wi.ItemID_DE, wi]),
+    );
 
-    const missingSupplierIds = items.filter(i => !i.supplier_id).map(i => i.id);
+    const missingSupplierIds = items
+      .filter((i) => !i.supplier_id)
+      .map((i) => i.id);
     const defaultSIMap = new Map<number, any>();
     if (missingSupplierIds.length > 0) {
       const defaultSIs = await AppDataSource.getRepository(SupplierItem).find({
         where: { item_id: In(missingSupplierIds), is_default: "Y" },
-        relations: ["supplier"]
+        relations: ["supplier"],
       });
       defaultSIs.forEach((si: any) => {
         defaultSIMap.set(si.item_id, {
           id: si.supplier_id,
           name: si.supplier?.name || null,
-          company_name: si.supplier?.company_name || null
+          company_name: si.supplier?.company_name || null,
         });
       });
     }
@@ -304,105 +359,17 @@ export const getItems = async (
     const formattedItems = items.map((item) => {
       const parentData = item.parent_id ? parentMap.get(item.parent_id) : null;
       const taricData = item.taric_id ? taricMap.get(item.taric_id) : null;
-      const warehouseData = (item.ItemID_DE ? warehouseByItemIdDE.get(item.ItemID_DE) : null) || warehouseByItemId.get(item.id) || null;
-      
-      let supplierData = item.supplier_id ? supplierMap.get(item.supplier_id) : defaultSIMap.get(item.id);
-      const effectiveSupplierId = item.supplier_id || defaultSIMap.get(item.id)?.id || null;
+      const warehouseData =
+        (item.ItemID_DE ? warehouseByItemIdDE.get(item.ItemID_DE) : null) ||
+        warehouseByItemId.get(item.id) ||
+        null;
 
-<<<<<<< HEAD
-        let taricData = null;
-        if (item.taric_id) {
-          taricData = await taricRepository.findOne({
-            where: { id: item.taric_id },
-            select: ["id", "code", "description_de"],
-          });
-        }
+      let supplierData = item.supplier_id
+        ? supplierMap.get(item.supplier_id)
+        : defaultSIMap.get(item.id);
+      const effectiveSupplierId =
+        item.supplier_id || defaultSIMap.get(item.id)?.id || null;
 
-        let categoryData = null;
-        if (item.cat_id) {
-          categoryData = await categoryRepository.findOne({
-            where: { id: item.cat_id },
-            select: ["id", "name"],
-          });
-        }
-
-        let supplierData: any = null;
-        const effectiveSupplierId = item.supplier_id || defaultSIMap.get(item.id)?.id || null;
-        if (item.supplier_id) {
-          supplierData = await supplierRepository.findOne({
-            where: { id: item.supplier_id },
-            select: ["id", "name", "company_name"],
-          });
-        } else if (defaultSIMap.has(item.id)) {
-          supplierData = defaultSIMap.get(item.id);
-        }
-
-        let warehouseData = null;
-        if (item.ItemID_DE) {
-          warehouseData = warehouseByItemIdDE.get(item.ItemID_DE);
-        }
-        if (!warehouseData) {
-          warehouseData = warehouseByItemId.get(item.id);
-        }
-
-        const ean = item.ean || warehouseData?.ean || null;
-        const rmbPrice = rmbPriceMap.get(item.id) || null;
-
-        return {
-          id: item.id,
-          de_no: warehouseData?.item_no_de || parentData?.de_no || null,
-          name_de: parentData?.name_de || null,
-          name_en: parentData?.name_en || null,
-          name_cn: parentData?.name_cn || null,
-          item_name: item.item_name,
-          item_name_cn: item.item_name_cn,
-          ean: ean,
-          ItemID_DE: item.ItemID_DE || null,
-          is_active: item.isActive,
-          parent_id: item.parent_id || null,
-          taric_id: item.taric_id || null,
-          category_id: item.cat_id || null,
-          category: item?.supp_cat || null,
-          supplier_id: effectiveSupplierId,
-          supplier_name:
-            supplierData?.company_name || supplierData?.name || null,
-          weight: item.weight,
-          length: item.length,
-          width: item.width,
-          height: item.height,
-          remark: item.remark,
-          model: item.model,
-          painPoints: item.painPoints || [],
-          taric_code: taricData?.code || null,
-          taric_description: taricData?.description_de || null,
-          is_updated: item.is_updated,
-          is_new: item.is_new,
-          rmb_price: rmbPrice,
-          price: item.price,
-          transfer_price_EUR: item.transfer_price_EUR,
-
-          warehouse_data: warehouseData
-            ? {
-                id: warehouseData.id,
-                item_no_de: warehouseData.item_no_de,
-                item_name_de: warehouseData.item_name_de,
-                item_name_en: warehouseData.item_name_en,
-                stock_qty: warehouseData.stock_qty,
-                msq: warehouseData.msq,
-                buffer: warehouseData.buffer,
-                is_stock_item: warehouseData.is_stock_item,
-                is_SnSI: warehouseData.is_SnSI,
-                ship_class: warehouseData.ship_class,
-              }
-            : null,
-
-          created_at: item.created_at,
-          updated_at: item.updated_at,
-          synced_at: (item as any).synced_at,
-        };
-      }),
-    );
-=======
       return {
         id: item.id,
         de_no: warehouseData?.item_no_de || parentData?.de_no || null,
@@ -434,19 +401,20 @@ export const getItems = async (
         rmb_price: rmbPriceMap.get(item.id) || null,
         price: item.price,
         transfer_price_EUR: item.transfer_price_EUR,
-        warehouse_data: warehouseData ? {
-          id: warehouseData.id,
-          item_no_de: warehouseData.item_no_de,
-          stock_qty: warehouseData.stock_qty,
-          msq: warehouseData.msq,
-          buffer: warehouseData.buffer,
-          is_stock_item: warehouseData.is_stock_item,
-        } : null,
+        warehouse_data: warehouseData
+          ? {
+              id: warehouseData.id,
+              item_no_de: warehouseData.item_no_de,
+              stock_qty: warehouseData.stock_qty,
+              msq: warehouseData.msq,
+              buffer: warehouseData.buffer,
+              is_stock_item: warehouseData.is_stock_item,
+            }
+          : null,
         created_at: item.created_at,
-        updated_at: item.updated_at
+        updated_at: item.updated_at,
       };
     });
->>>>>>> fe6c60ef93bb963240d9182acaf5ff2dfbe232dc
 
     const user = (req as AuthorizedRequest).user;
     const filteredData = filterDataByRole(
@@ -1137,7 +1105,11 @@ export const updateItem = async (
         currentRMBPrice = existingSI?.price_rmb || null;
       }
 
-      if (currentRMBPrice && req.body.price === undefined && req.body.transfer_price_EUR === undefined) {
+      if (
+        currentRMBPrice &&
+        req.body.price === undefined &&
+        req.body.transfer_price_EUR === undefined
+      ) {
         const calculated = calculateTransferPrice(
           Number(currentRMBPrice),
           category.name,
@@ -1217,7 +1189,10 @@ export const syncTransferPrices = async (
           sItem.price_rmb,
           item.category?.name || "STD",
         );
-        if (item.transfer_price_EUR !== newTransferPrice || item.price !== newTransferPrice) {
+        if (
+          item.transfer_price_EUR !== newTransferPrice ||
+          item.price !== newTransferPrice
+        ) {
           item.transfer_price_EUR = newTransferPrice;
           item.price = newTransferPrice;
           item.is_updated = true;
