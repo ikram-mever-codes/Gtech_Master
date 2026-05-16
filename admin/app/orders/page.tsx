@@ -1196,7 +1196,9 @@ const OrderPage: React.FC = () => {
         if (item.supplier_order_id) return;
         const rawStatus = (item.status || "").trim().toUpperCase();
         if (rawStatus && rawStatus !== "NSO" && rawStatus !== "SO") return;
-        const itemDetails = itemById.get(String(item.item_id));
+        
+        // Optimize: Use embedded item data if present to avoid waiting for fetchAllItems
+        const itemDetails = item.item || itemById.get(String(item.item_id));
 
         let sId = 0;
         const o_sid = String(o.supplier_id || "0");
@@ -2227,7 +2229,15 @@ const OrderPage: React.FC = () => {
 
           <div className="bg-white rounded-[4px] shadow-lg border border-gray-200 overflow-hidden">
             {activeTab === "nso" ? (
-              <div className="p-4 bg-gray-50/30 min-h-[600px]">
+              <div className="p-4 bg-gray-50/30 min-h-[600px] relative">
+                {loadingOrders && (
+                  <div className="absolute inset-0 z-50 bg-white/60 backdrop-blur-[2px] flex flex-col items-center justify-center gap-4 transition-all duration-300">
+                    <div className="w-12 h-12 border-4 border-gray-200 border-t-[#059669] rounded-full animate-spin shadow-lg"></div>
+                    <p className="text-sm font-bold text-gray-600 animate-pulse uppercase tracking-widest">
+                      Processing NSO Data...
+                    </p>
+                  </div>
+                )}
                 <div className="flex items-center justify-between mb-8 px-4">
                   <button
                     onClick={() => setActiveTab("orders")}
@@ -2272,7 +2282,7 @@ const OrderPage: React.FC = () => {
                           </thead>
                           <tbody className="bg-white">
                             {row.items.map((it: any, idx: number) => {
-                              const d = itemById.get(String(it.item_id));
+                              const d = it.item || itemById.get(String(it.item_id));
                               const name =
                                 d?.item_name ||
                                 d?.name ||
@@ -2391,7 +2401,7 @@ const OrderPage: React.FC = () => {
                             },
                           ]}
                           loading={loadingOrders}
-                          emptyMessage="No Express NSOs found"
+                          emptyMessage={loadingOrders ? "Loading NSO Data..." : "No Express NSOs found"}
                           getRowClassName={() => "bg-red-50"}
                           expandedRowId={expandedNsoId}
                           onRowClick={(row) =>
@@ -2472,7 +2482,7 @@ const OrderPage: React.FC = () => {
                             },
                           ]}
                           loading={loadingOrders}
-                          emptyMessage="No Normal NSOs found"
+                          emptyMessage={loadingOrders ? "Loading NSO Data..." : "No Normal NSOs found"}
                           expandedRowId={expandedNsoId}
                           onRowClick={(row) =>
                             setExpandedNsoId(
