@@ -10,7 +10,7 @@ import {
   ChevronDown,
   Save,
 } from "lucide-react";
-import { getAllInvoices, updatePackingList, downloadPackingList } from "@/api/invoice";
+import { getAllInvoices, updatePackingList, downloadPackingList, getExpandedInvoiceDetails } from "@/api/invoice";
 import { toast } from "react-hot-toast";
 
 interface PackingListData {
@@ -71,25 +71,61 @@ const PackingListTab: React.FC = () => {
     );
   });
 
-  const handleEditClick = (invoice: PackingListData) => {
+  const handleEditClick = async (invoice: PackingListData) => {
     if (editingId === invoice.id) {
       setEditingId(null);
       setEditItems([]);
       return;
     }
-    if (invoice.packingListData && Array.isArray(invoice.packingListData)) {
+
+    if (invoice.packingListData && Array.isArray(invoice.packingListData) && invoice.packingListData.length > 0) {
       setEditItems(invoice.packingListData);
-    } else {
+      setEditingId(invoice.id);
+      return;
+    }
+    const extractClients = (comment: string): string => {
+      if (!comment) return "";
+      const tokens: string[] = [];
+      const gtechMatch = comment.match(/\b(GTECH-[A-Z0-9]+)\b/i);
+      if (gtechMatch) tokens.push(gtechMatch[1].toUpperCase());
+      const kMatch = comment.match(/\b(K0\d{2,})\b/i);
+      if (kMatch) tokens.push(kMatch[1].toUpperCase());
+      return tokens.join(" / ");
+    };
+
+    const clientNumber = extractClients(invoice.orderComment || "");
+
+    try {
+      setLoading(true);
+      let expandedItems: any[] = [];
+      try {
+        const expanded = await getExpandedInvoiceDetails(invoice.id);
+        if (expanded?.data?.detailedItems) {
+          expandedItems = expanded.data.detailedItems;
+        }
+      } catch (e) {
+        console.warn("Could not load expanded details, falling back to invoice items", e);
+      }
+
+      const taricDescMap = new Map<number, string>();
+      expandedItems.forEach((oi: any) => {
+        const desc = oi.item?.taric?.description_en || "";
+        if (oi.id && desc) taricDescMap.set(Number(oi.id), desc);
+      });
+
       const items: PackingItem[] = (invoice.items || []).map((it: any, idx: number) => {
-        const baseName = it.description || it.item?.item_name || "Unknown";
-        const remark = it.item?.remark || it.remark_de || invoice.orderComment || "";
-        const description = remark ? `${baseName} - ${remark}` : baseName;
+        const expandedMatch = expandedItems.find((ei: any) => Number(ei.id) === Number(it.id || it.order_item_id));
+        const taricDescEn = expandedMatch?.item?.taric?.description_en
+          || expandedMatch?.item?.taric?.name_en
+          || "";
+        const fallbackName = it.description || it.item?.item_name || "Unknown";
+        const description = taricDescEn || fallbackName;
 
         return {
           id: it.id || idx,
-          description: description,
+          description,
           qty: Number(it.quantity || it.qty || 0),
-          client: it.item?.customer?.companyName || invoice.customer?.companyName || "",
+          client: clientNumber,
           package: `P${idx + 1}`,
           pType: "Tray",
           weight: Number(it.item?.weight || 0),
@@ -99,6 +135,11 @@ const PackingListTab: React.FC = () => {
         };
       });
       setEditItems(items);
+    } catch (error) {
+      console.error("Failed to load packing list items:", error);
+      toast.error("Failed to load items");
+    } finally {
+      setLoading(false);
     }
     setEditingId(invoice.id);
   };

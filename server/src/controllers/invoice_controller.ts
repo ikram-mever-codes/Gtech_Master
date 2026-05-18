@@ -161,9 +161,7 @@ export class InvoiceController {
         yPos += 12;
         doc.text("Shop:", rightAlignX, yPos);
         doc.text(companyInfo.website, rightAlignX + 50, yPos);
-
         yPos = 180;
-
         doc.fontSize(8).font("Helvetica");
         doc.fillColor("#666666");
         doc.text(
@@ -655,6 +653,20 @@ export class InvoiceController {
         }
       });
 
+      const allCargoIds = allCargos.map(c => c.id).filter(Boolean);
+      const cargoCommentMap = new Map<string, string>();
+      if (allCargoIds.length > 0) {
+        const allCargoOrders = await AppDataSource.getRepository(CargoOrder).find({
+          where: { cargo_id: In(allCargoIds) },
+          relations: ["cargo", "order"],
+        });
+        allCargoOrders.forEach((co) => {
+          if (co.cargo?.cargo_no && co.order?.comment && !cargoCommentMap.has(co.cargo.cargo_no)) {
+            cargoCommentMap.set(co.cargo.cargo_no, co.order.comment);
+          }
+        });
+      }
+
       const orderItemsRaw = await AppDataSource.manager.query(`
         SELECT 
           oi.order_id, 
@@ -722,7 +734,11 @@ export class InvoiceController {
         const cargoNo = cargo?.cargo_no || (inv.orderNumber && !orderIdMap.has(inv.orderNumber) ? inv.orderNumber : undefined);
 
         const order = orders.find(o => o.order_no === inv.orderNumber);
-        const orderComment = order?.comment || "";
+        const orderComment =
+          order?.comment ||
+          cargoCommentMap.get(cargo?.cargo_no || "") ||
+          cargoCommentMap.get(inv.orderNumber || "") ||
+          "";
 
         return {
           ...inv,
@@ -1025,6 +1041,9 @@ export class InvoiceController {
 
   static downloadPackingListPDF = async (req: Request, res: Response, next: NextFunction) => {
     const invoiceRepository = AppDataSource.getRepository(Invoice);
+    const orderRepository = AppDataSource.getRepository(Order);
+    const cargoRepository = AppDataSource.getRepository(Cargo);
+    const orderItemRepository = AppDataSource.getRepository(OrderItem);
     try {
       const { id } = req.params;
       const invoice = await invoiceRepository.findOne({
@@ -1041,7 +1060,77 @@ export class InvoiceController {
       res.setHeader("Content-type", "application/pdf");
       doc.pipe(res);
 
-      const items = invoice.packingListData || [];
+      let items: any[] = [];
+      let orderComment = "";
+
+      if (invoice.packingListData && Array.isArray(invoice.packingListData) && invoice.packingListData.length > 0) {
+        items = invoice.packingListData;
+      } else {
+        const orderNumber = invoice.orderNumber;
+        let orderItems: any[] = [];
+
+        const cargo = await cargoRepository.findOne({ where: { cargo_no: orderNumber } });
+        if (cargo) {
+          orderItems = await orderItemRepository.find({
+            where: { cargo_id: cargo.id },
+            relations: ["item", "item.taric", "order"],
+          });
+        } else {
+          const order = await orderRepository.findOne({ where: { order_no: orderNumber } });
+          if (order) {
+            orderComment = order.comment || "";
+            orderItems = await orderItemRepository.find({
+              where: { order_id: order.id },
+              relations: ["item", "item.taric", "order"],
+            });
+          }
+        }
+
+        if (!orderComment && orderItems.length > 0) {
+          orderComment = orderItems.find((oi: any) => oi.order?.comment)?.order?.comment || "";
+          if (!orderComment) {
+            const distinctOrderIds = [...new Set(orderItems.map((oi: any) => oi.order_id).filter(Boolean))];
+            if (distinctOrderIds.length > 0) {
+              const relatedOrders = await orderRepository.find({ where: { id: In(distinctOrderIds as number[]) } });
+              orderComment = relatedOrders.find((o: any) => o.comment)?.comment || "";
+            }
+          }
+        }
+
+        items = orderItems.map((oi: any, idx: number) => {
+          const item = oi.item;
+          const taric = item?.taric;
+          const desc = taric?.description_en || taric?.name_en || item?.item_name || "";
+          return {
+            id: oi.id || idx,
+            description: desc,
+            qty: Number(oi.qty || 0),
+            client: "",
+            package: `P${idx + 1}`,
+            pType: "Tray",
+            weight: Number(item?.weight || 0),
+            length: Number(item?.length || 0),
+            width: Number(item?.width || 0),
+            height: Number(item?.height || 0),
+          };
+        });
+      }
+
+      const extractClients = (comment: string): string => {
+        if (!comment) return "";
+        const tokens: string[] = [];
+        const gtechMatch = comment.match(/\b(GTECH-[A-Z0-9]+)\b/i);
+        if (gtechMatch) tokens.push(gtechMatch[1].toUpperCase());
+        const kMatch = comment.match(/\b(K0\d{2,})\b/i);
+        if (kMatch) tokens.push(kMatch[1].toUpperCase());
+        return tokens.join(" / ");
+      };
+
+      const derivedClient = extractClients(orderComment);
+      if (derivedClient) {
+        items = items.map((it: any) => ({ ...it, client: it.client || derivedClient }));
+      }
+
       const cargoNo = invoice.orderNumber || "N/A";
       const dateStr = new Date(invoice.invoiceDate).toISOString().split("T")[0];
 
@@ -1050,38 +1139,42 @@ export class InvoiceController {
 
       doc.rect(30, 50, 535, 15).stroke();
       doc.fontSize(8).font("Helvetica").text("Yongxin Road, Bowang Town, Bowang, Maanshan, Anhui, China", 30, 54, { align: "center", width: 535 });
-
       doc.rect(30, 65, 535, 15).fillAndStroke("#f0f0f0", "#000000");
       doc.fillColor("#000000").fontSize(9).font("Helvetica-Bold").text("Packing List", 30, 69, { align: "center", width: 535 });
       doc.fillColor("#000000");
-      doc.rect(30, 80, 420, 15).stroke();
-      doc.fontSize(8).font("Helvetica-Bold").text("Buyer:", 35, 87);
-      doc.moveTo(70, 80).lineTo(70, 95).stroke();
 
-      doc.rect(450, 80, 115, 15).stroke();
-      doc.text("Invoice No.:", 455, 87);
-      doc.moveTo(505, 80).lineTo(505, 95).stroke();
-      doc.font("Helvetica").text(invoice.invoiceNumber, 510, 88);
+      const RX = 430;
+      const RL = 60;
+      const RV = 75;
+      const RW = RL + RV;
+      const LW = 535 - RW;
+      doc.rect(30, 80, LW, 15).stroke();
+      doc.fontSize(8).font("Helvetica-Bold").text("Buyer:", 35, 84);
+      doc.moveTo(75, 80).lineTo(75, 95).stroke();
+      doc.rect(RX, 80, RW, 15).stroke();
+      doc.text("Invoice No.:", RX + 3, 84, { width: RL - 3 });
+      doc.moveTo(RX + RL, 80).lineTo(RX + RL, 95).stroke();
+      doc.font("Helvetica").fontSize(7.5).text(invoice.invoiceNumber, RX + RL + 3, 84, { width: RV - 5 });
 
-      doc.rect(30, 95, 420, 20).stroke();
+      doc.rect(30, 95, LW, 20).stroke();
       doc.fillColor("#000000").fontSize(8).font("Helvetica").text("GTech Industries GmbH", 35, 101);
 
-      doc.rect(450, 95, 115, 20).stroke();
-      doc.fillColor("#000000").font("Helvetica-Bold").text("Cargo No.", 455, 101);
-      doc.moveTo(505, 95).lineTo(505, 115).stroke();
-      doc.font("Helvetica").text(cargoNo, 510, 101);
+      doc.rect(RX, 95, RW, 20).stroke();
+      doc.fillColor("#000000").font("Helvetica-Bold").fontSize(8).text("Cargo No.", RX + 3, 101, { width: RL - 3 });
+      doc.moveTo(RX + RL, 95).lineTo(RX + RL, 115).stroke();
+      doc.font("Helvetica").fontSize(7.5).text(cargoNo, RX + RL + 3, 101, { width: RV - 5 });
 
-      doc.rect(30, 115, 420, 15).stroke();
-      doc.text("Reichshofstr. 137 58239 Schwerte Germany, Tel: +4923043389510", 35, 119);
+      doc.rect(30, 115, LW, 15).stroke();
+      doc.fontSize(8).text("Reichshofstr. 137 58239 Schwerte Germany, Tel: +4923043389510", 35, 119);
 
-      doc.rect(450, 115, 115, 15).stroke();
-      doc.font("Helvetica-Bold").text("Date:", 455, 119);
-      doc.moveTo(505, 115).lineTo(505, 130).stroke();
-      doc.font("Helvetica").text(dateStr, 510, 119);
+      doc.rect(RX, 115, RW, 15).stroke();
+      doc.font("Helvetica-Bold").fontSize(8).text("Date:", RX + 3, 119, { width: RL - 3 });
+      doc.moveTo(RX + RL, 115).lineTo(RX + RL, 130).stroke();
+      doc.font("Helvetica").fontSize(8).text(dateStr, RX + RL + 3, 119, { width: RV - 5 });
 
-      doc.rect(30, 130, 420, 15).stroke();
+      doc.rect(30, 130, LW, 15).stroke();
       doc.text("Mr. Markus Entner", 35, 134);
-      doc.rect(450, 130, 115, 15).stroke();
+      doc.rect(RX, 130, RW, 15).stroke();
 
       let itemY = 155;
       const colWidths = { desc: 215, qty: 35, client: 45, pack: 55, weight: 60, measure: 65, volume: 55 };
@@ -1124,7 +1217,7 @@ export class InvoiceController {
       let totalQty = 0;
       let grandTotalWeight = 0;
       let grandTotalVolume = 0;
-      const clientTotals: Record<string, { weight: number, volume: number }> = {};
+      const clientTotals: Record<string, { weight: number, volume: number, label: string }> = {};
 
       for (const item of items) {
         const rowHeight = 25;
@@ -1133,15 +1226,21 @@ export class InvoiceController {
           itemY = 50;
         }
 
-        const volume = (Number(item.qty || 0) * Number(item.length || 0) * Number(item.width || 0) * Number(item.height || 0)) / 1000000;
-        totalQty += Number(item.qty || 0);
-        grandTotalWeight += Number(item.weight || 0);
+        const qty = Number(item.qty || 0);
+        const wt = Number(item.weight || 0);
+        const len = Number(item.length || 0);
+        const wid = Number(item.width || 0);
+        const ht = Number(item.height || 0);
+        const volume = (qty * len * wid * ht) / 1_000_000;
+        totalQty += qty;
+        grandTotalWeight += wt;
         grandTotalVolume += volume;
 
-        const client = item.client || "N/A";
-        if (!clientTotals[client]) clientTotals[client] = { weight: 0, volume: 0 };
-        clientTotals[client].weight += Number(item.weight || 0);
-        clientTotals[client].volume += volume;
+        const client = (item.client && item.client.trim()) ? item.client.trim() : "";
+        const clientKey = client || "__unknown__";
+        if (!clientTotals[clientKey]) clientTotals[clientKey] = { weight: 0, volume: 0, label: client };
+        clientTotals[clientKey].weight += wt;
+        clientTotals[clientKey].volume += volume;
 
         doc.rect(30, itemY, 535, rowHeight).stroke();
         doc.moveTo(colX.qty, itemY).lineTo(colX.qty, itemY + rowHeight).stroke();
@@ -1153,46 +1252,85 @@ export class InvoiceController {
         doc.moveTo(colX.measure + (colWidths.measure / 3) * 2, itemY).lineTo(colX.measure + (colWidths.measure / 3) * 2, itemY + rowHeight).stroke();
         doc.moveTo(colX.volume, itemY).lineTo(colX.volume, itemY + rowHeight).stroke();
 
-        doc.fillColor("#000000").fontSize(7).text(item.description || "", colX.desc + 5, itemY + 5, { width: colWidths.desc - 10 });
-        doc.fontSize(8).text(item.qty?.toString() || "0", colX.qty, itemY + 8, { width: colWidths.qty, align: "center" });
-        doc.text(client, colX.client, itemY + 8, { width: colWidths.client, align: "center" });
-        doc.text(item.package || "", colX.pack, itemY + 8, { width: colWidths.pack, align: "center" });
-        doc.text(item.weight?.toString() || "0", colX.weight, itemY + 8, { width: colWidths.weight, align: "center" });
-        doc.text(item.length?.toString() || "0", colX.measure, itemY + 8, { width: colWidths.measure / 3, align: "center" });
-        doc.text(item.width?.toString() || "0", colX.measure + colWidths.measure / 3, itemY + 8, { width: colWidths.measure / 3, align: "center" });
-        doc.text(item.height?.toString() || "0", colX.measure + (colWidths.measure / 3) * 2, itemY + 8, { width: colWidths.measure / 3, align: "center" });
-        doc.text(volume.toFixed(3), colX.volume, itemY + 8, { width: colWidths.volume, align: "center" });
+        const textY = itemY + 8;
+        doc.fillColor("#000000").fontSize(7);
+        doc.text(item.description || "", colX.desc + 4, itemY + 5, { width: colWidths.desc - 8, lineBreak: true });
+        doc.fontSize(8);
+        const fmt2 = (n: number) => n > 0 ? parseFloat(n.toFixed(2)).toString() : "";
+        doc.text(qty > 0 ? qty.toString() : "",
+          colX.qty, textY, { width: colWidths.qty, align: "center" });
+        doc.text(client,
+          colX.client, textY, { width: colWidths.client, align: "center" });
+        doc.text(item.package || "",
+          colX.pack, textY, { width: colWidths.pack, align: "center" });
+        doc.text(wt > 0 ? parseFloat(wt.toFixed(2)).toString() : "",
+          colX.weight, textY, { width: colWidths.weight, align: "center" });
+        doc.text(fmt2(len),
+          colX.measure, textY, { width: colWidths.measure / 3, align: "center" });
+        doc.text(fmt2(wid),
+          colX.measure + colWidths.measure / 3, textY, { width: colWidths.measure / 3, align: "center" });
+        doc.text(fmt2(ht),
+          colX.measure + (colWidths.measure / 3) * 2, textY, { width: colWidths.measure / 3, align: "center" });
+        doc.text(volume > 0 ? volume.toFixed(3) : "",
+          colX.volume, textY, { width: colWidths.volume, align: "center" });
 
         itemY += rowHeight;
       }
 
-      const clients = Object.keys(clientTotals);
-      const totalsRowHeight = clients.length * 15;
+      const clientKeys = Object.keys(clientTotals).filter(k => k !== "__unknown__");
+      const namedClients = clientKeys.map(k => ({ key: k, ...clientTotals[k] }));
+
+      const totalsRowHeight = (namedClients.length > 0 ? namedClients.length : 1) * 15;
       doc.rect(30, itemY, 535, totalsRowHeight + 15).stroke();
-      doc.font("Helvetica-Bold").text("Total", 30, itemY + 5, { width: colWidths.desc, align: "center" });
+      doc.moveTo(colX.qty, itemY).lineTo(colX.qty, itemY + totalsRowHeight + 15).stroke();
+      doc.moveTo(colX.client, itemY).lineTo(colX.client, itemY + totalsRowHeight + 15).stroke();
+      doc.moveTo(colX.pack, itemY).lineTo(colX.pack, itemY + totalsRowHeight + 15).stroke();
+      doc.moveTo(colX.weight, itemY).lineTo(colX.weight, itemY + totalsRowHeight + 15).stroke();
+      doc.moveTo(colX.measure, itemY).lineTo(colX.measure, itemY + totalsRowHeight + 15).stroke();
+      doc.moveTo(colX.measure + colWidths.measure / 3, itemY).lineTo(colX.measure + colWidths.measure / 3, itemY + totalsRowHeight + 15).stroke();
+      doc.moveTo(colX.measure + (colWidths.measure / 3) * 2, itemY).lineTo(colX.measure + (colWidths.measure / 3) * 2, itemY + totalsRowHeight + 15).stroke();
+      doc.moveTo(colX.volume, itemY).lineTo(colX.volume, itemY + totalsRowHeight + 15).stroke();
+
+      doc.font("Helvetica-Bold").fontSize(8);
+      doc.text("Total", colX.desc, itemY + 5, { width: colWidths.desc, align: "center" });
       doc.text(totalQty.toString(), colX.qty, itemY + 5, { width: colWidths.qty, align: "center" });
 
       let currentY = itemY;
-      clients.forEach((client, idx) => {
-        doc.fontSize(8).text(client, colX.client, currentY + 5, { width: colWidths.client, align: "center" });
-        doc.text(`${clientTotals[client].weight.toFixed(2)} kg`, colX.weight, currentY + 5, { width: colWidths.weight, align: "center" });
-        doc.text(`${clientTotals[client].volume.toFixed(2)} m³`, colX.volume, currentY + 5, { width: colWidths.volume, align: "center" });
+      namedClients.forEach((c) => {
+        doc.fontSize(8).font("Helvetica-Bold");
+        doc.text(c.label, colX.client, currentY + 5, { width: colWidths.client, align: "center" });
+        doc.font("Helvetica");
+        doc.text(`${c.weight.toFixed(2)} kg`, colX.weight, currentY + 5, { width: colWidths.weight, align: "center" });
+        doc.text(`${c.volume.toFixed(2)} m³`, colX.volume, currentY + 5, { width: colWidths.volume, align: "center" });
         doc.moveTo(colX.client, currentY).lineTo(565, currentY).stroke();
         currentY += 15;
       });
 
       doc.rect(colX.client, currentY, 565 - colX.client, 15).fillAndStroke("#f0f0f0", "#000000");
-      doc.fillColor("#000000").text("Total", colX.client, currentY + 4, { width: colWidths.client, align: "center" });
+      doc.fillColor("#000000").font("Helvetica-Bold").fontSize(8);
+      doc.text("Total", colX.client, currentY + 4, { width: colWidths.client, align: "center" });
+      doc.font("Helvetica");
       doc.text(`${grandTotalWeight.toFixed(2)} kg`, colX.weight, currentY + 4, { width: colWidths.weight, align: "center" });
       doc.text(`${grandTotalVolume.toFixed(2)} m³`, colX.volume, currentY + 4, { width: colWidths.volume, align: "center" });
 
-      itemY = currentY + 20;
+      itemY = currentY + 15;
       doc.rect(30, itemY, 535, 15).stroke();
-      doc.fontSize(8).font("Helvetica-Bold").text(`No. of packages: ${items.length}`, 35, itemY + 4);
+      doc.fontSize(8).font("Helvetica-Bold");
+      const uniquePackages = [...new Set(items.map((i: any) => i.package).filter(Boolean))];
+      const pTypeCount = items.reduce((acc: Record<string, number>, i: any) => {
+        if (i.pType) acc[i.pType] = (acc[i.pType] || 0) + 1;
+        return acc;
+      }, {});
+      const pTypeSummary = Object.entries(pTypeCount).map(([t, n]) => `${n} ${t}`).join(" + ");
+      const pkgText = pTypeSummary ? `${uniquePackages.length} (${pTypeSummary})` : `${uniquePackages.length}`;
+      doc.text(`No. of packages: ${pkgText}`, 35, itemY + 4);
 
       itemY += 15;
       doc.rect(30, itemY, 535, 15).stroke();
-      const shippingMarks = clients.join(", ");
+      const uniqueClientLabels = [...new Set(
+        namedClients.map(c => c.label).filter(Boolean)
+      )];
+      const shippingMarks = uniqueClientLabels.join(", ");
       doc.text(`Shipping Marks: ${shippingMarks}`, 35, itemY + 4);
 
       itemY += 15;
