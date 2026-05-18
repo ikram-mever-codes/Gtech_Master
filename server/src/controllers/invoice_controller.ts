@@ -742,6 +742,7 @@ export class InvoiceController {
 
         return {
           ...inv,
+          grossTotal: calculatedGrossTotal,
           bill_to: "GTech-Warehouse",
           ship_to:
             cargo?.ship_to_company_name ||
