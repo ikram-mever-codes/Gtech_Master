@@ -1279,28 +1279,62 @@ export const generateCommercialInvoicePDF = async (
     const grandTotal = (subTotal + freightCost).toFixed(2);
     const customer = invoice.customer;
 
-    const rawBillName = cargo?.bill_to_display_name || cargo?.bill_to_company_name || customer?.companyName || "N/A";
-    const billToName = rawBillName.replace(/^GTech$/i, "GTech Industries GmbH");
+    const hasCargoBillTo = !!(cargo?.bill_to_display_name || cargo?.bill_to_company_name);
+
+    const rawBillName = hasCargoBillTo
+      ? (cargo!.bill_to_display_name || cargo!.bill_to_company_name || "")
+      : (cargo?.ship_to_display_name || cargo?.ship_to_company_name || customer?.companyName || "");
+    const billToName = rawBillName
+      .replace(/^GTech$/i, "GTech Industries GmbH")
+      .replace(/^GTech[-\s]?Warehouse$/i, "GTech Industries GmbH") ||
+      "GTech Industries GmbH";
+
+    const billToStreet = hasCargoBillTo
+      ? (cargo?.bill_to_full_address || customer?.addressLine1 || "")
+      : (cargo?.ship_to_full_address || customer?.addressLine1 || "");
+    const billToCity = hasCargoBillTo
+      ? (cargo?.bill_to_city ? `${cargo.bill_to_postal_code || ""} ${cargo.bill_to_city}` : `${customer?.postalCode || ""} ${customer?.city || ""}`)
+      : (cargo?.ship_to_city ? `${cargo.ship_to_postal_code || ""} ${cargo.ship_to_city}` : `${customer?.postalCode || ""} ${customer?.city || ""}`);
+    const billToCountry = hasCargoBillTo
+      ? (cargo?.bill_to_country || customer?.country || "Germany")
+      : (cargo?.ship_to_country || customer?.country || "Germany");
+    const billToPhone = hasCargoBillTo
+      ? (cargo?.bill_to_phone_no || customer?.contactPhoneNumber || "")
+      : (cargo?.ship_to_contact_phone || customer?.contactPhoneNumber || "");
+    const billToEori = hasCargoBillTo
+      ? (cargo?.bill_to_tax_no || customer?.taxNumber || "")
+      : (customer?.taxNumber || "");
+
+    const shipToCompany = cargo?.ship_to_display_name || cargo?.ship_to_company_name || customer?.companyName || "";
+    const shipToStreet = cargo?.ship_to_full_address || customer?.addressLine1 || "";
+
+    const customerID: string = (() => {
+      if ((customer as any)?.businessDetails?.customerNumber)
+        return String((customer as any).businessDetails.customerNumber);
+      if (customer?.id)
+        return (parseInt(customer.id.replace(/-/g, "").substring(0, 8), 16) % 100000).toString().padStart(5, "0");
+      return "";
+    })();
 
     const data = {
-      invoiceNo: (invoice.invoiceNumber || "N/A").replace(/-/g, ""),
-      date: invoice.invoiceDate ? new Date(invoice.invoiceDate).toISOString().split("T")[0] : "N/A",
-      cargoNo: invoice.orderNumber || "N/A",
-      customerID: customer ? (parseInt(customer.id.split("-")[0], 16) % 10000).toString() : "N/A",
+      invoiceNo: (invoice.invoiceNumber || "").replace(/-/g, ""),
+      date: invoice.invoiceDate ? new Date(invoice.invoiceDate).toISOString().split("T")[0] : "",
+      cargoNo: cargo?.cargo_no || invoice.orderNumber || "",
+      customerID,
       billTo: {
         name: billToName,
-        street: cargo?.bill_to_full_address || customer?.addressLine1 || "",
-        city: cargo?.bill_to_city ? `${cargo.bill_to_postal_code || ""} ${cargo.bill_to_city}` : `${customer?.postalCode || ""} ${customer?.city || ""}`,
-        country: cargo?.bill_to_country || customer?.country || "Germany",
-        phone: cargo?.bill_to_phone_no || customer?.contactPhoneNumber || "",
-        eori: cargo?.bill_to_tax_no || customer?.taxNumber || "",
+        street: billToStreet,
+        city: billToCity,
+        country: billToCountry,
+        phone: billToPhone,
+        eori: billToEori,
       },
       shipTo: {
-        company: cargo?.ship_to_display_name || cargo?.ship_to_company_name || customer?.companyName || "N/A",
-        contact: cargo?.ship_to_contact_person || "-",
-        street: cargo?.ship_to_full_address || customer?.addressLine1 || "",
+        company: shipToCompany,
+        contact: cargo?.ship_to_contact_person || "",
+        street: shipToStreet,
         city: cargo?.ship_to_city ? `${cargo.ship_to_postal_code || ""} ${cargo.ship_to_city}` : `${customer?.postalCode || ""} ${customer?.city || ""}`,
-        country: cargo?.ship_to_country || customer?.country || "Germany",
+        country: cargo?.ship_to_country || customer?.country || "",
         phone: cargo?.ship_to_contact_phone || customer?.contactPhoneNumber || "",
       },
     };
@@ -1342,33 +1376,66 @@ export const generateCommercialInvoicePDF = async (
       }
     }
 
+    const GTECH_GMBH = {
+      name: "GTech Industries GmbH",
+      street: "Reichshofstr. 137",
+      city: "58239 Schwerte",
+      country: "Germany",
+      phone: "+4923043389510",
+      eori: "DE977540238364617",
+    };
+    const isGTechBillTo = data.billTo.name === "GTech Industries GmbH";
 
-    const isSameAddr = data.billTo.name === data.shipTo.company && data.billTo.street === data.shipTo.street;
+    const isSameAddr = !hasCargoBillTo ||
+      (data.billTo.name === data.shipTo.company && data.billTo.street === data.shipTo.street);
     const addrY = 125;
     if (isSameAddr) {
-      doc.fillColor("black").font("Helvetica-Bold").fontSize(11).text(data.billTo.name, 40, addrY);
+      const bName = isGTechBillTo ? GTECH_GMBH.name : data.billTo.name;
+      const bStreet = isGTechBillTo ? GTECH_GMBH.street : data.billTo.street;
+      const bCity = isGTechBillTo ? GTECH_GMBH.city : data.billTo.city;
+      const bCountry = isGTechBillTo ? GTECH_GMBH.country : data.billTo.country;
+      const bPhone = isGTechBillTo ? GTECH_GMBH.phone : data.billTo.phone;
+      const bEori = isGTechBillTo ? GTECH_GMBH.eori : data.billTo.eori;
+
+      doc.fillColor("black").font("Helvetica-Bold").fontSize(11).text(bName, 40, addrY);
       doc.font("Helvetica").fontSize(10)
-        .text(data.billTo.street, 40, addrY + 15).text(data.billTo.city, 40, addrY + 28)
-        .text(data.billTo.country, 40, addrY + 41).text(data.billTo.phone, 40, addrY + 55);
-      doc.font("Helvetica-Bold").text(`EORI: ${data.billTo.eori}`, 40, addrY + 69);
+        .text(bStreet, 40, addrY + 15)
+        .text(bCity, 40, addrY + 28)
+        .text(bCountry, 40, addrY + 41)
+        .text(bPhone, 40, addrY + 55);
+      doc.font("Helvetica-Bold").text(`EORI: ${bEori}`, 40, addrY + 69);
     } else {
+      const bName = isGTechBillTo ? GTECH_GMBH.name : data.billTo.name;
+      const bStreet = isGTechBillTo ? GTECH_GMBH.street : data.billTo.street;
+      const bCity = isGTechBillTo ? GTECH_GMBH.city : data.billTo.city;
+      const bCountry = isGTechBillTo ? GTECH_GMBH.country : data.billTo.country;
+      const bPhone = isGTechBillTo ? GTECH_GMBH.phone : data.billTo.phone;
+      const bEori = isGTechBillTo ? GTECH_GMBH.eori : data.billTo.eori;
+
       doc.fillColor("black").font("Helvetica-Bold").fontSize(10.5).text("BILL TO:", 40, addrY - 3).text("SHIP TO:", 240, addrY - 3);
-      doc.font("Helvetica-Bold").fontSize(11).text(data.billTo.name, 40, addrY + 13);
+      doc.font("Helvetica-Bold").fontSize(11).text(bName, 40, addrY + 13);
       doc.font("Helvetica").fontSize(10)
-        .text(data.billTo.street, 40, addrY + 33).text(data.billTo.city, 40, addrY + 46)
-        .text(data.billTo.country, 40, addrY + 59).text(data.billTo.phone, 40, addrY + 73);
-      doc.font("Helvetica-Bold").text(`EORI: ${data.billTo.eori}`, 40, addrY + 87);
+        .text(bStreet, 40, addrY + 33)
+        .text(bCity, 40, addrY + 46)
+        .text(bCountry, 40, addrY + 59)
+        .text(bPhone, 40, addrY + 73);
+      doc.font("Helvetica-Bold").text(`EORI: ${bEori}`, 40, addrY + 87);
 
       doc.font("Helvetica-Bold").fontSize(11).text(data.shipTo.company, 240, addrY + 13);
       doc.font("Helvetica").fontSize(10).text(data.shipTo.contact, 240, addrY + 27)
         .text(data.shipTo.street, 240, addrY + 41).text(data.shipTo.city, 240, addrY + 57)
         .text(data.shipTo.country, 240, addrY + 70).text(data.shipTo.phone, 240, addrY + 83);
     }
-
-    doc.font("Helvetica").fontSize(12).text("Customer ID: ", 420, 130, { continued: true }).font("Helvetica-Bold").text(data.customerID);
-    doc.font("Helvetica").text("Date: ", 420, 157, { continued: true }).font("Helvetica-Bold").text(data.date);
-    doc.font("Helvetica").text("Invoice No: ", 420, 184, { continued: true }).font("Helvetica-Bold").text(data.invoiceNo);
-    doc.font("Helvetica").text("Cargo No.: ", 420, 211, { continued: true }).font("Helvetica-Bold").text(data.cargoNo);
+    let rightY = 130;
+    if (data.customerID) {
+      doc.font("Helvetica").fontSize(12).text("Customer ID: ", 420, rightY, { continued: true }).font("Helvetica-Bold").text(data.customerID);
+    }
+    rightY = 157;
+    doc.font("Helvetica").fontSize(12).text("Date: ", 420, rightY, { continued: true }).font("Helvetica-Bold").text(data.date);
+    rightY = 184;
+    doc.font("Helvetica").text("Invoice No: ", 420, rightY, { continued: true }).font("Helvetica-Bold").text(data.invoiceNo);
+    rightY = 211;
+    doc.font("Helvetica").text("Cargo No.: ", 420, rightY, { continued: true }).font("Helvetica-Bold").text(data.cargoNo);
     doc.fontSize(15).font("Helvetica-Bold").text("Commercial Invoice", 0, 240, { align: "center" });
 
     const tableTop = 272;
@@ -1383,27 +1450,36 @@ export const generateCommercialInvoicePDF = async (
     let itemY = tableTop + 46;
     const pageH = 841.89;
     const footerReserve = 140;
-    const rowH = 28;
+    const minRowH = 28;
+    const rowPad = 12;
 
     lineItems.forEach((item) => {
-      if (itemY + rowH > pageH - footerReserve) { doc.addPage(); itemY = 50; }
       doc.font("Helvetica").fontSize(11);
-      doc.text(item.no.toString(), 40, itemY);
+      const descH = doc.heightOfString(item.desc, { width: 250 });
+      const actualRowH = Math.max(minRowH, descH + rowPad);
+
+      if (itemY + actualRowH > pageH - footerReserve) { doc.addPage(); itemY = 50; }
+
+      const midOffset = (actualRowH - 13) / 2;
+      doc.text(item.no.toString(), 40, itemY + midOffset);
       doc.text(item.desc, 75, itemY, { width: 250 });
-      doc.text(item.hs, 340, itemY);
-      doc.text(item.qty.toString(), 425, itemY);
-      doc.text(item.unit, 463, itemY);
-      doc.text(item.price, 510, itemY, { align: "right", width: 45 });
-      itemY += rowH;
+      doc.text(item.hs, 340, itemY + midOffset);
+      doc.text(item.qty.toString(), 425, itemY + midOffset);
+      doc.text(item.unit, 463, itemY + midOffset);
+      doc.text(item.price, 510, itemY + midOffset, { align: "right", width: 45 });
+
+      doc.moveTo(40, itemY + actualRowH - 2).lineTo(555, itemY + actualRowH - 2)
+        .strokeColor("#eeeeee").lineWidth(0.5).stroke();
+
+      itemY += actualRowH;
     });
 
-    if (itemY + rowH > pageH - footerReserve) { doc.addPage(); itemY = 50; }
+    if (itemY + minRowH > pageH - footerReserve) { doc.addPage(); itemY = 50; }
     doc.font("Helvetica").fontSize(11);
-    doc.text((lineItems.length + 1).toString(), 40, itemY);
     doc.text("Freight cost", 75, itemY);
     doc.text("n/a", 340, itemY).text("n/a", 425, itemY).text("n/a", 470, itemY);
     doc.text(freightCost.toFixed(2), 510, itemY, { align: "right", width: 45 });
-    itemY += rowH;
+    itemY += minRowH + 4;
 
     doc.moveTo(40, itemY).lineTo(555, itemY).strokeColor("black").lineWidth(1).stroke();
     itemY += 12;
@@ -1417,54 +1493,59 @@ export const generateCommercialInvoicePDF = async (
     itemY += 25;
     doc.fontSize(10).font("Helvetica").text("Remark:", 40, itemY);
     const remarkX = 100;
-    doc.text(`DHL Express, ${data.cargoNo}`, remarkX, itemY);
-    doc.text(`Express, ${data.cargoNo}`, remarkX, itemY + 15);
-    const calcWeight = lineItems.reduce((sum, it) => sum + (it.qty * 0.2), 0);
+    const remarkLines: string[] = [];
+    if (cargo?.cargo_no) {
+      remarkLines.push(`${cargo.cargo_no}`);
+    }
+    const orderForRemark = await AppDataSource.getRepository(Order).findOne({ where: { order_no: invoice.orderNumber } });
+    const orderComment = orderForRemark?.comment || "";
+    if (orderComment) remarkLines.push(orderComment);
+    remarkLines.forEach((line, idx) => {
+      doc.text(line, remarkX, itemY + idx * 15);
+    });
     const packageCount = lineItems.length;
-    doc.text(`DHL Express, ${calcWeight.toFixed(1)}kg total`, remarkX, itemY + 30);
-    doc.text(`${packageCount} parcels`, remarkX, itemY + 45);
-    doc.text(`WAYBILL 85 8524 1766`, remarkX, itemY + 60);
+    const nextRemarkY = itemY + Math.max(remarkLines.length, 1) * 15;
+    doc.text(`${packageCount} parcels`, remarkX, nextRemarkY);
 
-    itemY += 80;
+    itemY = nextRemarkY + 30;
     if (itemY + 30 > pageH - footerReserve) { doc.addPage(); itemY = 50; }
     doc.fontSize(9).font("Helvetica").fillColor("#000000")
       .text("We hereby confirm that no raw material from Russia were used", 100, itemY, { lineBreak: false });
     itemY += 14;
     doc.text("in the production of the goods mentioned in this invoice.", 100, itemY, { lineBreak: false });
 
-    itemY += 20;
-    if (itemY + 80 > pageH - 20) {
-      doc.addPage();
-      itemY = 50;
-    }
+    const range = doc.bufferedPageRange();
+    const totalPagesCount = range.count;
+    const lastPageIdx = range.start + totalPagesCount - 1;
+    const footerY = pageH - 100;
 
-    doc.moveTo(40, itemY).lineTo(555, itemY).strokeColor("#cccccc").lineWidth(0.5).stroke();
-    itemY += 10;
+    doc.switchToPage(lastPageIdx);
+
+    doc.moveTo(40, footerY).lineTo(555, footerY).strokeColor("#cccccc").lineWidth(0.5).stroke();
     doc.fontSize(8).fillColor("#000000").font("Helvetica-Bold");
-    doc.text("GTech Industries Limited", 40, itemY);
+    doc.text("GTech Industries Limited", 40, footerY + 10);
     doc.fontSize(8).font("Helvetica").fillColor("#444444");
-    doc.text("Acc. No 478798112483", 40, itemY + 12);
-    doc.text("Swift Code: DHBKHKHH", 40, itemY + 24);
-    doc.text("DBS Bank (Hong Kong)", 40, itemY + 36);
+    doc.text("Acc. No 478798112483", 40, footerY + 22);
+    doc.text("Swift Code: DHBKHKHH", 40, footerY + 34);
+    doc.text("DBS Bank (Hong Kong)", 40, footerY + 46);
 
-    doc.text("+86 555 6767 199", 220, itemY);
-    doc.text("+86 17355524828", 220, itemY + 12);
-    doc.text("Contact: lili", 220, itemY + 24);
-    doc.text("info@gtech-industries.net", 220, itemY + 36);
+    doc.text("+86 555 6767 199", 220, footerY + 10);
+    doc.text("+86 17355524828", 220, footerY + 22);
+    doc.text("Contact: lili", 220, footerY + 34);
+    doc.text("info@gtech-industries.net", 220, footerY + 46);
 
     const footerLogo = path.join(process.cwd(), "assets", "logo.png");
     try {
       if (existsSync(footerLogo)) {
-        doc.image(footerLogo, 420, itemY, { width: 100 });
+        doc.image(footerLogo, 420, footerY + 8, { width: 100 });
       }
     } catch (e) { }
 
-    const range = doc.bufferedPageRange();
-    const totalPagesCount = range.count;
     for (let i = 0; i < totalPagesCount; i++) {
-      doc.switchToPage(i);
+      doc.switchToPage(range.start + i);
       doc.fontSize(8).fillColor("#999999").font("Helvetica");
-      doc.text(`${i + 1} / ${totalPagesCount}`, 500, 780, { align: "right", width: 50 });
+      const numY = (i === totalPagesCount - 1) ? footerY + 55 : 780;
+      doc.text(`${i + 1} / ${totalPagesCount}`, 490, numY, { align: "right", width: 60, lineBreak: false });
     }
 
     doc.end();

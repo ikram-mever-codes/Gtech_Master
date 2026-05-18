@@ -154,7 +154,6 @@ const CustomerViewItem = ({ customer, onViewLists, router }: any) => {
   );
 };
 
-// Empty state component
 const EmptyState = () => {
   return (
     <Box
@@ -190,26 +189,20 @@ const EmptyState = () => {
   );
 };
 
-// Main Page Component
 const AdminCustomersPage = () => {
-  // State for customers
   const [customers, setCustomers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // UI state
   const [searchTerm, setSearchTerm] = useState("");
   const [viewListsDialogOpen, setViewListsDialogOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
 
-  // Pagination state
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
 
   const router = useRouter();
 
-  // Fetch customers from backend
   const fetchCustomers = async (showLoading = true) => {
     try {
       if (showLoading) {
@@ -220,7 +213,11 @@ const AdminCustomersPage = () => {
       setError(null);
 
       const response = await getAllCustomers({ limit: 1000 });
-      setCustomers(response?.data || []);
+      const customersData = response?.data;
+      const customersArray = Array.isArray(customersData)
+        ? customersData
+        : (customersData?.customers || customersData?.businesses || []);
+      setCustomers(customersArray);
     } catch (error) {
       console.error("Failed to fetch customers:", error);
       setError("Failed to load customers. Please try again.");
@@ -231,12 +228,9 @@ const AdminCustomersPage = () => {
     }
   };
 
-  // Load customers on component mount
   useEffect(() => {
     fetchCustomers();
   }, []);
-
-  // Filter customers based on search term
   const filteredCustomers = customers.filter(
     (customer: any) =>
       customer.companyName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -244,13 +238,10 @@ const AdminCustomersPage = () => {
       customer.legalName?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Paginated customers
   const paginatedCustomers = filteredCustomers.slice(
     page * rowsPerPage,
     page * rowsPerPage + rowsPerPage
   );
-
-  // Event handlers
   const handleViewLists = (customer: any) => {
     setSelectedCustomer(customer);
     setViewListsDialogOpen(true);
@@ -260,7 +251,6 @@ const AdminCustomersPage = () => {
     fetchCustomers(false);
   };
 
-  // Loading state
   if (loading) {
     return (
       <div className="w-full mx-auto px-0">
@@ -286,7 +276,6 @@ const AdminCustomersPage = () => {
     );
   }
 
-  // Render page
   return (
     <div className="w-full mx-auto px-0">
       <div
@@ -296,7 +285,6 @@ const AdminCustomersPage = () => {
           background: "linear-gradient(to bottom, #ffffff, #f9f9f9)",
         }}
       >
-        {/* Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <div>
             <PageHeader title="List Management" icon={ClipboardList} />
