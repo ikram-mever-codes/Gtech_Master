@@ -27,16 +27,16 @@ const getValidator = (): ValidatorModule => {
     return require("class-validator");
   } catch {
     return {
-      IsDate: () => () => { },
-      IsEnum: () => () => { },
-      IsNumber: () => () => { },
-      IsObject: () => () => { },
-      IsOptional: () => () => { },
-      IsString: () => () => { },
-      Max: () => () => { },
-      Min: () => () => { },
-      IsBoolean: () => () => { },
-      IsArray: () => () => { },
+      IsDate: () => () => {},
+      IsEnum: () => () => {},
+      IsNumber: () => () => {},
+      IsObject: () => () => {},
+      IsOptional: () => () => {},
+      IsString: () => () => {},
+      Max: () => () => {},
+      Min: () => () => {},
+      IsBoolean: () => () => {},
+      IsArray: () => () => {},
       validate: async () => [],
     };
   }
@@ -47,7 +47,7 @@ const getTransformer = (): TransformerModule => {
     return require("class-transformer");
   } catch {
     return {
-      Type: () => () => { },
+      Type: () => () => {},
       plainToInstance: <T>(cls: ClassConstructor<T>, plain: any): T =>
         plain as T,
     };
@@ -2191,8 +2191,9 @@ export class OfferController {
 
       return response.status(200).json({
         success: true,
-        message: `Unit prices ${useUnitPrices ? "enabled" : "disabled"
-          } successfully for entire offer`,
+        message: `Unit prices ${
+          useUnitPrices ? "enabled" : "disabled"
+        } successfully for entire offer`,
         data: updatedOffer,
       });
     } catch (error) {
@@ -2640,7 +2641,8 @@ export class OfferController {
 
       if (offer.useUnitPrices) {
         doc.text(
-          `Pricing Mode: Unit Pricing (${offer.maxUnitPriceColumns || 3
+          `Pricing Mode: Unit Pricing (${
+            offer.maxUnitPriceColumns || 3
           } columns)`,
         );
       }
@@ -2933,343 +2935,97 @@ export class OfferController {
       });
     }
   }
-
   async generateAndDownloadPdf(request: Request, response: Response) {
     try {
       const { id } = request.params;
 
-      if (!id) {
+      const uuidRegex =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+      if (!id || !uuidRegex.test(id)) {
+        console.error(`[PDF Error] Blocked invalid UUID: "${id}"`);
         return response.status(400).json({
           success: false,
-          message: "Offer ID is required",
+          message:
+            "Invalid Offer ID format. The request never reached the database to prevent a crash.",
         });
       }
 
+      // 2. FETCH DATA
       const offer = await this.offerRepository.findOne({
-        where: { id },
+        where: { id: id },
         relations: ["lineItems"],
       });
 
       if (!offer) {
         return response.status(404).json({
           success: false,
-          message: "Offer not found",
+          message: "Offer not found.",
         });
       }
 
-      const formatDate = (dateValue: any): string => {
-        if (!dateValue) return "N/A";
-        const date =
-          typeof dateValue === "string" ? new Date(dateValue) : dateValue;
-        if (!(date instanceof Date) || isNaN(date.getTime())) return "N/A";
-        return date.toLocaleDateString();
-      };
-
-      const getSafeNumber = (numValue: any): number => {
-        if (numValue === null || numValue === undefined || numValue === "")
-          return 0;
-        if (typeof numValue === "string") {
-          const cleaned = numValue.replace(/[^0-9.-]/g, "");
-          if (cleaned === "" || cleaned === "-") return 0;
-          const num = parseFloat(cleaned);
-          return isNaN(num) ? 0 : num;
-        }
-        const num = Number(numValue);
-        return isNaN(num) ? 0 : num;
-      };
-
-      const formatNumber = (numValue: any, decimals: number = 2): string => {
-        const num = getSafeNumber(numValue);
-        const factor = Math.pow(10, decimals);
-        const rounded = Math.round((num + Number.EPSILON) * factor) / factor;
-        const fixedNum = Math.abs(rounded).toFixed(decimals);
-        return rounded < 0 ? `-${fixedNum}` : fixedNum;
-      };
-
+      // 3. INITIALIZE PDF
       const doc = new PDFDocument({ margin: 50, size: "A4" });
+      const filename = `Offer-${offer.offerNumber || "Document"}.pdf`;
 
-      doc
-        .fontSize(20)
-        .text(`OFFER ${offer.offerNumber || "N/A"}`, { align: "center" });
-      doc.moveDown();
-
-      doc.fontSize(12);
-      doc.text(`Date: ${formatDate(offer.createdAt)}`);
-      doc.text(`Valid Until: ${formatDate(offer.validUntil)}`);
-
-      if (offer.useUnitPrices) {
-        doc.text(
-          `Pricing Mode: Unit Pricing (${offer.maxUnitPriceColumns || 3} columns)`,
-        );
-      }
-      doc.moveDown();
-
-      doc.fontSize(14).text("Customer Information:", { underline: true });
-      doc.fontSize(11);
-      if (offer.customerSnapshot) {
-        let customer;
-        try {
-          customer =
-            typeof offer.customerSnapshot === "string"
-              ? JSON.parse(offer.customerSnapshot)
-              : offer.customerSnapshot;
-        } catch (e) {
-          customer = offer.customerSnapshot;
-        }
-
-        if (customer && typeof customer === "object") {
-          doc.text(`${customer.companyName || customer.name || ""}`);
-          if (
-            customer.legalName &&
-            customer.legalName !== customer.companyName
-          ) {
-            doc.text(`${customer.legalName}`);
-          }
-          if (customer.address) doc.text(`${customer.address}`);
-          if (customer.postalCode && customer.city)
-            doc.text(`${customer.postalCode} ${customer.city}`);
-          if (customer.country) doc.text(`${customer.country}`);
-          if (customer.vatId) doc.text(`VAT ID: ${customer.vatId}`);
-        }
-      }
-      doc.moveDown();
-
-      if (offer.deliveryAddress) {
-        try {
-          let deliveryAddress;
-          if (typeof offer.deliveryAddress === "string") {
-            deliveryAddress = JSON.parse(offer.deliveryAddress);
-          } else {
-            deliveryAddress = offer.deliveryAddress;
-          }
-
-          if (deliveryAddress && typeof deliveryAddress === "object") {
-            doc.fontSize(14).text("Delivery Address:", { underline: true });
-            doc.fontSize(11);
-
-            if (deliveryAddress.contactName)
-              doc.text(`${deliveryAddress.contactName}`);
-            if (deliveryAddress.street) doc.text(`${deliveryAddress.street}`);
-            if (deliveryAddress.postalCode && deliveryAddress.city)
-              doc.text(`${deliveryAddress.postalCode} ${deliveryAddress.city}`);
-            if (deliveryAddress.state) doc.text(`${deliveryAddress.state}`);
-            if (deliveryAddress.country) doc.text(`${deliveryAddress.country}`);
-            if (deliveryAddress.contactPhone)
-              doc.text(`Phone: ${deliveryAddress.contactPhone}`);
-            doc.moveDown();
-          }
-        } catch (e) {
-          console.warn("Failed to parse delivery address:", e);
-        }
-      }
-
-      doc.fontSize(14).text("Offer Positions:", { underline: true });
-      doc.moveDown();
-
-      const tableTop = doc.y;
-      const itemX = 50;
-      const descX = 150;
-      const qtyX = 350;
-      const priceX = 400;
-      const totalX = 500;
-
-      doc.fontSize(10);
-      doc.text("Pos.", itemX, tableTop);
-      doc.text("Description", descX, tableTop);
-      doc.text("Qty", qtyX, tableTop);
-      doc.text("Price", priceX, tableTop);
-      doc.text("Total", totalX, tableTop);
-
-      doc
-        .moveTo(50, tableTop + 20)
-        .lineTo(550, tableTop + 20)
-        .stroke();
-
-      let y = tableTop + 30;
-
-      let subtotal = 0;
-
-      if (offer.lineItems && Array.isArray(offer.lineItems)) {
-        const customerItems = offer.lineItems.filter(
-          (item: any) => !item.isComponent,
-        );
-
-        customerItems.forEach((item: any, index: number) => {
-          const itemNumber = `${index + 1}.`;
-          const itemName = item.itemName || item.description || "Unnamed Item";
-
-          doc.text(itemNumber, itemX, y);
-          doc.text(itemName, descX, y, { width: 180 });
-
-          let itemTotal = 0;
-
-          if (
-            offer.useUnitPrices &&
-            item.unitPrices &&
-            Array.isArray(item.unitPrices)
-          ) {
-            const maxColumns = offer.maxUnitPriceColumns || 3;
-            const displayedPrices = item.unitPrices.slice(0, maxColumns);
-            let itemY = y;
-
-            displayedPrices.forEach((up: any, upIndex: number) => {
-              const qty = getSafeNumber(up.quantity);
-              const unitPrice = getSafeNumber(up.unitPrice);
-              const unitPriceDecimalPlaces = offer.unitPriceDecimalPlaces || 3;
-              const priceText = `${qty} pcs: €${formatNumber(unitPrice, unitPriceDecimalPlaces)} (unit)`;
-              const highlight = up.isActive ? { color: "red" } : {};
-              doc.text(priceText, qtyX, itemY + upIndex * 15, {
-                ...highlight,
-                width: 150,
-              });
-            });
-
-            const activeUnitPrice = item.unitPrices.find(
-              (up: any) => up.isActive,
-            );
-            if (activeUnitPrice) {
-              const totalPriceDecimalPlaces =
-                offer.totalPriceDecimalPlaces || 2;
-              itemTotal = getSafeNumber(activeUnitPrice.totalPrice);
-              doc.text(
-                `€${formatNumber(activeUnitPrice.totalPrice, totalPriceDecimalPlaces)}`,
-                totalX,
-                y,
-              );
-            }
-          } else if (
-            item.quantityPrices &&
-            Array.isArray(item.quantityPrices)
-          ) {
-            let itemY = y;
-            item.quantityPrices.forEach((qp: any, qpIndex: number) => {
-              const qpQuantity = getSafeNumber(qp.quantity);
-              const qpPrice = getSafeNumber(qp.price);
-              const priceText = `${qpQuantity} pcs: €${formatNumber(qpPrice, 3)}`;
-              const highlight = qp.isActive ? { color: "red" } : {};
-              doc.text(priceText, qtyX, itemY + qpIndex * 15, {
-                ...highlight,
-                width: 150,
-              });
-            });
-
-            const activePrice = item.quantityPrices.find(
-              (qp: any) => qp.isActive,
-            );
-            if (activePrice) {
-              itemTotal = getSafeNumber(activePrice.total);
-              doc.text(`€${formatNumber(activePrice.total, 2)}`, totalX, y);
-            }
-          } else if (item.baseQuantity || item.basePrice) {
-            const quantity = getSafeNumber(item.baseQuantity);
-            const price = getSafeNumber(item.basePrice);
-            itemTotal = quantity * price;
-
-            doc.text(quantity.toString(), qtyX, y);
-            doc.text(`€${formatNumber(price, 3)}`, priceX, y);
-            doc.text(`€${formatNumber(itemTotal, 2)}`, totalX, y);
-          } else {
-            doc.text("N/A", qtyX, y);
-            doc.text("N/A", priceX, y);
-            doc.text("N/A", totalX, y);
-          }
-
-          subtotal += itemTotal;
-
-          const numPrices = Math.max(
-            offer.useUnitPrices && item.unitPrices ? item.unitPrices.length : 0,
-            item.quantityPrices ? item.quantityPrices.length : 0,
-            1,
-          );
-          y += Math.max(30, numPrices * 20);
-        });
-      }
-
-      const discount = getSafeNumber(offer.discountAmount || offer.discount);
-      let discountedSubtotal = subtotal - discount;
-      if (discountedSubtotal < 0) discountedSubtotal = 0;
-
-      const shipping = getSafeNumber(offer.shippingCost || offer.shipping);
-      const amountBeforeTax = discountedSubtotal + shipping;
-
-      const taxRate = offer.taxRate ? getSafeNumber(offer.taxRate) / 100 : 0.19;
-      const taxAmount = amountBeforeTax * taxRate;
-
-      const totalAmount = amountBeforeTax + taxAmount;
-
-      y += 20;
-      doc.moveTo(400, y).lineTo(550, y).stroke();
-      y += 10;
-
-      doc.fontSize(10);
-      doc.text("Subtotal:", 400, y);
-      doc.text(`€${formatNumber(subtotal, 2)}`, 500, y);
-      y += 20;
-
-      if (discount > 0) {
-        doc.text("Discount:", 400, y);
-        doc.text(`-€${formatNumber(discount, 2)}`, 500, y);
-        y += 20;
-      }
-
-      if (shipping > 0) {
-        doc.text("Shipping:", 400, y);
-        doc.text(`€${formatNumber(shipping, 2)}`, 500, y);
-        y += 20;
-      }
-
-      const displayTaxRate = offer.taxRate ? getSafeNumber(offer.taxRate) : 19;
-      doc.text(`VAT (${displayTaxRate}%):`, 400, y);
-      doc.text(`€${formatNumber(taxAmount, 2)}`, 500, y);
-      y += 20;
-
-      doc.fontSize(12).font("Helvetica-Bold");
-      doc.text("TOTAL:", 400, y);
-      doc.text(`€${formatNumber(totalAmount, 2)}`, 500, y);
-
-      y += 40;
-      doc.fontSize(10).font("Helvetica");
-      doc.text("All prices are net prices.", 50, y);
-      y += 15;
-
-      if (offer.deliveryTime) {
-        doc.text(`Delivery Time: ${offer.deliveryTime}`, 50, y);
-        y += 15;
-      }
-
-      if (offer.paymentTerms) {
-        doc.text(`Payment Terms: ${offer.paymentTerms}`, 50, y);
-        y += 15;
-      }
-
-      if (offer.notes) {
-        const notes =
-          offer.notes.length > 200
-            ? offer.notes.substring(0, 200) + "..."
-            : offer.notes;
-        doc.text(`Notes: ${notes}`, 50, y, { width: 500 });
-      }
-
+      // 4. PREPARE RESPONSE HEADERS
       response.setHeader("Content-Type", "application/pdf");
       response.setHeader(
         "Content-Disposition",
-        `attachment; filename="Offer-${offer.offerNumber || id}.pdf"`,
+        `attachment; filename="${filename}"`,
+      );
+      response.setHeader(
+        "Access-Control-Expose-Headers",
+        "Content-Disposition",
       );
 
+      // 5. PIPE & GENERATE
       doc.pipe(response);
-      doc.end();
-    } catch (error: any) {
-      console.error("Error generating PDF:", error);
-      if (response.headersSent) {
-        return;
-      }
 
-      return response.status(500).json({
-        success: false,
-        message: "Internal server error while generating PDF",
-        error:
-          process.env.NODE_ENV === "development" ? error.message : undefined,
+      // Header
+      doc
+        .fontSize(20)
+        .text(`OFFER ${offer.offerNumber || ""}`, { align: "center" });
+      doc.moveDown();
+      doc.fontSize(10).text(`Project: ${offer.title || "N/A"}`);
+      doc.moveDown();
+
+      // Line Items Table
+      doc.fontSize(10).text("Description", 50, 150);
+      doc.text("Qty", 350, 150);
+      doc.text("Total", 450, 150);
+      doc.moveTo(50, 165).lineTo(550, 165).stroke();
+
+      let y = 175;
+      (offer.lineItems || []).forEach((item: any) => {
+        doc.text(item.itemName || item.description || "Item", 50, y, {
+          width: 280,
+        });
+        doc.text((item.quantity || 0).toString(), 350, y);
+        doc.text((item.lineTotal || 0).toLocaleString(), 450, y);
+        y += 20;
       });
+
+      // 6. END DOCUMENT
+      doc.end();
+
+      // 7. STREAM ERROR HANDLING
+      return new Promise<void>((resolve, reject) => {
+        response.on("finish", resolve);
+        response.on("error", (err) => {
+          console.error("Streaming error:", err);
+          reject(err);
+        });
+      });
+    } catch (error: any) {
+      console.error("Fatal Controller Error:", error);
+      if (!response.headersSent) {
+        return response.status(500).json({
+          success: false,
+          message: "Internal server error during PDF generation",
+          details: error.message,
+        });
+      }
     }
   }
 

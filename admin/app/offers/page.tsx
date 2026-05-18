@@ -113,11 +113,12 @@ const OffersPage: React.FC = () => {
   const [inquiries, setInquiries] = useState<Inquiry[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
 
-  // Form states
   const [offerFormData, setOfferFormData] = useState<CreateOfferPayload>({
     title: "",
     currency: "EUR",
-    validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+    validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .split("T")[0] as any,
     useUnitPrices: false,
     unitPriceDecimalPlaces: 3,
     totalPriceDecimalPlaces: 2,
@@ -242,7 +243,6 @@ const OffersPage: React.FC = () => {
     setShowCreateModal(true);
   };
 
-  // Handle offer creation
   const handleCreateOffer = async () => {
     if (!selectedInquiry) {
       toast.error("Please select an inquiry");
@@ -254,13 +254,21 @@ const OffersPage: React.FC = () => {
         selectedInquiry.id,
         offerFormData,
       );
+
       if (response.success) {
+        toast.success("Offer created successfully");
         setShowCreateModal(false);
         resetCreateForm();
+
+        // Fix: Move to page 1 so the new offer (prepended by backend) is visible
+        setFilters((prev) => ({ ...prev, page: 1 }));
+
+        // Refresh the list to ensure all calculated totals are correct
         fetchOffers();
       }
     } catch (error) {
       console.error("Error creating offer:", error);
+      toast.error("Failed to create offer. Please check all required fields.");
     }
   };
 
@@ -292,34 +300,16 @@ const OffersPage: React.FC = () => {
     }
   };
 
-  // Handle create revision
-  const handleCreateRevision = async (offer: Offer) => {
-    try {
-      const response = await createOfferRevision(offer.id, {
-        title: `Revision of ${offer.offerNumber}`,
-        useUnitPrices: offer.useUnitPrices,
-        unitPriceDecimalPlaces: offer.unitPriceDecimalPlaces,
-        totalPriceDecimalPlaces: offer.totalPriceDecimalPlaces,
-        maxUnitPriceColumns: offer.maxUnitPriceColumns,
-      });
-      if (response.success) {
-        fetchOffers();
-      }
-    } catch (error) {
-      console.error("Error creating revision:", error);
-    }
-  };
-
   // Handle PDF generation
-  const handleGeneratePdf = async (offerId: string) => {
+  const handleGeneratePdf = async (offer: Offer) => {
     try {
-      const response = await generateOfferPdf(offerId);
-      if (response.success) {
-        // Download the PDF
-        await downloadOfferPdf(offerId);
+      const response = await generateOfferPdf(offer.id);
+      // Many APIs return { data: { success: true } }, check your structure
+      if (response || response.success) {
+        await downloadOfferPdf(offer.id, offer.offerNumber);
       }
     } catch (error) {
-      console.error("Error generating PDF:", error);
+      console.error("Error in PDF workflow:", error);
     }
   };
 
@@ -417,15 +407,15 @@ const OffersPage: React.FC = () => {
         editingLineItemData,
       );
       if (response.success) {
-        // Refresh offer data
+        toast.success("Item updated");
         const updatedOffer = await getOfferById(offerId);
+
         if (updatedOffer.success) {
+          // Fix: Update both the selected modal view and the background list
           setSelectedOffer(updatedOffer.data);
-          // Update offers list
-          const updatedOffers = offers.map((offer: any) =>
-            offer.id === offerId ? updatedOffer.data : offer,
+          setOffers((prev) =>
+            prev.map((o) => (o.id === offerId ? updatedOffer.data : o)),
           );
-          setOffers(updatedOffers);
         }
 
         setEditingLineItemId(null);
@@ -633,15 +623,18 @@ const OffersPage: React.FC = () => {
     setOfferFormData({
       title: "",
       currency: "EUR",
-      validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      // Fix: Maintain YYYY-MM-DD format on reset
+      validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+        .toISOString()
+        .split("T")[0] as any,
       useUnitPrices: false,
       unitPriceDecimalPlaces: 3,
       totalPriceDecimalPlaces: 2,
       maxUnitPriceColumns: 3,
     });
     setSelectedInquiry(null);
-    setSelectedCustomerId(""); // Reset customer filter
-    setFilteredInquiries(inquiries); // Reset to all inquiries
+    setSelectedCustomerId("");
+    setFilteredInquiries(inquiries);
   };
 
   // Toggle offer expansion
@@ -1987,7 +1980,16 @@ const OffersPage: React.FC = () => {
                       filteredInquiries.map((inquiry) => (
                         <div
                           key={inquiry.id}
-                          onClick={() => setSelectedInquiry(inquiry)}
+                          onClick={() => {
+                            // 1. Select the inquiry as usual
+                            setSelectedInquiry(inquiry);
+
+                            // 2. Default the offer title to the inquiry name
+                            setOfferFormData((prev) => ({
+                              ...prev,
+                              title: inquiry.name,
+                            }));
+                          }}
                           className={`p-3 border rounded-lg cursor-pointer transition-all ${
                             selectedInquiry?.id === inquiry.id
                               ? "border-gray-600 bg-gray-50"
@@ -2177,24 +2179,38 @@ const OffersPage: React.FC = () => {
                               Max Columns
                             </label>
                             <input
-                              type="number"
-                              min="1"
-                              max="10"
-                              value={offerFormData.maxUnitPriceColumns}
+                              type="text"
+                              value={offerFormData.maxUnitPriceColumns || ""}
                               onChange={(e) => {
-                                if (e.target.value >= "10") {
+                                const val = e.target.value;
+
+                                if (val === "") {
+                                  setOfferFormData({
+                                    ...offerFormData,
+                                    maxUnitPriceColumns: 0,
+                                  });
+                                  return;
+                                }
+
+                                if (!/^\d+$/.test(val)) return;
+
+                                const numValue = parseInt(val, 10);
+
+                                if (numValue > 10) {
                                   toast.error(
                                     "Max unit price columns is 10",
                                     errorStyles,
                                   );
                                   return;
                                 }
+
                                 setOfferFormData({
                                   ...offerFormData,
-                                  maxUnitPriceColumns: parseInt(e.target.value),
+                                  maxUnitPriceColumns: numValue,
                                 });
                               }}
                               className="w-full px-2 py-1 text-xs border border-gray-300 rounded"
+                              placeholder="0"
                             />
                           </div>
                         </div>
@@ -2525,17 +2541,48 @@ const OffersPage: React.FC = () => {
                           Max Columns
                         </label>
                         <input
-                          type="number"
-                          min="1"
-                          max="10"
-                          value={editFormData.maxUnitPriceColumns || 3}
-                          onChange={(e) =>
+                          type="text"
+                          // If the value is 0 or NaN, show empty so the user can type
+                          value={editFormData.maxUnitPriceColumns || ""}
+                          onChange={(e) => {
+                            const val = e.target.value;
+
+                            // 1. Allow empty string for easy editing/backspacing
+                            if (val === "") {
+                              setEditFormData({
+                                ...editFormData,
+                                maxUnitPriceColumns: 0,
+                              });
+                              return;
+                            }
+
+                            // 2. Strict digit-only check (prevents e, ., -, etc.)
+                            if (!/^\d+$/.test(val)) return;
+
+                            const numValue = parseInt(val, 10);
+
+                            // 3. Enforce Range (1 to 10)
+                            if (numValue > 10) {
+                              toast.error(
+                                "Max unit price columns is 10",
+                                errorStyles,
+                              );
+                              return;
+                            }
+
+                            // If you want to prevent '0' as a valid entry:
+                            if (numValue < 1 && val !== "0") {
+                              // Optional: toast error or reset to 1
+                              return;
+                            }
+
                             setEditFormData({
                               ...editFormData,
-                              maxUnitPriceColumns: parseInt(e.target.value),
-                            })
-                          }
+                              maxUnitPriceColumns: numValue,
+                            });
+                          }}
                           className="w-full px-2 py-1 text-xs border border-gray-300 rounded"
+                          placeholder="3"
                         />
                       </div>
                     </div>

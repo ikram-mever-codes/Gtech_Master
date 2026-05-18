@@ -544,39 +544,56 @@ export const generateOfferPdf = async (id: string) => {
   }
 };
 
-export const downloadOfferPdf = async (id: string) => {
+export const downloadOfferPdf = async (id: string, offerNumber?: string) => {
   try {
-    // Check if PDF is already generated
-    const offerResponse = await getOfferById(id);
-    if (offerResponse.data && !offerResponse.data.pdfGenerated) {
-      // Generate PDF first
+    toast.loading("Preparing download...", loadingStyles);
+
+    // 1. Verify generation status
+    const offerResponse: any = await getOfferById(id);
+    const offer = offerResponse.data || offerResponse;
+
+    if (!offer.pdfGenerated) {
       await generateOfferPdf(id);
     }
 
-    // Use fetch to download
-    const response = await fetch(`/api/offers/${id}/download-pdf`);
-    if (response.ok) {
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `offer-${id}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-    } else {
-      throw new Error("Failed to download PDF");
+    // 2. Fetch binary data
+    // Note: 'api' must be your axios instance
+    const response: any = await api.get(`/offers/${id}/download-pdf`, {
+      responseType: "blob",
+    });
+
+    // 3. Trigger Browser Download
+    // CRITICAL FIX: Use response.data, not the whole response object
+    const blob = new Blob([response.data], { type: "application/pdf" });
+
+    // Safety check: ensure blob has content
+    if (blob.size === 0) {
+      throw new Error("The downloaded PDF is empty.");
     }
+
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `Offer-${offerNumber || id}.pdf`;
+
+    document.body.appendChild(link);
+    link.click();
+
+    // Cleanup
+    setTimeout(() => {
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(link);
+      toast.dismiss();
+    }, 100);
 
     return true;
   } catch (error) {
+    toast.dismiss();
     console.error("Error downloading PDF:", error);
     toast.error("Failed to download PDF");
     throw error;
   }
 };
-
 export const getOffersByInquiry = async (
   inquiryId: string,
   page = 1,
