@@ -1427,9 +1427,7 @@ export const generateCommercialInvoicePDF = async (
         .text(data.shipTo.country, 240, addrY + 70).text(data.shipTo.phone, 240, addrY + 83);
     }
     let rightY = 130;
-    if (data.customerID) {
-      doc.font("Helvetica").fontSize(12).text("Customer ID: ", 420, rightY, { continued: true }).font("Helvetica-Bold").text(data.customerID);
-    }
+    doc.font("Helvetica").fontSize(12).text("Customer ID: ", 420, rightY, { continued: true }).font("Helvetica-Bold").text(data.customerID || "");
     rightY = 157;
     doc.font("Helvetica").fontSize(12).text("Date: ", 420, rightY, { continued: true }).font("Helvetica-Bold").text(data.date);
     rightY = 184;
@@ -1514,9 +1512,12 @@ export const generateCommercialInvoicePDF = async (
     itemY += 14;
     doc.text("in the production of the goods mentioned in this invoice.", 100, itemY, { lineBreak: false });
 
-    const range = doc.bufferedPageRange();
-    const totalPagesCount = range.count;
-    const lastPageIdx = range.start + totalPagesCount - 1;
+    const originalBottomMargin = doc.page.margins.bottom;
+    doc.page.margins.bottom = 0;
+
+    let range = doc.bufferedPageRange();
+    let totalPagesCount = range.count;
+    let lastPageIdx = range.start + totalPagesCount - 1;
     const footerY = pageH - 100;
 
     doc.switchToPage(lastPageIdx);
@@ -1541,12 +1542,17 @@ export const generateCommercialInvoicePDF = async (
       }
     } catch (e) { }
 
+    range = doc.bufferedPageRange();
+    totalPagesCount = range.count;
+
     for (let i = 0; i < totalPagesCount; i++) {
       doc.switchToPage(range.start + i);
       doc.fontSize(8).fillColor("#999999").font("Helvetica");
       const numY = (i === totalPagesCount - 1) ? footerY + 55 : 780;
       doc.text(`${i + 1} / ${totalPagesCount}`, 490, numY, { align: "right", width: 60, lineBreak: false });
     }
+
+    doc.page.margins.bottom = originalBottomMargin;
 
     doc.end();
   } catch (error) {
