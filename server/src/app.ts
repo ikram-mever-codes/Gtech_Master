@@ -25,7 +25,6 @@ import cargoTypeRoutes from "./routes/cargo_type_routes";
 import etlRoutes from "./routes/etl_routes";
 import supplierOrderRoutes from "./routes/supplier_order_routes";
 import systemRoutes from "./routes/system_routes";
-import dashboardRoutes from "./routes/dashboard_routes";
 
 const app: any = express();
 
@@ -73,7 +72,6 @@ app.use("/api/v1/cargo-types", cargoTypeRoutes);
 app.use("/api/v1/etl", etlRoutes);
 app.use("/api/v1/supplier-orders", supplierOrderRoutes);
 app.use("/api/v1/system", systemRoutes);
-app.use("/api/v1/dashboard", dashboardRoutes);
 
 const __uploads_dirname = path.resolve();
 app.use("/uploads", express.static(path.join(__uploads_dirname, "/uploads")));
