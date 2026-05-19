@@ -965,7 +965,7 @@ const ItemDetailsPage = () => {
                   editMode={editMode}
                   itemData={itemData}
                   setItemData={setItemData}
-                  readOnly={false}
+                  readOnly={true}
                 />
                 <EditableInfoRow
                   label="Item Name"

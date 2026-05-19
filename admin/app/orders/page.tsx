@@ -1180,7 +1180,7 @@ const OrderPage: React.FC = () => {
 
   const nsoGroups = useMemo(() => {
     if (loadingOrders) return { express: [], normal: [] };
-    
+
     const groups = {
       express: new Map<string, any>(),
       normal: new Map<string, any>(),
@@ -1196,8 +1196,7 @@ const OrderPage: React.FC = () => {
         if (item.supplier_order_id) return;
         const rawStatus = (item.status || "").trim().toUpperCase();
         if (rawStatus && rawStatus !== "NSO" && rawStatus !== "SO") return;
-        
-        // Optimize: Use embedded item data if present to avoid waiting for fetchAllItems
+
         const itemDetails = item.item || itemById.get(String(item.item_id));
 
         let sId = 0;
@@ -2087,7 +2086,7 @@ const OrderPage: React.FC = () => {
     [orders],
   );
   const orderItemsFlat = useMemo(() => {
-    const allItems = orders.flatMap((o: any) =>
+    let allItems = orders.flatMap((o: any) =>
       (o.items || []).map((i: any) => ({
         ...i,
         order_id: o.id,
@@ -2101,6 +2100,22 @@ const OrderPage: React.FC = () => {
       })),
     );
 
+    const filterParam = searchParams.get("filter");
+    if (filterParam) {
+      if (filterParam === "unassigned_cargo") {
+        allItems = allItems.filter((i: any) => !i.cargo_id || i.cargo_id === 0);
+      } else if (filterParam === "purchase_problem") {
+        allItems = allItems.filter((i: any) =>
+          (i.problems && i.problems !== "" && (i.problems.toLowerCase().includes("purchase") || i.problems.toLowerCase().includes("buy"))) ||
+          (i.status && String(i.status).toLowerCase().includes("purchase"))
+        );
+      } else if (filterParam === "check_problem") {
+        allItems = allItems.filter((i: any) =>
+          (i.problems && i.problems !== "" && (i.problems.toLowerCase().includes("check") || i.problems.toLowerCase().includes("verify")))
+        );
+      }
+    }
+
     if (!orderNoFilter) return allItems;
     const s = orderNoFilter.toLowerCase();
     return allItems.filter((i) =>
@@ -2108,7 +2123,7 @@ const OrderPage: React.FC = () => {
       String(i.ean || i.item?.ean || "").toLowerCase().includes(s) ||
       String(i.item_name || i.itemName || i.item?.item_name || "").toLowerCase().includes(s)
     );
-  }, [orders, orderNoFilter]);
+  }, [orders, orderNoFilter, searchParams]);
 
   const filteredOrders = useMemo(() => {
     if (!orderNoFilter) return orders;
@@ -2209,6 +2224,34 @@ const OrderPage: React.FC = () => {
               {tabActions[activeTab]}
             </div>
           </div>
+
+          {searchParams.get("filter") && (
+            <div className="mb-6 px-5 py-3 bg-[#FFF3CD] border border-[#FFEBA2] rounded-md text-[#856404] flex items-center justify-between text-sm shadow-sm animate-pulse">
+              <div className="flex items-center gap-2">
+                <span className="font-bold">⚠️ Reports & Control Health Audit View Active:</span>
+                <span className="font-semibold text-gray-800">
+                  {(() => {
+                    switch (searchParams.get("filter")) {
+                      case "unassigned_cargo": return "Order items unassigned to cargo";
+                      case "purchase_problem": return "Orders with purchase problem";
+                      case "check_problem": return "Orders with Check Problem";
+                      default: return searchParams.get("filter");
+                    }
+                  })()}
+                </span>
+              </div>
+              <button
+                onClick={() => {
+                  const params = new URLSearchParams(searchParams.toString());
+                  params.delete("filter");
+                  window.location.href = `/orders?${params.toString()}`;
+                }}
+                className="px-3 py-1 bg-amber-800 hover:bg-amber-900 text-white rounded text-xs font-bold transition-all"
+              >
+                Clear Audit Filter
+              </button>
+            </div>
+          )}
 
           <div className="border-b border-gray-200">
             <nav className="-mb-px flex space-x-8">

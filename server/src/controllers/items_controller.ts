@@ -395,9 +395,20 @@ export const getItems = async (
         model: item.model,
         painPoints: item.painPoints || [],
         taric_code: taricData?.code || null,
-        taric_description: taricData?.description_de || null,
-        is_updated: item.is_updated,
-        is_new: item.is_new,
+        synced_at: item.synced_at,
+        is_rmb_special: item.is_rmb_special,
+        is_eur_special: item.is_eur_special,
+        is_dimension_special: item.is_dimension_special,
+        is_npr: item.is_npr,
+        ship_class: warehouseData?.ship_class || null,
+        is_po:
+          supplierItems.find(
+            (si) => si.item_id === item.id && si.is_default === "Y",
+          )?.is_po || null,
+        url:
+          supplierItems.find(
+            (si) => si.item_id === item.id && si.is_default === "Y",
+          )?.url || null,
         rmb_price: rmbPriceMap.get(item.id) || null,
         price: item.price,
         transfer_price_EUR: item.transfer_price_EUR,
@@ -812,11 +823,11 @@ export const createItem = async (
         return next(new ErrorHandler("Item with this EAN already exists", 400));
     }
 
-    let finalPrice = price ? parseFloat(price) : null;
     const finalRMB = RMB_Price ? parseFloat(RMB_Price) : null;
+    let finalPrice = null;
 
-    if (category?.name === "STD" && finalRMB) {
-      finalPrice = calculateTransferPrice(finalRMB, category.name);
+    if (finalRMB !== null && !isNaN(finalRMB)) {
+      finalPrice = calculateTransferPrice(finalRMB, category?.name || "STD");
     }
 
     const newItem = itemRepository.create({
@@ -1089,36 +1100,43 @@ export const updateItem = async (
       }
     }
 
-    if (req.body.price !== undefined) {
-      item.transfer_price_EUR = parseFloat(req.body.price);
-      item.price = parseFloat(req.body.price);
-    } else if (req.body.transfer_price_EUR !== undefined) {
-      item.price = parseFloat(req.body.transfer_price_EUR);
-      item.transfer_price_EUR = parseFloat(req.body.transfer_price_EUR);
+    const categoryName = category?.name || item.supp_cat || "STD";
+
+    let rmbPriceToUse: number | null = null;
+    if (supplierItemData && supplierItemData.price_rmb !== undefined) {
+      rmbPriceToUse = parseFloat(supplierItemData.price_rmb);
+    } else {
+      const existingSI =
+        (await supplierItemRepository.findOne({
+          where: { item_id: item.id, is_default: "Y" },
+        })) ||
+        (await supplierItemRepository.findOne({
+          where: { item_id: item.id },
+        }));
+      rmbPriceToUse =
+        existingSI?.price_rmb !== undefined && existingSI?.price_rmb !== null
+          ? parseFloat(existingSI.price_rmb)
+          : null;
     }
 
-    if (category?.name === "STD") {
-      if (currentRMBPrice === null) {
-        const existingSI = await supplierItemRepository.findOne({
-          where: { item_id: item.id },
-        });
-        currentRMBPrice = existingSI?.price_rmb || null;
-      }
-
+    if (rmbPriceToUse !== null && !isNaN(rmbPriceToUse)) {
+      const calculatedPrice = calculateTransferPrice(
+        rmbPriceToUse,
+        categoryName,
+      );
       if (
-        currentRMBPrice &&
-        req.body.price === undefined &&
-        req.body.transfer_price_EUR === undefined
+        item.price !== calculatedPrice ||
+        item.transfer_price_EUR !== calculatedPrice
       ) {
-        const calculated = calculateTransferPrice(
-          Number(currentRMBPrice),
-          category.name,
-        );
-        if (item.price !== calculated) {
-          item.price = calculated;
-          item.transfer_price_EUR = calculated;
-          hasChanges = true;
-        }
+        item.price = calculatedPrice;
+        item.transfer_price_EUR = calculatedPrice;
+        hasChanges = true;
+      }
+    } else {
+      if (item.price !== null || item.transfer_price_EUR !== null) {
+        item.price = null as any;
+        item.transfer_price_EUR = null as any;
+        hasChanges = true;
       }
     }
 
