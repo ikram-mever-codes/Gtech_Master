@@ -18,7 +18,7 @@ import {
   TruckIcon,
   EyeIcon as EyeIconOutline,
 } from "@heroicons/react/24/outline";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import CustomButton from "@/components/UI/CustomButton";
 import PageHeader from "@/components/UI/PageHeader";
 import {
@@ -108,7 +108,14 @@ interface PaginationState {
 }
 
 const ItemsManagementPage: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<TabType>("items");
+  const searchParams = useSearchParams();
+  const [activeTab, setActiveTab] = useState<TabType>(() => {
+    const tabParam = searchParams.get("tab");
+    if (tabParam === "parents" || tabParam === "warehouse" || tabParam === "tarics" || tabParam === "suppliers") {
+      return tabParam;
+    }
+    return "items";
+  });
   const [items, setItems] = useState<Item[]>([]);
   const [parents, setParents] = useState<Parent[]>([]);
   const [warehouseItems, setWarehouseItems] = useState<WarehouseItem[]>([]);
@@ -361,9 +368,10 @@ const ItemsManagementPage: React.FC = () => {
     try {
       switch (activeTab) {
         case "items":
+          const isFilterActive = !!searchParams.get("filter");
           const itemsResponse: any = await getItems({
-            page: pagination.page,
-            limit: pagination.limit,
+            page: isFilterActive ? 1 : pagination.page,
+            limit: isFilterActive ? 10000 : pagination.limit,
             search: debouncedFilters.search,
             isActive: debouncedFilters.isActive,
             category: debouncedFilters.category,
@@ -385,9 +393,10 @@ const ItemsManagementPage: React.FC = () => {
           break;
 
         case "warehouse":
+          const isWarehouseFilterActive = !!searchParams.get("filter");
           const warehouseResponse: any = await getWarehouseItems({
-            page: pagination.page,
-            limit: pagination.limit,
+            page: isWarehouseFilterActive ? 1 : pagination.page,
+            limit: isWarehouseFilterActive ? 10000 : pagination.limit,
             search: debouncedFilters.search,
             hasStock: debouncedFilters.status,
           });
@@ -503,7 +512,6 @@ const ItemsManagementPage: React.FC = () => {
     }
   };
 
-  // Handle reset sync flags (for admin purposes)
   const handleResetSyncFlags = async () => {
     if (
       !confirm(
@@ -911,6 +919,42 @@ const ItemsManagementPage: React.FC = () => {
     return data.filter((item) => {
       const it = item as any;
 
+      const filterParam = searchParams.get("filter");
+      if (filterParam) {
+        if (filterParam === "rmb_special_no_value") {
+          if (it.is_rmb_special !== "Y" || (it.rmb_price && parseFloat(it.rmb_price) > 0)) return false;
+        } else if (filterParam === "eur_special_no_value") {
+          const hasEUR = (it.price && parseFloat(it.price) > 0) || (it.transfer_price_EUR && parseFloat(it.transfer_price_EUR) > 0);
+          if (it.is_eur_special !== "Y" || hasEUR) return false;
+        } else if (filterParam === "dimension_special_no_value") {
+          const hasDim = (it.weight && parseFloat(it.weight) > 0) && (it.length && parseFloat(it.length) > 0) && (it.width && parseFloat(it.width) > 0) && (it.height && parseFloat(it.height) > 0);
+          if (it.is_dimension_special !== "Y" || hasDim) return false;
+        } else if (filterParam === "missing_var_values_en") {
+          if (it.name_en || !it.name_de) return false;
+        } else if (filterParam === "no_taric") {
+          if (it.taric_id && it.taric_id !== 0 && it.taric_code) return false;
+        } else if (filterParam === "mismatched_tarics") {
+          if (!it.taric_id || !it.parent_taric_id || it.taric_id === it.parent_taric_id) return false;
+        } else if (filterParam === "null_category") {
+          if (it.category_id && it.category_id !== 0) return false;
+        } else if (filterParam === "wrong_shipping_class") {
+          const shipClass = (it.ship_class || "").trim().toLowerCase();
+          if (shipClass !== "" && shipClass !== "na") return false;
+        } else if (filterParam === "no_supplier") {
+          if (it.supplier_id && it.supplier_id !== 0) return false;
+        } else if (filterParam === "no_rmb_price") {
+          if (it.is_active !== "Y" || (it.rmb_price && parseFloat(it.rmb_price) > 0)) return false;
+        } else if (filterParam === "is_po_no_url_null") {
+          if (it.is_po !== "No" || (it.url && it.url !== "" && it.url !== "null")) return false;
+        } else if (filterParam === "is_po_null") {
+          if (it.is_po && it.is_po !== "" && it.is_po !== "null") return false;
+        } else if (filterParam === "new_picture_required") {
+          if (it.is_npr !== "Y") return false;
+        } else if (filterParam === "no_picture") {
+          if (it.is_active !== "Y" || (it.photo && it.photo !== "" && it.photo !== "null")) return false;
+        }
+      }
+
       if (activeTab === "items" && debouncedFilters.eanSearch) {
         const eanMatches = matchesEANSearch(it.ean, debouncedFilters.eanSearch);
         if (!eanMatches) return false;
@@ -1107,8 +1151,8 @@ const ItemsManagementPage: React.FC = () => {
                 router.push(`/items/${item.id}`);
               }}
               className={`cursor-pointer transition-colors ${isNewItem
-                  ? "bg-blue-50 hover:bg-blue-100 border-l-4 border-l-blue-400"
-                  : "hover:bg-gray-50"
+                ? "bg-blue-50 hover:bg-blue-100 border-l-4 border-l-blue-400"
+                : "hover:bg-gray-50"
                 }`}
             >
               <td className="p-4">
@@ -1166,8 +1210,8 @@ const ItemsManagementPage: React.FC = () => {
               <td className="px-4 py-3">
                 <span
                   className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${item.is_updated
-                      ? "bg-yellow-100 text-yellow-700"
-                      : "bg-green-100 text-green-700"
+                    ? "bg-yellow-100 text-yellow-700"
+                    : "bg-green-100 text-green-700"
                     }`}
                 >
                   {item.is_updated ? "Pending Sync" : "Synced"}
@@ -1592,8 +1636,8 @@ const ItemsManagementPage: React.FC = () => {
                 onClick={handleExportNewItemsCSV}
                 disabled={exportingNew || newItemsCount === 0}
                 className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all flex items-center gap-1.5 ${exportingNew || newItemsCount === 0
-                    ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                    : "bg-emerald-600 text-white hover:bg-emerald-700"
+                  ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                  : "bg-emerald-600 text-white hover:bg-emerald-700"
                   }`}
               >
                 {exportingNew ? (
@@ -1616,8 +1660,8 @@ const ItemsManagementPage: React.FC = () => {
                   onClick={() => handleExportCSV()}
                   disabled={exporting || pendingSyncCount === 0}
                   className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all flex items-center gap-1.5 ${exporting || pendingSyncCount === 0
-                      ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                      : "bg-blue-600 text-white hover:bg-blue-700"
+                    ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                    : "bg-blue-600 text-white hover:bg-blue-700"
                     }`}
                 >
                   {exporting ? (
@@ -1683,8 +1727,8 @@ const ItemsManagementPage: React.FC = () => {
             <button
               onClick={() => setShowFilters(!showFilters)}
               className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all flex items-center gap-1.5 ${showFilters
-                  ? "bg-[#8CC21B] text-white"
-                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                ? "bg-[#8CC21B] text-white"
+                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                 }`}
             >
               <FunnelIcon className="w-4 h-4" />
@@ -1729,6 +1773,45 @@ const ItemsManagementPage: React.FC = () => {
           </div>
         </div>
 
+        {searchParams.get("filter") && (
+          <div className="mb-6 px-5 py-3 bg-[#FFF3CD] border border-[#FFEBA2] rounded-md text-[#856404] flex items-center justify-between text-sm shadow-sm animate-pulse">
+            <div className="flex items-center gap-2">
+              <span className="font-bold">⚠️ Reports & Control Health Audit View Active:</span>
+              <span className="font-semibold text-gray-800">
+                {(() => {
+                  switch (searchParams.get("filter")) {
+                    case "rmb_special_no_value": return "RMB Special SET with no value";
+                    case "eur_special_no_value": return "EUR Special SET with no value";
+                    case "dimension_special_no_value": return "Dimension Special SET with no value";
+                    case "missing_var_values_en": return "Missing Var Values EN";
+                    case "no_taric": return "Items with No Taric Code";
+                    case "mismatched_tarics": return "Items with mismatched tarics";
+                    case "null_category": return "Items with null category";
+                    case "wrong_shipping_class": return "Items with wrong shipping class (Na)";
+                    case "no_supplier": return "Items without suppliers";
+                    case "no_rmb_price": return "Items without RMB Price";
+                    case "is_po_no_url_null": return "Items isPO ='No' with URL='null'";
+                    case "is_po_null": return "Suppliers items isPO ='null'";
+                    case "new_picture_required": return "Is New Picture Required";
+                    case "no_picture": return "Items without picture";
+                    default: return searchParams.get("filter");
+                  }
+                })()}
+              </span>
+            </div>
+            <button
+              onClick={() => {
+                const params = new URLSearchParams(searchParams.toString());
+                params.delete("filter");
+                window.location.href = `/items?${params.toString()}`;
+              }}
+              className="px-3 py-1 bg-amber-800 hover:bg-amber-900 text-white rounded text-xs font-bold transition-all"
+            >
+              Clear Audit Filter
+            </button>
+          </div>
+        )}
+
         <div className="mb-6">
           <div className="border-b border-gray-200">
             <nav className="-mb-px flex space-x-8">
@@ -1743,8 +1826,8 @@ const ItemsManagementPage: React.FC = () => {
                   key={tab.key}
                   onClick={() => setActiveTab(tab.key as TabType)}
                   className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${activeTab === tab.key
-                      ? "border-primary text-primary"
-                      : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                    ? "border-primary text-primary"
+                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
                     }`}
                 >
                   <tab.icon className="w-5 h-5" />
@@ -2004,7 +2087,6 @@ const ItemsManagementPage: React.FC = () => {
         </div>
       </div>
 
-      {/* TARIC Modal */}
       {showTaricModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl max-w-md w-full">
@@ -2191,7 +2273,6 @@ const ItemsManagementPage: React.FC = () => {
         </div>
       )}
 
-      {/* Item Modal */}
       {showItemModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
