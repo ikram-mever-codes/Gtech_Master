@@ -34,7 +34,7 @@ const corsOptions = {
     "http://localhost:3000",
     "http://localhost:3001",
     "http://localhost:3002",
-    // "https://stars.gtech.de",
+    "https://stars.gtech.de",
     "https://master.gtech.de",
   ],
   credentials: true,
