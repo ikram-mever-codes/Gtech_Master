@@ -1003,8 +1003,21 @@ const OrderPage: React.FC = () => {
         }
       });
     });
+
+    const filterParam = searchParams.get("filter");
+    if (filterParam === "purchase_problem") {
+      return list.filter((i: any) =>
+        (i.problems && (i.problems.toLowerCase().includes("purchase") || i.problems.toLowerCase().includes("buy"))) ||
+        (i.status && String(i.status).toLowerCase().includes("purchase"))
+      );
+    } else if (filterParam === "check_problem") {
+      return list.filter((i: any) =>
+        (i.problems && (i.problems.toLowerCase().includes("check") || i.problems.toLowerCase().includes("verify")))
+      );
+    }
+
     return list;
-  }, [orders]);
+  }, [orders, searchParams]);
 
   const reprintItems = useMemo(() => {
     const list: any[] = [];
@@ -1580,6 +1593,20 @@ const OrderPage: React.FC = () => {
   };
 
   useEffect(() => {
+    const tabParam = searchParams.get("tab");
+    if (tabParam) {
+      const validTabs = ["orders", "order_items", "nso", "supplier_orders", "purchase_order", "problems", "label_print"];
+      if (validTabs.includes(tabParam)) {
+        setActiveTab(tabParam as any);
+      }
+    }
+    const orderNo = searchParams.get("order_no");
+    if (orderNo !== null) {
+      setOrderNoFilter(orderNo);
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
     if (activeTab === "supplier_orders" || activeTab === "purchase_order")
       fetchSupplierOrders();
   }, [activeTab, fetchSupplierOrders]);
@@ -2113,6 +2140,27 @@ const OrderPage: React.FC = () => {
         allItems = allItems.filter((i: any) =>
           (i.problems && i.problems !== "" && (i.problems.toLowerCase().includes("check") || i.problems.toLowerCase().includes("verify")))
         );
+      } else if (filterParam === "rmb_special_no_value") {
+        allItems = allItems.filter((i: any) => {
+          const it = i.item || {};
+          const price = it.rmb_price || it.RMB_Price || 0;
+          return it.is_rmb_special === "Y" && (!price || parseFloat(String(price)) === 0);
+        });
+      } else if (filterParam === "eur_special_no_value") {
+        allItems = allItems.filter((i: any) => {
+          const it = i.item || {};
+          const hasEUR = (it.price && parseFloat(String(it.price)) > 0) || (it.transfer_price_EUR && parseFloat(String(it.transfer_price_EUR)) > 0);
+          return it.is_eur_special === "Y" && !hasEUR;
+        });
+      } else if (filterParam === "dimension_special_no_value") {
+        allItems = allItems.filter((i: any) => {
+          const it = i.item || {};
+          const hasDim = (it.weight && parseFloat(String(it.weight)) > 0) &&
+                          (it.length && parseFloat(String(it.length)) > 0) &&
+                          (it.width && parseFloat(String(it.width)) > 0) &&
+                          (it.height && parseFloat(String(it.height)) > 0);
+          return it.is_dimension_special === "Y" && !hasDim;
+        });
       }
     }
 
@@ -2225,7 +2273,7 @@ const OrderPage: React.FC = () => {
             </div>
           </div>
 
-          {searchParams.get("filter") && (
+          {searchParams.get("filter") && searchParams.get("hide_banner") !== "true" && (
             <div className="mb-6 px-5 py-3 bg-[#FFF3CD] border border-[#FFEBA2] rounded-md text-[#856404] flex items-center justify-between text-sm shadow-sm animate-pulse">
               <div className="flex items-center gap-2">
                 <span className="font-bold">⚠️ Reports & Control Health Audit View Active:</span>

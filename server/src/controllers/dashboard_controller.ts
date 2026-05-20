@@ -8,8 +8,21 @@ import { VariationValue } from "../models/variation_values";
 import fs from "fs";
 import path from "path";
 
+interface CacheData {
+  timestamp: number;
+  data: any;
+}
+
+let reportsCache: CacheData | null = null;
+const CACHE_TTL = 5 * 60 * 1000;
+
 export const getAuditReports = async (req: Request, res: Response) => {
   try {
+    const forceRefresh = req.query.refresh === "true";
+    if (!forceRefresh && reportsCache && (Date.now() - reportsCache.timestamp < CACHE_TTL)) {
+      return res.status(200).json(reportsCache.data);
+    }
+
     let currencyRates = {
       date: new Date().toISOString().split("T")[0],
       rates: {
@@ -204,13 +217,17 @@ export const getAuditReports = async (req: Request, res: Response) => {
         const itemsWithPhotos = await AppDataSource.getRepository(Item)
           .createQueryBuilder("item")
           .select(["item.photo", "item.pix_path", "item.pix_path_eBay"])
-          .getMany();
+          .getRawMany();
 
         const referencedPhotos = new Set<string>();
         itemsWithPhotos.forEach((item) => {
-          if (item.photo) referencedPhotos.add(path.basename(item.photo));
-          if (item.pix_path) referencedPhotos.add(path.basename(item.pix_path));
-          if (item.pix_path_eBay) referencedPhotos.add(path.basename(item.pix_path_eBay));
+          const photo = item.item_photo || item.photo;
+          const pixPath = item.item_pix_path || item.pix_path;
+          const pixPathEbay = item.item_pix_path_eBay || item.pix_path_eBay;
+
+          if (photo) referencedPhotos.add(path.basename(photo));
+          if (pixPath) referencedPhotos.add(path.basename(pixPath));
+          if (pixPathEbay) referencedPhotos.add(path.basename(pixPathEbay));
         });
 
         const unusedFiles = files.filter((file) => {
@@ -227,7 +244,7 @@ export const getAuditReports = async (req: Request, res: Response) => {
       console.error("Error listing unused pictures:", e);
     }
 
-    return res.status(200).json({
+    const responseData = {
       success: true,
       data: {
         currencyRates,
@@ -261,7 +278,14 @@ export const getAuditReports = async (req: Request, res: Response) => {
           ],
         },
       },
-    });
+    };
+
+    reportsCache = {
+      timestamp: Date.now(),
+      data: responseData,
+    };
+
+    return res.status(200).json(responseData);
   } catch (error) {
     console.error("Dashboard Auditing Reports Error:", error);
     return res.status(500).json({

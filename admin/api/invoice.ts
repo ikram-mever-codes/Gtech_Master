@@ -32,6 +32,9 @@ interface CreateInvoicePayload {
 
 interface UpdateInvoicePayload extends Partial<CreateInvoicePayload> {
   id: string;
+  description?: string;
+  freightCost?: number | string;
+  remark?: string;
 }
 
 export const createNewInvoice = async (invoiceData: CreateInvoicePayload) => {

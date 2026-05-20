@@ -11,7 +11,7 @@ import { OrderItem } from "../models/order_items";
 import { Item } from "../models/items";
 import { Taric } from "../models/tarics";
 import { CargoOrder } from "../models/cargo_orders";
-import { In } from "typeorm";
+import { In, Like } from "typeorm";
 import { getRMBPriceFromSupplier } from "./items_controller";
 import { WarehouseItem } from "../models/warehouse_items";
 import { _cachedCjkFontPath, _cachedCjkFontBuffer } from "./order_controller";
@@ -1349,15 +1349,52 @@ export class InvoiceController {
     const invoiceRepository = AppDataSource.getRepository(Invoice);
     try {
       const { id } = req.params;
-      const invoice = await invoiceRepository.findOne({ where: { id } });
+      const invoice = await invoiceRepository.findOne({
+        where: { id },
+        relations: ["customer", "items", "items.item"]
+      });
       if (!invoice) return res.status(404).json({ message: "Invoice not found" });
-      (invoice as any).status = "paid";
+
+      if (!invoice.invoiceNumber || !invoice.invoiceNumber.startsWith("CI")) {
+        const allCisInvoices = await invoiceRepository.find({
+          where: {
+            invoiceNumber: Like("CI%")
+          }
+        });
+
+        let maxSeq = 0;
+        for (const inv of allCisInvoices) {
+          const numStr = inv.invoiceNumber;
+          if (numStr && numStr.length > 6) {
+            const seqStr = numStr.substring(6);
+            const seqVal = parseInt(seqStr, 10);
+            if (!isNaN(seqVal) && seqVal > maxSeq) {
+              maxSeq = seqVal;
+            }
+          }
+        }
+
+        const nextSeq = maxSeq + 1;
+        const now = new Date();
+        const yy = now.getFullYear().toString().slice(-2);
+        const mm = (now.getMonth() + 1).toString().padStart(2, "0");
+        const prefix = `CI${yy}${mm}`;
+        invoice.invoiceNumber = `${prefix}${nextSeq.toString().padStart(3, "0")}`;
+
+        // Regenerate PDF URL
+        const pdfUrl = await InvoiceController.generateInvoicePDF(invoice);
+        invoice.pdfUrl = pdfUrl;
+      }
+
+      invoice.status = "paid";
       invoice.paidAmount = invoice.grossTotal;
       invoice.outstandingAmount = 0;
-      (invoice as any).closedAt = new Date();
+      invoice.closedAt = new Date();
+
       await invoiceRepository.save(invoice);
-      return res.json({ success: true, message: "Invoice marked as paid" });
+      return res.json({ success: true, message: "Invoice marked as paid", data: invoice });
     } catch (error) {
+      console.error("Error in markAsPaid:", error);
       return next(error);
     }
   };

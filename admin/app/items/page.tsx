@@ -153,7 +153,7 @@ const ItemsManagementPage: React.FC = () => {
     status: "",
     category: "",
     supplier: "",
-    isActive: "",
+    isActive: "Y",
   });
 
   const hasChinese = (str: string) => /[\u4e00-\u9fa5]/.test(str || "");
@@ -441,6 +441,16 @@ const ItemsManagementPage: React.FC = () => {
       console.error("Error fetching statistics:", error);
     }
   }, []);
+
+  useEffect(() => {
+    const tabParam = searchParams.get("tab");
+    if (tabParam) {
+      const validTabs = ["items", "parents", "warehouse", "tarics", "suppliers"];
+      if (validTabs.includes(tabParam)) {
+        setActiveTab(tabParam as TabType);
+      }
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     setPagination((prev) => ({ ...prev, page: 1 }));
@@ -952,6 +962,26 @@ const ItemsManagementPage: React.FC = () => {
           if (it.is_npr !== "Y") return false;
         } else if (filterParam === "no_picture") {
           if (it.is_active !== "Y" || (it.photo && it.photo !== "" && it.photo !== "null")) return false;
+        } else if (filterParam === "unused_pictures") {
+          return false;
+        } else if (filterParam === "multiple_parents_pictures") {
+          const photoToParentIds = new Map<string, Set<number | string>>();
+          data.forEach((item: any) => {
+            if (item.photo && item.photo !== "null" && item.photo !== "" && item.parent_id) {
+              const photoName = item.photo.trim();
+              if (!photoToParentIds.has(photoName)) {
+                photoToParentIds.set(photoName, new Set());
+              }
+              photoToParentIds.get(photoName)!.add(item.parent_id);
+            }
+          });
+          const multipleParentPhotos = new Set<string>();
+          photoToParentIds.forEach((parentIds, photo) => {
+            if (parentIds.size > 1) {
+              multipleParentPhotos.add(photo);
+            }
+          });
+          if (!it.photo || !multipleParentPhotos.has(it.photo.trim())) return false;
         }
       }
 
@@ -1773,7 +1803,7 @@ const ItemsManagementPage: React.FC = () => {
           </div>
         </div>
 
-        {searchParams.get("filter") && (
+        {searchParams.get("filter") && searchParams.get("hide_banner") !== "true" && (
           <div className="mb-6 px-5 py-3 bg-[#FFF3CD] border border-[#FFEBA2] rounded-md text-[#856404] flex items-center justify-between text-sm shadow-sm animate-pulse">
             <div className="flex items-center gap-2">
               <span className="font-bold">⚠️ Reports & Control Health Audit View Active:</span>
@@ -1794,6 +1824,8 @@ const ItemsManagementPage: React.FC = () => {
                     case "is_po_null": return "Suppliers items isPO ='null'";
                     case "new_picture_required": return "Is New Picture Required";
                     case "no_picture": return "Items without picture";
+                    case "unused_pictures": return "Unused Pictures";
+                    case "multiple_parents_pictures": return "Picture with multiple parents";
                     default: return searchParams.get("filter");
                   }
                 })()}
