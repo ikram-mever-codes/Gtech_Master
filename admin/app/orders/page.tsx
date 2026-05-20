@@ -3018,8 +3018,6 @@ const OrderPage: React.FC = () => {
                       render: (row) => (
                         <div className="text-center text-[11px]">
                           {new Date(row.created_at).toLocaleDateString()}
-                          <br />
-                          {new Date(row.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                         </div>
                       ),
                       align: "center",
@@ -3083,10 +3081,10 @@ const OrderPage: React.FC = () => {
                         return (
                           <div className="flex flex-col items-center">
                             <span className="text-green-600 font-bold text-[10px] uppercase">
-                              {allPurchased ? "Purchased" : "Partially"}
+                              {allPurchased ? "Purchased" : "PO"}
                             </span>
                             <span className="text-green-600 font-bold text-[10px] uppercase">
-                              {allPurchased ? "Order" : "Purchased"}
+                              {allPurchased ? "Order" : "Created"}
                             </span>
                           </div>
                         );
