@@ -343,11 +343,9 @@ export const getItems = async (
     const taricMap = new Map(tarics.map((t) => [t.id, t]));
     const catMap = new Map(cats.map((c) => [c.id, c]));
     const supplierMap = new Map(suppliersList.map((s) => [s.id, s]));
-    // Build rmbPriceMap: prefer the default supplier_item, then any
     const rmbPriceMap = new Map<number, any>();
     supplierItems.forEach((si) => {
       const existing = rmbPriceMap.get(si.item_id);
-      // Prefer is_default='Y', or the first entry found
       if (!existing || si.is_default === "Y") {
         rmbPriceMap.set(si.item_id, si.price_rmb);
       }
@@ -556,8 +554,6 @@ export const getItemById = async (
       });
 
       if (item.supplier_id && !supplierItems.some(si => Number(si.supplier_id) === Number(item.supplier_id))) {
-        // Auto-create supplier_item without price (null) so existing prices for
-        // other suppliers are not masked by a fake 0
         const newSupplierItem = supplierItemRepository.create({
           item_id: item.id,
           supplier_id: item.supplier_id,
@@ -1006,7 +1002,7 @@ export const updateItem = async (
       const allSIs = await supplierItemRepository.find({
         where: { item_id: item.id }
       });
-      
+
       let foundActive = false;
       for (const si of allSIs) {
         const shouldBeDefault = Number(si.supplier_id) === Number(newSupplierId);
@@ -1019,7 +1015,7 @@ export const updateItem = async (
           await supplierItemRepository.save(si);
         }
       }
-      
+
       if (!foundActive) {
         const supplierItemData = req.body.supplierItem;
         const newSI = supplierItemRepository.create({
