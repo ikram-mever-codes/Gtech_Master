@@ -30,16 +30,27 @@ import { AuthorizedRequest } from "../middlewares/authorized";
 
 export const getRMBPriceFromSupplier = async (
   itemId: number,
+  supplierId?: number,
 ): Promise<number | null> => {
   try {
     const supplierItemRepository = AppDataSource.getRepository(SupplierItem);
-    const supplierItem =
-      await supplierItemRepository.findOne({
-        where: { item_id: itemId, is_default: "Y" },
-      }) ||
-      await supplierItemRepository.findOne({
-        where: { item_id: itemId },
+    let supplierItem = null;
+
+    if (supplierId) {
+      supplierItem = await supplierItemRepository.findOne({
+        where: { item_id: itemId, supplier_id: supplierId },
       });
+    }
+
+    if (!supplierItem) {
+      supplierItem =
+        await supplierItemRepository.findOne({
+          where: { item_id: itemId, is_default: "Y" },
+        }) ||
+        await supplierItemRepository.findOne({
+          where: { item_id: itemId },
+        });
+    }
 
     return supplierItem && supplierItem.price_rmb !== undefined && supplierItem.price_rmb !== null
       ? Number(supplierItem.price_rmb)
@@ -332,9 +343,15 @@ export const getItems = async (
     const taricMap = new Map(tarics.map((t) => [t.id, t]));
     const catMap = new Map(cats.map((c) => [c.id, c]));
     const supplierMap = new Map(suppliersList.map((s) => [s.id, s]));
-    const rmbPriceMap = new Map(
-      supplierItems.map((si) => [si.item_id, si.price_rmb]),
-    );
+    // Build rmbPriceMap: prefer the default supplier_item, then any
+    const rmbPriceMap = new Map<number, any>();
+    supplierItems.forEach((si) => {
+      const existing = rmbPriceMap.get(si.item_id);
+      // Prefer is_default='Y', or the first entry found
+      if (!existing || si.is_default === "Y") {
+        rmbPriceMap.set(si.item_id, si.price_rmb);
+      }
+    });
     const warehouseByItemId = new Map(
       warehouseItems.filter((wi) => wi.item_id).map((wi) => [wi.item_id, wi]),
     );
@@ -537,6 +554,26 @@ export const getItemById = async (
         where: { item_id: parseInt(id) },
         relations: ["supplier"],
       });
+
+      if (item.supplier_id && !supplierItems.some(si => Number(si.supplier_id) === Number(item.supplier_id))) {
+        // Auto-create supplier_item without price (null) so existing prices for
+        // other suppliers are not masked by a fake 0
+        const newSupplierItem = supplierItemRepository.create({
+          item_id: item.id,
+          supplier_id: item.supplier_id,
+          is_default: supplierItems.length === 0 ? "Y" : "N",
+          moq: 1,
+          oi: 0,
+          is_po: "No",
+          lead_time: "",
+          url: "",
+        });
+        await supplierItemRepository.save(newSupplierItem);
+        supplierItems = await supplierItemRepository.find({
+          where: { item_id: parseInt(id) },
+          relations: ["supplier"],
+        });
+      }
     } catch (e: any) {
       console.warn("supplier_items table not available:", e.message);
     }
@@ -556,7 +593,7 @@ export const getItemById = async (
     const de_no = primaryWarehouseItem?.item_no_de || item.parent?.de_no || "";
     const ean = item.ean || primaryWarehouseItem?.ean || "";
 
-    const rmbPrice = await getRMBPriceFromSupplier(parseInt(id));
+    const rmbPrice = await getRMBPriceFromSupplier(parseInt(id), item.supplier_id ?? undefined);
 
     const formattedItem = {
       id: item.id,
@@ -693,7 +730,9 @@ export const getItemById = async (
 
       supplierItem: (() => {
         const defaultSi =
-          supplierItems.find((si) => si.is_default === "Y") || supplierItems[0];
+          supplierItems.find((si) => item.supplier_id && Number(si.supplier_id) === Number(item.supplier_id)) ||
+          supplierItems.find((si) => si.is_default === "Y") ||
+          supplierItems[0];
         return defaultSi
           ? {
             id: defaultSi.id,
@@ -922,6 +961,7 @@ export const updateItem = async (
 ) => {
   try {
     const { id } = req.params;
+    console.log(`[DEBUG] updateItem called for ID: ${id}. Body:`, JSON.stringify(req.body, null, 2));
     const itemRepository = AppDataSource.getRepository(Item);
     const supplierItemRepository: any =
       AppDataSource.getRepository(SupplierItem);
@@ -960,6 +1000,41 @@ export const updateItem = async (
           400,
         ),
       );
+    }
+
+    if (newSupplierId) {
+      const allSIs = await supplierItemRepository.find({
+        where: { item_id: item.id }
+      });
+      
+      let foundActive = false;
+      for (const si of allSIs) {
+        const shouldBeDefault = Number(si.supplier_id) === Number(newSupplierId);
+        if (shouldBeDefault) {
+          foundActive = true;
+        }
+        const targetIsDefault = shouldBeDefault ? "Y" : "N";
+        if (si.is_default !== targetIsDefault) {
+          si.is_default = targetIsDefault;
+          await supplierItemRepository.save(si);
+        }
+      }
+      
+      if (!foundActive) {
+        const supplierItemData = req.body.supplierItem;
+        const newSI = supplierItemRepository.create({
+          item_id: item.id,
+          supplier_id: newSupplierId,
+          is_default: "Y",
+          price_rmb: supplierItemData?.price_rmb !== undefined ? parseFloat(supplierItemData.price_rmb) : 0,
+          is_po: supplierItemData?.is_po || "No",
+          moq: supplierItemData?.moq !== undefined ? parseInt(supplierItemData.moq) : 1,
+          oi: supplierItemData?.oi !== undefined ? parseInt(supplierItemData.oi) : 0,
+          lead_time: supplierItemData?.lead_time || "",
+          url: supplierItemData?.url || "",
+        });
+        await supplierItemRepository.save(newSI);
+      }
     }
 
     const updatableFields = [
@@ -1096,6 +1171,10 @@ export const updateItem = async (
         }
         if (supplierItemData.url !== undefined) {
           supplierItem.url = supplierItemData.url;
+          sChanges = true;
+        }
+        if (supplierItemData.note_cn !== undefined) {
+          supplierItem.note_cn = supplierItemData.note_cn;
           sChanges = true;
         }
 
