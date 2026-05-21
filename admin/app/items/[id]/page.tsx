@@ -227,7 +227,7 @@ const ItemDetailsPage = () => {
       const activeSupplierId = resolved.supplier_id || resolved.supplierItems?.find((si: any) => si.isDefault)?.supplierId;
       if (activeSupplierId && resolved.supplierItem && resolved.supplierItems) {
         resolved.supplierItems = resolved.supplierItems.map((si: any) => {
-          if (si.supplierId === activeSupplierId) {
+          if (Number(si.supplierId) === Number(activeSupplierId)) {
             return {
               ...si,
               priceRMB: resolved.supplierItem.priceRMB !== undefined ? resolved.supplierItem.priceRMB : si.priceRMB,
@@ -260,7 +260,7 @@ const ItemDetailsPage = () => {
       val === "1";
 
     const activeSupplierId = rawItem.supplier_id || rawItem.supplierItems?.find((si: any) => si.isDefault)?.supplierId || null;
-    const defaultSupplierItem = rawItem.supplierItems?.find((si: any) => si.isDefault || si.supplierId === activeSupplierId);
+    const defaultSupplierItem = rawItem.supplierItems?.find((si: any) => si.isDefault || Number(si.supplierId) === Number(activeSupplierId));
 
     return {
       ...rawItem,
@@ -999,13 +999,13 @@ const ItemDetailsPage = () => {
                             ? String(!hasChinese(supplierDetail.name || "") ? supplierDetail.name : supplierDetail.company_name || "Unknown")
                             : "Unknown";
                           let existingItem = updated.supplierItems?.find(
-                            (si: any) => si.supplierId === newSupplierId
+                            (si: any) => Number(si.supplierId) === Number(newSupplierId)
                           );
 
                           if (existingItem) {
                             updated.supplierItems = updated.supplierItems.map((si: any) => ({
                               ...si,
-                              isDefault: si.supplierId === newSupplierId,
+                              isDefault: Number(si.supplierId) === Number(newSupplierId),
                             }));
                           } else {
                             const newLink = {
@@ -1703,6 +1703,18 @@ const ItemDetailsPage = () => {
                                     isDefault: x.id === si.id,
                                   }),
                                 );
+                                updated.supplierItem = {
+                                  priceRMB: si.priceRMB || "0",
+                                  isPO: si.isPO || "No",
+                                  moq: si.moq || "0",
+                                  interval: si.interval || "0",
+                                  leadTime: si.leadTime || "",
+                                  noteCN: si.noteCN || "",
+                                  url: si.url || "",
+                                };
+                                if (updated.others) {
+                                  updated.others.rmbPrice = si.priceRMB || "0";
+                                }
                                 setItemData(updated);
                                 await handleUpdateItem(updated);
                                 toast.success("Default supplier source updated", successStyles);
