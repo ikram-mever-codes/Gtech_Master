@@ -2101,206 +2101,206 @@ const ItemDetailsPage = () => {
         </div>
 
         <div className="mt-8 flex flex-wrap gap-3 justify-between items-center">
-            <div className="flex gap-3">
-              <button className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 text-gray-700">
-                <ArrowDownTrayIcon className="h-4 w-4" />
-                Export Details
-              </button>
-              <input
-                type="file"
-                ref={fileInputRef}
-                className="hidden"
-                multiple
-                accept="image/*"
-                onChange={(e) => handleImageUpload(e)}
-              />
-              <input
-                type="file"
-                ref={attachmentInputRef}
-                className="hidden"
-                multiple
-                onChange={(e) => handleAttachmentUpload(e)}
-              />
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploadingPictures}
-                className={`px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 text-gray-700 ${uploadingPictures ? "opacity-50 cursor-not-allowed" : ""
-                  }`}
-              >
-                <PhotoIcon className="h-4 w-4" />
-                {uploadingPictures ? "Uploading..." : "Add Pictures"}
-              </button>
-              <button
-                onClick={() => attachmentInputRef.current?.click()}
-                className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 text-gray-700"
-              >
-                <DocumentIcon className="h-4 w-4" />
-                Add Documents
-              </button>
-            </div>
+          <div className="flex gap-3">
+            <button className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 text-gray-700">
+              <ArrowDownTrayIcon className="h-4 w-4" />
+              Export Details
+            </button>
+            <input
+              type="file"
+              ref={fileInputRef}
+              className="hidden"
+              multiple
+              accept="image/*"
+              onChange={(e) => handleImageUpload(e)}
+            />
+            <input
+              type="file"
+              ref={attachmentInputRef}
+              className="hidden"
+              multiple
+              onChange={(e) => handleAttachmentUpload(e)}
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploadingPictures}
+              className={`px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 text-gray-700 ${uploadingPictures ? "opacity-50 cursor-not-allowed" : ""
+                }`}
+            >
+              <PhotoIcon className="h-4 w-4" />
+              {uploadingPictures ? "Uploading..." : "Add Pictures"}
+            </button>
+            <button
+              onClick={() => attachmentInputRef.current?.click()}
+              className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 text-gray-700"
+            >
+              <DocumentIcon className="h-4 w-4" />
+              Add Documents
+            </button>
+          </div>
 
-            <div className="text-sm text-gray-500">
-              Last updated: {itemData?.updated_at ? formatDate(itemData.updated_at) : formatDate(new Date())}
-            </div>
+          <div className="text-sm text-gray-500">
+            Last updated: {itemData?.updated_at ? formatDate(itemData.updated_at) : formatDate(new Date())}
           </div>
         </div>
-        <CustomModal
-          isOpen={isQualityModalOpen}
-          onClose={handleCloseQualityModal}
-          title={
-            editingQuality
-              ? "Update Quality of this item"
-              : "Add Quality to this item"
-          }
-          width="max-w-md"
-          footer={
-            <div className="flex gap-2 w-full justify-end">
-              <button
-                onClick={handleCloseQualityModal}
-                className="px-4 py-2 flex items-center gap-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-              >
-                <XCircleIcon className="h-4 w-4" />
-                Cancel
-              </button>
-              <button
-                onClick={handleSaveQuality}
-                className="px-4 py-2 flex items-center gap-2 text-white bg-[#00A651] rounded-lg hover:bg-[#008c44] transition-colors"
-              >
-                <CheckCircleIcon className="h-4 w-4" />
-                {editingQuality ? "Update" : "Add"}
-              </button>
-            </div>
-          }
-        >
-          <div className="space-y-4">
-            <p className="text-sm text-gray-500 -mt-2">
-              Make changes to item quality details.
-            </p>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Name
-              </label>
-              <input
-                type="text"
-                name="name"
-                value={qualityFormData.name}
-                onChange={handleQualityFormChange}
-                placeholder="Quality name"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Photo:
-              </label>
-              <div className="flex items-center gap-3">
-                <input
-                  type="file"
-                  id="quality-photo"
-                  className="hidden"
-                  onChange={handleFileChange}
-                  accept="image/*"
-                />
-                <label
-                  htmlFor="quality-photo"
-                  className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-50 transition-colors"
-                >
-                  Choose file
-                </label>
-                <span className="text-sm text-gray-500">
-                  {qualityFormData.picture
-                    ? qualityFormData.picture.name
-                    : qualityFormData.pictureUrl
-                      ? "Existing photo"
-                      : "No file chosen"}
-                </span>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Description:
-              </label>
-              <textarea
-                name="description"
-                value={qualityFormData.description}
-                onChange={handleQualityFormChange}
-                placeholder="Item Description"
-                rows={3}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Description CN:
-              </label>
-              <textarea
-                name="descriptionCN"
-                value={qualityFormData.descriptionCN}
-                onChange={handleQualityFormChange}
-                placeholder="Item Description in CN"
-                rows={3}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary"
-              />
-            </div>
-          </div>
-        </CustomModal>
-
-        <CustomModal
-          isOpen={isLinkSupplierModalOpen}
-          onClose={() => setIsLinkSupplierModalOpen(false)}
-          title="Link New Supplier Source"
-        >
-          <div className="space-y-6">
-            <div className="space-y-2">
-              <label className="text-sm font-semibold text-gray-700">
-                Select Supplier
-              </label>
-              <div className="relative">
-                <select
-                  value={selectedSupplierToLink}
-                  onChange={(e) => setSelectedSupplierToLink(e.target.value)}
-                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#8CC21B] focus:border-transparent transition-all outline-none appearance-none"
-                >
-                  <option value="">Choose a supplier...</option>
-                  {allSuppliers.map((s) => (
-                    <option key={s.id} value={String(s.id)}>
-                      [{s.id}]{s.name && !hasChinese(s.name) ? " " + s.name : ""}
-                    </option>
-                  ))}
-                </select>
-                <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
-                  <ChevronRightIcon className="h-4 w-4 text-gray-400 rotate-90" />
-                </div>
-              </div>
-              <p className="text-xs text-gray-500 italic">
-                Link an additional supplier to this item. You can then set
-                specific prices and lead times for this source.
-              </p>
-            </div>
-
-            <div className="flex gap-3 pt-2">
-              <button
-                onClick={() => setIsLinkSupplierModalOpen(false)}
-                className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition-all"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleLinkSupplier}
-                disabled={!selectedSupplierToLink}
-                className="flex-1 px-4 py-3 bg-[#8CC21B] text-white rounded-xl font-semibold hover:bg-[#7ab318] transition-all disabled:opacity-50 shadow-md"
-              >
-                Link Supplier
-              </button>
-            </div>
-          </div>
-        </CustomModal>
       </div>
-      );
+      <CustomModal
+        isOpen={isQualityModalOpen}
+        onClose={handleCloseQualityModal}
+        title={
+          editingQuality
+            ? "Update Quality of this item"
+            : "Add Quality to this item"
+        }
+        width="max-w-md"
+        footer={
+          <div className="flex gap-2 w-full justify-end">
+            <button
+              onClick={handleCloseQualityModal}
+              className="px-4 py-2 flex items-center gap-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+            >
+              <XCircleIcon className="h-4 w-4" />
+              Cancel
+            </button>
+            <button
+              onClick={handleSaveQuality}
+              className="px-4 py-2 flex items-center gap-2 text-white bg-[#00A651] rounded-lg hover:bg-[#008c44] transition-colors"
+            >
+              <CheckCircleIcon className="h-4 w-4" />
+              {editingQuality ? "Update" : "Add"}
+            </button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-gray-500 -mt-2">
+            Make changes to item quality details.
+          </p>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Name
+            </label>
+            <input
+              type="text"
+              name="name"
+              value={qualityFormData.name}
+              onChange={handleQualityFormChange}
+              placeholder="Quality name"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Photo:
+            </label>
+            <div className="flex items-center gap-3">
+              <input
+                type="file"
+                id="quality-photo"
+                className="hidden"
+                onChange={handleFileChange}
+                accept="image/*"
+              />
+              <label
+                htmlFor="quality-photo"
+                className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-50 transition-colors"
+              >
+                Choose file
+              </label>
+              <span className="text-sm text-gray-500">
+                {qualityFormData.picture
+                  ? qualityFormData.picture.name
+                  : qualityFormData.pictureUrl
+                    ? "Existing photo"
+                    : "No file chosen"}
+              </span>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Description:
+            </label>
+            <textarea
+              name="description"
+              value={qualityFormData.description}
+              onChange={handleQualityFormChange}
+              placeholder="Item Description"
+              rows={3}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Description CN:
+            </label>
+            <textarea
+              name="descriptionCN"
+              value={qualityFormData.descriptionCN}
+              onChange={handleQualityFormChange}
+              placeholder="Item Description in CN"
+              rows={3}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary"
+            />
+          </div>
+        </div>
+      </CustomModal>
+
+      <CustomModal
+        isOpen={isLinkSupplierModalOpen}
+        onClose={() => setIsLinkSupplierModalOpen(false)}
+        title="Link New Supplier Source"
+      >
+        <div className="space-y-6">
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-gray-700">
+              Select Supplier
+            </label>
+            <div className="relative">
+              <select
+                value={selectedSupplierToLink}
+                onChange={(e) => setSelectedSupplierToLink(e.target.value)}
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#8CC21B] focus:border-transparent transition-all outline-none appearance-none"
+              >
+                <option value="">Choose a supplier...</option>
+                {allSuppliers.map((s) => (
+                  <option key={s.id} value={String(s.id)}>
+                    [{s.id}]{s.name && !hasChinese(s.name) ? " " + s.name : ""}
+                  </option>
+                ))}
+              </select>
+              <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
+                <ChevronRightIcon className="h-4 w-4 text-gray-400 rotate-90" />
+              </div>
+            </div>
+            <p className="text-xs text-gray-500 italic">
+              Link an additional supplier to this item. You can then set
+              specific prices and lead times for this source.
+            </p>
+          </div>
+
+          <div className="flex gap-3 pt-2">
+            <button
+              onClick={() => setIsLinkSupplierModalOpen(false)}
+              className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition-all"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleLinkSupplier}
+              disabled={!selectedSupplierToLink}
+              className="flex-1 px-4 py-3 bg-[#8CC21B] text-white rounded-xl font-semibold hover:bg-[#7ab318] transition-all disabled:opacity-50 shadow-md"
+            >
+              Link Supplier
+            </button>
+          </div>
+        </div>
+      </CustomModal>
+    </div>
+  );
 };
 
-      export default ItemDetailsPage;
+export default ItemDetailsPage;
