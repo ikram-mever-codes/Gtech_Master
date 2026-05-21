@@ -247,7 +247,7 @@ export const login = async (
     const cleanRes = (user.assignedResources || []).map(r => r.trim()).filter(r => r.length > 0);
     const derivedRes = user.permissions?.map(p => p.resource.trim()) || [];
     let finalResources = Array.from(new Set([...cleanRes, ...derivedRes]));
-    
+
     if (user.role === UserRole.PURCHASING && !finalResources.includes("Orders")) {
       finalResources.push("Orders");
     }
