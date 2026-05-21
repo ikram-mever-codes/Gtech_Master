@@ -1,7 +1,6 @@
 "use client";
-
 import React, { useState, useEffect, useCallback, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import {
   MagnifyingGlassIcon,
   ArrowPathIcon,
@@ -63,7 +62,6 @@ import { MessagesSquare, ClipboardList } from "lucide-react";
 import PageHeader from "@/components/UI/PageHeader";
 import { UserRole } from "@/utils/interfaces";
 import { getAllTarics } from "@/api/items";
-
 export interface Customer {
   id: string;
   companyName: string;
@@ -72,7 +70,6 @@ export interface Customer {
   stage: "business" | "star_business" | "star_customer" | "device_maker";
   displayName: string;
 }
-
 interface ContactPerson {
   id: string;
   name: string;
@@ -85,13 +82,11 @@ interface ContactPerson {
     companyName: string;
   };
 }
-
 interface QualityCriterion {
   description: string;
   picture?: File | string;
   pictureUrl?: string;
 }
-
 const getConversionFormFields = (hasExistingDimensions?: any) => {
   const baseFields = [
     {
@@ -244,10 +239,8 @@ const getConversionFormFields = (hasExistingDimensions?: any) => {
       required: false,
     },
   ];
-
   return baseFields;
 };
-
 const CombinedInquiriesPageContent = () => {
   const [inquiries, setInquiries] = useState<Inquiry[]>([]);
   const [allInquiries, setAllInquiries] = useState<Inquiry[]>([]);
@@ -260,7 +253,6 @@ const CombinedInquiriesPageContent = () => {
     "create",
   );
   const [tarics, setTarics] = useState<any[]>([]);
-
   const [editingInquiryId, setEditingInquiryId] = useState<string | null>(null);
   const { user } = useSelector((state: RootState) => state.user);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -273,7 +265,6 @@ const CombinedInquiriesPageContent = () => {
     height?: boolean;
     length?: boolean;
   }>({});
-
   const [showConversionModal, setShowConversionModal] = useState(false);
   const [conversionType, setConversionType] = useState<"inquiry" | "request">(
     "inquiry",
@@ -285,19 +276,13 @@ const CombinedInquiriesPageContent = () => {
     useState<Inquiry | null>(null);
   const [conversionRequestData, setConversionRequestData] =
     useState<Request | null>(null);
-
-  const [expandedRequestIndex, setExpandedRequestIndex] = useState<
-    number | null
-  >(0);
-
+  const [expandedRequestIndex, setExpandedRequestIndex] = useState<any>(0);
   const [expandedInquiryIds, setExpandedInquiryIds] = useState<Set<string>>(
     new Set(),
   );
   const [allRequestsExpanded, setAllRequestsExpanded] = useState(true);
-
   const [inquiryImageFile, setInquiryImageFile] = useState<File | null>(null);
   const [inquiryImagePreview, setInquiryImagePreview] = useState<string>("");
-
   const [inquiryFormData, setInquiryFormData] = useState<CreateInquiryPayload>({
     name: "",
     description: "",
@@ -335,12 +320,8 @@ const CombinedInquiriesPageContent = () => {
     painPoints: [],
     requests: [],
   });
-
   const [inquiryTagInput, setInquiryTagInput] = useState("");
-  const [requestLoopTagInputs, setRequestLoopTagInputs] = useState<
-    Record<number, string>
-  >({});
-
+  const [requestLoopTagInputs, setRequestLoopTagInputs] = useState<any>({});
   const handleAddInquiryPainPoint = () => {
     const value = inquiryTagInput.trim();
     if (value && !inquiryFormData.painPoints?.includes(value)) {
@@ -351,7 +332,6 @@ const CombinedInquiriesPageContent = () => {
       setInquiryTagInput("");
     }
   };
-
   const handleAddRequestLoopPainPoint = (index: number) => {
     const value = (requestLoopTagInputs[index] || "").trim();
     if (value && !inquiryRequests[index].painPoints?.includes(value)) {
@@ -367,9 +347,7 @@ const CombinedInquiriesPageContent = () => {
       });
     }
   };
-
   const [conversionTagInput, setConversionTagInput] = useState("");
-
   const handleAddConversionPainPoint = () => {
     const value = conversionTagInput.trim();
     if (value && !conversionFormData.painPoints?.includes(value)) {
@@ -380,35 +358,7 @@ const CombinedInquiriesPageContent = () => {
       setConversionTagInput("");
     }
   };
-
-  const [inquiryRequests, setInquiryRequests] = useState<
-    Array<{
-      itemName: string;
-      description: string;
-      qty: number;
-      purchasePrice: number;
-      currency: string;
-      status: string;
-      material: string;
-      specification: string;
-      images?: string[];
-      weight?: number;
-      width?: number;
-      height?: number;
-      length?: number;
-      qualityCriteria?: QualityCriterion[];
-      attachments?: File[];
-      taric?: string;
-      asanaLink?: string;
-      itemNo?: string;
-      urgency1?: string;
-      urgency2?: string;
-      painPoints?: string[];
-      priceRMB?: number;
-      priority?: string;
-      interval?: string;
-    }>
-  >([
+  const [inquiryRequests, setInquiryRequests] = useState<any[]>([
     {
       itemName: "",
       description: "",
@@ -436,7 +386,6 @@ const CombinedInquiriesPageContent = () => {
       interval: "Monatlich",
     },
   ]);
-
   const [inquiryFilters, setInquiryFilters] = useState<InquirySearchFilters>({
     search: "",
     status: "",
@@ -447,15 +396,16 @@ const CombinedInquiriesPageContent = () => {
     sortBy: "createdAt",
     sortOrder: "DESC",
   });
-
   const itemsPerPage = 20;
+
+  // ── NEW: track whether we've already auto-opened from the URL param ──
+  const [urlParamHandled, setUrlParamHandled] = useState(false);
 
   useEffect(() => {
     fetchCustomers();
     fetchContactPersons();
     fetchTarics();
   }, []);
-
   const fetchTarics = async () => {
     try {
       const response = await getAllTarics();
@@ -464,23 +414,33 @@ const CombinedInquiriesPageContent = () => {
       console.error("Error fetching tarics:", error);
     }
   };
-
   useEffect(() => {
     fetchInquiries();
   }, [inquiryFilters, selectedCustomerId]);
-
   const searchParams = useSearchParams();
 
+  // ── UPDATED: open the inquiry from URL param once allInquiries is loaded ──
   useEffect(() => {
+    if (urlParamHandled) return;
     const inquiryId = searchParams.get("inquiryId");
-
     if (inquiryId && allInquiries.length > 0) {
       const inquiry = allInquiries.find((i) => i.id === inquiryId);
       if (inquiry) {
         handleInquiryClick(inquiry);
+        setUrlParamHandled(true);
       }
     }
-  }, [searchParams, allInquiries]);
+  }, [searchParams, allInquiries, urlParamHandled]);
+
+  // ── NEW: copy a shareable link for a given inquiry ──
+  const handleCopyInquiryLink = (e: React.MouseEvent, inquiryId: string) => {
+    e.stopPropagation();
+    const url = `${window.location.origin}${window.location.pathname}?inquiryId=${inquiryId}`;
+    navigator.clipboard
+      .writeText(url)
+      .then(() => toast.success("Link copied to clipboard!"))
+      .catch(() => toast.error("Failed to copy link"));
+  };
 
   const toggleRequestExpansion = (index: number) => {
     if (expandedRequestIndex === index) {
@@ -489,7 +449,6 @@ const CombinedInquiriesPageContent = () => {
       setExpandedRequestIndex(index);
     }
   };
-
   const toggleInquiryRequests = (inquiryId: string) => {
     setExpandedInquiryIds((prev) => {
       const next = new Set(prev);
@@ -501,7 +460,6 @@ const CombinedInquiriesPageContent = () => {
       return next;
     });
   };
-
   const toggleAllInquiryRequests = (inquiries: any[]) => {
     if (allRequestsExpanded) {
       setExpandedInquiryIds(new Set());
@@ -515,7 +473,6 @@ const CombinedInquiriesPageContent = () => {
       setAllRequestsExpanded(true);
     }
   };
-
   const fetchCustomers = async () => {
     try {
       const response = await getAllCustomers({ limit: 1000 });
@@ -523,15 +480,12 @@ const CombinedInquiriesPageContent = () => {
         const customers = Array.isArray(response.data)
           ? response.data
           : response.data.businesses || [];
-
-        // Filter based on stage field
         const filteredCustomers = customers.filter((customer: Customer) => {
           return (
             customer.stage === "star_business" ||
             customer.stage === "star_customer"
           );
         });
-
         setCustomers(filteredCustomers);
         console.log(
           `Found ${filteredCustomers.length} star customers/businesses`,
@@ -552,7 +506,6 @@ const CombinedInquiriesPageContent = () => {
       console.error("Error fetching contact persons:", error);
     }
   };
-
   const fetchInquiries = useCallback(async () => {
     setInquiryLoading(true);
     try {
@@ -563,23 +516,19 @@ const CombinedInquiriesPageContent = () => {
         ...(selectedCustomerId ? { customerId: selectedCustomerId } : {}),
       };
       const response = await getAllInquiries(filters);
-
       if (response?.data) {
         const inquiryData = Array.isArray(response.data)
           ? response.data
           : response.data.data || response.data.inquiries || [];
         setAllInquiries(inquiryData);
-
         const totalFiltered = inquiryData.length;
         const totalPagesCalc = Math.ceil(totalFiltered / itemsPerPage);
         setInquiryTotalPages(totalPagesCalc);
         setInquiryTotalRecords(totalFiltered);
-
         const startIndex = (inquiryCurrentPage - 1) * itemsPerPage;
         const endIndex = startIndex + itemsPerPage;
         const paginatedItems = inquiryData.slice(startIndex, endIndex);
         setInquiries(paginatedItems);
-
         const withRequests = inquiryData.filter(
           (i: any) => i.requests?.length > 0,
         );
@@ -592,12 +541,10 @@ const CombinedInquiriesPageContent = () => {
       setInquiryLoading(false);
     }
   }, [inquiryFilters, inquiryCurrentPage, itemsPerPage, selectedCustomerId]);
-
   const renderDimensionStatus = () => {
     if (!Object.values(existingDimensionFields).some((v) => v)) {
       return null;
     }
-
     return (
       <div className="mb-4 p-3 bg-green-50 rounded-lg border border-green-200">
         <div className="flex items-center gap-2">
@@ -635,7 +582,6 @@ const CombinedInquiriesPageContent = () => {
       </div>
     );
   };
-
   const handleInquiryClick = (inquiry: Inquiry) => {
     setInquiryModalMode("edit");
     setEditingInquiryId(inquiry.id);
@@ -676,7 +622,6 @@ const CombinedInquiriesPageContent = () => {
       requests: inquiry.requests || [],
     });
     setInquiryImagePreview(inquiry.image || "");
-
     if (inquiry.requests && inquiry.requests.length > 0) {
       setInquiryRequests(
         inquiry.requests.map((req: any) => ({
@@ -707,17 +652,14 @@ const CombinedInquiriesPageContent = () => {
         })),
       );
     }
-
     setExpandedRequestIndex(0);
     setShowCreateModal(true);
   };
-
   const handleInquirySubmit = async () => {
     if (!inquiryFormData.name || !inquiryFormData.customerId) {
       toast.error("Please fill in all required fields");
       return;
     }
-
     const hasValidRequest = inquiryRequests.some(
       (req) => req.itemName && req.qty >= 1,
     );
@@ -725,18 +667,15 @@ const CombinedInquiriesPageContent = () => {
       toast.error("Please add at least one valid request item");
       return;
     }
-
     try {
       const requestsData = inquiryRequests.map((req) => ({
         ...req,
         qty: req.qty.toString(),
       }));
-
       const inquiryPayload = {
         ...inquiryFormData,
         requests: requestsData,
       };
-
       if (inquiryModalMode === "edit" && editingInquiryId) {
         await updateInquiry({
           id: editingInquiryId,
@@ -745,19 +684,18 @@ const CombinedInquiriesPageContent = () => {
       } else {
         await createInquiry(inquiryPayload as CreateInquiryPayload);
       }
-
       resetInquiryForm();
       setShowCreateModal(false);
       fetchInquiries();
     } catch (error) {
       console.error(
-        `Error ${inquiryModalMode === "edit" ? "updating" : "creating"
+        `Error ${
+          inquiryModalMode === "edit" ? "updating" : "creating"
         } inquiry:`,
         error,
       );
     }
   };
-
   const addNewRequest = () => {
     setInquiryRequests([
       ...inquiryRequests,
@@ -790,7 +728,6 @@ const CombinedInquiriesPageContent = () => {
     ]);
     setExpandedRequestIndex(inquiryRequests.length);
   };
-
   const handleDeleteInquiry = async (inquiryId: string) => {
     if (window.confirm("Are you sure you want to delete this inquiry?")) {
       try {
@@ -802,7 +739,6 @@ const CombinedInquiriesPageContent = () => {
       }
     }
   };
-
   const updateRequest = (index: number, field: string, value: any) => {
     const updatedRequests = [...inquiryRequests];
     updatedRequests[index] = {
@@ -811,7 +747,6 @@ const CombinedInquiriesPageContent = () => {
     };
     setInquiryRequests(updatedRequests);
   };
-
   const addRequestQualityCriterion = (requestIndex: number) => {
     const updatedRequests = [...inquiryRequests];
     if (!updatedRequests[requestIndex].qualityCriteria) {
@@ -823,7 +758,6 @@ const CombinedInquiriesPageContent = () => {
     });
     setInquiryRequests(updatedRequests);
   };
-
   const updateRequestQualityCriterion = (
     requestIndex: number,
     criterionIndex: number,
@@ -839,7 +773,6 @@ const CombinedInquiriesPageContent = () => {
       setInquiryRequests(updatedRequests);
     }
   };
-
   const removeRequestQualityCriterion = (
     requestIndex: number,
     criterionIndex: number,
@@ -848,11 +781,10 @@ const CombinedInquiriesPageContent = () => {
     if (updatedRequests[requestIndex].qualityCriteria) {
       updatedRequests[requestIndex].qualityCriteria = updatedRequests[
         requestIndex
-      ].qualityCriteria!.filter((_, i) => i !== criterionIndex);
+      ].qualityCriteria!.filter((_: any, i: any) => i !== criterionIndex);
       setInquiryRequests(updatedRequests);
     }
   };
-
   const handleRequestAttachmentUpload = (
     requestIndex: number,
     files: FileList,
@@ -868,17 +800,15 @@ const CombinedInquiriesPageContent = () => {
     ];
     setInquiryRequests(updatedRequests);
   };
-
   const removeRequestAttachment = (requestIndex: number, fileIndex: number) => {
     const updatedRequests = [...inquiryRequests];
     if (updatedRequests[requestIndex].attachments) {
       updatedRequests[requestIndex].attachments = updatedRequests[
         requestIndex
-      ].attachments!.filter((_, i) => i !== fileIndex);
+      ].attachments!.filter((_: any, i: any) => i !== fileIndex);
       setInquiryRequests(updatedRequests);
     }
   };
-
   const resetInquiryForm = () => {
     setInquiryFormData({
       name: "",
@@ -952,12 +882,10 @@ const CombinedInquiriesPageContent = () => {
     setInquiryModalMode("create");
     setExpandedRequestIndex(0);
   };
-
   const removeRequest = (index: number) => {
     if (inquiryRequests.length > 1) {
       const updatedRequests = inquiryRequests.filter((_, i) => i !== index);
       setInquiryRequests(updatedRequests);
-
       if (expandedRequestIndex === index) {
         setExpandedRequestIndex(Math.max(0, index - 1));
       } else if (expandedRequestIndex && expandedRequestIndex > index) {
@@ -967,7 +895,6 @@ const CombinedInquiriesPageContent = () => {
       toast.error("At least one request is required");
     }
   };
-
   const handleOpenConversionModal = async (
     type: "inquiry" | "request",
     itemId: string,
@@ -978,7 +905,6 @@ const CombinedInquiriesPageContent = () => {
     setConversionType(type);
     setConvertingItemId(itemId);
     if (inquiryId) setConvertingInquiryId(inquiryId);
-
     let existingDims = {
       weight: false,
       width: false,
@@ -986,17 +912,14 @@ const CombinedInquiriesPageContent = () => {
       length: false,
     };
     let initialFormData: any = {};
-
     if (type === "inquiry" && inquiryData) {
       setConversionInquiryData(inquiryData);
-
       existingDims = {
         weight: !!inquiryData.weight,
         width: !!inquiryData.width,
         height: !!inquiryData.height,
         length: !!inquiryData.length,
       };
-
       if (inquiryData.isAssembly) {
         initialFormData = {
           itemNameCN: inquiryData.description,
@@ -1024,14 +947,12 @@ const CombinedInquiriesPageContent = () => {
       }
     } else if (type === "request" && requestData) {
       setConversionRequestData(requestData);
-
       existingDims = {
         weight: !!requestData.weight,
         width: !!requestData.width,
         height: !!requestData.height,
         length: !!requestData.length,
       };
-
       initialFormData = {
         itemNameCN: requestData.specification,
         FOQ: requestData.qty ? parseInt(requestData.qty) || 0 : 0,
@@ -1047,12 +968,10 @@ const CombinedInquiriesPageContent = () => {
         length: requestData.length || "",
       };
     }
-
     setExistingDimensionFields(existingDims);
     setConversionFormData(initialFormData);
     setShowConversionModal(true);
   };
-
   const handleConvertInquiryToItem = async () => {
     const validationErrors = validateConversionForm(
       conversionFormData,
@@ -1064,7 +983,6 @@ const CombinedInquiriesPageContent = () => {
       );
       return;
     }
-
     try {
       await convertInquiryToItem(convertingItemId, conversionFormData);
       setShowConversionModal(false);
@@ -1075,7 +993,6 @@ const CombinedInquiriesPageContent = () => {
       toast.error(error.message || "Failed to convert inquiry to item");
     }
   };
-
   const handleConvertRequestToItem = async () => {
     const validationErrors = validateConversionForm(
       conversionFormData,
@@ -1087,7 +1004,6 @@ const CombinedInquiriesPageContent = () => {
       );
       return;
     }
-
     try {
       await convertRequestToItem(
         convertingItemId,
@@ -1100,29 +1016,22 @@ const CombinedInquiriesPageContent = () => {
       console.error("Error converting request to item:", error);
     }
   };
-
   const validateConversionForm = (formData: any, existingDims: any) => {
     const errors: string[] = [];
-
     if (!existingDims.weight && (!formData.weight || formData.weight === "")) {
       errors.push("Weight");
     }
-
     if (!existingDims.width && (!formData.width || formData.width === "")) {
       errors.push("Width");
     }
-
     if (!existingDims.height && (!formData.height || formData.height === "")) {
       errors.push("Height");
     }
-
     if (!existingDims.length && (!formData.length || formData.length === "")) {
       errors.push("Length");
     }
-
     return errors;
   };
-
   const resetConversionForm = () => {
     setConversionFormData({});
     setConversionInquiryData(null);
@@ -1131,11 +1040,9 @@ const CombinedInquiriesPageContent = () => {
     setConvertingInquiryId("");
     setExistingDimensionFields({});
   };
-
   const handleConvertInquiryClick = (inquiry: Inquiry) => {
     handleOpenConversionModal("inquiry", inquiry.id, inquiry);
   };
-
   const handleConvertRequestClick = (request: Request, inquiryId?: string) => {
     handleOpenConversionModal(
       "request",
@@ -1145,17 +1052,14 @@ const CombinedInquiriesPageContent = () => {
       inquiryId,
     );
   };
-
   const getInquiryStatusColor = (status: string) => {
     const statusObj = getInquiryStatuses().find((s) => s.value === status);
     return statusObj?.color || "bg-gray-100 text-gray-800";
   };
-
   const getInquiryPriorityColor = (priority: string) => {
     const priorityObj = getPriorityOptions().find((p) => p.value === priority);
     return priorityObj?.color || "bg-gray-100 text-gray-800";
   };
-
   const getRequestStatusColor = (status: string) => {
     const colors: Record<string, string> = {
       open: "bg-blue-100 text-blue-800",
@@ -1173,7 +1077,6 @@ const CombinedInquiriesPageContent = () => {
     };
     return colors[status] || "bg-gray-100 text-gray-800";
   };
-
   const getRequestPriorityColor = (priority: string) => {
     const colors: Record<string, string> = {
       Low: "bg-green-100 text-green-800",
@@ -1184,7 +1087,6 @@ const CombinedInquiriesPageContent = () => {
     };
     return colors[priority] || "bg-gray-100 text-gray-800";
   };
-
   const formatDate = (dateString: string | Date) => {
     if (!dateString) return "-";
     return new Date(dateString).toLocaleDateString("de-DE", {
@@ -1193,19 +1095,16 @@ const CombinedInquiriesPageContent = () => {
       day: "numeric",
     });
   };
-
   const formatCurrency = (amount: number, currency: string) => {
     return new Intl.NumberFormat("de-DE", {
       style: "currency",
       currency: currency,
     }).format(amount);
   };
-
   const renderDimensionInfo = (item: any) => {
     const hasDimensions =
       item.weight || item.width || item.height || item.length;
     if (!hasDimensions) return null;
-
     return (
       <div className="flex items-center gap-2 mt-1 text-xs text-gray-500">
         {item.weight && (
@@ -1226,13 +1125,12 @@ const CombinedInquiriesPageContent = () => {
       </div>
     );
   };
-
   const formatTaricDisplay = (taric: any) => {
     if (!taric) return "";
-    return `${taric.id} - ${taric.code || "No code"} - ${taric.name_de || taric.name_en || taric.name_cn || "No name"
-      }`;
+    return `${taric.id} - ${taric.code || "No code"} - ${
+      taric.name_de || taric.name_en || taric.name_cn || "No name"
+    }`;
   };
-
   const getConversionFormFieldsWithOptions = () => {
     const fields = getConversionFormFields(existingDimensionFields);
     return fields.map((field) => {
@@ -1248,7 +1146,6 @@ const CombinedInquiriesPageContent = () => {
       return field;
     });
   };
-
   const renderAssemblyRequestView = (request: any, index: number) => {
     return (
       <div className="border border-gray-200 rounded-lg p-4 mb-3 bg-gray-50">
@@ -1268,7 +1165,6 @@ const CombinedInquiriesPageContent = () => {
               min="1"
             />
           </div>
-
           <div className="col-span-1">
             <label className="block text-xs font-medium text-gray-700 mb-1">
               Interval
@@ -1286,7 +1182,6 @@ const CombinedInquiriesPageContent = () => {
               ))}
             </select>
           </div>
-
           <div className="col-span-1">
             <label className="block text-xs font-medium text-gray-700 mb-1">
               Price (RMB) *
@@ -1307,7 +1202,6 @@ const CombinedInquiriesPageContent = () => {
               step="0.01"
             />
           </div>
-
           <div className="col-span-1">
             <label className="block text-xs font-medium text-gray-700 mb-1">
               TARIC Code
@@ -1326,7 +1220,6 @@ const CombinedInquiriesPageContent = () => {
               ))}
             </select>
           </div>
-
           <div className="col-span-2">
             <div className="flex items-center justify-between mb-2">
               <label className="block text-xs font-medium text-gray-700">
@@ -1342,7 +1235,6 @@ const CombinedInquiriesPageContent = () => {
                 Add Criterion
               </button>
             </div>
-
             {request.qualityCriteria?.map(
               (criterion: QualityCriterion, criterionIndex: number) => (
                 <div
@@ -1364,7 +1256,6 @@ const CombinedInquiriesPageContent = () => {
                       Remove
                     </button>
                   </div>
-
                   <div className="mb-2">
                     <label className="block text-xs font-medium text-gray-700 mb-1">
                       Description
@@ -1385,7 +1276,6 @@ const CombinedInquiriesPageContent = () => {
                       placeholder="Enter quality description"
                     />
                   </div>
-
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">
                       Picture
@@ -1443,7 +1333,6 @@ const CombinedInquiriesPageContent = () => {
               ),
             )}
           </div>
-
           <div className="col-span-2">
             <div className="flex items-center justify-between mb-2">
               <label className="block text-xs font-medium text-gray-700">
@@ -1465,7 +1354,6 @@ const CombinedInquiriesPageContent = () => {
                 />
               </label>
             </div>
-
             {request.attachments && request.attachments.length > 0 && (
               <div className="space-y-2">
                 {request.attachments.map((file: File, fileIndex: number) => (
@@ -1498,7 +1386,6 @@ const CombinedInquiriesPageContent = () => {
       </div>
     );
   };
-
   const renderStandardRequestView = (request: any, index: number) => {
     return (
       <div className="grid grid-cols-2 gap-2">
@@ -1515,7 +1402,6 @@ const CombinedInquiriesPageContent = () => {
             placeholder="Enter item name"
           />
         </div>
-
         <div>
           <label className="block text-xs font-medium text-gray-700 mb-1">
             Quantity *
@@ -1531,7 +1417,6 @@ const CombinedInquiriesPageContent = () => {
             min="1"
           />
         </div>
-
         <div>
           <label className="block text-xs font-medium text-gray-700 mb-1">
             Purchase Price (RMB)
@@ -1555,7 +1440,6 @@ const CombinedInquiriesPageContent = () => {
       </div>
     );
   };
-
   return (
     <div className="min-h-screen bg-white shadow-xl rounded-lg p-6">
       <div className="max-w-7xl mx-auto">
@@ -1596,7 +1480,6 @@ const CombinedInquiriesPageContent = () => {
                 )}
                 {allRequestsExpanded ? "Fold All" : "Unfold All"}
               </button>
-
               <button
                 onClick={fetchInquiries}
                 disabled={inquiryLoading}
@@ -1607,7 +1490,6 @@ const CombinedInquiriesPageContent = () => {
                 />
                 Refresh
               </button>
-
               <CustomButton
                 gradient={true}
                 onClick={() => {
@@ -1622,7 +1504,6 @@ const CombinedInquiriesPageContent = () => {
             </div>
           </div>
         </div>
-
         <div className="bg-white/80 backdrop-blur-sm rounded-md shadow-lg border border-gray-100/50 overflow-hidden">
           {inquiryLoading ? (
             <div className="p-8 text-center">
@@ -1700,7 +1581,7 @@ const CombinedInquiriesPageContent = () => {
                             <a
                               href={`/customers/${inquiry.customer.id}`}
                               className="text-sm text-blue-600 hover:text-blue-800 block"
-                              onClick={(e) => e.stopPropagation()}
+                              onClick={(e: any) => e.stopPropagation()}
                             >
                               {inquiry.customer?.companyName || "-"}
                             </a>
@@ -1712,7 +1593,6 @@ const CombinedInquiriesPageContent = () => {
                             )}
                           </div>
                         </td>
-
                         <td className="px-4 py-3 text-center">
                           <div className="space-y-1">
                             <div className="text-sm font-medium text-gray-900">
@@ -1793,10 +1673,11 @@ const CombinedInquiriesPageContent = () => {
                                 e.stopPropagation();
                                 toggleInquiryRequests(inquiry.id);
                               }}
-                              className={`px-2 py-1 text-xs rounded-lg transition-all flex items-center gap-1 ${expandedInquiryIds.has(inquiry.id)
-                                ? "bg-blue-100 text-blue-800"
-                                : "bg-blue-500 text-white hover:bg-blue-600"
-                                }`}
+                              className={`px-2 py-1 text-xs rounded-lg transition-all flex items-center gap-1 ${
+                                expandedInquiryIds.has(inquiry.id)
+                                  ? "bg-blue-100 text-blue-800"
+                                  : "bg-blue-500 text-white hover:bg-blue-600"
+                              }`}
                             >
                               {expandedInquiryIds.has(inquiry.id) ? (
                                 <EyeSlashIcon className="h-3 w-3" />
@@ -1817,6 +1698,16 @@ const CombinedInquiriesPageContent = () => {
                                 <LinkIcon className="h-4 w-4" />
                               </button>
                             )}
+                            {/* ── NEW: Copy shareable link button ── */}
+                            <button
+                              onClick={(e) =>
+                                handleCopyInquiryLink(e, inquiry.id)
+                              }
+                              className="text-gray-400 hover:text-gray-600 transition-colors p-1"
+                              title="Copy shareable link"
+                            >
+                              <ClipboardDocumentListIcon className="h-4 w-4" />
+                            </button>
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -1843,7 +1734,6 @@ const CombinedInquiriesPageContent = () => {
                           </div>
                         </td>
                       </tr>
-
                       {expandedInquiryIds.has(inquiry.id) &&
                         inquiry.requests &&
                         inquiry.requests.length > 0 && (
@@ -1880,10 +1770,11 @@ const CombinedInquiriesPageContent = () => {
                                     {inquiry.requests.map((request: any) => (
                                       <tr
                                         key={request.id}
-                                        className={`hover:bg-gray-50/50 transition-colors ${request.priority === "High"
-                                          ? "bg-red-50/50"
-                                          : ""
-                                          }`}
+                                        className={`hover:bg-gray-50/50 transition-colors ${
+                                          request.priority === "High"
+                                            ? "bg-red-50/50"
+                                            : ""
+                                        }`}
                                       >
                                         <td className="px-4 py-3">
                                           <div className="w-[8rem]">
@@ -1897,7 +1788,6 @@ const CombinedInquiriesPageContent = () => {
                                             )}
                                           </div>
                                         </td>
-
                                         <td className="px-4 py-3 text-center">
                                           {renderDimensionInfo(request)}
                                         </td>
@@ -2036,7 +1926,6 @@ const CombinedInquiriesPageContent = () => {
               </table>
             </div>
           )}
-
           {inquiryTotalPages > 1 && (
             <div className="px-4 py-3 bg-gray-50/50 border-t border-gray-200/50 flex items-center justify-between">
               <div className="text-sm text-gray-700">
@@ -2065,10 +1954,11 @@ const CombinedInquiriesPageContent = () => {
                       <button
                         key={pageNum}
                         onClick={() => setInquiryCurrentPage(pageNum)}
-                        className={`px-2 py-1 text-sm rounded-lg transition-all ${inquiryCurrentPage === pageNum
-                          ? "bg-gray-600 text-white"
-                          : "bg-white/80 backdrop-blur-sm border border-gray-300/80 hover:bg-white/60"
-                          }`}
+                        className={`px-2 py-1 text-sm rounded-lg transition-all ${
+                          inquiryCurrentPage === pageNum
+                            ? "bg-gray-600 text-white"
+                            : "bg-white/80 backdrop-blur-sm border border-gray-300/80 hover:bg-white/60"
+                        }`}
                       >
                         {pageNum}
                       </button>
@@ -2079,10 +1969,11 @@ const CombinedInquiriesPageContent = () => {
                       <span className="px-1 text-gray-500">...</span>
                       <button
                         onClick={() => setInquiryCurrentPage(inquiryTotalPages)}
-                        className={`px-2 py-1 text-sm rounded-lg transition-all ${inquiryCurrentPage === inquiryTotalPages
-                          ? "bg-gray-600 text-white"
-                          : "bg-white/80 backdrop-blur-sm border border-gray-300/80 hover:bg-white/60"
-                          }`}
+                        className={`px-2 py-1 text-sm rounded-lg transition-all ${
+                          inquiryCurrentPage === inquiryTotalPages
+                            ? "bg-gray-600 text-white"
+                            : "bg-white/80 backdrop-blur-sm border border-gray-300/80 hover:bg-white/60"
+                        }`}
                       >
                         {inquiryTotalPages}
                       </button>
@@ -2106,7 +1997,6 @@ const CombinedInquiriesPageContent = () => {
           )}
         </div>
       </div>
-
       {showCreateModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="backdrop-blur-md rounded-2xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto bg-white/95">
@@ -2138,25 +2028,27 @@ const CombinedInquiriesPageContent = () => {
                     </span>
                     <button
                       type="button"
-                      className={`${editModeEnabled ? "bg-gray-600" : "bg-gray-200"
-                        } relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2`}
+                      className={`${
+                        editModeEnabled ? "bg-gray-600" : "bg-gray-200"
+                      } relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2`}
                       onClick={() => setEditModeEnabled(!editModeEnabled)}
                     >
                       <span
-                        className={`${editModeEnabled ? "translate-x-4" : "translate-x-0"
-                          } pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out`}
+                        className={`${
+                          editModeEnabled ? "translate-x-4" : "translate-x-0"
+                        } pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out`}
                       />
                     </button>
                   </div>
                 </div>
               )}
-
               <div className="space-y-6">
                 <div
-                  className={`rounded-xl p-4 -mx-4 transition-colors duration-300 ${inquiryFormData.isAssembly
-                    ? "bg-red-50 border border-red-200/70"
-                    : "bg-transparent"
-                    }`}
+                  className={`rounded-xl p-4 -mx-4 transition-colors duration-300 ${
+                    inquiryFormData.isAssembly
+                      ? "bg-red-50 border border-red-200/70"
+                      : "bg-transparent"
+                  }`}
                 >
                   <div>
                     <h3 className="text-lg font-semibold text-gray-900 mb-3">
@@ -2188,7 +2080,6 @@ const CombinedInquiriesPageContent = () => {
                           ))}
                         </select>
                       </div>
-
                       <div>
                         <label className="block text-xs font-medium text-gray-700 mb-1">
                           Contact Person
@@ -2220,7 +2111,6 @@ const CombinedInquiriesPageContent = () => {
                             ))}
                         </select>
                       </div>
-
                       <div className="col-span-2">
                         <label className="block text-xs font-medium text-gray-700 mb-1">
                           Inquiry Name *
@@ -2241,7 +2131,6 @@ const CombinedInquiriesPageContent = () => {
                           placeholder="PT0171 - Untere Schiebemuffe"
                         />
                       </div>
-
                       <div className="col-span-1">
                         <label className="block text-xs font-medium text-gray-700 mb-1">
                           Status
@@ -2266,7 +2155,6 @@ const CombinedInquiriesPageContent = () => {
                           ))}
                         </select>
                       </div>
-
                       <div className="col-span-1">
                         <label className="block text-xs font-medium text-gray-700 mb-1">
                           Description
@@ -2287,7 +2175,6 @@ const CombinedInquiriesPageContent = () => {
                           placeholder="Enter inquiry description"
                         />
                       </div>
-
                       <div className="col-span-2">
                         <div
                           className={`flex items-center gap-2 p-2 border rounded-lg transition-colors duration-200 ${inquiryFormData.isAssembly ? "border-orange-300 bg-orange-100" : "border-gray-200 bg-gray-50"}`}
@@ -2315,7 +2202,6 @@ const CombinedInquiriesPageContent = () => {
                           </label>
                         </div>
                       </div>
-
                       {inquiryFormData.isAssembly && (
                         <div className="col-span-2 bg-orange-100/50 border border-orange-200 rounded-xl p-4 mt-2 space-y-4">
                           <div className="grid grid-cols-3 gap-3">
@@ -2380,7 +2266,6 @@ const CombinedInquiriesPageContent = () => {
                               </select>
                             </div>
                           </div>
-
                           <div className="grid grid-cols-4 gap-3">
                             <div>
                               <label className="block text-xs font-medium text-gray-700 mb-1">
@@ -2481,7 +2366,6 @@ const CombinedInquiriesPageContent = () => {
                               </select>
                             </div>
                           </div>
-
                           <div className="grid grid-cols-3 gap-3">
                             <div>
                               <label className="block text-xs font-medium text-gray-700 mb-1">
@@ -2561,7 +2445,6 @@ const CombinedInquiriesPageContent = () => {
                               </select>
                             </div>
                           </div>
-
                           <div className="grid grid-cols-4 gap-3 border-t border-orange-200/50 pt-3">
                             <div>
                               <label className="block text-xs font-medium text-gray-700 mb-1">
@@ -2652,7 +2535,6 @@ const CombinedInquiriesPageContent = () => {
                               />
                             </div>
                           </div>
-
                           <div className="grid grid-cols-3 gap-3 border-t border-orange-200/50 pt-3">
                             <div>
                               <label className="block text-xs font-medium text-gray-700 mb-1">
@@ -2766,7 +2648,6 @@ const CombinedInquiriesPageContent = () => {
                               </div>
                             </div>
                           </div>
-
                           <div className="pt-2">
                             <label className="block text-xs font-medium text-gray-700 mb-1">
                               Assembly Instructions
@@ -2792,12 +2673,12 @@ const CombinedInquiriesPageContent = () => {
                     </div>
                   </div>
                 </div>
-
                 <div
-                  className={`rounded-xl p-4 -mx-4 transition-colors duration-300 ${inquiryFormData.isAssembly
-                    ? "bg-green-50 border border-green-200/70 mt-2"
-                    : "bg-transparent"
-                    }`}
+                  className={`rounded-xl p-4 -mx-4 transition-colors duration-300 ${
+                    inquiryFormData.isAssembly
+                      ? "bg-green-50 border border-green-200/70 mt-2"
+                      : "bg-transparent"
+                  }`}
                 >
                   <div>
                     <div className="flex items-center justify-between mb-3">
@@ -2819,9 +2700,8 @@ const CombinedInquiriesPageContent = () => {
                         Add Item
                       </button>
                     </div>
-
                     <div className="space-y-2">
-                      {inquiryRequests.map((request, index) => (
+                      {inquiryRequests.map((request: any, index: any) => (
                         <div
                           key={index}
                           className={`border rounded-lg overflow-hidden transition-colors duration-300 ${inquiryFormData.isAssembly ? "border-green-200" : "border-gray-200"}`}
@@ -2829,14 +2709,15 @@ const CombinedInquiriesPageContent = () => {
                           <button
                             type="button"
                             onClick={() => toggleRequestExpansion(index)}
-                            className={`w-full px-3 py-2 flex items-center justify-between text-left transition-colors ${expandedRequestIndex === index
-                              ? inquiryFormData.isAssembly
-                                ? "bg-green-100"
-                                : "bg-gray-100"
-                              : inquiryFormData.isAssembly
-                                ? "bg-green-50 hover:bg-green-100"
-                                : "bg-gray-50 hover:bg-gray-100"
-                              }`}
+                            className={`w-full px-3 py-2 flex items-center justify-between text-left transition-colors ${
+                              expandedRequestIndex === index
+                                ? inquiryFormData.isAssembly
+                                  ? "bg-green-100"
+                                  : "bg-gray-100"
+                                : inquiryFormData.isAssembly
+                                  ? "bg-green-50 hover:bg-green-100"
+                                  : "bg-gray-50 hover:bg-gray-100"
+                            }`}
                           >
                             <div className="flex items-center gap-2">
                               {expandedRequestIndex === index ? (
@@ -2868,7 +2749,6 @@ const CombinedInquiriesPageContent = () => {
                               )}
                             </div>
                           </button>
-
                           {expandedRequestIndex === index && (
                             <div
                               className={`p-4 transition-colors duration-300 ${inquiryFormData.isAssembly ? "bg-green-50/60" : "bg-white"}`}
@@ -2948,7 +2828,6 @@ const CombinedInquiriesPageContent = () => {
                                     </select>
                                   </div>
                                 </div>
-
                                 <div className="grid grid-cols-4 gap-3">
                                   <div>
                                     <label className="block text-xs font-medium text-gray-700 mb-1">
@@ -3055,7 +2934,6 @@ const CombinedInquiriesPageContent = () => {
                                     </select>
                                   </div>
                                 </div>
-
                                 <div className="grid grid-cols-3 gap-3">
                                   <div>
                                     <label className="block text-xs font-medium text-gray-700 mb-1">
@@ -3143,7 +3021,6 @@ const CombinedInquiriesPageContent = () => {
                                     </select>
                                   </div>
                                 </div>
-
                                 <div className="grid grid-cols-4 gap-3 border-t border-gray-200/50 pt-3">
                                   <div>
                                     <label className="block text-xs font-medium text-gray-700 mb-1">
@@ -3157,7 +3034,7 @@ const CombinedInquiriesPageContent = () => {
                                           index,
                                           "weight",
                                           parseFloat(e.target.value) ||
-                                          undefined,
+                                            undefined,
                                         )
                                       }
                                       disabled={
@@ -3180,7 +3057,7 @@ const CombinedInquiriesPageContent = () => {
                                           index,
                                           "length",
                                           parseFloat(e.target.value) ||
-                                          undefined,
+                                            undefined,
                                         )
                                       }
                                       disabled={
@@ -3203,7 +3080,7 @@ const CombinedInquiriesPageContent = () => {
                                           index,
                                           "width",
                                           parseFloat(e.target.value) ||
-                                          undefined,
+                                            undefined,
                                         )
                                       }
                                       disabled={
@@ -3226,7 +3103,7 @@ const CombinedInquiriesPageContent = () => {
                                           index,
                                           "height",
                                           parseFloat(e.target.value) ||
-                                          undefined,
+                                            undefined,
                                         )
                                       }
                                       disabled={
@@ -3238,7 +3115,6 @@ const CombinedInquiriesPageContent = () => {
                                     />
                                   </div>
                                 </div>
-
                                 <div className="grid grid-cols-3 gap-3 border-t border-gray-200/50 pt-3">
                                   <div>
                                     <label className="block text-xs font-medium text-gray-700 mb-1">
@@ -3290,33 +3166,36 @@ const CombinedInquiriesPageContent = () => {
                                     </label>
                                     <div className="min-h-[80px] p-2 border border-gray-300/80 bg-white rounded-lg focus-within:ring-2 focus-within:ring-gray-500/50 transition-all">
                                       <div className="flex flex-wrap gap-1 mb-2">
-                                        {request.painPoints?.map((tag, i) => (
-                                          <span
-                                            key={i}
-                                            className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 border border-gray-200"
-                                          >
-                                            {tag}
-                                            <button
-                                              type="button"
-                                              onClick={() =>
-                                                updateRequest(
-                                                  index,
-                                                  "painPoints",
-                                                  request.painPoints?.filter(
-                                                    (_, idx) => idx !== i,
-                                                  ),
-                                                )
-                                              }
-                                              disabled={
-                                                inquiryModalMode === "edit" &&
-                                                !editModeEnabled
-                                              }
-                                              className="ml-1 text-gray-400 hover:text-gray-600 focus:outline-none"
+                                        {request.painPoints?.map(
+                                          (tag: any, i: any) => (
+                                            <span
+                                              key={i}
+                                              className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 border border-gray-200"
                                             >
-                                              <XMarkIcon className="h-3 w-3" />
-                                            </button>
-                                          </span>
-                                        ))}
+                                              {tag}
+                                              <button
+                                                type="button"
+                                                onClick={() =>
+                                                  updateRequest(
+                                                    index,
+                                                    "painPoints",
+                                                    request.painPoints?.filter(
+                                                      (_: any, idx: any) =>
+                                                        idx !== i,
+                                                    ),
+                                                  )
+                                                }
+                                                disabled={
+                                                  inquiryModalMode === "edit" &&
+                                                  !editModeEnabled
+                                                }
+                                                className="ml-1 text-gray-400 hover:text-gray-600 focus:outline-none"
+                                              >
+                                                <XMarkIcon className="h-3 w-3" />
+                                              </button>
+                                            </span>
+                                          ),
+                                        )}
                                       </div>
                                       <div className="flex items-center gap-1">
                                         <input
@@ -3423,7 +3302,6 @@ const CombinedInquiriesPageContent = () => {
                   </div>
                 </div>
               </div>
-
               <div className="mt-4 flex justify-between gap-2">
                 <div>
                   {inquiryModalMode === "edit" &&
@@ -3456,23 +3334,23 @@ const CombinedInquiriesPageContent = () => {
                   </button>
                   {(inquiryModalMode === "create" ||
                     (inquiryModalMode === "edit" && editModeEnabled)) && (
-                      <CustomButton
-                        gradient={true}
-                        onClick={handleInquirySubmit}
-                        disabled={
-                          !inquiryFormData.name ||
-                          !inquiryFormData.customerId ||
-                          !inquiryRequests.some(
-                            (req) => req.itemName && req.qty >= 1,
-                          )
-                        }
-                        className="px-3 py-2 text-xs bg-gray-600/90 backdrop-blur-sm text-white rounded hover:bg-gray-700/90 transition-all disabled:opacity-50"
-                      >
-                        {inquiryModalMode === "edit"
-                          ? "Update Inquiry"
-                          : "Create Inquiry"}
-                      </CustomButton>
-                    )}
+                    <CustomButton
+                      gradient={true}
+                      onClick={handleInquirySubmit}
+                      disabled={
+                        !inquiryFormData.name ||
+                        !inquiryFormData.customerId ||
+                        !inquiryRequests.some(
+                          (req) => req.itemName && req.qty >= 1,
+                        )
+                      }
+                      className="px-3 py-2 text-xs bg-gray-600/90 backdrop-blur-sm text-white rounded hover:bg-gray-700/90 transition-all disabled:opacity-50"
+                    >
+                      {inquiryModalMode === "edit"
+                        ? "Update Inquiry"
+                        : "Create Inquiry"}
+                    </CustomButton>
+                  )}
                 </div>
               </div>
             </div>
@@ -3504,7 +3382,6 @@ const CombinedInquiriesPageContent = () => {
                   <XMarkIcon className="h-5 w-5" />
                 </button>
               </div>
-
               <div className="mb-6 p-3 bg-gray-50 rounded-lg">
                 <h3 className="font-medium text-gray-900 mb-2">
                   Source Information
@@ -3535,21 +3412,21 @@ const CombinedInquiriesPageContent = () => {
                       conversionInquiryData.width ||
                       conversionInquiryData.height ||
                       conversionInquiryData.length) && (
-                        <div className="col-span-2">
-                          <span className="text-gray-600">Dimensions:</span>
-                          <span className="ml-2">
-                            {conversionInquiryData.weight &&
-                              `${conversionInquiryData.weight}kg `}
-                            {conversionInquiryData.length &&
-                              `${conversionInquiryData.length}×`}
-                            {conversionInquiryData.width &&
-                              `${conversionInquiryData.width}×`}
-                            {conversionInquiryData.height &&
-                              `${conversionInquiryData.height}`}
-                            cm
-                          </span>
-                        </div>
-                      )}
+                      <div className="col-span-2">
+                        <span className="text-gray-600">Dimensions:</span>
+                        <span className="ml-2">
+                          {conversionInquiryData.weight &&
+                            `${conversionInquiryData.weight}kg `}
+                          {conversionInquiryData.length &&
+                            `${conversionInquiryData.length}×`}
+                          {conversionInquiryData.width &&
+                            `${conversionInquiryData.width}×`}
+                          {conversionInquiryData.height &&
+                            `${conversionInquiryData.height}`}
+                          cm
+                        </span>
+                      </div>
+                    )}
                   </div>
                 )}
                 {conversionType === "request" && conversionRequestData && (
@@ -3586,27 +3463,25 @@ const CombinedInquiriesPageContent = () => {
                       conversionRequestData.width ||
                       conversionRequestData.height ||
                       conversionRequestData.length) && (
-                        <div className="col-span-2">
-                          <span className="text-gray-600">Dimensions:</span>
-                          <span className="ml-2">
-                            {conversionRequestData.weight &&
-                              `${conversionRequestData.weight}kg `}
-                            {conversionRequestData.length &&
-                              `${conversionRequestData.length}×`}
-                            {conversionRequestData.width &&
-                              `${conversionRequestData.width}×`}
-                            {conversionRequestData.height &&
-                              `${conversionRequestData.height}`}
-                            cm
-                          </span>
-                        </div>
-                      )}
+                      <div className="col-span-2">
+                        <span className="text-gray-600">Dimensions:</span>
+                        <span className="ml-2">
+                          {conversionRequestData.weight &&
+                            `${conversionRequestData.weight}kg `}
+                          {conversionRequestData.length &&
+                            `${conversionRequestData.length}×`}
+                          {conversionRequestData.width &&
+                            `${conversionRequestData.width}×`}
+                          {conversionRequestData.height &&
+                            `${conversionRequestData.height}`}
+                          cm
+                        </span>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
-
               {renderDimensionStatus()}
-
               <div className="space-y-4">
                 <h3 className="font-medium text-gray-900">Item Details</h3>
                 <div className="grid grid-cols-2 gap-3">
@@ -3732,10 +3607,11 @@ const CombinedInquiriesPageContent = () => {
                                   : e.target.value,
                             })
                           }
-                          className={`w-full px-3 py-2 text-sm border ${field.required && !conversionFormData[field.name]
-                            ? "border-red-300"
-                            : "border-gray-300/80"
-                            } bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all`}
+                          className={`w-full px-3 py-2 text-sm border ${
+                            field.required && !conversionFormData[field.name]
+                              ? "border-red-300"
+                              : "border-gray-300/80"
+                          } bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all`}
                           placeholder={field.placeholder}
                           min={field.min}
                           step={field.step}
@@ -3744,8 +3620,9 @@ const CombinedInquiriesPageContent = () => {
                       )}
                       {field.description && (
                         <p
-                          className={`text-xs mt-1 ${field.required ? "text-red-600" : "text-gray-500"
-                            }`}
+                          className={`text-xs mt-1 ${
+                            field.required ? "text-red-600" : "text-gray-500"
+                          }`}
                         >
                           {field.description}
                         </p>
@@ -3753,7 +3630,6 @@ const CombinedInquiriesPageContent = () => {
                     </div>
                   ))}
                 </div>
-
                 <div className="mt-4 p-3 bg-blue-50 rounded-lg">
                   <div className="flex items-start gap-2">
                     <InformationCircleIcon className="h-5 w-5 text-blue-500 mt-0.5" />
@@ -3783,7 +3659,6 @@ const CombinedInquiriesPageContent = () => {
                     </div>
                   </div>
                 </div>
-
                 <div className="mt-6 flex justify-end gap-2">
                   <button
                     onClick={() => {
@@ -3815,7 +3690,6 @@ const CombinedInquiriesPageContent = () => {
     </div>
   );
 };
-
 const CombinedInquiriesPage = () => {
   return (
     <Suspense
@@ -3829,5 +3703,4 @@ const CombinedInquiriesPage = () => {
     </Suspense>
   );
 };
-
 export default CombinedInquiriesPage;
