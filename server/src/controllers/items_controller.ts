@@ -33,11 +33,17 @@ export const getRMBPriceFromSupplier = async (
 ): Promise<number | null> => {
   try {
     const supplierItemRepository = AppDataSource.getRepository(SupplierItem);
-    const supplierItem = await supplierItemRepository.findOne({
-      where: { item_id: itemId },
-    });
+    const supplierItem =
+      await supplierItemRepository.findOne({
+        where: { item_id: itemId, is_default: "Y" },
+      }) ||
+      await supplierItemRepository.findOne({
+        where: { item_id: itemId },
+      });
 
-    return supplierItem?.price_rmb || null;
+    return supplierItem && supplierItem.price_rmb !== undefined && supplierItem.price_rmb !== null
+      ? Number(supplierItem.price_rmb)
+      : null;
   } catch (error) {
     console.error(`Error fetching RMB_Price for item ${itemId}:`, error);
     return null;
@@ -281,44 +287,44 @@ export const getItems = async (
     ] = await Promise.all([
       parentIds.length > 0
         ? parentRepository.find({
-            where: { id: In(parentIds) },
-            select: ["id", "de_no", "name_de", "name_en", "name_cn"],
-          })
+          where: { id: In(parentIds) },
+          select: ["id", "de_no", "name_de", "name_en", "name_cn"],
+        })
         : Promise.resolve([]),
       taricIds.length > 0
         ? taricRepository.find({
-            where: { id: In(taricIds) },
-            select: ["id", "code", "description_de"],
-          })
+          where: { id: In(taricIds) },
+          select: ["id", "code", "description_de"],
+        })
         : Promise.resolve([]),
       catIds.length > 0
         ? categoryRepository.find({
-            where: { id: In(catIds) },
-            select: ["id", "name"],
-          })
+          where: { id: In(catIds) },
+          select: ["id", "name"],
+        })
         : Promise.resolve([]),
       itemSupplierIds.length > 0
         ? supplierRepository.find({
-            where: { id: In(itemSupplierIds) },
-            select: ["id", "name", "company_name"],
-          })
+          where: { id: In(itemSupplierIds) },
+          select: ["id", "name", "company_name"],
+        })
         : Promise.resolve([]),
       itemIds.length > 0
         ? warehouseRepository.find({
-            where: [
-              { item_id: In(itemIds) },
-              {
-                ItemID_DE: In(
-                  items.map((i) => i.ItemID_DE).filter(Boolean) as number[],
-                ),
-              },
-            ],
-          })
+          where: [
+            { item_id: In(itemIds) },
+            {
+              ItemID_DE: In(
+                items.map((i) => i.ItemID_DE).filter(Boolean) as number[],
+              ),
+            },
+          ],
+        })
         : Promise.resolve([]),
       itemIds.length > 0
         ? AppDataSource.getRepository(SupplierItem).find({
-            where: { item_id: In(itemIds) },
-          })
+          where: { item_id: In(itemIds) },
+        })
         : Promise.resolve([]),
     ]);
 
@@ -414,13 +420,13 @@ export const getItems = async (
         transfer_price_EUR: item.transfer_price_EUR,
         warehouse_data: warehouseData
           ? {
-              id: warehouseData.id,
-              item_no_de: warehouseData.item_no_de,
-              stock_qty: warehouseData.stock_qty,
-              msq: warehouseData.msq,
-              buffer: warehouseData.buffer,
-              is_stock_item: warehouseData.is_stock_item,
-            }
+            id: warehouseData.id,
+            item_no_de: warehouseData.item_no_de,
+            stock_qty: warehouseData.stock_qty,
+            msq: warehouseData.msq,
+            buffer: warehouseData.buffer,
+            is_stock_item: warehouseData.is_stock_item,
+          }
           : null,
         created_at: item.created_at,
         updated_at: item.updated_at,
@@ -690,29 +696,29 @@ export const getItemById = async (
           supplierItems.find((si) => si.is_default === "Y") || supplierItems[0];
         return defaultSi
           ? {
-              id: defaultSi.id,
-              supplierId: defaultSi.supplier_id,
-              supplierName:
-                defaultSi.supplier?.company_name ||
-                defaultSi.supplier?.name ||
-                "Unknown",
-              priceRMB: defaultSi.price_rmb?.toString() || "0",
-              isPO: defaultSi.is_po || "No",
-              moq: defaultSi.moq?.toString() || "0",
-              interval: defaultSi.oi?.toString() || "0",
-              leadTime: defaultSi.lead_time || "",
-              noteCN: defaultSi.note_cn || "",
-              url: defaultSi.url || "",
-            }
+            id: defaultSi.id,
+            supplierId: defaultSi.supplier_id,
+            supplierName:
+              defaultSi.supplier?.company_name ||
+              defaultSi.supplier?.name ||
+              "Unknown",
+            priceRMB: defaultSi.price_rmb?.toString() || "0",
+            isPO: defaultSi.is_po || "No",
+            moq: defaultSi.moq?.toString() || "0",
+            interval: defaultSi.oi?.toString() || "0",
+            leadTime: defaultSi.lead_time || "",
+            noteCN: defaultSi.note_cn || "",
+            url: defaultSi.url || "",
+          }
           : {
-              priceRMB: "0",
-              isPO: "No",
-              moq: "0",
-              interval: "0",
-              leadTime: "",
-              noteCN: "",
-              url: "",
-            };
+            priceRMB: "0",
+            isPO: "No",
+            moq: "0",
+            interval: "0",
+            leadTime: "",
+            noteCN: "",
+            url: "",
+          };
       })(),
 
       nprRemarks: item.npr_remark || "",
@@ -927,20 +933,33 @@ export const updateItem = async (
     const item = await itemRepository.findOne({ where: { id: parseInt(id) } });
     if (!item) return next(new ErrorHandler("Item not found", 404));
 
-    const newSupplierId = req.body.supplier_id;
-    if (newSupplierId !== undefined) {
-      if (!newSupplierId || newSupplierId === 0) {
-        return next(new ErrorHandler("Supplier is required", 400));
+    let newSupplierId = req.body.supplier_id;
+
+    if (!newSupplierId || newSupplierId === 0) {
+      const defaultSI = await supplierItemRepository.findOne({
+        where: { item_id: item.id, is_default: "Y" },
+      });
+      if (defaultSI) {
+        newSupplierId = defaultSI.supplier_id;
+        req.body.supplier_id = newSupplierId;
+      } else {
+        const anySI = await supplierItemRepository.findOne({
+          where: { item_id: item.id },
+        });
+        if (anySI) {
+          newSupplierId = anySI.supplier_id;
+          req.body.supplier_id = newSupplierId;
+        }
       }
-    } else {
-      if (!item.supplier_id) {
-        return next(
-          new ErrorHandler(
-            "This item needs a supplier assigned before saving changes",
-            400,
-          ),
-        );
-      }
+    }
+
+    if (!newSupplierId && !item.supplier_id) {
+      return next(
+        new ErrorHandler(
+          "This item needs a supplier assigned before saving changes",
+          400,
+        ),
+      );
     }
 
     const updatableFields = [
@@ -1043,8 +1062,9 @@ export const updateItem = async (
     let currentRMBPrice: any = null;
 
     if (supplierItemData) {
+      const targetSupplierId = req.body.supplier_id || item.supplier_id;
       let supplierItem = await supplierItemRepository.findOne({
-        where: { item_id: item.id },
+        where: { item_id: item.id, supplier_id: targetSupplierId },
       });
 
       if (supplierItem) {
@@ -1086,13 +1106,14 @@ export const updateItem = async (
       } else {
         const newSI = supplierItemRepository.create({
           item_id: item.id,
-          supplier_id: toInt(req.body.supplier_id) || 0,
+          supplier_id: targetSupplierId || 0,
           price_rmb: toNum(supplierItemData.price_rmb),
           is_po: supplierItemData.is_po || "No",
           moq: toInt(supplierItemData.moq),
           oi: toInt(supplierItemData.oi),
           lead_time: supplierItemData.lead_time || "",
           url: supplierItemData.url || "",
+          is_default: "Y",
         });
         await supplierItemRepository.save(newSI);
         currentRMBPrice = newSI.price_rmb;
@@ -1684,9 +1705,9 @@ export const getParents = async (
       supplier_id: parent.supplier_id,
       supplier: parent.supplier
         ? {
-            id: parent.supplier.id,
-            name: parent.supplier.name,
-          }
+          id: parent.supplier.id,
+          name: parent.supplier.name,
+        }
         : null,
       item_count: parent.items?.length || 0,
       created_at: parent.created_at,
@@ -1762,17 +1783,17 @@ export const getParentById = async (
       is_active: parent.is_active,
       taric: parent.taric
         ? {
-            id: parent.taric.id,
-            code: parent.taric.code,
-            name_de: parent.taric.name_de,
-          }
+          id: parent.taric.id,
+          code: parent.taric.code,
+          name_de: parent.taric.name_de,
+        }
         : null,
       supplier: parent.supplier
         ? {
-            id: parent.supplier.id,
-            name: parent.supplier.name,
-            contact_person: parent.supplier.contact_person,
-          }
+          id: parent.supplier.id,
+          name: parent.supplier.name,
+          contact_person: parent.supplier.contact_person,
+        }
         : null,
       variations: {
         de: [parent.var_de_1, parent.var_de_2, parent.var_de_3].filter(Boolean),
@@ -3326,23 +3347,23 @@ export const getNewItems = async (
       items.map(async (item) => {
         const parentData = item.parent_id
           ? await parentRepository.findOne({
-              where: { id: item.parent_id },
-              select: ["id", "de_no", "name_de", "name_en"],
-            })
+            where: { id: item.parent_id },
+            select: ["id", "de_no", "name_de", "name_en"],
+          })
           : null;
 
         const categoryData = item.cat_id
           ? await categoryRepository.findOne({
-              where: { id: item.cat_id },
-              select: ["id", "name"],
-            })
+            where: { id: item.cat_id },
+            select: ["id", "name"],
+          })
           : null;
 
         const supplierData = item.supplier_id
           ? await supplierRepository.findOne({
-              where: { id: item.supplier_id },
-              select: ["id", "name", "company_name"],
-            })
+            where: { id: item.supplier_id },
+            select: ["id", "name", "company_name"],
+          })
           : null;
 
         let warehouseData: any = null;
@@ -3669,13 +3690,11 @@ export const syncSuppCatWithCategoryName = async (
   try {
     const itemRepo = AppDataSource.getRepository(Item);
 
-    // 1. Fetch items where the supp_cat doesn't match the linked Category name
-    // We use a query builder with a join to find discrepancies efficiently
     const itemsWithMismatches = await itemRepo
       .createQueryBuilder("item")
       .leftJoinAndSelect("item.category", "category")
-      .where("item.supp_cat IS NULL") // Case 1: Missing category label
-      .orWhere("item.supp_cat != category.name") // Case 2: Incorrect category label
+      .where("item.supp_cat IS NULL")
+      .orWhere("item.supp_cat != category.name")
       .getMany();
 
     if (itemsWithMismatches.length === 0) {
@@ -3691,9 +3710,8 @@ export const syncSuppCatWithCategoryName = async (
         const oldCat = item.supp_cat;
         const newCat = item.category.name;
 
-        // Perform the reassignment
         item.supp_cat = newCat;
-        item.is_updated = true; // Flag for external syncs if needed
+        item.is_updated = true;
 
         console.log(
           `[FIX] Item ID ${item.id}: Reassigning supp_cat from "${oldCat}" to "${newCat}"`,

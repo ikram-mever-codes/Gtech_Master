@@ -294,6 +294,12 @@ export class EtlController {
     const allItems = await itemRepo.find({ select: ["id", "ItemID_DE"] });
     const itemLookup = new Map(allItems.map((i: any) => [i.ItemID_DE, i.id]));
 
+    // Track valid master_ids for each order we process from the CSV
+    const orderToCsvMasterIds = new Map<number, Set<string>>();
+    for (const [_, orderId] of orderMap.entries()) {
+      orderToCsvMasterIds.set(orderId, new Set<string>());
+    }
+
     console.log(`\nProcessing ${rows.length} order items...`);
 
     for (let i = 0; i < rows.length; i++) {
@@ -333,6 +339,12 @@ export class EtlController {
           failed++;
           continue;
         }
+
+        // Track the masterId as a valid CSV item for this order
+        if (!orderToCsvMasterIds.has(orderId)) {
+          orderToCsvMasterIds.set(orderId, new Set<string>());
+        }
+        orderToCsvMasterIds.get(orderId)!.add(masterId);
 
         // Handle ItemID_DE
         let itemIdDeValue: any = null;
@@ -397,6 +409,25 @@ export class EtlController {
     console.log(
       `\n📊 Items: ${created} created, ${updated} updated, ${failed} failed`,
     );
+
+    // Clean stale order items for processed orders
+    let deletedCount = 0;
+    for (const [orderId, csvMasterIds] of orderToCsvMasterIds.entries()) {
+      const dbItems = await orderItemRepo.find({
+        where: { order_id: orderId },
+        select: ["id", "master_id"],
+      });
+
+      const itemsToDelete = dbItems.filter(
+        (item: any) => !item.master_id || !csvMasterIds.has(item.master_id),
+      );
+
+      if (itemsToDelete.length > 0) {
+        const idsToDelete = itemsToDelete.map((item: any) => item.id);
+        await orderItemRepo.delete({ id: In(idsToDelete) });
+        deletedCount += idsToDelete.length;
+      }
+    }
   }
 
   /**

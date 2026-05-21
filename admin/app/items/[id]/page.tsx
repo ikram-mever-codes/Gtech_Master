@@ -215,7 +215,104 @@ const ItemDetailsPage = () => {
   const [activeTab, setActiveTab] = useState("item");
   const [editMode, setEditMode] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [itemData, setItemData] = useState<ItemDetails | null>(null);
+  const [itemData, setItemDataRaw] = useState<ItemDetails | null>(null);
+
+  const setItemData = (
+    newData: ItemDetails | null | ((prev: ItemDetails | null) => ItemDetails | null)
+  ) => {
+    setItemDataRaw((prev) => {
+      const resolved = typeof newData === "function" ? newData(prev) : newData;
+      if (!resolved) return null;
+
+      const activeSupplierId = resolved.supplier_id || resolved.supplierItems?.find((si: any) => si.isDefault)?.supplierId;
+      if (activeSupplierId && resolved.supplierItem && resolved.supplierItems) {
+        resolved.supplierItems = resolved.supplierItems.map((si: any) => {
+          if (si.supplierId === activeSupplierId) {
+            return {
+              ...si,
+              priceRMB: resolved.supplierItem.priceRMB !== undefined ? resolved.supplierItem.priceRMB : si.priceRMB,
+              isPO: resolved.supplierItem.isPO !== undefined ? resolved.supplierItem.isPO : si.isPO,
+              moq: resolved.supplierItem.moq !== undefined ? resolved.supplierItem.moq : si.moq,
+              interval: resolved.supplierItem.interval !== undefined ? resolved.supplierItem.interval : si.interval,
+              leadTime: resolved.supplierItem.leadTime !== undefined ? resolved.supplierItem.leadTime : si.leadTime,
+              noteCN: resolved.supplierItem.noteCN !== undefined ? resolved.supplierItem.noteCN : si.noteCN,
+              url: resolved.supplierItem.url !== undefined ? resolved.supplierItem.url : si.url,
+              isDefault: true,
+            };
+          }
+          return si;
+        });
+
+        if (resolved.others) {
+          resolved.others.rmbPrice = resolved.supplierItem.priceRMB;
+        }
+      }
+      return resolved;
+    });
+  };
+
+  const transformItemResponse = (rawItem: any, currentItemData?: any): ItemDetails => {
+    const toBool = (val: any) =>
+      val === "Y" ||
+      val === "Yes" ||
+      val === true ||
+      val === 1 ||
+      val === "1";
+
+    const activeSupplierId = rawItem.supplier_id || rawItem.supplierItems?.find((si: any) => si.isDefault)?.supplierId || null;
+    const defaultSupplierItem = rawItem.supplierItems?.find((si: any) => si.isDefault || si.supplierId === activeSupplierId);
+
+    return {
+      ...rawItem,
+      id: rawItem.id || currentItemData?.id,
+      supplier_id: activeSupplierId,
+      supplierItem: rawItem.supplierItem || (defaultSupplierItem ? {
+        priceRMB: defaultSupplierItem.priceRMB || "0",
+        isPO: defaultSupplierItem.isPO || "No",
+        moq: defaultSupplierItem.moq || "0",
+        interval: defaultSupplierItem.interval || "0",
+        leadTime: defaultSupplierItem.leadTime || "",
+        noteCN: defaultSupplierItem.noteCN || "",
+        url: defaultSupplierItem.url || "",
+      } : {
+        priceRMB: "0",
+        isPO: "No",
+        moq: "0",
+        interval: "0",
+        leadTime: "",
+        noteCN: "",
+        url: "",
+      }),
+      isActive: toBool(rawItem.isActive),
+      parent: {
+        ...rawItem.parent,
+        isActive: toBool(rawItem.parent?.isActive),
+        isSpecialItem: toBool(rawItem.parent?.isSpecialItem),
+        isEURSpecial: toBool(rawItem.parent?.isEURSpecial),
+        isRMBSpecial: toBool(rawItem.parent?.isRMBSpecial),
+        isDimensionSpecial: toBool(rawItem.parent?.isDimensionSpecial),
+      },
+      others: {
+        ...rawItem.others,
+        isQTYdiv: toBool(rawItem.others?.isQTYdiv),
+        isMeter: toBool(rawItem.others?.isMeter),
+        isPU: toBool(rawItem.others?.isPU),
+        isNPR: toBool(rawItem.others?.isNPR),
+        isNew: toBool(rawItem.others?.isNew),
+        isActive: toBool(rawItem.others?.isActive),
+        isStock: toBool(rawItem.others?.isStock),
+        isNAO: toBool(rawItem.others?.isNAO),
+        isSnSI: toBool(rawItem.others?.isSnSI),
+        isDimensionSpecial: toBool(rawItem.others?.isDimensionSpecial),
+        pixPath: rawItem.others?.pixPath || "",
+      },
+      pictures: {
+        shopPicture: rawItem.pictures?.shopPicture || "",
+        ebayPictures: rawItem.pictures?.ebayPictures || "",
+        pixPath: rawItem.pictures?.pixPath || "",
+      },
+    };
+  };
   const [variations, setVariations] = useState<any[]>([]);
   const [qualityCriteria, setQualityCriteria] = useState<any[]>([]);
   const [isQualityModalOpen, setIsQualityModalOpen] = useState(false);
@@ -530,45 +627,8 @@ const ItemDetailsPage = () => {
 
       const itemResponse: any = await getItemById(parseInt(id as string));
       if (itemResponse.data && itemData) {
-        const toBool = (val: any) =>
-          val === "Y" ||
-          val === "Yes" ||
-          val === true ||
-          val === 1 ||
-          val === "1";
         const rawItem = itemResponse.data;
-        const transformedItem: ItemDetails = {
-          ...rawItem,
-          id: rawItem.id || itemData.id,
-          isActive: toBool(rawItem.isActive),
-          parent: {
-            ...rawItem.parent,
-            isActive: toBool(rawItem.parent.isActive),
-            isSpecialItem: toBool(rawItem.parent.isSpecialItem),
-            isEURSpecial: toBool(rawItem.parent.isEURSpecial),
-            isRMBSpecial: toBool(rawItem.parent.isRMBSpecial),
-            isDimensionSpecial: toBool(rawItem.parent.isDimensionSpecial),
-          },
-          others: {
-            ...rawItem.others,
-            isQTYdiv: toBool(rawItem.others.isQTYdiv),
-            isMeter: toBool(rawItem.others.isMeter),
-            isPU: toBool(rawItem.others.isPU),
-            isNPR: toBool(rawItem.others.isNPR),
-            isNew: toBool(rawItem.others.isNew),
-            isActive: toBool(rawItem.others.isActive),
-            isStock: toBool(rawItem.others.isStock),
-            isNAO: toBool(rawItem.others.isNAO),
-            isSnSI: toBool(rawItem.others.isSnSI),
-            isDimensionSpecial: toBool(rawItem.others.isDimensionSpecial),
-            pixPath: rawItem.others.pixPath || "",
-          },
-          pictures: {
-            shopPicture: rawItem.pictures.shopPicture || "",
-            ebayPictures: rawItem.pictures.ebayPictures || "",
-            pixPath: rawItem.pictures.pixPath || "",
-          },
-        };
+        const transformedItem = transformItemResponse(rawItem, itemData);
         setItemData(transformedItem);
       }
 
@@ -652,45 +712,7 @@ const ItemDetailsPage = () => {
         }
 
         const rawItem = itemResponse.data;
-        const toBool = (val: any) =>
-          val === "Y" ||
-          val === "Yes" ||
-          val === true ||
-          val === 1 ||
-          val === "1";
-
-        const transformedItem: ItemDetails = {
-          ...rawItem,
-          isActive: toBool(rawItem.isActive),
-          parent: {
-            ...rawItem.parent,
-            isActive: toBool(rawItem.parent.isActive),
-            isSpecialItem: toBool(rawItem.parent.isSpecialItem),
-            isEURSpecial: toBool(rawItem.parent.isEURSpecial),
-            isRMBSpecial: toBool(rawItem.parent.isRMBSpecial),
-            isDimensionSpecial: toBool(rawItem.parent.isDimensionSpecial),
-          },
-          others: {
-            ...rawItem.others,
-            isQTYdiv: toBool(rawItem.others.isQTYdiv),
-            isMeter: toBool(rawItem.others.isMeter),
-            isPU: toBool(rawItem.others.isPU),
-            isNPR: toBool(rawItem.others.isNPR),
-            isNew: toBool(rawItem.others.isNew),
-            isActive: toBool(rawItem.others.isActive),
-            isStock: toBool(rawItem.others.isStock),
-            isNAO: toBool(rawItem.others.isNAO),
-            isSnSI: toBool(rawItem.others.isSnSI),
-            isDimensionSpecial: toBool(rawItem.others.isDimensionSpecial),
-            pixPath: rawItem.others.pixPath || "",
-          },
-          pictures: {
-            shopPicture: rawItem.pictures.shopPicture || "",
-            ebayPictures: rawItem.pictures.ebayPictures || "",
-            pixPath: rawItem.pictures.pixPath || "",
-          },
-        };
-
+        const transformedItem = transformItemResponse(rawItem);
         setItemData(transformedItem);
         setVariations(variationsResponse.data || []);
         setQualityCriteria(qualityResponse.data || []);
@@ -795,45 +817,9 @@ const ItemDetailsPage = () => {
       await updateItem(itemId, payload);
       setEditMode(false);
 
-      const toBool = (val: any) =>
-        val === "Y" ||
-        val === "Yes" ||
-        val === true ||
-        val === 1 ||
-        val === "1";
       const itemResponse: any = await getItemById(itemId);
       const rawItem = itemResponse.data;
-      const transformedItem: ItemDetails = {
-        ...rawItem,
-        isActive: toBool(rawItem.isActive),
-        parent: {
-          ...rawItem.parent,
-          isActive: toBool(rawItem.parent.isActive),
-          isSpecialItem: toBool(rawItem.parent.isSpecialItem),
-          isEURSpecial: toBool(rawItem.parent.isEURSpecial),
-          isRMBSpecial: toBool(rawItem.parent.isRMBSpecial),
-          isDimensionSpecial: toBool(rawItem.parent.isDimensionSpecial),
-        },
-        others: {
-          ...rawItem.others,
-          isQTYdiv: toBool(rawItem.others.isQTYdiv),
-          isMeter: toBool(rawItem.others.isMeter),
-          isPU: toBool(rawItem.others.isPU),
-          isNPR: toBool(rawItem.others.isNPR),
-          isNew: toBool(rawItem.others.isNew),
-          isActive: toBool(rawItem.others.isActive),
-          isStock: toBool(rawItem.others.isStock),
-          isNAO: toBool(rawItem.others.isNAO),
-          isSnSI: toBool(rawItem.others.isSnSI),
-          isDimensionSpecial: toBool(rawItem.others.isDimensionSpecial),
-          pixPath: rawItem.others.pixPath || "",
-        },
-        pictures: {
-          shopPicture: rawItem.pictures.shopPicture || "",
-          ebayPictures: rawItem.pictures.ebayPictures || "",
-          pixPath: rawItem.pictures.pixPath || "",
-        },
-      };
+      const transformedItem = transformItemResponse(rawItem);
       setItemData(transformedItem);
     } catch (error) {
       console.error("Save error:", error);
@@ -995,18 +981,94 @@ const ItemDetailsPage = () => {
                   itemData={itemData}
                   setItemData={setItemData}
                 />
-                <SelectInfoRow
-                  label="Supplier"
-                  value={(itemData.supplier_id || itemData.supplierItems?.find((si: any) => si.isDefault)?.supplierId)?.toString() ?? ""}
-                  field="supplier_id"
-                  options={allSuppliers.map((s: any) => ({
-                    label: `[ID: ${s.id}] ${!hasChinese(s.name) ? s.name : s.company_name || ""}`,
-                    value: s.id.toString(),
-                  }))}
-                  editMode={editMode}
-                  itemData={itemData}
-                  setItemData={setItemData}
-                />
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 py-3 border-b border-gray-100">
+                  <div className="text-sm font-medium text-gray-700">Supplier</div>
+                  <div className="md:col-span-2">
+                    {editMode ? (
+                      <select
+                        value={itemData.supplier_id?.toString() ?? ""}
+                        onChange={(e) => {
+                          const newSupplierId = parseInt(e.target.value);
+                          if (!newSupplierId) return;
+
+                          const updated = { ...itemData };
+                          updated.supplier_id = newSupplierId;
+
+                          const supplierDetail = allSuppliers.find((s) => s.id === newSupplierId);
+                          const supplierName = supplierDetail
+                            ? String(!hasChinese(supplierDetail.name || "") ? supplierDetail.name : supplierDetail.company_name || "Unknown")
+                            : "Unknown";
+                          let existingItem = updated.supplierItems?.find(
+                            (si: any) => si.supplierId === newSupplierId
+                          );
+
+                          if (existingItem) {
+                            updated.supplierItems = updated.supplierItems.map((si: any) => ({
+                              ...si,
+                              isDefault: si.supplierId === newSupplierId,
+                            }));
+                          } else {
+                            const newLink = {
+                              id: -Math.floor(Date.now() % 1000000000),
+                              supplierId: newSupplierId,
+                              supplierName: supplierName,
+                              priceRMB: "0",
+                              isPO: "No",
+                              moq: "0",
+                              interval: "0",
+                              leadTime: "",
+                              noteCN: "",
+                              url: "",
+                              isDefault: true,
+                            };
+                            updated.supplierItems = [
+                              ...(updated.supplierItems || []).map((si: any) => ({
+                                ...si,
+                                isDefault: false,
+                              })),
+                              newLink,
+                            ];
+                            existingItem = newLink;
+                          }
+
+                          updated.supplierItem = {
+                            priceRMB: existingItem.priceRMB || "0",
+                            isPO: existingItem.isPO || "No",
+                            moq: existingItem.moq || "0",
+                            interval: existingItem.interval || "0",
+                            leadTime: existingItem.leadTime || "",
+                            noteCN: existingItem.noteCN || "",
+                            url: existingItem.url || "",
+                          };
+
+                          if (updated.others) {
+                            updated.others.rmbPrice = existingItem.priceRMB || "0";
+                          }
+
+                          setItemData(updated);
+                        }}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary"
+                      >
+                        <option value="">Select a Supplier</option>
+                        {allSuppliers.map((s: any) => (
+                          <option key={s.id} value={s.id.toString()}>
+                            {`[ID: ${s.id}] ${!hasChinese(s.name) ? s.name : s.company_name || ""}`}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <span className="text-gray-900">
+                        {(() => {
+                          const currentId = itemData.supplier_id || itemData.supplierItems?.find((si: any) => si.isDefault)?.supplierId;
+                          const matched = allSuppliers.find((s) => s.id === currentId);
+                          return matched
+                            ? `[ID: ${matched.id}] ${!hasChinese(matched.name || "") ? matched.name : matched.company_name || ""}`
+                            : (currentId ? `[ID: ${currentId}]` : "—");
+                        })()}
+                      </span>
+                    )}
+                  </div>
+                </div>
                 <EditableInfoRow
                   label="Model"
                   value={itemData.model}
@@ -2007,226 +2069,226 @@ const ItemDetailsPage = () => {
                   </button>
                 </div>
               )}
+
+              <div className="mt-8">
+                <h4 className="text-md font-semibold text-gray-900 mb-4">
+                  NPR Remarks
+                </h4>
+                <div className="bg-gray-50 rounded-lg p-4">
+                  {itemData.nprRemarks ? (
+                    <p className="text-gray-900">{itemData.nprRemarks}</p>
+                  ) : (
+                    <p className="text-gray-500 italic">
+                      No NPR remarks for this item
+                    </p>
+                  )}
+                </div>
+              </div>
             </div>
           )}
-
-          <div className="mt-8">
-            <h4 className="text-md font-semibold text-gray-900 mb-4">
-              NPR Remarks
-            </h4>
-            <div className="bg-gray-50 rounded-lg p-4">
-              {itemData.nprRemarks ? (
-                <p className="text-gray-900">{itemData.nprRemarks}</p>
-              ) : (
-                <p className="text-gray-500 italic">
-                  No NPR remarks for this item
-                </p>
-              )}
-            </div>
-          </div>
         </div>
 
         <div className="mt-8 flex flex-wrap gap-3 justify-between items-center">
-          <div className="flex gap-3">
-            <button className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 text-gray-700">
-              <ArrowDownTrayIcon className="h-4 w-4" />
-              Export Details
-            </button>
-            <input
-              type="file"
-              ref={fileInputRef}
-              className="hidden"
-              multiple
-              accept="image/*"
-              onChange={(e) => handleImageUpload(e)}
-            />
-            <input
-              type="file"
-              ref={attachmentInputRef}
-              className="hidden"
-              multiple
-              onChange={(e) => handleAttachmentUpload(e)}
-            />
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploadingPictures}
-              className={`px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 text-gray-700 ${uploadingPictures ? "opacity-50 cursor-not-allowed" : ""
-                }`}
-            >
-              <PhotoIcon className="h-4 w-4" />
-              {uploadingPictures ? "Uploading..." : "Add Pictures"}
-            </button>
-            <button
-              onClick={() => attachmentInputRef.current?.click()}
-              className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 text-gray-700"
-            >
-              <DocumentIcon className="h-4 w-4" />
-              Add Documents
-            </button>
-          </div>
-
-          <div className="text-sm text-gray-500">
-            Last updated: {itemData?.updated_at ? formatDate(itemData.updated_at) : formatDate(new Date())}
-          </div>
-        </div>
-      </div>
-      <CustomModal
-        isOpen={isQualityModalOpen}
-        onClose={handleCloseQualityModal}
-        title={
-          editingQuality
-            ? "Update Quality of this item"
-            : "Add Quality to this item"
-        }
-        width="max-w-md"
-        footer={
-          <div className="flex gap-2 w-full justify-end">
-            <button
-              onClick={handleCloseQualityModal}
-              className="px-4 py-2 flex items-center gap-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-            >
-              <XCircleIcon className="h-4 w-4" />
-              Cancel
-            </button>
-            <button
-              onClick={handleSaveQuality}
-              className="px-4 py-2 flex items-center gap-2 text-white bg-[#00A651] rounded-lg hover:bg-[#008c44] transition-colors"
-            >
-              <CheckCircleIcon className="h-4 w-4" />
-              {editingQuality ? "Update" : "Add"}
-            </button>
-          </div>
-        }
-      >
-        <div className="space-y-4">
-          <p className="text-sm text-gray-500 -mt-2">
-            Make changes to item quality details.
-          </p>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Name
-            </label>
-            <input
-              type="text"
-              name="name"
-              value={qualityFormData.name}
-              onChange={handleQualityFormChange}
-              placeholder="Quality name"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Photo:
-            </label>
-            <div className="flex items-center gap-3">
+            <div className="flex gap-3">
+              <button className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 text-gray-700">
+                <ArrowDownTrayIcon className="h-4 w-4" />
+                Export Details
+              </button>
               <input
                 type="file"
-                id="quality-photo"
+                ref={fileInputRef}
                 className="hidden"
-                onChange={handleFileChange}
+                multiple
                 accept="image/*"
+                onChange={(e) => handleImageUpload(e)}
               />
-              <label
-                htmlFor="quality-photo"
-                className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-50 transition-colors"
+              <input
+                type="file"
+                ref={attachmentInputRef}
+                className="hidden"
+                multiple
+                onChange={(e) => handleAttachmentUpload(e)}
+              />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploadingPictures}
+                className={`px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 text-gray-700 ${uploadingPictures ? "opacity-50 cursor-not-allowed" : ""
+                  }`}
               >
-                Choose file
-              </label>
-              <span className="text-sm text-gray-500">
-                {qualityFormData.picture
-                  ? qualityFormData.picture.name
-                  : qualityFormData.pictureUrl
-                    ? "Existing photo"
-                    : "No file chosen"}
-              </span>
+                <PhotoIcon className="h-4 w-4" />
+                {uploadingPictures ? "Uploading..." : "Add Pictures"}
+              </button>
+              <button
+                onClick={() => attachmentInputRef.current?.click()}
+                className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 text-gray-700"
+              >
+                <DocumentIcon className="h-4 w-4" />
+                Add Documents
+              </button>
+            </div>
+
+            <div className="text-sm text-gray-500">
+              Last updated: {itemData?.updated_at ? formatDate(itemData.updated_at) : formatDate(new Date())}
             </div>
           </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Description:
-            </label>
-            <textarea
-              name="description"
-              value={qualityFormData.description}
-              onChange={handleQualityFormChange}
-              placeholder="Item Description"
-              rows={3}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Description CN:
-            </label>
-            <textarea
-              name="descriptionCN"
-              value={qualityFormData.descriptionCN}
-              onChange={handleQualityFormChange}
-              placeholder="Item Description in CN"
-              rows={3}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary"
-            />
-          </div>
         </div>
-      </CustomModal>
-
-      <CustomModal
-        isOpen={isLinkSupplierModalOpen}
-        onClose={() => setIsLinkSupplierModalOpen(false)}
-        title="Link New Supplier Source"
-      >
-        <div className="space-y-6">
-          <div className="space-y-2">
-            <label className="text-sm font-semibold text-gray-700">
-              Select Supplier
-            </label>
-            <div className="relative">
-              <select
-                value={selectedSupplierToLink}
-                onChange={(e) => setSelectedSupplierToLink(e.target.value)}
-                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#8CC21B] focus:border-transparent transition-all outline-none appearance-none"
+        <CustomModal
+          isOpen={isQualityModalOpen}
+          onClose={handleCloseQualityModal}
+          title={
+            editingQuality
+              ? "Update Quality of this item"
+              : "Add Quality to this item"
+          }
+          width="max-w-md"
+          footer={
+            <div className="flex gap-2 w-full justify-end">
+              <button
+                onClick={handleCloseQualityModal}
+                className="px-4 py-2 flex items-center gap-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
               >
-                <option value="">Choose a supplier...</option>
-                {allSuppliers.map((s) => (
-                  <option key={s.id} value={String(s.id)}>
-                    [{s.id}]{s.name && !hasChinese(s.name) ? " " + s.name : ""}
-                  </option>
-                ))}
-              </select>
-              <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
-                <ChevronRightIcon className="h-4 w-4 text-gray-400 rotate-90" />
+                <XCircleIcon className="h-4 w-4" />
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveQuality}
+                className="px-4 py-2 flex items-center gap-2 text-white bg-[#00A651] rounded-lg hover:bg-[#008c44] transition-colors"
+              >
+                <CheckCircleIcon className="h-4 w-4" />
+                {editingQuality ? "Update" : "Add"}
+              </button>
+            </div>
+          }
+        >
+          <div className="space-y-4">
+            <p className="text-sm text-gray-500 -mt-2">
+              Make changes to item quality details.
+            </p>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Name
+              </label>
+              <input
+                type="text"
+                name="name"
+                value={qualityFormData.name}
+                onChange={handleQualityFormChange}
+                placeholder="Quality name"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Photo:
+              </label>
+              <div className="flex items-center gap-3">
+                <input
+                  type="file"
+                  id="quality-photo"
+                  className="hidden"
+                  onChange={handleFileChange}
+                  accept="image/*"
+                />
+                <label
+                  htmlFor="quality-photo"
+                  className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-50 transition-colors"
+                >
+                  Choose file
+                </label>
+                <span className="text-sm text-gray-500">
+                  {qualityFormData.picture
+                    ? qualityFormData.picture.name
+                    : qualityFormData.pictureUrl
+                      ? "Existing photo"
+                      : "No file chosen"}
+                </span>
               </div>
             </div>
-            <p className="text-xs text-gray-500 italic">
-              Link an additional supplier to this item. You can then set
-              specific prices and lead times for this source.
-            </p>
-          </div>
 
-          <div className="flex gap-3 pt-2">
-            <button
-              onClick={() => setIsLinkSupplierModalOpen(false)}
-              className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition-all"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleLinkSupplier}
-              disabled={!selectedSupplierToLink}
-              className="flex-1 px-4 py-3 bg-[#8CC21B] text-white rounded-xl font-semibold hover:bg-[#7ab318] transition-all disabled:opacity-50 shadow-md"
-            >
-              Link Supplier
-            </button>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Description:
+              </label>
+              <textarea
+                name="description"
+                value={qualityFormData.description}
+                onChange={handleQualityFormChange}
+                placeholder="Item Description"
+                rows={3}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Description CN:
+              </label>
+              <textarea
+                name="descriptionCN"
+                value={qualityFormData.descriptionCN}
+                onChange={handleQualityFormChange}
+                placeholder="Item Description in CN"
+                rows={3}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary"
+              />
+            </div>
           </div>
-        </div>
-      </CustomModal>
-    </div>
-  );
+        </CustomModal>
+
+        <CustomModal
+          isOpen={isLinkSupplierModalOpen}
+          onClose={() => setIsLinkSupplierModalOpen(false)}
+          title="Link New Supplier Source"
+        >
+          <div className="space-y-6">
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-gray-700">
+                Select Supplier
+              </label>
+              <div className="relative">
+                <select
+                  value={selectedSupplierToLink}
+                  onChange={(e) => setSelectedSupplierToLink(e.target.value)}
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#8CC21B] focus:border-transparent transition-all outline-none appearance-none"
+                >
+                  <option value="">Choose a supplier...</option>
+                  {allSuppliers.map((s) => (
+                    <option key={s.id} value={String(s.id)}>
+                      [{s.id}]{s.name && !hasChinese(s.name) ? " " + s.name : ""}
+                    </option>
+                  ))}
+                </select>
+                <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
+                  <ChevronRightIcon className="h-4 w-4 text-gray-400 rotate-90" />
+                </div>
+              </div>
+              <p className="text-xs text-gray-500 italic">
+                Link an additional supplier to this item. You can then set
+                specific prices and lead times for this source.
+              </p>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <button
+                onClick={() => setIsLinkSupplierModalOpen(false)}
+                className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleLinkSupplier}
+                disabled={!selectedSupplierToLink}
+                className="flex-1 px-4 py-3 bg-[#8CC21B] text-white rounded-xl font-semibold hover:bg-[#7ab318] transition-all disabled:opacity-50 shadow-md"
+              >
+                Link Supplier
+              </button>
+            </div>
+          </div>
+        </CustomModal>
+      </div>
+      );
 };
 
-export default ItemDetailsPage;
+      export default ItemDetailsPage;
