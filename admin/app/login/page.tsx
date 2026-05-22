@@ -1,4 +1,3 @@
-// login/page.tsx
 "use client";
 import React, { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
@@ -11,15 +10,17 @@ import {
 } from "lucide-react";
 import { Button, TextField, Typography, Link, IconButton } from "@mui/material";
 import Image from "next/image";
+import theme from "@/styles/theme";
 import { useDispatch, useSelector } from "react-redux";
 import { AppDispatch, RootState } from "../Redux/store";
 import { BASE_URL, loadingStyles, successStyles } from "@/utils/constants";
 import toast from "react-hot-toast";
-import { handleApiError } from "@/utils/api";
+import { api, handleApiError } from "@/utils/api";
 import { login } from "../Redux/features/userSlice";
 import logo from "@/public/logo.png";
 import axios from "axios";
 import { useRouter } from "next/navigation";
+import { UserRole } from "@/utils/interfaces";
 
 const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
@@ -28,53 +29,47 @@ const Login = () => {
   const {
     register,
     handleSubmit,
-    formState: { errors },
+    reset,
+    formState: { errors, isSubmitSuccessful },
   } = useForm();
 
   const dispatch = useDispatch<AppDispatch>();
-
-  const doRedirect = (role: string) => {
-    const saved = sessionStorage.getItem("redirectAfterLogin");
-    console.log("[Login] sessionStorage redirectAfterLogin =", saved);
-
-    if (saved && saved !== "/login" && saved !== "/") {
-      sessionStorage.removeItem("redirectAfterLogin");
-      console.log("[Login] Redirecting to saved URL:", saved);
-      // Use window.location.href for a hard navigation
-      // so Next.js fully reloads the page with the query params
-      window.location.href = saved;
-    } else if (role === "PURCHASING") {
-      router.push("/orders?tab=label_print");
-    } else {
-      router.push("/scheduled");
-    }
-  };
-
   const onSubmit = async (data: any) => {
     try {
       toast.loading("Authenticating...", loadingStyles);
       const response = await axios.post(`${BASE_URL}/auth/login`, data, {
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+        },
         withCredentials: true,
       });
 
-      const userData = response.data.data;
-      dispatch(login(userData));
+      dispatch(login(response.data.data));
       toast.dismiss();
-      toast.success(`Welcome ${userData.name}!`, successStyles);
+      toast.success(`Welcome ${response.data.data.name}!`, successStyles);
 
-      doRedirect(userData.role);
+      // Fix: Add preventDefault if in an event handler
+      if (response.data.data.role === "PURCHASING") {
+        router.push("/orders?tab=label_print");
+      } else {
+        router.push("/scheduled");
+      }
+
+      return response.data;
     } catch (error) {
-      toast.dismiss();
       handleApiError(error, "Login failed");
     }
   };
 
   useEffect(() => {
     if (user && !loading) {
-      doRedirect(user.role);
+      if (user.role === "PURCHASING") {
+        router.push("/orders?tab=label_print");
+      } else {
+        router.push("/scheduled");
+      }
     }
-  }, [user, loading]);
+  }, [user, loading, router]);
 
   if (user && !loading) {
     return null;
@@ -83,6 +78,7 @@ const Login = () => {
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-[#f8fafc] to-[#e2e8f0]">
       <div className="min-w-[40vw] flex rounded-2xl shadow-xl bg-white overflow-hidden">
+        {/* Form Section */}
         <div className="flex-1 p-12">
           <div className="max-w-md mx-auto">
             <div className="text-center flex justify-center items-center mb-10 w-full">
