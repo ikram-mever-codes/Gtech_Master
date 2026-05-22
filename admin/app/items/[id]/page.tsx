@@ -7,6 +7,7 @@ import {
   ArrowDownTrayIcon,
   EyeIcon,
   ChevronRightIcon,
+  ChevronDownIcon,
   CheckCircleIcon,
   XCircleIcon,
   ExclamationTriangleIcon,
@@ -21,6 +22,7 @@ import CustomButton from "@/components/UI/CustomButton";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
 import {
+  getItems,
   getItemById,
   updateItem,
   getItemVariations,
@@ -216,6 +218,29 @@ const ItemDetailsPage = () => {
   const [editMode, setEditMode] = useState(false);
   const [loading, setLoading] = useState(true);
   const [itemData, setItemDataRaw] = useState<ItemDetails | null>(null);
+
+  const [supplierItems, setSupplierItems] = useState<any[]>([]);
+  const [loadingSupplierItems, setLoadingSupplierItems] = useState(false);
+  const [openSupplierDropdownId, setOpenSupplierDropdownId] = useState<number | null>(null);
+  const [supplierItemSearch, setSupplierItemSearch] = useState("");
+
+  const fetchSupplierItems = async (supplierId: string | number) => {
+    if (supplierItems.length > 0 && supplierItems[0]?.supplier_id === Number(supplierId)) {
+      return;
+    }
+    setLoadingSupplierItems(true);
+    try {
+      const response: any = await getItems({ supplier: String(supplierId), limit: 1000 });
+      if (response && response.data) {
+        setSupplierItems(response.data);
+      }
+    } catch (error) {
+      console.error("Failed to fetch supplier items:", error);
+      toast.error("Failed to load items for this supplier");
+    } finally {
+      setLoadingSupplierItems(false);
+    }
+  };
 
   const setItemData = (
     newData: ItemDetails | null | ((prev: ItemDetails | null) => ItemDetails | null)
@@ -1057,15 +1082,96 @@ const ItemDetailsPage = () => {
                         ))}
                       </select>
                     ) : (
-                      <span className="text-gray-900">
+                      <div className="flex items-center gap-2">
+                        <span className="text-gray-900">
+                          {(() => {
+                            const currentId = itemData.supplier_id || itemData.supplierItems?.find((si: any) => si.isDefault)?.supplierId;
+                            const matched = allSuppliers.find((s) => s.id === currentId);
+                            return matched
+                              ? `[ID: ${matched.id}] ${!hasChinese(matched.name || "") ? matched.name : matched.company_name || ""}`
+                              : (currentId ? `[ID: ${currentId}]` : "—");
+                          })()}
+                        </span>
                         {(() => {
                           const currentId = itemData.supplier_id || itemData.supplierItems?.find((si: any) => si.isDefault)?.supplierId;
-                          const matched = allSuppliers.find((s) => s.id === currentId);
-                          return matched
-                            ? `[ID: ${matched.id}] ${!hasChinese(matched.name || "") ? matched.name : matched.company_name || ""}`
-                            : (currentId ? `[ID: ${currentId}]` : "—");
+                          return currentId ? (
+                            <div className="relative inline-block text-left">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const supplierId = Number(currentId);
+                                  const isOpen = openSupplierDropdownId === supplierId;
+                                  setOpenSupplierDropdownId(isOpen ? null : supplierId);
+                                  if (!isOpen) fetchSupplierItems(supplierId);
+                                }}
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100 transition-colors cursor-pointer"
+                                title="Show all items for this supplier"
+                              >
+                                <EyeIcon className="h-3.5 w-3.5" />
+                                View Items
+                                <ChevronDownIcon className={`h-3 w-3 transform transition-transform duration-200 ${openSupplierDropdownId === Number(currentId) ? "rotate-180" : "rotate-0"}`} />
+                              </button>
+
+                              {openSupplierDropdownId === Number(currentId) && (
+                                <>
+                                  <div 
+                                    className="fixed inset-0 z-40 cursor-default" 
+                                    onClick={() => {
+                                      setOpenSupplierDropdownId(null);
+                                      setSupplierItemSearch("");
+                                    }} 
+                                  />
+                                  <div className="absolute left-0 mt-1 w-80 bg-white border border-gray-200 rounded-xl shadow-xl z-50 py-2">
+                                    <div className="px-3 py-1 border-b border-gray-100 mb-1">
+                                      <input
+                                        type="text"
+                                        placeholder="Search items..."
+                                        value={supplierItemSearch}
+                                        onChange={(e) => setSupplierItemSearch(e.target.value)}
+                                        className="w-full px-2.5 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                      />
+                                    </div>
+                                    <div className="max-h-60 overflow-y-auto px-1">
+                                      {loadingSupplierItems ? (
+                                        <div className="px-3 py-3 text-xs text-gray-500 text-center flex items-center justify-center gap-2">
+                                          <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                                          Loading items...
+                                        </div>
+                                      ) : (() => {
+                                        const filtered = supplierItems.filter(item => 
+                                          String(item.id).includes(supplierItemSearch) ||
+                                          (item.item_name && item.item_name.toLowerCase().includes(supplierItemSearch.toLowerCase())) ||
+                                          (item.name_de && item.name_de.toLowerCase().includes(supplierItemSearch.toLowerCase()))
+                                        );
+                                        
+                                        if (filtered.length === 0) {
+                                          return <div className="px-3 py-2 text-xs text-gray-500 text-center">No items found</div>;
+                                        }
+
+                                        return filtered.map((item) => (
+                                          <button
+                                            key={item.id}
+                                            type="button"
+                                            onClick={() => {
+                                              setOpenSupplierDropdownId(null);
+                                              setSupplierItemSearch("");
+                                              router.push(`/items/${item.id}`);
+                                            }}
+                                            className={`w-full text-left px-3 py-2 text-xs rounded-lg hover:bg-blue-50 hover:text-blue-700 transition-colors flex flex-col gap-0.5 ${Number(item.id) === Number(id) ? "bg-blue-50 text-blue-700 font-semibold" : "text-gray-700"}`}
+                                          >
+                                            <span className="font-medium line-clamp-2">{item.item_name}</span>
+                                            <span className="text-[10px] text-gray-400">ID: {item.id} {item.ean ? `| EAN: ${item.ean}` : ""}</span>
+                                          </button>
+                                        ));
+                                      })()}
+                                    </div>
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                          ) : null;
                         })()}
-                      </span>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -1672,9 +1778,85 @@ const ItemDetailsPage = () => {
                             </span>
                           </div>
                           {si.isDefault && (
-                            <span className="text-[10px] bg-blue-600 text-white px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">
-                              Default Source
-                            </span>
+                            <div className="flex items-center gap-2 mt-1 relative">
+                              <span className="text-[10px] bg-blue-600 text-white px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">
+                                Default Source
+                              </span>
+                              <div className="relative inline-block text-left">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const supplierId = Number(si.supplierId);
+                                    const isOpen = openSupplierDropdownId === supplierId;
+                                    setOpenSupplierDropdownId(isOpen ? null : supplierId);
+                                    if (!isOpen) fetchSupplierItems(supplierId);
+                                  }}
+                                  className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded hover:bg-blue-100 transition-colors cursor-pointer"
+                                  title="Show all items for this supplier"
+                                >
+                                  <EyeIcon className="h-3 w-3" />
+                                  View Items
+                                  <ChevronDownIcon className={`h-2.5 w-2.5 transform transition-transform duration-200 ${openSupplierDropdownId === Number(si.supplierId) ? "rotate-180" : "rotate-0"}`} />
+                                </button>
+
+                                {openSupplierDropdownId === Number(si.supplierId) && (
+                                  <>
+                                    <div 
+                                      className="fixed inset-0 z-40 cursor-default" 
+                                      onClick={() => {
+                                        setOpenSupplierDropdownId(null);
+                                        setSupplierItemSearch("");
+                                      }} 
+                                    />
+                                    <div className="absolute left-0 mt-1 w-80 bg-white border border-gray-200 rounded-xl shadow-xl z-50 py-2">
+                                      <div className="px-3 py-1 border-b border-gray-100 mb-1">
+                                        <input
+                                          type="text"
+                                          placeholder="Search items..."
+                                          value={supplierItemSearch}
+                                          onChange={(e) => setSupplierItemSearch(e.target.value)}
+                                          className="w-full px-2.5 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        />
+                                      </div>
+                                      <div className="max-h-60 overflow-y-auto px-1">
+                                        {loadingSupplierItems ? (
+                                          <div className="px-3 py-3 text-xs text-gray-500 text-center flex items-center justify-center gap-2">
+                                            <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                                            Loading items...
+                                          </div>
+                                        ) : (() => {
+                                          const filtered = supplierItems.filter(item => 
+                                            String(item.id).includes(supplierItemSearch) ||
+                                            (item.item_name && item.item_name.toLowerCase().includes(supplierItemSearch.toLowerCase())) ||
+                                            (item.name_de && item.name_de.toLowerCase().includes(supplierItemSearch.toLowerCase()))
+                                          );
+                                          
+                                          if (filtered.length === 0) {
+                                            return <div className="px-3 py-2 text-xs text-gray-500 text-center">No items found</div>;
+                                          }
+
+                                          return filtered.map((item) => (
+                                            <button
+                                              key={item.id}
+                                              type="button"
+                                              onClick={() => {
+                                                setOpenSupplierDropdownId(null);
+                                                setSupplierItemSearch("");
+                                                router.push(`/items/${item.id}`);
+                                              }}
+                                              className={`w-full text-left px-3 py-2 text-xs rounded-lg hover:bg-blue-50 hover:text-blue-700 transition-colors flex flex-col gap-0.5 ${Number(item.id) === Number(id) ? "bg-blue-50 text-blue-700 font-semibold" : "text-gray-700"}`}
+                                            >
+                                              <span className="font-medium line-clamp-2">{item.item_name}</span>
+                                              <span className="text-[10px] text-gray-400">ID: {item.id} {item.ean ? `| EAN: ${item.ean}` : ""}</span>
+                                            </button>
+                                          ));
+                                        })()}
+                                      </div>
+                                    </div>
+                                  </>
+                                )}
+                              </div>
+                            </div>
                           )}
                         </div>
                       </div>
