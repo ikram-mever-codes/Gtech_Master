@@ -376,6 +376,7 @@ const ItemsManagementPage: React.FC = () => {
             isActive: debouncedFilters.isActive,
             category: debouncedFilters.category,
             eanSearch: debouncedFilters.eanSearch,
+            supplier: debouncedFilters.supplier,
           });
           setItems(itemsResponse.data);
           setPagination(itemsResponse.pagination);
@@ -449,6 +450,13 @@ const ItemsManagementPage: React.FC = () => {
       if (validTabs.includes(tabParam)) {
         setActiveTab(tabParam as TabType);
       }
+    }
+    const supplierParam = searchParams.get("supplier");
+    if (supplierParam) {
+      setFilters((prev) => ({
+        ...prev,
+        supplier: supplierParam,
+      }));
     }
   }, [searchParams]);
 
@@ -1981,10 +1989,29 @@ const ItemsManagementPage: React.FC = () => {
                         })}
                     </select>
                   </div>
-                  <div className="md:col-span-2 flex items-end">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Supplier
+                    </label>
+                    <select
+                      value={filters.supplier}
+                      onChange={(e) =>
+                        setFilters({ ...filters, supplier: e.target.value })
+                      }
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                    >
+                      <option value="">All Suppliers</option>
+                      {suppliers.map((s) => (
+                        <option key={s.id} value={s.id.toString()}>
+                          {`[ID: ${s.id}] ${s.company_name || s.name || ""}`}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex items-end">
                     <button
                       onClick={resetFilters}
-                      className="px-4 py-2 text-sm bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+                      className="px-4 py-2 text-sm bg-gray-200 text-gray-700 rounded hover:bg-gray-300 w-full"
                     >
                       Reset Filters
                     </button>
