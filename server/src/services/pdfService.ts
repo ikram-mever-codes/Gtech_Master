@@ -109,6 +109,22 @@ export async function generatePurchaseOrderPDFBuffer(so: SupplierOrder): Promise
     };
 
     try {
+        const { SupplierItem } = await import("../models/supplier_items");
+        const { AppDataSource } = await import("../config/database");
+        const { In } = await import("typeorm");
+
+        const itemIds = items.map(it => it.item_id).filter(id => id !== null && id !== undefined);
+        const supplierItems = so.supplier_id && itemIds.length > 0
+            ? await AppDataSource.getRepository(SupplierItem).find({
+                where: {
+                    supplier_id: so.supplier_id,
+                    item_id: In(itemIds)
+                }
+            })
+            : [];
+
+        const supplierPriceMap = new Map(supplierItems.map(si => [si.item_id, si.price_rmb]));
+
         doc.fontSize(16).fillColor("#333333").font(boldFont).text("GTech Industries Limited", 40, 30, { align: "right" });
         doc.moveTo(40, 55).lineTo(555, 55).strokeColor("#333333").lineWidth(0.8).stroke();
         doc.fillColor("#666666").font(regularFont).fontSize(8).text("Engineering ✔ Design ✔ Manufacturing ✔", 40, 60, { align: "right" });
@@ -198,7 +214,22 @@ export async function generatePurchaseOrderPDFBuffer(so: SupplierOrder): Promise
             doc.text(item.item?.model || "N/A", cols[2] + 5, itemY + 10, { width: cols[3] - cols[2] - 10, height: rowHeight - 15 });
 
             const qty = Number(item.qty || 0);
-            const price = Number(item.price || 0);
+
+            // Resolve the RMB Price:
+            // 1. Check if we have a direct price_rmb in our mapping for this item and supplier.
+            // 2. Fallback to rmb_special_price on the order item.
+            // 3. Fallback to item.price as a last resort.
+            let price = 0;
+            const mappedRmbPrice = item.item_id ? supplierPriceMap.get(item.item_id) : null;
+
+            if (mappedRmbPrice !== undefined && mappedRmbPrice !== null && Number(mappedRmbPrice) > 0) {
+                price = Number(mappedRmbPrice);
+            } else if (item.rmb_special_price !== undefined && item.rmb_special_price !== null && Number(item.rmb_special_price) > 0) {
+                price = Number(item.rmb_special_price);
+            } else {
+                price = Number(item.price || 0);
+            }
+
             const total = qty * price;
 
             doc.text(qty.toString(), cols[3] + 5, itemY + 10, { width: cols[4] - cols[3] - 10, align: 'center' });
