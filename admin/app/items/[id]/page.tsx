@@ -224,6 +224,38 @@ const ItemDetailsPage = () => {
   const [openSupplierDropdownId, setOpenSupplierDropdownId] = useState<number | null>(null);
   const [supplierItemSearch, setSupplierItemSearch] = useState("");
 
+  const [supplierRelatedItems, setSupplierRelatedItems] = useState<Record<number, any[]>>({});
+  const [loadingSupplierRelatedItems, setLoadingSupplierRelatedItems] = useState<Record<number, boolean>>({});
+  const [supplierSearchTerms, setSupplierSearchTerms] = useState<Record<number, string>>({});
+
+  const fetchSupplierRelatedItems = async (supplierId: string | number) => {
+    const sId = Number(supplierId);
+    if (supplierRelatedItems[sId]) {
+      return;
+    }
+    setLoadingSupplierRelatedItems(prev => ({ ...prev, [sId]: true }));
+    try {
+      const response: any = await getItems({ supplier: String(supplierId), limit: 1000 });
+      if (response && response.data) {
+        setSupplierRelatedItems(prev => ({ ...prev, [sId]: response.data }));
+      }
+    } catch (error) {
+      console.error(`Failed to fetch items for supplier ${sId}:`, error);
+    } finally {
+      setLoadingSupplierRelatedItems(prev => ({ ...prev, [sId]: false }));
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === "supplier" && itemData?.supplierItems && itemData.supplierItems.length > 0) {
+      itemData.supplierItems.forEach((si: any) => {
+        if (si.supplierId) {
+          fetchSupplierRelatedItems(si.supplierId);
+        }
+      });
+    }
+  }, [activeTab, itemData?.supplierItems]);
+
   const fetchSupplierItems = async (supplierId: string | number) => {
     if (supplierItems.length > 0 && supplierItems[0]?.supplier_id === Number(supplierId)) {
       return;
@@ -1669,174 +1701,181 @@ const ItemDetailsPage = () => {
                   itemData.supplierItems.map((si: any) => (
                     <div
                       key={si.id}
-                      className={`p-4 rounded-xl border transition-all flex items-center justify-between group ${si.isDefault
-                        ? "bg-blue-50/50 border-blue-200 shadow-sm"
+                      className={`p-5 rounded-xl border transition-all flex flex-col gap-4 ${si.isDefault
+                        ? "bg-blue-50/20 border-blue-200 shadow-sm"
                         : "bg-white border-gray-100 hover:border-gray-200"
                         }`}
                     >
-                      <div className="flex items-center gap-4">
-                        <div
-                          className={`p-2 rounded-lg ${si.isDefault
-                            ? "bg-blue-100 text-blue-600"
-                            : "bg-gray-100 text-gray-400"
-                            }`}
-                        >
-                          <Package className="h-5 w-5" />
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <h4 className="font-bold text-gray-900 line-clamp-1">
-                              {(() => {
-                                const sDetail = allSuppliers.find((s) => String(s.id) === String(si.supplierId));
-                                const bestName = sDetail?.company_name || sDetail?.name || sDetail?.name_de || si.supplierName;
-                                return (bestName && bestName !== "Unknown" && bestName !== "-") ? bestName : "";
-                              })()}
-                            </h4>
-                            <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded font-medium">
-                              ID: {si.supplierId}
-                            </span>
+                      <div className="flex items-center justify-between flex-wrap gap-3">
+                        <div className="flex items-center gap-4">
+                          <div
+                            className={`p-2 rounded-lg ${si.isDefault
+                              ? "bg-blue-100 text-blue-600"
+                              : "bg-gray-100 text-gray-400"
+                              }`}
+                          >
+                            <Package className="h-5 w-5" />
                           </div>
-                          {si.isDefault && (
-                            <div className="flex items-center gap-2 mt-1 relative">
-                              <span className="text-[10px] bg-blue-600 text-white px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">
-                                Default Source
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h4 className="font-bold text-gray-900 line-clamp-1">
+                                {(() => {
+                                  const sDetail = allSuppliers.find((s) => String(s.id) === String(si.supplierId));
+                                  const bestName = sDetail?.company_name || sDetail?.name || sDetail?.name_de || si.supplierName;
+                                  return (bestName && bestName !== "Unknown" && bestName !== "-") ? bestName : "";
+                                })()}
+                              </h4>
+                              <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded font-medium">
+                                ID: {si.supplierId}
                               </span>
-                              <div className="relative inline-block text-left">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const supplierId = Number(si.supplierId);
-                                    const isOpen = openSupplierDropdownId === supplierId;
-                                    setOpenSupplierDropdownId(isOpen ? null : supplierId);
-                                    if (!isOpen) fetchSupplierItems(supplierId);
-                                  }}
-                                  className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded hover:bg-blue-100 transition-colors cursor-pointer"
-                                  title="Show all items for this supplier"
-                                >
-                                  <EyeIcon className="h-3 w-3" />
-                                  View Items
-                                  <ChevronDownIcon className={`h-2.5 w-2.5 transform transition-transform duration-200 ${openSupplierDropdownId === Number(si.supplierId) ? "rotate-180" : "rotate-0"}`} />
-                                </button>
-
-                                {openSupplierDropdownId === Number(si.supplierId) && (
-                                  <>
-                                    <div 
-                                      className="fixed inset-0 z-40 cursor-default" 
-                                      onClick={() => {
-                                        setOpenSupplierDropdownId(null);
-                                        setSupplierItemSearch("");
-                                      }} 
-                                    />
-                                    <div className="absolute left-0 mt-1 w-80 bg-white border border-gray-200 rounded-xl shadow-xl z-50 py-2">
-                                      <div className="px-3 py-1 border-b border-gray-100 mb-1">
-                                        <input
-                                          type="text"
-                                          placeholder="Search items..."
-                                          value={supplierItemSearch}
-                                          onChange={(e) => setSupplierItemSearch(e.target.value)}
-                                          className="w-full px-2.5 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                        />
-                                      </div>
-                                      <div className="max-h-60 overflow-y-auto px-1">
-                                        {loadingSupplierItems ? (
-                                          <div className="px-3 py-3 text-xs text-gray-500 text-center flex items-center justify-center gap-2">
-                                            <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                                            Loading items...
-                                          </div>
-                                        ) : (() => {
-                                          const filtered = supplierItems.filter(item => 
-                                            String(item.id).includes(supplierItemSearch) ||
-                                            (item.item_name && item.item_name.toLowerCase().includes(supplierItemSearch.toLowerCase())) ||
-                                            (item.name_de && item.name_de.toLowerCase().includes(supplierItemSearch.toLowerCase()))
-                                          );
-                                          
-                                          if (filtered.length === 0) {
-                                            return <div className="px-3 py-2 text-xs text-gray-500 text-center">No items found</div>;
-                                          }
-
-                                          return filtered.map((item) => (
-                                            <button
-                                              key={item.id}
-                                              type="button"
-                                              onClick={() => {
-                                                setOpenSupplierDropdownId(null);
-                                                setSupplierItemSearch("");
-                                                router.push(`/items/${item.id}`);
-                                              }}
-                                              className={`w-full text-left px-3 py-2 text-xs rounded-lg hover:bg-blue-50 hover:text-blue-700 transition-colors flex flex-col gap-0.5 ${Number(item.id) === Number(id) ? "bg-blue-50 text-blue-700 font-semibold" : "text-gray-700"}`}
-                                            >
-                                              <span className="font-medium line-clamp-2">{item.item_name}</span>
-                                              <span className="text-[10px] text-gray-400">ID: {item.id} {item.ean ? `| EAN: ${item.ean}` : ""}</span>
-                                            </button>
-                                          ));
-                                        })()}
-                                      </div>
-                                    </div>
-                                  </>
-                                )}
+                            </div>
+                            {si.isDefault && (
+                              <div className="mt-1">
+                                <span className="text-[10px] bg-blue-600 text-white px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">
+                                  Default Source
+                                </span>
                               </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          <button
+                            onClick={() => window.open(si.url, "_blank")}
+                            disabled={!si.url}
+                            className={`p-2 rounded-lg transition-all ${si.url
+                              ? "text-blue-500 hover:bg-blue-50"
+                              : "text-gray-300 cursor-not-allowed"
+                              }`}
+                          >
+                            <LinkIcon className="h-5 w-5" />
+                          </button>
+
+                          {editMode && (
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={async () => {
+                                  const updated = { ...itemData };
+                                  updated.supplier_id = si.supplierId;
+                                  updated.supplierItems = updated.supplierItems.map(
+                                    (x: any) => ({
+                                      ...x,
+                                      isDefault: x.id === si.id,
+                                    }),
+                                  );
+                                  updated.supplierItem = {
+                                    priceRMB: si.priceRMB || "0",
+                                    isPO: si.isPO || "No",
+                                    moq: si.moq || "0",
+                                    interval: si.interval || "0",
+                                    leadTime: si.leadTime || "",
+                                    noteCN: si.noteCN || "",
+                                    url: si.url || "",
+                                  };
+                                  if (updated.others) {
+                                    updated.others.rmbPrice = si.priceRMB || "0";
+                                  }
+                                  setItemData(updated);
+                                  await handleUpdateItem(updated);
+                                  toast.success("Default supplier source updated", successStyles);
+                                }}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${si.isDefault
+                                  ? "bg-blue-600 text-white"
+                                  : "bg-white border border-blue-200 text-blue-600 hover:bg-blue-50"
+                                  }`}
+                              >
+                                {si.isDefault ? "Default" : "Set Default"}
+                              </button>
+                              {!si.isDefault && (
+                                <button
+                                  onClick={() => handleRemoveSupplier(si.id)}
+                                  className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                                >
+                                  <TrashIcon className="h-5 w-5" />
+                                </button>
+                              )}
                             </div>
                           )}
                         </div>
                       </div>
-
-                      <div className="flex items-center gap-3">
-                        <button
-                          onClick={() => window.open(si.url, "_blank")}
-                          disabled={!si.url}
-                          className={`p-2 rounded-lg transition-all ${si.url
-                            ? "text-blue-500 hover:bg-blue-50"
-                            : "text-gray-300 cursor-not-allowed"
-                            }`}
-                        >
-                          <LinkIcon className="h-5 w-5" />
-                        </button>
-
-                        {editMode && (
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={async () => {
-                                const updated = { ...itemData };
-                                updated.supplier_id = si.supplierId;
-                                updated.supplierItems = updated.supplierItems.map(
-                                  (x: any) => ({
-                                    ...x,
-                                    isDefault: x.id === si.id,
-                                  }),
-                                );
-                                updated.supplierItem = {
-                                  priceRMB: si.priceRMB || "0",
-                                  isPO: si.isPO || "No",
-                                  moq: si.moq || "0",
-                                  interval: si.interval || "0",
-                                  leadTime: si.leadTime || "",
-                                  noteCN: si.noteCN || "",
-                                  url: si.url || "",
-                                };
-                                if (updated.others) {
-                                  updated.others.rmbPrice = si.priceRMB || "0";
-                                }
-                                setItemData(updated);
-                                await handleUpdateItem(updated);
-                                toast.success("Default supplier source updated", successStyles);
-                              }}
-                              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${si.isDefault
-                                ? "bg-blue-600 text-white"
-                                : "bg-white border border-blue-200 text-blue-600 hover:bg-blue-50"
-                                }`}
-                            >
-                              {si.isDefault ? "Default" : "Set Default"}
-                            </button>
-                            {!si.isDefault && (
-                              <button
-                                onClick={() => handleRemoveSupplier(si.id)}
-                                className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
-                              >
-                                <TrashIcon className="h-5 w-5" />
-                              </button>
-                            )}
+                      <div className="mt-2 border-t border-gray-100 pt-4">
+                        <div className="bg-gray-50 border border-gray-100 rounded-xl p-4">
+                          <div className="flex justify-between items-center mb-3">
+                            <span className="text-xs font-bold text-gray-700">
+                              Supplier Item Catalog
+                            </span>
+                            <span className="text-[11px] font-medium text-gray-500 bg-gray-200/50 px-2 py-0.5 rounded-full">
+                              Total: {supplierRelatedItems[Number(si.supplierId)]?.length || 0} items
+                            </span>
                           </div>
-                        )}
+
+                          <div className="relative mb-3">
+                            <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
+                            <input
+                              type="text"
+                              placeholder="Search catalog items..."
+                              value={supplierSearchTerms[Number(si.supplierId)] || ""}
+                              onChange={(e) => setSupplierSearchTerms(prev => ({ ...prev, [Number(si.supplierId)]: e.target.value }))}
+                              className="w-full pl-9 pr-4 py-1.5 text-xs bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#8CC21B]/20 focus:border-[#8CC21B] transition-all"
+                            />
+                          </div>
+
+                          <div className="max-h-64 overflow-y-auto space-y-1.5 pr-1 scrollbar-thin">
+                            {loadingSupplierRelatedItems[Number(si.supplierId)] ? (
+                              <div className="py-6 text-center text-xs text-gray-500 flex items-center justify-center gap-2">
+                                <div className="w-4 h-4 border-2 border-[#8CC21B] border-t-transparent rounded-full animate-spin"></div>
+                                Loading items...
+                              </div>
+                            ) : (() => {
+                              const items = supplierRelatedItems[Number(si.supplierId)] || [];
+                              const term = (supplierSearchTerms[Number(si.supplierId)] || "").toLowerCase();
+                              const filtered = items.filter(item =>
+                                String(item.id).includes(term) ||
+                                (item.item_name && item.item_name.toLowerCase().includes(term)) ||
+                                (item.name_de && item.name_de.toLowerCase().includes(term))
+                              );
+
+                              if (filtered.length === 0) {
+                                return (
+                                  <div className="py-6 text-center text-xs text-gray-400">
+                                    No items found.
+                                  </div>
+                                );
+                              }
+
+                              return filtered.map((item: any) => {
+                                const isCurrent = Number(item.id) === Number(id);
+                                return (
+                                  <div
+                                    key={item.id}
+                                    onClick={() => router.push(`/items/${item.id}`)}
+                                    className={`w-full text-left px-3.5 py-2.5 text-xs rounded-xl transition-all flex items-center justify-between cursor-pointer group/item border ${isCurrent
+                                        ? "bg-blue-50 border-blue-200 text-blue-700 font-semibold"
+                                        : "bg-white border-gray-100 hover:border-[#8CC21B]/30 hover:bg-[#8CC21B]/5 text-gray-700"
+                                      }`}
+                                  >
+                                    <div className="flex flex-col gap-0.5 flex-1 min-w-0 pr-4">
+                                      <span className="font-semibold line-clamp-1 group-hover/item:text-[#8CC21B] transition-colors">
+                                        {item.item_name || item.name_de || "Unnamed Item"}
+                                      </span>
+                                      <span className="text-[10px] text-gray-400 flex items-center gap-2">
+                                        <span>ID: {item.id}</span>
+                                        {item.ean && <span>• EAN: {item.ean}</span>}
+                                      </span>
+                                    </div>
+                                    {isCurrent ? (
+                                      <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider shrink-0">
+                                        Current
+                                      </span>
+                                    ) : (
+                                      <ChevronRightIcon className="h-3.5 w-3.5 text-gray-400 group-hover/item:translate-x-0.5 transition-transform shrink-0" />
+                                    )}
+                                  </div>
+                                );
+                              });
+                            })()}
+                          </div>
+                        </div>
                       </div>
                     </div>
                   ))
