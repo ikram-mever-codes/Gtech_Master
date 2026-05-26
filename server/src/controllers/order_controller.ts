@@ -1275,7 +1275,7 @@ export const generateCommercialInvoicePDF = async (
 
     const totalQty = lineItems.reduce((s, it) => s + it.qty, 0);
     const subTotal = lineItems.reduce((s, it) => s + Number(it.price), 0);
-    const freightCost = 292.0;
+    const freightCost = invoice.freightCost !== undefined && invoice.freightCost !== null ? Number(invoice.freightCost) : 0;
     const grandTotal = (subTotal + freightCost).toFixed(2);
     const customer = invoice.customer;
 
@@ -1498,12 +1498,11 @@ export const generateCommercialInvoicePDF = async (
     const orderForRemark = await AppDataSource.getRepository(Order).findOne({ where: { order_no: invoice.orderNumber } });
     const orderComment = orderForRemark?.comment || "";
     if (orderComment) remarkLines.push(orderComment);
+    if (invoice.remark) remarkLines.push(invoice.remark);
     remarkLines.forEach((line, idx) => {
       doc.text(line, remarkX, itemY + idx * 15);
     });
-    const packageCount = lineItems.length;
     const nextRemarkY = itemY + Math.max(remarkLines.length, 1) * 15;
-    doc.text(`${packageCount} parcels`, remarkX, nextRemarkY);
 
     itemY = nextRemarkY + 30;
     if (itemY + 30 > pageH - footerReserve) { doc.addPage(); itemY = 50; }

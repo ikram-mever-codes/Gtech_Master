@@ -58,6 +58,15 @@ export class Invoice {
   @Column({ nullable: true })
   notes?: string;
 
+  @Column({ type: "varchar", nullable: true })
+  description?: string;
+
+  @Column({ type: "decimal", precision: 10, scale: 2, default: 0, nullable: true })
+  freightCost?: number;
+
+  @Column({ type: "text", nullable: true })
+  remark?: string;
+
   @Column({ type: "varchar", default: "draft" })
   status!: string;
 
