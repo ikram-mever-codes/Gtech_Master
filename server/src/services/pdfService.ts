@@ -123,11 +123,20 @@ export async function generatePurchaseOrderPDFBuffer(so: SupplierOrder): Promise
             })
             : [];
 
-        const supplierPriceMap = new Map(supplierItems.map(si => [si.item_id, si.price_rmb]));
+        const supplierPriceMap = new Map(supplierItems.map(si => [Number(si.item_id), si.price_rmb]));
+        console.log(`[PDF_SERVICE] supplierPriceMap has ${supplierPriceMap.size} entries for supplier ${so.supplier_id}`);
 
         doc.fontSize(16).fillColor("#333333").font(boldFont).text("GTech Industries Limited", 40, 30, { align: "right" });
         doc.moveTo(40, 55).lineTo(555, 55).strokeColor("#333333").lineWidth(0.8).stroke();
-        doc.fillColor("#666666").font(regularFont).fontSize(8).text("Engineering ✔ Design ✔ Manufacturing ✔", 40, 60, { align: "right" });
+        const tickClr = "#666666";
+        const hdrY = 60;
+        doc.fillColor(tickClr).font(regularFont).fontSize(8);
+        doc.text("Engineering", 395, hdrY, { lineBreak: false });
+        doc.save().translate(441, hdrY).scale(0.55).moveTo(0, 5).lineTo(3, 8).lineTo(8, 0).strokeColor(tickClr).lineWidth(2.5).stroke().restore();
+        doc.text("Design", 453, hdrY, { lineBreak: false });
+        doc.save().translate(479, hdrY).scale(0.55).moveTo(0, 5).lineTo(3, 8).lineTo(8, 0).strokeColor(tickClr).lineWidth(2.5).stroke().restore();
+        doc.text("Manufacturing", 491, hdrY, { lineBreak: false });
+        doc.save().translate(546, hdrY).scale(0.55).moveTo(0, 5).lineTo(3, 8).lineTo(8, 0).strokeColor(tickClr).lineWidth(2.5).stroke().restore();
 
         doc.fontSize(7).fillColor("#555555");
         doc.text("GTech Industries Limited: 3A, 12/F, Kaiser Centre, N. 18 Centre Street, Sai Ying Pun, Hong Kong", 40, 75);
@@ -215,12 +224,9 @@ export async function generatePurchaseOrderPDFBuffer(so: SupplierOrder): Promise
 
             const qty = Number(item.qty || 0);
 
-            // Resolve the RMB Price:
-            // 1. Check if we have a direct price_rmb in our mapping for this item and supplier.
-            // 2. Fallback to rmb_special_price on the order item.
-            // 3. Fallback to item.price as a last resort.
             let price = 0;
-            const mappedRmbPrice = item.item_id ? supplierPriceMap.get(item.item_id) : null;
+            const mappedRmbPrice = item.item_id ? supplierPriceMap.get(Number(item.item_id)) : null;
+            console.log(`[PDF_SERVICE] item ${item.item_id}: mappedRmbPrice=${mappedRmbPrice}, rmb_special_price=${item.rmb_special_price}, price=${item.price}`);
 
             if (mappedRmbPrice !== undefined && mappedRmbPrice !== null && Number(mappedRmbPrice) > 0) {
                 price = Number(mappedRmbPrice);
