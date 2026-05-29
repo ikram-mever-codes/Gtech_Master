@@ -123,6 +123,14 @@ export class EtlController {
         console.log("order_items.csv not found");
       }
 
+      // Step 4.5: Execute dynamic EAN mapping & fix missing ItemID_DE cross-links
+      console.log("\n🔗 Step 4.5: Mapping items via EAN (ItemIDs.csv)...");
+      const itemIdsFilePath = path.join(
+        EtlController.publicPath,
+        "ItemIDs.csv",
+      );
+      await EtlController.syncItemEanMappings(itemIdsFilePath, orderItemRepo);
+
       // Step 5: Delete orders that are NOT in the CSV (orders removed from MIS/WaWi)
       console.log("\n🗑️ Step 5: Removing orders not in MIS...");
       const deletedOrders = await EtlController.deleteOrdersNotInCSV(
@@ -273,7 +281,7 @@ export class EtlController {
       }
     }
 
-    console.log(`\n📊 Orders: ${created} created, ${updated} updated`);
+    console.log(`\n Bars: ${created} created, ${updated} updated`);
     return orderMap;
   }
 
@@ -428,6 +436,85 @@ export class EtlController {
         deletedCount += idsToDelete.length;
       }
     }
+  }
+
+  /**
+   * Reads ItemIDs.csv to link missing identifiers across Items and OrderItems dynamically using EAN
+   */
+  private static async syncItemEanMappings(
+    filePath: string,
+    orderItemRepo: any,
+  ) {
+    if (!fs.existsSync(filePath)) {
+      console.log(
+        "⚠️ ItemIDs.csv mapping file not found. Skipping cross-linking mapping.",
+      );
+      return;
+    }
+
+    const itemRepo = AppDataSource.getRepository(Item);
+    const csvRecords = await EtlController.readCsv(filePath);
+    if (csvRecords.length <= 1) {
+      console.log("⚠️ ItemIDs.csv is empty or missing data rows.");
+      return;
+    }
+
+    const mappingRows = csvRecords.slice(1);
+    const eanToItemIdDeMap = new Map<string, number>();
+
+    // Step A: Index the EAN mappings found inside the CSV
+    for (const row of mappingRows) {
+      const itemIdDe = parseInt(row[0]);
+      const ean = row[1]?.toString().trim();
+      if (!isNaN(itemIdDe) && ean) {
+        eanToItemIdDeMap.set(ean, itemIdDe);
+      }
+    }
+
+    // Step B: Collect local item data entries containing an EAN to update missing ItemID_DEs
+    const targetItems = await itemRepo.find({
+      where: { isActive: "Y" },
+    });
+
+    let updatedItemsCount = 0;
+    const itemDeToLocalIdMap = new Map<number, number>();
+
+    for (const item of targetItems) {
+      if (item.ean && eanToItemIdDeMap.has(item.ean)) {
+        const matchingItemIdDe = eanToItemIdDeMap.get(item.ean)!;
+
+        // Update local item if it lacks the German system key match
+        if (!item.ItemID_DE || item.ItemID_DE !== matchingItemIdDe) {
+          item.ItemID_DE = matchingItemIdDe;
+          item.is_updated = true;
+          await itemRepo.save(item);
+          updatedItemsCount++;
+        }
+        itemDeToLocalIdMap.set(matchingItemIdDe, item.id);
+      } else if (item.ItemID_DE) {
+        itemDeToLocalIdMap.set(item.ItemID_DE, item.id);
+      }
+    }
+    console.log(
+      `🔗 Updated ${updatedItemsCount} global catalogs with missing system ItemID_DE numbers.`,
+    );
+
+    // Step C: Repair loose relational connections sitting in order_items records
+    const looseOrderItems = await orderItemRepo.find({
+      where: [{ item_id: undefined }, { item_id: null as any }],
+    });
+
+    let remappedOrderItemsCount = 0;
+    for (const oItem of looseOrderItems) {
+      if (oItem.ItemID_DE && itemDeToLocalIdMap.has(oItem.ItemID_DE)) {
+        oItem.item_id = itemDeToLocalIdMap.get(oItem.ItemID_DE)!;
+        await orderItemRepo.save(oItem);
+        remappedOrderItemsCount++;
+      }
+    }
+    console.log(
+      `🔗 Repaired relational links across ${remappedOrderItemsCount} OrderItem entries using explicit mapping.`,
+    );
   }
 
   /**

@@ -59,7 +59,7 @@ export class RequestedItemController {
           "requestedItem.contactPersonId = :contactPersonId",
           {
             contactPersonId,
-          }
+          },
         );
       }
 
@@ -102,25 +102,28 @@ export class RequestedItemController {
               ...item.business,
               customer: customer
                 ? {
-                  id: customer.id,
-                  companyName: customer.companyName,
-                  legalName: customer.legalName,
-                  email: customer.email,
-                  contactEmail: customer.contactEmail,
-                  contactPhoneNumber: customer.contactPhoneNumber,
-                  stage: customer.stage,
-                  avatar: customer.avatar,
-                  createdAt: customer.createdAt,
-                  updatedAt: customer.updatedAt,
-                }
+                    id: customer.id,
+                    companyName: customer.companyName,
+                    legalName: customer.legalName,
+                    email: customer.email,
+                    contactEmail: customer.contactEmail,
+                    contactPhoneNumber: customer.contactPhoneNumber,
+                    stage: customer.stage,
+                    avatar: customer.avatar,
+                    createdAt: customer.createdAt,
+                    updatedAt: customer.updatedAt,
+                  }
                 : null,
             },
           };
-        })
+        }),
       );
 
       const user = (request as AuthorizedRequest).user;
-      const filteredData = filterDataByRole(enrichedItems, user?.role || UserRole.STAFF);
+      const filteredData = filterDataByRole(
+        enrichedItems,
+        user?.role || UserRole.STAFF,
+      );
 
       return response.status(200).json({
         success: true,
@@ -168,23 +171,26 @@ export class RequestedItemController {
           ...item.business,
           customer: customer
             ? {
-              id: customer.id,
-              companyName: customer.companyName,
-              legalName: customer.legalName,
-              email: customer.email,
-              contactEmail: customer.contactEmail,
-              contactPhoneNumber: customer.contactPhoneNumber,
-              stage: customer.stage,
-              avatar: customer.avatar,
-              createdAt: customer.createdAt,
-              updatedAt: customer.updatedAt,
-            }
+                id: customer.id,
+                companyName: customer.companyName,
+                legalName: customer.legalName,
+                email: customer.email,
+                contactEmail: customer.contactEmail,
+                contactPhoneNumber: customer.contactPhoneNumber,
+                stage: customer.stage,
+                avatar: customer.avatar,
+                createdAt: customer.createdAt,
+                updatedAt: customer.updatedAt,
+              }
             : null,
         },
       };
 
       const user = (request as AuthorizedRequest).user;
-      const filteredData = filterDataByRole(enrichedItem, user?.role || UserRole.STAFF);
+      const filteredData = filterDataByRole(
+        enrichedItem,
+        user?.role || UserRole.STAFF,
+      );
 
       return response.status(200).json({
         success: true,
@@ -317,9 +323,8 @@ export class RequestedItemController {
         painPoints,
       });
 
-      const savedItem: any = await this.requestedItemRepository.save(
-        requestedItem
-      );
+      const savedItem: any =
+        await this.requestedItemRepository.save(requestedItem);
 
       const itemWithRelations = await this.requestedItemRepository.findOne({
         where: { id: savedItem.id },
@@ -453,12 +458,13 @@ export class RequestedItemController {
         ...(painPoints !== undefined && { painPoints }),
       };
 
-      if (contactPerson !== undefined) {
+      // Safely update relation keys only if they are present in the request body
+      if (request.body.hasOwnProperty("contactPersonId")) {
         updateData.contactPerson = contactPerson;
         updateData.contactPersonId = contactPerson ? contactPerson.id : null;
       }
 
-      if (inquiry !== undefined) {
+      if (request.body.hasOwnProperty("inquiryId")) {
         updateData.inquiry = inquiry;
       }
 
@@ -571,11 +577,11 @@ export class RequestedItemController {
 
       if (hasDimensions === "true") {
         queryBuilder.andWhere(
-          "(requestedItem.weight IS NOT NULL OR requestedItem.width IS NOT NULL OR requestedItem.height IS NOT NULL OR requestedItem.length IS NOT NULL)"
+          "(requestedItem.weight IS NOT NULL OR requestedItem.width IS NOT NULL OR requestedItem.height IS NOT NULL OR requestedItem.length IS NOT NULL)",
         );
       } else if (hasDimensions === "false") {
         queryBuilder.andWhere(
-          "(requestedItem.weight IS NULL AND requestedItem.width IS NULL AND requestedItem.height IS NULL AND requestedItem.length IS NULL)"
+          "(requestedItem.weight IS NULL AND requestedItem.width IS NULL AND requestedItem.height IS NULL AND requestedItem.length IS NULL)",
         );
       }
 
@@ -799,7 +805,7 @@ export class RequestedItemController {
         .leftJoinAndSelect("requestedItem.business", "business")
         .leftJoinAndSelect("requestedItem.contactPerson", "contactPerson")
         .where(
-          "(requestedItem.weight IS NULL OR requestedItem.width IS NULL OR requestedItem.height IS NULL OR requestedItem.length IS NULL)"
+          "(requestedItem.weight IS NULL OR requestedItem.width IS NULL OR requestedItem.height IS NULL OR requestedItem.length IS NULL)",
         )
         .orderBy("requestedItem.createdAt", "DESC");
 

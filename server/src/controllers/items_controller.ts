@@ -44,15 +44,17 @@ export const getRMBPriceFromSupplier = async (
 
     if (!supplierItem) {
       supplierItem =
-        await supplierItemRepository.findOne({
+        (await supplierItemRepository.findOne({
           where: { item_id: itemId, is_default: "Y" },
-        }) ||
-        await supplierItemRepository.findOne({
+        })) ||
+        (await supplierItemRepository.findOne({
           where: { item_id: itemId },
-        });
+        }));
     }
 
-    return supplierItem && supplierItem.price_rmb !== undefined && supplierItem.price_rmb !== null
+    return supplierItem &&
+      supplierItem.price_rmb !== undefined &&
+      supplierItem.price_rmb !== null
       ? Number(supplierItem.price_rmb)
       : null;
   } catch (error) {
@@ -298,44 +300,44 @@ export const getItems = async (
     ] = await Promise.all([
       parentIds.length > 0
         ? parentRepository.find({
-          where: { id: In(parentIds) },
-          select: ["id", "de_no", "name_de", "name_en", "name_cn"],
-        })
+            where: { id: In(parentIds) },
+            select: ["id", "de_no", "name_de", "name_en", "name_cn"],
+          })
         : Promise.resolve([]),
       taricIds.length > 0
         ? taricRepository.find({
-          where: { id: In(taricIds) },
-          select: ["id", "code", "description_de"],
-        })
+            where: { id: In(taricIds) },
+            select: ["id", "code", "description_de"],
+          })
         : Promise.resolve([]),
       catIds.length > 0
         ? categoryRepository.find({
-          where: { id: In(catIds) },
-          select: ["id", "name"],
-        })
+            where: { id: In(catIds) },
+            select: ["id", "name"],
+          })
         : Promise.resolve([]),
       itemSupplierIds.length > 0
         ? supplierRepository.find({
-          where: { id: In(itemSupplierIds) },
-          select: ["id", "name", "company_name"],
-        })
+            where: { id: In(itemSupplierIds) },
+            select: ["id", "name", "company_name"],
+          })
         : Promise.resolve([]),
       itemIds.length > 0
         ? warehouseRepository.find({
-          where: [
-            { item_id: In(itemIds) },
-            {
-              ItemID_DE: In(
-                items.map((i) => i.ItemID_DE).filter(Boolean) as number[],
-              ),
-            },
-          ],
-        })
+            where: [
+              { item_id: In(itemIds) },
+              {
+                ItemID_DE: In(
+                  items.map((i) => i.ItemID_DE).filter(Boolean) as number[],
+                ),
+              },
+            ],
+          })
         : Promise.resolve([]),
       itemIds.length > 0
         ? AppDataSource.getRepository(SupplierItem).find({
-          where: { item_id: In(itemIds) },
-        })
+            where: { item_id: In(itemIds) },
+          })
         : Promise.resolve([]),
     ]);
 
@@ -435,13 +437,13 @@ export const getItems = async (
         transfer_price_EUR: item.transfer_price_EUR,
         warehouse_data: warehouseData
           ? {
-            id: warehouseData.id,
-            item_no_de: warehouseData.item_no_de,
-            stock_qty: warehouseData.stock_qty,
-            msq: warehouseData.msq,
-            buffer: warehouseData.buffer,
-            is_stock_item: warehouseData.is_stock_item,
-          }
+              id: warehouseData.id,
+              item_no_de: warehouseData.item_no_de,
+              stock_qty: warehouseData.stock_qty,
+              msq: warehouseData.msq,
+              buffer: warehouseData.buffer,
+              is_stock_item: warehouseData.is_stock_item,
+            }
           : null,
         created_at: item.created_at,
         updated_at: item.updated_at,
@@ -553,7 +555,12 @@ export const getItemById = async (
         relations: ["supplier"],
       });
 
-      if (item.supplier_id && !supplierItems.some(si => Number(si.supplier_id) === Number(item.supplier_id))) {
+      if (
+        item.supplier_id &&
+        !supplierItems.some(
+          (si) => Number(si.supplier_id) === Number(item.supplier_id),
+        )
+      ) {
         const newSupplierItem = supplierItemRepository.create({
           item_id: item.id,
           supplier_id: item.supplier_id,
@@ -589,7 +596,10 @@ export const getItemById = async (
     const de_no = primaryWarehouseItem?.item_no_de || item.parent?.de_no || "";
     const ean = item.ean || primaryWarehouseItem?.ean || "";
 
-    const rmbPrice = await getRMBPriceFromSupplier(parseInt(id), item.supplier_id ?? undefined);
+    const rmbPrice = await getRMBPriceFromSupplier(
+      parseInt(id),
+      item.supplier_id ?? undefined,
+    );
 
     const formattedItem = {
       id: item.id,
@@ -726,34 +736,38 @@ export const getItemById = async (
 
       supplierItem: (() => {
         const defaultSi =
-          supplierItems.find((si) => item.supplier_id && Number(si.supplier_id) === Number(item.supplier_id)) ||
+          supplierItems.find(
+            (si) =>
+              item.supplier_id &&
+              Number(si.supplier_id) === Number(item.supplier_id),
+          ) ||
           supplierItems.find((si) => si.is_default === "Y") ||
           supplierItems[0];
         return defaultSi
           ? {
-            id: defaultSi.id,
-            supplierId: defaultSi.supplier_id,
-            supplierName:
-              defaultSi.supplier?.company_name ||
-              defaultSi.supplier?.name ||
-              "Unknown",
-            priceRMB: defaultSi.price_rmb?.toString() || "0",
-            isPO: defaultSi.is_po || "No",
-            moq: defaultSi.moq?.toString() || "0",
-            interval: defaultSi.oi?.toString() || "0",
-            leadTime: defaultSi.lead_time || "",
-            noteCN: defaultSi.note_cn || "",
-            url: defaultSi.url || "",
-          }
+              id: defaultSi.id,
+              supplierId: defaultSi.supplier_id,
+              supplierName:
+                defaultSi.supplier?.company_name ||
+                defaultSi.supplier?.name ||
+                "Unknown",
+              priceRMB: defaultSi.price_rmb?.toString() || "0",
+              isPO: defaultSi.is_po || "No",
+              moq: defaultSi.moq?.toString() || "0",
+              interval: defaultSi.oi?.toString() || "0",
+              leadTime: defaultSi.lead_time || "",
+              noteCN: defaultSi.note_cn || "",
+              url: defaultSi.url || "",
+            }
           : {
-            priceRMB: "0",
-            isPO: "No",
-            moq: "0",
-            interval: "0",
-            leadTime: "",
-            noteCN: "",
-            url: "",
-          };
+              priceRMB: "0",
+              isPO: "No",
+              moq: "0",
+              interval: "0",
+              leadTime: "",
+              noteCN: "",
+              url: "",
+            };
       })(),
 
       nprRemarks: item.npr_remark || "",
@@ -957,7 +971,10 @@ export const updateItem = async (
 ) => {
   try {
     const { id } = req.params;
-    console.log(`[DEBUG] updateItem called for ID: ${id}. Body:`, JSON.stringify(req.body, null, 2));
+    console.log(
+      `[DEBUG] updateItem called for ID: ${id}. Body:`,
+      JSON.stringify(req.body, null, 2),
+    );
     const itemRepository = AppDataSource.getRepository(Item);
     const supplierItemRepository: any =
       AppDataSource.getRepository(SupplierItem);
@@ -1000,12 +1017,13 @@ export const updateItem = async (
 
     if (newSupplierId) {
       const allSIs = await supplierItemRepository.find({
-        where: { item_id: item.id }
+        where: { item_id: item.id },
       });
 
       let foundActive = false;
       for (const si of allSIs) {
-        const shouldBeDefault = Number(si.supplier_id) === Number(newSupplierId);
+        const shouldBeDefault =
+          Number(si.supplier_id) === Number(newSupplierId);
         if (shouldBeDefault) {
           foundActive = true;
         }
@@ -1022,10 +1040,19 @@ export const updateItem = async (
           item_id: item.id,
           supplier_id: newSupplierId,
           is_default: "Y",
-          price_rmb: supplierItemData?.price_rmb !== undefined ? parseFloat(supplierItemData.price_rmb) : 0,
+          price_rmb:
+            supplierItemData?.price_rmb !== undefined
+              ? parseFloat(supplierItemData.price_rmb)
+              : 0,
           is_po: supplierItemData?.is_po || "No",
-          moq: supplierItemData?.moq !== undefined ? parseInt(supplierItemData.moq) : 1,
-          oi: supplierItemData?.oi !== undefined ? parseInt(supplierItemData.oi) : 0,
+          moq:
+            supplierItemData?.moq !== undefined
+              ? parseInt(supplierItemData.moq)
+              : 1,
+          oi:
+            supplierItemData?.oi !== undefined
+              ? parseInt(supplierItemData.oi)
+              : 0,
           lead_time: supplierItemData?.lead_time || "",
           url: supplierItemData?.url || "",
         });
@@ -1780,9 +1807,9 @@ export const getParents = async (
       supplier_id: parent.supplier_id,
       supplier: parent.supplier
         ? {
-          id: parent.supplier.id,
-          name: parent.supplier.name,
-        }
+            id: parent.supplier.id,
+            name: parent.supplier.name,
+          }
         : null,
       item_count: parent.items?.length || 0,
       created_at: parent.created_at,
@@ -1858,17 +1885,17 @@ export const getParentById = async (
       is_active: parent.is_active,
       taric: parent.taric
         ? {
-          id: parent.taric.id,
-          code: parent.taric.code,
-          name_de: parent.taric.name_de,
-        }
+            id: parent.taric.id,
+            code: parent.taric.code,
+            name_de: parent.taric.name_de,
+          }
         : null,
       supplier: parent.supplier
         ? {
-          id: parent.supplier.id,
-          name: parent.supplier.name,
-          contact_person: parent.supplier.contact_person,
-        }
+            id: parent.supplier.id,
+            name: parent.supplier.name,
+            contact_person: parent.supplier.contact_person,
+          }
         : null,
       variations: {
         de: [parent.var_de_1, parent.var_de_2, parent.var_de_3].filter(Boolean),
@@ -3422,23 +3449,23 @@ export const getNewItems = async (
       items.map(async (item) => {
         const parentData = item.parent_id
           ? await parentRepository.findOne({
-            where: { id: item.parent_id },
-            select: ["id", "de_no", "name_de", "name_en"],
-          })
+              where: { id: item.parent_id },
+              select: ["id", "de_no", "name_de", "name_en"],
+            })
           : null;
 
         const categoryData = item.cat_id
           ? await categoryRepository.findOne({
-            where: { id: item.cat_id },
-            select: ["id", "name"],
-          })
+              where: { id: item.cat_id },
+              select: ["id", "name"],
+            })
           : null;
 
         const supplierData = item.supplier_id
           ? await supplierRepository.findOne({
-            where: { id: item.supplier_id },
-            select: ["id", "name", "company_name"],
-          })
+              where: { id: item.supplier_id },
+              select: ["id", "name", "company_name"],
+            })
           : null;
 
         let warehouseData: any = null;
@@ -3663,16 +3690,18 @@ export const exportNewItemsToCSV = async (
           formatDate(item.created_at || new Date()),
           item.ean?.toString() || "",
           parent?.de_no || "NONE",
-          item.ItemID_DE?.toString() || item.id.toString(),
+          warehouseData?.item_no_de ||
+            item.ItemID_DE?.toString() ||
+            item.id.toString(),
           item.supp_cat || item.category?.name || "STD",
-          item.item_name || parent?.name_de || "",
+          warehouseData?.item_name_de || parent?.name_de || "",
           parent?.var_de_1 || "",
           variationData?.value_de || "",
           parent?.var_de_2 || "",
           variationData?.value_de_2 || "",
           parent?.var_de_3 || "",
           variationData?.value_de_3 || "",
-          item.item_name_cn || parent?.name_en || "",
+          item.item_name || parent?.name_en || "",
           item.item_name || parent?.name_en || "",
           parent?.var_en_1 || "",
           variationData?.value_en || "",
