@@ -98,7 +98,7 @@ export class EtlController {
 
       console.log(`\n✅ Orders processed: ${orderMap.size} orders in database`);
 
-      // Step 4: Process order items
+      // Step 4: Process order items (with upfront extraction, query check, and EAN fallback)
       console.log("\n📋 Step 4: Processing order items...");
       const orderItemsFilePath = path.join(
         EtlController.publicPath,
@@ -136,7 +136,7 @@ export class EtlController {
       const deletedOrders = await EtlController.deleteOrdersNotInCSV(
         orderRepo,
         orderItemRepo,
-        orderRows, // Use ALL orders from CSV for comparison
+        orderRows,
       );
 
       if (deletedOrders.length > 0) {
@@ -168,7 +168,6 @@ export class EtlController {
 
   /**
    * Process ALL orders from CSV - CREATE or UPDATE
-   * Orders with invalid status (completed/cancelled) will be marked as inactive
    */
   private static async processAllOrders(
     rows: any[],
@@ -190,7 +189,6 @@ export class EtlController {
           continue;
         }
 
-        // Parse category
         const csvCategoryId = parseInt(row[1]);
         let databaseCategoryId = 55; // Default STD
 
@@ -207,36 +205,33 @@ export class EtlController {
           }
         }
 
-        // Parse dates
         const dateCreated = EtlController.parseGermanDateStrict(row[4]);
         const dateEmailed = EtlController.parseGermanDateStrict(row[5]);
         const dateDelivery = EtlController.parseGermanDateStrict(row[6]);
+
+        let finalDateCreated: string;
+        let finalDateDelivery: string;
 
         if (!dateCreated) {
           console.error(
             `Row ${rowNum}: Missing date_created for order ${orderNo}, using current date`,
           );
-          // Don't skip - use current date as fallback
           const currentDate = new Date().toISOString();
-          var finalDateCreated = currentDate;
-          var finalDateDelivery = dateDelivery || currentDate;
+          finalDateCreated = currentDate;
+          finalDateDelivery = dateDelivery || currentDate;
         } else {
-          var finalDateCreated = dateCreated;
-          var finalDateDelivery = dateDelivery || dateCreated;
+          finalDateCreated = dateCreated;
+          finalDateDelivery = dateDelivery || dateCreated;
         }
 
-        // Get the original WaWi status
         const wawiStatus = row[2]?.toString().trim().toLowerCase() || "";
-
-        // Determine master status based on WaWi status
         let masterStatus = 20; // Default active status
 
         if (wawiStatus === "teilgeliefert") {
-          masterStatus = 25; // Partially delivered
+          masterStatus = 25;
         } else if (wawiStatus === "in bearbeitung") {
-          masterStatus = 20; // In progress
+          masterStatus = 20;
         } else {
-          // Orders with other statuses (completed, cancelled, etc.) are marked as inactive
           masterStatus = 999; // Completed/Archived
           console.log(
             `Row ${rowNum}: Order ${orderNo} has status "${wawiStatus}" - marking as inactive (999)`,
@@ -253,18 +248,15 @@ export class EtlController {
           date_delivery: finalDateDelivery,
         };
 
-        // Check if order exists
         const existingOrder = await orderRepo.findOne({
           where: { order_no: orderNo },
         });
 
         if (existingOrder) {
-          // UPDATE existing order
           await orderRepo.update({ order_no: orderNo }, orderData);
           orderMap.set(orderNo, existingOrder.id);
           updated++;
         } else {
-          // CREATE new order
           const newOrder = orderRepo.create(orderData);
           const saved = await orderRepo.save(newOrder);
           orderMap.set(orderNo, saved.id);
@@ -286,7 +278,7 @@ export class EtlController {
   }
 
   /**
-   * Process order items - CREATE or UPDATE existing items
+   * Process order items - Extracts ItemID_DE upfront, queries existence, fallback to EAN mapping
    */
   private static async processOrderItems(
     rows: any[],
@@ -298,31 +290,69 @@ export class EtlController {
     let updated = 0;
     let failed = 0;
 
-    // Get all items for lookup
-    const allItems = await itemRepo.find({ select: ["id", "ItemID_DE"] });
-    const itemLookup = new Map(allItems.map((i: any) => [i.ItemID_DE, i.id]));
+    console.log(`\nProcessing ${rows.length} order items...`);
 
-    // Track valid master_ids for each order we process from the CSV
+    // ----------------------------------------------------------------
+    // OPTIMIZATION STEP 1: Extract all unique ItemID_DEs from CSV rows
+    // ----------------------------------------------------------------
+    const csvItemIdDes = new Set<number>();
+    for (const row of rows) {
+      const itemIdDe = parseInt(row[1]);
+      if (!isNaN(itemIdDe)) {
+        csvItemIdDes.add(itemIdDe);
+      }
+    }
+
+    // ----------------------------------------------------------------
+    // OPTIMIZATION STEP 2: Query database specifically for these keys
+    // ----------------------------------------------------------------
+    const existingItemsByDe = await itemRepo.find({
+      where: { ItemID_DE: In(Array.from(csvItemIdDes)) },
+      select: ["id", "ItemID_DE"],
+    });
+
+    // Create a precise lookup map for items existing via ItemID_DE
+    const itemLookup = new Map<number, number>(
+      existingItemsByDe.map((i: any) => [i.ItemID_DE, i.id]),
+    );
+
+    // ----------------------------------------------------------------
+    // OPTIMIZATION STEP 3: Load active EAN catalog as quick-fallback map
+    // ----------------------------------------------------------------
+    const allEanItems = await itemRepo.find({
+      where: { isActive: "Y" },
+      select: ["id", "ean"],
+    });
+
+    const eanLookup = new Map<string, number>();
+    for (const item of allEanItems) {
+      if (item.ean) {
+        eanLookup.set(item.ean.trim(), item.id);
+      }
+    }
+
+    // Track valid master_ids for stale item cleanup logic
     const orderToCsvMasterIds = new Map<number, Set<string>>();
     for (const [_, orderId] of orderMap.entries()) {
       orderToCsvMasterIds.set(orderId, new Set<string>());
     }
 
-    console.log(`\nProcessing ${rows.length} order items...`);
-
+    // ----------------------------------------------------------------
+    // STEP 4: Process rows row-by-row with built-in EAN fallback logic
+    // ----------------------------------------------------------------
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
       const rowNum = i + 2;
 
       try {
-        // CORRECT COLUMN MAPPINGS for order_items.csv:
-        // 0: masterItemID, 1: ItemID_DE, 2: order_no, 3: qty, 4: remark, 5: qty_delivered
+        // Expected layout: 0: masterItemID, 1: ItemID_DE, 2: order_no, 3: qty, 4: remark, 5: qty_delivered, 6: ean (if mapped in your raw stream)
         const masterId = row[0]?.toString().trim();
         const itemIdDe = parseInt(row[1]);
         const orderNo = row[2]?.toString().trim();
         const qty = parseInt(row[3]);
         const remarkDe = row[4]?.toString().trim() || "";
         const qtyDelivered = parseInt(row[5]) || 0;
+        const csvEan = row[6]?.toString().trim(); // Dynamic programmatic mapping reference fallback column
 
         if (!masterId) {
           console.error(`Row ${rowNum}: Missing master_id`);
@@ -338,7 +368,6 @@ export class EtlController {
           continue;
         }
 
-        // Get order ID
         const orderId = orderMap.get(orderNo);
         if (!orderId) {
           console.warn(
@@ -348,27 +377,32 @@ export class EtlController {
           continue;
         }
 
-        // Track the masterId as a valid CSV item for this order
         if (!orderToCsvMasterIds.has(orderId)) {
           orderToCsvMasterIds.set(orderId, new Set<string>());
         }
         orderToCsvMasterIds.get(orderId)!.add(masterId);
 
-        // Handle ItemID_DE
-        let itemIdDeValue: any = null;
-        let itemId = null;
+        let itemIdDeValue: number | null = null;
+        let itemId: number | null = null;
+
         if (!isNaN(itemIdDe)) {
           itemIdDeValue = itemIdDe;
+          // Step 4a: Look up existing match using our batched itemLookup map
           itemId = itemLookup.get(itemIdDe) || null;
+
+          // Step 4b: CRITICAL FALLBACK - If it doesn't exist, try resolving item index using EAN fallback references
+          if (!itemId && csvEan) {
+            itemId = eanLookup.get(csvEan) || null;
+            if (itemId) {
+              console.log(
+                `🔗 Row ${rowNum}: ItemID_DE ${itemIdDe} not found in catalog. Successfully mapped via structural EAN fallback to system Item ID: ${itemId}`,
+              );
+            }
+          }
         }
 
-        // Handle quantity
-        let qtyValue = 0;
-        if (!isNaN(qty)) {
-          qtyValue = qty;
-        }
+        let qtyValue = isNaN(qty) ? 0 : qty;
 
-        // Check if order item exists
         const existingItem = await orderItemRepo.findOne({
           where: { master_id: masterId },
         });
@@ -386,11 +420,11 @@ export class EtlController {
         };
 
         if (existingItem) {
-          // UPDATE existing item if changed
           const needsUpdate =
             existingItem.qty !== qtyValue ||
             existingItem.remark_de !== remarkDe ||
             existingItem.qty_delivered !== qtyDelivered ||
+            existingItem.item_id !== itemId || // Force field updates if resolved via fallback mapping changes
             existingItem.ItemID_DE !== itemIdDeValue;
 
           if (needsUpdate) {
@@ -398,7 +432,6 @@ export class EtlController {
             updated++;
           }
         } else {
-          // CREATE new item
           await orderItemRepo.save(orderItemRepo.create(itemData));
           created++;
         }
@@ -462,7 +495,6 @@ export class EtlController {
     const mappingRows = csvRecords.slice(1);
     const eanToItemIdDeMap = new Map<string, number>();
 
-    // Step A: Index the EAN mappings found inside the CSV
     for (const row of mappingRows) {
       const itemIdDe = parseInt(row[0]);
       const ean = row[1]?.toString().trim();
@@ -471,7 +503,6 @@ export class EtlController {
       }
     }
 
-    // Step B: Collect local item data entries containing an EAN to update missing ItemID_DEs
     const targetItems = await itemRepo.find({
       where: { isActive: "Y" },
     });
@@ -483,7 +514,6 @@ export class EtlController {
       if (item.ean && eanToItemIdDeMap.has(item.ean)) {
         const matchingItemIdDe = eanToItemIdDeMap.get(item.ean)!;
 
-        // Update local item if it lacks the German system key match
         if (!item.ItemID_DE || item.ItemID_DE !== matchingItemIdDe) {
           item.ItemID_DE = matchingItemIdDe;
           item.is_updated = true;
@@ -499,7 +529,6 @@ export class EtlController {
       `🔗 Updated ${updatedItemsCount} global catalogs with missing system ItemID_DE numbers.`,
     );
 
-    // Step C: Repair loose relational connections sitting in order_items records
     const looseOrderItems = await orderItemRepo.find({
       where: [{ item_id: undefined }, { item_id: null as any }],
     });
@@ -527,12 +556,10 @@ export class EtlController {
   ): Promise<string[]> {
     const deletedOrders: string[] = [];
 
-    // Get all orders currently in database
     const allOrdersInDb = await orderRepo.find({
       select: ["id", "order_no"],
     });
 
-    // Get order numbers from ALL orders in CSV (not just filtered ones)
     const csvOrderNos = new Set(
       allOrdersFromCSV.map((row) => row[0]?.toString().trim()).filter(Boolean),
     );
@@ -540,7 +567,6 @@ export class EtlController {
     console.log(`Found ${allOrdersInDb.length} orders in database`);
     console.log(`Found ${csvOrderNos.size} orders in CSV`);
 
-    // Find orders in database that are NOT in CSV
     const ordersToDelete = allOrdersInDb.filter(
       (order: { order_no: string }) => !csvOrderNos.has(order.order_no),
     );
@@ -553,10 +579,7 @@ export class EtlController {
 
     for (const order of ordersToDelete) {
       try {
-        // First delete all order items for this order
         await orderItemRepo.delete({ order_id: order.id });
-
-        // Then delete the order itself
         await orderRepo.delete({ id: order.id });
 
         deletedOrders.push(order.order_no);
@@ -608,7 +631,6 @@ export class EtlController {
     csvId: number,
     categoryRepo: any,
   ): Promise<number> {
-    // Check if it's in our hardcoded map
     let dbId = EtlController.CATEGORY_MAP.get(csvId);
 
     if (dbId) {
@@ -616,7 +638,6 @@ export class EtlController {
       if (exists) return dbId;
     }
 
-    // Look for it by name
     const dynamicDeCat = `C${csvId}`.substring(0, 5);
     let category = await categoryRepo.findOne({
       where: { de_cat: dynamicDeCat },
@@ -632,7 +653,6 @@ export class EtlController {
       category = await categoryRepo.save(category);
     }
 
-    // Cache it
     EtlController.CATEGORY_MAP.set(csvId, category.id);
     return category.id;
   }
@@ -646,7 +666,6 @@ export class EtlController {
     try {
       let cleaned = dateStr.trim().replace(/\s+/g, " ");
 
-      // Replace German months with numbers
       for (const [de, num] of Object.entries(EtlController.MONTH_MAP)) {
         cleaned = cleaned.replace(new RegExp(de, "g"), num);
       }
@@ -698,7 +717,6 @@ export class EtlController {
     });
   }
 
-  // Placeholder methods
   public static async whareHouseSync(req: Request, res: Response) {
     res.status(200).json({
       success: true,

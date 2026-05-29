@@ -3600,6 +3600,7 @@ export const exportNewItemsToCSV = async (
       "EAN",
       "Parent No DE",
       "Item No DE",
+      "Item ID DE",
       "Sup_cat",
       "Item Name DE",
       "Variation DE 1",
@@ -3693,6 +3694,8 @@ export const exportNewItemsToCSV = async (
           warehouseData?.item_no_de ||
             item.ItemID_DE?.toString() ||
             item.id.toString(),
+          item.ItemID_DE?.toString() || "",
+
           item.supp_cat || item.category?.name || "STD",
           warehouseData?.item_name_de || parent?.name_de || "",
           parent?.var_de_1 || "",
