@@ -1514,10 +1514,62 @@ const CombinedInquiriesPageContent = () => {
                                         <td className="px-4 py-3 text-center">
                                           <select
                                             value={request.requestStatus}
-                                            onChange={(e: any) => {
-                                              updateRequestedItem(request.id, {
-                                                requestStatus: e.target.value,
-                                              });
+                                            onChange={async (e: any) => {
+                                              const nextStatus = e.target.value;
+
+                                              // 1. Optimistic local state updates for instant visual feedback
+                                              setInquiries((prevInquiries) =>
+                                                prevInquiries.map((inq) => ({
+                                                  ...inq,
+                                                  requests: inq.requests?.map(
+                                                    (req: any) =>
+                                                      req.id === request.id
+                                                        ? {
+                                                            ...req,
+                                                            requestStatus:
+                                                              nextStatus,
+                                                          }
+                                                        : req,
+                                                  ),
+                                                })),
+                                              );
+
+                                              setAllInquiries(
+                                                (prevAllInquiries) =>
+                                                  prevAllInquiries.map(
+                                                    (inq) => ({
+                                                      ...inq,
+                                                      requests:
+                                                        inq.requests?.map(
+                                                          (req: any) =>
+                                                            req.id ===
+                                                            request.id
+                                                              ? {
+                                                                  ...req,
+                                                                  requestStatus:
+                                                                    nextStatus,
+                                                                }
+                                                              : req,
+                                                        ),
+                                                    }),
+                                                  ),
+                                              );
+
+                                              try {
+                                                // 2. Await backend database mutation sync
+                                                await updateRequestedItem(
+                                                  request.id,
+                                                  {
+                                                    requestStatus: nextStatus,
+                                                  },
+                                                );
+
+                                                // 3. Re-pull records to ensure layout data consistency
+                                                fetchInquiries();
+                                              } catch (error) {
+                                                // Rollback status to database values if network call fails
+                                                fetchInquiries();
+                                              }
                                             }}
                                             className={`text-xs px-2 py-1 rounded-full font-medium border-0 cursor-pointer ${getRequestStatusColor(
                                               request.requestStatus,
