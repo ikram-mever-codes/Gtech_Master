@@ -43,7 +43,7 @@ const Header = () => {
   const router = useRouter();
   const dispatch = useDispatch();
   const isMobile = useMediaQuery((theme: Theme) =>
-    theme.breakpoints.down("md")
+    theme.breakpoints.down("md"),
   );
 
   const openMenu = (event: React.MouseEvent<HTMLElement>) => {
@@ -130,7 +130,7 @@ const Header = () => {
         }}
       >
         {/* Notification Icon */}
-        <IconButton
+        {/* <IconButton
           sx={{
             "&:hover": {
               backgroundColor: "action.hover",
@@ -152,7 +152,7 @@ const Header = () => {
           >
             <Bell size={30} color={theme.palette.secondary.main} />
           </Badge>
-        </IconButton>
+        </IconButton> */}
 
         {/* User Profile Icon with Menu */}
         <Box
@@ -224,7 +224,7 @@ const Header = () => {
                     bgcolor: theme.palette.primary.main,
                     border: `2px solid ${alpha(
                       theme.palette.primary.main,
-                      0.2
+                      0.2,
                     )}`,
                   }}
                 >
