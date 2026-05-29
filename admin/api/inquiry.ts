@@ -73,14 +73,14 @@ export interface Inquiry {
   deliveryAddress?: DeliveryAddress;
   requests: Request[];
   status:
-  | "Draft"
-  | "Submitted"
-  | "In Review"
-  | "Quoted"
-  | "Negotiation"
-  | "Accepted"
-  | "Rejected"
-  | "Cancelled";
+    | "Draft"
+    | "Submitted"
+    | "In Review"
+    | "Quoted"
+    | "Negotiation"
+    | "Accepted"
+    | "Rejected"
+    | "Cancelled";
   totalEstimatedCost?: number;
   priority: "Low" | "Medium" | "High" | "Urgent";
   referenceNumber?: string;
@@ -293,13 +293,13 @@ export const getInquiriesByCustomer = async (customerId: string) => {
 
 export const addRequestToInquiry = async (
   inquiryId: string,
-  requestData: Omit<Request, "id" | "inquiryId" | "inquiry">
+  requestData: Omit<Request, "id" | "inquiryId" | "inquiry">,
 ) => {
   try {
     toast.loading("Adding request...", loadingStyles);
     const response = await api.post(
       `/inquiries/${inquiryId}/requests`,
-      requestData
+      requestData,
     );
     toast.dismiss();
     toast.success("Request added successfully", successStyles);
@@ -313,13 +313,13 @@ export const addRequestToInquiry = async (
 export const updateRequestInInquiry = async (
   inquiryId: string,
   requestId: string,
-  requestData: Partial<Request>
+  requestData: Partial<Request>,
 ) => {
   try {
     toast.loading("Updating request...", loadingStyles);
     const response = await api.put(
       `/inquiries/${inquiryId}/requests/${requestId}`,
-      requestData
+      requestData,
     );
     toast.dismiss();
     toast.success("Request updated successfully", successStyles);
@@ -332,7 +332,7 @@ export const updateRequestInInquiry = async (
 
 export const removeRequestFromInquiry = async (
   inquiryId: string,
-  requestId: string
+  requestId: string,
 ) => {
   try {
     toast.loading("Removing request...", loadingStyles);
@@ -371,7 +371,7 @@ export const exportInquiriesToCSV = async (filters?: InquirySearchFilters) => {
     link.href = url;
     link.setAttribute(
       "download",
-      `inquiries_${new Date().toISOString().split("T")[0]}.csv`
+      `inquiries_${new Date().toISOString().split("T")[0]}.csv`,
     );
     document.body.appendChild(link);
     link.click();
@@ -384,27 +384,9 @@ export const exportInquiriesToCSV = async (filters?: InquirySearchFilters) => {
   }
 };
 
-export const updateInquiryStatus = async (
-  inquiryId: string,
-  status: Inquiry["status"]
-) => {
-  try {
-    toast.loading("Updating status...", loadingStyles);
-    const response = await api.patch(`/inquiries/${inquiryId}/status`, {
-      status,
-    });
-    toast.dismiss();
-    toast.success("Status updated successfully", successStyles);
-    return response.data;
-  } catch (error) {
-    handleApiError(error, "Failed to update status");
-    throw error;
-  }
-};
-
 export const updateInquiryPriority = async (
   inquiryId: string,
-  priority: Inquiry["priority"]
+  priority: Inquiry["priority"],
 ) => {
   try {
     toast.loading("Updating priority...", loadingStyles);
@@ -422,13 +404,13 @@ export const updateInquiryPriority = async (
 
 export const convertInquiryToItem = async (
   inquiryId: string,
-  conversionData: any
+  conversionData: any,
 ) => {
   try {
     toast.loading("Converting inquiry to item...", loadingStyles);
     const response = await api.post(
       `/inquiries/${inquiryId}/convert-to-item`,
-      conversionData
+      conversionData,
     );
     toast.dismiss();
     toast.success("Inquiry converted to item successfully", successStyles);
@@ -442,13 +424,13 @@ export const convertInquiryToItem = async (
 export const convertRequestToItem = async (
   requestId: string,
   conversionData: any,
-  inquiryId: string = "all"
+  inquiryId: string = "all",
 ) => {
   try {
     toast.loading("Converting request to item...", loadingStyles);
     const response = await api.post(
       `/inquiries/${inquiryId}/requests/${requestId}/convert-to-item`,
-      conversionData
+      conversionData,
     );
     toast.dismiss();
     toast.success("Request converted to item successfully", successStyles);
