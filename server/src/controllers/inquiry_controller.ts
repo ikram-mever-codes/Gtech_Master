@@ -14,7 +14,6 @@ import { UserRole } from "../models/users";
 import { filterDataByRole } from "../utils/dataFilter";
 import { AuthorizedRequest } from "../middlewares/authorized";
 
-
 import { IsOptional, IsString, IsNumber, IsInt, Min } from "class-validator";
 import { Type } from "class-transformer";
 
@@ -94,7 +93,7 @@ export class BaseItemConversionDto {
   note?: string;
 }
 
-export class ConvertInquiryToItemDto extends BaseItemConversionDto { }
+export class ConvertInquiryToItemDto extends BaseItemConversionDto {}
 
 export class ConvertRequestToItemDto extends BaseItemConversionDto {
   @IsOptional()
@@ -134,7 +133,7 @@ export class ItemGenerator {
     const baseNumber = parseInt(
       `${itemId.toString().padStart(6, "0")}${timestamp
         .toString()
-        .padStart(6, "0")}`.slice(0, 9)
+        .padStart(6, "0")}`.slice(0, 9),
     );
 
     const eanWithoutCheck = `${prefix}${baseNumber
@@ -262,7 +261,10 @@ export class InquiryController {
         .getManyAndCount();
 
       const user = (request as AuthorizedRequest).user;
-      const filteredData = filterDataByRole(inquiries, user?.role || UserRole.STAFF);
+      const filteredData = filterDataByRole(
+        inquiries,
+        user?.role || UserRole.STAFF,
+      );
 
       return response.status(200).json({
         success: true,
@@ -300,7 +302,10 @@ export class InquiryController {
       }
 
       const user = (request as AuthorizedRequest).user;
-      const filteredData = filterDataByRole(inquiry, user?.role || UserRole.STAFF);
+      const filteredData = filterDataByRole(
+        inquiry,
+        user?.role || UserRole.STAFF,
+      );
 
       return response.status(200).json({
         success: true,
@@ -424,7 +429,8 @@ export class InquiryController {
       if (requests && Array.isArray(requests) && requests.length > 0) {
         let starBusinessDetails = customer.starBusinessDetails;
         if (!starBusinessDetails) {
-          const starBusinessDetailsRepository = AppDataSource.getRepository(StarBusinessDetails);
+          const starBusinessDetailsRepository =
+            AppDataSource.getRepository(StarBusinessDetails);
           starBusinessDetails = starBusinessDetailsRepository.create({
             customer: customer,
           });
@@ -460,7 +466,10 @@ export class InquiryController {
       });
 
       const user = (request as AuthorizedRequest).user;
-      const filteredData = filterDataByRole(completeInquiry, user?.role || UserRole.STAFF);
+      const filteredData = filterDataByRole(
+        completeInquiry,
+        user?.role || UserRole.STAFF,
+      );
 
       return response.status(201).json({
         success: true,
@@ -475,7 +484,7 @@ export class InquiryController {
       return response.status(500).json({
         success: false,
         message: "Internal server error",
-        error: error instanceof Error ? error.message : "Unknown error"
+        error: error instanceof Error ? error.message : "Unknown error",
       });
     }
   }
@@ -594,9 +603,11 @@ export class InquiryController {
         }
 
         if (requests.length > 0) {
-          let starBusinessDetails = existingInquiry.customer?.starBusinessDetails;
+          let starBusinessDetails =
+            existingInquiry.customer?.starBusinessDetails;
           if (!starBusinessDetails && existingInquiry.customer) {
-            const starBusinessDetailsRepository = AppDataSource.getRepository(StarBusinessDetails);
+            const starBusinessDetailsRepository =
+              AppDataSource.getRepository(StarBusinessDetails);
             starBusinessDetails = starBusinessDetailsRepository.create({
               customer: existingInquiry.customer,
             });
@@ -637,20 +648,20 @@ export class InquiryController {
           relations: ["requests"],
         });
 
-        if (
-          updatedInquiry &&
-          !updatedInquiry.isAssembly &&
-          updatedInquiry.requests &&
-          updatedInquiry.requests.length > 0
-        ) {
-          await Promise.all(
-            updatedInquiry.requests.map(async (requestItem: any) => {
-              await this.requestRepository.update(requestItem.id, {
-                status: status,
-              });
-            })
-          );
-        }
+        // if (
+        //   updatedInquiry &&
+        //   !updatedInquiry.isAssembly &&
+        //   updatedInquiry.requests &&
+        //   updatedInquiry.requests.length > 0
+        // ) {
+        //   await Promise.all(
+        //     updatedInquiry.requests.map(async (requestItem: any) => {
+        //       await this.requestRepository.update(requestItem.id, {
+        //         status: status,
+        //       });
+        //     })
+        //   );
+        // }
       }
 
       const updatedInquiry = await this.inquiryRepository.findOne({
@@ -879,7 +890,7 @@ export class InquiryController {
       const { inquiryId } = request.params;
       const conversionData = plainToInstance(
         ConvertInquiryToItemDto,
-        request.body
+        request.body,
       );
 
       const errors = await validate(conversionData);
@@ -1036,7 +1047,7 @@ export class InquiryController {
       const { requestId } = request.params;
       const conversionData = plainToInstance(
         ConvertRequestToItemDto,
-        request.body
+        request.body,
       );
 
       const errors = await validate(conversionData);
@@ -1156,7 +1167,7 @@ export class InquiryController {
 
         if (inquiry) {
           const allConverted = inquiry.requests.every(
-            (req) => req.requestStatus === "Converted to Item"
+            (req) => req.requestStatus === "Converted to Item",
           );
 
           if (allConverted) {
