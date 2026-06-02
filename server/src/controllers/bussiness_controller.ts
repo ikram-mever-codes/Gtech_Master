@@ -1267,6 +1267,7 @@ export const updateBusiness = async (
         "starBusinessDetails",
         "starBusinessDetails.convertedBy",
         "starCustomerDetails",
+        "tags",
       ],
     });
 
@@ -1325,6 +1326,7 @@ export const updateBusiness = async (
       source: finalCustomer.businessDetails?.businessSource,
       isDeviceMaker: finalCustomer.businessDetails?.isDeviceMaker,
       isStarCustomer: !!finalCustomer.starCustomerDetails,
+      tags: finalCustomer.tags,
       createdAt: finalCustomer.createdAt,
       updatedAt: finalCustomer.updatedAt,
     };
@@ -1378,6 +1380,7 @@ export const getBusinessById = async (
         "starBusinessDetails",
         "starBusinessDetails.convertedBy",
         "starCustomerDetails",
+        "tags",
       ],
     });
 
@@ -1466,6 +1469,7 @@ export const getBusinessById = async (
       isStarCustomer: customer.businessDetails?.isStarCustomer,
       check_timestamp: customer.businessDetails?.check_timestamp,
       status: BUSINESS_STATUS.ACTIVE,
+      tags: customer.tags,
       createdAt: customer.createdAt,
       updatedAt: customer.updatedAt,
     };
@@ -1527,6 +1531,7 @@ export const getAllBusinesses = async (
       verified,
       sortBy = "createdAt",
       sortOrder = "DESC",
+      tags,
     } = req.query;
 
     const pageNum = parseInt(page as string);
@@ -1536,7 +1541,43 @@ export const getAllBusinesses = async (
     const customerRepository = AppDataSource.getRepository(Customer);
     const queryBuilder = customerRepository
       .createQueryBuilder("customer")
-      .leftJoinAndSelect("customer.businessDetails", "businessDetails");
+      .leftJoinAndSelect("customer.businessDetails", "businessDetails")
+      .leftJoinAndSelect("customer.tags", "tags");
+
+    if (tags) {
+      const tagIds = (tags as string).split(",");
+      const includeTagIds = tagIds.filter((id) => !id.startsWith("!")).map((id) => id.trim());
+      const excludeTagIds = tagIds.filter((id) => id.startsWith("!")).map((id) => id.substring(1).trim());
+
+      if (includeTagIds.length > 0) {
+        queryBuilder.andWhere((qb) => {
+          const subQuery = qb
+            .subQuery()
+            .select("c.id")
+            .from(Customer, "c")
+            .innerJoin("c.tags", "t")
+            .where("t.id IN (:...includeTagIds)")
+            .groupBy("c.id")
+            .having("COUNT(t.id) = :includeCount");
+          return `customer.id IN ${subQuery.getQuery()}`;
+        });
+        queryBuilder.setParameter("includeTagIds", includeTagIds);
+        queryBuilder.setParameter("includeCount", includeTagIds.length);
+      }
+
+      if (excludeTagIds.length > 0) {
+        queryBuilder.andWhere((qb) => {
+          const subQuery = qb
+            .subQuery()
+            .select("c.id")
+            .from(Customer, "c")
+            .innerJoin("c.tags", "t")
+            .where("t.id IN (:...excludeTagIds)");
+          return `customer.id NOT IN ${subQuery.getQuery()}`;
+        });
+        queryBuilder.setParameter("excludeTagIds", excludeTagIds);
+      }
+    }
 
     if (search) {
       queryBuilder.andWhere(
@@ -1635,6 +1676,7 @@ export const getAllBusinesses = async (
         businessEmail: customer.businessDetails?.email,
         status: BUSINESS_STATUS.ACTIVE,
         source: customer.businessDetails?.businessSource,
+        tags: customer.tags,
         createdAt: customer.createdAt,
         updatedAt: customer.updatedAt,
       };

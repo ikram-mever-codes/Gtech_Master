@@ -84,6 +84,7 @@ import {
 import { getAllSuppliers, Supplier } from "@/api/suppliers";
 import { getCategories } from "@/api/categories";
 import { loadingStyles, successStyles, errorStyles } from "@/utils/constants";
+import { TagFilterSelector } from "@/components/Tags/TagFilterSelector";
 
 type TabType = "items" | "parents" | "warehouse" | "tarics" | "suppliers";
 
@@ -94,6 +95,7 @@ interface FilterState {
   category: string;
   supplier: string;
   isActive: string;
+  tags?: string;
 }
 
 interface TaricFilterState {
@@ -154,6 +156,7 @@ const ItemsManagementPage: React.FC = () => {
     category: "",
     supplier: "",
     isActive: "Y",
+    tags: "",
   });
 
   const hasChinese = (str: string) => /[\u4e00-\u9fa5]/.test(str || "");
@@ -377,6 +380,7 @@ const ItemsManagementPage: React.FC = () => {
             category: debouncedFilters.category,
             eanSearch: debouncedFilters.eanSearch,
             supplier: debouncedFilters.supplier,
+            tags: debouncedFilters.tags,
           });
           setItems(itemsResponse.data);
           setPagination(itemsResponse.pagination);
@@ -1621,6 +1625,7 @@ const ItemsManagementPage: React.FC = () => {
       eanSearch: "",
       supplier: "",
       isActive: "",
+      tags: "",
     });
   };
 
@@ -1891,28 +1896,38 @@ const ItemsManagementPage: React.FC = () => {
         {showFilters && (
           <div className="mb-6 bg-gray-50 p-4 rounded-lg">
             {activeTab === "items" && (
-              <div className="relative mb-4">
-                <label className="block text-xs font-bold text-gray-500 uppercase mb-1 flex items-center gap-1">
-                  <Hash className="w-3 h-3 text-green-600" /> EAN Search
-                </label>
-                <input
-                  type="text"
-                  placeholder="Scan or type EAN..."
-                  value={filters.eanSearch}
-                  onChange={(e) =>
-                    setFilters({ ...filters, eanSearch: e.target.value })
-                  }
-                  className="w-full px-3 py-2 border-2 border-green-200 rounded-md focus:border-green-500 outline-none text-sm transition-all bg-white"
-                />
-                {filters.eanSearch && (
-                  <button
-                    onClick={() => setFilters({ ...filters, eanSearch: "" })}
-                    className="absolute right-2 top-7 text-gray-400 hover:text-red-500"
-                  >
-                    <XMarkIcon className="w-4 h-4" />
-                  </button>
-                )}
-              </div>
+              <>
+                <div className="relative mb-4">
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1 flex items-center gap-1">
+                    <Hash className="w-3 h-3 text-green-600" /> EAN Search
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Scan or type EAN..."
+                    value={filters.eanSearch}
+                    onChange={(e) =>
+                      setFilters({ ...filters, eanSearch: e.target.value })
+                    }
+                    className="w-full px-3 py-2 border-2 border-green-200 rounded-md focus:border-green-500 outline-none text-sm transition-all bg-white"
+                  />
+                  {filters.eanSearch && (
+                    <button
+                      onClick={() => setFilters({ ...filters, eanSearch: "" })}
+                      className="absolute right-2 top-7 text-gray-400 hover:text-red-500"
+                    >
+                      <XMarkIcon className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+
+                <div className="mb-4">
+                  <TagFilterSelector
+                    category="item"
+                    onChange={(tagString) => setFilters((prev) => ({ ...prev, tags: tagString }))}
+                    onReset={() => setFilters((prev) => ({ ...prev, tags: "" }))}
+                  />
+                </div>
+              </>
             )}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               {activeTab === "tarics" ? (

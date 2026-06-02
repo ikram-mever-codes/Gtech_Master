@@ -39,6 +39,8 @@ import { Delete } from "@mui/icons-material";
 import { RootState } from "../Redux/store";
 import { useSelector } from "react-redux";
 import { UserRole } from "@/utils/interfaces";
+import { TagBadge } from "@/components/Tags/TagManager";
+import { TagFilterSelector } from "@/components/Tags/TagFilterSelector";
 
 interface FilterState {
   search: string;
@@ -53,6 +55,7 @@ interface FilterState {
   verified: string;
   source: string;
   stage: string;
+  tags: string;
 }
 const formatDateTime = (dateString: string | undefined) => {
   if (!dateString) return "-";
@@ -92,6 +95,7 @@ const BusinessSearchPage: React.FC = () => {
     verified: "",
     source: "",
     stage: "",
+    tags: "",
   });
 
   const [categories, setCategories] = useState<string[]>([]);
@@ -195,6 +199,7 @@ const BusinessSearchPage: React.FC = () => {
           ? parseFloat(filters.maxRating)
           : undefined,
         stage: filters.stage || undefined,
+        tags: filters.tags || undefined,
         sortBy: "createdAt",
         sortOrder: "desc",
       };
@@ -277,6 +282,7 @@ const BusinessSearchPage: React.FC = () => {
       minRating: filters.minRating ? parseFloat(filters.minRating) : undefined,
       maxRating: filters.maxRating ? parseFloat(filters.maxRating) : undefined,
       stage: filters.stage || undefined,
+      tags: filters.tags || undefined,
     };
 
     setCurrentPage(1);
@@ -339,6 +345,7 @@ const BusinessSearchPage: React.FC = () => {
       verified: "",
       source: "",
       stage: "",
+      tags: "",
     });
   };
 
@@ -613,6 +620,14 @@ const BusinessSearchPage: React.FC = () => {
               </div>
             </div>
 
+            <div className="mt-5 pt-5 border-t border-gray-100">
+              <TagFilterSelector
+                category="company"
+                onChange={(tagString) => setFilters((prev) => ({ ...prev, tags: tagString }))}
+                onReset={() => setFilters((prev) => ({ ...prev, tags: "" }))}
+              />
+            </div>
+
             {Object.entries(filters).some(([key, value]) => value) && (
               <div className="mt-4 flex flex-wrap gap-2">
                 {Object.entries(filters).map(([key, value]) => {
@@ -881,7 +896,17 @@ const BusinessSearchPage: React.FC = () => {
                             <span className="text-gray-400">-</span>
                           )}
                         </td>
-                        <td className="px-3 py-3"></td>
+                        <td className="px-3 py-3">
+                          <div className="flex flex-wrap gap-1 max-w-[200px]">
+                            {business.tags && business.tags.length > 0 ? (
+                              business.tags.map((tag: any) => (
+                                <TagBadge key={tag.id} tag={tag} size="sm" />
+                              ))
+                            ) : (
+                              <span className="text-gray-400 text-xs">-</span>
+                            )}
+                          </div>
+                        </td>
                         <td
                           className="px-3 py-3 cursor-pointer"
                           onClick={() => {

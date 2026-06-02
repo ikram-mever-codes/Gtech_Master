@@ -828,6 +828,7 @@ export const getAllContactPersons = async (
       hasLinkedIn,
       sortBy = "createdAt",
       sortOrder = "DESC",
+      tags,
     } = req.query;
 
     const customerRepository = AppDataSource.getRepository(Customer);
@@ -841,12 +842,13 @@ export const getAllContactPersons = async (
       relations: [
         "starBusinessDetails",
         "starBusinessDetails.contactPersons",
+        "starBusinessDetails.contactPersons.tags",
         "businessDetails",
       ],
       order: { createdAt: "DESC" },
     });
 
-    console.log(`Total star business customers found: ${allCustomers.length}`);
+
 
     let allContactPersons = allCustomers.flatMap(
       (customer) =>
@@ -857,7 +859,27 @@ export const getAllContactPersons = async (
         })) || []
     );
 
-    console.log(`Total contact persons found: ${allContactPersons.length}`);
+
+
+    if (tags) {
+      const tagIds = (tags as string).split(",");
+      const includeTagIds = tagIds.filter((id) => !id.startsWith("!")).map((id) => id.trim());
+      const excludeTagIds = tagIds.filter((id) => id.startsWith("!")).map((id) => id.substring(1).trim());
+
+      if (includeTagIds.length > 0) {
+        allContactPersons = allContactPersons.filter((contactPerson) => {
+          const contactTagIds = contactPerson.tags?.map((t: any) => t.id) || [];
+          return includeTagIds.every((id) => contactTagIds.includes(id));
+        });
+      }
+
+      if (excludeTagIds.length > 0) {
+        allContactPersons = allContactPersons.filter((contactPerson) => {
+          const contactTagIds = contactPerson.tags?.map((t: any) => t.id) || [];
+          return !excludeTagIds.some((id) => contactTagIds.includes(id));
+        });
+      }
+    }
 
     if (search) {
       const searchTerm = search.toString().toLowerCase();
@@ -1025,6 +1047,7 @@ export const getAllContactPersons = async (
           note: contactPerson.note || null,
           noteContactPreference: contactPerson.noteContactPreference || null,
           positionOthers: null,
+          tags: contactPerson.tags || [],
         };
       }
     );
@@ -1548,6 +1571,7 @@ function formatContactPersonResponse(contactPerson: any) {
     decisionMakerState: contactPerson.decisionMakerState,
     decisionMakerNote: contactPerson.decisionMakerNote,
     note: contactPerson.note,
+    tags: contactPerson.tags || [],
     createdAt: contactPerson.createdAt,
     updatedAt: contactPerson.updatedAt,
   };
@@ -1706,9 +1730,7 @@ export const getStarBusinessesWithoutContacts = async (
       },
     });
 
-    console.log(
-      `Total star businesses and customers found: ${starCustomers.length}`
-    );
+
 
     let filteredRecords = starCustomers.filter((customer) => {
       if (customer.stage === "star_business") {
@@ -1728,10 +1750,6 @@ export const getStarBusinessesWithoutContacts = async (
 
       return false;
     });
-
-    console.log(
-      `Star businesses and customers without contacts: ${filteredRecords.length}`
-    );
 
     if (search) {
       const searchTerm = search.toString().toLowerCase();

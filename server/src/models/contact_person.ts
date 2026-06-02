@@ -7,9 +7,12 @@ import {
   ManyToOne,
   JoinColumn,
   OneToMany,
+  ManyToMany,
+  JoinTable,
 } from "typeorm";
 import { StarBusinessDetails } from "./star_business_details";
 import { RequestedItem } from "./requested_items";
+import { Tag } from "./tags";
 
 export type Sex = "male" | "female" | "Not Specified";
 export type Position =
@@ -178,6 +181,10 @@ export class ContactPerson {
 
   @UpdateDateColumn()
   updatedAt!: Date;
+
+  @ManyToMany(() => Tag, (tag) => tag.contacts)
+  @JoinTable({ name: "contact_tags" })
+  tags!: Tag[];
 
   constructor(partial?: Partial<ContactPerson>) {
     if (partial) {

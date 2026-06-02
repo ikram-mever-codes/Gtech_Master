@@ -6,7 +6,7 @@ const page = () => {
   const router = useRouter();
 
   React.useEffect(() => {
-    router.push("/scheduled");
+    router.push("/dashboard");
   }, [router]);
 
   return null;

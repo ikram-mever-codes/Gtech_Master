@@ -8,12 +8,15 @@ import {
   OneToOne,
   JoinColumn,
   AfterLoad,
+  ManyToMany,
+  JoinTable,
 } from "typeorm";
 import { Invoice } from "./invoice";
 import { BusinessDetails } from "./business_details";
 import { StarBusinessDetails } from "./star_business_details";
 import { StarCustomerDetails } from "./star_customer_details";
 import { Inquiry } from "./inquiry";
+import { Tag } from "./tags";
 
 @Entity()
 export class Customer {
@@ -86,6 +89,11 @@ export class Customer {
 
   @UpdateDateColumn()
   updatedAt!: Date;
+
+  @ManyToMany(() => Tag, (tag) => tag.customers)
+  @JoinTable({ name: "customer_tags" })
+  tags!: Tag[];
+
   @AfterLoad()
   populateDetails() {
     if (this.businessDetails) {

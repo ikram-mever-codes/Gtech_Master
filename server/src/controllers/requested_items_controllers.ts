@@ -27,6 +27,7 @@ export class RequestedItemController {
         inquiryId,
         minWeight,
         maxWeight,
+        tags,
       } = request.query;
 
       const queryBuilder = this.requestedItemRepository
@@ -34,7 +35,43 @@ export class RequestedItemController {
         .leftJoinAndSelect("requestedItem.business", "starBusiness")
         .leftJoinAndSelect("requestedItem.contactPerson", "contactPerson")
         .leftJoinAndSelect("requestedItem.inquiry", "inquiry")
+        .leftJoinAndSelect("requestedItem.tags", "tags")
         .orderBy("requestedItem.createdAt", "DESC");
+
+      if (tags) {
+        const tagIds = (tags as string).split(",");
+        const includeTagIds = tagIds.filter((id) => !id.startsWith("!")).map((id) => id.trim());
+        const excludeTagIds = tagIds.filter((id) => id.startsWith("!")).map((id) => id.substring(1).trim());
+
+        if (includeTagIds.length > 0) {
+          queryBuilder.andWhere((qb: any) => {
+            const subQuery = qb
+              .subQuery()
+              .select("c.id")
+              .from(RequestedItem, "c")
+              .innerJoin("c.tags", "t")
+              .where("t.id IN (:...reqIncludeTagIds)")
+              .groupBy("c.id")
+              .having("COUNT(t.id) = :reqIncludeCount");
+            return `requestedItem.id IN ${subQuery.getQuery()}`;
+          });
+          queryBuilder.setParameter("reqIncludeTagIds", includeTagIds);
+          queryBuilder.setParameter("reqIncludeCount", includeTagIds.length);
+        }
+
+        if (excludeTagIds.length > 0) {
+          queryBuilder.andWhere((qb: any) => {
+            const subQuery = qb
+              .subQuery()
+              .select("c.id")
+              .from(RequestedItem, "c")
+              .innerJoin("c.tags", "t")
+              .where("t.id IN (:...reqExcludeTagIds)");
+            return `requestedItem.id NOT IN ${subQuery.getQuery()}`;
+          });
+          queryBuilder.setParameter("reqExcludeTagIds", excludeTagIds);
+        }
+      }
 
       if (businessId) {
         queryBuilder.andWhere("requestedItem.businessId = :businessId", {
@@ -147,7 +184,7 @@ export class RequestedItemController {
 
       const item = await this.requestedItemRepository.findOne({
         where: { id },
-        relations: ["business", "contactPerson", "inquiry"],
+        relations: ["business", "contactPerson", "inquiry", "tags"],
       });
 
       if (!item) {
@@ -323,7 +360,7 @@ export class RequestedItemController {
 
       const itemWithRelations = await this.requestedItemRepository.findOne({
         where: { id: savedItem.id },
-        relations: ["business", "contactPerson", "inquiry"],
+        relations: ["business", "contactPerson", "inquiry", "tags"],
       });
 
       return response.status(201).json({
@@ -377,7 +414,7 @@ export class RequestedItemController {
 
       const existingItem = await this.requestedItemRepository.findOne({
         where: { id },
-        relations: ["business", "contactPerson", "inquiry"],
+        relations: ["business", "contactPerson", "inquiry", "tags"],
       });
 
       if (!existingItem) {
@@ -466,7 +503,7 @@ export class RequestedItemController {
 
       const updatedItem = await this.requestedItemRepository.findOne({
         where: { id },
-        relations: ["business", "contactPerson", "inquiry"],
+        relations: ["business", "contactPerson", "inquiry", "tags"],
       });
 
       return response.status(200).json({

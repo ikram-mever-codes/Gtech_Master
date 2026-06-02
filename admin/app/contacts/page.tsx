@@ -48,6 +48,7 @@ import { RootState } from "../Redux/store";
 import { useSelector } from "react-redux";
 import { UserRole } from "@/utils/interfaces";
 import Link from "next/link";
+import { TagFilterSelector } from "@/components/Tags/TagFilterSelector";
 
 type TabType = "all" | "no-contacts" | "sales";
 type ModalMode = "create" | "edit";
@@ -109,18 +110,17 @@ const ContactPersonsPage: React.FC = () => {
 
   const itemsPerPage = 20;
 
-  // Filter state - simplified
   const [filters, setFilters] = useState<any>({
     search: "",
     position: "" as any,
     stateLinkedIn: "" as any,
     contact: "" as any,
     decisionMakerState: "" as any,
+    tags: "",
     page: 1,
     limit: itemsPerPage,
   });
 
-  // Decision Makers filter state
   const [decisionMakersFilters, setDecisionMakersFilters] = useState<any>({
     search: "",
     position: "" as any,
@@ -131,7 +131,6 @@ const ContactPersonsPage: React.FC = () => {
     limit: itemsPerPage,
   });
 
-  // Form state with decisionMakerNote field
   const [createForm, setCreateForm] = useState<any>({
     starBusinessDetailsId: "",
     name: "",
@@ -147,10 +146,9 @@ const ContactPersonsPage: React.FC = () => {
     decisionMakerState: "",
     note: "",
     noteContactPreference: "",
-    decisionMakerNote: "", // Initialize the new field
+    decisionMakerNote: "",
   });
 
-  // Fetch contact persons
   const fetchContactPersons = useCallback(async () => {
     setLoading(true);
     try {
@@ -179,7 +177,7 @@ const ContactPersonsPage: React.FC = () => {
       "real DecisionMaker",
     ].includes(contactType);
   };
-  // Fetch decision makers
+
   const fetchDecisionMakers = useCallback(async () => {
     setLoadingDecisionMakers(true);
     try {
@@ -859,6 +857,15 @@ const ContactPersonsPage: React.FC = () => {
                       </div>
                     </div>
 
+                    {/* Tag Combination Filter */}
+                    <div className="mt-5 pt-5 border-t border-gray-200/50">
+                      <TagFilterSelector
+                        category="contact"
+                        onChange={(tagString) => setFilters((prev: any) => ({ ...prev, tags: tagString }))}
+                        onReset={() => setFilters((prev: any) => ({ ...prev, tags: "" }))}
+                      />
+                    </div>
+
                     <div className="mt-4 flex justify-end">
                       <button
                         onClick={() => {
@@ -868,6 +875,7 @@ const ContactPersonsPage: React.FC = () => {
                             stateLinkedIn: "" as any,
                             contact: "" as any,
                             decisionMakerState: "" as any,
+                            tags: "",
                             page: 1,
                             limit: itemsPerPage,
                           });

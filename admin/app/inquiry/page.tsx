@@ -63,6 +63,7 @@ import { MessagesSquare, ClipboardList } from "lucide-react";
 import PageHeader from "@/components/UI/PageHeader";
 import { UserRole } from "@/utils/interfaces";
 import { getAllTarics } from "@/api/items";
+import { TagFilterSelector } from "@/components/Tags/TagFilterSelector";
 
 export interface Customer {
   id: string;
@@ -446,7 +447,8 @@ const CombinedInquiriesPageContent = () => {
     limit: 20,
     sortBy: "createdAt",
     sortOrder: "DESC",
-  });
+    tags: "",
+  } as any);
 
   const itemsPerPage = 20;
 
@@ -524,7 +526,6 @@ const CombinedInquiriesPageContent = () => {
           ? response.data
           : response.data.businesses || [];
 
-        // Filter based on stage field
         const filteredCustomers = customers.filter((customer: Customer) => {
           return (
             customer.stage === "star_business" ||
@@ -1620,6 +1621,13 @@ const CombinedInquiriesPageContent = () => {
                 New Inquiry
               </CustomButton>
             </div>
+          </div>
+          <div className="mb-4">
+            <TagFilterSelector
+              category="inquiry"
+              onChange={(tagString) => setInquiryFilters((prev: any) => ({ ...prev, tags: tagString }))}
+              onReset={() => setInquiryFilters((prev: any) => ({ ...prev, tags: "" }))}
+            />
           </div>
         </div>
 

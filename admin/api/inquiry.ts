@@ -156,6 +156,7 @@ export interface InquirySearchFilters {
   limit?: number;
   sortBy?: string;
   sortOrder?: "ASC" | "DESC";
+  tags?: string;
 }
 
 export interface InquiryStatistics {

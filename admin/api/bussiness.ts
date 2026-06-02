@@ -4,7 +4,6 @@ import { api, handleApiError } from "../utils/api";
 import { loadingStyles, successStyles } from "@/utils/constants";
 import { ResponseInterface } from "@/utils/interfaces";
 
-// Types
 export interface Business {
   id: string;
   name: string;
@@ -123,6 +122,7 @@ export interface SearchFilters {
   minRating?: number;
   maxRating?: number;
   verified?: boolean;
+  tags?: string;
 }
 
 export interface LocationSearchPayload {
@@ -153,7 +153,6 @@ export const createBusiness = async (businessData: BusinessCreatePayload) => {
   }
 };
 
-// Get all businesses with pagination and filtering
 export const getAllBusinesses = async (filters: SearchFilters = {}) => {
   try {
     const params = new URLSearchParams();
@@ -182,7 +181,6 @@ export const getBusinessById = async (id: string) => {
   }
 };
 
-// Update business
 export const updateBusiness = async (
   id: string,
   updateData: BusinessUpdatePayload
@@ -199,7 +197,6 @@ export const updateBusiness = async (
   }
 };
 
-// Delete business
 export const deleteBusiness = async (id: string) => {
   try {
     toast.loading("Deleting business...", loadingStyles);
@@ -240,7 +237,6 @@ export const bulkImportBusinesses = async (payload: BulkImportPayload) => {
   }
 };
 
-// Bulk delete businesses
 export const bulkDeleteBusinesses = async (payload: BulkOperationPayload) => {
   try {
     toast.loading(
@@ -260,7 +256,6 @@ export const bulkDeleteBusinesses = async (payload: BulkOperationPayload) => {
   }
 };
 
-// Bulk update business status
 export const bulkUpdateBusinessStatus = async (
   payload: BulkStatusUpdatePayload
 ) => {
@@ -282,9 +277,6 @@ export const bulkUpdateBusinessStatus = async (
   }
 };
 
-// ======================== Search and Filter Operations ========================
-
-// Search businesses by location
 export const searchBusinessesByLocation = async (
   payload: LocationSearchPayload
 ) => {
@@ -306,7 +298,6 @@ export const searchBusinessesByLocation = async (
   }
 };
 
-// Get business statistics
 export const getBusinessStatistics = async (): Promise<{
   data: BusinessStatistics;
 }> => {
@@ -319,16 +310,12 @@ export const getBusinessStatistics = async (): Promise<{
   }
 };
 
-// ======================== Utility Functions ========================
-
-// Check if business should be imported (has website)
 export const shouldImportBusiness = (
   business: BusinessCreatePayload
 ): boolean => {
   return !!(business.website && business.website.trim() !== "");
 };
 
-// Format address from business data
 export const formatBusinessAddress = (business: Business): string => {
   return business.address
     ? business.address
@@ -343,7 +330,6 @@ export const formatBusinessAddress = (business: Business): string => {
       .join(", ");
 };
 
-// Check if business needs verification
 export const needsVerification = (business: Business): boolean => {
   if (!business.lastVerifiedAt) return true;
   const thirtyDaysAgo = new Date();
@@ -351,14 +337,12 @@ export const needsVerification = (business: Business): boolean => {
   return new Date(business.lastVerifiedAt) < thirtyDaysAgo;
 };
 
-// Filter businesses that can be imported (have websites)
 export const filterImportableBusinesses = (
   businesses: BusinessCreatePayload[]
 ): BusinessCreatePayload[] => {
   return businesses.filter(shouldImportBusiness);
 };
 
-// Validate business data before import
 export const validateBusinessData = (
   business: BusinessCreatePayload
 ): { isValid: boolean; errors: string[] } => {
@@ -386,7 +370,6 @@ export const validateBusinessData = (
   };
 };
 
-// Helper validation functions
 const isValidEmail = (email: string): boolean => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return emailRegex.test(email);
@@ -401,7 +384,6 @@ const isValidUrl = (url: string): boolean => {
   }
 };
 
-// Export businesses to CSV
 export const exportBusinessesToCSV = async (filters: SearchFilters = {}) => {
   try {
     toast.loading("Exporting businesses...", loadingStyles);
@@ -410,7 +392,6 @@ export const exportBusinessesToCSV = async (filters: SearchFilters = {}) => {
       responseType: "blob",
     });
 
-    // Create download link
     const url = window.URL.createObjectURL(new Blob([response.data]));
     const link = document.createElement("a");
     link.href = url;
@@ -431,7 +412,6 @@ export const exportBusinessesToCSV = async (filters: SearchFilters = {}) => {
   }
 };
 
-// Check service health
 export const checkBusinessServiceHealth = async () => {
   try {
     const response = await api.get("/businesses/health");

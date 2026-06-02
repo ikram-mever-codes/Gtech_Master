@@ -7,10 +7,13 @@ import {
   ManyToOne,
   JoinColumn,
   OneToMany,
+  ManyToMany,
+  JoinTable,
 } from "typeorm";
 import { StarBusinessDetails } from "./star_business_details";
 import { ContactPerson } from "./contact_person";
 import { Inquiry } from "./inquiry";
+import { Tag } from "./tags";
 
 export type Interval =
   | "Monatlich"
@@ -169,6 +172,10 @@ export class RequestedItem {
 
   @UpdateDateColumn()
   updatedAt!: Date;
+
+  @ManyToMany(() => Tag, (tag) => tag.requestedItems)
+  @JoinTable({ name: "requested_item_tags" })
+  tags!: Tag[];
 
   constructor(partial?: Partial<RequestedItem>) {
     if (partial) {
