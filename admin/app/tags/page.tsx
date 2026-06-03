@@ -9,9 +9,10 @@ import {
 import { getTags, createTag, updateTag, deleteTag } from "@/api/tags";
 import { toast } from "react-hot-toast";
 import { colorClasses, TagBadge } from "@/components/Tags/TagManager";
+import PageHeader from "@/components/UI/PageHeader";
+import { Tag } from "lucide-react";
 
 const CATEGORIES = [
-  { id: "all", label: "All Categories" },
   { id: "company", label: "Companies" },
   { id: "contact", label: "Contacts" },
   { id: "inquiry", label: "Inquiries" },
@@ -45,7 +46,7 @@ interface Tag {
 }
 
 export default function TagsPage() {
-  const [activeTab, setActiveTab] = useState("all");
+  const [activeTab, setActiveTab] = useState("company");
   const [tags, setTags] = useState<Tag[]>([]);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
@@ -58,7 +59,7 @@ export default function TagsPage() {
   const fetchTags = async () => {
     setLoading(true);
     try {
-      const res = await getTags(activeTab === "all" ? undefined : activeTab);
+      const res = await getTags(activeTab);
       if (res && res.data) {
         setTags(res.data);
       }
@@ -142,20 +143,7 @@ export default function TagsPage() {
 
   return (
     <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-8">
-      <div className="flex items-center gap-3">
-        <div className="p-3 bg-[#8CC21B]/15 rounded-2xl text-[#8CC21B]">
-          <TagIcon className="h-7 w-7" />
-        </div>
-        <div>
-          <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">
-            Tag Management
-          </h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Create, edit, and organize reusable tags for companies, contacts,
-            inquiries, and items.
-          </p>
-        </div>
-      </div>
+      <PageHeader title="Tag Management" icon={Tag} />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-6 h-fit lg:sticky lg:top-6">

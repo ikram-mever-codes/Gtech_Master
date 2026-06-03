@@ -106,6 +106,7 @@ const CargoTypesTab: React.FC = () => {
         try {
             setLoading(true);
             await deleteCargoType(id);
+            setShowModal(false);
             fetchCargoTypes();
         } catch (error) {
             // error already handled
@@ -174,13 +175,6 @@ const CargoTypesTab: React.FC = () => {
                                                 <PencilIcon className="h-3 w-3" />
                                                 Edit
                                             </button>
-                                            <button
-                                                onClick={() => handleDelete(ct.id)}
-                                                className="px-3 py-1 text-xs font-semibold bg-red-600 text-white rounded flex items-center gap-1 hover:bg-red-700"
-                                            >
-                                                <TrashIcon className="h-3 w-3" />
-                                                Delete
-                                            </button>
                                         </div>
                                     </td>
                                 </tr>
@@ -225,20 +219,34 @@ const CargoTypesTab: React.FC = () => {
                                 />
                             </div>
 
-                            <div className="flex justify-end gap-2 pt-4">
-                                <button
-                                    onClick={() => setShowModal(false)}
-                                    className="px-4 py-2 text-sm text-gray-600 bg-gray-100 hover:bg-gray-200 rounded transition-colors"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    onClick={handleSubmit}
-                                    disabled={loading || !formData.type?.trim()}
-                                    className="px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded transition-colors disabled:opacity-50"
-                                >
-                                    {modalMode === "create" ? "Create" : "Update"}
-                                </button>
+                            <div className="flex justify-between items-center pt-4">
+                                <div>
+                                    {modalMode === "edit" && editingId && (
+                                        <button
+                                            onClick={() => handleDelete(editingId)}
+                                            disabled={loading}
+                                            className="px-4 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded transition-colors flex items-center gap-1.5 disabled:opacity-50"
+                                        >
+                                            <TrashIcon className="h-4 w-4" />
+                                            Delete
+                                        </button>
+                                    )}
+                                </div>
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={() => setShowModal(false)}
+                                        className="px-4 py-2 text-sm text-gray-600 bg-gray-100 hover:bg-gray-200 rounded transition-colors"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={handleSubmit}
+                                        disabled={loading || !formData.type?.trim()}
+                                        className="px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded transition-colors disabled:opacity-50"
+                                    >
+                                        {modalMode === "create" ? "Create" : "Update"}
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>

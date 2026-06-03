@@ -1296,15 +1296,6 @@ const ItemsManagementPage: React.FC = () => {
                   >
                     <EditIcon className="w-4 h-4" />
                   </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDeleteItem(item.id);
-                    }}
-                    className="text-red-600 hover:text-red-900 p-1"
-                  >
-                    <Delete className="w-4 h-4" />
-                  </button>
                 </div>
               </td>
             </tr>

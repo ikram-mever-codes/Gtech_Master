@@ -25,6 +25,7 @@ import {
   getItems,
   getItemById,
   updateItem,
+  deleteItem,
   getItemVariations,
   getItemQualityCriteria,
   createQualityCriterion,
@@ -218,6 +219,25 @@ const ItemDetailsPage = () => {
   const [editMode, setEditMode] = useState(false);
   const [loading, setLoading] = useState(true);
   const [itemData, setItemDataRaw] = useState<ItemDetails | null>(null);
+
+  const handleDeleteItem = async () => {
+    if (!itemData || !id) return;
+    if (
+      !confirm(
+        "Are you sure you want to delete this item? This action cannot be undone."
+      )
+    )
+      return;
+
+    try {
+      const itemId = parseInt(id as string);
+      await deleteItem(itemId);
+      toast.success("Item deleted successfully", successStyles);
+      router.push("/items");
+    } catch (error: any) {
+      toast.error(error.message || "Failed to delete item", errorStyles);
+    }
+  };
 
   const [supplierItems, setSupplierItems] = useState<any[]>([]);
   const [loadingSupplierItems, setLoadingSupplierItems] = useState(false);
@@ -953,9 +973,20 @@ const ItemDetailsPage = () => {
               {editMode && (
                 <CustomButton
                   onClick={() => setEditMode(false)}
-                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all"
+                  color="error"
+                  className="px-4 py-2 text-white rounded-lg transition-all"
                 >
                   Cancel
+                </CustomButton>
+              )}
+              {!editMode && (
+                <CustomButton
+                  onClick={handleDeleteItem}
+                  color="error"
+                  className="px-4 py-2 text-white rounded-lg transition-all flex items-center gap-2"
+                >
+                  <TrashIcon className="h-4 w-4" />
+                  Delete Item
                 </CustomButton>
               )}
             </div>
