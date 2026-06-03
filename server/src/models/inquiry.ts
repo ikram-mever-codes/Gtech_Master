@@ -8,10 +8,13 @@ import {
   OneToMany,
   JoinColumn,
   OneToOne,
+  ManyToMany,
+  JoinTable,
 } from "typeorm";
 import { Customer } from "./customers";
 import { ContactPerson } from "./contact_person";
 import { RequestedItem, Interval } from "./requested_items";
+import { Tag } from "./tags";
 import { Offer } from "./offer";
 
 export type Currency = "RMB" | "HKD" | "EUR" | "USD";
@@ -241,6 +244,10 @@ export class Inquiry {
 
   @UpdateDateColumn()
   updatedAt!: Date;
+
+  @ManyToMany(() => Tag, (tag) => tag.inquiries)
+  @JoinTable({ name: "inquiry_tags" })
+  tags!: Tag[];
 
   constructor(partial?: Partial<Inquiry>) {
     if (partial) {

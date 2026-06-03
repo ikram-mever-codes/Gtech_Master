@@ -46,8 +46,8 @@ import { useSelector } from "react-redux";
 import { UserRole } from "@/utils/interfaces";
 import { ClipboardList } from "lucide-react";
 import PageHeader from "@/components/UI/PageHeader";
+import { TagFilterSelector } from "@/components/Tags/TagFilterSelector";
 
-// Add interface for ContactPerson
 interface ContactPerson {
   id: string;
   name: string;
@@ -62,11 +62,10 @@ interface ContactPerson {
 }
 
 const RequestedItemsPage: React.FC = () => {
-  // State management
   const [requestedItems, setRequestedItems] = useState<RequestedItem[]>([]);
   const [allRequestedItems, setAllRequestedItems] = useState<RequestedItem[]>(
     []
-  ); // Store all items for frontend filtering
+  );
   const [loading, setLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -87,19 +86,15 @@ const RequestedItemsPage: React.FC = () => {
 
   const [showFilters, setShowFilters] = useState(false);
   const [editModeEnabled, setEditModeEnabled] = useState(false);
-  // Add state for contact persons
   const [contactPersons, setContactPersons] = useState<ContactPerson[]>([]);
   const [loadingContactPersons, setLoadingContactPersons] = useState(false);
   const [filteredContactPersons, setFilteredContactPersons] = useState<
     ContactPerson[]
   >([]);
 
-  // Add state for businesses
   const [businesses, setBusinesses] = useState<any[]>([]);
   const [loadingBusinesses, setLoadingBusinesses] = useState(false);
   const [selectedBusinessId, setSelectedBusinessId] = useState<string>("");
-
-  // Add state for notes popup
   const [showNotesPopup, setShowNotesPopup] = useState(false);
   const [selectedItemNotes, setSelectedItemNotes] =
     useState<RequestedItem | null>(null);
@@ -127,7 +122,7 @@ const RequestedItemsPage: React.FC = () => {
 
     return Array.from(businessMap.values());
   }, []);
-  // Filter state
+
   const [filters, setFilters] = useState<RequestedItemsSearchFilters>({
     search: "",
     requestStatus: "",
@@ -138,9 +133,9 @@ const RequestedItemsPage: React.FC = () => {
     sortOrder: "DESC",
     page: 1,
     limit: itemsPerPage,
-  });
+    tags: "",
+  } as any);
 
-  // Create/Edit form state
   const [formData, setFormData] = useState<any>({
     businessId: "",
     contactPersonId: "",
@@ -160,7 +155,6 @@ const RequestedItemsPage: React.FC = () => {
     asanaLink: "",
   });
 
-  // Fetch businesses on component mount
   useEffect(() => {
     const fetchBusinesses = async () => {
       setLoadingBusinesses(true);
@@ -187,7 +181,6 @@ const RequestedItemsPage: React.FC = () => {
     fetchBusinesses();
   }, []);
 
-  // Fetch contact persons on component mount
   useEffect(() => {
     const fetchContactPersons = async () => {
       setLoadingContactPersons(true);
@@ -196,7 +189,7 @@ const RequestedItemsPage: React.FC = () => {
         console.log("Contact persons response:", response);
         if (response?.data?.contactPersons) {
           setContactPersons(response.data.contactPersons);
-          setFilteredContactPersons(response.data.contactPersons); // Initialize filtered list
+          setFilteredContactPersons(response.data.contactPersons);
         } else {
           console.error("Unexpected response structure:", response);
           setContactPersons([]);
@@ -215,7 +208,6 @@ const RequestedItemsPage: React.FC = () => {
     fetchContactPersons();
   }, []);
 
-  // Handle contact person selection
   const handleContactPersonChange = (contactPersonId: string) => {
     const selectedContactPerson = contactPersons.find(
       (person) => person.id === contactPersonId
@@ -228,7 +220,6 @@ const RequestedItemsPage: React.FC = () => {
         businessId: selectedContactPerson.starBusinessDetailsId,
       });
 
-      // When creating new item, update filtered list based on selected business
       if (modalMode === "create") {
         const businessContactPersons = contactPersons.filter(
           (person) =>
@@ -244,21 +235,19 @@ const RequestedItemsPage: React.FC = () => {
         businessId: "",
       });
 
-      // Reset to all contact persons when nothing is selected
       if (modalMode === "create") {
         setFilteredContactPersons(contactPersons);
       }
     }
   };
 
-  // Fetch requested items
   const fetchRequestedItems = useCallback(async () => {
     setLoading(true);
     try {
       const filterParams: any = {
         ...filters,
         page: 1,
-        limit: 10000, // Fetch all items for frontend filtering
+        limit: 10000,
       };
 
       const response = await getAllRequestedItems(filterParams);
@@ -272,7 +261,6 @@ const RequestedItemsPage: React.FC = () => {
     }
   }, [filters]);
 
-  // Fetch statistics
   const fetchStatistics = async () => {
     try {
       const response = await getRequestedItemsStatistics();
@@ -292,27 +280,23 @@ const RequestedItemsPage: React.FC = () => {
   useEffect(() => {
     let filtered = allRequestedItems;
 
-    // Filter by business if selected
     if (selectedBusinessId) {
       filtered = filtered.filter(
         (item) => item.business?.customer?.id === selectedBusinessId
       );
     }
 
-    // Calculate pagination
     const totalFiltered = filtered.length;
     const totalPagesCalc = Math.ceil(totalFiltered / itemsPerPage);
     setTotalPages(totalPagesCalc);
     setTotalRecords(totalFiltered);
 
-    // Apply pagination
     const startIndex = (currentPage - 1) * itemsPerPage;
     const endIndex = startIndex + itemsPerPage;
     const paginatedItems = filtered.slice(startIndex, endIndex);
 
     setRequestedItems(paginatedItems);
 
-    // Update businesses with requests whenever allRequestedItems changes
     const businessesWithRequestsData =
       getBusinessesWithRequests(allRequestedItems);
     setBusinessesWithRequests(businessesWithRequestsData);
@@ -324,26 +308,20 @@ const RequestedItemsPage: React.FC = () => {
     getBusinessesWithRequests,
   ]);
 
-  // Handle notes icon click
   const handleNotesClick = (item: RequestedItem, e: React.MouseEvent) => {
     e.stopPropagation();
     setSelectedItemNotes(item);
     setShowNotesPopup(true);
   };
 
-  // Handle Asana link click
   const handleAsanaLinkClick = (asanaLink: string, e: React.MouseEvent) => {
     e.stopPropagation();
     window.open(asanaLink, "_blank");
   };
-
-  // Handle item click - open modal in view mode
   const handleItemClick = (item: RequestedItem) => {
     setModalMode("edit");
     setEditingItemId(item.id);
     setEditModeEnabled(false);
-
-    // Filter contact persons by the business of the current item
     const businessContactPersons = contactPersons.filter(
       (person) => person.starBusinessDetailsId === item.businessId
     );
@@ -371,9 +349,7 @@ const RequestedItemsPage: React.FC = () => {
     setShowCreateModal(true);
   };
 
-  // Handle create/edit submission
   const handleSubmit = async () => {
-    // Validation
     if (!formData.businessId || !formData.itemName || !formData.qty) {
       toast.error("Please fill in all required fields");
       return;
@@ -401,7 +377,6 @@ const RequestedItemsPage: React.FC = () => {
     }
   };
 
-  // Handle status update
   const handleStatusUpdate = async (itemId: string, newStatus: string) => {
     try {
       await updateRequestedItem(itemId, { requestStatus: newStatus as any });
@@ -412,7 +387,6 @@ const RequestedItemsPage: React.FC = () => {
     }
   };
 
-  // Handle priority update
   const handlePriorityUpdate = async (itemId: string, newPriority: string) => {
     try {
       await updateRequestedItem(itemId, { priority: newPriority as any });
@@ -423,7 +397,6 @@ const RequestedItemsPage: React.FC = () => {
     }
   };
 
-  // Handle delete item
   const handleDeleteItem = async (itemId: string) => {
     if (window.confirm("Are you sure you want to delete this item?")) {
       try {
@@ -437,7 +410,6 @@ const RequestedItemsPage: React.FC = () => {
     }
   };
 
-  // Export to CSV
   const handleExportToCSV = async () => {
     try {
       await exportRequestedItemsToCSV(filters);
@@ -446,7 +418,6 @@ const RequestedItemsPage: React.FC = () => {
     }
   };
 
-  // Reset form
   const resetForm = () => {
     setFormData({
       businessId: "",
@@ -469,10 +440,9 @@ const RequestedItemsPage: React.FC = () => {
     setEditModeEnabled(false);
     setEditingItemId(null);
     setModalMode("create");
-    setFilteredContactPersons(contactPersons); // Reset to show all contact persons for new item
+    setFilteredContactPersons(contactPersons);
   };
 
-  // Get status color
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
       open: "bg-blue-100 text-blue-800",
@@ -483,14 +453,12 @@ const RequestedItemsPage: React.FC = () => {
     return colors[status] || "bg-gray-100 text-gray-800";
   };
 
-  // Get priority color
   const getPriorityColor = (priority: string) => {
     return priority === "High"
       ? "bg-red-100 text-red-800"
       : "bg-gray-100 text-gray-800";
   };
 
-  // Get status icon
   const getStatusIcon = (status: string) => {
     switch (status) {
       case "successful":
@@ -504,7 +472,6 @@ const RequestedItemsPage: React.FC = () => {
     }
   };
 
-  // Format date
   const formatDate = (dateString: string) => {
     if (!dateString) return "-";
     return new Date(dateString).toLocaleDateString("de-DE", {
@@ -517,15 +484,12 @@ const RequestedItemsPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-white shadow-xl rounded-lg p-8">
       <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        {/* Header */}
         <div className="mb-8 w-full flex justify-between items-center">
           <div className="">
             <PageHeader title="Requested Items" icon={ClipboardList} />
           </div>
           <div>
             <div className="flex gap-3">
-              {/* Business Filter Dropdown - Updated to only show businesses with requests */}
               <select
                 value={selectedBusinessId}
                 onChange={(e) => {
@@ -581,7 +545,14 @@ const RequestedItemsPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Statistics Cards */}
+        <div className="mb-4">
+          <TagFilterSelector
+            category="request_item"
+            onChange={(tagString) => setFilters((prev: any) => ({ ...prev, tags: tagString }))}
+            onReset={() => setFilters((prev: any) => ({ ...prev, tags: "" }))}
+          />
+        </div>
+
         {statistics && (
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
             <div className="bg-white/80 backdrop-blur-sm rounded-xl shadow-lg border border-gray-100/50 p-4">
@@ -623,7 +594,6 @@ const RequestedItemsPage: React.FC = () => {
           </div>
         )}
 
-        {/* Items Table */}
         <div className="bg-white/80 backdrop-blur-sm rounded-md shadow-lg border border-gray-100/50 overflow-hidden">
           {loading ? (
             <div className="p-12 text-center">
@@ -743,7 +713,6 @@ const RequestedItemsPage: React.FC = () => {
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center justify-center gap-3">
-                          {/* Notes/Comments Icon */}
                           {(item.comment || item.extraItemsDescriptions) && (
                             <button
                               onClick={(e) => handleNotesClick(item, e)}
@@ -753,14 +722,12 @@ const RequestedItemsPage: React.FC = () => {
                               <DocumentTextIcon className="h-5 w-5" />
                             </button>
                           )}
-                          {/* Extra Items Icon */}
                           {item.extraItems === "YES" && (
                             <CubeIcon
                               className="h-5 w-5 text-green-500"
                               title="Has extra items"
                             />
                           )}
-                          {/* Asana Link Icon */}
                           {item.asanaLink && (
                             <button
                               onClick={(e) =>
@@ -781,7 +748,6 @@ const RequestedItemsPage: React.FC = () => {
             </div>
           )}
 
-          {/* Pagination */}
           {totalPages > 1 && (
             <div className="px-6 py-4 bg-gray-50/50 border-t border-gray-200/50 flex items-center justify-between">
               <div className="text-sm text-gray-700">
@@ -806,8 +772,8 @@ const RequestedItemsPage: React.FC = () => {
                         key={pageNum}
                         onClick={() => setCurrentPage(pageNum)}
                         className={`px-3 py-1 text-sm rounded-lg transition-all ${currentPage === pageNum
-                            ? "bg-gray-600 text-white"
-                            : "bg-white/80 backdrop-blur-sm border border-gray-300/80 hover:bg-white/60"
+                          ? "bg-gray-600 text-white"
+                          : "bg-white/80 backdrop-blur-sm border border-gray-300/80 hover:bg-white/60"
                           }`}
                       >
                         {pageNum}
@@ -820,8 +786,8 @@ const RequestedItemsPage: React.FC = () => {
                       <button
                         onClick={() => setCurrentPage(totalPages)}
                         className={`px-3 py-1 text-sm rounded-lg transition-all ${currentPage === totalPages
-                            ? "bg-gray-600 text-white"
-                            : "bg-white/80 backdrop-blur-sm border border-gray-300/80 hover:bg-white/60"
+                          ? "bg-gray-600 text-white"
+                          : "bg-white/80 backdrop-blur-sm border border-gray-300/80 hover:bg-white/60"
                           }`}
                       >
                         {totalPages}
@@ -844,7 +810,6 @@ const RequestedItemsPage: React.FC = () => {
           )}
         </div>
 
-        {/* Notes Popup Modal */}
         {showNotesPopup && selectedItemNotes && (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
             <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl max-w-2xl w-full max-h-[80vh] overflow-y-auto">
@@ -865,7 +830,6 @@ const RequestedItemsPage: React.FC = () => {
                 </div>
 
                 <div className="space-y-4">
-                  {/* Extra Note */}
                   {selectedItemNotes.extraNote && (
                     <div>
                       <h3 className="text-sm font-semibold text-gray-700 mb-1">
@@ -877,7 +841,6 @@ const RequestedItemsPage: React.FC = () => {
                     </div>
                   )}
 
-                  {/* Extra Items Description */}
                   {selectedItemNotes.extraItemsDescriptions && (
                     <div>
                       <h3 className="text-sm font-semibold text-gray-700 mb-1">
@@ -889,7 +852,6 @@ const RequestedItemsPage: React.FC = () => {
                     </div>
                   )}
 
-                  {/* Comments */}
                   {selectedItemNotes.comment && (
                     <div>
                       <h3 className="text-sm font-semibold text-gray-700 mb-1">
@@ -918,7 +880,6 @@ const RequestedItemsPage: React.FC = () => {
           </div>
         )}
 
-        {/* Create/Edit Modal */}
         {showCreateModal && (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
             <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
@@ -940,7 +901,6 @@ const RequestedItemsPage: React.FC = () => {
                   </button>
                 </div>
 
-                {/* Edit Mode Switch */}
                 {modalMode === "edit" && (
                   <div className="mb-6 flex items-center justify-between bg-gray-50 rounded-lg p-4">
                     <span className="text-sm font-medium text-gray-700">
@@ -967,7 +927,6 @@ const RequestedItemsPage: React.FC = () => {
 
                 <div className="space-y-6">
                   <div className="grid grid-cols-2 gap-4">
-                    {/* Contact Person Dropdown - Now comes first */}
                     <div className="col-span-2">
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Contact Person *
@@ -1012,7 +971,6 @@ const RequestedItemsPage: React.FC = () => {
                       </select>
                     </div>
 
-                    {/* Item Name */}
                     <div className="col-span-2">
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Item Name *
@@ -1029,7 +987,6 @@ const RequestedItemsPage: React.FC = () => {
                       />
                     </div>
 
-                    {/* Material & Specification */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Material
@@ -1064,7 +1021,6 @@ const RequestedItemsPage: React.FC = () => {
                       />
                     </div>
 
-                    {/* Quantity & Interval */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Quantity *
@@ -1103,7 +1059,6 @@ const RequestedItemsPage: React.FC = () => {
                       </select>
                     </div>
 
-                    {/* Priority & Status */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Priority
@@ -1149,7 +1104,6 @@ const RequestedItemsPage: React.FC = () => {
                       </select>
                     </div>
 
-                    {/* Extra Items */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Extra Items
@@ -1188,7 +1142,6 @@ const RequestedItemsPage: React.FC = () => {
                       />
                     </div>
 
-                    {/* Extra Items Description */}
                     {formData.extraItems === "YES" && (
                       <div className="col-span-2">
                         <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -1210,7 +1163,6 @@ const RequestedItemsPage: React.FC = () => {
                       </div>
                     )}
 
-                    {/* Extra Note Field */}
                     <div className="col-span-2">
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Extra Note
@@ -1230,7 +1182,6 @@ const RequestedItemsPage: React.FC = () => {
                       />
                     </div>
 
-                    {/* Asana Link Field */}
                     <div className="col-span-2">
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Asana Link
@@ -1250,7 +1201,6 @@ const RequestedItemsPage: React.FC = () => {
                       />
                     </div>
 
-                    {/* Expected Delivery */}
                     <div className="col-span-2">
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Expected Delivery
@@ -1270,7 +1220,6 @@ const RequestedItemsPage: React.FC = () => {
                       />
                     </div>
 
-                    {/* Comments */}
                     <div className="col-span-2">
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Comments
@@ -1289,7 +1238,6 @@ const RequestedItemsPage: React.FC = () => {
                   </div>
 
                   <div className="mt-6 flex justify-between gap-3">
-                    {/* Delete Button in Edit Mode - Only when edit is enabled */}
                     <div>
                       {modalMode === "edit" &&
                         editModeEnabled &&

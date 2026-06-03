@@ -200,6 +200,7 @@ export class InquiryController {
         priority,
         contactPersonId,
         isAssembly,
+        tags,
       } = request.query;
 
       const queryBuilder = this.inquiryRepository
@@ -210,6 +211,7 @@ export class InquiryController {
         .leftJoinAndSelect("requests.business", "business")
         .leftJoinAndSelect("business.customer", "businessCustomer")
         .leftJoinAndSelect("requests.contactPerson", "requestContactPerson")
+        .leftJoinAndSelect("inquiry.tags", "tags")
         .select([
           "inquiry",
           "customer",
@@ -221,8 +223,44 @@ export class InquiryController {
           "requestContactPerson.name",
           "requestContactPerson.familyName",
           "requestContactPerson.id",
+          "tags",
         ])
         .orderBy("inquiry.createdAt", "DESC");
+
+      if (tags) {
+        const tagIds = (tags as string).split(",");
+        const includeTagIds = tagIds.filter((id) => !id.startsWith("!")).map((id) => id.trim());
+        const excludeTagIds = tagIds.filter((id) => id.startsWith("!")).map((id) => id.substring(1).trim());
+
+        if (includeTagIds.length > 0) {
+          queryBuilder.andWhere((qb: any) => {
+            const subQuery = qb
+              .subQuery()
+              .select("c.id")
+              .from(Inquiry, "c")
+              .innerJoin("c.tags", "t")
+              .where("t.id IN (:...inquiryIncludeTagIds)")
+              .groupBy("c.id")
+              .having("COUNT(t.id) = :inquiryIncludeCount");
+            return `inquiry.id IN ${subQuery.getQuery()}`;
+          });
+          queryBuilder.setParameter("inquiryIncludeTagIds", includeTagIds);
+          queryBuilder.setParameter("inquiryIncludeCount", includeTagIds.length);
+        }
+
+        if (excludeTagIds.length > 0) {
+          queryBuilder.andWhere((qb: any) => {
+            const subQuery = qb
+              .subQuery()
+              .select("c.id")
+              .from(Inquiry, "c")
+              .innerJoin("c.tags", "t")
+              .where("t.id IN (:...inquiryExcludeTagIds)");
+            return `inquiry.id NOT IN ${subQuery.getQuery()}`;
+          });
+          queryBuilder.setParameter("inquiryExcludeTagIds", excludeTagIds);
+        }
+      }
 
       if (customerId) {
         queryBuilder.andWhere("inquiry.customerId = :customerId", {
@@ -291,7 +329,7 @@ export class InquiryController {
 
       const inquiry = await this.inquiryRepository.findOne({
         where: { id },
-        relations: ["customer", "contactPerson", "requests"],
+        relations: ["customer", "contactPerson", "requests", "tags"],
       });
 
       if (!inquiry) {
@@ -671,6 +709,7 @@ export class InquiryController {
           "contactPerson",
           "requests",
           "customer.starBusinessDetails",
+          "tags",
         ],
       });
 

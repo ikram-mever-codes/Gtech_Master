@@ -3,6 +3,7 @@ import React, { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { getBusinessById } from "@/api/bussiness";
 import { toast } from "react-hot-toast";
+import { EntityTagSelector } from "@/components/Tags/TagManager";
 import {
   Building2,
   Mail,
@@ -63,6 +64,7 @@ interface BusinessData {
   businessDetails?: any;
   starBusinessDetails?: any;
   starCustomerDetails?: any;
+  tags?: any[];
   createdAt: string;
   updatedAt: string;
 }
@@ -153,7 +155,7 @@ const BusinessProfilePage = () => {
     { id: "contact", label: "Contact", icon: Mail },
     { id: "business", label: "Business", icon: Briefcase },
     ...(business?.stage === "star_business" ||
-    business?.stage === "star_customer"
+      business?.stage === "star_customer"
       ? [{ id: "star_business", label: "Star Business", icon: Star }]
       : []),
     ...(business?.stage === "star_customer"
@@ -195,10 +197,8 @@ const BusinessProfilePage = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Simplified Header */}
       <div className="bg-white shadow-sm">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* Breadcrumb */}
           <div className="py-3 border-b border-gray-100">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2 text-sm text-gray-500">
@@ -221,10 +221,8 @@ const BusinessProfilePage = () => {
             </div>
           </div>
 
-          {/* Business Header - Simplified */}
           <div className="py-6">
             <div className="flex items-center space-x-4">
-              {/* Avatar */}
               <div className="relative">
                 <div className="h-16 w-16 rounded-xl bg-gradient-to-br from-[#8CC21B] to-[#7AAF19] flex items-center justify-center text-white text-2xl font-semibold shadow-sm">
                   {business.avatar ? (
@@ -244,7 +242,6 @@ const BusinessProfilePage = () => {
                 </div>
               </div>
 
-              {/* Company Info - Streamlined */}
               <div className="flex-1">
                 <div className="flex items-start justify-between">
                   <div>
@@ -256,6 +253,18 @@ const BusinessProfilePage = () => {
                         {business.legalName}
                       </p>
                     )}
+                    <div className="mt-2">
+                      <EntityTagSelector
+                        entityId={business.id}
+                        entityType="company"
+                        initialTags={business.tags || []}
+                        onTagsUpdated={(newTags) => {
+                          setBusiness((prev) =>
+                            prev ? { ...prev, tags: newTags } : null
+                          );
+                        }}
+                      />
+                    </div>
                   </div>
                   <span
                     className={`px-3 py-1 ${stageConfig.lightBg} ${stageConfig.textColor} rounded-full text-xs font-medium flex items-center space-x-1`}
@@ -267,21 +276,18 @@ const BusinessProfilePage = () => {
               </div>
             </div>
 
-            {/* Progress Bar - Minimal */}
             <div className="mt-6 bg-gray-100 rounded-full h-2 overflow-hidden">
               <div
-                className={`h-full transition-all duration-500 ${
-                  business.stage === "star_customer"
+                className={`h-full transition-all duration-500 ${business.stage === "star_customer"
                     ? "bg-emerald-500 w-full"
                     : business.stage === "star_business"
-                    ? "bg-amber-500 w-2/3"
-                    : "bg-[#8CC21B] w-1/3"
-                }`}
+                      ? "bg-amber-500 w-2/3"
+                      : "bg-[#8CC21B] w-1/3"
+                  }`}
               />
             </div>
           </div>
 
-          {/* Simplified Tabs */}
           <div className="flex space-x-6 border-t border-gray-100">
             {tabs.map((tab) => {
               const Icon = tab.icon;
@@ -289,11 +295,10 @@ const BusinessProfilePage = () => {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`py-3 border-b-2 -mb-px transition-all text-sm font-medium ${
-                    activeTab === tab.id
+                  className={`py-3 border-b-2 -mb-px transition-all text-sm font-medium ${activeTab === tab.id
                       ? "border-[#8CC21B] text-gray-900"
                       : "border-transparent text-gray-500 hover:text-gray-700"
-                  }`}
+                    }`}
                 >
                   <div className="flex items-center space-x-2">
                     <Icon className="h-4 w-4" />
@@ -306,12 +311,9 @@ const BusinessProfilePage = () => {
         </div>
       </div>
 
-      {/* Content Area - Cleaner Layout */}
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Overview Tab - Simplified */}
         {activeTab === "overview" && (
           <div className="space-y-6">
-            {/* Key Info Cards - Minimalist */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="bg-white rounded-lg p-5 shadow-sm">
                 <div className="flex items-center space-x-3">
@@ -357,7 +359,6 @@ const BusinessProfilePage = () => {
               </div>
             </div>
 
-            {/* Description Card - Clean */}
             {business.businessDetails?.description && (
               <div className="bg-white rounded-lg p-6 shadow-sm">
                 <h3 className="text-sm font-medium text-gray-700 mb-3">
@@ -369,7 +370,6 @@ const BusinessProfilePage = () => {
               </div>
             )}
 
-            {/* Quick Details Grid */}
             <div className="bg-white rounded-lg p-6 shadow-sm">
               <h3 className="text-sm font-medium text-gray-700 mb-4">
                 Quick Details
@@ -403,7 +403,6 @@ const BusinessProfilePage = () => {
               </div>
             </div>
 
-            {/* Timeline - Minimal */}
             <div className="bg-white rounded-lg p-6 shadow-sm">
               <h3 className="text-sm font-medium text-gray-700 mb-4">
                 Activity
@@ -428,10 +427,8 @@ const BusinessProfilePage = () => {
           </div>
         )}
 
-        {/* Contact Tab - Streamlined */}
         {activeTab === "contact" && (
           <div className="space-y-6">
-            {/* Primary Contact Card */}
             <div className="bg-white rounded-lg shadow-sm">
               <div className="p-6 border-b border-gray-100">
                 <h3 className="text-lg font-medium text-gray-900">
@@ -531,7 +528,6 @@ const BusinessProfilePage = () => {
               </div>
             </div>
 
-            {/* Location Card - Simple */}
             {business.businessDetails && (
               <div className="bg-white rounded-lg shadow-sm">
                 <div className="p-6 border-b border-gray-100">
@@ -578,7 +574,6 @@ const BusinessProfilePage = () => {
           </div>
         )}
 
-        {/* Business Details Tab - Organized */}
         {activeTab === "business" && business.businessDetails && (
           <div className="space-y-6">
             <div className="bg-white rounded-lg shadow-sm">
@@ -663,7 +658,6 @@ const BusinessProfilePage = () => {
           </div>
         )}
 
-        {/* Star Business Tab - Clean */}
         {activeTab === "star_business" && business.starBusinessDetails && (
           <div className="space-y-6">
             <div className="bg-white rounded-lg shadow-sm">
@@ -745,10 +739,8 @@ const BusinessProfilePage = () => {
           </div>
         )}
 
-        {/* Star Customer Tab - Simplified */}
         {activeTab === "star_customer" && business.starCustomerDetails && (
           <div className="space-y-6">
-            {/* Verification Status */}
             <div className="bg-white rounded-lg shadow-sm">
               <div className="p-6 border-b border-gray-100">
                 <h3 className="text-lg font-medium text-gray-900">
@@ -779,7 +771,7 @@ const BusinessProfilePage = () => {
                         .accountVerificationStatus === "verified" ? (
                         <CheckCircle2 className="h-8 w-8 text-green-500" />
                       ) : business.starCustomerDetails
-                          .accountVerificationStatus === "pending" ? (
+                        .accountVerificationStatus === "pending" ? (
                         <Clock className="h-8 w-8 text-yellow-500" />
                       ) : (
                         <XCircle className="h-8 w-8 text-gray-300" />
@@ -812,48 +804,46 @@ const BusinessProfilePage = () => {
               </div>
             </div>
 
-            {/* Delivery Address */}
             {(business.starCustomerDetails.deliveryAddressLine1 ||
               business.starCustomerDetails.deliveryCity) && (
-              <div className="bg-white rounded-lg shadow-sm">
-                <div className="p-6 border-b border-gray-100">
-                  <h3 className="text-lg font-medium text-gray-900">
-                    Delivery Address
-                  </h3>
-                </div>
-                <div className="p-6">
-                  <div className="space-y-1 text-sm text-gray-600">
-                    {business.starCustomerDetails.deliveryAddressLine1 && (
-                      <p>{business.starCustomerDetails.deliveryAddressLine1}</p>
-                    )}
-                    {business.starCustomerDetails.deliveryAddressLine2 && (
-                      <p>{business.starCustomerDetails.deliveryAddressLine2}</p>
-                    )}
-                    {(business.starCustomerDetails.deliveryCity ||
-                      business.starCustomerDetails.deliveryPostalCode) && (
-                      <p>
-                        {[
-                          business.starCustomerDetails.deliveryCity,
-                          business.starCustomerDetails.deliveryPostalCode,
-                        ]
-                          .filter(Boolean)
-                          .join(", ")}
-                      </p>
-                    )}
-                    {business.starCustomerDetails.deliveryCountry && (
-                      <p className="font-medium text-gray-900">
-                        {business.starCustomerDetails.deliveryCountry}
-                      </p>
-                    )}
+                <div className="bg-white rounded-lg shadow-sm">
+                  <div className="p-6 border-b border-gray-100">
+                    <h3 className="text-lg font-medium text-gray-900">
+                      Delivery Address
+                    </h3>
+                  </div>
+                  <div className="p-6">
+                    <div className="space-y-1 text-sm text-gray-600">
+                      {business.starCustomerDetails.deliveryAddressLine1 && (
+                        <p>{business.starCustomerDetails.deliveryAddressLine1}</p>
+                      )}
+                      {business.starCustomerDetails.deliveryAddressLine2 && (
+                        <p>{business.starCustomerDetails.deliveryAddressLine2}</p>
+                      )}
+                      {(business.starCustomerDetails.deliveryCity ||
+                        business.starCustomerDetails.deliveryPostalCode) && (
+                          <p>
+                            {[
+                              business.starCustomerDetails.deliveryCity,
+                              business.starCustomerDetails.deliveryPostalCode,
+                            ]
+                              .filter(Boolean)
+                              .join(", ")}
+                          </p>
+                        )}
+                      {business.starCustomerDetails.deliveryCountry && (
+                        <p className="font-medium text-gray-900">
+                          {business.starCustomerDetails.deliveryCountry}
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
+              )}
           </div>
         )}
       </div>
 
-      {/* Simple Footer */}
       <div className="bg-white border-t border-gray-200 mt-auto">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between text-xs text-gray-500">

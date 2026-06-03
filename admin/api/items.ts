@@ -231,6 +231,7 @@ export const getItems = async (params?: {
   includeOnlyUpdated?: boolean;
   isNew?: string;
   eanSearch?: string;
+  tags?: string;
 }) => {
   try {
     const response = await api.get("/items", {

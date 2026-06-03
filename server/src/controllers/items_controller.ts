@@ -176,6 +176,7 @@ export const getItems = async (
       taricId,
       isNew,
       eanSearch,
+      tags,
     } = req.query;
 
     let pageNum = parseInt(page as string);
@@ -184,7 +185,43 @@ export const getItems = async (
     if (isNaN(limitNum)) limitNum = 50;
     const skip = (pageNum - 1) * limitNum;
 
-    const queryBuilder = itemRepository.createQueryBuilder("item");
+    const queryBuilder = itemRepository.createQueryBuilder("item")
+      .leftJoinAndSelect("item.tags", "tags");
+
+    if (tags) {
+      const tagIds = (tags as string).split(",");
+      const includeTagIds = tagIds.filter((id) => !id.startsWith("!")).map((id) => id.trim());
+      const excludeTagIds = tagIds.filter((id) => id.startsWith("!")).map((id) => id.substring(1).trim());
+
+      if (includeTagIds.length > 0) {
+        queryBuilder.andWhere((qb) => {
+          const subQuery = qb
+            .subQuery()
+            .select("c.id")
+            .from(Item, "c")
+            .innerJoin("c.tags", "t")
+            .where("t.id IN (:...itemIncludeTagIds)")
+            .groupBy("c.id")
+            .having("COUNT(t.id) = :itemIncludeCount");
+          return `item.id IN ${subQuery.getQuery()}`;
+        });
+        queryBuilder.setParameter("itemIncludeTagIds", includeTagIds);
+        queryBuilder.setParameter("itemIncludeCount", includeTagIds.length);
+      }
+
+      if (excludeTagIds.length > 0) {
+        queryBuilder.andWhere((qb) => {
+          const subQuery = qb
+            .subQuery()
+            .select("c.id")
+            .from(Item, "c")
+            .innerJoin("c.tags", "t")
+            .where("t.id IN (:...itemExcludeTagIds)");
+          return `item.id NOT IN ${subQuery.getQuery()}`;
+        });
+        queryBuilder.setParameter("itemExcludeTagIds", excludeTagIds);
+      }
+    }
 
     if (eanSearch) {
       const eanStr = (eanSearch as string).replace(/\s+/g, "");
@@ -447,6 +484,7 @@ export const getItems = async (
           : null,
         created_at: item.created_at,
         updated_at: item.updated_at,
+        tags: item.tags || [],
       };
     });
 
@@ -505,7 +543,7 @@ export const getItemById = async (
 
     const item = await itemRepository.findOne({
       where: { id: parseInt(id) },
-      relations: ["parent", "taric", "category", "supplier"],
+      relations: ["parent", "taric", "category", "supplier", "tags"],
     });
 
     console.log(item);
@@ -620,6 +658,7 @@ export const getItemById = async (
       supplier_name: item.supplier?.company_name || item.supplier?.name || "",
       painPoints: item.painPoints || [],
       isActive: item.isActive === "Y",
+      tags: item.tags || [],
       is_updated: item.is_updated,
       transfer_price: item.transfer_price_EUR
         ? Number(item.transfer_price_EUR).toFixed(2)

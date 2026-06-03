@@ -5,7 +5,10 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   Index,
+  ManyToMany,
+  JoinTable,
 } from "typeorm";
+import { Tag } from "./tags";
 
 export enum BUSINESS_STATUS {
   ACTIVE = "active",
@@ -102,7 +105,6 @@ export class Business {
     sunday?: string;
   };
 
-  // Source of the business entry
   @Column({
     type: "enum",
     enum: BUSINESS_SOURCE,
@@ -110,7 +112,6 @@ export class Business {
   })
   source!: BUSINESS_SOURCE;
 
-  // Status and Import Management
   @Column({
     type: "enum",
     enum: BUSINESS_STATUS,

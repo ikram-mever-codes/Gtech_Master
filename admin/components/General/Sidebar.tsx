@@ -4,11 +4,7 @@ import { logoutUser } from "@/api/user";
 import { RootState } from "@/app/Redux/store";
 import theme from "@/styles/theme";
 import {
-  BusinessCenterSharp,
-  LibraryAdd,
   Logout,
-  Person,
-  ShopSharp,
 } from "@mui/icons-material";
 import {
   Box,
@@ -29,26 +25,21 @@ import {
 import {
   LucideHome,
   LucideUsers,
-  LucideBox,
-  LucideChartBar,
-  LucideSettings,
   LucideMenu,
   LucideChevronLeft,
-  LucideMoveRight,
   LucideChevronRight,
   LucideShield,
   LucideFileText,
-  LucideShoppingCart,
-  LucideMail,
-  LucideHelpCircle,
   Timer,
   BookUser,
   DollarSign,
-  IceCream2,
   PackageSearchIcon,
   LucideChevronUp,
   LucideChevronDown,
   BoxesIcon,
+  Tag as LucideTag,
+  Store,
+  Briefcase,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -70,7 +61,7 @@ const allMenuItems = [
     resource: "Users",
   },
   {
-    icon: ShopSharp,
+    icon: Store,
     text: "Items Management",
     path: "/items",
     resource: "Items",
@@ -95,7 +86,7 @@ const allMenuItems = [
     resource: "Scheduled Items",
   },
   {
-    icon: BusinessCenterSharp,
+    icon: Briefcase,
     text: "Bussinesses",
     path: "/bussinesses",
     resource: "Bussinesses",
@@ -117,6 +108,12 @@ const allMenuItems = [
     text: "Offers",
     path: "/offers",
     resource: "Offers",
+  },
+  {
+    icon: LucideTag,
+    text: "Tags",
+    path: "/tags",
+    resource: "Tags",
   },
   // {
   //   icon: LibraryAdd,
@@ -251,7 +248,7 @@ const Sidebar = () => {
           overflow: "hidden",
         }}
       >
-        <Link href="/" style={{ flexShrink: 0 }}>
+        <Link href="/dashboard" style={{ flexShrink: 0 }}>
           <Image
             alt="Gtech"
             src="/logo.png"

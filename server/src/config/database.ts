@@ -40,6 +40,7 @@ import { SupplierOrder } from "../models/supplier_orders";
 import { fixSequences } from "../utils/dbUtils";
 import { SalesPrice } from "../models/sales_prices";
 import { PurchasePrice } from "../models/purchase_prices";
+import { Tag } from "../models/tags";
 
 dotenv.config();
 
@@ -93,6 +94,7 @@ export const AppDataSource = new DataSource({
     CargoOrder,
     CargoType,
     SupplierOrder,
+    Tag,
   ],
   extra: {
     ssl:

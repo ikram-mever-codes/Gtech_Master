@@ -7,6 +7,8 @@ import {
   OneToMany,
   JoinColumn,
   PrimaryGeneratedColumn,
+  ManyToMany,
+  JoinTable,
 } from "typeorm";
 import { Parent } from "./parents";
 import { Taric } from "./tarics";
@@ -17,6 +19,7 @@ import { LibraryFile } from "./library";
 import { PurchasePrice } from "./purchase_prices";
 import { SalesPrice } from "./sales_prices";
 import { ItemQuality } from "./item_qualities";
+import { Tag } from "./tags";
 
 @Entity()
 export class Item {
@@ -194,4 +197,8 @@ export class Item {
 
   @OneToMany(() => ItemQuality, (quality) => quality.item)
   qualityCriteria!: ItemQuality[];
+
+  @ManyToMany(() => Tag, (tag) => tag.items)
+  @JoinTable({ name: "item_tags" })
+  tags!: Tag[];
 }

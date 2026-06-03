@@ -61,6 +61,8 @@ import { MessagesSquare, ClipboardList } from "lucide-react";
 import PageHeader from "@/components/UI/PageHeader";
 import { UserRole } from "@/utils/interfaces";
 import { getAllTarics } from "@/api/items";
+import { TagFilterSelector } from "@/components/Tags/TagFilterSelector";
+
 export interface Customer {
   id: string;
   companyName: string;
@@ -394,7 +396,9 @@ const CombinedInquiriesPageContent = () => {
     limit: 20,
     sortBy: "createdAt",
     sortOrder: "DESC",
-  });
+    tags: "",
+  } as any);
+
   const itemsPerPage = 20;
 
   // ── NEW: track whether we've already auto-opened from the URL param ──
@@ -535,6 +539,10 @@ const CombinedInquiriesPageContent = () => {
         const customers = Array.isArray(response.data)
           ? response.data
           : response.data.businesses || [];
+<<<<<<< HEAD
+=======
+
+>>>>>>> 67c342630fece8467a6cb977afd393f9304845c5
         const filteredCustomers = customers.filter((customer: Customer) => {
           return (
             customer.stage === "star_business" ||
@@ -1214,6 +1222,13 @@ const CombinedInquiriesPageContent = () => {
                 New Inquiry
               </CustomButton>
             </div>
+          </div>
+          <div className="mb-4">
+            <TagFilterSelector
+              category="inquiry"
+              onChange={(tagString) => setInquiryFilters((prev: any) => ({ ...prev, tags: tagString }))}
+              onReset={() => setInquiryFilters((prev: any) => ({ ...prev, tags: "" }))}
+            />
           </div>
         </div>
         <div className="bg-white/80 backdrop-blur-sm rounded-md shadow-lg border border-gray-100/50 overflow-hidden">

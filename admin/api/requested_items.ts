@@ -166,6 +166,7 @@ export interface RequestedItemsSearchFilters {
   minWeight?: any;
   maxWeight?: any;
   hasDimensions?: any;
+  tags?: string;
 }
 
 export interface RequestedItemsStatistics {
