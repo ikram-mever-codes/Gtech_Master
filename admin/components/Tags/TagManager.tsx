@@ -65,7 +65,6 @@ export const TagBadge = ({
     <span
       className={`inline-flex items-center gap-1.5 rounded-full font-semibold transition-colors duration-150 ${padding} ${styles.badge}`}
     >
-      <span className={`w-1.5 h-1.5 rounded-full ${styles.dot}`} />
       <span>{tag.name}</span>
       {onRemove && (
         <button

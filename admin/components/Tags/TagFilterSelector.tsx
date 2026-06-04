@@ -159,7 +159,6 @@ export const TagFilterSelector: React.FC<TagFilterSelectorProps> = ({
                 >
                   {isInclude ? "Include" : "Exclude"}
                 </button>
-                <span className={`w-1.5 h-1.5 rounded-full ${styles.dot}`} />
                 <span className="max-w-[120px] truncate">{filter.tag.name}</span>
                 <button
                   type="button"
