@@ -539,10 +539,6 @@ const CombinedInquiriesPageContent = () => {
         const customers = Array.isArray(response.data)
           ? response.data
           : response.data.businesses || [];
-<<<<<<< HEAD
-=======
-
->>>>>>> 67c342630fece8467a6cb977afd393f9304845c5
         const filteredCustomers = customers.filter((customer: Customer) => {
           return (
             customer.stage === "star_business" ||
@@ -1226,8 +1222,12 @@ const CombinedInquiriesPageContent = () => {
           <div className="mb-4">
             <TagFilterSelector
               category="inquiry"
-              onChange={(tagString) => setInquiryFilters((prev: any) => ({ ...prev, tags: tagString }))}
-              onReset={() => setInquiryFilters((prev: any) => ({ ...prev, tags: "" }))}
+              onChange={(tagString) =>
+                setInquiryFilters((prev: any) => ({ ...prev, tags: tagString }))
+              }
+              onReset={() =>
+                setInquiryFilters((prev: any) => ({ ...prev, tags: "" }))
+              }
             />
           </div>
         </div>

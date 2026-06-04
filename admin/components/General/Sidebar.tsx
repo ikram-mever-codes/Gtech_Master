@@ -3,14 +3,11 @@
 import { logoutUser } from "@/api/user";
 import { RootState } from "@/app/Redux/store";
 import theme from "@/styles/theme";
-import {
-  Logout,
-} from "@mui/icons-material";
+import { Logout } from "@mui/icons-material";
 import {
   Box,
   List,
   ListItem,
-  ListItemText,
   Divider,
   Typography,
   ListItemIcon,
@@ -21,25 +18,31 @@ import {
   Button,
   Tooltip,
   Fade,
+  Collapse,
 } from "@mui/material";
 import {
-  LucideHome,
-  LucideUsers,
   LucideMenu,
   LucideChevronLeft,
   LucideChevronRight,
   LucideShield,
-  LucideFileText,
-  Timer,
-  BookUser,
-  DollarSign,
-  PackageSearchIcon,
   LucideChevronUp,
   LucideChevronDown,
-  BoxesIcon,
   Tag as LucideTag,
-  Store,
-  Briefcase,
+  Users as LucideUsers,
+  Handshake,
+  MessagesSquare,
+  Package,
+  DollarSign,
+  Truck,
+  AlertTriangle,
+  Settings,
+  FileText,
+  FileCheck,
+  Receipt,
+  ReceiptText,
+  ClipboardList,
+  ShoppingCart,
+  Timer,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -47,87 +50,126 @@ import { usePathname } from "next/navigation";
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useDispatch, useSelector } from "react-redux";
 
-const allMenuItems = [
-  {
-    icon: LucideHome,
-    text: "Dashboard",
-    path: "/dashboard",
-    resource: "Dashboard",
-  },
-  {
-    icon: LucideUsers,
-    text: "Users",
-    path: "/users",
-    resource: "Users",
-  },
-  {
-    icon: Store,
-    text: "Items Management",
-    path: "/items",
-    resource: "Items",
-  },
+// ── New information architecture ──────────────────────────────────────────
+// Dashboard is intentionally NOT a menu item — clicking the Gtech logo opens it.
+// Items with `children` render as collapsible groups.
+// NOTE: paths for pages that don't exist yet (Order Confirmation, Invoice
+// Correction, Delivery Note, Attention) are best guesses — adjust to your real
+// routes. Relationships points to the merged company+contacts page.
+type MenuChild = {
+  icon: any;
+  text: string;
+  path: string;
+  resource: string;
+};
+type MenuEntry = {
+  icon: any;
+  text: string;
+  path?: string;
+  resource: string;
+  children?: MenuChild[];
+};
 
+const allMenuItems: MenuEntry[] = [
   {
-    icon: DollarSign,
-    text: "Invoices",
-    path: "/invoices",
-    resource: "Invoices",
-  },
-  {
-    icon: LucideFileText,
-    text: "Orders",
-    path: "/orders",
-    resource: "Orders",
-  },
-  {
-    icon: Timer,
-    text: "Scheduled Items",
-    path: "/scheduled",
-    resource: "Scheduled Items",
-  },
-  {
-    icon: Briefcase,
-    text: "Bussinesses",
-    path: "/bussinesses",
+    icon: Handshake,
+    text: "Relationships",
+    path: "/bussinesses", // merged Company + Contacts page
     resource: "Bussinesses",
   },
   {
-    icon: BookUser,
-    text: "Contacts",
-    path: "/contacts",
-    resource: "Contacts",
-  },
-  {
-    icon: PackageSearchIcon,
-    text: "Inquiries & Requests",
-    path: "/inquiry",
+    icon: MessagesSquare,
+    text: "Collaboration",
+    path: "/inquiry", // merged Inquiry + Requests page
     resource: "Inquiries",
   },
   {
-    icon: BoxesIcon,
-    text: "Offers",
-    path: "/offers",
-    resource: "Offers",
+    icon: Package,
+    text: "Items",
+    path: "/items",
+    resource: "Items",
   },
   {
-    icon: LucideTag,
-    text: "Tags",
-    path: "/tags",
-    resource: "Tags",
+    icon: DollarSign,
+    text: "Commercial",
+    resource: "Commercial",
+    children: [
+      {
+        icon: FileText,
+        text: "Customer Offer",
+        path: "/offers",
+        resource: "Offers",
+      },
+      // {
+      //   icon: FileCheck,
+      //   text: "Order Confirmation",
+      //   path: "/order-confirmations",
+      //   resource: "OrderConfirmations",
+      // },
+      {
+        icon: Receipt,
+        text: "Invoice",
+        path: "/invoices",
+        resource: "Invoices",
+      },
+      // {
+      //   icon: ReceiptText,
+      //   text: "Invoice Correction",
+      //   path: "/invoice-corrections",
+      //   resource: "InvoiceCorrections",
+      // },
+      // {
+      //   icon: ClipboardList,
+      //   text: "Delivery Note",
+      //   path: "/delivery-notes",
+      //   resource: "DeliveryNotes",
+      // },
+    ],
   },
-  // {
-  //   icon: LibraryAdd,
-  //   text: "Library",
-  //   path: "/library",
-  //   resource: "Library",
-  // },
-
-  // {
-  //   icon: Person,
-  //   text: "Customers",
-  //   path: "/customers",
-  //   resource: "Customers",
-  // },
+  {
+    icon: Truck,
+    text: "Delivery",
+    resource: "Delivery",
+    children: [
+      {
+        icon: ShoppingCart,
+        text: "Orders",
+        path: "/orders",
+        resource: "Orders",
+      },
+      {
+        icon: Timer,
+        text: "Scheduled Items",
+        path: "/scheduled",
+        resource: "Scheduled Items",
+      },
+    ],
+  },
+  {
+    icon: AlertTriangle,
+    text: "Attention",
+    path: "/attention",
+    resource: "Attention",
+  },
+  {
+    icon: Settings,
+    text: "Settings",
+    resource: "Settings",
+    children: [
+      {
+        icon: LucideUsers,
+        text: "Users",
+        path: "/users",
+        resource: "Users",
+      },
+      {
+        icon: LucideTag,
+        text: "Tags",
+        path: "/tags",
+        resource: "Tags",
+      },
+    ],
+  },
 ];
 
 const Sidebar = () => {
@@ -136,6 +178,7 @@ const Sidebar = () => {
   const [showScrollUp, setShowScrollUp] = useState(false);
   const [showScrollDown, setShowScrollDown] = useState(false);
   const [hasOverflow, setHasOverflow] = useState(false);
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
   const dispatch = useDispatch();
   const { user } = useSelector((state: RootState) => state.user);
   const [isMounted, setIsMounted] = useState(false);
@@ -147,18 +190,61 @@ const Sidebar = () => {
   const menuContainerRef = useRef<HTMLDivElement>(null);
   const menuContentRef = useRef<HTMLDivElement>(null);
 
-  const menuItems = useMemo(() => {
-    if (!user || user.role === "ADMIN") {
-      return allMenuItems;
-    }
+  // Access-aware menu (ADMIN sees everything). Groups appear if at least one
+  // child is permitted; permitted children are kept.
+  const menuItems = useMemo<MenuEntry[]>(() => {
+    if (!user || user.role === "ADMIN") return allMenuItems;
     const userResources = user.assignedResources || [];
+    const allowed = (resource: string) =>
+      userResources.includes(resource) ||
+      (user.role === "PURCHASING" && resource === "Orders");
 
-    return allMenuItems.filter((item) => {
-      if (item.resource === "Dashboard") return true;
-      if (user.role === "PURCHASING" && item.resource === "Orders") return true;
-      return userResources.includes(item.resource);
-    });
+    return allMenuItems
+      .map((item) => {
+        if (item.children) {
+          const kids = item.children.filter((c) => allowed(c.resource));
+          return kids.length ? { ...item, children: kids } : null;
+        }
+        return allowed(item.resource) ? item : null;
+      })
+      .filter(Boolean) as MenuEntry[];
   }, [user]);
+
+  const isPathActive = useCallback(
+    (path?: string) =>
+      !!path && (activePath === path || activePath.startsWith(path)),
+    [activePath],
+  );
+
+  const isGroupActive = useCallback(
+    (item: MenuEntry) =>
+      isPathActive(item.path) ||
+      !!item.children?.some((c) => isPathActive(c.path)),
+    [isPathActive],
+  );
+
+  // Auto-open the group that contains the active route
+  useEffect(() => {
+    const next: Record<string, boolean> = {};
+    menuItems.forEach((item) => {
+      if (item.children && item.children.some((c) => isPathActive(c.path))) {
+        next[item.text] = true;
+      }
+    });
+    if (Object.keys(next).length) {
+      setOpenGroups((prev) => ({ ...prev, ...next }));
+    }
+  }, [activePath, menuItems, isPathActive]);
+
+  const toggleGroup = (text: string) => {
+    // If collapsed, expand the rail first so children are visible
+    if (isCollapsed) {
+      setIsCollapsed(false);
+      setOpenGroups((prev) => ({ ...prev, [text]: true }));
+      return;
+    }
+    setOpenGroups((prev) => ({ ...prev, [text]: !prev[text] }));
+  };
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
@@ -169,56 +255,88 @@ const Sidebar = () => {
   };
 
   const updateScrollButtons = useCallback(() => {
-    if (menuContainerRef.current && menuContentRef.current) {
-      const container = menuContainerRef.current;
-      const content = menuContentRef.current;
+    const container = menuContainerRef.current;
+    const content = menuContentRef.current;
+    if (!container || !content) return;
 
-      const canScrollUp = container.scrollTop > 0;
-      const canScrollDown =
-        container.scrollTop + container.clientHeight < content.scrollHeight - 1;
+    const overflow = content.scrollHeight > container.clientHeight + 1;
+    const canScrollUp = container.scrollTop > 0;
+    const canScrollDown =
+      container.scrollTop + container.clientHeight < content.scrollHeight - 1;
 
-      setShowScrollUp(canScrollUp);
-      setShowScrollDown(canScrollDown);
-      setHasOverflow(content.scrollHeight > container.clientHeight);
-    }
+    setHasOverflow(overflow);
+    setShowScrollUp(overflow && canScrollUp);
+    setShowScrollDown(overflow && canScrollDown);
   }, []);
 
   const scrollUp = () => {
-    if (menuContainerRef.current) {
-      menuContainerRef.current.scrollBy({ top: -100, behavior: "smooth" });
-    }
+    menuContainerRef.current?.scrollBy({ top: -120, behavior: "smooth" });
   };
 
   const scrollDown = () => {
-    if (menuContainerRef.current) {
-      menuContainerRef.current.scrollBy({ top: 100, behavior: "smooth" });
-    }
+    menuContainerRef.current?.scrollBy({ top: 120, behavior: "smooth" });
   };
 
   useEffect(() => {
     setIsMounted(true);
   }, []);
 
+  // Recalculate on resize
   useEffect(() => {
     if (!isMounted) return;
     updateScrollButtons();
-    const handleResize = () => {
-      setTimeout(updateScrollButtons, 100);
-    };
-
+    const handleResize = () => updateScrollButtons();
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
-  }, [updateScrollButtons, menuItems, isCollapsed]);
+  }, [updateScrollButtons, menuItems, isCollapsed, isMounted]);
 
+  // Reliable recalculation whenever the menu's height changes — covers group
+  // expand/collapse (the Collapse animation) and rail collapse/expand, which
+  // timeouts handled inconsistently before.
   useEffect(() => {
     if (!isMounted) return;
-    const timer = setTimeout(updateScrollButtons, 150);
-    return () => clearTimeout(timer);
-  }, [isCollapsed, updateScrollButtons, isMounted]);
+    const container = menuContainerRef.current;
+    const content = menuContentRef.current;
+    if (!container || !content) return;
+
+    const ro = new ResizeObserver(() => updateScrollButtons());
+    ro.observe(container);
+    ro.observe(content);
+    updateScrollButtons();
+    return () => ro.disconnect();
+  }, [isMounted, updateScrollButtons, menuItems]);
 
   const handleScroll = () => {
     if (isMounted) updateScrollButtons();
   };
+
+  // ── shared row styles ──
+  const rowSx = (active: boolean) => ({
+    borderTopLeftRadius: "5px",
+    borderBottomLeftRadius: "5px",
+    mb: 0.5,
+    mx: 1,
+    cursor: "pointer",
+    backgroundColor: active ? "rgba(255, 255, 255, 0.15)" : "transparent",
+    transition: "all 0.2s ease",
+    "&:hover": {
+      backgroundColor: "rgba(255, 255, 255, 0.1)",
+      transform: "translateX(4px)",
+    },
+    minHeight: 48,
+    overflow: "hidden",
+    position: "relative" as const,
+    "&::after": {
+      content: '""',
+      position: "absolute" as const,
+      left: 0,
+      top: 0,
+      height: "100%",
+      width: active ? "3px" : 0,
+      backgroundColor: "primary.main",
+      transition: "width 0.3s ease",
+    },
+  });
 
   const drawerContent = (
     <Box
@@ -245,9 +363,11 @@ const Sidebar = () => {
           alignItems: "center",
           justifyContent: isCollapsed ? "space-between" : "flex-end",
           height: "90px",
+          flexShrink: 0,
           overflow: "hidden",
         }}
       >
+        {/* Clicking the logo opens the Dashboard */}
         <Link href="/dashboard" style={{ flexShrink: 0 }}>
           <Image
             alt="Gtech"
@@ -280,6 +400,7 @@ const Sidebar = () => {
           sx={{
             width: "100%",
             color: "text.secondary",
+            flexShrink: 0,
             display: { xs: "none", sm: "flex" },
           }}
         >
@@ -291,14 +412,14 @@ const Sidebar = () => {
         suppressHydrationWarning
         sx={{
           width: "100%",
-          height: "100%",
           display: "flex",
           flexDirection: "column",
           flex: 1,
+          minHeight: 0, // allow inner scroll area to shrink & scroll
           overflow: "hidden",
         }}
       >
-        <Divider sx={{ borderColor: "divider", mb: 2 }} />
+        <Divider sx={{ borderColor: "divider", mb: 2, flexShrink: 0 }} />
         <Fade in={isMounted && hasOverflow && showScrollUp}>
           <Box
             suppressHydrationWarning
@@ -306,6 +427,7 @@ const Sidebar = () => {
               display: "flex",
               justifyContent: "center",
               mb: 0.5,
+              flexShrink: 0,
               position: "relative",
               zIndex: 1,
             }}
@@ -333,6 +455,7 @@ const Sidebar = () => {
           onScroll={handleScroll}
           sx={{
             flex: 1,
+            minHeight: 0, // critical: lets this flex child actually scroll
             overflowY: "auto",
             overflowX: "hidden",
             scrollbarWidth: "none",
@@ -351,77 +474,147 @@ const Sidebar = () => {
               pb: 0,
             }}
           >
-            {menuItems.map((item) => (
-              <Tooltip
-                key={item.text}
-                title={isCollapsed ? item.text : ""}
-                placement="right"
-                arrow
-              >
-                <ListItem
-                  component={Link}
-                  href={item.path}
-                  sx={{
-                    borderTopLeftRadius: "5px",
-                    borderBottomLeftRadius: "5px",
-                    mb: 0.5,
-                    mx: 1,
-                    backgroundColor:
-                      activePath === item.path || activePath.includes(item.path)
-                        ? "rgba(255, 255, 255, 0.15)"
-                        : "transparent",
-                    transition: "all 0.2s ease",
-                    "&:hover": {
-                      backgroundColor: "rgba(255, 255, 255, 0.1)",
-                      transform: "translateX(4px)",
-                    },
-                    minHeight: 48,
-                    overflow: "hidden",
-                    position: "relative",
-                    "&::after": {
-                      content: '""',
-                      position: "absolute",
-                      left: 0,
-                      top: 0,
-                      height: "100%",
-                      width:
-                        activePath === item.path ||
-                        activePath.includes(item.path)
-                          ? "3px"
-                          : 0,
-                      backgroundColor: "primary.main",
-                      transition: "width 0.3s ease",
-                    },
-                  }}
-                >
-                  <ListItemIcon
-                    sx={{
-                      minWidth: 40,
-                      color:
-                        activePath === item.path ||
-                        activePath.includes(item.path)
-                          ? "white"
-                          : "text.secondary",
-                      transition: "color 0.2s ease",
-                    }}
-                  >
-                    <item.icon size={20} />
-                  </ListItemIcon>
+            {menuItems.map((item) => {
+              const active = isGroupActive(item);
+              const hasChildren = !!item.children?.length;
+              const isOpen = !!openGroups[item.text];
 
-                  <Typography
-                    sx={{
-                      fontWeight: 400,
-                      opacity: isCollapsed ? 0 : 1,
-                      transition: "opacity 0.2s ease, color 0.2s ease",
-                      whiteSpace: "nowrap",
-                      color: activePath === item.path ? "white" : "#777777",
-                    }}
+              // Group header (collapsible)
+              if (hasChildren) {
+                return (
+                  <Box key={item.text}>
+                    <Tooltip
+                      title={isCollapsed ? item.text : ""}
+                      placement="right"
+                      arrow
+                    >
+                      <ListItem
+                        onClick={() => toggleGroup(item.text)}
+                        sx={rowSx(active)}
+                      >
+                        <ListItemIcon
+                          sx={{
+                            minWidth: 40,
+                            color: active ? "white" : "text.secondary",
+                            transition: "color 0.2s ease",
+                          }}
+                        >
+                          <item.icon size={20} />
+                        </ListItemIcon>
+                        <Typography
+                          sx={{
+                            fontWeight: 400,
+                            flex: 1,
+                            opacity: isCollapsed ? 0 : 1,
+                            transition: "opacity 0.2s ease, color 0.2s ease",
+                            whiteSpace: "nowrap",
+                            color: active ? "white" : "#777777",
+                          }}
+                        >
+                          {item.text}
+                        </Typography>
+                        {!isCollapsed &&
+                          (isOpen ? (
+                            <LucideChevronUp
+                              size={16}
+                              color={theme.palette.text.secondary}
+                            />
+                          ) : (
+                            <LucideChevronDown
+                              size={16}
+                              color={theme.palette.text.secondary}
+                            />
+                          ))}
+                      </ListItem>
+                    </Tooltip>
+
+                    <Collapse
+                      in={!isCollapsed && isOpen}
+                      timeout="auto"
+                      unmountOnExit
+                      onEntered={updateScrollButtons}
+                      onExited={updateScrollButtons}
+                    >
+                      <Box sx={{ pl: 2 }}>
+                        {item.children!.map((child) => {
+                          const childActive = isPathActive(child.path);
+                          return (
+                            <ListItem
+                              key={child.text}
+                              component={Link}
+                              href={child.path}
+                              sx={{
+                                ...rowSx(childActive),
+                                minHeight: 40,
+                              }}
+                            >
+                              <ListItemIcon
+                                sx={{
+                                  minWidth: 34,
+                                  color: childActive
+                                    ? "white"
+                                    : "text.secondary",
+                                  transition: "color 0.2s ease",
+                                }}
+                              >
+                                <child.icon size={17} />
+                              </ListItemIcon>
+                              <Typography
+                                sx={{
+                                  fontSize: "0.9rem",
+                                  fontWeight: 400,
+                                  whiteSpace: "nowrap",
+                                  color: childActive ? "white" : "#777777",
+                                }}
+                              >
+                                {child.text}
+                              </Typography>
+                            </ListItem>
+                          );
+                        })}
+                      </Box>
+                    </Collapse>
+                  </Box>
+                );
+              }
+
+              // Plain link item
+              return (
+                <Tooltip
+                  key={item.text}
+                  title={isCollapsed ? item.text : ""}
+                  placement="right"
+                  arrow
+                >
+                  <ListItem
+                    component={Link}
+                    href={item.path!}
+                    sx={rowSx(active)}
                   >
-                    {item.text}
-                  </Typography>
-                </ListItem>
-              </Tooltip>
-            ))}
+                    <ListItemIcon
+                      sx={{
+                        minWidth: 40,
+                        color: active ? "white" : "text.secondary",
+                        transition: "color 0.2s ease",
+                      }}
+                    >
+                      <item.icon size={20} />
+                    </ListItemIcon>
+                    <Typography
+                      sx={{
+                        fontWeight: 400,
+                        opacity: isCollapsed ? 0 : 1,
+                        transition: "opacity 0.2s ease, color 0.2s ease",
+                        whiteSpace: "nowrap",
+                        color: active ? "white" : "#777777",
+                      }}
+                    >
+                      {item.text}
+                    </Typography>
+                  </ListItem>
+                </Tooltip>
+              );
+            })}
           </Box>
         </Box>
         <Fade in={isMounted && hasOverflow && showScrollDown}>
@@ -431,6 +624,7 @@ const Sidebar = () => {
               display: "flex",
               justifyContent: "center",
               mt: 0.5,
+              flexShrink: 0,
               position: "relative",
               zIndex: 1,
             }}
@@ -451,9 +645,9 @@ const Sidebar = () => {
             </IconButton>
           </Box>
         </Fade>
-        <Divider sx={{ borderColor: "divider", my: 2 }} />
+        <Divider sx={{ borderColor: "divider", my: 2, flexShrink: 0 }} />
         {user?.role && !isCollapsed && (
-          <Box sx={{ px: 3, mb: 2 }}>
+          <Box sx={{ px: 3, mb: 2, flexShrink: 0 }}>
             <Box
               sx={{
                 display: "flex",
