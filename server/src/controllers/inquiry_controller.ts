@@ -211,6 +211,7 @@ export class InquiryController {
         .leftJoinAndSelect("requests.business", "business")
         .leftJoinAndSelect("business.customer", "businessCustomer")
         .leftJoinAndSelect("requests.contactPerson", "requestContactPerson")
+        .leftJoinAndSelect("requests.tags", "requestTags")
         .leftJoinAndSelect("inquiry.tags", "tags")
         .select([
           "inquiry",
@@ -223,6 +224,7 @@ export class InquiryController {
           "requestContactPerson.name",
           "requestContactPerson.familyName",
           "requestContactPerson.id",
+          "requestTags",
           "tags",
         ])
         .orderBy("inquiry.createdAt", "DESC");

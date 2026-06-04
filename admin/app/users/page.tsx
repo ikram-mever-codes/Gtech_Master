@@ -31,7 +31,7 @@ import theme from "@/styles/theme";
 import CustomButton from "@/components/UI/CustomButton";
 import CustomTable from "@/components/UI/CustomTable";
 import { useRouter } from "next/navigation";
-import { deleteUser, getAllUsers, resendVerificationEmail } from "@/api/user";
+import { getAllUsers, resendVerificationEmail } from "@/api/user";
 import { toast } from "react-hot-toast";
 
 const UsersPage = () => {
@@ -384,14 +384,6 @@ const UsersPage = () => {
             pagination={true}
             onRowClick={(row) => router.push(`/users/${row.id}`)}
             onEdit={(row) => router.push(`/users/${row.id}/edit`)}
-            onDelete={async (row) => {
-              const confirmDelete = window.confirm(
-                "Do you want to delete this User?"
-              );
-              if (!confirmDelete) return;
-              const data = await deleteUser(row.id);
-              if (data?.success) await fetchUsers();
-            }}
             onView={(row) => router.push(`/users/${row.id}`)}
             onResendVerification={(row) => {
               handleResendVerification(row.id, row.email);

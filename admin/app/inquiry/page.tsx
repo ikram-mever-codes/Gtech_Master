@@ -55,6 +55,7 @@ import {
 import { getAllCustomers } from "@/api/customers";
 import { getAllContactPersons } from "@/api/contacts";
 import CustomButton from "@/components/UI/CustomButton";
+import CustomModal from "@/components/UI/CustomModal";
 import { useSelector } from "react-redux";
 import { RootState } from "@/app/Redux/store";
 import { MessagesSquare, ClipboardList } from "lucide-react";
@@ -277,6 +278,9 @@ const CombinedInquiriesPageContent = () => {
     useState<Inquiry | null>(null);
   const [conversionRequestData, setConversionRequestData] =
     useState<Request | null>(null);
+  const [showRequestDetailModal, setShowRequestDetailModal] = useState(false);
+  const [selectedRequestForDetail, setSelectedRequestForDetail] = useState<any | null>(null);
+  const [selectedRequestInquiryId, setSelectedRequestInquiryId] = useState<string>("");
   const [expandedRequestIndex, setExpandedRequestIndex] = useState<any>(0);
   const [expandedInquiryIds, setExpandedInquiryIds] = useState<Set<string>>(
     new Set(),
@@ -397,6 +401,7 @@ const CombinedInquiriesPageContent = () => {
     sortBy: "createdAt",
     sortOrder: "DESC",
     tags: "",
+    requestItemTags: "",
   } as any);
 
   const itemsPerPage = 20;
@@ -444,7 +449,7 @@ const CombinedInquiriesPageContent = () => {
         isAssembly: targetInquiry.isAssembly,
         customerId: targetInquiry.customer?.id,
         contactPersonId: targetInquiry.contactPerson?.id || "",
-        status: newStatus, // Updated field
+        status: newStatus,
         priority: targetInquiry.priority,
         referenceNumber: targetInquiry.referenceNumber || "",
         requiredByDate: targetInquiry.requiredByDate
@@ -576,9 +581,26 @@ const CombinedInquiriesPageContent = () => {
       };
       const response = await getAllInquiries(filters);
       if (response?.data) {
-        const inquiryData = Array.isArray(response.data)
+        let inquiryData = Array.isArray(response.data)
           ? response.data
           : response.data.data || response.data.inquiries || [];
+
+        // Apply client-side request items tags filtering if selected
+        if (inquiryFilters.requestItemTags) {
+          const tagFilters = inquiryFilters.requestItemTags.split(",");
+          const includeTagIds = tagFilters.filter((t: string) => !t.startsWith("!")).map((t: string) => t);
+          const excludeTagIds = tagFilters.filter((t: string) => t.startsWith("!")).map((t: string) => t.substring(1));
+
+          inquiryData = inquiryData.filter((inquiry: any) => {
+            return (inquiry.requests || []).some((req: any) => {
+              const reqTagIds = req.tags?.map((t: any) => t.id) || [];
+              const hasAllIncludes = includeTagIds.every((id: string) => reqTagIds.includes(id));
+              const hasNoExcludes = excludeTagIds.every((id: string) => !reqTagIds.includes(id));
+              return hasAllIncludes && hasNoExcludes;
+            });
+          });
+        }
+
         setAllInquiries(inquiryData);
         const totalFiltered = inquiryData.length;
         const totalPagesCalc = Math.ceil(totalFiltered / itemsPerPage);
@@ -748,8 +770,7 @@ const CombinedInquiriesPageContent = () => {
       fetchInquiries();
     } catch (error) {
       console.error(
-        `Error ${
-          inquiryModalMode === "edit" ? "updating" : "creating"
+        `Error ${inquiryModalMode === "edit" ? "updating" : "creating"
         } inquiry:`,
         error,
       );
@@ -1136,9 +1157,8 @@ const CombinedInquiriesPageContent = () => {
   };
   const formatTaricDisplay = (taric: any) => {
     if (!taric) return "";
-    return `${taric.id} - ${taric.code || "No code"} - ${
-      taric.name_de || taric.name_en || taric.name_cn || "No name"
-    }`;
+    return `${taric.id} - ${taric.code || "No code"} - ${taric.name_de || taric.name_en || taric.name_cn || "No name"
+      }`;
   };
   const getConversionFormFieldsWithOptions = () => {
     const fields = getConversionFormFields(existingDimensionFields);
@@ -1219,16 +1239,31 @@ const CombinedInquiriesPageContent = () => {
               </CustomButton>
             </div>
           </div>
-          <div className="mb-4">
-            <TagFilterSelector
-              category="inquiry"
-              onChange={(tagString) =>
-                setInquiryFilters((prev: any) => ({ ...prev, tags: tagString }))
-              }
-              onReset={() =>
-                setInquiryFilters((prev: any) => ({ ...prev, tags: "" }))
-              }
-            />
+          <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="bg-white/50 backdrop-blur-sm p-4 rounded-xl border border-gray-100 shadow-sm flex flex-col gap-2">
+              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Filter by Inquiry Tags</span>
+              <TagFilterSelector
+                category="inquiry"
+                onChange={(tagString) =>
+                  setInquiryFilters((prev: any) => ({ ...prev, tags: tagString }))
+                }
+                onReset={() =>
+                  setInquiryFilters((prev: any) => ({ ...prev, tags: "" }))
+                }
+              />
+            </div>
+            <div className="bg-white/50 backdrop-blur-sm p-4 rounded-xl border border-gray-100 shadow-sm flex flex-col gap-2">
+              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Filter by Request Item Tags</span>
+              <TagFilterSelector
+                category="request_item"
+                onChange={(tagString) =>
+                  setInquiryFilters((prev: any) => ({ ...prev, requestItemTags: tagString }))
+                }
+                onReset={() =>
+                  setInquiryFilters((prev: any) => ({ ...prev, requestItemTags: "" }))
+                }
+              />
+            </div>
           </div>
         </div>
         <div className="bg-white/80 backdrop-blur-sm rounded-md shadow-lg border border-gray-100/50 overflow-hidden">
@@ -1403,11 +1438,10 @@ const CombinedInquiriesPageContent = () => {
                                 e.stopPropagation();
                                 toggleInquiryRequests(inquiry.id);
                               }}
-                              className={`px-2 py-1 text-xs rounded-lg transition-all flex items-center gap-1 ${
-                                expandedInquiryIds.has(inquiry.id)
-                                  ? "bg-blue-100 text-blue-800"
-                                  : "bg-blue-500 text-white hover:bg-blue-600"
-                              }`}
+                              className={`px-2 py-1 text-xs rounded-lg transition-all flex items-center gap-1 ${expandedInquiryIds.has(inquiry.id)
+                                ? "bg-blue-100 text-blue-800"
+                                : "bg-blue-500 text-white hover:bg-blue-600"
+                                }`}
                             >
                               {expandedInquiryIds.has(inquiry.id) ? (
                                 <EyeSlashIcon className="h-3 w-3" />
@@ -1428,7 +1462,6 @@ const CombinedInquiriesPageContent = () => {
                                 <LinkIcon className="h-4 w-4" />
                               </button>
                             )}
-                            {/* ── NEW: Copy shareable link button ── */}
                             <button
                               onClick={(e) =>
                                 handleCopyInquiryLink(e, inquiry.id)
@@ -1449,18 +1482,6 @@ const CombinedInquiriesPageContent = () => {
                               <ArrowRightIcon className="h-3 w-3" />
                               Convert
                             </button>
-                            {user?.role === UserRole.ADMIN && (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDeleteInquiry(inquiry.id);
-                                }}
-                                className="p-1 text-red-500 hover:text-red-700 transition-colors"
-                                title="Delete Inquiry"
-                              >
-                                <TrashIcon className="h-4 w-4" />
-                              </button>
-                            )}
                           </div>
                         </td>
                       </tr>
@@ -1500,11 +1521,15 @@ const CombinedInquiriesPageContent = () => {
                                     {inquiry.requests.map((request: any) => (
                                       <tr
                                         key={request.id}
-                                        className={`hover:bg-gray-50/50 transition-colors ${
-                                          request.priority === "High"
-                                            ? "bg-red-50/50"
-                                            : ""
-                                        }`}
+                                        onClick={() => {
+                                          setSelectedRequestForDetail(request);
+                                          setSelectedRequestInquiryId(inquiry.id);
+                                          setShowRequestDetailModal(true);
+                                        }}
+                                        className={`hover:bg-gray-50/50 transition-colors cursor-pointer ${request.priority === "High"
+                                          ? "bg-red-50/50"
+                                          : ""
+                                          }`}
                                       >
                                         <td className="px-4 py-3">
                                           <div className="w-[8rem]">
@@ -1529,10 +1554,10 @@ const CombinedInquiriesPageContent = () => {
                                         <td className="px-4 py-3 text-center">
                                           <select
                                             value={request.requestStatus}
+                                            onClick={(e) => e.stopPropagation()}
                                             onChange={async (e: any) => {
                                               const nextStatus = e.target.value;
 
-                                              // 1. Optimistic local state updates for instant visual feedback
                                               setInquiries((prevInquiries) =>
                                                 prevInquiries.map((inq) => ({
                                                   ...inq,
@@ -1540,10 +1565,10 @@ const CombinedInquiriesPageContent = () => {
                                                     (req: any) =>
                                                       req.id === request.id
                                                         ? {
-                                                            ...req,
-                                                            requestStatus:
-                                                              nextStatus,
-                                                          }
+                                                          ...req,
+                                                          requestStatus:
+                                                            nextStatus,
+                                                        }
                                                         : req,
                                                   ),
                                                 })),
@@ -1558,12 +1583,12 @@ const CombinedInquiriesPageContent = () => {
                                                         inq.requests?.map(
                                                           (req: any) =>
                                                             req.id ===
-                                                            request.id
+                                                              request.id
                                                               ? {
-                                                                  ...req,
-                                                                  requestStatus:
-                                                                    nextStatus,
-                                                                }
+                                                                ...req,
+                                                                requestStatus:
+                                                                  nextStatus,
+                                                              }
                                                               : req,
                                                         ),
                                                     }),
@@ -1571,7 +1596,6 @@ const CombinedInquiriesPageContent = () => {
                                               );
 
                                               try {
-                                                // 2. Await backend database mutation sync
                                                 await updateRequestedItem(
                                                   request.id,
                                                   {
@@ -1579,10 +1603,8 @@ const CombinedInquiriesPageContent = () => {
                                                   },
                                                 );
 
-                                                // 3. Re-pull records to ensure layout data consistency
                                                 fetchInquiries();
                                               } catch (error) {
-                                                // Rollback status to database values if network call fails
                                                 fetchInquiries();
                                               }
                                             }}
@@ -1672,26 +1694,6 @@ const CombinedInquiriesPageContent = () => {
                                               <ArrowRightIcon className="h-3 w-3" />
                                               Convert
                                             </button>
-                                            <button
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                if (
-                                                  window.confirm(
-                                                    "Are you sure you want to delete this request?",
-                                                  )
-                                                ) {
-                                                  removeRequestFromInquiry(
-                                                    inquiry.id,
-                                                    request.id,
-                                                  );
-                                                  fetchInquiries();
-                                                }
-                                              }}
-                                              className="p-1 text-red-500 hover:text-red-700 transition-colors"
-                                              title="Delete Request"
-                                            >
-                                              <TrashIcon className="h-4 w-4" />
-                                            </button>
                                           </div>
                                         </td>
                                       </tr>
@@ -1736,11 +1738,10 @@ const CombinedInquiriesPageContent = () => {
                       <button
                         key={pageNum}
                         onClick={() => setInquiryCurrentPage(pageNum)}
-                        className={`px-2 py-1 text-sm rounded-lg transition-all ${
-                          inquiryCurrentPage === pageNum
-                            ? "bg-gray-600 text-white"
-                            : "bg-white/80 backdrop-blur-sm border border-gray-300/80 hover:bg-white/60"
-                        }`}
+                        className={`px-2 py-1 text-sm rounded-lg transition-all ${inquiryCurrentPage === pageNum
+                          ? "bg-gray-600 text-white"
+                          : "bg-white/80 backdrop-blur-sm border border-gray-300/80 hover:bg-white/60"
+                          }`}
                       >
                         {pageNum}
                       </button>
@@ -1751,11 +1752,10 @@ const CombinedInquiriesPageContent = () => {
                       <span className="px-1 text-gray-500">...</span>
                       <button
                         onClick={() => setInquiryCurrentPage(inquiryTotalPages)}
-                        className={`px-2 py-1 text-sm rounded-lg transition-all ${
-                          inquiryCurrentPage === inquiryTotalPages
-                            ? "bg-gray-600 text-white"
-                            : "bg-white/80 backdrop-blur-sm border border-gray-300/80 hover:bg-white/60"
-                        }`}
+                        className={`px-2 py-1 text-sm rounded-lg transition-all ${inquiryCurrentPage === inquiryTotalPages
+                          ? "bg-gray-600 text-white"
+                          : "bg-white/80 backdrop-blur-sm border border-gray-300/80 hover:bg-white/60"
+                          }`}
                       >
                         {inquiryTotalPages}
                       </button>
@@ -1810,15 +1810,13 @@ const CombinedInquiriesPageContent = () => {
                     </span>
                     <button
                       type="button"
-                      className={`${
-                        editModeEnabled ? "bg-gray-600" : "bg-gray-200"
-                      } relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2`}
+                      className={`${editModeEnabled ? "bg-gray-600" : "bg-gray-200"
+                        } relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2`}
                       onClick={() => setEditModeEnabled(!editModeEnabled)}
                     >
                       <span
-                        className={`${
-                          editModeEnabled ? "translate-x-4" : "translate-x-0"
-                        } pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out`}
+                        className={`${editModeEnabled ? "translate-x-4" : "translate-x-0"
+                          } pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out`}
                       />
                     </button>
                   </div>
@@ -1826,11 +1824,10 @@ const CombinedInquiriesPageContent = () => {
               )}
               <div className="space-y-6">
                 <div
-                  className={`rounded-xl p-4 -mx-4 transition-colors duration-300 ${
-                    inquiryFormData.isAssembly
-                      ? "bg-red-50 border border-red-200/70"
-                      : "bg-transparent"
-                  }`}
+                  className={`rounded-xl p-4 -mx-4 transition-colors duration-300 ${inquiryFormData.isAssembly
+                    ? "bg-red-50 border border-red-200/70"
+                    : "bg-transparent"
+                    }`}
                 >
                   <div>
                     <h3 className="text-lg font-semibold text-gray-900 mb-3">
@@ -2456,11 +2453,10 @@ const CombinedInquiriesPageContent = () => {
                   </div>
                 </div>
                 <div
-                  className={`rounded-xl p-4 -mx-4 transition-colors duration-300 ${
-                    inquiryFormData.isAssembly
-                      ? "bg-green-50 border border-green-200/70 mt-2"
-                      : "bg-transparent"
-                  }`}
+                  className={`rounded-xl p-4 -mx-4 transition-colors duration-300 ${inquiryFormData.isAssembly
+                    ? "bg-green-50 border border-green-200/70 mt-2"
+                    : "bg-transparent"
+                    }`}
                 >
                   <div>
                     <div className="flex items-center justify-between mb-3">
@@ -2491,15 +2487,14 @@ const CombinedInquiriesPageContent = () => {
                           <button
                             type="button"
                             onClick={() => toggleRequestExpansion(index)}
-                            className={`w-full px-3 py-2 flex items-center justify-between text-left transition-colors ${
-                              expandedRequestIndex === index
-                                ? inquiryFormData.isAssembly
-                                  ? "bg-green-100"
-                                  : "bg-gray-100"
-                                : inquiryFormData.isAssembly
-                                  ? "bg-green-50 hover:bg-green-100"
-                                  : "bg-gray-50 hover:bg-gray-100"
-                            }`}
+                            className={`w-full px-3 py-2 flex items-center justify-between text-left transition-colors ${expandedRequestIndex === index
+                              ? inquiryFormData.isAssembly
+                                ? "bg-green-100"
+                                : "bg-gray-100"
+                              : inquiryFormData.isAssembly
+                                ? "bg-green-50 hover:bg-green-100"
+                                : "bg-gray-50 hover:bg-gray-100"
+                              }`}
                           >
                             <div className="flex items-center gap-2">
                               {expandedRequestIndex === index ? (
@@ -2816,7 +2811,7 @@ const CombinedInquiriesPageContent = () => {
                                           index,
                                           "weight",
                                           parseFloat(e.target.value) ||
-                                            undefined,
+                                          undefined,
                                         )
                                       }
                                       disabled={
@@ -2839,7 +2834,7 @@ const CombinedInquiriesPageContent = () => {
                                           index,
                                           "length",
                                           parseFloat(e.target.value) ||
-                                            undefined,
+                                          undefined,
                                         )
                                       }
                                       disabled={
@@ -2862,7 +2857,7 @@ const CombinedInquiriesPageContent = () => {
                                           index,
                                           "width",
                                           parseFloat(e.target.value) ||
-                                            undefined,
+                                          undefined,
                                         )
                                       }
                                       disabled={
@@ -2885,7 +2880,7 @@ const CombinedInquiriesPageContent = () => {
                                           index,
                                           "height",
                                           parseFloat(e.target.value) ||
-                                            undefined,
+                                          undefined,
                                         )
                                       }
                                       disabled={
@@ -3087,17 +3082,17 @@ const CombinedInquiriesPageContent = () => {
               <div className="mt-4 flex justify-between gap-2">
                 <div>
                   {inquiryModalMode === "edit" &&
-                    editModeEnabled &&
                     user?.role === UserRole.ADMIN && (
                       <button
-                        onClick={() => {
+                        onClick={async () => {
                           if (editingInquiryId) {
-                            handleDeleteInquiry(editingInquiryId);
+                            await handleDeleteInquiry(editingInquiryId);
                             setShowCreateModal(false);
                           }
                         }}
-                        className="px-3 py-2 text-xs text-red-700 bg-white/80 backdrop-blur-sm border border-red-300/80 rounded hover:bg-red-50/60 transition-all"
+                        className="px-4 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-lg transition-all flex items-center gap-1.5"
                       >
+                        <TrashIcon className="h-4 w-4" />
                         Delete Inquiry
                       </button>
                     )}
@@ -3116,23 +3111,23 @@ const CombinedInquiriesPageContent = () => {
                   </button>
                   {(inquiryModalMode === "create" ||
                     (inquiryModalMode === "edit" && editModeEnabled)) && (
-                    <CustomButton
-                      gradient={true}
-                      onClick={handleInquirySubmit}
-                      disabled={
-                        !inquiryFormData.name ||
-                        !inquiryFormData.customerId ||
-                        !inquiryRequests.some(
-                          (req) => req.itemName && req.qty >= 1,
-                        )
-                      }
-                      className="px-3 py-2 text-xs bg-gray-600/90 backdrop-blur-sm text-white rounded hover:bg-gray-700/90 transition-all disabled:opacity-50"
-                    >
-                      {inquiryModalMode === "edit"
-                        ? "Update Inquiry"
-                        : "Create Inquiry"}
-                    </CustomButton>
-                  )}
+                      <CustomButton
+                        gradient={true}
+                        onClick={handleInquirySubmit}
+                        disabled={
+                          !inquiryFormData.name ||
+                          !inquiryFormData.customerId ||
+                          !inquiryRequests.some(
+                            (req) => req.itemName && req.qty >= 1,
+                          )
+                        }
+                        className="px-3 py-2 text-xs bg-gray-600/90 backdrop-blur-sm text-white rounded hover:bg-gray-700/90 transition-all disabled:opacity-50"
+                      >
+                        {inquiryModalMode === "edit"
+                          ? "Update Inquiry"
+                          : "Create Inquiry"}
+                      </CustomButton>
+                    )}
                 </div>
               </div>
             </div>
@@ -3194,21 +3189,21 @@ const CombinedInquiriesPageContent = () => {
                       conversionInquiryData.width ||
                       conversionInquiryData.height ||
                       conversionInquiryData.length) && (
-                      <div className="col-span-2">
-                        <span className="text-gray-600">Dimensions:</span>
-                        <span className="ml-2">
-                          {conversionInquiryData.weight &&
-                            `${conversionInquiryData.weight}kg `}
-                          {conversionInquiryData.length &&
-                            `${conversionInquiryData.length}×`}
-                          {conversionInquiryData.width &&
-                            `${conversionInquiryData.width}×`}
-                          {conversionInquiryData.height &&
-                            `${conversionInquiryData.height}`}
-                          cm
-                        </span>
-                      </div>
-                    )}
+                        <div className="col-span-2">
+                          <span className="text-gray-600">Dimensions:</span>
+                          <span className="ml-2">
+                            {conversionInquiryData.weight &&
+                              `${conversionInquiryData.weight}kg `}
+                            {conversionInquiryData.length &&
+                              `${conversionInquiryData.length}×`}
+                            {conversionInquiryData.width &&
+                              `${conversionInquiryData.width}×`}
+                            {conversionInquiryData.height &&
+                              `${conversionInquiryData.height}`}
+                            cm
+                          </span>
+                        </div>
+                      )}
                   </div>
                 )}
                 {conversionType === "request" && conversionRequestData && (
@@ -3245,21 +3240,21 @@ const CombinedInquiriesPageContent = () => {
                       conversionRequestData.width ||
                       conversionRequestData.height ||
                       conversionRequestData.length) && (
-                      <div className="col-span-2">
-                        <span className="text-gray-600">Dimensions:</span>
-                        <span className="ml-2">
-                          {conversionRequestData.weight &&
-                            `${conversionRequestData.weight}kg `}
-                          {conversionRequestData.length &&
-                            `${conversionRequestData.length}×`}
-                          {conversionRequestData.width &&
-                            `${conversionRequestData.width}×`}
-                          {conversionRequestData.height &&
-                            `${conversionRequestData.height}`}
-                          cm
-                        </span>
-                      </div>
-                    )}
+                        <div className="col-span-2">
+                          <span className="text-gray-600">Dimensions:</span>
+                          <span className="ml-2">
+                            {conversionRequestData.weight &&
+                              `${conversionRequestData.weight}kg `}
+                            {conversionRequestData.length &&
+                              `${conversionRequestData.length}×`}
+                            {conversionRequestData.width &&
+                              `${conversionRequestData.width}×`}
+                            {conversionRequestData.height &&
+                              `${conversionRequestData.height}`}
+                            cm
+                          </span>
+                        </div>
+                      )}
                   </div>
                 )}
               </div>
@@ -3389,11 +3384,10 @@ const CombinedInquiriesPageContent = () => {
                                   : e.target.value,
                             })
                           }
-                          className={`w-full px-3 py-2 text-sm border ${
-                            field.required && !conversionFormData[field.name]
-                              ? "border-red-300"
-                              : "border-gray-300/80"
-                          } bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all`}
+                          className={`w-full px-3 py-2 text-sm border ${field.required && !conversionFormData[field.name]
+                            ? "border-red-300"
+                            : "border-gray-300/80"
+                            } bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all`}
                           placeholder={field.placeholder}
                           min={field.min}
                           step={field.step}
@@ -3402,9 +3396,8 @@ const CombinedInquiriesPageContent = () => {
                       )}
                       {field.description && (
                         <p
-                          className={`text-xs mt-1 ${
-                            field.required ? "text-red-600" : "text-gray-500"
-                          }`}
+                          className={`text-xs mt-1 ${field.required ? "text-red-600" : "text-gray-500"
+                            }`}
                         >
                           {field.description}
                         </p>
@@ -3468,6 +3461,241 @@ const CombinedInquiriesPageContent = () => {
             </div>
           </div>
         </div>
+      )}
+      {showRequestDetailModal && selectedRequestForDetail && (
+        <CustomModal
+          isOpen={showRequestDetailModal}
+          onClose={() => setShowRequestDetailModal(false)}
+          title={selectedRequestForDetail.itemName}
+          width="max-w-4xl"
+          footer={
+            <div className="flex justify-between items-center w-full">
+              <button
+                onClick={async () => {
+                  if (
+                    window.confirm(
+                      "Are you sure you want to delete this request from the inquiry? This action cannot be undone."
+                    )
+                  ) {
+                    try {
+                      await removeRequestFromInquiry(
+                        selectedRequestInquiryId,
+                        selectedRequestForDetail.id
+                      );
+                      setShowRequestDetailModal(false);
+                      fetchInquiries();
+                    } catch (err) {
+                      console.error("Failed to delete request:", err);
+                    }
+                  }
+                }}
+                className="px-4 py-2 bg-rose-600 text-white rounded-xl hover:bg-rose-700 transition-all text-sm font-semibold flex items-center gap-1.5 shadow-sm hover:shadow"
+              >
+                <TrashIcon className="h-4 w-4" />
+                Delete Request
+              </button>
+
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    setShowRequestDetailModal(false);
+                    handleConvertRequestClick(
+                      selectedRequestForDetail,
+                      selectedRequestInquiryId
+                    );
+                  }}
+                  className="px-4 py-2 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-all text-sm font-semibold flex items-center gap-1.5 shadow-sm hover:shadow"
+                >
+                  <ArrowRightIcon className="h-4 w-4" />
+                  Convert to Item
+                </button>
+                <button
+                  onClick={() => setShowRequestDetailModal(false)}
+                  className="px-4 py-2 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-all text-sm font-semibold"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          }
+        >
+          <div className="space-y-6">
+            <div className="-mt-2 pb-4 border-b border-gray-100 flex items-center gap-3 flex-wrap text-sm">
+              {selectedRequestForDetail.itemNo && (
+                <span className="font-mono text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
+                  #{selectedRequestForDetail.itemNo}
+                </span>
+              )}
+              <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${getRequestPriorityColor(selectedRequestForDetail.priority)}`}>
+                {selectedRequestForDetail.priority || "Normal"}
+              </span>
+              <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${getRequestStatusColor(selectedRequestForDetail.requestStatus || selectedRequestForDetail.status)}`}>
+                {selectedRequestForDetail.requestStatus || selectedRequestForDetail.status || "Draft"}
+              </span>
+              <span className="text-gray-500">
+                &bull; Request Item Details &bull; Inquiry ID: {selectedRequestInquiryId}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-6">
+                <div>
+                  <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-2">Description</h3>
+                  <div className="bg-gray-50/50 rounded-xl p-4 border border-gray-100">
+                    <p className="text-sm text-gray-800 whitespace-pre-line">
+                      {selectedRequestForDetail.description || "No description provided."}
+                    </p>
+                  </div>
+                </div>
+                {((selectedRequestForDetail.painPoints && selectedRequestForDetail.painPoints.length > 0) || (selectedRequestForDetail.tags && selectedRequestForDetail.tags.length > 0)) && (
+                  <div>
+                    <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-2">Tags & Pain Points</h3>
+                    <div className="flex flex-wrap gap-1.5">
+                      {selectedRequestForDetail.tags?.map((tag: any) => (
+                        <span
+                          key={tag.id}
+                          className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200/60"
+                        >
+                          {tag.name}
+                        </span>
+                      ))}
+                      {selectedRequestForDetail.painPoints?.map((painPoint: string, i: number) => (
+                        <span
+                          key={i}
+                          className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200/60"
+                        >
+                          {painPoint}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div className="space-y-6">
+                <div>
+                  <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-2">Pricing & Logistics</h3>
+                  <div className="bg-gray-50/50 rounded-xl p-4 border border-gray-100 space-y-3">
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <span className="text-gray-500 block">Quantity / Interval</span>
+                        <span className="font-semibold text-gray-900 text-base">
+                          {selectedRequestForDetail.qty} / {selectedRequestForDetail.interval || "Monthly"}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500 block">Purchase Price</span>
+                        <span className="font-semibold text-gray-900 text-base">
+                          {selectedRequestForDetail.purchasePrice} {selectedRequestForDetail.currency || "RMB"}
+                        </span>
+                      </div>
+                      {selectedRequestForDetail.priceRMB && (
+                        <div>
+                          <span className="text-gray-500 block">Price in RMB</span>
+                          <span className="font-semibold text-gray-800">
+                            ¥{selectedRequestForDetail.priceRMB}
+                          </span>
+                        </div>
+                      )}
+                      <div>
+                        <span className="text-gray-500 block">Delivery Date</span>
+                        <span className="font-semibold text-gray-800">
+                          {selectedRequestForDetail.expectedDeliveryDate
+                            ? new Date(selectedRequestForDetail.expectedDeliveryDate).toLocaleDateString()
+                            : "Not specified"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                {(selectedRequestForDetail.urgency1 || selectedRequestForDetail.urgency2) && (
+                  <div>
+                    <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-2">Urgency & Quality Criteria</h3>
+                    <div className="bg-gray-50/50 rounded-xl p-4 border border-gray-100 space-y-3 text-sm">
+                      {selectedRequestForDetail.urgency1 && (
+                        <div>
+                          <span className="text-gray-500 block font-medium">Urgency 1</span>
+                          <p className="text-gray-800">{selectedRequestForDetail.urgency1}</p>
+                        </div>
+                      )}
+                      {selectedRequestForDetail.urgency2 && (
+                        <div className="pt-2 border-t border-gray-200/50">
+                          <span className="text-gray-500 block font-medium">Quality Criteria / Urgency 2</span>
+                          <p className="text-gray-800 whitespace-pre-line">{selectedRequestForDetail.urgency2}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+            </div>
+            {selectedRequestForDetail.images && selectedRequestForDetail.images.length > 0 && (
+              <div className="border-t border-gray-100 pt-4">
+                <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-3">Images</h3>
+                <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3">
+                  {selectedRequestForDetail.images.map((image: string, idx: number) => (
+                    <a
+                      key={idx}
+                      href={image}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="group relative aspect-square rounded-xl overflow-hidden bg-gray-100 border border-gray-200 hover:shadow-md transition-all"
+                    >
+                      <img
+                        src={image}
+                        alt={`Preview ${idx + 1}`}
+                        className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-200"
+                      />
+                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                        <PhotoIcon className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </div>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+            {selectedRequestForDetail.attachments && selectedRequestForDetail.attachments.length > 0 && (
+              <div className="border-t border-gray-100 pt-4">
+                <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-2">Attachments</h3>
+                <div className="flex flex-wrap gap-2">
+                  {selectedRequestForDetail.attachments.map((attachment: any, idx: number) => (
+                    <a
+                      key={idx}
+                      href={attachment.fileUrl || attachment.url || attachment}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-xs font-semibold transition-colors border border-gray-200"
+                    >
+                      <PaperClipIcon className="w-3.5 h-3.5" />
+                      <span className="truncate max-w-[200px]">
+                        {attachment.fileName || attachment.name || `Attachment ${idx + 1}`}
+                      </span>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+            {selectedRequestForDetail.asanaLink && (
+              <div className="border-t border-gray-100 pt-4 flex items-center gap-2">
+                <span className="text-sm font-medium text-gray-600">Asana Task:</span>
+                <a
+                  href={selectedRequestForDetail.asanaLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1 text-purple-600 hover:text-purple-800 hover:bg-purple-50 rounded-lg text-sm font-semibold transition-all border border-purple-200"
+                >
+                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z" />
+                    <circle cx="12" cy="8.5" r="1.5" />
+                    <circle cx="8.5" cy="14.5" r="1.5" />
+                    <circle cx="15.5" cy="14.5" r="1.5" />
+                  </svg>
+                  Open in Asana
+                </a>
+              </div>
+            )}
+          </div>
+        </CustomModal>
       )}
     </div>
   );

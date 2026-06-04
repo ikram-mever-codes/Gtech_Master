@@ -893,11 +893,10 @@ const CombinedBusinessContactsContent: React.FC = () => {
           <div className="flex flex-wrap gap-3">
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className={`px-4 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2 ${
-                showFilters
-                  ? "bg-primary text-white"
-                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-              }`}
+              className={`px-4 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2 ${showFilters
+                ? "bg-primary text-white"
+                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                }`}
             >
               <FunnelIcon className="w-5 h-5" />
               Filters
@@ -947,7 +946,33 @@ const CombinedBusinessContactsContent: React.FC = () => {
           </div>
         </div>
 
-        {/* Main table: businesses with contacts sub-table */}
+        {showFilters && (
+          <div className="mb-6 p-5 bg-white border border-gray-200 rounded-xl space-y-4 shadow-sm">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="md:col-span-2">
+                <TagFilterSelector
+                  category="company"
+                  onChange={(tagString) =>
+                    setFilters((prev) => ({ ...prev, tags: tagString }))
+                  }
+                  onReset={() =>
+                    setFilters((prev) => ({ ...prev, tags: "" }))
+                  }
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-2 border-t border-gray-100">
+              <button
+                onClick={resetFilters}
+                className="text-xs font-semibold text-rose-600 hover:text-rose-800 transition-colors flex items-center gap-1"
+              >
+                <ArrowPathIcon className="w-3.5 h-3.5" />
+                Reset All Filters
+              </button>
+            </div>
+          </div>
+        )}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
           {loading ? (
             <div className="p-20 flex justify-center items-center">
@@ -1088,11 +1113,10 @@ const CombinedBusinessContactsContent: React.FC = () => {
                                 onClick={() =>
                                   toggleBusinessContacts(business.id)
                                 }
-                                className={`px-2 py-1 text-xs rounded-lg transition-all flex items-center gap-1 ${
-                                  expandedBusinessIds.has(business.id)
-                                    ? "bg-blue-100 text-blue-800"
-                                    : "bg-blue-500 text-white hover:bg-blue-600"
-                                }`}
+                                className={`px-2 py-1 text-xs rounded-lg transition-all flex items-center gap-1 ${expandedBusinessIds.has(business.id)
+                                  ? "bg-blue-100 text-blue-800"
+                                  : "bg-blue-500 text-white hover:bg-blue-600"
+                                  }`}
                               >
                                 {expandedBusinessIds.has(business.id) ? (
                                   <EyeSlashIcon className="h-3 w-3" />
@@ -1267,7 +1291,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
                                               }
                                               className={`text-xs px-2 max-w-[180px] truncate py-1 rounded-full font-medium border-0 cursor-pointer ${getDecisionMakerStateColor(
                                                 contact.decisionMakerState ||
-                                                  "",
+                                                "",
                                               )}`}
                                             >
                                               {DECISION_MAKER_STATES.map(
@@ -1338,23 +1362,23 @@ const CombinedBusinessContactsContent: React.FC = () => {
                                               </button>
                                               {user?.role ===
                                                 UserRole.ADMIN && (
-                                                <button
-                                                  onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    handleDeleteContact(
-                                                      contact.id,
-                                                    );
-                                                  }}
-                                                  title="Delete contact"
-                                                >
-                                                  <Delete
-                                                    sx={{
-                                                      fontSize: 16,
-                                                      color: "red",
+                                                  <button
+                                                    onClick={(e) => {
+                                                      e.stopPropagation();
+                                                      handleDeleteContact(
+                                                        contact.id,
+                                                      );
                                                     }}
-                                                  />
-                                                </button>
-                                              )}
+                                                    title="Delete contact"
+                                                  >
+                                                    <Delete
+                                                      sx={{
+                                                        fontSize: 16,
+                                                        color: "red",
+                                                      }}
+                                                    />
+                                                  </button>
+                                                )}
                                             </div>
                                           </td>
                                         </tr>
@@ -1483,15 +1507,13 @@ const CombinedBusinessContactsContent: React.FC = () => {
                     </span>
                     <button
                       type="button"
-                      className={`${
-                        businessEditMode ? "bg-gray-600" : "bg-gray-200"
-                      } relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2`}
+                      className={`${businessEditMode ? "bg-gray-600" : "bg-gray-200"
+                        } relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2`}
                       onClick={() => setBusinessEditMode(!businessEditMode)}
                     >
                       <span
-                        className={`${
-                          businessEditMode ? "translate-x-4" : "translate-x-0"
-                        } pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out`}
+                        className={`${businessEditMode ? "translate-x-4" : "translate-x-0"
+                          } pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out`}
                       />
                     </button>
                   </div>
@@ -1852,17 +1874,17 @@ const CombinedBusinessContactsContent: React.FC = () => {
                   </button>
                   {(businessModalMode === "create" ||
                     (businessModalMode === "edit" && businessEditMode)) && (
-                    <CustomButton
-                      gradient={true}
-                      onClick={handleBusinessSubmit}
-                      disabled={!businessForm.companyName?.trim()}
-                      className="px-3 py-2 text-xs bg-gray-600/90 backdrop-blur-sm text-white rounded hover:bg-gray-700/90 transition-all disabled:opacity-50"
-                    >
-                      {businessModalMode === "edit"
-                        ? "Update Business"
-                        : "Create Business"}
-                    </CustomButton>
-                  )}
+                      <CustomButton
+                        gradient={true}
+                        onClick={handleBusinessSubmit}
+                        disabled={!businessForm.companyName?.trim()}
+                        className="px-3 py-2 text-xs bg-gray-600/90 backdrop-blur-sm text-white rounded hover:bg-gray-700/90 transition-all disabled:opacity-50"
+                      >
+                        {businessModalMode === "edit"
+                          ? "Update Business"
+                          : "Create Business"}
+                      </CustomButton>
+                    )}
                 </div>
               </div>
             </div>
@@ -1905,18 +1927,16 @@ const CombinedBusinessContactsContent: React.FC = () => {
                     </span>
                     <button
                       type="button"
-                      className={`${
-                        editModeEnabled ? "bg-gray-600" : "bg-gray-200"
-                      } relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2`}
+                      className={`${editModeEnabled ? "bg-gray-600" : "bg-gray-200"
+                        } relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2`}
                       role="switch"
                       aria-checked={editModeEnabled}
                       onClick={() => setEditModeEnabled(!editModeEnabled)}
                     >
                       <span
                         aria-hidden="true"
-                        className={`${
-                          editModeEnabled ? "translate-x-5" : "translate-x-0"
-                        } pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out`}
+                        className={`${editModeEnabled ? "translate-x-5" : "translate-x-0"
+                          } pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out`}
                       />
                     </button>
                   </div>

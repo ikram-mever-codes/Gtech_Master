@@ -108,7 +108,7 @@ export const TagFilterSelector: React.FC<TagFilterSelectorProps> = ({
   );
 
   return (
-    <div className="space-y-2.5 w-full" ref={dropdownRef}>
+    <div className="space-y-2.5 w-full max-w-lg" ref={dropdownRef}>
       <label className="block text-sm font-medium text-gray-700 flex items-center justify-between">
         <span className="flex items-center gap-1.5">
           <FunnelIcon className="w-4 h-4 text-primary" />

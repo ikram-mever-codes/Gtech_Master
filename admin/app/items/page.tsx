@@ -1885,74 +1885,36 @@ const ItemsManagementPage: React.FC = () => {
         </div>
 
         {showFilters && (
-          <div className="mb-6 bg-gray-50 p-4 rounded-lg">
-            {activeTab === "items" && (
-              <>
-                <div className="relative mb-4">
-                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1 flex items-center gap-1">
-                    <Hash className="w-3 h-3 text-green-600" /> EAN Search
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Scan or type EAN..."
-                    value={filters.eanSearch}
-                    onChange={(e) =>
-                      setFilters({ ...filters, eanSearch: e.target.value })
-                    }
-                    className="w-full px-3 py-2 border-2 border-green-200 rounded-md focus:border-green-500 outline-none text-sm transition-all bg-white"
-                  />
-                  {filters.eanSearch && (
-                    <button
-                      onClick={() => setFilters({ ...filters, eanSearch: "" })}
-                      className="absolute right-2 top-7 text-gray-400 hover:text-red-500"
-                    >
-                      <XMarkIcon className="w-4 h-4" />
-                    </button>
-                  )}
-                </div>
-
-                <div className="mb-4">
-                  <TagFilterSelector
-                    category="item"
-                    onChange={(tagString) => setFilters((prev) => ({ ...prev, tags: tagString }))}
-                    onReset={() => setFilters((prev) => ({ ...prev, tags: "" }))}
-                  />
-                </div>
-              </>
-            )}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              {activeTab === "tarics" ? (
-                <>
-                  <div className="md:col-span-3">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Search
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="Search code or name..."
-                      value={taricFilters.search}
-                      onChange={(e) =>
-                        setTaricFilters({
-                          ...taricFilters,
-                          search: e.target.value,
-                        })
-                      }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                    />
-                  </div>
-                  <div className="flex items-end">
-                    <button
-                      onClick={resetTaricFilters}
-                      className="px-4 py-2 text-sm bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
-                    >
-                      Reset Filters
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <>
+          <div className="mb-6 p-5 bg-white border border-gray-200 rounded-xl space-y-4 shadow-sm">
+            {activeTab === "items" ? (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1 flex items-center gap-1">
+                      <Hash className="w-3.5 h-3.5 text-green-600" /> EAN Search
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        placeholder="Scan or type EAN..."
+                        value={filters.eanSearch}
+                        onChange={(e) =>
+                          setFilters({ ...filters, eanSearch: e.target.value })
+                        }
+                        className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                      />
+                      {filters.eanSearch && (
+                        <button
+                          onClick={() => setFilters({ ...filters, eanSearch: "" })}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500"
+                        >
+                          <XMarkIcon className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">
                       Status
                     </label>
                     <select
@@ -1960,7 +1922,7 @@ const ItemsManagementPage: React.FC = () => {
                       onChange={(e) =>
                         setFilters({ ...filters, isActive: e.target.value })
                       }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                      className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
                     >
                       <option value="">All Status</option>
                       <option value="Y">Active</option>
@@ -1968,7 +1930,7 @@ const ItemsManagementPage: React.FC = () => {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">
                       Category
                     </label>
                     <select
@@ -1976,7 +1938,7 @@ const ItemsManagementPage: React.FC = () => {
                       onChange={(e) =>
                         setFilters({ ...filters, category: e.target.value })
                       }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                      className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
                     >
                       <option value="">All Categories</option>
                       {Array.from(
@@ -1996,7 +1958,7 @@ const ItemsManagementPage: React.FC = () => {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">
                       Supplier
                     </label>
                     <select
@@ -2004,7 +1966,7 @@ const ItemsManagementPage: React.FC = () => {
                       onChange={(e) =>
                         setFilters({ ...filters, supplier: e.target.value })
                       }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                      className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
                     >
                       <option value="">All Suppliers</option>
                       {suppliers.map((s) => (
@@ -2014,17 +1976,71 @@ const ItemsManagementPage: React.FC = () => {
                       ))}
                     </select>
                   </div>
-                  <div className="flex items-end">
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end pt-3 border-t border-gray-100">
+                  <div className="md:col-span-3">
+                    <TagFilterSelector
+                      category="item"
+                      onChange={(tagString) => setFilters((prev) => ({ ...prev, tags: tagString }))}
+                      onReset={() => setFilters((prev) => ({ ...prev, tags: "" }))}
+                    />
+                  </div>
+                  <div className="flex justify-end">
                     <button
                       onClick={resetFilters}
-                      className="px-4 py-2 text-sm bg-gray-200 text-gray-700 rounded hover:bg-gray-300 w-full"
+                      className="px-4 py-2 text-xs font-semibold text-rose-600 hover:text-rose-800 transition-colors flex items-center gap-1.5 border border-rose-200 rounded-lg bg-rose-50/50 hover:bg-rose-50"
                     >
+                      <ArrowPathIcon className="w-3.5 h-3.5" />
                       Reset Filters
                     </button>
                   </div>
-                </>
-              )}
-            </div>
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                {activeTab === "tarics" ? (
+                  <>
+                    <div className="md:col-span-3">
+                      <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">
+                        Search
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Search code or name..."
+                        value={taricFilters.search}
+                        onChange={(e) =>
+                          setTaricFilters({
+                            ...taricFilters,
+                            search: e.target.value,
+                          })
+                        }
+                        className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                      />
+                    </div>
+                    <div className="flex items-end justify-end">
+                      <button
+                        onClick={resetTaricFilters}
+                        className="px-4 py-2 text-xs font-semibold text-rose-600 hover:text-rose-800 transition-colors flex items-center gap-1.5 border border-rose-200 rounded-lg bg-rose-50/50 hover:bg-rose-50"
+                      >
+                        <ArrowPathIcon className="w-3.5 h-3.5" />
+                        Reset Filters
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex items-end justify-end md:col-span-4">
+                    <button
+                      onClick={resetFilters}
+                      className="px-4 py-2 text-xs font-semibold text-rose-600 hover:text-rose-800 transition-colors flex items-center gap-1.5 border border-rose-200 rounded-lg bg-rose-50/50 hover:bg-rose-50"
+                    >
+                      <ArrowPathIcon className="w-3.5 h-3.5" />
+                      Reset Filters
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 
