@@ -63,6 +63,8 @@ import PageHeader from "@/components/UI/PageHeader";
 import { UserRole } from "@/utils/interfaces";
 import { getAllTarics } from "@/api/items";
 import { TagFilterSelector } from "@/components/Tags/TagFilterSelector";
+import { TagPickerInput, EntityTagSelector, type Tag } from "@/components/Tags/TagManager";
+import { syncEntityTags } from "@/api/tags";
 
 export interface Customer {
   id: string;
@@ -245,6 +247,7 @@ const getConversionFormFields = (hasExistingDimensions?: any) => {
 };
 const CombinedInquiriesPageContent = () => {
   const [inquiries, setInquiries] = useState<Inquiry[]>([]);
+  const [newInquiryTags, setNewInquiryTags] = useState<Tag[]>([]);
   const [allInquiries, setAllInquiries] = useState<Inquiry[]>([]);
   const [inquiryLoading, setInquiryLoading] = useState(false);
   const [inquiryCurrentPage, setInquiryCurrentPage] = useState(1);
@@ -702,6 +705,7 @@ const CombinedInquiriesPageContent = () => {
       painPoints: inquiry.painPoints || [],
       requests: inquiry.requests || [],
     });
+    setNewInquiryTags((inquiry as any).tags || []);
     setInquiryImagePreview(inquiry.image || "");
     if (inquiry.requests && inquiry.requests.length > 0) {
       setInquiryRequests(
@@ -763,7 +767,11 @@ const CombinedInquiriesPageContent = () => {
           ...inquiryPayload,
         } as UpdateInquiryPayload);
       } else {
-        await createInquiry(inquiryPayload as CreateInquiryPayload);
+        const result = await createInquiry(inquiryPayload as CreateInquiryPayload);
+        const createdId = (result as any)?.data?.id;
+        if (createdId && newInquiryTags.length > 0) {
+          await syncEntityTags(createdId, "inquiry", newInquiryTags.map((t) => t.id));
+        }
       }
       resetInquiryForm();
       setShowCreateModal(false);
@@ -910,6 +918,7 @@ const CombinedInquiriesPageContent = () => {
     setEditModeEnabled(false);
     setEditingInquiryId(null);
     setInquiryModalMode("create");
+    setNewInquiryTags([]);
     setExpandedRequestIndex(0);
   };
   const removeRequest = (index: number) => {
@@ -1934,7 +1943,7 @@ const CombinedInquiriesPageContent = () => {
                           ))}
                         </select>
                       </div>
-                      <div className="col-span-1">
+                      <div className="col-span-2">
                         <label className="block text-xs font-medium text-gray-700 mb-1">
                           Description
                         </label>
@@ -1949,10 +1958,35 @@ const CombinedInquiriesPageContent = () => {
                           disabled={
                             inquiryModalMode === "edit" && !editModeEnabled
                           }
-                          rows={3}
+                          rows={2}
                           className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
                           placeholder="Enter inquiry description"
                         />
+                      </div>
+                      <div className="col-span-2">
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                          Tags
+                        </label>
+                        {inquiryModalMode === "create" ? (
+                          <TagPickerInput
+                            category="inquiry"
+                            selectedTags={newInquiryTags}
+                            onChange={setNewInquiryTags}
+                          />
+                        ) : (
+                          <EntityTagSelector
+                            entityId={editingInquiryId!}
+                            entityType="inquiry"
+                            initialTags={(inquiryFormData as any).tags || []}
+                            onTagsUpdated={(updatedTags) =>
+                              setInquiryFormData((prev: any) => ({
+                                ...prev,
+                                tags: updatedTags,
+                              }))
+                            }
+                            disabled={!editModeEnabled}
+                          />
+                        )}
                       </div>
                       <div className="col-span-2">
                         <div

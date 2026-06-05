@@ -87,11 +87,13 @@ export const EntityTagSelector = ({
   entityType,
   initialTags = [],
   onTagsUpdated,
+  disabled = false,
 }: {
   entityId: string | number;
   entityType: "company" | "contact" | "inquiry" | "request_item" | "item";
   initialTags?: Tag[];
   onTagsUpdated?: (tags: Tag[]) => void;
+  disabled?: boolean;
 }) => {
   const [currentTags, setCurrentTags] = useState<Tag[]>(initialTags);
   const [allAvailableTags, setAllAvailableTags] = useState<Tag[]>([]);
@@ -164,56 +166,164 @@ export const EntityTagSelector = ({
   return (
     <div className="flex flex-wrap items-center gap-1.5 relative" ref={dropdownRef}>
       {currentTags.map((tag) => (
-        <TagBadge key={tag.id} tag={tag} onRemove={() => handleRemoveTag(tag.id)} />
+        <TagBadge key={tag.id} tag={tag} onRemove={disabled ? undefined : () => handleRemoveTag(tag.id)} />
       ))}
 
-      <div className="relative">
-        <button
-          type="button"
-          onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-          disabled={loading}
-          className="flex items-center justify-center p-1 rounded-full border border-dashed border-gray-300 hover:border-[#8CC21B] hover:bg-[#8CC21B]/5 text-gray-500 hover:text-[#8CC21B] transition-all"
-          title="Add Tag"
-        >
-          <PlusIcon className="h-4 w-4 stroke-[2]" />
-        </button>
+      {!disabled && (
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+            disabled={loading}
+            className="flex items-center justify-center p-1 rounded-full border border-dashed border-gray-300 hover:border-[#8CC21B] hover:bg-[#8CC21B]/5 text-gray-500 hover:text-[#8CC21B] transition-all"
+            title="Add Tag"
+          >
+            <PlusIcon className="h-4 w-4 stroke-[2]" />
+          </button>
 
-        {isDropdownOpen && (
-          <div className="absolute left-0 mt-1 w-64 bg-white border border-gray-200 rounded-xl shadow-xl z-50 py-2 animate-in fade-in slide-in-from-top-1 duration-150">
-            <div className="px-3 py-1.5 border-b border-gray-100 mb-1">
-              <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">
-                Select Tag ({entityType})
-              </span>
-            </div>
+          {isDropdownOpen && (
+            <div className="absolute left-0 mt-1 w-64 bg-white border border-gray-200 rounded-xl shadow-xl z-50 py-2 animate-in fade-in slide-in-from-top-1 duration-150">
+              <div className="px-3 py-1.5 border-b border-gray-100 mb-1">
+                <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+                  Select Tag ({entityType})
+                </span>
+              </div>
 
-            <div className="max-h-56 overflow-y-auto px-1 space-y-0.5">
-              {tagsToSelect.length === 0 ? (
-                <div className="px-3 py-3 text-xs text-gray-500 text-center">
-                  {allAvailableTags.length === 0 ? "No tags created yet." : "All tags already assigned."}
-                </div>
-              ) : (
-                tagsToSelect.map((tag) => {
-                  const styles = colorClasses[tag.color] || colorClasses.gray;
-                  return (
-                    <button
-                      key={tag.id}
-                      type="button"
-                      onClick={() => {
-                        handleAddTag(tag);
-                        setIsDropdownOpen(false);
-                      }}
-                      className="w-full text-left px-3 py-2 text-xs rounded-lg hover:bg-gray-50 flex items-center gap-2 text-gray-700 transition-colors"
-                    >
-                      <span className={`w-2 h-2 rounded-full ${styles.dot}`} />
-                      <span className="font-medium">{tag.name}</span>
-                    </button>
-                  );
-                })
-              )}
+              <div className="max-h-56 overflow-y-auto px-1 space-y-0.5">
+                {tagsToSelect.length === 0 ? (
+                  <div className="px-3 py-3 text-xs text-gray-500 text-center">
+                    {allAvailableTags.length === 0 ? "No tags created yet." : "All tags already assigned."}
+                  </div>
+                ) : (
+                  tagsToSelect.map((tag) => {
+                    const styles = colorClasses[tag.color] || colorClasses.gray;
+                    return (
+                      <button
+                        key={tag.id}
+                        type="button"
+                        onClick={() => {
+                          handleAddTag(tag);
+                          setIsDropdownOpen(false);
+                        }}
+                        className="w-full text-left px-3 py-2 text-xs rounded-lg hover:bg-gray-50 flex items-center gap-2 text-gray-700 transition-colors"
+                      >
+                        <span className={`w-2 h-2 rounded-full ${styles.dot}`} />
+                        <span className="font-medium">{tag.name}</span>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
             </div>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+export const TagPickerInput = ({
+  category,
+  selectedTags,
+  onChange,
+  disabled = false,
+}: {
+  category: "company" | "contact" | "inquiry" | "request_item" | "item";
+  selectedTags: Tag[];
+  onChange: (tags: Tag[]) => void;
+  disabled?: boolean;
+}) => {
+  const [allAvailableTags, setAllAvailableTags] = useState<Tag[]>([]);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isDropdownOpen) return;
+    getTags(category)
+      .then((res) => {
+        if (res?.data) setAllAvailableTags(res.data);
+      })
+      .catch(console.error);
+  }, [isDropdownOpen, category]);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const tagsToSelect = allAvailableTags.filter(
+    (t) => !selectedTags.some((s) => s.id === t.id)
+  );
+
+  return (
+    <div className="flex flex-wrap items-center gap-1.5 relative" ref={dropdownRef}>
+      {selectedTags.map((tag) => (
+        <TagBadge
+          key={tag.id}
+          tag={tag}
+          onRemove={
+            disabled
+              ? undefined
+              : () => onChange(selectedTags.filter((t) => t.id !== tag.id))
+          }
+        />
+      ))}
+      {!disabled && (
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setIsDropdownOpen((o) => !o)}
+            className="flex items-center justify-center p-1 rounded-full border border-dashed border-gray-300 hover:border-[#8CC21B] hover:bg-[#8CC21B]/5 text-gray-500 hover:text-[#8CC21B] transition-all"
+            title="Add Tag"
+          >
+            <PlusIcon className="h-4 w-4 stroke-[2]" />
+          </button>
+          {isDropdownOpen && (
+            <div className="absolute left-0 mt-1 w-60 bg-white border border-gray-200 rounded-xl shadow-xl z-50 py-2 animate-in fade-in slide-in-from-top-1 duration-150">
+              <div className="px-3 py-1.5 border-b border-gray-100 mb-1">
+                <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+                  Select Tag
+                </span>
+              </div>
+              <div className="max-h-52 overflow-y-auto px-1 space-y-0.5">
+                {tagsToSelect.length === 0 ? (
+                  <div className="px-3 py-3 text-xs text-gray-500 text-center">
+                    {allAvailableTags.length === 0
+                      ? "No tags created yet."
+                      : "All tags already assigned."}
+                  </div>
+                ) : (
+                  tagsToSelect.map((tag) => {
+                    const styles = colorClasses[tag.color] || colorClasses.gray;
+                    return (
+                      <button
+                        key={tag.id}
+                        type="button"
+                        onClick={() => {
+                          onChange([...selectedTags, tag]);
+                          setIsDropdownOpen(false);
+                        }}
+                        className="w-full text-left px-3 py-2 text-xs rounded-lg hover:bg-gray-50 flex items-center gap-2 text-gray-700 transition-colors"
+                      >
+                        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${styles.dot}`} />
+                        <span className="font-medium">{tag.name}</span>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+      {selectedTags.length === 0 && !isDropdownOpen && (
+        <span className="text-xs text-gray-400 italic">No tags selected</span>
+      )}
     </div>
   );
 };

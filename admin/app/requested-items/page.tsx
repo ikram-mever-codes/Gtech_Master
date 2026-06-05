@@ -47,6 +47,8 @@ import { UserRole } from "@/utils/interfaces";
 import { ClipboardList } from "lucide-react";
 import PageHeader from "@/components/UI/PageHeader";
 import { TagFilterSelector } from "@/components/Tags/TagFilterSelector";
+import { TagPickerInput, EntityTagSelector, type Tag } from "@/components/Tags/TagManager";
+import { syncEntityTags } from "@/api/tags";
 
 interface ContactPerson {
   id: string;
@@ -86,6 +88,7 @@ const RequestedItemsPage: React.FC = () => {
 
   const [showFilters, setShowFilters] = useState(false);
   const [editModeEnabled, setEditModeEnabled] = useState(false);
+  const [newItemTags, setNewItemTags] = useState<Tag[]>([]);
   const [contactPersons, setContactPersons] = useState<ContactPerson[]>([]);
   const [loadingContactPersons, setLoadingContactPersons] = useState(false);
   const [filteredContactPersons, setFilteredContactPersons] = useState<
@@ -362,7 +365,11 @@ const RequestedItemsPage: React.FC = () => {
           formData as RequestedItemUpdatePayload
         );
       } else {
-        await createRequestedItem(formData);
+        const result = await createRequestedItem(formData);
+        const createdId = (result as any)?.data?.id;
+        if (createdId && newItemTags.length > 0) {
+          await syncEntityTags(createdId, "request_item", newItemTags.map((t) => t.id));
+        }
       }
 
       resetForm();
@@ -441,6 +448,7 @@ const RequestedItemsPage: React.FC = () => {
     setEditingItemId(null);
     setModalMode("create");
     setFilteredContactPersons(contactPersons);
+    setNewItemTags([]);
   };
 
   const getStatusColor = (status: string) => {
@@ -1234,6 +1242,26 @@ const RequestedItemsPage: React.FC = () => {
                         className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
                         placeholder="Additional comments..."
                       />
+                    </div>
+
+                    <div className="col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Tags
+                      </label>
+                      {modalMode === "create" ? (
+                        <TagPickerInput
+                          category="request_item"
+                          selectedTags={newItemTags}
+                          onChange={setNewItemTags}
+                        />
+                      ) : (
+                        <EntityTagSelector
+                          entityId={editingItemId!}
+                          entityType="request_item"
+                          initialTags={(requestedItems.find((i) => i.id === editingItemId) as any)?.tags || []}
+                          disabled={!editModeEnabled}
+                        />
+                      )}
                     </div>
                   </div>
 

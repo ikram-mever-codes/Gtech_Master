@@ -85,6 +85,8 @@ import { getAllSuppliers, Supplier } from "@/api/suppliers";
 import { getCategories } from "@/api/categories";
 import { loadingStyles, successStyles, errorStyles } from "@/utils/constants";
 import { TagFilterSelector } from "@/components/Tags/TagFilterSelector";
+import { TagPickerInput, type Tag } from "@/components/Tags/TagManager";
+import { syncEntityTags } from "@/api/tags";
 
 type TabType = "items" | "parents" | "warehouse" | "tarics" | "suppliers";
 
@@ -128,6 +130,7 @@ const ItemsManagementPage: React.FC = () => {
 
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [newItemTags, setNewItemTags] = useState<Tag[]>([]);
   const [exportingNew, setExportingNew] = useState(false);
   const [pendingSyncCount, setPendingSyncCount] = useState(0);
   const [pagination, setPagination] = useState<PaginationState>({
@@ -636,6 +639,7 @@ const ItemsManagementPage: React.FC = () => {
       item_no_de: "",
       item_name_de: "",
     });
+    setNewItemTags([]);
     setShowItemModal(true);
   };
 
@@ -656,7 +660,7 @@ const ItemsManagementPage: React.FC = () => {
     }
     try {
       setLoading(true);
-      await createItem({
+      const result = await createItem({
         item_name: itemFormData.item_name,
         item_name_cn: itemFormData.item_name_cn,
         ean: itemFormData.ean,
@@ -678,6 +682,11 @@ const ItemsManagementPage: React.FC = () => {
         is_eur_special: itemFormData.is_eur_special ? "Y" : "N",
         is_rmb_special: itemFormData.is_rmb_special ? "Y" : "N",
       });
+
+      const createdId = (result as any)?.data?.id || (result as any)?.data?.data?.id;
+      if (createdId && newItemTags.length > 0) {
+        await syncEntityTags(createdId, "item", newItemTags.map((t) => t.id));
+      }
 
       setShowItemModal(false);
       fetchData();
@@ -2841,6 +2850,17 @@ const ItemsManagementPage: React.FC = () => {
                       Special Item
                     </label>
                   </div>
+                </div>
+
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Tags
+                  </label>
+                  <TagPickerInput
+                    category="item"
+                    selectedTags={newItemTags}
+                    onChange={setNewItemTags}
+                  />
                 </div>
               </div>
 

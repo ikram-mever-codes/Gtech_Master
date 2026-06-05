@@ -40,14 +40,15 @@ import { Google, LinkedIn, Delete, Add } from "@mui/icons-material";
 import { useSelector } from "react-redux";
 import { RootState } from "../Redux/store";
 import { UserRole } from "@/utils/interfaces";
-import { TagBadge } from "@/components/Tags/TagManager";
+import { TagBadge, TagPickerInput, EntityTagSelector, type Tag } from "@/components/Tags/TagManager";
 import { TagFilterSelector } from "@/components/Tags/TagFilterSelector";
+import { syncEntityTags } from "@/api/tags";
 import {
   getAllBusinesses,
   exportBusinessesToCSV,
   deleteBusiness,
-  createBusiness, // NOTE: ensure these are exported from @/api/bussiness
-  updateBusiness, //       (used by the new in-page business modal)
+  createBusiness,
+  updateBusiness,
   type Business,
   type SearchFilters,
 } from "@/api/bussiness";
@@ -85,7 +86,6 @@ interface FilterState {
   tags: string;
 }
 
-// A business with its grouped contacts attached (like inquiry.requests)
 type BusinessWithContacts = Business & { contacts?: ContactPersonData[] };
 
 const COUNTRY_OPTIONS = [
@@ -111,7 +111,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
   const searchParams = useSearchParams();
   const { user } = useSelector((state: RootState) => state.user);
 
-  // ── Business + grouped contacts data (fetch-all + client paginate, like inquiries) ──
   const [allBusinesses, setAllBusinesses] = useState<BusinessWithContacts[]>(
     [],
   );
@@ -122,13 +121,11 @@ const CombinedBusinessContactsContent: React.FC = () => {
   const [totalRecords, setTotalRecords] = useState(0);
   const itemsPerPage = 30;
 
-  // ── Fold / unfold (mirrors inquiries page) ──
   const [expandedBusinessIds, setExpandedBusinessIds] = useState<Set<string>>(
     new Set(),
   );
   const [allContactsExpanded, setAllContactsExpanded] = useState(true);
 
-  // ── Filters / dropdown sources ──
   const [showFilters, setShowFilters] = useState(true);
   const [filters, setFilters] = useState<FilterState>({
     search: "",
@@ -150,7 +147,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
   const [countries, setCountries] = useState<string[]>([]);
   const [sources, setSources] = useState<string[]>([]);
 
-  // ── Contact modal state (ported from contacts page) ──
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [modalMode, setModalMode] = useState<ModalMode>("create");
   const [editingContactId, setEditingContactId] = useState<string | null>(null);
@@ -176,11 +172,9 @@ const CombinedBusinessContactsContent: React.FC = () => {
     decisionMakerNote: "",
   });
 
-  // ── Notes modal state ──
   const [showNotesModal, setShowNotesModal] = useState(false);
   const [notesModalData, setNotesModalData] = useState<any>(null);
 
-  // ── Business modal state (NEW — replaces the company details page) ──
   const [showBusinessModal, setShowBusinessModal] = useState(false);
   const [businessModalMode, setBusinessModalMode] =
     useState<ModalMode>("create");
@@ -189,7 +183,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
   );
   const [businessEditMode, setBusinessEditMode] = useState(false);
   const emptyBusinessForm = {
-    companyName: "", // full legal name
+    companyName: "",
     displayName: "",
     starPortalLinkName: "",
     addressAdditional: "",
@@ -201,17 +195,16 @@ const CombinedBusinessContactsContent: React.FC = () => {
     phone: "",
     website: "",
     note: "",
-    tags: [] as any[], // placeholder — tags feature still under development
+    tags: [] as any[],
   };
   const [businessForm, setBusinessForm] = useState<any>({
     ...emptyBusinessForm,
   });
+  const [newBusinessTags, setNewBusinessTags] = useState<Tag[]>([]);
+  const [newContactTags, setNewContactTags] = useState<Tag[]>([]);
 
   const [urlParamHandled, setUrlParamHandled] = useState(false);
 
-  // ──────────────────────────────────────────────────────────────────────
-  //  DATA FETCHING
-  // ──────────────────────────────────────────────────────────────────────
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
@@ -252,10 +245,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
       const contactData: ContactPersonData[] =
         contactRes?.data?.contactPersons || [];
 
-      // Group contacts by their owning business. A contact references its
-      // business via starBusinessDetailsId (creation FK) and/or businessId.
-      // NOTE: confirm which key matches `business.id` in your data model; both
-      // are indexed here so a lookup by business.id resolves either way.
       const contactMap = new Map<string, ContactPersonData[]>();
       contactData.forEach((c: any) => {
         const keys = [c.starBusinessDetailsId, c.businessId].filter(Boolean);
@@ -283,7 +272,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
       const startIndex = (currentPage - 1) * itemsPerPage;
       setBusinesses(merged.slice(startIndex, startIndex + itemsPerPage));
 
-      // Auto-expand every business that has contacts (mirrors inquiries)
       setExpandedBusinessIds(
         new Set(
           merged.filter((b) => (b.contacts?.length || 0) > 0).map((b) => b.id),
@@ -291,7 +279,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
       );
       setAllContactsExpanded(true);
 
-      // Populate filter dropdown sources
       setCategories([
         ...new Set(merged.map((b) => b.category).filter(Boolean)),
       ] as string[]);
@@ -312,18 +299,14 @@ const CombinedBusinessContactsContent: React.FC = () => {
     }
   }, [filters, currentPage]);
 
-  // Re-fetch when filters change; reset to page 1
   useEffect(() => {
     setCurrentPage(1);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters]);
 
   useEffect(() => {
     fetchData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters]);
 
-  // Re-slice when paginating (no re-fetch needed)
   useEffect(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
     setBusinesses(allBusinesses.slice(startIndex, startIndex + itemsPerPage));
@@ -342,7 +325,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
     if (showCreateModal && !selectedBusiness) fetchStarBusinessesForModal();
   }, [showCreateModal, selectedBusiness]);
 
-  // ── Open a contact modal from a ?contactId= deep link ──
   useEffect(() => {
     if (urlParamHandled) return;
     const contactId = searchParams?.get("contactId");
@@ -355,12 +337,8 @@ const CombinedBusinessContactsContent: React.FC = () => {
         setUrlParamHandled(true);
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, allBusinesses, urlParamHandled]);
 
-  // ──────────────────────────────────────────────────────────────────────
-  //  FOLD / UNFOLD (mirrors inquiries page)
-  // ──────────────────────────────────────────────────────────────────────
   const toggleBusinessContacts = (businessId: string) => {
     setExpandedBusinessIds((prev) => {
       const next = new Set(prev);
@@ -385,9 +363,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
     }
   };
 
-  // ──────────────────────────────────────────────────────────────────────
-  //  CONTACT HELPERS (optimistic local updates over nested state)
-  // ──────────────────────────────────────────────────────────────────────
   const patchContactInState = (contactId: string, patch: any) => {
     const update = (list: BusinessWithContacts[]) =>
       list.map((b) => ({
@@ -448,7 +423,9 @@ const CombinedBusinessContactsContent: React.FC = () => {
         note: (contact as any).note || "",
         noteContactPreference: (contact as any).noteContactPreference || "",
         decisionMakerNote: (contact as any).decisionMakerNote || "",
+        tags: (contact as any).tags || [],
       });
+      setNewContactTags((contact as any).tags || []);
       if ((contact as any).starBusinessDetailsId) {
         setSelectedBusiness({
           id: (contact as any).starBusinessDetailsId,
@@ -499,7 +476,11 @@ const CombinedBusinessContactsContent: React.FC = () => {
       if (modalMode === "edit" && editingContactId) {
         await updateContactPerson(editingContactId, payload);
       } else {
-        await createContactPerson(payload);
+        const result = await createContactPerson(payload);
+        const createdId = (result as any)?.data?.id || (result as any)?.data?.contactPerson?.id;
+        if (createdId && newContactTags.length > 0) {
+          await syncEntityTags(createdId, "contact", newContactTags.map((t) => t.id));
+        }
       }
       resetCreateForm();
       setShowCreateModal(false);
@@ -535,12 +516,13 @@ const CombinedBusinessContactsContent: React.FC = () => {
       note: "",
       noteContactPreference: "",
       decisionMakerNote: "",
+      tags: [],
     });
     setSelectedBusiness(null);
     setEditModeEnabled(false);
+    setNewContactTags([]);
   };
 
-  // Open create-contact modal pre-bound to a specific business row
   const handleAddContactForBusiness = (business: BusinessWithContacts) => {
     setModalMode("create");
     setEditingContactId(null);
@@ -558,12 +540,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
     setShowNotesModal(true);
   };
 
-  // ──────────────────────────────────────────────────────────────────────
-  //  BUSINESS MODAL HELPERS (NEW)
-  // ──────────────────────────────────────────────────────────────────────
-
-  // Display name = first word of company name; must be UNIQUE, else fall back
-  // to the second word (then to first + numeric suffix).
   const generateDisplayName = (
     companyName: string,
     existing: BusinessWithContacts[],
@@ -586,9 +562,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
     return `${first}${i}`;
   };
 
-  // Star portal link name = same as display name; but if the display name had
-  // to fall back to the second word, the link name combines the words
-  // ("between the words"). Must be UNIQUE.
   const generateStarPortalLinkName = (
     companyName: string,
     displayName: string,
@@ -614,7 +587,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
   const handleBusinessCompanyNameChange = (value: string) => {
     setBusinessForm((prev: any) => {
       const next = { ...prev, companyName: value };
-      // Auto-suggest display + portal name only while creating
       if (businessModalMode === "create") {
         const dn = generateDisplayName(value, allBusinesses, editingBusinessId);
         next.displayName = dn;
@@ -633,19 +605,18 @@ const CombinedBusinessContactsContent: React.FC = () => {
     setBusinessForm({ ...emptyBusinessForm });
     setEditingBusinessId(null);
     setBusinessEditMode(false);
+    setNewBusinessTags([]);
   };
-
   const openCreateBusinessModal = () => {
     setBusinessModalMode("create");
     resetBusinessForm();
-    setBusinessEditMode(true); // create mode is always editable
+    setBusinessEditMode(true);
     setShowBusinessModal(true);
   };
-
   const openBusinessModal = (business: any) => {
     setBusinessModalMode("edit");
     setEditingBusinessId(business.id);
-    setBusinessEditMode(false); // open uneditable first
+    setBusinessEditMode(false);
     setBusinessForm({
       companyName:
         business.companyName || business.legalName || business.name || "",
@@ -662,6 +633,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
       note: business.note || "",
       tags: business.tags || [],
     });
+    setNewBusinessTags(business.tags || []);
     setShowBusinessModal(true);
   };
 
@@ -671,12 +643,15 @@ const CombinedBusinessContactsContent: React.FC = () => {
       return;
     }
     try {
-      // NOTE: align these keys with your createBusiness / updateBusiness payload
       const payload: any = { ...businessForm };
       if (businessModalMode === "edit" && editingBusinessId) {
         await updateBusiness(editingBusinessId, payload);
       } else {
-        await createBusiness(payload);
+        const result = await createBusiness(payload);
+        const createdId = (result as any)?.data?.id;
+        if (createdId && newBusinessTags.length > 0) {
+          await syncEntityTags(createdId, "company", newBusinessTags.map((t) => t.id));
+        }
       }
       setShowBusinessModal(false);
       resetBusinessForm();
@@ -693,14 +668,9 @@ const CombinedBusinessContactsContent: React.FC = () => {
     }
   };
 
-  // Live contacts for the currently open business modal (kept fresh from state)
   const modalContacts: ContactPersonData[] = editingBusinessId
     ? allBusinesses.find((b) => b.id === editingBusinessId)?.contacts || []
     : [];
-
-  // ──────────────────────────────────────────────────────────────────────
-  //  BUSINESS HELPERS
-  // ──────────────────────────────────────────────────────────────────────
   const handleDeleteBusiness = async (id: string) => {
     if (!window.confirm("Are you sure you want to delete this business?"))
       return;
@@ -710,7 +680,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
       resetBusinessForm();
       fetchData();
     } catch {
-      /* handled by api layer */
     }
   };
 
@@ -750,7 +719,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
     });
   };
 
-  // ── badge / format helpers ──
   const formatDate = (dateString: string) => {
     if (!dateString) return "-";
     return new Date(dateString).toLocaleDateString("en-US", {
@@ -760,7 +728,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
     });
   };
 
-  // Full address; country shown only when NOT German.
   const buildFullAddress = (b: any) => {
     const isGerman =
       !b.country || b.country === "Germany" || b.country === "DE";
@@ -856,7 +823,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
     );
   };
 
-  // ── stat cards (computed off the full set) ──
   const stats = useMemo(
     () => ({
       total: allBusinesses.length,
@@ -872,10 +838,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
 
   const businessFieldDisabled =
     businessModalMode === "edit" && !businessEditMode;
-
-  // ──────────────────────────────────────────────────────────────────────
-  //  RENDER
-  // ──────────────────────────────────────────────────────────────────────
   return (
     <div className="w-full max-w-full mx-auto overflow-hidden">
       <div
@@ -885,7 +847,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
           background: "linear-gradient(to bottom, #ffffff, #f9f9f9)",
         }}
       >
-        {/* Header + actions */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
           <div>
             <PageHeader title="Relationships" icon={HandshakeIcon} />
@@ -1022,7 +983,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
                     {businesses.map((business: any) => (
                       <React.Fragment key={business.id}>
                         <tr className="hover:bg-gray-50 transition-colors">
-                          {/* Company → display name; click opens the business modal */}
                           <td
                             className="px-3 py-3 cursor-pointer"
                             onClick={() => openBusinessModal(business)}
@@ -1040,7 +1000,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
                                 business.name}
                             </p>
                           </td>
-                          {/* Address → full address (country only if not German) */}
                           <td
                             className="px-3 py-3 cursor-pointer"
                             onClick={() => openBusinessModal(business)}
@@ -1106,7 +1065,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
                                 : "-"}
                             </div>
                           </td>
-                          {/* Actions: Contacts toggle + Add (delete moved into the modal) */}
                           <td className="px-3 py-3">
                             <div className="flex items-center justify-center gap-2">
                               <button
@@ -1139,7 +1097,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
                           </td>
                         </tr>
 
-                        {/* Contacts sub-table */}
                         {expandedBusinessIds.has(business.id) &&
                           business.contacts &&
                           business.contacts.length > 0 && (
@@ -1390,7 +1347,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
                             </tr>
                           )}
 
-                        {/* Expanded but no contacts → empty hint with quick add */}
                         {expandedBusinessIds.has(business.id) &&
                           (!business.contacts ||
                             business.contacts.length === 0) && (
@@ -1419,7 +1375,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
                 </table>
               </div>
 
-              {/* Pagination */}
               <div className="p-4 border-t border-gray-100 bg-gray-50 flex items-center justify-between">
                 <p className="text-sm text-gray-600">
                   Showing {(currentPage - 1) * itemsPerPage + 1} to{" "}
@@ -1472,7 +1427,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
         </div>
       </div>
 
-      {/* ──────────────── Business Modal (NEW — design inspired by inquiries) ──────────────── */}
       {showBusinessModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="backdrop-blur-md rounded-2xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto bg-white/95">
@@ -1495,7 +1449,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
                 </button>
               </div>
 
-              {/* Edit-mode toggle (edit only) */}
               {businessModalMode === "edit" && (
                 <div className="mb-4 flex items-center justify-between bg-gray-50 rounded-lg p-3">
                   <span className="text-sm font-medium text-gray-700">
@@ -1521,7 +1474,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
               )}
 
               <div className="space-y-6">
-                {/* Business information */}
                 <div className="rounded-xl p-4 -mx-4 bg-transparent">
                   <h3 className="text-lg font-semibold text-gray-900 mb-3">
                     Business Information
@@ -1744,25 +1696,34 @@ const CombinedBusinessContactsContent: React.FC = () => {
                         placeholder="Internal note…"
                       />
                     </div>
-                    {/* Tags — placeholder (feature under development) */}
                     <div className="col-span-2">
                       <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Tags{" "}
-                        <span className="text-gray-400 font-normal">
-                          (coming soon)
-                        </span>
+                        Tags
                       </label>
-                      <input
-                        type="text"
-                        disabled
-                        className="w-full px-3 py-2 text-sm border border-dashed border-gray-300/80 bg-gray-50 rounded-lg text-gray-400 cursor-not-allowed"
-                        placeholder="Tag management is still under development"
-                      />
+                      {businessModalMode === "create" ? (
+                        <TagPickerInput
+                          category="company"
+                          selectedTags={newBusinessTags}
+                          onChange={setNewBusinessTags}
+                        />
+                      ) : (
+                        <EntityTagSelector
+                          entityId={editingBusinessId!}
+                          entityType="company"
+                          initialTags={businessForm.tags || []}
+                          onTagsUpdated={(updatedTags) =>
+                            setBusinessForm((prev: any) => ({
+                              ...prev,
+                              tags: updatedTags,
+                            }))
+                          }
+                          disabled={businessFieldDisabled}
+                        />
+                      )}
                     </div>
                   </div>
                 </div>
 
-                {/* Contacts (edit mode only — a saved business is required) */}
                 {businessModalMode === "edit" && (
                   <div className="rounded-xl p-4 -mx-4 bg-green-50 border border-green-200/70">
                     <div className="flex items-center justify-between mb-3">
@@ -1841,7 +1802,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
                 )}
               </div>
 
-              {/* Footer: delete bottom-left (active only when editing), actions right */}
               <div className="mt-4 flex justify-between gap-2">
                 <div>
                   {businessModalMode === "edit" &&
@@ -1892,7 +1852,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
         </div>
       )}
 
-      {/* ──────────────── Create / Edit Contact Modal (ported) ──────────────── */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
@@ -2299,8 +2258,33 @@ const CombinedBusinessContactsContent: React.FC = () => {
                       }
                       rows={3}
                       disabled={modalMode === "edit" && !editModeEnabled}
-                      className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
                     />
+                  </div>
+
+                  <div className="col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Tags
+                    </label>
+                    {modalMode === "create" ? (
+                      <TagPickerInput
+                        category="contact"
+                        selectedTags={newContactTags}
+                        onChange={setNewContactTags}
+                      />
+                    ) : (
+                      <EntityTagSelector
+                        entityId={editingContactId!}
+                        entityType="contact"
+                        initialTags={createForm.tags || []}
+                        onTagsUpdated={(updatedTags) =>
+                          setCreateForm((prev: any) => ({
+                            ...prev,
+                            tags: updatedTags,
+                          }))
+                        }
+                        disabled={modalMode === "edit" && !editModeEnabled}
+                      />
+                    )}
                   </div>
                 </div>
 
@@ -2341,7 +2325,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
         </div>
       )}
 
-      {/* ──────────────── Notes Modal (ported) ──────────────── */}
       {showNotesModal && notesModalData && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl max-w-2xl w-full max-h-[80vh] overflow-y-auto">

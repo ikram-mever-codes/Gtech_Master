@@ -40,6 +40,7 @@ import CustomModal from "@/components/UI/CustomModal";
 import { loadingStyles, successStyles, errorStyles, BASE_URL } from "@/utils/constants";
 import { Package } from "lucide-react";
 import PageHeader from "@/components/UI/PageHeader";
+import { EntityTagSelector } from "@/components/Tags/TagManager";
 
 const hasChinese = (str: string) => /[\u4e00-\u9fa5]/.test(str || "");
 
@@ -758,6 +759,7 @@ const ItemDetailsPage = () => {
     { id: "quality", label: "Quality Criteria" },
     { id: "attachments", label: "Attachments" },
     { id: "pictures", label: "Item Pictures" },
+    { id: "tags", label: "Tags" },
   ];
   useEffect(() => {
     const fetchItemData = async () => {
@@ -2266,6 +2268,22 @@ const ItemDetailsPage = () => {
                     </p>
                   )}
                 </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === "tags" && (
+            <div>
+              <SectionHeader title="Tags" />
+              <div className="py-4">
+                <p className="text-sm text-gray-500 mb-4">
+                  Add or remove tags for this item. Tags help you filter and categorize items across the system.
+                </p>
+                <EntityTagSelector
+                  entityId={parseInt(id as string)}
+                  entityType="item"
+                  initialTags={(itemData as any).tags || []}
+                />
               </div>
             </div>
           )}
