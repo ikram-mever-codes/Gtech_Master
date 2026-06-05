@@ -37,7 +37,7 @@ export const BUSINESS_STATUS = {
 export const bulkImportBusinesses = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     const { businesses, source = BUSINESS_SOURCE.GOOGLE_MAPS } = req.body;
@@ -51,7 +51,7 @@ export const bulkImportBusinesses = async (
     }
 
     console.log(
-      `Starting bulk import of ${businesses.length} businesses from source: ${source}...`
+      `Starting bulk import of ${businesses.length} businesses from source: ${source}...`,
     );
 
     const customerRepository = AppDataSource.getRepository(Customer);
@@ -196,8 +196,7 @@ export const bulkImportBusinesses = async (
         ) {
           duplicateReason = "Website already exists in database";
           existingRecord = existingBusinessesByWebsite.get(normalizedWebsite);
-        }
-        else if (existingBusinessesByName.has(normalizedCompanyName)) {
+        } else if (existingBusinessesByName.has(normalizedCompanyName)) {
           duplicateReason = "Company name already exists in database";
           existingRecord = existingBusinessesByName.get(normalizedCompanyName);
         }
@@ -232,8 +231,8 @@ export const bulkImportBusinesses = async (
         customer.email = businessData.email
           ? businessData.email.trim().toLowerCase()
           : `${companyNameFirstWord
-            .toLowerCase()
-            .replace(/[^a-z0-9]/g, ".")}@imported.business`;
+              .toLowerCase()
+              .replace(/[^a-z0-9]/g, ".")}@imported.business`;
         customer.stage = "business";
         customer.contactEmail = businessData.contactEmail
           ? businessData.contactEmail.trim().toLowerCase()
@@ -263,10 +262,10 @@ export const bulkImportBusinesses = async (
           ? businessData.businessEmail.trim().toLowerCase()
           : undefined;
         businessDetails.socialLinks = sanitizeSocialLinks(
-          businessData.socialMedia || businessData.socialLinks
+          businessData.socialMedia || businessData.socialLinks,
         );
         businessDetails.isDeviceMaker = sanitizeIsDeviceMaker(
-          businessData.isDeviceMaker
+          businessData.isDeviceMaker,
         );
         businessDetails.description = businessData.description
           ? businessData.description.trim()
@@ -313,7 +312,7 @@ export const bulkImportBusinesses = async (
           ? businessData.industry.trim()
           : undefined;
         businessDetails.employeeCount = sanitizeInteger(
-          businessData.employeeCount
+          businessData.employeeCount,
         );
         businessDetails.isStarBusiness = false;
         businessDetails.isStarCustomer = false;
@@ -347,7 +346,7 @@ export const bulkImportBusinesses = async (
     if (customersToSave.length > 0) {
       try {
         console.log(
-          `Attempting to save ${customersToSave.length} new businesses to database...`
+          `Attempting to save ${customersToSave.length} new businesses to database...`,
         );
 
         const CHUNK_SIZE = 50;
@@ -356,8 +355,9 @@ export const bulkImportBusinesses = async (
         for (let i = 0; i < customersToSave.length; i += CHUNK_SIZE) {
           const chunk = customersToSave.slice(i, i + CHUNK_SIZE);
           console.log(
-            `Saving chunk ${Math.floor(i / CHUNK_SIZE) + 1} with ${chunk.length
-            } businesses`
+            `Saving chunk ${Math.floor(i / CHUNK_SIZE) + 1} with ${
+              chunk.length
+            } businesses`,
           );
 
           try {
@@ -377,12 +377,12 @@ export const bulkImportBusinesses = async (
             console.log(
               `Successfully saved chunk ${Math.floor(i / CHUNK_SIZE) + 1}:`,
               savedChunk.length,
-              "businesses"
+              "businesses",
             );
           } catch (chunkError: any) {
             console.error(
               `Error saving chunk ${Math.floor(i / CHUNK_SIZE) + 1}:`,
-              chunkError
+              chunkError,
             );
 
             for (const customer of chunk) {
@@ -404,7 +404,7 @@ export const bulkImportBusinesses = async (
                 });
                 console.error(
                   `Failed to save business: ${customer.legalName}`,
-                  individualError
+                  individualError,
                 );
               }
             }
@@ -416,7 +416,7 @@ export const bulkImportBusinesses = async (
       } catch (error: any) {
         console.error("Error during save operation:", error);
         return next(
-          new ErrorHandler(`Failed to save businesses: ${error.message}`, 500)
+          new ErrorHandler(`Failed to save businesses: ${error.message}`, 500),
         );
       }
     } else {
@@ -443,7 +443,7 @@ export const bulkImportBusinesses = async (
   } catch (error: any) {
     console.error("Critical error in bulk import:", error);
     return next(
-      new ErrorHandler(`Failed to process bulk import: ${error.message}`, 500)
+      new ErrorHandler(`Failed to process bulk import: ${error.message}`, 500),
     );
   }
 };
@@ -482,13 +482,15 @@ const generateTempPassword = (): string => {
 export const createBusiness = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     const {
       displayName,
       companyName,
       name,
+      customerNumber,
+      companyLabelPrintLogo,
       address,
       website,
       description,
@@ -544,8 +546,8 @@ export const createBusiness = async (
       return next(
         new ErrorHandler(
           "Please specify if this is a device maker (Yes/No/Unsure)",
-          400
-        )
+          400,
+        ),
       );
     }
 
@@ -553,14 +555,14 @@ export const createBusiness = async (
       return next(
         new ErrorHandler(
           "Star Customer can only be created when device maker is Yes",
-          400
-        )
+          400,
+        ),
       );
     }
 
     if (isStarCustomer && !starCustomerEmail) {
       return next(
-        new ErrorHandler("Email is required for Star Customer account", 400)
+        new ErrorHandler("Email is required for Star Customer account", 400),
       );
     }
 
@@ -588,13 +590,15 @@ export const createBusiness = async (
       if (existingBusinessWithWebsite) {
         console.warn(`[DEBUG] Duplicate website found: ${normalizedWebsite}`);
         return next(
-          new ErrorHandler("A business with this website already exists", 400)
+          new ErrorHandler("A business with this website already exists", 400),
         );
       }
     }
 
     const trimmedDisplayName = dbCompanyName.trim();
-    console.log(`[DEBUG] Checking display name uniqueness: ${trimmedDisplayName}`);
+    console.log(
+      `[DEBUG] Checking display name uniqueness: ${trimmedDisplayName}`,
+    );
     const existingCustomerWithName = await customerRepository
       .createQueryBuilder("customer")
       .where("LOWER(customer.companyName) = LOWER(:companyName)", {
@@ -603,13 +607,40 @@ export const createBusiness = async (
       .getOne();
 
     if (existingCustomerWithName) {
-      console.warn(`[DEBUG] Duplicate display name found: ${trimmedDisplayName}`);
+      console.warn(
+        `[DEBUG] Duplicate display name found: ${trimmedDisplayName}`,
+      );
       return next(
         new ErrorHandler(
           "A business with this display name already exists",
-          400
-        )
+          400,
+        ),
       );
+    }
+
+    const trimmedCustomerNumber = customerNumber ? customerNumber.trim() : "";
+    if (trimmedCustomerNumber) {
+      console.log(
+        `[DEBUG] Checking customer number uniqueness: ${trimmedCustomerNumber}`,
+      );
+      const existingCustomerWithNumber = await customerRepository
+        .createQueryBuilder("customer")
+        .where("customer.customerNumber = :customerNumber", {
+          customerNumber: trimmedCustomerNumber,
+        })
+        .getOne();
+
+      if (existingCustomerWithNumber) {
+        console.warn(
+          `[DEBUG] Duplicate customer number found: ${trimmedCustomerNumber}`,
+        );
+        return next(
+          new ErrorHandler(
+            "A business with this customer number already exists",
+            400,
+          ),
+        );
+      }
     }
 
     const emailToCheck = isStarCustomer ? starCustomerEmail : finalEmail;
@@ -622,20 +653,29 @@ export const createBusiness = async (
       });
 
       if (existingCustomerWithEmail) {
-        console.warn(`[DEBUG] Duplicate email found in Customer table: ${trimmedEmail}`);
+        console.warn(
+          `[DEBUG] Duplicate email found in Customer table: ${trimmedEmail}`,
+        );
         return next(
-          new ErrorHandler("A business with this email already exists", 400)
+          new ErrorHandler("A business with this email already exists", 400),
         );
       }
 
-      const existingBusinessWithEmail = await businessDetailsRepository.findOne({
-        where: { email: trimmedEmail },
-      });
+      const existingBusinessWithEmail = await businessDetailsRepository.findOne(
+        {
+          where: { email: trimmedEmail },
+        },
+      );
 
       if (existingBusinessWithEmail) {
-        console.warn(`[DEBUG] Duplicate email found in BusinessDetails table: ${trimmedEmail}`);
+        console.warn(
+          `[DEBUG] Duplicate email found in BusinessDetails table: ${trimmedEmail}`,
+        );
         return next(
-          new ErrorHandler("This email is already associated with another business's details", 400)
+          new ErrorHandler(
+            "This email is already associated with another business's details",
+            400,
+          ),
         );
       }
     }
@@ -649,6 +689,10 @@ export const createBusiness = async (
         const customer = new Customer();
         customer.companyName = trimmedDisplayName;
         customer.legalName = dbLegalName ? dbLegalName.trim() : undefined;
+        customer.customerNumber = trimmedCustomerNumber || undefined;
+        customer.companyLabelPrintLogo = companyLabelPrintLogo
+          ? companyLabelPrintLogo.trim()
+          : undefined;
 
         if (isStarCustomer) {
           customer.stage = "star_customer";
@@ -694,7 +738,7 @@ export const createBusiness = async (
 
         const savedCustomer = await transactionalEntityManager.save(
           Customer,
-          customer
+          customer,
         );
         const businessDetails = new BusinessDetails();
         businessDetails.businessSource = source as any;
@@ -731,7 +775,7 @@ export const createBusiness = async (
 
         const savedBusinessDetails = await transactionalEntityManager.save(
           BusinessDetails,
-          businessDetails
+          businessDetails,
         );
 
         if (isDeviceMaker === "Yes" || shouldBeStarBusiness) {
@@ -750,7 +794,7 @@ export const createBusiness = async (
 
           const savedStarBusiness = await transactionalEntityManager.save(
             StarBusinessDetails,
-            starBusiness
+            starBusiness,
           );
 
           savedCustomer.starBusinessDetails = savedStarBusiness;
@@ -773,7 +817,7 @@ export const createBusiness = async (
 
           const savedStarCustomer = await transactionalEntityManager.save(
             StarCustomerDetails,
-            starCustomer
+            starCustomer,
           );
 
           savedCustomer.starCustomerDetails = savedStarCustomer;
@@ -786,7 +830,7 @@ export const createBusiness = async (
 
           defaultList = await transactionalEntityManager.save(
             List,
-            defaultList
+            defaultList,
           );
         }
 
@@ -800,7 +844,7 @@ export const createBusiness = async (
           defaultList,
           shouldBeStarBusiness,
         };
-      }
+      },
     );
 
     const { customer, businessDetails, tempPassword, defaultList } = result;
@@ -822,9 +866,10 @@ export const createBusiness = async (
         <p><strong>Email:</strong> ${customer.email}</p>
         <p><strong>Temporary Password:</strong> ${tempPassword}</p>
         <p>Please login <a href="${loginLink}">here</a> to access your full account features.</p>
-        ${defaultList
-          ? `<p>A default list "${defaultList.name}" has been created for your company.</p>`
-          : ""
+        ${
+          defaultList
+            ? `<p>A default list "${defaultList.name}" has been created for your company.</p>`
+            : ""
         }
       `;
 
@@ -855,6 +900,8 @@ export const createBusiness = async (
       companyName: finalCustomer.companyName,
       name: finalCustomer.companyName,
       legalName: finalCustomer.legalName,
+      customerNumber: finalCustomer.customerNumber,
+      companyLabelPrintLogo: finalCustomer.companyLabelPrintLogo,
       email: finalCustomer.email,
       contactEmail: finalCustomer.contactEmail,
       contactPhoneNumber: finalCustomer.contactPhoneNumber,
@@ -862,26 +909,26 @@ export const createBusiness = async (
       ...finalCustomer.businessDetails,
       starBusinessDetails: finalCustomer.starBusinessDetails
         ? {
-          inSeries: finalCustomer.starBusinessDetails.inSeries,
-          madeIn: finalCustomer.starBusinessDetails.madeIn,
-          device: finalCustomer.starBusinessDetails.device,
-          industry: finalCustomer.starBusinessDetails.industry,
-          converted_timestamp:
-            finalCustomer.starBusinessDetails.converted_timestamp,
-          convertedBy: finalCustomer.starBusinessDetails.convertedBy
-            ? {
-              id: finalCustomer.starBusinessDetails.convertedBy.id,
-              name: finalCustomer.starBusinessDetails.convertedBy.name,
-              email: finalCustomer.starBusinessDetails.convertedBy.email,
-            }
-            : undefined,
-        }
+            inSeries: finalCustomer.starBusinessDetails.inSeries,
+            madeIn: finalCustomer.starBusinessDetails.madeIn,
+            device: finalCustomer.starBusinessDetails.device,
+            industry: finalCustomer.starBusinessDetails.industry,
+            converted_timestamp:
+              finalCustomer.starBusinessDetails.converted_timestamp,
+            convertedBy: finalCustomer.starBusinessDetails.convertedBy
+              ? {
+                  id: finalCustomer.starBusinessDetails.convertedBy.id,
+                  name: finalCustomer.starBusinessDetails.convertedBy.name,
+                  email: finalCustomer.starBusinessDetails.convertedBy.email,
+                }
+              : undefined,
+          }
         : undefined,
       defaultList: defaultList
         ? {
-          id: defaultList.id,
-          name: defaultList.name,
-        }
+            id: defaultList.id,
+            name: defaultList.name,
+          }
         : undefined,
       website: finalCustomer.businessDetails?.website,
       hasWebsite: !!finalCustomer.businessDetails?.website,
@@ -917,8 +964,8 @@ export const createBusiness = async (
     return next(
       new ErrorHandler(
         "Error creating business: " + (error as Error).message,
-        500
-      )
+        500,
+      ),
     );
   }
 };
@@ -926,7 +973,7 @@ export const createBusiness = async (
 export const updateBusiness = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     const { id } = req.params;
@@ -935,6 +982,8 @@ export const updateBusiness = async (
     const {
       displayName,
       name,
+      customerNumber,
+      companyLabelPrintLogo,
       contactEmail,
       contactPhoneNumber,
       isDeviceMaker,
@@ -988,14 +1037,14 @@ export const updateBusiness = async (
       return next(
         new ErrorHandler(
           "Star Customer can only be created when device maker is Yes",
-          400
-        )
+          400,
+        ),
       );
     }
 
     if (isStarCustomer && !currentIsStarCustomer && !starCustomerEmail) {
       return next(
-        new ErrorHandler("Email is required for Star Customer account", 400)
+        new ErrorHandler("Email is required for Star Customer account", 400),
       );
     }
 
@@ -1007,13 +1056,21 @@ export const updateBusiness = async (
 
       if (existingCustomer && existingCustomer.id !== id) {
         return next(
-          new ErrorHandler("A business with this email already exists", 400)
+          new ErrorHandler("A business with this email already exists", 400),
         );
       }
     }
 
-    const newCompanyName = name !== undefined ? name.trim() : (displayName !== undefined ? displayName.trim() : undefined);
-    if (newCompanyName !== undefined && newCompanyName !== customer.companyName) {
+    const newCompanyName =
+      name !== undefined
+        ? name.trim()
+        : displayName !== undefined
+          ? displayName.trim()
+          : undefined;
+    if (
+      newCompanyName !== undefined &&
+      newCompanyName !== customer.companyName
+    ) {
       const existingCustomerWithName = await customerRepository
         .createQueryBuilder("customer")
         .where("LOWER(customer.companyName) = LOWER(:companyName)", {
@@ -1025,14 +1082,46 @@ export const updateBusiness = async (
         return next(
           new ErrorHandler(
             "A business with this display name already exists",
-            400
-          )
+            400,
+          ),
         );
       }
     }
 
-    if (updateData.website !== undefined && updateData.website !== customer.businessDetails?.website) {
-      const normalizedWebsite = updateData.website ? normalizeWebsite(updateData.website) : null;
+    if (customerNumber !== undefined) {
+      const trimmedCustomerNumber = customerNumber ? customerNumber.trim() : "";
+      if (
+        trimmedCustomerNumber &&
+        trimmedCustomerNumber !== customer.customerNumber
+      ) {
+        const existingCustomerWithNumber = await customerRepository
+          .createQueryBuilder("customer")
+          .where("customer.customerNumber = :customerNumber", {
+            customerNumber: trimmedCustomerNumber,
+          })
+          .getOne();
+
+        if (
+          existingCustomerWithNumber &&
+          existingCustomerWithNumber.id !== id
+        ) {
+          return next(
+            new ErrorHandler(
+              "A business with this customer number already exists",
+              400,
+            ),
+          );
+        }
+      }
+    }
+
+    if (
+      updateData.website !== undefined &&
+      updateData.website !== customer.businessDetails?.website
+    ) {
+      const normalizedWebsite = updateData.website
+        ? normalizeWebsite(updateData.website)
+        : null;
       if (normalizedWebsite) {
         const existingBusinessWithWebsite = await businessDetailsRepository
           .createQueryBuilder("businessDetails")
@@ -1042,9 +1131,15 @@ export const updateBusiness = async (
           })
           .getOne();
 
-        if (existingBusinessWithWebsite && existingBusinessWithWebsite.customer?.id !== id) {
+        if (
+          existingBusinessWithWebsite &&
+          existingBusinessWithWebsite.customer?.id !== id
+        ) {
           return next(
-            new ErrorHandler("A business with this website already exists", 400)
+            new ErrorHandler(
+              "A business with this website already exists",
+              400,
+            ),
           );
         }
       }
@@ -1060,8 +1155,22 @@ export const updateBusiness = async (
         if (updateData.companyName !== undefined) {
           customer.legalName = updateData.companyName.trim();
         }
+        if (customerNumber !== undefined) {
+          customer.customerNumber =
+            customerNumber && customerNumber.trim()
+              ? customerNumber.trim()
+              : undefined;
+        }
+        if (companyLabelPrintLogo !== undefined) {
+          customer.companyLabelPrintLogo =
+            companyLabelPrintLogo && companyLabelPrintLogo.trim()
+              ? companyLabelPrintLogo.trim()
+              : undefined;
+        }
         if (contactEmail !== undefined) {
-          customer.contactEmail = contactEmail.trim() ? contactEmail.trim().toLowerCase() : undefined;
+          customer.contactEmail = contactEmail.trim()
+            ? contactEmail.trim().toLowerCase()
+            : undefined;
         }
         if (contactPhoneNumber !== undefined) {
           customer.contactPhoneNumber = contactPhoneNumber.trim();
@@ -1094,7 +1203,9 @@ export const updateBusiness = async (
           if (updateData.phoneNumber !== undefined)
             businessDetails.contactPhone = updateData.phoneNumber.trim();
           if (updateData.email !== undefined) {
-            const trimmedEmail = updateData.email.trim() ? updateData.email.trim().toLowerCase() : undefined;
+            const trimmedEmail = updateData.email.trim()
+              ? updateData.email.trim().toLowerCase()
+              : undefined;
             businessDetails.email = trimmedEmail;
             customer.email = trimmedEmail;
           }
@@ -1117,7 +1228,7 @@ export const updateBusiness = async (
 
           await transactionalEntityManager.save(
             BusinessDetails,
-            businessDetails
+            businessDetails,
           );
         }
 
@@ -1138,14 +1249,14 @@ export const updateBusiness = async (
 
           const savedStarBusiness = await transactionalEntityManager.save(
             StarBusinessDetails,
-            starBusiness
+            starBusiness,
           );
           customer.starBusinessDetails = savedStarBusiness;
         } else if (customer.starBusinessDetails && starBusinessDetails) {
           Object.assign(customer.starBusinessDetails, starBusinessDetails);
           await transactionalEntityManager.save(
             StarBusinessDetails,
-            customer.starBusinessDetails
+            customer.starBusinessDetails,
           );
         }
 
@@ -1172,7 +1283,7 @@ export const updateBusiness = async (
           const savedStarCustomerDetails =
             await transactionalEntityManager.save(
               StarCustomerDetails,
-              starCustomerDetails
+              starCustomerDetails,
             );
 
           customer.starCustomerDetails = savedStarCustomerDetails;
@@ -1185,7 +1296,7 @@ export const updateBusiness = async (
 
           defaultList = await transactionalEntityManager.save(
             List,
-            defaultList
+            defaultList,
           );
 
           customer.email = starCustomerEmail.trim().toLowerCase();
@@ -1218,7 +1329,7 @@ export const updateBusiness = async (
           isStarCustomerChanged,
           shouldBeStarBusiness,
         };
-      }
+      },
     );
 
     const {
@@ -1246,9 +1357,10 @@ export const updateBusiness = async (
         <p><strong>Email:</strong> ${customer.email}</p>
         <p><strong>Temporary Password:</strong> ${tempPassword}</p>
         <p>Please login <a href="${loginLink}">here</a> to access your full account features and change your password.</p>
-        ${defaultList
-          ? `<p>A default list "${defaultList.name}" has been created for your company.</p>`
-          : ""
+        ${
+          defaultList
+            ? `<p>A default list "${defaultList.name}" has been created for your company.</p>`
+            : ""
         }
       `;
 
@@ -1281,6 +1393,8 @@ export const updateBusiness = async (
       companyName: finalCustomer.companyName,
       name: finalCustomer.companyName,
       legalName: finalCustomer.legalName,
+      customerNumber: finalCustomer.customerNumber,
+      companyLabelPrintLogo: finalCustomer.companyLabelPrintLogo,
       email: finalCustomer.email,
       contactEmail: finalCustomer.contactEmail,
       contactPhoneNumber: finalCustomer.contactPhoneNumber,
@@ -1288,35 +1402,35 @@ export const updateBusiness = async (
       ...finalCustomer.businessDetails,
       check_by: finalCustomer.businessDetails?.check_by
         ? {
-          id: finalCustomer.businessDetails.check_by.id,
-          name: finalCustomer.businessDetails.check_by.name,
-          email: finalCustomer.businessDetails.check_by.email,
-        }
+            id: finalCustomer.businessDetails.check_by.id,
+            name: finalCustomer.businessDetails.check_by.name,
+            email: finalCustomer.businessDetails.check_by.email,
+          }
         : undefined,
       starBusinessDetails: finalCustomer.starBusinessDetails
         ? {
-          inSeries: finalCustomer.starBusinessDetails.inSeries,
-          madeIn: finalCustomer.starBusinessDetails.madeIn,
-          lastChecked: finalCustomer.starBusinessDetails.lastChecked,
-          checkedBy: finalCustomer.starBusinessDetails.checkedBy,
-          device: finalCustomer.starBusinessDetails.device,
-          industry: finalCustomer.starBusinessDetails.industry,
-          converted_timestamp:
-            finalCustomer.starBusinessDetails.converted_timestamp,
-          convertedBy: finalCustomer.starBusinessDetails.convertedBy
-            ? {
-              id: finalCustomer.starBusinessDetails.convertedBy.id,
-              name: finalCustomer.starBusinessDetails.convertedBy.name,
-              email: finalCustomer.starBusinessDetails.convertedBy.email,
-            }
-            : undefined,
-        }
+            inSeries: finalCustomer.starBusinessDetails.inSeries,
+            madeIn: finalCustomer.starBusinessDetails.madeIn,
+            lastChecked: finalCustomer.starBusinessDetails.lastChecked,
+            checkedBy: finalCustomer.starBusinessDetails.checkedBy,
+            device: finalCustomer.starBusinessDetails.device,
+            industry: finalCustomer.starBusinessDetails.industry,
+            converted_timestamp:
+              finalCustomer.starBusinessDetails.converted_timestamp,
+            convertedBy: finalCustomer.starBusinessDetails.convertedBy
+              ? {
+                  id: finalCustomer.starBusinessDetails.convertedBy.id,
+                  name: finalCustomer.starBusinessDetails.convertedBy.name,
+                  email: finalCustomer.starBusinessDetails.convertedBy.email,
+                }
+              : undefined,
+          }
         : undefined,
       defaultList: defaultList
         ? {
-          id: defaultList.id,
-          name: defaultList.name,
-        }
+            id: defaultList.id,
+            name: defaultList.name,
+          }
         : undefined,
       website: finalCustomer.businessDetails?.website,
       hasWebsite: !!finalCustomer.businessDetails?.website,
@@ -1357,8 +1471,8 @@ export const updateBusiness = async (
     return next(
       new ErrorHandler(
         "Error updating business: " + (error as Error).message,
-        500
-      )
+        500,
+      ),
     );
   }
 };
@@ -1366,7 +1480,7 @@ export const updateBusiness = async (
 export const getBusinessById = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     const { id } = req.params;
@@ -1393,60 +1507,62 @@ export const getBusinessById = async (
       displayName: customer.companyName,
       legalName: customer.legalName,
       name: customer.companyName,
+      customerNumber: customer.customerNumber,
+      companyLabelPrintLogo: customer.companyLabelPrintLogo,
       email: customer.email,
       contactEmail: customer.contactEmail,
       contactPhoneNumber: customer.contactPhoneNumber,
       stage: customer.stage,
       businessDetails: customer.businessDetails
         ? {
-          ...customer.businessDetails,
-          check_by: customer.businessDetails.check_by
-            ? {
-              id: customer.businessDetails.check_by.id,
-              name: customer.businessDetails.check_by.name,
-              email: customer.businessDetails.check_by.email,
-            }
-            : undefined,
-        }
+            ...customer.businessDetails,
+            check_by: customer.businessDetails.check_by
+              ? {
+                  id: customer.businessDetails.check_by.id,
+                  name: customer.businessDetails.check_by.name,
+                  email: customer.businessDetails.check_by.email,
+                }
+              : undefined,
+          }
         : undefined,
       starBusinessDetails: customer.starBusinessDetails
         ? {
-          id: customer.starBusinessDetails.id,
-          inSeries: customer.starBusinessDetails.inSeries,
-          madeIn: customer.starBusinessDetails.madeIn,
-          lastChecked: customer.starBusinessDetails.lastChecked,
-          checkedBy: customer.starBusinessDetails.checkedBy,
-          device: customer.starBusinessDetails.device,
-          industry: customer.starBusinessDetails.industry,
-          converted_timestamp:
-            customer.starBusinessDetails.converted_timestamp,
-          convertedBy: customer.starBusinessDetails.convertedBy
-            ? {
-              id: customer.starBusinessDetails.convertedBy.id,
-              name: customer.starBusinessDetails.convertedBy.name,
-              email: customer.starBusinessDetails.convertedBy.email,
-            }
-            : undefined,
-          comment: customer.starBusinessDetails.comment,
-          createdAt: customer.starBusinessDetails.createdAt,
-          updatedAt: customer.starBusinessDetails.updatedAt,
-        }
+            id: customer.starBusinessDetails.id,
+            inSeries: customer.starBusinessDetails.inSeries,
+            madeIn: customer.starBusinessDetails.madeIn,
+            lastChecked: customer.starBusinessDetails.lastChecked,
+            checkedBy: customer.starBusinessDetails.checkedBy,
+            device: customer.starBusinessDetails.device,
+            industry: customer.starBusinessDetails.industry,
+            converted_timestamp:
+              customer.starBusinessDetails.converted_timestamp,
+            convertedBy: customer.starBusinessDetails.convertedBy
+              ? {
+                  id: customer.starBusinessDetails.convertedBy.id,
+                  name: customer.starBusinessDetails.convertedBy.name,
+                  email: customer.starBusinessDetails.convertedBy.email,
+                }
+              : undefined,
+            comment: customer.starBusinessDetails.comment,
+            createdAt: customer.starBusinessDetails.createdAt,
+            updatedAt: customer.starBusinessDetails.updatedAt,
+          }
         : undefined,
       starCustomerDetails: customer.starCustomerDetails
         ? {
-          id: customer.starCustomerDetails.id,
-          taxNumber: customer.starCustomerDetails.taxNumber,
-          accountVerificationStatus:
-            customer.starCustomerDetails.accountVerificationStatus,
-          isEmailVerified: customer.starCustomerDetails.isEmailVerified,
-          deliveryAddressLine1:
-            customer.starCustomerDetails.deliveryAddressLine1,
-          deliveryPostalCode: customer.starCustomerDetails.deliveryPostalCode,
-          deliveryCity: customer.starCustomerDetails.deliveryCity,
-          deliveryCountry: customer.starCustomerDetails.deliveryCountry,
-          createdAt: customer.starCustomerDetails.createdAt,
-          updatedAt: customer.starCustomerDetails.updatedAt,
-        }
+            id: customer.starCustomerDetails.id,
+            taxNumber: customer.starCustomerDetails.taxNumber,
+            accountVerificationStatus:
+              customer.starCustomerDetails.accountVerificationStatus,
+            isEmailVerified: customer.starCustomerDetails.isEmailVerified,
+            deliveryAddressLine1:
+              customer.starCustomerDetails.deliveryAddressLine1,
+            deliveryPostalCode: customer.starCustomerDetails.deliveryPostalCode,
+            deliveryCity: customer.starCustomerDetails.deliveryCity,
+            deliveryCountry: customer.starCustomerDetails.deliveryCountry,
+            createdAt: customer.starCustomerDetails.createdAt,
+            updatedAt: customer.starCustomerDetails.updatedAt,
+          }
         : undefined,
       website: customer.businessDetails?.website,
       hasWebsite: !!customer.businessDetails?.website,
@@ -1512,7 +1628,7 @@ const sanitizeSocialLinks = (socialMedia: any): any => {
 export const getAllBusinesses = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     const {
@@ -1546,8 +1662,12 @@ export const getAllBusinesses = async (
 
     if (tags) {
       const tagIds = (tags as string).split(",");
-      const includeTagIds = tagIds.filter((id) => !id.startsWith("!")).map((id) => id.trim());
-      const excludeTagIds = tagIds.filter((id) => id.startsWith("!")).map((id) => id.substring(1).trim());
+      const includeTagIds = tagIds
+        .filter((id) => !id.startsWith("!"))
+        .map((id) => id.trim());
+      const excludeTagIds = tagIds
+        .filter((id) => id.startsWith("!"))
+        .map((id) => id.substring(1).trim());
 
       if (includeTagIds.length > 0) {
         queryBuilder.andWhere((qb) => {
@@ -1581,8 +1701,8 @@ export const getAllBusinesses = async (
 
     if (search) {
       queryBuilder.andWhere(
-        "(customer.companyName LIKE :search OR customer.legalName LIKE :search OR customer.email LIKE :search OR businessDetails.description LIKE :search OR businessDetails.address LIKE :search OR businessDetails.email LIKE :search OR businessDetails.contactPhone LIKE :search)",
-        { search: `%${search}%` }
+        "(customer.companyName LIKE :search OR customer.legalName LIKE :search OR customer.customerNumber LIKE :search OR customer.email LIKE :search OR businessDetails.description LIKE :search OR businessDetails.address LIKE :search OR businessDetails.email LIKE :search OR businessDetails.contactPhone LIKE :search)",
+        { search: `%${search}%` },
       );
     }
 
@@ -1660,6 +1780,8 @@ export const getAllBusinesses = async (
         displayName: customer.companyName,
         legalName: customer.legalName,
         name: customer.companyName,
+        customerNumber: customer.customerNumber,
+        companyLabelPrintLogo: customer.companyLabelPrintLogo,
         email: customer.email,
         contactEmail: customer.contactEmail,
         contactPhoneNumber: customer.contactPhoneNumber,
@@ -1704,7 +1826,7 @@ export const getAllBusinesses = async (
 export const bulkDeleteBusinesses = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     const { ids } = req.body;
@@ -1732,7 +1854,7 @@ export const bulkDeleteBusinesses = async (
 export const searchBusinessesByLocation = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     const { latitude, longitude, radius = 10, limit = 20 } = req.query;
@@ -1768,6 +1890,8 @@ export const searchBusinessesByLocation = async (
       id: raw.customer_id,
       name: raw.customer_companyName,
       legalName: raw.customer_legalName,
+      customerNumber: raw.customer_customerNumber,
+      companyLabelPrintLogo: raw.customer_companyLabelPrintLogo,
       email: raw.customer_email,
       contactEmail: raw.customer_contactEmail,
       contactPhoneNumber: raw.customer_contactPhoneNumber,
@@ -1790,7 +1914,7 @@ export const searchBusinessesByLocation = async (
     });
   } catch (error) {
     return next(
-      new ErrorHandler("Failed to search businesses by location", 500)
+      new ErrorHandler("Failed to search businesses by location", 500),
     );
   }
 };
@@ -1798,7 +1922,7 @@ export const searchBusinessesByLocation = async (
 export const getBusinessStatistics = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     const customerRepository = AppDataSource.getRepository(Customer);
@@ -1861,7 +1985,7 @@ export const getBusinessStatistics = async (
 export const bulkUpdateStatus = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     const { ids, status } = req.body;
@@ -1883,7 +2007,7 @@ export const bulkUpdateStatus = async (
 };
 
 function sanitizeIsDeviceMaker(
-  value: any
+  value: any,
 ): "Yes" | "No" | "Unsure" | undefined {
   if (!value) return undefined;
   const stringValue = String(value).trim();
@@ -1896,7 +2020,7 @@ function sanitizeIsDeviceMaker(
 export const deleteBusiness = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     const { id } = req.params;
@@ -1913,7 +2037,7 @@ export const deleteBusiness = async (
 
     if (customer.starBusinessDetails) {
       const starBusinessDetails = await AppDataSource.getRepository(
-        StarBusinessDetails
+        StarBusinessDetails,
       ).findOne({
         where: { id: customer.starBusinessDetails.id },
         relations: ["contactPersons", "requestedItems"],
@@ -1924,16 +2048,16 @@ export const deleteBusiness = async (
           return next(
             new ErrorHandler(
               "Cannot delete business with associated contact persons",
-              400
-            )
+              400,
+            ),
           );
         }
         if (starBusinessDetails.requestedItems?.length > 0) {
           return next(
             new ErrorHandler(
               "Cannot delete business with associated item requests",
-              400
-            )
+              400,
+            ),
           );
         }
       }
@@ -1948,7 +2072,7 @@ export const deleteBusiness = async (
 
       await queryRunner.query(
         `DELETE FROM list_creator WHERE "customerId" = $1`,
-        [id]
+        [id],
       );
 
       await queryRunner.query(`DELETE FROM customer WHERE id = $1`, [id]);

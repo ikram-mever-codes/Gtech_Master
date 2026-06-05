@@ -5,6 +5,7 @@ import React, {
   useMemo,
   useCallback,
   Suspense,
+  useRef,
 } from "react";
 import {
   MagnifyingGlassIcon,
@@ -25,8 +26,6 @@ import {
   ChartBarIcon,
   CalendarIcon,
   AdjustmentsHorizontalIcon,
-  EyeIcon,
-  EyeSlashIcon,
   ExclamationTriangleIcon,
   TrashIcon,
 } from "@heroicons/react/24/outline";
@@ -40,7 +39,12 @@ import { Google, LinkedIn, Delete, Add } from "@mui/icons-material";
 import { useSelector } from "react-redux";
 import { RootState } from "../Redux/store";
 import { UserRole } from "@/utils/interfaces";
-import { TagBadge, TagPickerInput, EntityTagSelector, type Tag } from "@/components/Tags/TagManager";
+import {
+  TagBadge,
+  TagPickerInput,
+  EntityTagSelector,
+  type Tag,
+} from "@/components/Tags/TagManager";
 import { TagFilterSelector } from "@/components/Tags/TagFilterSelector";
 import { syncEntityTags } from "@/api/tags";
 import {
@@ -88,11 +92,29 @@ interface FilterState {
 
 type BusinessWithContacts = Business & { contacts?: ContactPersonData[] };
 
+// Country is restricted to DE / AT / CH and shown as the bare 2-letter code.
 const COUNTRY_OPTIONS = [
-  { value: "DE", label: "DE – Germany" },
-  { value: "AT", label: "AT – Austria" },
-  { value: "CH", label: "CH – Switzerland" },
+  { value: "DE", label: "DE" },
+  { value: "AT", label: "AT" },
+  { value: "CH", label: "CH" },
 ];
+
+// Normalize any stored country value (full name or code) to a 2-letter code.
+const toCountryCode = (country?: string) => {
+  if (!country) return "";
+  const c = country.trim();
+  if (c.length === 2) return c.toUpperCase();
+  const map: Record<string, string> = {
+    germany: "DE",
+    deutschland: "DE",
+    austria: "AT",
+    österreich: "AT",
+    oesterreich: "AT",
+    switzerland: "CH",
+    schweiz: "CH",
+  };
+  return map[c.toLowerCase()] || c.toUpperCase().slice(0, 2);
+};
 
 const formatDateTime = (dateString: string | undefined) => {
   if (!dateString) return "-";
@@ -120,11 +142,12 @@ const CombinedBusinessContactsContent: React.FC = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [totalRecords, setTotalRecords] = useState(0);
   const itemsPerPage = 30;
-
+  const displayNameTouched = useRef(false);
+  const starPortalTouched = useRef(false);
+  // Accordion: only one business's contacts are expanded at a time (folded by default).
   const [expandedBusinessIds, setExpandedBusinessIds] = useState<Set<string>>(
     new Set(),
   );
-  const [allContactsExpanded, setAllContactsExpanded] = useState(true);
 
   const [showFilters, setShowFilters] = useState(true);
   const [filters, setFilters] = useState<FilterState>({
@@ -186,6 +209,8 @@ const CombinedBusinessContactsContent: React.FC = () => {
     companyName: "",
     displayName: "",
     starPortalLinkName: "",
+    customerNumber: "",
+    companyLabelPrintLogo: "",
     addressAdditional: "",
     street: "",
     postalCode: "",
@@ -272,12 +297,8 @@ const CombinedBusinessContactsContent: React.FC = () => {
       const startIndex = (currentPage - 1) * itemsPerPage;
       setBusinesses(merged.slice(startIndex, startIndex + itemsPerPage));
 
-      setExpandedBusinessIds(
-        new Set(
-          merged.filter((b) => (b.contacts?.length || 0) > 0).map((b) => b.id),
-        ),
-      );
-      setAllContactsExpanded(true);
+      // Contacts are folded by default.
+      setExpandedBusinessIds(new Set());
 
       setCategories([
         ...new Set(merged.map((b) => b.category).filter(Boolean)),
@@ -339,28 +360,13 @@ const CombinedBusinessContactsContent: React.FC = () => {
     }
   }, [searchParams, allBusinesses, urlParamHandled]);
 
+  // Accordion toggle: opening one business closes any other.
   const toggleBusinessContacts = (businessId: string) => {
     setExpandedBusinessIds((prev) => {
-      const next = new Set(prev);
-      next.has(businessId) ? next.delete(businessId) : next.add(businessId);
+      const next = new Set<string>();
+      if (!prev.has(businessId)) next.add(businessId);
       return next;
     });
-  };
-
-  const toggleAllBusinessContacts = () => {
-    if (allContactsExpanded) {
-      setExpandedBusinessIds(new Set());
-      setAllContactsExpanded(false);
-    } else {
-      setExpandedBusinessIds(
-        new Set(
-          allBusinesses
-            .filter((b) => (b.contacts?.length || 0) > 0)
-            .map((b) => b.id),
-        ),
-      );
-      setAllContactsExpanded(true);
-    }
   };
 
   const patchContactInState = (contactId: string, patch: any) => {
@@ -477,9 +483,14 @@ const CombinedBusinessContactsContent: React.FC = () => {
         await updateContactPerson(editingContactId, payload);
       } else {
         const result = await createContactPerson(payload);
-        const createdId = (result as any)?.data?.id || (result as any)?.data?.contactPerson?.id;
+        const createdId =
+          (result as any)?.data?.id || (result as any)?.data?.contactPerson?.id;
         if (createdId && newContactTags.length > 0) {
-          await syncEntityTags(createdId, "contact", newContactTags.map((t) => t.id));
+          await syncEntityTags(
+            createdId,
+            "contact",
+            newContactTags.map((t) => t.id),
+          );
         }
       }
       resetCreateForm();
@@ -542,13 +553,13 @@ const CombinedBusinessContactsContent: React.FC = () => {
 
   const generateDisplayName = (
     companyName: string,
-    existing: BusinessWithContacts[],
+    existing: BusinessWithContacts[] = [],
     excludeId?: string | null,
   ) => {
     const words = (companyName || "").trim().split(/\s+/).filter(Boolean);
     if (!words.length) return "";
     const used = new Set(
-      existing
+      (existing || [])
         .filter((b) => b.id !== excludeId)
         .map((b: any) => (b.displayName || "").toLowerCase())
         .filter(Boolean),
@@ -556,7 +567,10 @@ const CombinedBusinessContactsContent: React.FC = () => {
     const first = words[0];
     if (!used.has(first.toLowerCase())) return first;
     const second = words[1];
-    if (second && !used.has(second.toLowerCase())) return second;
+    if (second) {
+      const combo = `${first}${second}`; // same as Star Portal, no "-"
+      if (!used.has(combo.toLowerCase())) return combo;
+    }
     let i = 2;
     while (used.has(`${first}${i}`.toLowerCase())) i++;
     return `${first}${i}`;
@@ -565,12 +579,12 @@ const CombinedBusinessContactsContent: React.FC = () => {
   const generateStarPortalLinkName = (
     companyName: string,
     displayName: string,
-    existing: BusinessWithContacts[],
+    existing: BusinessWithContacts[] = [],
     excludeId?: string | null,
   ) => {
     const words = (companyName || "").trim().split(/\s+/).filter(Boolean);
     const used = new Set(
-      existing
+      (existing || [])
         .filter((b) => b.id !== excludeId)
         .map((b: any) => (b.starPortalLinkName || "").toLowerCase())
         .filter(Boolean),
@@ -584,20 +598,32 @@ const CombinedBusinessContactsContent: React.FC = () => {
     return `${base}-${i}`;
   };
 
-  const handleBusinessCompanyNameChange = (value: string) => {
+  // FIX: auto-generation runs ONLY when the user leaves the legal-name field
+  // (onBlur) and ONLY in create mode. Typing the legal name no longer writes
+  // into Display Name / Star Portal Link Name on every keystroke.
+  const handleCompanyNameBlur = () => {
+    if (businessModalMode !== "create") return;
     setBusinessForm((prev: any) => {
-      const next = { ...prev, companyName: value };
-      if (businessModalMode === "create") {
-        const dn = generateDisplayName(value, allBusinesses, editingBusinessId);
-        next.displayName = dn;
-        next.starPortalLinkName = generateStarPortalLinkName(
-          value,
-          dn,
-          allBusinesses,
-          editingBusinessId,
-        );
-      }
-      return next;
+      const autoDisplay = displayNameTouched.current
+        ? prev.displayName
+        : generateDisplayName(
+            prev.companyName,
+            allBusinesses,
+            editingBusinessId,
+          );
+      const autoStar = starPortalTouched.current
+        ? prev.starPortalLinkName
+        : generateStarPortalLinkName(
+            prev.companyName,
+            autoDisplay,
+            allBusinesses,
+            editingBusinessId,
+          );
+      return {
+        ...prev,
+        displayName: autoDisplay,
+        starPortalLinkName: autoStar,
+      };
     });
   };
 
@@ -606,7 +632,24 @@ const CombinedBusinessContactsContent: React.FC = () => {
     setEditingBusinessId(null);
     setBusinessEditMode(false);
     setNewBusinessTags([]);
+    displayNameTouched.current = false;
+    starPortalTouched.current = false;
   };
+
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      setBusinessForm((prev: any) => ({
+        ...prev,
+        companyLabelPrintLogo: reader.result as string,
+      }));
+    };
+    reader.readAsDataURL(file);
+    e.target.value = ""; // allow re-uploading the same file
+  };
+
   const openCreateBusinessModal = () => {
     setBusinessModalMode("create");
     resetBusinessForm();
@@ -622,18 +665,25 @@ const CombinedBusinessContactsContent: React.FC = () => {
         business.legalName || business.companyName || business.name || "",
       displayName: business.displayName || business.companyName || "",
       starPortalLinkName: business.starPortalLinkName || "",
+      customerNumber: business.customerNumber || "",
+      companyLabelPrintLogo: business.companyLabelPrintLogo || "",
       addressAdditional: business.addressAdditional || "",
       street: business.street || "",
       postalCode: business.postalCode || "",
       city: business.city || "",
-      country: business.country || "DE",
+      country: toCountryCode(business.country) || "DE",
       email: business.email || "",
       phone: business.phone || "",
       website: business.website || "",
       note: business.note || "",
       tags: business.tags || [],
     });
+
     setNewBusinessTags(business.tags || []);
+    // Existing values count as "already set" so editing the legal name
+    // never auto-overwrites the saved display / star names.
+    displayNameTouched.current = true;
+    starPortalTouched.current = true;
     setShowBusinessModal(true);
   };
 
@@ -643,14 +693,39 @@ const CombinedBusinessContactsContent: React.FC = () => {
       return;
     }
     try {
-      const payload: any = { ...businessForm };
+      // FIX: the legal name (businessForm.companyName) must be sent under
+      // `legalName` — the field the read path checks FIRST. We also keep
+      // `companyName` for backends that use that column, and send
+      // displayName / starPortalLinkName as their own distinct fields so the
+      // legal name can never land in the display slot.
+      const payload: any = {
+        legalName: businessForm.companyName,
+        companyName: businessForm.companyName,
+        displayName: businessForm.displayName,
+        starPortalLinkName: businessForm.starPortalLinkName,
+        customerNumber: businessForm.customerNumber,
+        companyLabelPrintLogo: businessForm.companyLabelPrintLogo,
+        addressAdditional: businessForm.addressAdditional,
+        street: businessForm.street,
+        postalCode: businessForm.postalCode,
+        city: businessForm.city,
+        country: businessForm.country,
+        email: businessForm.email,
+        phone: businessForm.phone,
+        website: businessForm.website,
+        note: businessForm.note,
+      };
       if (businessModalMode === "edit" && editingBusinessId) {
         await updateBusiness(editingBusinessId, payload);
       } else {
         const result = await createBusiness(payload);
         const createdId = (result as any)?.data?.id;
         if (createdId && newBusinessTags.length > 0) {
-          await syncEntityTags(createdId, "company", newBusinessTags.map((t) => t.id));
+          await syncEntityTags(
+            createdId,
+            "company",
+            newBusinessTags.map((t) => t.id),
+          );
         }
       }
       setShowBusinessModal(false);
@@ -679,8 +754,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
       setShowBusinessModal(false);
       resetBusinessForm();
       fetchData();
-    } catch {
-    }
+    } catch {}
   };
 
   const handleExportContacts = async () => {
@@ -729,8 +803,8 @@ const CombinedBusinessContactsContent: React.FC = () => {
   };
 
   const buildFullAddress = (b: any) => {
-    const isGerman =
-      !b.country || b.country === "Germany" || b.country === "DE";
+    const code = toCountryCode(b.country);
+    const isGerman = !code || code === "DE";
     const parts: string[] = [];
     if (b.addressAdditional?.trim()) parts.push(b.addressAdditional.trim());
     if (b.street?.trim()) parts.push(b.street.trim());
@@ -739,30 +813,8 @@ const CombinedBusinessContactsContent: React.FC = () => {
       .join(" ")
       .trim();
     if (cityLine) parts.push(cityLine);
-    if (!isGerman && b.country?.trim()) parts.push(b.country.trim());
+    if (!isGerman) parts.push(code);
     return parts.length ? parts.join(", ") : null;
-  };
-
-  const getStageBadgeColor = (stage: string) => {
-    switch (stage) {
-      case "star_business":
-        return "bg-yellow-100 text-yellow-700 border border-yellow-200";
-      case "star_customer":
-        return "bg-purple-100 text-purple-700 border border-purple-200";
-      default:
-        return "bg-blue-100 text-blue-700 border border-blue-200";
-    }
-  };
-
-  const getStageDisplayName = (stage: string) => {
-    switch (stage) {
-      case "star_business":
-        return "Star Business";
-      case "star_customer":
-        return "Star Customer";
-      default:
-        return "Business";
-    }
   };
 
   const getLinkedInStateColor = (state: string) => {
@@ -854,29 +906,14 @@ const CombinedBusinessContactsContent: React.FC = () => {
           <div className="flex flex-wrap gap-3">
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className={`px-4 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2 ${showFilters
-                ? "bg-primary text-white"
-                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                }`}
+              className={`px-4 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2 ${
+                showFilters
+                  ? "bg-primary text-white"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+              }`}
             >
               <FunnelIcon className="w-5 h-5" />
               Filters
-            </button>
-            <button
-              onClick={toggleAllBusinessContacts}
-              className="px-4 py-2.5 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-all flex items-center gap-2"
-              title={
-                allContactsExpanded
-                  ? "Fold all contacts"
-                  : "Unfold all contacts"
-              }
-            >
-              {allContactsExpanded ? (
-                <EyeSlashIcon className="w-5 h-5" />
-              ) : (
-                <EyeIcon className="w-5 h-5" />
-              )}
-              {allContactsExpanded ? "Fold All" : "Unfold All"}
             </button>
             <CustomButton
               startIcon={<PlusIcon className="w-5 h-5" />}
@@ -916,9 +953,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
                   onChange={(tagString) =>
                     setFilters((prev) => ({ ...prev, tags: tagString }))
                   }
-                  onReset={() =>
-                    setFilters((prev) => ({ ...prev, tags: "" }))
-                  }
+                  onReset={() => setFilters((prev) => ({ ...prev, tags: "" }))}
                 />
               </div>
             </div>
@@ -968,37 +1003,53 @@ const CombinedBusinessContactsContent: React.FC = () => {
                       <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                         Tags
                       </th>
-                      <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                        Stage
-                      </th>
-                      <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                        Added On
-                      </th>
-                      <th className="px-3 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                        Actions
-                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {businesses.map((business: any) => (
                       <React.Fragment key={business.id}>
                         <tr className="hover:bg-gray-50 transition-colors">
-                          <td
-                            className="px-3 py-3 cursor-pointer"
-                            onClick={() => openBusinessModal(business)}
-                          >
-                            <p
-                              className="font-medium w-[180px] truncate text-gray-900"
-                              title={
-                                business.displayName ||
-                                business.companyName ||
-                                business.name
-                              }
-                            >
-                              {business.displayName ||
-                                business.companyName ||
-                                business.name}
-                            </p>
+                          <td className="px-3 py-3">
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleBusinessContacts(business.id);
+                                }}
+                                className="text-gray-400 hover:text-gray-700 flex-shrink-0"
+                                title={
+                                  expandedBusinessIds.has(business.id)
+                                    ? "Hide contacts"
+                                    : "Show contacts"
+                                }
+                              >
+                                <ChevronRightIcon
+                                  className={`h-4 w-4 transition-transform duration-200 ${
+                                    expandedBusinessIds.has(business.id)
+                                      ? "rotate-90"
+                                      : ""
+                                  }`}
+                                />
+                              </button>
+                              <p
+                                className="font-medium w-[180px] truncate text-gray-900 cursor-pointer"
+                                title={
+                                  business.displayName ||
+                                  business.companyName ||
+                                  business.name
+                                }
+                                onClick={() => openBusinessModal(business)}
+                              >
+                                {business.displayName ||
+                                  business.companyName ||
+                                  business.name}
+                                {business.contacts?.length ? (
+                                  <span className="ml-1 text-xs font-normal text-gray-400">
+                                    ({business.contacts.length})
+                                  </span>
+                                ) : null}
+                              </p>
+                            </div>
                           </td>
                           <td
                             className="px-3 py-3 cursor-pointer"
@@ -1044,64 +1095,13 @@ const CombinedBusinessContactsContent: React.FC = () => {
                               )}
                             </div>
                           </td>
-                          <td className="px-3 py-3">
-                            {business.stage ? (
-                              <span
-                                className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-full ${getStageBadgeColor(
-                                  business.stage,
-                                )}`}
-                              >
-                                {getStageDisplayName(business.stage)}
-                              </span>
-                            ) : (
-                              <span className="text-gray-400">-</span>
-                            )}
-                          </td>
-                          <td className="px-3 py-3">
-                            <div className="flex items-center gap-2 text-sm text-gray-600">
-                              <CalendarIcon className="w-4 h-4" />
-                              {business.createdAt
-                                ? formatDate(business.createdAt)
-                                : "-"}
-                            </div>
-                          </td>
-                          <td className="px-3 py-3">
-                            <div className="flex items-center justify-center gap-2">
-                              <button
-                                onClick={() =>
-                                  toggleBusinessContacts(business.id)
-                                }
-                                className={`px-2 py-1 text-xs rounded-lg transition-all flex items-center gap-1 ${expandedBusinessIds.has(business.id)
-                                  ? "bg-blue-100 text-blue-800"
-                                  : "bg-blue-500 text-white hover:bg-blue-600"
-                                  }`}
-                              >
-                                {expandedBusinessIds.has(business.id) ? (
-                                  <EyeSlashIcon className="h-3 w-3" />
-                                ) : (
-                                  <EyeIcon className="h-3 w-3" />
-                                )}
-                                Contacts ({business.contacts?.length || 0})
-                              </button>
-                              <button
-                                onClick={() =>
-                                  handleAddContactForBusiness(business)
-                                }
-                                className="px-2 py-1 text-xs bg-green-500 text-white rounded hover:bg-green-600 transition-all flex items-center gap-1"
-                                title="Add contact to this business"
-                              >
-                                <UserPlusIcon className="h-3 w-3" />
-                                Add
-                              </button>
-                            </div>
-                          </td>
                         </tr>
 
                         {expandedBusinessIds.has(business.id) &&
                           business.contacts &&
                           business.contacts.length > 0 && (
                             <tr className="bg-gray-50/30">
-                              <td colSpan={7} className="px-4 py-3">
+                              <td colSpan={4} className="px-4 py-3">
                                 <div className="overflow-x-auto">
                                   <table className="w-full text-sm border border-gray-200 rounded-lg">
                                     <thead className="bg-gray-200/50 border-b border-gray-200/50">
@@ -1248,7 +1248,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
                                               }
                                               className={`text-xs px-2 max-w-[180px] truncate py-1 rounded-full font-medium border-0 cursor-pointer ${getDecisionMakerStateColor(
                                                 contact.decisionMakerState ||
-                                                "",
+                                                  "",
                                               )}`}
                                             >
                                               {DECISION_MAKER_STATES.map(
@@ -1319,23 +1319,23 @@ const CombinedBusinessContactsContent: React.FC = () => {
                                               </button>
                                               {user?.role ===
                                                 UserRole.ADMIN && (
-                                                  <button
-                                                    onClick={(e) => {
-                                                      e.stopPropagation();
-                                                      handleDeleteContact(
-                                                        contact.id,
-                                                      );
+                                                <button
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleDeleteContact(
+                                                      contact.id,
+                                                    );
+                                                  }}
+                                                  title="Delete contact"
+                                                >
+                                                  <Delete
+                                                    sx={{
+                                                      fontSize: 16,
+                                                      color: "red",
                                                     }}
-                                                    title="Delete contact"
-                                                  >
-                                                    <Delete
-                                                      sx={{
-                                                        fontSize: 16,
-                                                        color: "red",
-                                                      }}
-                                                    />
-                                                  </button>
-                                                )}
+                                                  />
+                                                </button>
+                                              )}
                                             </div>
                                           </td>
                                         </tr>
@@ -1351,7 +1351,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
                           (!business.contacts ||
                             business.contacts.length === 0) && (
                             <tr className="bg-gray-50/30">
-                              <td colSpan={7} className="px-6 py-3">
+                              <td colSpan={4} className="px-6 py-3">
                                 <div className="flex items-center justify-between text-sm text-gray-500">
                                   <span>
                                     No contacts for this business yet.
@@ -1431,24 +1431,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="backdrop-blur-md rounded-2xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto bg-white/95">
             <div className="p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-bold text-gray-900">
-                  {businessModalMode === "edit"
-                    ? "Business Details"
-                    : "Add New Business"}
-                </h2>
-                <button
-                  onClick={() => {
-                    setShowBusinessModal(false);
-                    resetBusinessForm();
-                    setBusinessModalMode("create");
-                  }}
-                  className="text-gray-400 hover:text-gray-600 transition-colors"
-                >
-                  <XMarkIcon className="h-5 w-5" />
-                </button>
-              </div>
-
               {businessModalMode === "edit" && (
                 <div className="mb-4 flex items-center justify-between bg-gray-50 rounded-lg p-3">
                   <span className="text-sm font-medium text-gray-700">
@@ -1460,26 +1442,66 @@ const CombinedBusinessContactsContent: React.FC = () => {
                     </span>
                     <button
                       type="button"
-                      className={`${businessEditMode ? "bg-gray-600" : "bg-gray-200"
-                        } relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2`}
+                      className={`${
+                        businessEditMode ? "bg-gray-600" : "bg-gray-200"
+                      } relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2`}
                       onClick={() => setBusinessEditMode(!businessEditMode)}
                     >
                       <span
-                        className={`${businessEditMode ? "translate-x-4" : "translate-x-0"
-                          } pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out`}
+                        className={`${
+                          businessEditMode ? "translate-x-4" : "translate-x-0"
+                        } pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out`}
                       />
                     </button>
                   </div>
                 </div>
               )}
+              <div className="flex items-start justify-between mb-6 gap-3">
+                <h2 className="text-xl font-bold text-gray-900">
+                  {businessModalMode === "edit"
+                    ? "Business Details"
+                    : "Add New Business"}
+                </h2>
+                <div className="flex items-center gap-3">
+                  <div className="flex flex-col items-end">
+                    <label className="block text-[10px] font-medium text-gray-500 mb-0.5">
+                      Customer No
+                    </label>
+                    <input
+                      type="text"
+                      value={businessForm.customerNumber}
+                      onChange={(e) =>
+                        setBusinessForm({
+                          ...businessForm,
+                          customerNumber: e.target.value,
+                        })
+                      }
+                      disabled={businessFieldDisabled}
+                      className="w-28 px-2 py-1 text-xs border border-gray-300/80 bg-white/70 rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                      placeholder="K-1001"
+                    />
+                  </div>
+                  <button
+                    onClick={() => {
+                      setShowBusinessModal(false);
+                      resetBusinessForm();
+                      setBusinessModalMode("create");
+                    }}
+                    className="text-gray-400 hover:text-gray-600 transition-colors mt-1"
+                  >
+                    <XMarkIcon className="h-5 w-5" />
+                  </button>
+                </div>
+              </div>
 
               <div className="space-y-6">
                 <div className="rounded-xl p-4 -mx-4 bg-transparent">
                   <h3 className="text-lg font-semibold text-gray-900 mb-3">
                     Business Information
                   </h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="col-span-2">
+                  <div className="grid grid-cols-6 gap-4">
+                    {/* Names row (3 across) */}
+                    <div className="col-span-6 md:col-span-2">
                       <label className="block text-xs font-medium text-gray-700 mb-1">
                         Company Name (full legal name) *
                       </label>
@@ -1487,50 +1509,57 @@ const CombinedBusinessContactsContent: React.FC = () => {
                         type="text"
                         value={businessForm.companyName}
                         onChange={(e) =>
-                          handleBusinessCompanyNameChange(e.target.value)
+                          setBusinessForm({
+                            ...businessForm,
+                            companyName: e.target.value,
+                          })
                         }
+                        onBlur={handleCompanyNameBlur}
                         disabled={businessFieldDisabled}
                         className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed font-medium"
                         placeholder="Muster GmbH & Co. KG"
                       />
                     </div>
-                    <div>
+                    <div className="col-span-3 md:col-span-2">
                       <label className="block text-xs font-medium text-gray-700 mb-1">
                         Display Name
                       </label>
                       <input
                         type="text"
                         value={businessForm.displayName}
-                        onChange={(e) =>
+                        onChange={(e) => {
+                          displayNameTouched.current = true;
                           setBusinessForm({
                             ...businessForm,
                             displayName: e.target.value,
-                          })
-                        }
+                          });
+                        }}
                         disabled={businessFieldDisabled}
                         className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
                         placeholder="Auto from first word (unique)"
                       />
                     </div>
-                    <div>
+                    <div className="col-span-3 md:col-span-2">
                       <label className="block text-xs font-medium text-gray-700 mb-1">
                         Star Portal Link Name
                       </label>
                       <input
                         type="text"
                         value={businessForm.starPortalLinkName}
-                        onChange={(e) =>
+                        onChange={(e) => {
+                          starPortalTouched.current = true;
                           setBusinessForm({
                             ...businessForm,
                             starPortalLinkName: e.target.value,
-                          })
-                        }
+                          });
+                        }}
                         disabled={businessFieldDisabled}
                         className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
                         placeholder="Auto from display name (unique)"
                       />
                     </div>
-                    <div className="col-span-2">
+                    {/* Address line 1 + Street (2 across) */}
+                    <div className="col-span-6 md:col-span-3">
                       <label className="block text-xs font-medium text-gray-700 mb-1">
                         Address Additional Line
                       </label>
@@ -1548,7 +1577,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
                         placeholder="c/o, building, floor…"
                       />
                     </div>
-                    <div className="col-span-2">
+                    <div className="col-span-6 md:col-span-3">
                       <label className="block text-xs font-medium text-gray-700 mb-1">
                         Street and Street Number
                       </label>
@@ -1566,7 +1595,8 @@ const CombinedBusinessContactsContent: React.FC = () => {
                         placeholder="Musterstraße 12"
                       />
                     </div>
-                    <div>
+                    {/* Postal / City / Country (3 across) */}
+                    <div className="col-span-2">
                       <label className="block text-xs font-medium text-gray-700 mb-1">
                         Postal Code
                       </label>
@@ -1584,7 +1614,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
                         placeholder="80331"
                       />
                     </div>
-                    <div>
+                    <div className="col-span-2">
                       <label className="block text-xs font-medium text-gray-700 mb-1">
                         City
                       </label>
@@ -1602,7 +1632,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
                         placeholder="München"
                       />
                     </div>
-                    <div>
+                    <div className="col-span-2">
                       <label className="block text-xs font-medium text-gray-700 mb-1">
                         Country
                       </label>
@@ -1624,7 +1654,8 @@ const CombinedBusinessContactsContent: React.FC = () => {
                         ))}
                       </select>
                     </div>
-                    <div>
+                    {/* Email / Phone / Web (3 across) */}
+                    <div className="col-span-3 md:col-span-2">
                       <label className="block text-xs font-medium text-gray-700 mb-1">
                         Email
                       </label>
@@ -1642,7 +1673,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
                         placeholder="info@muster.de"
                       />
                     </div>
-                    <div>
+                    <div className="col-span-3 md:col-span-2">
                       <label className="block text-xs font-medium text-gray-700 mb-1">
                         Phone
                       </label>
@@ -1660,7 +1691,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
                         placeholder="+49 89 1234567"
                       />
                     </div>
-                    <div>
+                    <div className="col-span-6 md:col-span-2">
                       <label className="block text-xs font-medium text-gray-700 mb-1">
                         Web URL
                       </label>
@@ -1678,7 +1709,10 @@ const CombinedBusinessContactsContent: React.FC = () => {
                         placeholder="https://muster.de"
                       />
                     </div>
-                    <div className="col-span-2">
+
+                    {/* Company label print logo */}
+
+                    <div className="col-span-6">
                       <label className="block text-xs font-medium text-gray-700 mb-1">
                         Note
                       </label>
@@ -1696,7 +1730,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
                         placeholder="Internal note…"
                       />
                     </div>
-                    <div className="col-span-2">
+                    <div className="col-span-6">
                       <label className="block text-xs font-medium text-gray-700 mb-1">
                         Tags
                       </label>
@@ -1721,6 +1755,57 @@ const CombinedBusinessContactsContent: React.FC = () => {
                         />
                       )}
                     </div>
+                  </div>
+                </div>
+                <div className="col-span-6">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Company Label Print Logo
+                  </label>
+                  <div className="flex items-center gap-3">
+                    {businessForm.companyLabelPrintLogo ? (
+                      <img
+                        src={businessForm.companyLabelPrintLogo}
+                        alt="Label logo"
+                        className="h-12 w-12 object-contain rounded border border-gray-200 bg-white"
+                      />
+                    ) : (
+                      <div className="h-12 w-12 rounded border border-dashed border-gray-300 flex items-center justify-center text-[10px] text-gray-400">
+                        No logo
+                      </div>
+                    )}
+                    <input
+                      id="labelLogoInput"
+                      type="file"
+                      accept="image/*"
+                      onChange={handleLogoUpload}
+                      disabled={businessFieldDisabled}
+                      className="hidden"
+                    />
+                    <label
+                      htmlFor="labelLogoInput"
+                      className={`px-3 py-1.5 text-xs rounded-lg border border-gray-300/80 bg-white/70 transition-all ${
+                        businessFieldDisabled
+                          ? "opacity-50 cursor-not-allowed"
+                          : "cursor-pointer hover:bg-white"
+                      }`}
+                    >
+                      Upload
+                    </label>
+                    {businessForm.companyLabelPrintLogo &&
+                      !businessFieldDisabled && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setBusinessForm({
+                              ...businessForm,
+                              companyLabelPrintLogo: "",
+                            })
+                          }
+                          className="text-xs text-red-600 hover:text-red-800"
+                        >
+                          Remove
+                        </button>
+                      )}
                   </div>
                 </div>
 
@@ -1834,17 +1919,17 @@ const CombinedBusinessContactsContent: React.FC = () => {
                   </button>
                   {(businessModalMode === "create" ||
                     (businessModalMode === "edit" && businessEditMode)) && (
-                      <CustomButton
-                        gradient={true}
-                        onClick={handleBusinessSubmit}
-                        disabled={!businessForm.companyName?.trim()}
-                        className="px-3 py-2 text-xs bg-gray-600/90 backdrop-blur-sm text-white rounded hover:bg-gray-700/90 transition-all disabled:opacity-50"
-                      >
-                        {businessModalMode === "edit"
-                          ? "Update Business"
-                          : "Create Business"}
-                      </CustomButton>
-                    )}
+                    <CustomButton
+                      gradient={true}
+                      onClick={handleBusinessSubmit}
+                      disabled={!businessForm.companyName?.trim()}
+                      className="px-3 py-2 text-xs bg-gray-600/90 backdrop-blur-sm text-white rounded hover:bg-gray-700/90 transition-all disabled:opacity-50"
+                    >
+                      {businessModalMode === "edit"
+                        ? "Update Business"
+                        : "Create Business"}
+                    </CustomButton>
+                  )}
                 </div>
               </div>
             </div>
@@ -1886,16 +1971,18 @@ const CombinedBusinessContactsContent: React.FC = () => {
                     </span>
                     <button
                       type="button"
-                      className={`${editModeEnabled ? "bg-gray-600" : "bg-gray-200"
-                        } relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2`}
+                      className={`${
+                        editModeEnabled ? "bg-gray-600" : "bg-gray-200"
+                      } relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2`}
                       role="switch"
                       aria-checked={editModeEnabled}
                       onClick={() => setEditModeEnabled(!editModeEnabled)}
                     >
                       <span
                         aria-hidden="true"
-                        className={`${editModeEnabled ? "translate-x-5" : "translate-x-0"
-                          } pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out`}
+                        className={`${
+                          editModeEnabled ? "translate-x-5" : "translate-x-0"
+                        } pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out`}
                       />
                     </button>
                   </div>
