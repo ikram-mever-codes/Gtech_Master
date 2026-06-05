@@ -619,8 +619,8 @@ const CombinedBusinessContactsContent: React.FC = () => {
     setBusinessEditMode(false);
     setBusinessForm({
       companyName:
-        business.companyName || business.legalName || business.name || "",
-      displayName: business.displayName || "",
+        business.legalName || business.companyName || business.name || "",
+      displayName: business.displayName || business.companyName || "",
       starPortalLinkName: business.starPortalLinkName || "",
       addressAdditional: business.addressAdditional || "",
       street: business.street || "",
