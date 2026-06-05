@@ -1048,6 +1048,11 @@ const CombinedBusinessContactsContent: React.FC = () => {
                                     ({business.contacts.length})
                                   </span>
                                 ) : null}
+                                {business.customerNumber && (
+                                  <span className="ml-1 text-xs font-normal text-gray-400">
+                                    {`(${business.customerNumber})`}
+                                  </span>
+                                )}
                               </p>
                             </div>
                           </td>
@@ -1431,31 +1436,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="backdrop-blur-md rounded-2xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto bg-white/95">
             <div className="p-6">
-              {businessModalMode === "edit" && (
-                <div className="mb-4 flex items-center justify-between bg-gray-50 rounded-lg p-3">
-                  <span className="text-sm font-medium text-gray-700">
-                    Edit Mode
-                  </span>
-                  <div className="flex items-center">
-                    <span className="text-xs text-gray-500 mr-2">
-                      {businessEditMode ? "Enabled" : "Disabled"}
-                    </span>
-                    <button
-                      type="button"
-                      className={`${
-                        businessEditMode ? "bg-gray-600" : "bg-gray-200"
-                      } relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2`}
-                      onClick={() => setBusinessEditMode(!businessEditMode)}
-                    >
-                      <span
-                        className={`${
-                          businessEditMode ? "translate-x-4" : "translate-x-0"
-                        } pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out`}
-                      />
-                    </button>
-                  </div>
-                </div>
-              )}
               <div className="flex items-start justify-between mb-6 gap-3">
                 <h2 className="text-xl font-bold text-gray-900">
                   {businessModalMode === "edit"
@@ -1493,6 +1473,32 @@ const CombinedBusinessContactsContent: React.FC = () => {
                   </button>
                 </div>
               </div>
+
+              {businessModalMode === "edit" && (
+                <div className="mb-4 flex items-center justify-between bg-gray-50 rounded-lg p-3">
+                  <span className="text-sm font-medium text-gray-700">
+                    Edit Mode
+                  </span>
+                  <div className="flex items-center">
+                    <span className="text-xs text-gray-500 mr-2">
+                      {businessEditMode ? "Enabled" : "Disabled"}
+                    </span>
+                    <button
+                      type="button"
+                      className={`${
+                        businessEditMode ? "bg-gray-600" : "bg-gray-200"
+                      } relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2`}
+                      onClick={() => setBusinessEditMode(!businessEditMode)}
+                    >
+                      <span
+                        className={`${
+                          businessEditMode ? "translate-x-4" : "translate-x-0"
+                        } pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out`}
+                      />
+                    </button>
+                  </div>
+                </div>
+              )}
 
               <div className="space-y-6">
                 <div className="rounded-xl p-4 -mx-4 bg-transparent">
