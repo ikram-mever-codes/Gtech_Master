@@ -70,6 +70,7 @@ interface Invoice {
   id: string;
   invoiceNumber: string;
   orderNumber?: string;
+  cargoNo?: string;
   invoiceDate: string;
   deliveryDate: string;
   netTotal: number;
@@ -646,7 +647,9 @@ const InvoiceListPage: React.FC = () => {
           invoice.customer?.email?.toLowerCase().includes(searchLower) ||
           invoice.customer?.contactEmail?.toLowerCase().includes(searchLower) ||
           (invoice.orderNumber &&
-            invoice.orderNumber.toLowerCase().includes(searchLower)),
+            invoice.orderNumber.toLowerCase().includes(searchLower)) ||
+          (invoice.cargoNo &&
+            invoice.cargoNo.toLowerCase().includes(searchLower)),
       );
     }
 
@@ -1321,7 +1324,7 @@ const InvoiceListPage: React.FC = () => {
                                       }
                                       className="flex items-center gap-1.5 px-2.5 py-1 bg-[#495057] text-white text-[10px] font-bold rounded-[4px] hover:bg-[#343A40] transition-colors whitespace-nowrap"
                                     >
-                                      {(invoice as any).cargoNo ||
+                                      {invoice.cargoNo ||
                                         invoice.orderNumber ||
                                         invoice.id.slice(-6)}{" "}
                                       {expState.taric ? (
@@ -1358,13 +1361,17 @@ const InvoiceListPage: React.FC = () => {
                                         return (
                                           <span className="font-medium">
                                             {invoice.id.slice(-2)} -{" "}
-                                            {invoice.orderNumber || "No Cargo"}
+                                            {invoice.cargoNo ||
+                                              invoice.orderNumber ||
+                                              "No Cargo"}
                                           </span>
                                         );
                                       })()
                                     ) : (
                                       <span className="font-medium">
-                                        {invoice.orderNumber || "No Cargo"}
+                                        {invoice.cargoNo ||
+                                          invoice.orderNumber ||
+                                          "No Cargo"}
                                       </span>
                                     )}
                                   </td>
@@ -2297,7 +2304,7 @@ const InvoiceListPage: React.FC = () => {
                                   : "Cargo No."}
                               </span>
                               <span className="font-medium text-[#212529]">
-                                {invoice.orderNumber || "-"}
+                                {invoice.cargoNo || "-"}
                               </span>
                             </div>
                             <div className="flex justify-between text-xs">
