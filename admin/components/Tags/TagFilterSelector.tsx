@@ -10,7 +10,7 @@ interface TagFilter {
 }
 
 interface TagFilterSelectorProps {
-  category: "company" | "contact" | "inquiry" | "request_item" | "item";
+  category: "company" | "contact" | "inquiry" | "request_item" | "item" | "supplier";
   onChange: (filterString: string) => void;
   onReset?: () => void;
 }

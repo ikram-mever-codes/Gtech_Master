@@ -12,6 +12,7 @@ import { ContactPerson } from "./contact_person";
 import { Inquiry } from "./inquiry";
 import { RequestedItem } from "./requested_items";
 import { Item } from "./items";
+import { Supplier } from "./suppliers";
 
 export enum TagCategory {
   COMPANY = "company",
@@ -19,6 +20,7 @@ export enum TagCategory {
   INQUIRY = "inquiry",
   REQUEST_ITEM = "request_item",
   ITEM = "item",
+  SUPPLIER = "supplier",
 }
 
 export enum TagColor {
@@ -67,6 +69,9 @@ export class Tag {
 
   @ManyToMany(() => Item, (item) => item.tags)
   items!: Item[];
+
+  @ManyToMany(() => Supplier, (supplier) => supplier.tags)
+  suppliers!: Supplier[];
 
   @CreateDateColumn()
   created_at!: Date;

@@ -3,7 +3,7 @@ import { Request, Response, NextFunction } from "express";
 import { AppDataSource } from "../config/database";
 import { Supplier } from "../models/suppliers";
 import { SupplierItem } from "../models/supplier_items";
-import { Like, ILike } from "typeorm";
+import { Like, ILike, Brackets } from "typeorm";
 import { Item } from "../models/items";
 
 export const getAllSuppliers = async (req: Request, res: Response, next: NextFunction) => {
@@ -13,27 +13,70 @@ export const getAllSuppliers = async (req: Request, res: Response, next: NextFun
         const page = parseInt(req.query.page as string) || 1;
         const limit = parseInt(req.query.limit as string) || 30;
         const search = req.query.search as string || "";
+        const tags = req.query.tags as string || "";
         const skip = (page - 1) * limit;
 
-        let whereClause: any = {};
+        const queryBuilder = supplierRepo.createQueryBuilder("supplier")
+            .leftJoinAndSelect("supplier.tags", "tags");
+
         if (search) {
-            whereClause = [
-                { name: ILike(`%${search}%`) },
-                { name_cn: ILike(`%${search}%`) },
-                { company_name: ILike(`%${search}%`) },
-                { email: ILike(`%${search}%`) },
-                { contact_person: ILike(`%${search}%`) },
-                { city: ILike(`%${search}%`) },
-                { province: ILike(`%${search}%`) },
-            ];
+            const searchStr = `%${search}%`;
+            queryBuilder.andWhere(
+                new Brackets((qb) => {
+                    qb.where("supplier.name ILIKE :search", { search: searchStr })
+                      .orWhere("supplier.name_cn ILIKE :search", { search: searchStr })
+                      .orWhere("supplier.company_name ILIKE :search", { search: searchStr })
+                      .orWhere("supplier.email ILIKE :search", { search: searchStr })
+                      .orWhere("supplier.contact_person ILIKE :search", { search: searchStr })
+                      .orWhere("supplier.city ILIKE :search", { search: searchStr })
+                      .orWhere("supplier.province ILIKE :search", { search: searchStr });
+                })
+            );
         }
 
-        const [suppliers, totalRecords] = await supplierRepo.findAndCount({
-            where: whereClause,
-            order: { id: "DESC" },
-            skip,
-            take: limit,
-        });
+        if (tags) {
+            const tagIds = tags.split(",");
+            const includeTagIds = tagIds.filter((id) => !id.startsWith("!")).map((id) => id.trim());
+            const excludeTagIds = tagIds.filter((id) => id.startsWith("!")).map((id) => id.substring(1).trim());
+
+            if (includeTagIds.length > 0) {
+                queryBuilder.andWhere((qb) => {
+                    const subQuery = qb
+                        .subQuery()
+                        .select("s.id")
+                        .from(Supplier, "s")
+                        .innerJoin("s.tags", "t")
+                        .where("t.id IN (:...supplierIncludeTagIds)")
+                        .groupBy("s.id")
+                        .having("COUNT(t.id) = :supplierIncludeCount");
+                    return `supplier.id IN ${subQuery.getQuery()}`;
+                });
+                queryBuilder.setParameter("supplierIncludeTagIds", includeTagIds);
+                queryBuilder.setParameter("supplierIncludeCount", includeTagIds.length);
+            }
+
+            if (excludeTagIds.length > 0) {
+                queryBuilder.andWhere((qb) => {
+                    const subQuery = qb
+                        .subQuery()
+                        .select("s.id")
+                        .from(Supplier, "s")
+                        .innerJoin("s.tags", "t")
+                        .where("t.id IN (:...supplierExcludeTagIds)");
+                    return `supplier.id NOT IN ${subQuery.getQuery()}`;
+                });
+                queryBuilder.setParameter("supplierExcludeTagIds", excludeTagIds);
+            }
+        }
+
+        queryBuilder.orderBy("supplier.id", "DESC")
+            .skip(skip)
+            .take(limit);
+
+        const [suppliers, totalRecords] = await Promise.all([
+            queryBuilder.getMany(),
+            queryBuilder.getCount()
+        ]);
 
         const totalPages = Math.ceil(totalRecords / limit);
         res.status(200).json({
@@ -59,6 +102,7 @@ export const getSupplierById = async (req: Request, res: Response, next: NextFun
 
         const supplier = await supplierRepo.findOne({
             where: { id: Number(id) },
+            relations: ["tags"],
         });
 
         if (!supplier) {
@@ -82,7 +126,7 @@ export const createSupplier = async (req: Request, res: Response, next: NextFunc
     try {
         const supplierRepo = AppDataSource.getRepository(Supplier);
 
-        const { id, created_at, updated_at, supplierItems, parents, supplier: _supplier, ...supplierData } = req.body;
+        const { id, created_at, updated_at, supplierItems, parents, supplier: _supplier, tags, ...supplierData } = req.body;
 
         const newSupplier = supplierRepo.create(supplierData);
         const savedSupplier = await supplierRepo.save(newSupplier);
@@ -114,12 +158,9 @@ export const updateSupplier = async (req: Request, res: Response, next: NextFunc
             });
             return;
         }
-
-        const { id: _id, created_at, updated_at, supplierItems, parents, supplier: _supplier, ...updateData } = req.body;
-
+        const { id: _id, created_at, updated_at, supplierItems, parents, supplier: _supplier, tags, ...updateData } = req.body;
         supplierRepo.merge(supplier, updateData);
         const updatedSupplier = await supplierRepo.save(supplier);
-
         res.status(200).json({
             success: true,
             message: "Supplier updated successfully",
@@ -130,7 +171,6 @@ export const updateSupplier = async (req: Request, res: Response, next: NextFunc
         return next(error);
     }
 };
-
 export const deleteSupplier = async (req: Request, res: Response, next: NextFunction) => {
     try {
         const { id } = req.params;
@@ -147,9 +187,7 @@ export const deleteSupplier = async (req: Request, res: Response, next: NextFunc
             });
             return;
         }
-
         await supplierRepo.remove(supplier);
-
         res.status(200).json({
             success: true,
             message: "Supplier deleted successfully",
@@ -159,37 +197,25 @@ export const deleteSupplier = async (req: Request, res: Response, next: NextFunc
         return next(error);
     }
 };
-
 export const getSupplierItems = async (req: Request, res: Response, next: NextFunction) => {
     try {
         const { id } = req.params;
         const supplierId = Number(id);
-
         const supplierItemRepo = AppDataSource.getRepository(SupplierItem);
         const itemRepo = AppDataSource.getRepository(Item);
-
-        // Fetch items from the junction table
         const supplierItems = await supplierItemRepo.find({
             where: { supplier_id: supplierId },
             relations: ["item"]
         });
-
-        // Fetch items from the main Item table where supplier_id matches
         const itemsFromMainTable = await itemRepo.find({
             where: { supplier_id: supplierId }
         });
-
-        // Use a Map to deduplicate items by their ID
         const itemMap = new Map<number, any>();
-
-        // Add items from the junction table
         supplierItems.forEach(si => {
             if (si.item) {
                 itemMap.set(si.item.id, si.item);
             }
         });
-
-        // Add items from the main Item table (overwriting if already present)
         itemsFromMainTable.forEach(item => {
             itemMap.set(item.id, item);
         });
