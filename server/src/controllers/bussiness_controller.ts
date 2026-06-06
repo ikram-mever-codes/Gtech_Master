@@ -518,36 +518,22 @@ export const createBusiness = async (
 
     const user = (req as any).user;
 
-    const dbCompanyName = displayName || name;
+    // Fall back to the legal company name when no separate display name/name
+    // was sent, so a business can be created with just the company name.
+    const dbCompanyName = displayName || name || companyName;
     const dbLegalName = companyName;
     const finalEmail = email;
 
+    // Only the company name is required. Postal code, city, website, source
+    // and device-maker are all optional now.
     if (!dbCompanyName) {
-      return next(new ErrorHandler("Business display name is required", 400));
+      return next(new ErrorHandler("Company name is required", 400));
     }
 
-    if (!postalCode) {
-      return next(new ErrorHandler("Postal code is required", 400));
-    }
-
-    if (!city) {
-      return next(new ErrorHandler("City is required", 400));
-    }
-
-    if (!website) {
-      return next(new ErrorHandler("Website is required", 400));
-    }
-
-    if (!source) {
-      return next(new ErrorHandler("Source is required", 400));
-    }
-
-    if (!isDeviceMaker || !["Yes", "No", "Unsure"].includes(isDeviceMaker)) {
+    // If a device-maker value IS provided, it must be one of the allowed values.
+    if (isDeviceMaker && !["Yes", "No", "Unsure"].includes(isDeviceMaker)) {
       return next(
-        new ErrorHandler(
-          "Please specify if this is a device maker (Yes/No/Unsure)",
-          400,
-        ),
+        new ErrorHandler("Device maker must be one of Yes / No / Unsure", 400),
       );
     }
 
@@ -753,10 +739,10 @@ export const createBusiness = async (
         businessDetails.description = description
           ? description.trim()
           : undefined;
-        businessDetails.city = city.trim();
+        businessDetails.city = city ? city.trim() : undefined;
         businessDetails.state = state ? state.trim() : undefined;
         businessDetails.country = country ? country.trim() : undefined;
-        businessDetails.postalCode = postalCode.trim();
+        businessDetails.postalCode = postalCode ? postalCode.trim() : undefined;
         businessDetails.latitude = sanitizeNumber(latitude);
         businessDetails.longitude = sanitizeNumber(longitude);
         businessDetails.contactPhone = phoneNumber

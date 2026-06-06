@@ -404,7 +404,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
       await updateContactPerson(contactId, { decisionMakerState: newState });
     } catch (error) {
       console.error("Error updating decision maker state:", error);
-      toast.error("Failed to update decision maker state");
       fetchData();
     }
   };
@@ -452,7 +451,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
       fetchData();
     } catch (error) {
       console.error("Error deleting contact:", error);
-      toast.error("Failed to delete contact");
     }
   };
 
@@ -749,9 +747,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
       console.error(
         `Error ${businessModalMode === "edit" ? "updating" : "creating"} business:`,
         error,
-      );
-      toast.error(
-        `Failed to ${businessModalMode === "edit" ? "update" : "create"} business`,
       );
     }
   };
