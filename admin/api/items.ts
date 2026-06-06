@@ -103,6 +103,7 @@ export interface ItemDetails {
   supplier_name: string | null;
   isActive: boolean;
   is_updated: boolean;
+  isLabelPrint?: boolean;
   created_at?: Date | string;
   updated_at?: Date | string;
   parent: {
@@ -320,6 +321,7 @@ export const updateItem = async (
     is_npr: string;
     is_eur_special: string;
     is_rmb_special: string;
+    isLabelPrint?: boolean;
     ItemID_DE?: number;
     is_dimension_special?: string;
     FOQ?: number;
