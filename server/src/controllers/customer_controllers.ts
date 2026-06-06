@@ -35,48 +35,42 @@ export const requestCustomerAccount = async (
       password,
     } = req.body;
 
-    // Validation
-    if (
-      !companyName ||
-      !email ||
-      !contactEmail ||
-      !contactPhoneNumber ||
-      !password
-    ) {
-      return next(
-        new ErrorHandler("All required fields must be provided", 400),
-      );
+    // Validation - only company name is required
+    if (!companyName) {
+      return next(new ErrorHandler("Company name is required", 400));
     }
 
     const customerRepository = AppDataSource.getRepository(Customer);
     const starCustomerDetailsRepository =
       AppDataSource.getRepository(StarCustomerDetails);
 
-    // Check for existing customer with same company name, email, contact email, or phone
+    // Check for existing customer - only match on fields that were actually provided
+    const duplicateConditions: Record<string, string>[] = [{ companyName }];
+    if (email) duplicateConditions.push({ email });
+    if (contactEmail) duplicateConditions.push({ contactEmail });
+    if (contactPhoneNumber) duplicateConditions.push({ contactPhoneNumber });
+
     const existingCustomer = await customerRepository.findOne({
-      where: [
-        { companyName },
-        { email },
-        { contactEmail },
-        { contactPhoneNumber },
-      ],
+      where: duplicateConditions,
     });
 
     if (existingCustomer) {
       if (existingCustomer.companyName === companyName) {
         return next(new ErrorHandler("Company name already exists", 400));
       }
-      if (existingCustomer.email === email) {
+      if (email && existingCustomer.email === email) {
         return next(new ErrorHandler("Email already exists", 400));
       }
-      if (existingCustomer.contactEmail === contactEmail) {
+      if (contactEmail && existingCustomer.contactEmail === contactEmail) {
         return next(new ErrorHandler("Contact email already exists", 400));
       }
       return next(new ErrorHandler("Phone number already exists", 400));
     }
 
-    // Hash password
-    const hashedPassword = await bcrypt.hash(password, 10);
+    // Hash password only if provided
+    const hashedPassword = password
+      ? await bcrypt.hash(password, 10)
+      : undefined;
 
     // Generate email verification code
     const emailVerificationCode = crypto.randomBytes(20).toString("hex");
@@ -131,11 +125,12 @@ export const requestCustomerAccount = async (
 
     const { customer } = result;
 
-    // Send verification email
-    const verificationUrl = `${process.env.STAR_URL}/verify-email?code=${emailVerificationCode}`;
-    const displayName = legalName || companyName;
+    // Send verification email only if an email was provided
+    if (email) {
+      const verificationUrl = `${process.env.STAR_URL}/verify-email?code=${emailVerificationCode}`;
+      const displayName = legalName || companyName;
 
-    const htmlMessage = `
+      const htmlMessage = `
 <!DOCTYPE html>
 <html>
 <head>
@@ -161,9 +156,9 @@ export const requestCustomerAccount = async (
     <p><small>This is an automated message. Please do not reply to this email.</small></p>
 </body>
 </html>
-    `;
+      `;
 
-    const textMessage = `
+      const textMessage = `
 Welcome to Our Platform
 
 Hello ${displayName},
@@ -176,18 +171,19 @@ ${verificationUrl}
 This link will expire in 24 hours for security reasons.
 
 This is an automated message. Please do not reply to this email.
-    `;
+      `;
 
-    await sendEmail({
-      to: email,
-      subject: "Verify Your Email Address",
-      html: htmlMessage,
-      text: textMessage,
-      headers: {
-        "X-Priority": "3",
-        "X-Mailer": "Gtech Industries Gmbh",
-      },
-    });
+      await sendEmail({
+        to: email,
+        subject: "Verify Your Email Address",
+        html: htmlMessage,
+        text: textMessage,
+        headers: {
+          "X-Priority": "3",
+          "X-Mailer": "Gtech Industries Gmbh",
+        },
+      });
+    }
 
     return res.status(201).json({
       success: true,
@@ -609,7 +605,7 @@ export const changePassword = async (
     `;
 
     await sendEmail({
-      to: customer.email,
+      to: customer.email || "",
       subject: "Password Change Notification",
       html: message,
     });
@@ -798,7 +794,7 @@ export const resetPassword = async (
     `;
 
     await sendEmail({
-      to: starCustomerDetails.customer.email,
+      to: starCustomerDetails.customer.email || "",
       subject: "Password Reset Confirmation",
       html: message,
     });
@@ -975,7 +971,7 @@ Contact Support: support@accez.cloud
     `;
 
     await sendEmail({
-      to: customer.email,
+      to: customer.email || "",
       subject: `Account Status Update: ${status.toUpperCase()}`,
       html: htmlMessage,
       text: textMessage,

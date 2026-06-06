@@ -219,6 +219,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
     email: "",
     phone: "",
     website: "",
+    vatTaxId: "",
     note: "",
     tags: [] as any[],
   };
@@ -551,6 +552,9 @@ const CombinedBusinessContactsContent: React.FC = () => {
     setShowNotesModal(true);
   };
 
+  // Display Name: first word if unique; otherwise "first second" (space between
+  // the words) keeping the first word; otherwise "first N". Mirrors the Star
+  // Portal rule but uses a space instead of a "-".
   const generateDisplayName = (
     companyName: string,
     existing: BusinessWithContacts[] = [],
@@ -568,14 +572,17 @@ const CombinedBusinessContactsContent: React.FC = () => {
     if (!used.has(first.toLowerCase())) return first;
     const second = words[1];
     if (second) {
-      const combo = `${first}${second}`; // same as Star Portal, no "-"
+      const combo = `${first} ${second}`; // first word + space + second word
       if (!used.has(combo.toLowerCase())) return combo;
     }
     let i = 2;
-    while (used.has(`${first}${i}`.toLowerCase())) i++;
-    return `${first}${i}`;
+    while (used.has(`${first} ${i}`.toLowerCase())) i++;
+    return `${first} ${i}`;
   };
 
+  // Star Portal Link Name: first word if unique; otherwise "first-second" (dash
+  // between the words) keeping the first word; otherwise "first-N". Generated
+  // directly from the company words so it no longer depends on the display name.
   const generateStarPortalLinkName = (
     companyName: string,
     displayName: string,
@@ -583,19 +590,23 @@ const CombinedBusinessContactsContent: React.FC = () => {
     excludeId?: string | null,
   ) => {
     const words = (companyName || "").trim().split(/\s+/).filter(Boolean);
+    if (!words.length) return "";
     const used = new Set(
       (existing || [])
         .filter((b) => b.id !== excludeId)
         .map((b: any) => (b.starPortalLinkName || "").toLowerCase())
         .filter(Boolean),
     );
-    let base = displayName;
-    if (words[1] && displayName === words[1]) base = `${words[0]}-${words[1]}`;
-    if (!base) return "";
-    if (!used.has(base.toLowerCase())) return base;
+    const first = words[0];
+    if (!used.has(first.toLowerCase())) return first;
+    const second = words[1];
+    if (second) {
+      const combo = `${first}-${second}`; // first word + "-" + second word
+      if (!used.has(combo.toLowerCase())) return combo;
+    }
     let i = 2;
-    while (used.has(`${base}-${i}`.toLowerCase())) i++;
-    return `${base}-${i}`;
+    while (used.has(`${first}-${i}`.toLowerCase())) i++;
+    return `${first}-${i}`;
   };
 
   // FIX: auto-generation runs ONLY when the user leaves the legal-name field
@@ -665,6 +676,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
         business.legalName || business.companyName || business.name || "",
       displayName: business.displayName || business.companyName || "",
       starPortalLinkName: business.starPortalLinkName || "",
+      vatTaxId: business.vatTaxId || "",
       customerNumber: business.customerNumber || "",
       companyLabelPrintLogo: business.companyLabelPrintLogo || "",
       addressAdditional: business.addressAdditional || "",
@@ -703,6 +715,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
         companyName: businessForm.companyName,
         displayName: businessForm.displayName,
         starPortalLinkName: businessForm.starPortalLinkName,
+        vatTaxId: businessForm.vatTaxId,
         customerNumber: businessForm.customerNumber,
         companyLabelPrintLogo: businessForm.companyLabelPrintLogo,
         addressAdditional: businessForm.addressAdditional,
@@ -923,18 +936,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
               Add Business
             </CustomButton>
             <CustomButton
-              startIcon={<Add className="w-5 h-5" />}
-              gradient={true}
-              onClick={() => {
-                setModalMode("create");
-                setEditingContactId(null);
-                resetCreateForm();
-                setShowCreateModal(true);
-              }}
-            >
-              Add Contact
-            </CustomButton>
-            <CustomButton
               startIcon={<ArrowDownTrayIcon className="w-5 h-5" />}
               gradient={true}
               onClick={() => router.push("/bussinesses/import")}
@@ -961,7 +962,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
             <div className="flex justify-end pt-2 border-t border-gray-100">
               <button
                 onClick={resetFilters}
-                className="text-xs font-semibold text-rose-600 hover:text-rose-800 transition-colors flex items-center gap-1"
+                className="px-3 py-1.5 text-xs font-semibold text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 rounded-lg transition-colors flex items-center gap-1"
               >
                 <ArrowPathIcon className="w-3.5 h-3.5" />
                 Reset All Filters
@@ -1002,6 +1003,9 @@ const CombinedBusinessContactsContent: React.FC = () => {
                       </th>
                       <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                         Tags
+                      </th>
+                      <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                        Note
                       </th>
                     </tr>
                   </thead>
@@ -1090,15 +1094,30 @@ const CombinedBusinessContactsContent: React.FC = () => {
                             )}
                           </td>
                           <td className="px-3 py-3">
-                            <div className="flex flex-wrap gap-1 max-w-[200px]">
+                            <div className="flex flex-wrap gap-1.5 max-w-[220px]">
                               {business.tags && business.tags.length > 0 ? (
                                 business.tags.map((tag: any) => (
-                                  <TagBadge key={tag.id} tag={tag} size="sm" />
+                                  <TagBadge key={tag.id} tag={tag} size="md" />
                                 ))
                               ) : (
                                 <span className="text-gray-400 text-xs">-</span>
                               )}
                             </div>
+                          </td>
+                          <td
+                            className="px-3 py-3 cursor-pointer"
+                            onClick={() => openBusinessModal(business)}
+                          >
+                            {business.note ? (
+                              <p
+                                className="text-sm text-gray-600 w-[180px] truncate"
+                                title={business.note}
+                              >
+                                {business.note}
+                              </p>
+                            ) : (
+                              <span className="text-gray-400 text-xs">-</span>
+                            )}
                           </td>
                         </tr>
 
@@ -1106,7 +1125,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
                           business.contacts &&
                           business.contacts.length > 0 && (
                             <tr className="bg-gray-50/30">
-                              <td colSpan={4} className="px-4 py-3">
+                              <td colSpan={5} className="px-4 py-3">
                                 <div className="overflow-x-auto">
                                   <table className="w-full text-sm border border-gray-200 rounded-lg">
                                     <thead className="bg-gray-200/50 border-b border-gray-200/50">
@@ -1356,7 +1375,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
                           (!business.contacts ||
                             business.contacts.length === 0) && (
                             <tr className="bg-gray-50/30">
-                              <td colSpan={4} className="px-6 py-3">
+                              <td colSpan={5} className="px-6 py-3">
                                 <div className="flex items-center justify-between text-sm text-gray-500">
                                   <span>
                                     No contacts for this business yet.
@@ -1713,6 +1732,25 @@ const CombinedBusinessContactsContent: React.FC = () => {
                         disabled={businessFieldDisabled}
                         className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
                         placeholder="https://muster.de"
+                      />
+                    </div>
+                    {/* VAT / Tax ID */}
+                    <div className="col-span-3 md:col-span-2">
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        VAT / Tax ID
+                      </label>
+                      <input
+                        type="text"
+                        value={businessForm.vatTaxId}
+                        onChange={(e) =>
+                          setBusinessForm({
+                            ...businessForm,
+                            vatTaxId: e.target.value,
+                          })
+                        }
+                        disabled={businessFieldDisabled}
+                        className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                        placeholder="DE123456789"
                       />
                     </div>
 

@@ -30,6 +30,7 @@ export class Customer {
   })
   stage!: "business" | "star_business" | "star_customer" | "device_maker";
 
+  // Only required field
   @Column({ unique: true })
   companyName!: string;
 
@@ -49,13 +50,13 @@ export class Customer {
   companyLabelPrintLogo?: string;
 
   @Column({ unique: true, nullable: true })
-  email!: string;
+  email?: string;
 
   @Column({ nullable: true })
-  contactEmail!: string;
+  contactEmail?: string;
 
   @Column({ nullable: true })
-  contactPhoneNumber!: string;
+  contactPhoneNumber?: string;
 
   @Column({ nullable: true })
   taxNumber?: string;
