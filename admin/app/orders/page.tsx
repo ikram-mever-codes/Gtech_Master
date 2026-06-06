@@ -544,7 +544,7 @@ function OrdersTable({
               title={hasCargo ? "Re-assign to Cargo" : "Assign to Cargo"}
               className="px-2 py-1 text-[10px] font-bold bg-[#8CC21B] text-white rounded-[4px] hover:bg-green-700 transition shadow-md flex items-center gap-1"
             >
-              <span>&#8617;</span> {hasCargo ? "ReAssign" : "Assign"}
+              <span>&#8617;</span> {hasCargo ? "Reassign" : "Assign"}
             </button>
             <button
               onClick={(e) => {
@@ -588,7 +588,7 @@ function OrdersTable({
           title={hasCargo ? "Re-assign to Cargo" : "Assign to Cargo"}
           className="px-2 py-1 text-[10px] font-bold bg-[#8CC21B] text-white rounded-[4px] hover:bg-green-700 transition shadow-md flex items-center gap-1"
         >
-          <span>&#8617;</span> {hasCargo ? "ReAssign" : "Assign"}
+          <span>&#8617;</span> {hasCargo ? "Reassign" : "Assign"}
         </button>
         <button
           onClick={(e) => {
@@ -1543,7 +1543,7 @@ const OrderPage: React.FC = () => {
 
   const fetchCargos = useCallback(async () => {
     try {
-      const res = await getAllCargos({ limit: 1000, availableOnly: true });
+      const res = await getAllCargos({ limit: 1000 });
       const data = res?.data ?? res;
       setCargos(Array.isArray(data) ? data : data?.cargos || []);
     } catch (e) {
@@ -4205,7 +4205,7 @@ const OrderPage: React.FC = () => {
         <CustomModal
           isOpen={showREModal}
           onClose={() => setShowREModal(false)}
-          width="max-w-xl"
+          width="max-w-2xl"
           title={
             selectedItem.cargo_id
               ? (selectedItem.order_no
