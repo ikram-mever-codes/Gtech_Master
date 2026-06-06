@@ -85,7 +85,7 @@ import { getAllSuppliers, Supplier } from "@/api/suppliers";
 import { getCategories } from "@/api/categories";
 import { loadingStyles, successStyles, errorStyles } from "@/utils/constants";
 import { TagFilterSelector } from "@/components/Tags/TagFilterSelector";
-import { TagPickerInput, type Tag } from "@/components/Tags/TagManager";
+import { TagBadge, TagPickerInput, type Tag } from "@/components/Tags/TagManager";
 import { syncEntityTags } from "@/api/tags";
 
 type TabType = "items" | "parents" | "warehouse" | "tarics" | "suppliers";
@@ -427,6 +427,7 @@ const ItemsManagementPage: React.FC = () => {
             page: pagination.page,
             limit: pagination.limit,
             search: debouncedFilters.search,
+            tags: debouncedFilters.tags,
           });
           setSuppliers(suppliersResponse.data);
           if (suppliersResponse.pagination) {
@@ -1186,6 +1187,9 @@ const ItemsManagementPage: React.FC = () => {
               Email
             </th>
             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+              Tags
+            </th>
+            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
               Actions
             </th>
           </>
@@ -1511,6 +1515,16 @@ const ItemsManagementPage: React.FC = () => {
             </td>
             <td className="px-4 py-3">{supplier.contact_person}</td>
             <td className="px-4 py-3">{supplier.email}</td>
+            <td className="px-4 py-3">
+              <div className="flex flex-wrap gap-1 max-w-[150px]">
+                {(supplier.tags || []).map((tag: Tag) => (
+                  <TagBadge key={tag.id} tag={tag} size="sm" />
+                ))}
+                {(!supplier.tags || supplier.tags.length === 0) && (
+                  <span className="text-xs text-gray-400">—</span>
+                )}
+              </div>
+            </td>
             <td className="px-4 py-3 text-right">
               <button
                 onClick={(e) => {

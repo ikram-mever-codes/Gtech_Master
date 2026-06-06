@@ -8,10 +8,13 @@ import {
   ManyToOne,
   JoinColumn,
   PrimaryColumn,
+  ManyToMany,
+  JoinTable,
 } from "typeorm";
 import { SupplierItem } from "./supplier_items";
 import { Item } from "./items";
 import { Parent } from "./parents";
+import { Tag } from "./tags";
 
 @Entity()
 export class Supplier {
@@ -104,6 +107,14 @@ export class Supplier {
 
   @OneToMany(() => Parent, (parent) => parent.supplier)
   parents!: Parent[];
+
+  @ManyToMany(() => Tag, (tag) => tag.suppliers)
+  @JoinTable({
+    name: "supplier_tag",
+    joinColumn: { name: "supplier_id", referencedColumnName: "id" },
+    inverseJoinColumn: { name: "tag_id", referencedColumnName: "id" },
+  })
+  tags!: Tag[];
 
 
   @CreateDateColumn()

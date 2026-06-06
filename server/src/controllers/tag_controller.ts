@@ -6,6 +6,7 @@ import { ContactPerson } from "../models/contact_person";
 import { Inquiry } from "../models/inquiry";
 import { RequestedItem } from "../models/requested_items";
 import { Item } from "../models/items";
+import { Supplier } from "../models/suppliers";
 
 const entityMap: Record<string, { repo: any; relation: string }> = {
   company: { repo: Customer, relation: "tags" },
@@ -13,6 +14,7 @@ const entityMap: Record<string, { repo: any; relation: string }> = {
   inquiry: { repo: Inquiry, relation: "tags" },
   request_item: { repo: RequestedItem, relation: "tags" },
   item: { repo: Item, relation: "tags" },
+  supplier: { repo: Supplier, relation: "tags" },
 };
 
 export const getAllTags = async (req: Request, res: Response) => {
@@ -126,10 +128,27 @@ export const deleteTag = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const tagRepo = AppDataSource.getRepository(Tag);
-    const tag = await tagRepo.findOne({ where: { id } });
+    const tag = await tagRepo.findOne({
+      where: { id },
+      relations: ["customers", "contacts", "inquiries", "requestedItems", "items", "suppliers"],
+    });
 
     if (!tag) {
       return res.status(404).json({ message: "Tag not found" });
+    }
+
+    const totalAssigned =
+      (tag.customers?.length || 0) +
+      (tag.contacts?.length || 0) +
+      (tag.inquiries?.length || 0) +
+      (tag.requestedItems?.length || 0) +
+      (tag.items?.length || 0) +
+      (tag.suppliers?.length || 0);
+
+    if (totalAssigned > 0) {
+      return res.status(400).json({
+        message: `Cannot delete tag "${tag.name}": it is currently assigned to ${totalAssigned} record(s). Remove all assignments first.`,
+      });
     }
 
     await tagRepo.remove(tag);
@@ -168,11 +187,13 @@ export const syncEntityTags = async (req: Request, res: Response) => {
     let tags: Tag[] = [];
     if (tagIds.length > 0) {
       const { In } = require("typeorm");
-      tags = await tagRepo.find({
+      const foundTags = await tagRepo.find({
         where: {
           id: In(tagIds),
         },
       });
+      const tagMap = new Map(foundTags.map((t) => [t.id, t]));
+      tags = tagIds.map((tid: string) => tagMap.get(tid)).filter(Boolean) as Tag[];
     }
 
     entity[config.relation] = tags;

@@ -25,6 +25,8 @@ import {
     Supplier,
 } from "@/api/suppliers";
 import { loadingStyles, successStyles, errorStyles } from "@/utils/constants";
+import { EntityTagSelector, TagBadge, type Tag } from "@/components/Tags/TagManager";
+import { TagFilterSelector } from "@/components/Tags/TagFilterSelector";
 
 interface PaginationState {
     page: number;
@@ -75,6 +77,7 @@ const SuppliersPage: React.FC = () => {
         totalPages: 1,
     });
 
+    const [tagsFilter, setTagsFilter] = useState("");
     const [showModal, setShowModal] = useState(false);
     const [modalMode, setModalMode] = useState<"create" | "edit">("create");
     const [editingId, setEditingId] = useState<number | null>(null);
@@ -99,6 +102,7 @@ const SuppliersPage: React.FC = () => {
                 page: pagination.page,
                 limit: pagination.limit,
                 search,
+                tags: tagsFilter,
             });
             setSuppliers(response.data || []);
             if (response.pagination) {
@@ -109,7 +113,7 @@ const SuppliersPage: React.FC = () => {
         } finally {
             setLoading(false);
         }
-    }, [pagination.page, pagination.limit, search]);
+    }, [pagination.page, pagination.limit, search, tagsFilter]);
 
     useEffect(() => {
         fetchSuppliers();
@@ -239,7 +243,7 @@ const SuppliersPage: React.FC = () => {
                     </div>
                 </div>
 
-                <div className="mb-6">
+                <div className="mb-6 space-y-4">
                     <div className="relative">
                         <MagnifyingGlassIcon className="w-6 h-6 absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" />
                         <input
@@ -257,6 +261,15 @@ const SuppliersPage: React.FC = () => {
                                 <XMarkIcon className="w-5 h-5" />
                             </button>
                         )}
+                    </div>
+                    <div className="flex gap-4">
+                        <div className="flex-1 max-w-lg">
+                            <TagFilterSelector
+                                category="supplier"
+                                onChange={(tagString) => setTagsFilter(tagString)}
+                                onReset={() => setTagsFilter("")}
+                            />
+                        </div>
                     </div>
                 </div>
 
@@ -302,6 +315,9 @@ const SuppliersPage: React.FC = () => {
                                                 Created
                                             </th>
                                             <th className="px-2 py-2 text-left text-[10px] font-semibold text-gray-600 uppercase tracking-wider">
+                                                Tags
+                                            </th>
+                                            <th className="px-2 py-2 text-left text-[10px] font-semibold text-gray-600 uppercase tracking-wider">
                                                 Actions
                                             </th>
                                         </tr>
@@ -310,7 +326,7 @@ const SuppliersPage: React.FC = () => {
                                         {suppliers.length === 0 ? (
                                             <tr>
                                                 <td
-                                                    colSpan={10}
+                                                    colSpan={11}
                                                     className="px-4 py-12 text-center text-gray-500"
                                                 >
                                                     <TruckIcon className="w-12 h-12 mx-auto mb-3 text-gray-300" />
@@ -368,6 +384,16 @@ const SuppliersPage: React.FC = () => {
                                                     <td className="px-1.5 py-1.5">
                                                         <div className="text-[10px] text-gray-600 text-nowrap">
                                                             {formatDate(supplier.created_at)}
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-2 py-1.5">
+                                                        <div className="flex flex-wrap gap-1 max-w-[150px]">
+                                                            {(supplier.tags || []).map((tag: Tag) => (
+                                                                <TagBadge key={tag.id} tag={tag} size="sm" />
+                                                            ))}
+                                                            {(!supplier.tags || supplier.tags.length === 0) && (
+                                                                <span className="text-[10px] text-gray-400">—</span>
+                                                            )}
                                                         </div>
                                                     </td>
                                                     <td className="px-2 py-2">
@@ -591,6 +617,23 @@ const SuppliersPage: React.FC = () => {
                                             placeholder="Enter extra notes"
                                         />
                                     </div>
+
+                                    {modalMode === "edit" && editingId && (
+                                        <div className="md:col-span-2">
+                                            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                                                Tags
+                                            </label>
+                                            <div className="p-3 border border-gray-200 rounded-lg bg-gray-50/50 min-h-[44px] flex items-center">
+                                                <EntityTagSelector
+                                                    entityId={editingId}
+                                                    entityType="supplier"
+                                                    initialTags={(formData.tags as Tag[]) || []}
+                                                    disabled={!isEditEnabled}
+                                                    onTagsUpdated={(tags) => updateField("tags", tags)}
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
 
                                     <div className="grid grid-cols-3 gap-4 md:col-span-2">
                                         <div>

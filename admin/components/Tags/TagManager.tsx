@@ -90,7 +90,7 @@ export const EntityTagSelector = ({
   disabled = false,
 }: {
   entityId: string | number;
-  entityType: "company" | "contact" | "inquiry" | "request_item" | "item";
+  entityType: "company" | "contact" | "inquiry" | "request_item" | "item" | "supplier";
   initialTags?: Tag[];
   onTagsUpdated?: (tags: Tag[]) => void;
   disabled?: boolean;
@@ -228,7 +228,7 @@ export const TagPickerInput = ({
   onChange,
   disabled = false,
 }: {
-  category: "company" | "contact" | "inquiry" | "request_item" | "item";
+  category: "company" | "contact" | "inquiry" | "request_item" | "item" | "supplier";
   selectedTags: Tag[];
   onChange: (tags: Tag[]) => void;
   disabled?: boolean;

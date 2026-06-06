@@ -33,12 +33,14 @@ export type Supplier = {
     percentage3?: number;
     created_at?: Date;
     updated_at?: Date;
+    tags?: { id: string; name: string; category: string; color: string }[];
 };
 
 export const getAllSuppliers = async (params?: {
     page?: number;
     limit?: number;
     search?: string;
+    tags?: string;
 }) => {
     try {
         const res = await api.get("/suppliers", { params });

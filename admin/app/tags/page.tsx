@@ -18,6 +18,7 @@ const CATEGORIES = [
   { id: "inquiry", label: "Inquiries" },
   { id: "request_item", label: "Request Items" },
   { id: "item", label: "Items" },
+  { id: "supplier", label: "Suppliers" },
 ];
 
 const FORM_CATEGORIES = [
@@ -26,6 +27,7 @@ const FORM_CATEGORIES = [
   { id: "inquiry", label: "Inquiry" },
   { id: "request_item", label: "Request Item" },
   { id: "item", label: "Item" },
+  { id: "supplier", label: "Supplier" },
 ];
 
 const COLORS = [
@@ -133,10 +135,14 @@ export default function TagsPage() {
   const handleDelete = async (id: string) => {
     if (!confirm("Are you sure you want to delete this tag?")) return;
     try {
-      await deleteTag(id);
-      toast.success("Tag deleted successfully");
-      fetchTags();
-    } catch (err) {
+      const res = await deleteTag(id);
+      if (res) {
+        toast.success("Tag deleted successfully");
+        fetchTags();
+      }
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || err?.message || "Failed to delete tag";
+      toast.error(msg);
       console.error(err);
     }
   };
