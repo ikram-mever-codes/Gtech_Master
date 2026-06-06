@@ -660,6 +660,7 @@ export const getItemById = async (
       isActive: item.isActive === "Y",
       tags: item.tags || [],
       is_updated: item.is_updated,
+      isLabelPrint: item.isLabelPrint || false,
       transfer_price: item.transfer_price_EUR
         ? Number(item.transfer_price_EUR).toFixed(2)
         : "null",
@@ -863,6 +864,7 @@ export const createItem = async (
       painPoints = [],
       item_no_de,
       item_name_de,
+      isLabelPrint = false,
     } = req.body;
 
     if (!item_name || !parent_id || !supplier_id) {
@@ -949,6 +951,7 @@ export const createItem = async (
       painPoints,
       is_new: "Y",
       is_updated: false,
+      isLabelPrint,
       created_at: new Date(),
       updated_at: new Date(),
     });
@@ -1137,6 +1140,7 @@ export const updateItem = async (
       "painPoints",
       "price",
       "transfer_price_EUR",
+      "isLabelPrint",
     ];
 
     let hasChanges = false;
@@ -1176,6 +1180,13 @@ export const updateItem = async (
         if (siData.id > 0) {
           await supplierItemRepository.update(siData.id, {
             is_default: siData.isDefault ? "Y" : "N",
+            price_rmb: siData.priceRMB !== undefined && siData.priceRMB !== "" ? parseFloat(siData.priceRMB) : undefined,
+            moq: siData.moq !== undefined && siData.moq !== "" ? parseInt(siData.moq) : undefined,
+            oi: siData.interval !== undefined && siData.interval !== "" ? parseInt(siData.interval) : undefined,
+            lead_time: siData.leadTime !== undefined ? siData.leadTime : undefined,
+            url: siData.url !== undefined ? siData.url : undefined,
+            note_cn: siData.noteCN !== undefined ? siData.noteCN : undefined,
+            is_po: siData.isPO !== undefined ? siData.isPO : undefined,
           });
         } else if (siData.id < 0 && siData.supplierId) {
           const newSI = supplierItemRepository.create({

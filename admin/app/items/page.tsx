@@ -1013,19 +1013,30 @@ const ItemsManagementPage: React.FC = () => {
 
       if (currentFilters.search) {
         const searchLower = currentFilters.search.toLowerCase();
-        const matchesGlobal =
-          it.id?.toString().includes(searchLower) ||
-          it.name?.toLowerCase().includes(searchLower) ||
-          it.de_no?.toLowerCase().includes(searchLower) ||
-          it.item_name?.toLowerCase().includes(searchLower) ||
-          it.item_no_de?.toLowerCase().includes(searchLower) ||
-          it.name_en?.toLowerCase().includes(searchLower) ||
-          matchesEANSearch(it.ean, currentFilters.search);
+        let matchesGlobal = false;
+
+        if (activeTab === "suppliers") {
+          matchesGlobal =
+            it.id?.toString().includes(searchLower) ||
+            it.name?.toLowerCase().includes(searchLower) ||
+            it.company_name?.toLowerCase().includes(searchLower) ||
+            it.contact_person?.toLowerCase().includes(searchLower) ||
+            it.email?.toLowerCase().includes(searchLower);
+        } else {
+          matchesGlobal =
+            it.id?.toString().includes(searchLower) ||
+            it.name?.toLowerCase().includes(searchLower) ||
+            it.de_no?.toLowerCase().includes(searchLower) ||
+            it.item_name?.toLowerCase().includes(searchLower) ||
+            it.item_no_de?.toLowerCase().includes(searchLower) ||
+            it.name_en?.toLowerCase().includes(searchLower) ||
+            matchesEANSearch(it.ean, currentFilters.search);
+        }
 
         if (!matchesGlobal) return false;
       }
 
-      if (activeTab !== "tarics") {
+      if (activeTab === "items" || activeTab === "parents" || activeTab === "warehouse") {
         if (debouncedFilters.isActive && it.is_active?.trim() !== debouncedFilters.isActive.trim())
           return false;
         if (

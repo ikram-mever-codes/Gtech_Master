@@ -151,6 +151,7 @@ const SelectInfoRow = ({
                 "others.isDimensionSpecial",
                 "parent.isEURSpecial",
                 "parent.isRMBSpecial",
+                "isLabelPrint",
               ];
               let finalValue: any = val;
               if (booleanFields.includes(field)) {
@@ -361,6 +362,8 @@ const ItemDetailsPage = () => {
         noteCN: "",
         url: "",
       }),
+      isLabelPrint: rawItem.isLabelPrint !== undefined ? toBool(rawItem.isLabelPrint) : false,
+      supplierItems: rawItem.supplierItems || [],
       isActive: toBool(rawItem.isActive),
       parent: {
         ...rawItem.parent,
@@ -863,6 +866,7 @@ const ItemDetailsPage = () => {
         is_rmb_special: updatedData.parent?.isRMBSpecial ? "Y" : "N",
         is_new: updatedData.others?.isNew ? "Y" : "N",
         is_npr: updatedData.others?.isNPR ? "Y" : "N",
+        isLabelPrint: updatedData.isLabelPrint ? true : false,
         supplier_id: toInt(updatedData.supplier_id),
         supplierItems: updatedData.supplierItems,
 
@@ -1179,6 +1183,18 @@ const ItemDetailsPage = () => {
                   label="Price (RMB) ¥"
                   value={itemData.supplierItem?.priceRMB || (itemData as any).others?.rmbPrice}
                   field="supplierItem.priceRMB"
+                  editMode={editMode}
+                  itemData={itemData}
+                  setItemData={setItemData}
+                />
+                <SelectInfoRow
+                  label="Label Print"
+                  value={itemData.isLabelPrint ? "Yes" : "No"}
+                  field="isLabelPrint"
+                  options={[
+                    { label: "Yes", value: "Yes" },
+                    { label: "No", value: "No" },
+                  ]}
                   editMode={editMode}
                   itemData={itemData}
                   setItemData={setItemData}
@@ -1755,7 +1771,7 @@ const ItemDetailsPage = () => {
                                 {(() => {
                                   const sDetail = allSuppliers.find((s) => String(s.id) === String(si.supplierId));
                                   const bestName = sDetail?.company_name || sDetail?.name || sDetail?.name_de || si.supplierName;
-                                  return (bestName && bestName !== "Unknown" && bestName !== "-") ? bestName : "";
+                                  return (bestName && bestName !== "Unknown" && bestName !== "-") ? bestName : "Supplier #" + si.supplierId;
                                 })()}
                               </h4>
                               <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded font-medium">
@@ -1831,6 +1847,166 @@ const ItemDetailsPage = () => {
                           )}
                         </div>
                       </div>
+                      <div className="mt-2 border-t border-gray-100 pt-4 grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div>
+                          <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">Price (RMB)</label>
+                          {editMode ? (
+                            <input
+                              type="number"
+                              value={si.priceRMB || ""}
+                              onChange={(e) => {
+                                const updated = { ...itemData };
+                                updated.supplierItems = updated.supplierItems.map((x: any) =>
+                                  x.id === si.id ? { ...x, priceRMB: e.target.value } : x
+                                );
+                                if (si.isDefault) {
+                                  updated.supplierItem = {
+                                    ...updated.supplierItem,
+                                    priceRMB: e.target.value,
+                                  };
+                                  if (updated.others) {
+                                    updated.others.rmbPrice = e.target.value;
+                                  }
+                                }
+                                setItemData(updated);
+                              }}
+                              className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#8CC21B]/20"
+                            />
+                          ) : (
+                            <span className="text-sm font-semibold text-gray-900">¥{si.priceRMB || "0"}</span>
+                          )}
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">MOQ</label>
+                          {editMode ? (
+                            <input
+                              type="number"
+                              value={si.moq || ""}
+                              onChange={(e) => {
+                                const updated = { ...itemData };
+                                updated.supplierItems = updated.supplierItems.map((x: any) =>
+                                  x.id === si.id ? { ...x, moq: e.target.value } : x
+                                );
+                                if (si.isDefault) {
+                                  updated.supplierItem = {
+                                    ...updated.supplierItem,
+                                    moq: e.target.value,
+                                  };
+                                }
+                                setItemData(updated);
+                              }}
+                              className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#8CC21B]/20"
+                            />
+                          ) : (
+                            <span className="text-sm font-semibold text-gray-900">{si.moq || "0"}</span>
+                          )}
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">Lead Time</label>
+                          {editMode ? (
+                            <input
+                              type="text"
+                              value={si.leadTime || ""}
+                              onChange={(e) => {
+                                const updated = { ...itemData };
+                                updated.supplierItems = updated.supplierItems.map((x: any) =>
+                                  x.id === si.id ? { ...x, leadTime: e.target.value } : x
+                                );
+                                if (si.isDefault) {
+                                  updated.supplierItem = {
+                                    ...updated.supplierItem,
+                                    leadTime: e.target.value,
+                                  };
+                                }
+                                setItemData(updated);
+                              }}
+                              className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#8CC21B]/20"
+                            />
+                          ) : (
+                            <span className="text-sm font-semibold text-gray-900">{si.leadTime || "—"}</span>
+                          )}
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">Is PO</label>
+                          {editMode ? (
+                            <select
+                              value={si.isPO || "No"}
+                              onChange={(e) => {
+                                const updated = { ...itemData };
+                                updated.supplierItems = updated.supplierItems.map((x: any) =>
+                                  x.id === si.id ? { ...x, isPO: e.target.value } : x
+                                );
+                                if (si.isDefault) {
+                                  updated.supplierItem = {
+                                    ...updated.supplierItem,
+                                    isPO: e.target.value,
+                                  };
+                                }
+                                setItemData(updated);
+                              }}
+                              className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#8CC21B]/20"
+                            >
+                              <option value="Yes">Yes</option>
+                              <option value="No">No</option>
+                            </select>
+                          ) : (
+                            <span className="text-sm font-semibold text-gray-900">{si.isPO || "No"}</span>
+                          )}
+                        </div>
+                        <div className="col-span-2">
+                          <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">URL</label>
+                          {editMode ? (
+                            <input
+                              type="text"
+                              value={si.url || ""}
+                              onChange={(e) => {
+                                const updated = { ...itemData };
+                                updated.supplierItems = updated.supplierItems.map((x: any) =>
+                                  x.id === si.id ? { ...x, url: e.target.value } : x
+                                );
+                                if (si.isDefault) {
+                                  updated.supplierItem = {
+                                    ...updated.supplierItem,
+                                    url: e.target.value,
+                                  };
+                                }
+                                setItemData(updated);
+                              }}
+                              className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#8CC21B]/20"
+                            />
+                          ) : (
+                            <span className="text-sm text-blue-500 truncate block">
+                              {si.url ? <a href={si.url} target="_blank" rel="noreferrer" className="hover:underline">{si.url}</a> : "—"}
+                            </span>
+                          )}
+                        </div>
+                        <div className="col-span-2">
+                          <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">Note (CN)</label>
+                          {editMode ? (
+                            <input
+                              type="text"
+                              value={si.noteCN || ""}
+                              onChange={(e) => {
+                                const updated = { ...itemData };
+                                updated.supplierItems = updated.supplierItems.map((x: any) =>
+                                  x.id === si.id ? { ...x, noteCN: e.target.value } : x
+                                );
+                                if (si.isDefault) {
+                                  updated.supplierItem = {
+                                    ...updated.supplierItem,
+                                    noteCN: e.target.value,
+                                  };
+                                }
+                                setItemData(updated);
+                              }}
+                              className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#8CC21B]/20"
+                            />
+                          ) : (
+                            <span className="text-sm font-semibold text-gray-900 truncate block">{si.noteCN || "—"}</span>
+                          )}
+                        </div>
+                      </div>
+
                       <div className="mt-2 border-t border-gray-100 pt-4">
                         <div className="bg-gray-50 border border-gray-100 rounded-xl p-4">
                           <div className="flex justify-between items-center mb-3">
@@ -1883,8 +2059,8 @@ const ItemDetailsPage = () => {
                                     key={item.id}
                                     onClick={() => router.push(`/items/${item.id}`)}
                                     className={`w-full text-left px-3.5 py-2.5 text-xs rounded-xl transition-all flex items-center justify-between cursor-pointer group/item border ${isCurrent
-                                        ? "bg-blue-50 border-blue-200 text-blue-700 font-semibold"
-                                        : "bg-white border-gray-100 hover:border-[#8CC21B]/30 hover:bg-[#8CC21B]/5 text-gray-700"
+                                      ? "bg-blue-50 border-blue-200 text-blue-700 font-semibold"
+                                      : "bg-white border-gray-100 hover:border-[#8CC21B]/30 hover:bg-[#8CC21B]/5 text-gray-700"
                                       }`}
                                   >
                                     <div className="flex flex-col gap-0.5 flex-1 min-w-0 pr-4">

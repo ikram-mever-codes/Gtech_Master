@@ -532,30 +532,33 @@ function OrdersTable({
       header: "Actions",
       width: "135px",
       align: "center",
-      render: (row) => (
-        <div className="flex items-center justify-center gap-1.5">
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onReassign(row);
-            }}
-            title="Re-assign to Cargo"
-            className="px-2 py-1 text-[10px] font-bold bg-[#8CC21B] text-white rounded-[4px] hover:bg-green-700 transition shadow-md flex items-center gap-1"
-          >
-            <span>&#8617;</span> ReAssign
-          </button>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onSplit(row);
-            }}
-            title="Split Order Item"
-            className="px-2 py-1 text-[10px] font-bold bg-amber-600 text-white rounded-[4px] hover:bg-amber-700 transition shadow-md"
-          >
-            Split
-          </button>
-        </div>
-      ),
+      render: (row) => {
+        const hasCargo = !!row.cargo_id;
+        return (
+          <div className="flex items-center justify-center gap-1.5">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onReassign(row);
+              }}
+              title={hasCargo ? "Re-assign to Cargo" : "Assign to Cargo"}
+              className="px-2 py-1 text-[10px] font-bold bg-[#8CC21B] text-white rounded-[4px] hover:bg-green-700 transition shadow-md flex items-center gap-1"
+            >
+              <span>&#8617;</span> {hasCargo ? "Reassign" : "Assign"}
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onSplit(row);
+              }}
+              title="Split Order Item"
+              className="px-2 py-1 text-[10px] font-bold bg-amber-600 text-white rounded-[4px] hover:bg-amber-700 transition shadow-md"
+            >
+              Split
+            </button>
+          </div>
+        );
+      },
     },
   ];
 
@@ -573,30 +576,33 @@ function OrdersTable({
     </span>
   );
 
-  const ActionCell = ({ row }: { row: any }) => (
-    <div className="flex items-center justify-center gap-1.5">
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          onReassign(row);
-        }}
-        title="Re-assign to Cargo"
-        className="px-2 py-1 text-[10px] font-bold bg-[#8CC21B] text-white rounded-[4px] hover:bg-green-700 transition shadow-md flex items-center gap-1"
-      >
-        <span>&#8617;</span> ReAssign
-      </button>
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          onEdit(row);
-        }}
-        title="Edit Order"
-        className="px-2 py-1 text-[10px] font-bold bg-[#059669] text-white rounded-[4px] hover:bg-green-700 transition shadow-md"
-      >
-        Edit
-      </button>
-    </div>
-  );
+  const ActionCell = ({ row }: { row: any }) => {
+    const hasCargo = !!row.cargo_id;
+    return (
+      <div className="flex items-center justify-center gap-1.5">
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onReassign(row);
+          }}
+          title={hasCargo ? "Re-assign to Cargo" : "Assign to Cargo"}
+          className="px-2 py-1 text-[10px] font-bold bg-[#8CC21B] text-white rounded-[4px] hover:bg-green-700 transition shadow-md flex items-center gap-1"
+        >
+          <span>&#8617;</span> {hasCargo ? "Reassign" : "Assign"}
+        </button>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onEdit(row);
+          }}
+          title="Edit Order"
+          className="px-2 py-1 text-[10px] font-bold bg-[#059669] text-white rounded-[4px] hover:bg-green-700 transition shadow-md"
+        >
+          Edit
+        </button>
+      </div>
+    );
+  };
 
   const orderColumns: ColumnDef<any>[] = [
     {
@@ -1537,7 +1543,7 @@ const OrderPage: React.FC = () => {
 
   const fetchCargos = useCallback(async () => {
     try {
-      const res = await getAllCargos({ limit: 1000, availableOnly: true });
+      const res = await getAllCargos({ limit: 1000 });
       const data = res?.data ?? res;
       setCargos(Array.isArray(data) ? data : data?.cargos || []);
     } catch (e) {
@@ -4199,10 +4205,15 @@ const OrderPage: React.FC = () => {
         <CustomModal
           isOpen={showREModal}
           onClose={() => setShowREModal(false)}
+          width="max-w-2xl"
           title={
-            selectedItem.order_no
-              ? `Reassign Order No: ${selectedItem.order_no}`
-              : `Reassign Item ID: ${selectedItem.id}`
+            selectedItem.cargo_id
+              ? (selectedItem.order_no
+                ? `Reassign Order No: ${selectedItem.order_no}`
+                : `Reassign Item ID: ${selectedItem.id}`)
+              : (selectedItem.order_no
+                ? `Assign Order No: ${selectedItem.order_no}`
+                : `Assign Item ID: ${selectedItem.id}`)
           }
         >
           <div className="p-4 space-y-4">
@@ -4212,7 +4223,13 @@ const OrderPage: React.FC = () => {
               </label>
               <Select
                 className="text-sm"
+                menuPortalTarget={typeof window !== "undefined" ? document.body : undefined}
+                styles={{ menuPortal: (base) => ({ ...base, zIndex: 9999 }) }}
                 options={cargos
+                  .filter((c) => {
+                    const status = (c.cargo_status || "").toLowerCase();
+                    return status !== "shipped" && status !== "delivered";
+                  })
                   .map((c) => ({
                     value: String(c.id),
                     label: `${c.cargo_no} ${c.cargo_status ? `(${c.cargo_status})` : ""}`,
@@ -4244,7 +4261,7 @@ const OrderPage: React.FC = () => {
                 className="px-6 py-2 text-sm bg-[#059669] text-white rounded-[4px] hover:bg-green-700 disabled:opacity-50 transition-all font-bold uppercase shadow-md flex items-center gap-2"
               >
                 <ArrowRightCircleIcon className="h-4 w-4" />
-                Confirm Reassign
+                {selectedItem.cargo_id ? "Confirm Reassign" : "Confirm Assign"}
               </button>
             </div>
           </div>

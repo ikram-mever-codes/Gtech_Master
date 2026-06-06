@@ -143,6 +143,9 @@ export class Item {
   @Column({ type: "boolean", default: false })
   is_updated!: boolean;
 
+  @Column({ type: "boolean", default: false })
+  isLabelPrint!: boolean;
+
   @Column({
     name: "transfer_price (EUR)",
     type: "decimal",

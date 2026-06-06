@@ -8,14 +8,13 @@ const uploadDir = "uploads/";
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
-
 const storage = multer.diskStorage({
   destination: (
     req: Request,
     file: Express.Multer.File,
     cb: (error: Error | null, destination: string) => void
   ) => {
-    cb(null, uploadDir); // Use the defined uploadDir
+    cb(null, uploadDir);
   },
   filename: (
     req: Request,
@@ -26,20 +25,16 @@ const storage = multer.diskStorage({
     cb(null, `${file.fieldname}-${Date.now()}${extname}`);
   },
 });
-
 const fileFilter = (
   req: Request,
   file: Express.Multer.File,
   cb: FileFilterCallback
 ) => {
-  // Special handling for ICS files
   if (file.originalname.toLowerCase().endsWith(".ics")) {
     console.log("ICS file detected:", file.originalname);
     cb(null, true);
     return;
   }
-
-  // Existing file type checks for other file types
   const allowedFileTypes =
     /pdf|docx?|xlsx?|txt|jpe?g|png|webp|zip|csv|mp4|mp3|avi|pptx?/;
   const mimeTypes =
