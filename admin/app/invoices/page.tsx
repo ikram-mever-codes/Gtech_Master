@@ -1340,10 +1340,20 @@ const InvoiceListPage: React.FC = () => {
                                     </td>
                                   )}
                                   <td className="py-4 px-4 text-xs text-[#212529]">
-                                    {invoice.bill_to || "N/A"}
+                                    {(() => {
+                                      const v = invoice.bill_to;
+                                      if (!v || typeof v === "object") return "N/A";
+                                      const s = String(v).trim();
+                                      return s.length > 1 ? s : "N/A";
+                                    })()}
                                   </td>
                                   <td className="py-4 px-4 text-xs text-[#6C757D]">
-                                    {invoice.ship_to || "-"}
+                                    {(() => {
+                                      const v = invoice.ship_to;
+                                      if (!v || typeof v === "object") return "-";
+                                      const s = String(v).trim();
+                                      return s.length > 1 ? s : "-";
+                                    })()}
                                   </td>
                                   <td className="py-4 px-4 text-xs text-[#212529]">
                                     {activeInvTab === "open_invoices" ? (

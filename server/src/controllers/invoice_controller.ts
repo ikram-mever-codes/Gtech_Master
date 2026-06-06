@@ -740,15 +740,25 @@ export class InvoiceController {
           cargoCommentMap.get(inv.orderNumber || "") ||
           "";
 
+        const rawBillTo = typeof cargo?.bill_to_company_name === "string" && cargo.bill_to_company_name.trim()
+          ? cargo.bill_to_company_name.trim()
+          : typeof cargo?.bill_to_display_name === "string" && cargo.bill_to_display_name.trim()
+            ? cargo.bill_to_display_name.trim()
+            : "GTech-Warehouse";
+
+        const rawShipTo = typeof cargo?.ship_to_company_name === "string" && cargo.ship_to_company_name.trim().length > 1
+          ? cargo.ship_to_company_name.trim()
+          : typeof cargo?.ship_to_display_name === "string" && cargo.ship_to_display_name.trim().length > 1
+            ? cargo.ship_to_display_name.trim()
+            : typeof inv.customer?.companyName === "string" && inv.customer.companyName.trim()
+              ? inv.customer.companyName.trim()
+              : "-";
+
         return {
           ...inv,
           grossTotal: calculatedGrossTotal,
-          bill_to: "GTech-Warehouse",
-          ship_to:
-            cargo?.ship_to_company_name ||
-            cargo?.ship_to_display_name ||
-            inv.customer?.companyName ||
-            "-",
+          bill_to: rawBillTo,
+          ship_to: rawShipTo,
           customItemCount,
           customTotalQty,
           cargoNo: cargoNo || inv.orderNumber,
@@ -1008,8 +1018,18 @@ export class InvoiceController {
           cargo: cargo ? {
             id: cargo.id,
             cargo_no: cargo.cargo_no,
-            ship_to: cargo.ship_to_company_name || cargo.ship_to_display_name || null,
-            bill_to: cargo.bill_to_company_name || cargo.bill_to_display_name || null,
+            ship_to: (() => {
+              const v = cargo.ship_to_company_name ?? cargo.ship_to_display_name ?? null;
+              if (!v || typeof v !== "string") return null;
+              const s = v.trim();
+              return s.length > 1 ? s : null;
+            })(),
+            bill_to: (() => {
+              const v = cargo.bill_to_company_name ?? cargo.bill_to_display_name ?? null;
+              if (!v || typeof v !== "string") return "GTech-Warehouse";
+              const s = v.trim();
+              return s.length > 1 ? s : "GTech-Warehouse";
+            })(),
           } : null,
           orderNosInCargo,
           detailedItems: sortedItems,
@@ -1381,7 +1401,6 @@ export class InvoiceController {
         const prefix = `CI${yy}${mm}`;
         invoice.invoiceNumber = `${prefix}${nextSeq.toString().padStart(3, "0")}`;
 
-        // Regenerate PDF URL
         const pdfUrl = await InvoiceController.generateInvoicePDF(invoice);
         invoice.pdfUrl = pdfUrl;
       }
