@@ -36,16 +36,15 @@ export class Customer {
   @Column({ nullable: true })
   legalName?: string;
 
-  // Human-facing customer number / identifier. Unique when present, but
-  // nullable so existing rows and businesses without a number are allowed
-  // (Postgres permits multiple NULLs under a unique constraint).
+  @Column({ nullable: true })
+  vatTaxId?: string;
+
   @Column({ unique: true, nullable: true })
   customerNumber?: string;
 
   @Column({ nullable: true })
   avatar?: string;
 
-  // Logo used when printing company labels (URL or stored path / data URI).
   @Column({ nullable: true })
   companyLabelPrintLogo?: string;
 

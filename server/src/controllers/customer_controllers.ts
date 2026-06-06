@@ -16,7 +16,7 @@ import { List } from "../models/list";
 export const requestCustomerAccount = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     const {
@@ -26,6 +26,7 @@ export const requestCustomerAccount = async (
       contactEmail,
       contactPhoneNumber,
       taxNumber,
+      vatTaxId,
       deliveryAddressLine1,
       deliveryAddressLine2,
       deliveryPostalCode,
@@ -43,7 +44,7 @@ export const requestCustomerAccount = async (
       !password
     ) {
       return next(
-        new ErrorHandler("All required fields must be provided", 400)
+        new ErrorHandler("All required fields must be provided", 400),
       );
     }
 
@@ -91,6 +92,7 @@ export const requestCustomerAccount = async (
           email,
           contactEmail,
           contactPhoneNumber,
+          vatTaxId,
           stage: "star_customer",
         });
 
@@ -113,9 +115,8 @@ export const requestCustomerAccount = async (
         });
 
         // Save star customer details
-        const savedStarCustomerDetails = await transactionalEntityManager.save(
-          starCustomerDetails
-        );
+        const savedStarCustomerDetails =
+          await transactionalEntityManager.save(starCustomerDetails);
 
         // Update customer with star customer details relationship
         savedCustomer.starCustomerDetails = savedStarCustomerDetails;
@@ -125,7 +126,7 @@ export const requestCustomerAccount = async (
           customer: savedCustomer,
           starCustomerDetails: savedStarCustomerDetails,
         };
-      }
+      },
     );
 
     const { customer } = result;
@@ -209,7 +210,7 @@ This is an automated message. Please do not reply to this email.
 export const verifyEmail = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     const { code } = req.params;
@@ -261,7 +262,7 @@ export const verifyEmail = async (
 export const login = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     const { email, password } = req.body;
@@ -290,7 +291,7 @@ export const login = async (
 
     const isMatch = await bcrypt.compare(
       password,
-      customer.starCustomerDetails.password
+      customer.starCustomerDetails.password,
     );
     if (!isMatch) {
       return next(new ErrorHandler("Invalid credentials", 401));
@@ -299,7 +300,7 @@ export const login = async (
     const token = jwt.sign(
       { id: customer.id, role: "customer" },
       process.env.JWT_SECRET!,
-      { expiresIn: "1d" }
+      { expiresIn: "1d" },
     );
 
     // Filter sensitive data
@@ -339,7 +340,7 @@ export const login = async (
 export const logout = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     return res
@@ -362,7 +363,7 @@ export const logout = async (
 export const editCustomerProfile = async (
   req: AuthorizedCustomerRequest,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     const customerId = (req as any).customer.id;
@@ -372,6 +373,7 @@ export const editCustomerProfile = async (
       contactEmail,
       contactPhoneNumber,
       taxNumber,
+      vatTaxId,
       deliveryAddressLine1,
       deliveryAddressLine2,
       deliveryPostalCode,
@@ -424,6 +426,7 @@ export const editCustomerProfile = async (
     if (legalName) customer.legalName = legalName;
     if (contactEmail) customer.contactEmail = contactEmail;
     if (contactPhoneNumber) customer.contactPhoneNumber = contactPhoneNumber;
+    if (vatTaxId) customer.vatTaxId = vatTaxId;
 
     // Save customer updates
     await customerRepository.save(customer);
@@ -468,6 +471,7 @@ export const editCustomerProfile = async (
       email: updatedCustomer.email,
       contactEmail: updatedCustomer.contactEmail,
       contactPhoneNumber: updatedCustomer.contactPhoneNumber,
+      vatTaxId: updatedCustomer.vatTaxId,
       avatar: updatedCustomer.avatar,
       stage: updatedCustomer.stage,
       starCustomerDetails: {
@@ -500,7 +504,7 @@ export const editCustomerProfile = async (
 export const refresh = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     const token = req.cookies.token;
@@ -525,7 +529,7 @@ export const refresh = async (
     const newToken = jwt.sign(
       { id: customer.id, role: "customer" },
       process.env.JWT_SECRET!,
-      { expiresIn: "1d" }
+      { expiresIn: "1d" },
     );
 
     // Filter sensitive data
@@ -562,7 +566,7 @@ export const refresh = async (
 export const changePassword = async (
   req: AuthorizedCustomerRequest,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     const { currentPassword, newPassword } = req.body;
@@ -587,7 +591,7 @@ export const changePassword = async (
 
     const isMatch = await bcrypt.compare(
       currentPassword,
-      customer.starCustomerDetails.password
+      customer.starCustomerDetails.password,
     );
     if (!isMatch) {
       return next(new ErrorHandler("Current password is incorrect", 401));
@@ -624,7 +628,7 @@ export const changePassword = async (
 export const forgotPassword = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     const { email } = req.body;
@@ -730,8 +734,9 @@ Dein GTech Team
       headers: {
         "X-Priority": "3",
         "X-Mailer": "Gtech Industries Gmbh",
-        "List-Unsubscribe": `<mailto:${process.env.SUPPORT_EMAIL || "contact@gtech.de"
-          }>`,
+        "List-Unsubscribe": `<mailto:${
+          process.env.SUPPORT_EMAIL || "contact@gtech.de"
+        }>`,
       },
     });
 
@@ -742,7 +747,7 @@ Dein GTech Team
   } catch (error) {
     console.error("Forgot password error:", error);
     return next(
-      new ErrorHandler("Failed to process password reset request", 500)
+      new ErrorHandler("Failed to process password reset request", 500),
     );
   }
 };
@@ -751,7 +756,7 @@ Dein GTech Team
 export const resetPassword = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     const { token } = req.params;
@@ -811,7 +816,7 @@ export const resetPassword = async (
 export const updateCustomerStatus = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     const { customerId } = req.params;
@@ -855,7 +860,8 @@ export const updateCustomerStatus = async (
 
     <p>We're writing to inform you that your account status has been updated to: <strong>${status.toUpperCase()}</strong></p>
 
-    ${status === "verified"
+    ${
+      status === "verified"
         ? `
       <h3>Welcome Aboard!</h3>
       <p>Your account is now fully activated. You can access our platform using the link below:</p>
@@ -869,9 +875,10 @@ export const updateCustomerStatus = async (
       </ol>
     `
         : ""
-      }
+    }
 
-    ${status === "rejected"
+    ${
+      status === "rejected"
         ? `
       <h3>Account Verification Required</h3>
       <p>We were unable to verify your account. Please contact our support team for more information.</p>
@@ -883,9 +890,10 @@ export const updateCustomerStatus = async (
       </ol>
     `
         : ""
-      }
+    }
 
-    ${status === "pending"
+    ${
+      status === "pending"
         ? `
       <h3>Verification in Progress</h3>
       <p>We're currently reviewing your submitted documents.</p>
@@ -893,7 +901,7 @@ export const updateCustomerStatus = async (
       <p>Expect resolution within 3-5 business days.</p>
     `
         : ""
-      }
+    }
 
     <p><strong>Security Note:</strong> Never share your login credentials. Our team will never ask for your password.</p>
 
@@ -913,8 +921,9 @@ Dear ${customer.companyName},
 
 We're writing to inform you that your account status has been updated to: ${status.toUpperCase()}
 
-${status === "verified"
-        ? `
+${
+  status === "verified"
+    ? `
 Welcome Aboard!
 
 Your account is now fully activated. You can access our platform here:
@@ -925,11 +934,12 @@ First-time login instructions:
 2. Click "Forgot Password" if you need to set/reset your credentials
 3. Contact support if you experience any issues
 `
-        : ""
-      }
+    : ""
+}
 
-${status === "rejected"
-        ? `
+${
+  status === "rejected"
+    ? `
 Account Verification Required
 
 We were unable to verify your account. Please contact our support team for more information.
@@ -939,11 +949,12 @@ Next Steps:
 2. Provide any requested documentation
 3. We'll assist you with the verification process
 `
-        : ""
-      }
+    : ""
+}
 
-${status === "pending"
-        ? `
+${
+  status === "pending"
+    ? `
 Verification in Progress
 
 We're currently reviewing your submitted documents.
@@ -952,8 +963,8 @@ You can check your verification status at: ${process.env.STAR_URL}/dashboard
 
 Expect resolution within 3-5 business days.
 `
-        : ""
-      }
+    : ""
+}
 
 Security Note: Never share your login credentials. Our team will never ask for your password.
 
@@ -991,7 +1002,7 @@ Contact Support: support@accez.cloud
 export const getAllCustomers = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     const customerRepository = AppDataSource.getRepository(Customer);
@@ -1026,7 +1037,7 @@ export const getAllCustomers = async (
         "starCustomerDetails.accountVerificationStatus = :status",
         {
           status: status.toString(),
-        }
+        },
       );
     }
 
@@ -1036,7 +1047,7 @@ export const getAllCustomers = async (
     } else if (sortBy === "country") {
       queryBuilder.orderBy(
         `starCustomerDetails.deliveryCountry`,
-        validatedOrder
+        validatedOrder,
       );
     } else {
       // Sort by customer fields
@@ -1053,6 +1064,7 @@ export const getAllCustomers = async (
       contactEmail: customer.contactEmail,
       contactPhoneNumber: customer.contactPhoneNumber,
       taxNumber: customer.starCustomerDetails?.taxNumber,
+      vatTaxId: customer?.vatTaxId,
       deliveryAddressLine1: customer.starCustomerDetails?.deliveryAddressLine1,
       deliveryCity: customer.starCustomerDetails?.deliveryCity,
       deliveryCountry: customer.starCustomerDetails?.deliveryCountry,
@@ -1080,7 +1092,7 @@ export const getAllCustomers = async (
 export const getSingleUser = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     const { customerId } = req.params;
@@ -1103,6 +1115,7 @@ export const getSingleUser = async (
       contactEmail: customer.contactEmail,
       contactPhoneNumber: customer.contactPhoneNumber,
       taxNumber: customer.starCustomerDetails?.taxNumber,
+      vatTaxId: customer?.vatTaxId,
       deliveryAddressLine1: customer.starCustomerDetails?.deliveryAddressLine1,
       deliveryAddressLine2: customer.starCustomerDetails?.deliveryAddressLine2,
       deliveryPostalCode: customer.starCustomerDetails?.deliveryPostalCode,
