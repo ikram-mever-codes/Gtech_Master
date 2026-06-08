@@ -1,15 +1,21 @@
 master_id,ItemID_DE,order_no,qty,remark_de,qty_delivered
-27958,6390,DE3185,60,,0
-27959,7658,DE3185,70,,0
+27973,12364,DE3196,50,B99086,0
+27974,12365,DE3196,50,B99086,0
+27972,12363,DE3195,3000,"Auftrag B99084",0
+27971,12363,DE3194,3000,"Auftrag B99084",0
+27970,12363,DE3193,3000,"Auftrag B99084",0
+27969,12363,DE3192,3000,"Auftrag B99084",0
+27968,12363,DE3191,3000,"Auftrag B99084",0
+27966,12341,DE3190,4000,"4000 Einheiten für Auftrag B99083",0
+27965,12341,DE3189,4000,"4000 Einheiten für Auftrag B99082",0
+27964,12341,DE3188,4000,"4000 Einheiten für Auftrag B99081",0
+27963,12341,DE3187,4000,,0
+27960,7817,DE3186,380,"380 Einheiten für Auftrag B99076",0
+27961,7813,DE3186,70,"70 Einheiten für Auftrag B99076",0
+27962,7818,DE3186,50,"50 Einheiten für Auftrag B99076",0
 27957,12367,DE3184,10,"must be according to DIN 380 / ISO 2901",0
 27954,12346,DE3183,20,,0
 27955,12347,DE3183,20,,0
-27948,12363,DE3182,3,"nickel plated brass supplier QG",0
-27949,12363,DE3182,3,"nickel plated brass supplier HX",0
-27950,12363,DE3182,3,"nickel plated brass supplier SX",0
-27951,12363,DE3182,2,"stainless steel supplier QG",0
-27952,12363,DE3182,2,"stainless steel supplier HX",0
-27953,12363,DE3182,2,"stainless steel supplier SX",0
 27946,12362,DE3181,500,,0
 27945,6321,DE3180,10,"1000pcs total",0
 27941,12349,DE3179,1,,0
@@ -79,14 +85,6 @@ master_id,ItemID_DE,order_no,qty,remark_de,qty_delivered
 27861,12322,DE3142,100,"Topband lasered + labeled 13mm bearing ",0
 27860,11420,DE3141,50,,0
 27857,12349,DE3138,100,,0
-27854,11457,DE3136,30,,0
-27853,8428,DE3135,5,"5 Einheiten für Auftrag B98830",0
-27852,11480,DE3134,2,"2 Einheiten für Auftrag B98826",0
-27848,4071,DE3133,15,"PP204 pillow block low cost  like Craft Bearings",0
-27849,4071,DE3133,30,"PP204 pillow block high qualitiy (tolerance met)",0
-27850,4071,DE3133,15,"bearing SB204-ZZ low cost-  no lubrication hole",0
-27851,4071,DE3133,30,"bearing SB204-ZZ LDK -  no lubrication hole",0
-27855,4071,DE3133,2,"sprocket KS06B-1-19",0
 27844,11098,DE3130,1,"SFU1605-3 L260 customized according to drawing ",0
 27841,5543,DE3129,70,"70 Einheiten für Auftrag B98772",0
 27842,4044,DE3129,40,,0

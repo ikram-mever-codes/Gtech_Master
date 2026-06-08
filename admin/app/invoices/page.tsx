@@ -1342,36 +1342,21 @@ const InvoiceListPage: React.FC = () => {
                                   </td>
                                 )}
                                 <td className="py-4 px-4 text-xs text-[#212529]">
-                                  {startIndex + index + 1}
-                                </td>
-                                )
-                                <td className="py-4 px-4">
-                                  <button
-                                    onClick={() =>
-                                      toggleExpansion(invoice.id, "taric")
-                                    }
-                                    className="flex items-center gap-1.5 px-2.5 py-1 bg-[#495057] text-white text-[10px] font-bold rounded-[4px] hover:bg-[#343A40] transition-colors whitespace-nowrap"
-                                  >
-                                    {(invoice as any).cargoNo ||
-                                      invoice.orderNumber ||
-                                      invoice.id.slice(-6)}{" "}
-                                    {expState.taric ? (
-                                      <ChevronDown className="w-3 h-3" />
-                                    ) : (
-                                      <ChevronRight className="w-3 h-3" />
-                                    )}
-                                  </button>
-                                </td>
-                                {activeInvTab === "closed_invoices" && (
-                                  <td className="py-4 px-4 text-xs font-semibold text-[#212529]">
-                                    {invoice.invoiceNumber || "N/A"}
-                                  </td>
-                                )}
-                                <td className="py-4 px-4 text-xs text-[#212529]">
-                                  {invoice.bill_to || "N/A"}
+                                  {(() => {
+                                    const v = invoice.bill_to;
+                                    if (!v || typeof v === "object")
+                                      return "N/A";
+                                    const s = String(v).trim();
+                                    return s.length > 1 ? s : "N/A";
+                                  })()}
                                 </td>
                                 <td className="py-4 px-4 text-xs text-[#6C757D]">
-                                  {invoice.ship_to || "-"}
+                                  {(() => {
+                                    const v = invoice.ship_to;
+                                    if (!v || typeof v === "object") return "-";
+                                    const s = String(v).trim();
+                                    return s.length > 1 ? s : "-";
+                                  })()}
                                 </td>
                                 <td className="py-4 px-4 text-xs text-[#212529]">
                                   {activeInvTab === "open_invoices" ? (
@@ -1381,13 +1366,19 @@ const InvoiceListPage: React.FC = () => {
                                       if (cargoData) {
                                         return (
                                           <span className="font-medium">
-                                            {invoice.id.slice(-2)} -{" "}
-                                            {invoice.cargoNo ||
-                                              invoice.orderNumber ||
-                                              "No Cargo"}
+                                            {cargoData.id} -{" "}
+                                            {cargoData.cargo_no}
                                           </span>
                                         );
                                       }
+                                      return (
+                                        <span className="font-medium">
+                                          {invoice.id.slice(-2)} -{" "}
+                                          {invoice.cargoNo ||
+                                            invoice.orderNumber ||
+                                            "No Cargo"}
+                                        </span>
+                                      );
                                     })()
                                   ) : (
                                     <span className="font-medium">
@@ -1397,6 +1388,46 @@ const InvoiceListPage: React.FC = () => {
                                     </span>
                                   )}
                                 </td>
+                                <td className="py-4 px-4 text-xs text-[#495057]">
+                                  {new Date(
+                                    invoice.invoiceDate,
+                                  ).toLocaleDateString("de-DE", {
+                                    day: "2-digit",
+                                    month: "2-digit",
+                                  })}
+                                </td>
+                                <td className="py-4 px-4 text-xs">
+                                  <span
+                                    onClick={() =>
+                                      toggleExpansion(invoice.id, "items")
+                                    }
+                                    className="text-[#059669] font-bold hover:underline cursor-pointer"
+                                  >
+                                    {invoice.customItemCount ??
+                                      invoice.items?.length ??
+                                      0}
+                                  </span>
+                                </td>
+                                <td className="py-4 px-4 text-xs text-[#212529] font-medium">
+                                  {invoice.customTotalQty ??
+                                    invoice.items?.reduce(
+                                      (sum: any, item: any) =>
+                                        sum + item.quantity,
+                                      0,
+                                    ) ??
+                                    0}
+                                </td>
+                                {activeInvTab === "closed_invoices" && (
+                                  <td className="py-4 px-4 text-xs text-right font-bold text-[#212529]">
+                                    {Number(invoice.grossTotal).toLocaleString(
+                                      undefined,
+                                      {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2,
+                                      },
+                                    )}
+                                  </td>
+                                )}
                                 <td className="py-4 px-4">
                                   <div className="flex items-center justify-center gap-2">
                                     {activeInvTab === "open_invoices" ? (
@@ -2324,7 +2355,7 @@ const InvoiceListPage: React.FC = () => {
                                 : "Cargo No."}
                             </span>
                             <span className="font-medium text-[#212529]">
-                              {invoice.orderNumber || "-"}
+                              {invoice.cargoNo || "-"}
                             </span>
                           </div>
                           <div className="flex justify-between text-xs">
@@ -2342,8 +2373,8 @@ const InvoiceListPage: React.FC = () => {
                               <span className="text-[#6C757D]">
                                 Total Price
                               </span>
-                              <span className="font-medium text-[#212529]">
-                                {invoice.cargoNo || "-"}
+                              <span className="text-[#212529]">
+                                ${Number(invoice.grossTotal).toFixed(2)}
                               </span>
                             </div>
                           )}
