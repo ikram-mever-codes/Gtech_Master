@@ -24,6 +24,7 @@ export enum TagCategory {
 }
 
 export enum TagColor {
+  NONE = "none",
   GRAY = "gray",
   BLUE = "blue",
   GREEN = "green",
@@ -51,7 +52,7 @@ export class Tag {
   @Column({
     type: "enum",
     enum: TagColor,
-    default: TagColor.GRAY,
+    default: TagColor.NONE,
   })
   color!: TagColor;
 

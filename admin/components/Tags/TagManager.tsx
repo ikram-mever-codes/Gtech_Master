@@ -58,12 +58,18 @@ export const TagBadge = ({
   onRemove?: () => void;
   size?: "sm" | "md";
 }) => {
-  const styles = colorClasses[tag.color] || colorClasses.gray;
+  const styles =
+    tag.color && tag.color !== "none"
+      ? colorClasses[tag.color]
+      : null;
   const padding = size === "sm" ? "px-2 py-0.5 text-[10px]" : "px-2.5 py-1 text-xs";
 
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full font-semibold transition-colors duration-150 ${padding} ${styles.badge}`}
+      className={`inline-flex items-center gap-1.5 rounded-full font-semibold transition-colors duration-150 ${padding} ${styles
+        ? styles.badge
+        : "bg-transparent text-gray-700 border border-gray-300"
+        }`}
     >
       <span>{tag.name}</span>
       {onRemove && (
@@ -196,7 +202,10 @@ export const EntityTagSelector = ({
                   </div>
                 ) : (
                   tagsToSelect.map((tag) => {
-                    const styles = colorClasses[tag.color] || colorClasses.gray;
+                    const styles =
+                      tag.color && tag.color !== "none"
+                        ? colorClasses[tag.color]
+                        : null;
                     return (
                       <button
                         key={tag.id}
@@ -207,7 +216,10 @@ export const EntityTagSelector = ({
                         }}
                         className="w-full text-left px-3 py-2 text-xs rounded-lg hover:bg-gray-50 flex items-center gap-2 text-gray-700 transition-colors"
                       >
-                        <span className={`w-2 h-2 rounded-full ${styles.dot}`} />
+                        <span
+                          className={`w-2 h-2 rounded-full ${styles ? styles.dot : "bg-white border border-gray-400"
+                            }`}
+                        />
                         <span className="font-medium">{tag.name}</span>
                       </button>
                     );
@@ -299,7 +311,10 @@ export const TagPickerInput = ({
                   </div>
                 ) : (
                   tagsToSelect.map((tag) => {
-                    const styles = colorClasses[tag.color] || colorClasses.gray;
+                    const styles =
+                      tag.color && tag.color !== "none"
+                        ? colorClasses[tag.color]
+                        : null;
                     return (
                       <button
                         key={tag.id}
@@ -310,7 +325,10 @@ export const TagPickerInput = ({
                         }}
                         className="w-full text-left px-3 py-2 text-xs rounded-lg hover:bg-gray-50 flex items-center gap-2 text-gray-700 transition-colors"
                       >
-                        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${styles.dot}`} />
+                        <span
+                          className={`w-2 h-2 rounded-full flex-shrink-0 ${styles ? styles.dot : "bg-white border border-gray-400"
+                            }`}
+                        />
                         <span className="font-medium">{tag.name}</span>
                       </button>
                     );

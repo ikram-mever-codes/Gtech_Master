@@ -31,6 +31,7 @@ const FORM_CATEGORIES = [
 ];
 
 const COLORS = [
+  { id: "none", label: "No Color", bg: "bg-white" },
   { id: "gray", label: "Gray", bg: "bg-gray-100" },
   { id: "blue", label: "Blue", bg: "bg-blue-100" },
   { id: "green", label: "Green", bg: "bg-emerald-100" },
@@ -55,7 +56,7 @@ export default function TagsPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [tagName, setTagName] = useState("");
   const [tagCategory, setTagCategory] = useState("company");
-  const [tagColor, setTagColor] = useState("gray");
+  const [tagColor, setTagColor] = useState("none");
   const [submitting, setSubmitting] = useState(false);
 
   const fetchTags = async () => {
@@ -80,7 +81,7 @@ export default function TagsPage() {
   const resetForm = () => {
     setTagName("");
     setTagCategory("company");
-    setTagColor("gray");
+    setTagColor("none");
     setIsEditing(false);
     setEditingId(null);
   };
@@ -207,11 +208,14 @@ export default function TagsPage() {
               <label className="text-xs font-bold text-gray-700 uppercase tracking-wider block">
                 Badge Color
               </label>
-              <div className="grid grid-cols-7 gap-2">
+              <div className="grid grid-cols-8 gap-2">
                 {COLORS.map((col) => {
                   const isSelected = tagColor === col.id;
                   const activeColorClass =
-                    colorClasses[col.id] || colorClasses.gray;
+                    colorClasses[col.id] || {
+                      button: "bg-white border-gray-300 text-gray-700",
+                      dot: "bg-white",
+                    };
                   return (
                     <button
                       key={col.id}
@@ -224,9 +228,14 @@ export default function TagsPage() {
                       title={col.label}
                     >
                       <span
-                        className={`w-3.5 h-3.5 rounded-full ${isSelected ? activeColorClass.dot : col.bg} border border-black/5 flex items-center justify-center`}
+                        className={`w-3.5 h-3.5 rounded-full ${col.id === "none"
+                          ? "bg-white border border-gray-400"
+                          : isSelected
+                            ? activeColorClass.dot
+                            : col.bg
+                          } flex items-center justify-center`}
                       >
-                        {isSelected && (
+                        {isSelected && col.id !== "none" && (
                           <CheckIcon className="h-2 w-2 stroke-[3] text-white" />
                         )}
                       </span>
