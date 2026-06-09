@@ -753,6 +753,12 @@ const InvoiceListPage: React.FC = () => {
 
   const handleMarkAsPaid = async (invoiceId: string) => {
     try {
+      const invoice = invoices.find((inv) => inv.id === invoiceId);
+      if (!invoice || invoice.freightCost === null || invoice.freightCost === undefined || Number(invoice.freightCost) <= 0) {
+        toast.error("Please provide a freight cost by editing the invoice before verifying it.");
+        return;
+      }
+
       setActionLoading((prev) => ({ ...prev, [`paid-${invoiceId}`]: true }));
       await markInvoiceAsPaid(invoiceId);
       await loadInvoices();
