@@ -177,6 +177,9 @@ export class RequestedItem {
   @JoinTable({ name: "requested_item_tags" })
   tags!: Tag[];
 
+  @Column({ type: "text", nullable: true })
+  tagOrder?: string;
+
   constructor(partial?: Partial<RequestedItem>) {
     if (partial) {
       Object.assign(this, partial);

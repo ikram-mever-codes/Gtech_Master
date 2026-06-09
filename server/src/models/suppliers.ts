@@ -116,6 +116,9 @@ export class Supplier {
   })
   tags!: Tag[];
 
+  @Column({ type: "text", nullable: true })
+  tagOrder?: string;
+
 
   @CreateDateColumn()
   created_at!: Date;

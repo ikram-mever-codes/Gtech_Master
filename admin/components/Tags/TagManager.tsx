@@ -49,6 +49,22 @@ export interface Tag {
   color: string;
 }
 
+export const sortTags = (
+  tags: Tag[] | undefined | null,
+  tagOrder?: string | undefined | null
+): Tag[] => {
+  if (!tags) return [];
+  if (!tagOrder) return tags;
+  const orderList = tagOrder.split(",").map((id) => id.trim());
+  return [...tags].sort((a, b) => {
+    const indexA = orderList.indexOf(a.id);
+    const indexB = orderList.indexOf(b.id);
+    const posA = indexA === -1 ? 9999 : indexA;
+    const posB = indexB === -1 ? 9999 : indexB;
+    return posA - posB;
+  });
+};
+
 export const TagBadge = ({
   tag,
   onRemove,
@@ -92,24 +108,26 @@ export const EntityTagSelector = ({
   entityId,
   entityType,
   initialTags = [],
+  tagOrder,
   onTagsUpdated,
   disabled = false,
 }: {
   entityId: string | number;
   entityType: "company" | "contact" | "inquiry" | "request_item" | "item" | "supplier";
   initialTags?: Tag[];
+  tagOrder?: string;
   onTagsUpdated?: (tags: Tag[]) => void;
   disabled?: boolean;
 }) => {
-  const [currentTags, setCurrentTags] = useState<Tag[]>(initialTags);
+  const [currentTags, setCurrentTags] = useState<Tag[]>(sortTags(initialTags, tagOrder));
   const [allAvailableTags, setAllAvailableTags] = useState<Tag[]>([]);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    setCurrentTags(initialTags || []);
-  }, [initialTags]);
+    setCurrentTags(sortTags(initialTags || [], tagOrder));
+  }, [initialTags, tagOrder]);
   const loadAvailableTags = async () => {
     try {
       const res = await getTags(entityType);

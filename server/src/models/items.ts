@@ -204,4 +204,7 @@ export class Item {
   @ManyToMany(() => Tag, (tag) => tag.items)
   @JoinTable({ name: "item_tags" })
   tags!: Tag[];
+
+  @Column({ type: "text", nullable: true })
+  tagOrder?: string;
 }
