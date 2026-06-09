@@ -1192,10 +1192,10 @@ export const updateBusiness = async (
             businessDetails.description = updateData.description.trim();
           // Internal note (preferred field from the Relationships UI) is stored
           // in businessDetails.description. Sending an empty note clears it.
-          if (updateData.note !== undefined)
-            businessDetails.description = updateData.note
-              ? String(updateData.note).trim()
-              : undefined;
+          if (updateData.note !== undefined) {
+            const trimmedNote = String(updateData.note ?? "").trim();
+            businessDetails.description = trimmedNote ? trimmedNote : "";
+          }
           if (updateData.city !== undefined)
             businessDetails.city = updateData.city.trim();
           if (updateData.state !== undefined)
