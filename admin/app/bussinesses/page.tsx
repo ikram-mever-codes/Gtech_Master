@@ -511,6 +511,11 @@ const CombinedBusinessContactsContent: React.FC = () => {
     if (!window.confirm("Do you want to delete this contact?")) return;
     try {
       await deleteContactPerson(contactId);
+      // Close the contact modal if it was open (delete is now in its footer).
+      setShowCreateModal(false);
+      resetCreateForm();
+      setModalMode("create");
+      setEditingContactId(null);
       fetchData();
     } catch (error) {
       console.error("Error deleting contact:", error);
@@ -1295,20 +1300,8 @@ const CombinedBusinessContactsContent: React.FC = () => {
                                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                           Contact
                                         </th>
-                                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                          LinkedIn
-                                        </th>
-                                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                          Type
-                                        </th>
-                                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                          Decision Maker State
-                                        </th>
-                                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                           Note
-                                        </th>
-                                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                          Actions
                                         </th>
                                       </tr>
                                     </thead>
@@ -1316,14 +1309,13 @@ const CombinedBusinessContactsContent: React.FC = () => {
                                       {business.contacts.map((contact: any) => (
                                         <tr
                                           key={contact.id}
-                                          className="hover:bg-gray-50/50 transition-colors"
+                                          className="hover:bg-gray-50/50 transition-colors cursor-pointer"
+                                          onClick={() =>
+                                            openContactModal(contact, true)
+                                          }
+                                          title="Click to edit contact"
                                         >
-                                          <td
-                                            className="px-4 py-3 cursor-pointer"
-                                            onClick={() =>
-                                              openContactModal(contact)
-                                            }
-                                          >
+                                          <td className="px-4 py-3">
                                             <div className="text-sm font-medium text-gray-900">
                                               {contact.name}{" "}
                                               {contact.familyName}
@@ -1365,160 +1357,8 @@ const CombinedBusinessContactsContent: React.FC = () => {
                                             </div>
                                           </td>
                                           <td className="px-4 py-3 text-center">
-                                            <select
-                                              value={contact.stateLinkedIn}
-                                              onChange={(e) => {
-                                                e.stopPropagation();
-                                                handleUpdateLinkedInState(
-                                                  contact.id,
-                                                  e.target.value,
-                                                );
-                                              }}
-                                              onClick={(e) =>
-                                                e.stopPropagation()
-                                              }
-                                              className={`text-xs px-2 max-w-[150px] truncate py-1 rounded-full font-medium border-0 cursor-pointer ${getLinkedInStateColor(
-                                                contact.stateLinkedIn,
-                                              )}`}
-                                            >
-                                              {LINKEDIN_STATES.map(
-                                                (state: any) => (
-                                                  <option
-                                                    key={state.value}
-                                                    value={state.value}
-                                                  >
-                                                    {state.label}
-                                                  </option>
-                                                ),
-                                              )}
-                                            </select>
-                                            {contact.linkedInLink && (
-                                              <a
-                                                href={contact.linkedInLink}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="mt-1 inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800"
-                                                onClick={(e) =>
-                                                  e.stopPropagation()
-                                                }
-                                              >
-                                                <Linkedin className="h-3 w-3" />
-                                                Profile
-                                              </a>
-                                            )}
-                                          </td>
-                                          <td className="px-4 py-3 text-center">
-                                            {contact.contact && (
-                                              <span className="inline-flex text-xs px-2 py-1 rounded-full bg-indigo-100 text-indigo-800">
-                                                {contact.contact}
-                                              </span>
-                                            )}
-                                          </td>
-                                          <td className="px-4 py-3 text-center">
-                                            <select
-                                              value={
-                                                contact.decisionMakerState || ""
-                                              }
-                                              onChange={(e) => {
-                                                e.stopPropagation();
-                                                handleUpdateDecisionMakerState(
-                                                  contact.id,
-                                                  e.target.value,
-                                                );
-                                              }}
-                                              onClick={(e) =>
-                                                e.stopPropagation()
-                                              }
-                                              className={`text-xs px-2 max-w-[180px] truncate py-1 rounded-full font-medium border-0 cursor-pointer ${getDecisionMakerStateColor(
-                                                contact.decisionMakerState ||
-                                                  "",
-                                              )}`}
-                                            >
-                                              {DECISION_MAKER_STATES.map(
-                                                (state: any) => (
-                                                  <option
-                                                    key={state.value}
-                                                    value={state.value}
-                                                  >
-                                                    {state.label}
-                                                  </option>
-                                                ),
-                                              )}
-                                            </select>
-                                          </td>
-                                          <td className="px-4 py-3 text-center">
                                             <div className="flex justify-center">
                                               {renderNoteIcons(contact)}
-                                            </div>
-                                          </td>
-                                          <td className="px-4 py-3">
-                                            <div className="flex items-center justify-center gap-2">
-                                              <button
-                                                onClick={(e) => {
-                                                  e.stopPropagation();
-                                                  openContactModal(
-                                                    contact,
-                                                    true,
-                                                  );
-                                                }}
-                                                className="text-blue-600 hover:text-blue-800 transition-colors"
-                                                title="Edit contact"
-                                              >
-                                                <PencilIcon className="h-4 w-4" />
-                                              </button>
-                                              <button
-                                                onClick={(e) => {
-                                                  e.stopPropagation();
-                                                  const q = encodeURIComponent(
-                                                    `${contact.businessLegalName || business.name}`.trim(),
-                                                  );
-                                                  window.open(
-                                                    `https://www.google.com/search?q=${q}`,
-                                                    "_blank",
-                                                  );
-                                                }}
-                                                className="text-green-600 hover:text-green-800 transition-colors"
-                                                title="Google Search"
-                                              >
-                                                <Google sx={{ fontSize: 18 }} />
-                                              </button>
-                                              <button
-                                                onClick={(e) => {
-                                                  e.stopPropagation();
-                                                  const q = encodeURIComponent(
-                                                    `${contact.businessLegalName || business.name} linkedin`.trim(),
-                                                  );
-                                                  window.open(
-                                                    `https://www.google.com/search?q=${q}`,
-                                                    "_blank",
-                                                  );
-                                                }}
-                                                className="text-blue-700 hover:text-blue-900 transition-colors"
-                                                title="LinkedIn Search"
-                                              >
-                                                <LinkedIn
-                                                  sx={{ fontSize: 18 }}
-                                                />
-                                              </button>
-                                              {user?.role ===
-                                                UserRole.ADMIN && (
-                                                <button
-                                                  onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    handleDeleteContact(
-                                                      contact.id,
-                                                    );
-                                                  }}
-                                                  title="Delete contact"
-                                                >
-                                                  <Delete
-                                                    sx={{
-                                                      fontSize: 16,
-                                                      color: "red",
-                                                    }}
-                                                  />
-                                                </button>
-                                              )}
                                             </div>
                                           </td>
                                         </tr>
@@ -2424,77 +2264,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
                       className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
                     />
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      LinkedIn State
-                    </label>
-                    <select
-                      value={createForm.stateLinkedIn}
-                      onChange={(e) =>
-                        setCreateForm({
-                          ...createForm,
-                          stateLinkedIn: e.target.value,
-                        })
-                      }
-                      disabled={modalMode === "edit" && !editModeEnabled}
-                      className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                    >
-                      {LINKEDIN_STATES.map((state) => (
-                        <option key={state.value} value={state.value}>
-                          {state.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Contact Type
-                    </label>
-                    <select
-                      value={createForm.contact}
-                      onChange={(e) =>
-                        setCreateForm({
-                          ...createForm,
-                          contact: e.target.value,
-                        })
-                      }
-                      disabled={modalMode === "edit" && !editModeEnabled}
-                      className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                    >
-                      <option value="">Kontaktart auswählen</option>
-                      {CONTACT_TYPES.map((type) => (
-                        <option key={type.value} value={type.value}>
-                          {type.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Decision Maker State
-                    </label>
-                    <select
-                      value={createForm.decisionMakerState}
-                      onChange={(e) =>
-                        setCreateForm({
-                          ...createForm,
-                          decisionMakerState: e.target.value,
-                        })
-                      }
-                      disabled={modalMode === "edit" && !editModeEnabled}
-                      className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                    >
-                      <option value="">State auswählen</option>
-                      {DECISION_MAKER_STATES.map((state) => (
-                        <option key={state.value} value={state.value}>
-                          {state.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
                   <div className="col-span-2">
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       <span className="text-green-500 text-xl">⭐</span> Contact
@@ -2552,6 +2321,8 @@ const CombinedBusinessContactsContent: React.FC = () => {
                       }
                       rows={3}
                       disabled={modalMode === "edit" && !editModeEnabled}
+                      className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                      placeholder="Internal note about this contact…"
                     />
                   </div>
 
@@ -2582,36 +2353,53 @@ const CombinedBusinessContactsContent: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="mt-6 flex justify-end gap-3">
-                  <button
-                    onClick={() => {
-                      setShowCreateModal(false);
-                      resetCreateForm();
-                      setModalMode("create");
-                      setEditingContactId(null);
-                    }}
-                    className="px-4 py-2 text-gray-700 bg-white/80 backdrop-blur-sm border border-gray-300/80 rounded-lg hover:bg-white/60 transition-all"
-                  >
-                    {modalMode === "edit" ? "Close" : "Cancel"}
-                  </button>
-                  {modalMode === "edit" && editModeEnabled && (
-                    <CustomButton
-                      gradient={true}
-                      onClick={handleCreateContact}
-                      className="px-4 py-2 bg-gray-600/90 backdrop-blur-sm text-white rounded-lg hover:bg-gray-700/90 transition-all"
+                <div className="mt-6 flex justify-between gap-3">
+                  <div>
+                    {modalMode === "edit" && user?.role === UserRole.ADMIN && (
+                      <button
+                        onClick={() => {
+                          if (editingContactId)
+                            handleDeleteContact(editingContactId);
+                        }}
+                        disabled={!editModeEnabled}
+                        className="px-3 py-2 text-xs text-red-700 bg-white/80 backdrop-blur-sm border border-red-300/80 rounded hover:bg-red-50/60 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                      >
+                        <TrashIcon className="h-4 w-4" />
+                        Delete Contact
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => {
+                        setShowCreateModal(false);
+                        resetCreateForm();
+                        setModalMode("create");
+                        setEditingContactId(null);
+                      }}
+                      className="px-4 py-2 text-gray-700 bg-white/80 backdrop-blur-sm border border-gray-300/80 rounded-lg hover:bg-white/60 transition-all"
                     >
-                      Update Contact Person
-                    </CustomButton>
-                  )}
-                  {modalMode === "create" && (
-                    <CustomButton
-                      gradient={true}
-                      onClick={handleCreateContact}
-                      className="px-4 py-2 bg-gray-600/90 backdrop-blur-sm text-white rounded-lg hover:bg-gray-700/90 transition-all"
-                    >
-                      Add Contact Person
-                    </CustomButton>
-                  )}
+                      {modalMode === "edit" ? "Close" : "Cancel"}
+                    </button>
+                    {modalMode === "edit" && editModeEnabled && (
+                      <CustomButton
+                        gradient={true}
+                        onClick={handleCreateContact}
+                        className="px-4 py-2 bg-gray-600/90 backdrop-blur-sm text-white rounded-lg hover:bg-gray-700/90 transition-all"
+                      >
+                        Update Contact Person
+                      </CustomButton>
+                    )}
+                    {modalMode === "create" && (
+                      <CustomButton
+                        gradient={true}
+                        onClick={handleCreateContact}
+                        className="px-4 py-2 bg-gray-600/90 backdrop-blur-sm text-white rounded-lg hover:bg-gray-700/90 transition-all"
+                      >
+                        Add Contact Person
+                      </CustomButton>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
