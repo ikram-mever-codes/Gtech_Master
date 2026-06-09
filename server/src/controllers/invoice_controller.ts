@@ -1413,6 +1413,13 @@ export class InvoiceController {
       });
       if (!invoice) return res.status(404).json({ message: "Invoice not found" });
 
+      if (invoice.freightCost === null || invoice.freightCost === undefined || Number(invoice.freightCost) <= 0) {
+        return res.status(400).json({
+          success: false,
+          message: "Freight cost must be provided and greater than 0 before verifying the invoice."
+        });
+      }
+
       if (!invoice.invoiceNumber || !invoice.invoiceNumber.startsWith("CI")) {
         const allCisInvoices = await invoiceRepository.find({
           where: {
