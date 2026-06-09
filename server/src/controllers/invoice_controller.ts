@@ -930,16 +930,19 @@ export class InvoiceController {
 
       const getEffectiveTaricCode = (oi: any): string => {
         const itemTaricCode = oi.item?.taric?.code || "";
-        const isProjectItem = !itemTaricCode || itemTaricCode === "0" || itemTaricCode === "0000000000";
-        if (isProjectItem && oi.set_taric_code) {
-          return oi.set_taric_code.toString();
+        const rawCode = oi.set_taric_code ? oi.set_taric_code.toString() : itemTaricCode;
+        if (rawCode) {
+          const codes = rawCode.split("/");
+          return codes.length > 1 ? codes[1].trim() : codes[0].trim();
         }
-        return itemTaricCode || "unknown";
+        return "unknown";
       };
 
       const getGroupKey = (oi: any): string => {
         if (oi.set_taric_code) {
-          return `set_${oi.set_taric_code}`;
+          const codes = oi.set_taric_code.split("/");
+          const target = codes.length > 1 ? codes[1].trim() : codes[0].trim();
+          return `set_${target}`;
         }
         const taricId = oi.item?.taric?.id;
         return taricId ? `taric_${taricId}` : "unknown";
@@ -975,9 +978,9 @@ export class InvoiceController {
           let displayRate = taric?.duty_rate || 0;
 
           if (oi.set_taric_code) {
-            displayCode = `${oi.set_taric_code}`;
-            const codes = displayCode.split("/");
+            const codes = oi.set_taric_code.split("/");
             const targetCode = codes.length > 1 ? codes[1].trim() : codes[0].trim();
+            displayCode = targetCode;
 
             const mTaric = manualTaricMap.get(targetCode);
             if (mTaric) {
@@ -1012,7 +1015,14 @@ export class InvoiceController {
         group.totalPrice += (oi.qty || 0) * (Number(currentPrice) || 0);
       });
 
-      const taricGroups = Array.from(taricGroupsMap.values());
+      const taricGroups = Array.from(taricGroupsMap.values()).map((g: any) => {
+        if (g.totalQty > 0) {
+          g.unitPrice = g.totalPrice / g.totalQty;
+        } else {
+          g.unitPrice = 0;
+        }
+        return g;
+      });
 
       const itemsWithFallbacks = await Promise.all([...orderItems]
         .map(async (oi: any) => {

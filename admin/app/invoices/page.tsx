@@ -370,7 +370,9 @@ const InvoiceListPage: React.FC = () => {
             itemTaricCode === "0000000000";
           let oiGroupKey = "";
           if (oi.set_taric_code) {
-            oiGroupKey = `set_${oi.set_taric_code}`;
+            const codes = oi.set_taric_code.split("/");
+            const target = codes.length > 1 ? codes[1].trim() : codes[0].trim();
+            oiGroupKey = `set_${target}`;
           } else {
             const taricId = oi.item?.taric?.id;
             oiGroupKey = taricId ? `taric_${taricId}` : "unknown";

@@ -1311,10 +1311,10 @@ export const generateCommercialInvoicePDF = async (
       const isProject = !taricCode || taricCode === "0" || taricCode === "0000000000";
       let groupKey: string; let hsCode: string; let desc: string;
       if (oi.set_taric_code) {
-        groupKey = `set_${oi.set_taric_code}`;
-        hsCode = oi.set_taric_code;
         const codes = oi.set_taric_code.split("/");
         const target = codes.length > 1 ? codes[1].trim() : codes[0].trim();
+        groupKey = `set_${target}`;
+        hsCode = target;
         const mt = manualTaricMap.get(target);
         desc = mt?.name_en || item?.item_name || "Unknown";
       } else if (item?.taric?.id && !isProject) {
