@@ -945,41 +945,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
     return colors[state] || "bg-gray-100 text-gray-800";
   };
 
-  const renderNoteIcons = (contact: any) => {
-    if (
-      !contact.note &&
-      !contact.noteContactPreference &&
-      !contact.decisionMakerNote
-    )
-      return null;
-    return (
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          handleOpenNotesModal(contact);
-        }}
-        className="flex gap-1 hover:bg-gray-100 p-1 rounded cursor-pointer"
-        title="Click to view all notes"
-      >
-        {contact.note && (
-          <span className="text-blue-500" title="General Note">
-            📝
-          </span>
-        )}
-        {contact.noteContactPreference && (
-          <span className="text-green-500" title="Contact Preference">
-            ⭐
-          </span>
-        )}
-        {contact.decisionMakerNote && (
-          <span className="text-purple-500" title="Decision Maker Note">
-            💼
-          </span>
-        )}
-      </button>
-    );
-  };
-
   const stats = useMemo(
     () => ({
       total: allBusinesses.length,
@@ -1316,9 +1281,25 @@ const CombinedBusinessContactsContent: React.FC = () => {
                                           title="Click to edit contact"
                                         >
                                           <td className="px-4 py-3">
-                                            <div className="text-sm font-medium text-gray-900">
-                                              {contact.name}{" "}
-                                              {contact.familyName}
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                              <span className="text-sm font-medium text-gray-900">
+                                                {contact.name}{" "}
+                                                {contact.familyName}
+                                              </span>
+                                              {contact.tags &&
+                                                contact.tags.length > 0 && (
+                                                  <div className="flex flex-wrap gap-1.5">
+                                                    {contact.tags.map(
+                                                      (tag: any) => (
+                                                        <TagBadge
+                                                          key={tag.id}
+                                                          tag={tag}
+                                                          size="sm"
+                                                        />
+                                                      ),
+                                                    )}
+                                                  </div>
+                                                )}
                                             </div>
                                             {contact.position && (
                                               <div className="text-xs text-gray-500">
@@ -1356,10 +1337,31 @@ const CombinedBusinessContactsContent: React.FC = () => {
                                               )}
                                             </div>
                                           </td>
-                                          <td className="px-4 py-3 text-center">
-                                            <div className="flex justify-center">
-                                              {renderNoteIcons(contact)}
-                                            </div>
+                                          <td className="px-4 py-3">
+                                            {contact.note ? (
+                                              <button
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  handleOpenNotesModal(contact);
+                                                }}
+                                                className="flex items-center gap-1 text-left hover:bg-gray-100 p-1 rounded"
+                                                title="Click to view note"
+                                              >
+                                                <span
+                                                  className="text-blue-500"
+                                                  title="General Note"
+                                                >
+                                                  📝
+                                                </span>
+                                                <span className="text-sm text-gray-600 max-w-[220px] truncate">
+                                                  {contact.note}
+                                                </span>
+                                              </button>
+                                            ) : (
+                                              <span className="text-gray-400 text-xs">
+                                                -
+                                              </span>
+                                            )}
                                           </td>
                                         </tr>
                                       ))}
