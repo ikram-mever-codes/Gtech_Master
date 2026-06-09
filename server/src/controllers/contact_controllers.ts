@@ -227,18 +227,7 @@ export const createContactPerson = async (
     }
 
     if (decisionMakerNote) {
-      setDecisionMakerFromContactType(contactPerson);
-
-      if (contactPerson.isDecisionMaker) {
-        contactPerson.decisionMakerNote = decisionMakerNote.trim();
-      } else {
-        return next(
-          new ErrorHandler(
-            "Decision maker note can only be set for decision makers",
-            400,
-          ),
-        );
-      }
+      contactPerson.decisionMakerNote = decisionMakerNote.trim();
     }
 
     setDecisionMakerFromContactType(contactPerson);
@@ -350,15 +339,6 @@ export const updateContactPerson = async (
         : isDecisionMaker !== undefined
           ? Boolean(isDecisionMaker)
           : contactPerson.isDecisionMaker;
-
-      if (decisionMakerNote && !willBeDecisionMaker) {
-        return next(
-          new ErrorHandler(
-            "Decision maker note can only be set for decision makers",
-            400,
-          ),
-        );
-      }
 
       contactPerson.decisionMakerNote = decisionMakerNote
         ? decisionMakerNote.trim()
