@@ -494,6 +494,11 @@ export const createBusiness = async (
       address,
       website,
       description,
+      // The merged Relationships UI sends the internal note under `note`.
+      // It is persisted into businessDetails.description (there is no dedicated
+      // note column). If you later add a real note column, change the
+      // `businessDetails.description = ...note...` lines below to write it.
+      note,
       city,
       state,
       country = "Germany",
@@ -736,9 +741,15 @@ export const createBusiness = async (
         businessDetails.check_by = user;
         businessDetails.address = address ? address.trim() : undefined;
         businessDetails.website = normalizedWebsite || undefined;
-        businessDetails.description = description
-          ? description.trim()
-          : undefined;
+        // Persist the internal note (preferred) or a legacy description.
+        businessDetails.description =
+          note !== undefined
+            ? note
+              ? String(note).trim()
+              : undefined
+            : description
+              ? description.trim()
+              : undefined;
         businessDetails.city = city ? city.trim() : undefined;
         businessDetails.state = state ? state.trim() : undefined;
         businessDetails.country = country ? country.trim() : undefined;
@@ -893,6 +904,8 @@ export const createBusiness = async (
       contactPhoneNumber: finalCustomer.contactPhoneNumber,
       stage: finalCustomer.stage,
       ...finalCustomer.businessDetails,
+      // Surface the stored note for the UI (mapped from description).
+      note: finalCustomer.businessDetails?.description,
       starBusinessDetails: finalCustomer.starBusinessDetails
         ? {
             inSeries: finalCustomer.starBusinessDetails.inSeries,
@@ -1174,6 +1187,12 @@ export const updateBusiness = async (
           }
           if (updateData.description !== undefined)
             businessDetails.description = updateData.description.trim();
+          // Internal note (preferred field from the Relationships UI) is stored
+          // in businessDetails.description. Sending an empty note clears it.
+          if (updateData.note !== undefined)
+            businessDetails.description = updateData.note
+              ? String(updateData.note).trim()
+              : undefined;
           if (updateData.city !== undefined)
             businessDetails.city = updateData.city.trim();
           if (updateData.state !== undefined)
@@ -1386,6 +1405,8 @@ export const updateBusiness = async (
       contactPhoneNumber: finalCustomer.contactPhoneNumber,
       stage: finalCustomer.stage,
       ...finalCustomer.businessDetails,
+      // Surface the stored note for the UI (mapped from description).
+      note: finalCustomer.businessDetails?.description,
       check_by: finalCustomer.businessDetails?.check_by
         ? {
             id: finalCustomer.businessDetails.check_by.id,
@@ -1570,6 +1591,8 @@ export const getBusinessById = async (
       isDeviceMaker: customer.businessDetails?.isDeviceMaker,
       isStarCustomer: customer.businessDetails?.isStarCustomer,
       check_timestamp: customer.businessDetails?.check_timestamp,
+      // Surface the stored note for the UI (mapped from description).
+      note: customer.businessDetails?.description,
       status: BUSINESS_STATUS.ACTIVE,
       tags: customer.tags,
       createdAt: customer.createdAt,
@@ -1782,6 +1805,8 @@ export const getAllBusinesses = async (
         hasWebsite: !!customer.businessDetails?.website,
         phoneNumber: customer.businessDetails?.contactPhone,
         businessEmail: customer.businessDetails?.email,
+        // Surface the stored note for the UI (mapped from description).
+        note: customer.businessDetails?.description,
         status: BUSINESS_STATUS.ACTIVE,
         source: customer.businessDetails?.businessSource,
         tags: customer.tags,

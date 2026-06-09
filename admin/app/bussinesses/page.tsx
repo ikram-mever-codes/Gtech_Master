@@ -90,6 +90,14 @@ interface FilterState {
   tags: string;
 }
 
+// Client-side text filters that run over the already-fetched list (no refetch).
+interface ClientFilterState {
+  companyName: string;
+  customerNumber: string;
+  city: string;
+  postalCode: string;
+}
+
 type BusinessWithContacts = Business & { contacts?: ContactPersonData[] };
 
 // Country is restricted to DE / AT / CH and shown as the bare 2-letter code.
@@ -128,6 +136,20 @@ const formatDateTime = (dateString: string | undefined) => {
   });
 };
 
+// Extract the label between "www." (or the host start) and the next "." of a
+// web URL. e.g. https://www.neumaerker.de/ -> "neumaerker".
+// This also sidesteps the German special-character problem (ä ü ö ß) that a
+// company-name-derived slug would otherwise carry.
+const slugFromWebsite = (website?: string) => {
+  if (!website) return "";
+  let host = website.trim().toLowerCase();
+  host = host.replace(/^https?:\/\//, ""); // drop protocol
+  host = host.replace(/^www\./, ""); // drop leading www.
+  host = host.split(/[\/?#]/)[0]; // drop any path / query / hash
+  const label = host.split(".")[0]; // text up to the first dot
+  return label.replace(/[^a-z0-9-]/g, ""); // keep it URL-safe
+};
+
 const CombinedBusinessContactsContent: React.FC = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -164,6 +186,13 @@ const CombinedBusinessContactsContent: React.FC = () => {
     source: "",
     stage: "",
     tags: "",
+  });
+  // Client-side text filters (responsive, no refetch).
+  const [clientFilters, setClientFilters] = useState<ClientFilterState>({
+    companyName: "",
+    customerNumber: "",
+    city: "",
+    postalCode: "",
   });
   const [categories, setCategories] = useState<string[]>([]);
   const [cities, setCities] = useState<string[]>([]);
@@ -291,14 +320,8 @@ const CombinedBusinessContactsContent: React.FC = () => {
 
       setAllBusinesses(merged);
 
-      const total = merged.length;
-      setTotalRecords(total);
-      setTotalPages(Math.ceil(total / itemsPerPage) || 1);
-
-      const startIndex = (currentPage - 1) * itemsPerPage;
-      setBusinesses(merged.slice(startIndex, startIndex + itemsPerPage));
-
-      // Contacts are folded by default.
+      // Contacts are folded by default. Totals / pagination are derived from
+      // the client-filtered list in a dedicated effect below.
       setExpandedBusinessIds(new Set());
 
       setCategories([
@@ -319,20 +342,60 @@ const CombinedBusinessContactsContent: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [filters, currentPage]);
+  }, [filters]);
 
   useEffect(() => {
     setCurrentPage(1);
   }, [filters]);
 
+  // Reset to the first page whenever the client-side text filters change.
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [clientFilters]);
+
   useEffect(() => {
     fetchData();
   }, [filters]);
 
+  // Client-side filtering: company name / customer no / city / postal code.
+  const filteredBusinesses = useMemo(() => {
+    const cn = clientFilters.companyName.trim().toLowerCase();
+    const num = clientFilters.customerNumber.trim().toLowerCase();
+    const city = clientFilters.city.trim().toLowerCase();
+    const pc = clientFilters.postalCode.trim().toLowerCase();
+    if (!cn && !num && !city && !pc) return allBusinesses;
+    return allBusinesses.filter((b: any) => {
+      const name = (b.displayName || b.companyName || b.name || "")
+        .toString()
+        .toLowerCase();
+      const legal = (b.legalName || "").toString().toLowerCase();
+      const number = (b.customerNumber || "").toString().toLowerCase();
+      const bcity = (b.city || "").toString().toLowerCase();
+      const bpc = (b.postalCode || "").toString().toLowerCase();
+      if (cn && !name.includes(cn) && !legal.includes(cn)) return false;
+      if (num && !number.includes(num)) return false;
+      if (city && !bcity.includes(city)) return false;
+      if (pc && !bpc.includes(pc)) return false;
+      return true;
+    });
+  }, [allBusinesses, clientFilters]);
+
+  // Pagination over the filtered list.
   useEffect(() => {
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    setBusinesses(allBusinesses.slice(startIndex, startIndex + itemsPerPage));
-  }, [currentPage, allBusinesses]);
+    const total = filteredBusinesses.length;
+    setTotalRecords(total);
+    const pages = Math.max(1, Math.ceil(total / itemsPerPage));
+    setTotalPages(pages);
+    const safePage = Math.min(currentPage, pages);
+    if (safePage !== currentPage) {
+      setCurrentPage(safePage);
+      return;
+    }
+    const startIndex = (safePage - 1) * itemsPerPage;
+    setBusinesses(
+      filteredBusinesses.slice(startIndex, startIndex + itemsPerPage),
+    );
+  }, [currentPage, filteredBusinesses]);
 
   const fetchStarBusinessesForModal = async (search?: string) => {
     try {
@@ -474,9 +537,15 @@ const CombinedBusinessContactsContent: React.FC = () => {
     }
 
     try {
+      const resolvedBusinessId = businessId || createForm.starBusinessDetailsId;
+      // Send the business id under BOTH keys so the contacts backend can attach
+      // the contact to ANY business regardless of stage (see note in the chat
+      // about the createContactPerson controller change required to drop the
+      // "Star business or customer not found" check).
       const payload: any = {
         ...createForm,
-        starBusinessDetailsId: businessId || createForm.starBusinessDetailsId,
+        starBusinessDetailsId: resolvedBusinessId,
+        businessId: resolvedBusinessId,
       };
       if (modalMode === "edit" && editingContactId) {
         await updateContactPerson(editingContactId, payload);
@@ -551,8 +620,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
   };
 
   // Display Name: first word if unique; otherwise "first second" (space between
-  // the words) keeping the first word; otherwise "first N". Mirrors the Star
-  // Portal rule but uses a space instead of a "-".
+  // the words) keeping the first word; otherwise "first N".
   const generateDisplayName = (
     companyName: string,
     existing: BusinessWithContacts[] = [],
@@ -578,36 +646,39 @@ const CombinedBusinessContactsContent: React.FC = () => {
     return `${first} ${i}`;
   };
 
-  // Star Portal Link Name: first word if unique; otherwise "first-second" (dash
-  // between the words) keeping the first word; otherwise "first-N". Generated
-  // directly from the company words so it no longer depends on the display name.
+  // Star Portal Link Name: PREFER the company web URL — take the label between
+  // "www." and the next ".".  e.g. https://www.neumaerker.de/ -> "neumaerker".
+  // This also avoids German special characters (ä ü ö ß). If no website is
+  // given, fall back to the first word of the company name. The result is
+  // uniqueness-checked; collisions get a "-2", "-3", ... suffix.
   const generateStarPortalLinkName = (
     companyName: string,
-    displayName: string,
+    website: string,
     existing: BusinessWithContacts[] = [],
     excludeId?: string | null,
   ) => {
-    const words = (companyName || "").trim().split(/\s+/).filter(Boolean);
-    if (!words.length) return "";
     const used = new Set(
       (existing || [])
         .filter((b) => b.id !== excludeId)
         .map((b: any) => (b.starPortalLinkName || "").toLowerCase())
         .filter(Boolean),
     );
-    const first = words[0];
-    if (!used.has(first.toLowerCase())) return first;
-    const second = words[1];
-    if (second) {
-      const combo = `${first}-${second}`; // first word + "-" + second word
-      if (!used.has(combo.toLowerCase())) return combo;
+
+    // Prefer the website-derived slug; fall back to first word of company name.
+    let base = slugFromWebsite(website);
+    if (!base) {
+      const words = (companyName || "").trim().split(/\s+/).filter(Boolean);
+      base = words[0] || "";
     }
+    if (!base) return "";
+
+    if (!used.has(base.toLowerCase())) return base;
     let i = 2;
-    while (used.has(`${first}-${i}`.toLowerCase())) i++;
-    return `${first}-${i}`;
+    while (used.has(`${base}-${i}`.toLowerCase())) i++;
+    return `${base}-${i}`;
   };
 
-  // FIX: auto-generation runs ONLY when the user leaves the legal-name field
+  // Auto-generation runs ONLY when the user leaves the legal-name field
   // (onBlur) and ONLY in create mode. Typing the legal name no longer writes
   // into Display Name / Star Portal Link Name on every keystroke.
   const handleCompanyNameBlur = () => {
@@ -624,7 +695,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
         ? prev.starPortalLinkName
         : generateStarPortalLinkName(
             prev.companyName,
-            autoDisplay,
+            prev.website,
             allBusinesses,
             editingBusinessId,
           );
@@ -634,6 +705,22 @@ const CombinedBusinessContactsContent: React.FC = () => {
         starPortalLinkName: autoStar,
       };
     });
+  };
+
+  // When the user enters / leaves the Web URL field, regenerate the Star Portal
+  // Link Name from the URL (create mode only, unless manually edited).
+  const handleWebsiteBlur = () => {
+    if (businessModalMode !== "create") return;
+    if (starPortalTouched.current) return;
+    setBusinessForm((prev: any) => ({
+      ...prev,
+      starPortalLinkName: generateStarPortalLinkName(
+        prev.companyName,
+        prev.website,
+        allBusinesses,
+        editingBusinessId,
+      ),
+    }));
   };
 
   const resetBusinessForm = () => {
@@ -703,11 +790,10 @@ const CombinedBusinessContactsContent: React.FC = () => {
       return;
     }
     try {
-      // FIX: the legal name (businessForm.companyName) must be sent under
-      // `legalName` — the field the read path checks FIRST. We also keep
-      // `companyName` for backends that use that column, and send
-      // displayName / starPortalLinkName as their own distinct fields so the
-      // legal name can never land in the display slot.
+      // The legal name (businessForm.companyName) is sent under `legalName` —
+      // the field the read path checks FIRST. We also keep `companyName` for
+      // backends that use that column, and send displayName / starPortalLinkName
+      // / note as their own distinct fields.
       const payload: any = {
         legalName: businessForm.companyName,
         companyName: businessForm.companyName,
@@ -798,6 +884,12 @@ const CombinedBusinessContactsContent: React.FC = () => {
       source: "",
       stage: "",
       tags: "",
+    });
+    setClientFilters({
+      companyName: "",
+      customerNumber: "",
+      city: "",
+      postalCode: "",
     });
   };
 
@@ -912,17 +1004,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
             <PageHeader title="Relationships" icon={HandshakeIcon} />
           </div>
           <div className="flex flex-wrap gap-3">
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className={`px-4 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2 ${
-                showFilters
-                  ? "bg-primary text-white"
-                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-              }`}
-            >
-              <FunnelIcon className="w-5 h-5" />
-              Filters
-            </button>
             <CustomButton
               startIcon={<PlusIcon className="w-5 h-5" />}
               gradient={true}
@@ -940,31 +1021,112 @@ const CombinedBusinessContactsContent: React.FC = () => {
           </div>
         </div>
 
-        {showFilters && (
-          <div className="mb-6 p-5 bg-white border border-gray-200 rounded-xl space-y-4 shadow-sm">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="md:col-span-2">
-                <TagFilterSelector
-                  category="company"
-                  onChange={(tagString) =>
-                    setFilters((prev) => ({ ...prev, tags: tagString }))
+        {/* Filters: tag filter component (handles include + Not/exclude), then
+            text searches for company name, customer no, city and postal code. */}
+        <div className="mb-6 p-5 bg-white border border-gray-200 rounded-xl space-y-4 shadow-sm">
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">
+              Tags (include / exclude)
+            </label>
+            <TagFilterSelector
+              category="company"
+              onChange={(tagString) =>
+                setFilters((prev) => ({ ...prev, tags: tagString }))
+              }
+              onReset={() => setFilters((prev) => ({ ...prev, tags: "" }))}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">
+                Company Name
+              </label>
+              <div className="relative">
+                <MagnifyingGlassIcon className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={clientFilters.companyName}
+                  onChange={(e) =>
+                    setClientFilters((p) => ({
+                      ...p,
+                      companyName: e.target.value,
+                    }))
                   }
-                  onReset={() => setFilters((prev) => ({ ...prev, tags: "" }))}
+                  placeholder="Search company…"
+                  className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all"
                 />
               </div>
             </div>
-
-            <div className="flex justify-end pt-2 border-t border-gray-100">
-              <button
-                onClick={resetFilters}
-                className="px-3 py-1.5 text-xs font-semibold text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 rounded-lg transition-colors flex items-center gap-1"
-              >
-                <ArrowPathIcon className="w-3.5 h-3.5" />
-                Reset All Filters
-              </button>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">
+                Customer No
+              </label>
+              <div className="relative">
+                <MagnifyingGlassIcon className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={clientFilters.customerNumber}
+                  onChange={(e) =>
+                    setClientFilters((p) => ({
+                      ...p,
+                      customerNumber: e.target.value,
+                    }))
+                  }
+                  placeholder="K-1001"
+                  className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">
+                City
+              </label>
+              <div className="relative">
+                <MagnifyingGlassIcon className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={clientFilters.city}
+                  onChange={(e) =>
+                    setClientFilters((p) => ({ ...p, city: e.target.value }))
+                  }
+                  placeholder="München"
+                  className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">
+                Postal Code
+              </label>
+              <div className="relative">
+                <MagnifyingGlassIcon className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={clientFilters.postalCode}
+                  onChange={(e) =>
+                    setClientFilters((p) => ({
+                      ...p,
+                      postalCode: e.target.value,
+                    }))
+                  }
+                  placeholder="80331"
+                  className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all"
+                />
+              </div>
             </div>
           </div>
-        )}
+
+          <div className="flex justify-end pt-2 border-t border-gray-100">
+            <button
+              onClick={resetFilters}
+              className="px-3 py-1.5 text-xs font-semibold text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 rounded-lg transition-colors flex items-center gap-1"
+            >
+              <ArrowPathIcon className="w-3.5 h-3.5" />
+              Reset All Filters
+            </button>
+          </div>
+        </div>
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
           {loading ? (
             <div className="p-20 flex justify-center items-center">
@@ -997,9 +1159,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
                         Website
                       </th>
                       <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                        Tags
-                      </th>
-                      <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                         Note
                       </th>
                     </tr>
@@ -1009,13 +1168,13 @@ const CombinedBusinessContactsContent: React.FC = () => {
                       <React.Fragment key={business.id}>
                         <tr className="hover:bg-gray-50 transition-colors">
                           <td className="px-3 py-3">
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-start gap-2">
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   toggleBusinessContacts(business.id);
                                 }}
-                                className="text-gray-400 hover:text-gray-700 flex-shrink-0"
+                                className="text-gray-400 hover:text-gray-700 flex-shrink-0 mt-0.5"
                                 title={
                                   expandedBusinessIds.has(business.id)
                                     ? "Hide contacts"
@@ -1030,29 +1189,45 @@ const CombinedBusinessContactsContent: React.FC = () => {
                                   }`}
                                 />
                               </button>
-                              <p
-                                className="font-medium w-[180px] truncate text-gray-900 cursor-pointer"
-                                title={
-                                  business.displayName ||
-                                  business.companyName ||
-                                  business.name
-                                }
-                                onClick={() => openBusinessModal(business)}
-                              >
-                                {business.displayName ||
-                                  business.companyName ||
-                                  business.name}
-                                {business.contacts?.length ? (
-                                  <span className="ml-1 text-xs font-normal text-gray-400">
-                                    ({business.contacts.length})
-                                  </span>
-                                ) : null}
+                              <div className="min-w-0">
+                                {/* Business name + tags inline (tags sit where
+                                    the customer no used to be). */}
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <p
+                                    className="font-medium max-w-[220px] truncate text-gray-900 cursor-pointer"
+                                    title={
+                                      business.displayName ||
+                                      business.companyName ||
+                                      business.name
+                                    }
+                                    onClick={() => openBusinessModal(business)}
+                                  >
+                                    {business.displayName ||
+                                      business.companyName ||
+                                      business.name}
+                                  </p>
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {business.tags && business.tags.length > 0
+                                      ? business.tags.map((tag: any) => (
+                                          <TagBadge
+                                            key={tag.id}
+                                            tag={tag}
+                                            size="sm"
+                                          />
+                                        ))
+                                      : null}
+                                  </div>
+                                </div>
+                                {/* Customer no on its own line under the name. */}
                                 {business.customerNumber && (
-                                  <span className="ml-1 text-xs font-normal text-gray-400">
-                                    {`(${business.customerNumber})`}
-                                  </span>
+                                  <p
+                                    className="text-xs text-gray-400 mt-0.5"
+                                    title="Customer No"
+                                  >
+                                    {business.customerNumber}
+                                  </p>
                                 )}
-                              </p>
+                              </div>
                             </div>
                           </td>
                           <td
@@ -1088,17 +1263,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
                               <span className="text-gray-400">-</span>
                             )}
                           </td>
-                          <td className="px-3 py-3">
-                            <div className="flex flex-wrap gap-1.5 max-w-[220px]">
-                              {business.tags && business.tags.length > 0 ? (
-                                business.tags.map((tag: any) => (
-                                  <TagBadge key={tag.id} tag={tag} size="md" />
-                                ))
-                              ) : (
-                                <span className="text-gray-400 text-xs">-</span>
-                              )}
-                            </div>
-                          </td>
                           <td
                             className="px-3 py-3 cursor-pointer"
                             onClick={() => openBusinessModal(business)}
@@ -1120,7 +1284,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
                           business.contacts &&
                           business.contacts.length > 0 && (
                             <tr className="bg-gray-50/30">
-                              <td colSpan={5} className="px-4 py-3">
+                              <td colSpan={4} className="px-4 py-3">
                                 <div className="overflow-x-auto">
                                   <table className="w-full text-sm border border-gray-200 rounded-lg">
                                     <thead className="bg-gray-200/50 border-b border-gray-200/50">
@@ -1370,7 +1534,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
                           (!business.contacts ||
                             business.contacts.length === 0) && (
                             <tr className="bg-gray-50/30">
-                              <td colSpan={5} className="px-6 py-3">
+                              <td colSpan={4} className="px-6 py-3">
                                 <div className="flex items-center justify-between text-sm text-gray-500">
                                   <span>
                                     No contacts for this business yet.
@@ -1396,8 +1560,11 @@ const CombinedBusinessContactsContent: React.FC = () => {
 
               <div className="p-4 border-t border-gray-100 bg-gray-50 flex items-center justify-between">
                 <p className="text-sm text-gray-600">
-                  Showing {(currentPage - 1) * itemsPerPage + 1} to{" "}
-                  {Math.min(currentPage * itemsPerPage, totalRecords)} of{" "}
+                  Showing{" "}
+                  {totalRecords === 0
+                    ? 0
+                    : (currentPage - 1) * itemsPerPage + 1}{" "}
+                  to {Math.min(currentPage * itemsPerPage, totalRecords)} of{" "}
                   {totalRecords} businesses
                 </p>
                 <div className="flex items-center gap-2">
@@ -1575,7 +1742,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
                         }}
                         disabled={businessFieldDisabled}
                         className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                        placeholder="Auto from display name (unique)"
+                        placeholder="Auto from web URL (between www. and next .)"
                       />
                     </div>
                     {/* Address line 1 + Street (2 across) */}
@@ -1724,9 +1891,10 @@ const CombinedBusinessContactsContent: React.FC = () => {
                             website: e.target.value,
                           })
                         }
+                        onBlur={handleWebsiteBlur}
                         disabled={businessFieldDisabled}
                         className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                        placeholder="https://muster.de"
+                        placeholder="https://www.muster.de"
                       />
                     </div>
                     {/* VAT / Tax ID */}
