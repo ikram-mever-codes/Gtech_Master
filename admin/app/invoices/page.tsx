@@ -1279,9 +1279,7 @@ const InvoiceListPage: React.FC = () => {
                             Ship To
                           </th>
                           <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
-                            {activeInvTab === "open_invoices"
-                              ? "ID - Cargo No"
-                              : "Cargo No."}
+                            Cargo No.
                           </th>
                           <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
                             {activeInvTab === "open_invoices"
@@ -1328,8 +1326,7 @@ const InvoiceListPage: React.FC = () => {
                                     }
                                     className="flex items-center gap-1.5 px-2.5 py-1 bg-[#495057] text-white text-[10px] font-bold rounded-[4px] hover:bg-[#343A40] transition-colors whitespace-nowrap"
                                   >
-                                    {invoice.cargo?.cargo_no ||
-                                      invoice.id.slice(-6)}{" "}
+                                    {invoice.cargo?.cargo_no || "No Cargo"}{" "}
                                     {expState.taric ? (
                                       <ChevronDown className="w-3 h-3" />
                                     ) : (
@@ -1368,7 +1365,6 @@ const InvoiceListPage: React.FC = () => {
                                       if (cargoData) {
                                         return (
                                           <span className="font-medium">
-                                            {cargoData.id} -{" "}
                                             {cargoData.cargo_no || "No Cargo"}
                                           </span>
                                         );
@@ -1519,8 +1515,7 @@ const InvoiceListPage: React.FC = () => {
                                       {expState.data?.cargo && (
                                         <div className="flex items-center gap-4 px-4 py-2 bg-[#EFF6FF] border border-[#BFDBFE] rounded-[4px] text-xs">
                                           <span className="font-bold text-[#1D4ED8]">
-                                            Cargo: {expState.data.cargo.id} -{" "}
-                                            {expState.data.cargo.cargo_no}
+                                            Cargo: {expState.data.cargo.cargo_no}
                                           </span>
                                           {expState.data.orderNosInCargo
                                             ?.length > 0 && (

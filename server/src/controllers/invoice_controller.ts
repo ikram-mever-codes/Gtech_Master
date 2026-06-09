@@ -29,6 +29,34 @@ export class InvoiceController {
     try {
       const { customerId, ...invoiceData } = req.body;
 
+      const orderNumber = invoiceData.orderNumber;
+      if (!orderNumber) {
+        return res.status(400).json({ message: "Order Number/Cargo Number is required" });
+      }
+
+      const cargoRepo = AppDataSource.getRepository(Cargo);
+      const orderRepo = AppDataSource.getRepository(Order);
+
+      let associatedCargo = await cargoRepo.findOne({
+        where: { cargo_no: orderNumber }
+      });
+
+      if (!associatedCargo) {
+        const order = await orderRepo.findOne({
+          where: { order_no: orderNumber },
+          relations: ["cargo"]
+        });
+        if (order && order.cargo) {
+          associatedCargo = order.cargo;
+        }
+      }
+
+      if (!associatedCargo) {
+        return res.status(400).json({
+          message: "Invoice cannot be created because the provided Order Number/Cargo Number is not assigned to any Cargo."
+        });
+      }
+
       const customer = await customerRepository.findOne({
         where: { id: customerId },
       });
@@ -712,6 +740,13 @@ export class InvoiceController {
 
       const data = invoices.map((inv) => {
         const cargo = orderToCargoMap.get(inv.orderNumber);
+        if (!cargo) {
+          AppDataSource.getRepository(InvoiceItem).delete({ invoice: { id: inv.id } })
+            .then(() => invoiceRepository.delete(inv.id))
+            .catch(err => console.error("Error deleting cargo-less invoice:", err));
+          return null;
+        }
+
         let customItemCount = 0;
         let customTotalQty = 0;
         let calculatedGrossTotal = Number(inv.grossTotal) || 0;
@@ -767,6 +802,7 @@ export class InvoiceController {
           orderComment,
         };
       })
+        .filter((inv): inv is any => inv !== null)
         .filter(inv => {
           if (req.query.status === 'draft') {
             return inv.customItemCount > 0;

@@ -69,28 +69,13 @@ export const generateInvoicesForOrders = async (
     }
 
     for (const orderNo of Array.from(orderNumbers)) {
-      const items = await orderItemRepo.find({
-        where: {
-          order: { order_no: orderNo },
-          cargo_id: IsNull(),
-        },
-        relations: ["item", "item.taric", "order"],
+      const existingInvoice = await invoiceRepo.findOne({
+        where: { orderNumber: orderNo },
       });
-
-      const order = await orderRepo.findOne({
-        where: { order_no: orderNo },
-        relations: ["customer"],
-      });
-      if (!order) continue;
-
-      await syncInvoiceRecord(
-        orderNo,
-        items,
-        order.customer || null,
-        invoiceRepo,
-        invoiceItemRepo,
-        customerRepo,
-      );
+      if (existingInvoice) {
+        await invoiceItemRepo.delete({ invoice: { id: existingInvoice.id } });
+        await invoiceRepo.delete(existingInvoice.id);
+      }
     }
   } catch (e) {
     console.error("Failed to sync invoices", e);
