@@ -758,6 +758,10 @@ const InvoiceListPage: React.FC = () => {
         toast.error("Please provide a freight cost by editing the invoice before verifying it.");
         return;
       }
+      if (!invoice.description || !invoice.description.trim()) {
+        toast.error("Please provide a description by editing the invoice before verifying it.");
+        return;
+      }
 
       setActionLoading((prev) => ({ ...prev, [`paid-${invoiceId}`]: true }));
       await markInvoiceAsPaid(invoiceId);
@@ -770,6 +774,15 @@ const InvoiceListPage: React.FC = () => {
   };
 
   const handleSaveInvoiceEdit = async (invoiceId: string) => {
+    if (!invoiceEditForm.description?.trim()) {
+      toast.error("Description is required");
+      return;
+    }
+    if (invoiceEditForm.freightCost === "" || invoiceEditForm.freightCost === null || invoiceEditForm.freightCost === undefined || Number(invoiceEditForm.freightCost) <= 0) {
+      toast.error("Freight Cost must be greater than 0");
+      return;
+    }
+
     try {
       setActionLoading((prev) => ({ ...prev, [`save-${invoiceId}`]: true }));
       await updateInvoice({

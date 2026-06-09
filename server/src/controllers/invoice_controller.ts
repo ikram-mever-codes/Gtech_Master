@@ -578,7 +578,12 @@ export class InvoiceController {
       if (!invoice) {
         return res.status(404).json({ message: "Invoice not found" });
       }
-
+      if (invoiceData.description !== undefined && !invoiceData.description.trim()) {
+        return res.status(400).json({ message: "Description is required" });
+      }
+      if (invoiceData.freightCost !== undefined && (invoiceData.freightCost === null || Number(invoiceData.freightCost) <= 0)) {
+        return res.status(400).json({ message: "Freight Cost must be greater than 0" });
+      }
       invoiceRepository.merge(invoice, invoiceData);
       const updatedInvoice = await invoiceRepository.save(invoice);
 
@@ -1417,6 +1422,13 @@ export class InvoiceController {
         return res.status(400).json({
           success: false,
           message: "Freight cost must be provided and greater than 0 before verifying the invoice."
+        });
+      }
+
+      if (!invoice.description || !invoice.description.trim()) {
+        return res.status(400).json({
+          success: false,
+          message: "Description must be provided before verifying the invoice."
         });
       }
 

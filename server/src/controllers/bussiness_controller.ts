@@ -231,8 +231,8 @@ export const bulkImportBusinesses = async (
         customer.email = businessData.email
           ? businessData.email.trim().toLowerCase()
           : `${companyNameFirstWord
-              .toLowerCase()
-              .replace(/[^a-z0-9]/g, ".")}@imported.business`;
+            .toLowerCase()
+            .replace(/[^a-z0-9]/g, ".")}@imported.business`;
         customer.stage = "business";
         customer.contactEmail = businessData.contactEmail
           ? businessData.contactEmail.trim().toLowerCase()
@@ -355,8 +355,7 @@ export const bulkImportBusinesses = async (
         for (let i = 0; i < customersToSave.length; i += CHUNK_SIZE) {
           const chunk = customersToSave.slice(i, i + CHUNK_SIZE);
           console.log(
-            `Saving chunk ${Math.floor(i / CHUNK_SIZE) + 1} with ${
-              chunk.length
+            `Saving chunk ${Math.floor(i / CHUNK_SIZE) + 1} with ${chunk.length
             } businesses`,
           );
 
@@ -863,10 +862,9 @@ export const createBusiness = async (
         <p><strong>Email:</strong> ${customer.email}</p>
         <p><strong>Temporary Password:</strong> ${tempPassword}</p>
         <p>Please login <a href="${loginLink}">here</a> to access your full account features.</p>
-        ${
-          defaultList
-            ? `<p>A default list "${defaultList.name}" has been created for your company.</p>`
-            : ""
+        ${defaultList
+          ? `<p>A default list "${defaultList.name}" has been created for your company.</p>`
+          : ""
         }
       `;
 
@@ -907,30 +905,29 @@ export const createBusiness = async (
       contactPhoneNumber: finalCustomer.contactPhoneNumber,
       stage: finalCustomer.stage,
       ...businessDetailsWithoutId,
-      // Surface the stored note for the UI (mapped from description).
       note: finalCustomer.businessDetails?.description,
       starBusinessDetails: finalCustomer.starBusinessDetails
         ? {
-            inSeries: finalCustomer.starBusinessDetails.inSeries,
-            madeIn: finalCustomer.starBusinessDetails.madeIn,
-            device: finalCustomer.starBusinessDetails.device,
-            industry: finalCustomer.starBusinessDetails.industry,
-            converted_timestamp:
-              finalCustomer.starBusinessDetails.converted_timestamp,
-            convertedBy: finalCustomer.starBusinessDetails.convertedBy
-              ? {
-                  id: finalCustomer.starBusinessDetails.convertedBy.id,
-                  name: finalCustomer.starBusinessDetails.convertedBy.name,
-                  email: finalCustomer.starBusinessDetails.convertedBy.email,
-                }
-              : undefined,
-          }
+          inSeries: finalCustomer.starBusinessDetails.inSeries,
+          madeIn: finalCustomer.starBusinessDetails.madeIn,
+          device: finalCustomer.starBusinessDetails.device,
+          industry: finalCustomer.starBusinessDetails.industry,
+          converted_timestamp:
+            finalCustomer.starBusinessDetails.converted_timestamp,
+          convertedBy: finalCustomer.starBusinessDetails.convertedBy
+            ? {
+              id: finalCustomer.starBusinessDetails.convertedBy.id,
+              name: finalCustomer.starBusinessDetails.convertedBy.name,
+              email: finalCustomer.starBusinessDetails.convertedBy.email,
+            }
+            : undefined,
+        }
         : undefined,
       defaultList: defaultList
         ? {
-            id: defaultList.id,
-            name: defaultList.name,
-          }
+          id: defaultList.id,
+          name: defaultList.name,
+        }
         : undefined,
       website: finalCustomer.businessDetails?.website,
       hasWebsite: !!finalCustomer.businessDetails?.website,
@@ -1365,10 +1362,9 @@ export const updateBusiness = async (
         <p><strong>Email:</strong> ${customer.email}</p>
         <p><strong>Temporary Password:</strong> ${tempPassword}</p>
         <p>Please login <a href="${loginLink}">here</a> to access your full account features and change your password.</p>
-        ${
-          defaultList
-            ? `<p>A default list "${defaultList.name}" has been created for your company.</p>`
-            : ""
+        ${defaultList
+          ? `<p>A default list "${defaultList.name}" has been created for your company.</p>`
+          : ""
         }
       `;
 
@@ -1411,39 +1407,38 @@ export const updateBusiness = async (
       contactPhoneNumber: finalCustomer.contactPhoneNumber,
       stage: finalCustomer.stage,
       ...businessDetailsWithoutId,
-      // Surface the stored note for the UI (mapped from description).
       note: finalCustomer.businessDetails?.description,
       check_by: finalCustomer.businessDetails?.check_by
         ? {
-            id: finalCustomer.businessDetails.check_by.id,
-            name: finalCustomer.businessDetails.check_by.name,
-            email: finalCustomer.businessDetails.check_by.email,
-          }
+          id: finalCustomer.businessDetails.check_by.id,
+          name: finalCustomer.businessDetails.check_by.name,
+          email: finalCustomer.businessDetails.check_by.email,
+        }
         : undefined,
       starBusinessDetails: finalCustomer.starBusinessDetails
         ? {
-            inSeries: finalCustomer.starBusinessDetails.inSeries,
-            madeIn: finalCustomer.starBusinessDetails.madeIn,
-            lastChecked: finalCustomer.starBusinessDetails.lastChecked,
-            checkedBy: finalCustomer.starBusinessDetails.checkedBy,
-            device: finalCustomer.starBusinessDetails.device,
-            industry: finalCustomer.starBusinessDetails.industry,
-            converted_timestamp:
-              finalCustomer.starBusinessDetails.converted_timestamp,
-            convertedBy: finalCustomer.starBusinessDetails.convertedBy
-              ? {
-                  id: finalCustomer.starBusinessDetails.convertedBy.id,
-                  name: finalCustomer.starBusinessDetails.convertedBy.name,
-                  email: finalCustomer.starBusinessDetails.convertedBy.email,
-                }
-              : undefined,
-          }
+          inSeries: finalCustomer.starBusinessDetails.inSeries,
+          madeIn: finalCustomer.starBusinessDetails.madeIn,
+          lastChecked: finalCustomer.starBusinessDetails.lastChecked,
+          checkedBy: finalCustomer.starBusinessDetails.checkedBy,
+          device: finalCustomer.starBusinessDetails.device,
+          industry: finalCustomer.starBusinessDetails.industry,
+          converted_timestamp:
+            finalCustomer.starBusinessDetails.converted_timestamp,
+          convertedBy: finalCustomer.starBusinessDetails.convertedBy
+            ? {
+              id: finalCustomer.starBusinessDetails.convertedBy.id,
+              name: finalCustomer.starBusinessDetails.convertedBy.name,
+              email: finalCustomer.starBusinessDetails.convertedBy.email,
+            }
+            : undefined,
+        }
         : undefined,
       defaultList: defaultList
         ? {
-            id: defaultList.id,
-            name: defaultList.name,
-          }
+          id: defaultList.id,
+          name: defaultList.name,
+        }
         : undefined,
       website: finalCustomer.businessDetails?.website,
       hasWebsite: !!finalCustomer.businessDetails?.website,
@@ -1528,54 +1523,54 @@ export const getBusinessById = async (
       stage: customer.stage,
       businessDetails: customer.businessDetails
         ? {
-            ...customer.businessDetails,
-            check_by: customer.businessDetails.check_by
-              ? {
-                  id: customer.businessDetails.check_by.id,
-                  name: customer.businessDetails.check_by.name,
-                  email: customer.businessDetails.check_by.email,
-                }
-              : undefined,
-          }
+          ...customer.businessDetails,
+          check_by: customer.businessDetails.check_by
+            ? {
+              id: customer.businessDetails.check_by.id,
+              name: customer.businessDetails.check_by.name,
+              email: customer.businessDetails.check_by.email,
+            }
+            : undefined,
+        }
         : undefined,
       starBusinessDetails: customer.starBusinessDetails
         ? {
-            id: customer.starBusinessDetails.id,
-            inSeries: customer.starBusinessDetails.inSeries,
-            madeIn: customer.starBusinessDetails.madeIn,
-            lastChecked: customer.starBusinessDetails.lastChecked,
-            checkedBy: customer.starBusinessDetails.checkedBy,
-            device: customer.starBusinessDetails.device,
-            industry: customer.starBusinessDetails.industry,
-            converted_timestamp:
-              customer.starBusinessDetails.converted_timestamp,
-            convertedBy: customer.starBusinessDetails.convertedBy
-              ? {
-                  id: customer.starBusinessDetails.convertedBy.id,
-                  name: customer.starBusinessDetails.convertedBy.name,
-                  email: customer.starBusinessDetails.convertedBy.email,
-                }
-              : undefined,
-            comment: customer.starBusinessDetails.comment,
-            createdAt: customer.starBusinessDetails.createdAt,
-            updatedAt: customer.starBusinessDetails.updatedAt,
-          }
+          id: customer.starBusinessDetails.id,
+          inSeries: customer.starBusinessDetails.inSeries,
+          madeIn: customer.starBusinessDetails.madeIn,
+          lastChecked: customer.starBusinessDetails.lastChecked,
+          checkedBy: customer.starBusinessDetails.checkedBy,
+          device: customer.starBusinessDetails.device,
+          industry: customer.starBusinessDetails.industry,
+          converted_timestamp:
+            customer.starBusinessDetails.converted_timestamp,
+          convertedBy: customer.starBusinessDetails.convertedBy
+            ? {
+              id: customer.starBusinessDetails.convertedBy.id,
+              name: customer.starBusinessDetails.convertedBy.name,
+              email: customer.starBusinessDetails.convertedBy.email,
+            }
+            : undefined,
+          comment: customer.starBusinessDetails.comment,
+          createdAt: customer.starBusinessDetails.createdAt,
+          updatedAt: customer.starBusinessDetails.updatedAt,
+        }
         : undefined,
       starCustomerDetails: customer.starCustomerDetails
         ? {
-            id: customer.starCustomerDetails.id,
-            taxNumber: customer.starCustomerDetails.taxNumber,
-            accountVerificationStatus:
-              customer.starCustomerDetails.accountVerificationStatus,
-            isEmailVerified: customer.starCustomerDetails.isEmailVerified,
-            deliveryAddressLine1:
-              customer.starCustomerDetails.deliveryAddressLine1,
-            deliveryPostalCode: customer.starCustomerDetails.deliveryPostalCode,
-            deliveryCity: customer.starCustomerDetails.deliveryCity,
-            deliveryCountry: customer.starCustomerDetails.deliveryCountry,
-            createdAt: customer.starCustomerDetails.createdAt,
-            updatedAt: customer.starCustomerDetails.updatedAt,
-          }
+          id: customer.starCustomerDetails.id,
+          taxNumber: customer.starCustomerDetails.taxNumber,
+          accountVerificationStatus:
+            customer.starCustomerDetails.accountVerificationStatus,
+          isEmailVerified: customer.starCustomerDetails.isEmailVerified,
+          deliveryAddressLine1:
+            customer.starCustomerDetails.deliveryAddressLine1,
+          deliveryPostalCode: customer.starCustomerDetails.deliveryPostalCode,
+          deliveryCity: customer.starCustomerDetails.deliveryCity,
+          deliveryCountry: customer.starCustomerDetails.deliveryCountry,
+          createdAt: customer.starCustomerDetails.createdAt,
+          updatedAt: customer.starCustomerDetails.updatedAt,
+        }
         : undefined,
       website: customer.businessDetails?.website,
       hasWebsite: !!customer.businessDetails?.website,
@@ -1597,7 +1592,6 @@ export const getBusinessById = async (
       isDeviceMaker: customer.businessDetails?.isDeviceMaker,
       isStarCustomer: customer.businessDetails?.isStarCustomer,
       check_timestamp: customer.businessDetails?.check_timestamp,
-      // Surface the stored note for the UI (mapped from description).
       note: customer.businessDetails?.description,
       status: BUSINESS_STATUS.ACTIVE,
       tags: customer.tags,
@@ -1811,7 +1805,6 @@ export const getAllBusinesses = async (
         hasWebsite: !!customer.businessDetails?.website,
         phoneNumber: customer.businessDetails?.contactPhone,
         businessEmail: customer.businessDetails?.email,
-        // Surface the stored note for the UI (mapped from description).
         note: customer.businessDetails?.description,
         status: BUSINESS_STATUS.ACTIVE,
         source: customer.businessDetails?.businessSource,
