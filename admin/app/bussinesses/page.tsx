@@ -730,7 +730,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
         await updateBusiness(editingBusinessId, payload);
       } else {
         const result = await createBusiness(payload);
-        const createdId = (result as any)?.data?.id;
+        const createdId = (result as any)?.id || (result as any)?.data?.id;
         if (createdId && newBusinessTags.length > 0) {
           await syncEntityTags(
             createdId,
