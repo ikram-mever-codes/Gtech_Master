@@ -110,10 +110,12 @@ interface Invoice {
   bill_to?: string;
   ship_to?: string;
   customItemCount?: number;
-  customTotalQty?: number;
   description?: string;
   freightCost?: number | string;
   remark?: string;
+  customTotalQty?: number;
+  cargoId?: number | null;
+  cargo?: { id: number; cargo_no?: string } | null;
 }
 
 interface FilterOptions {
@@ -1326,8 +1328,7 @@ const InvoiceListPage: React.FC = () => {
                                     }
                                     className="flex items-center gap-1.5 px-2.5 py-1 bg-[#495057] text-white text-[10px] font-bold rounded-[4px] hover:bg-[#343A40] transition-colors whitespace-nowrap"
                                   >
-                                    {invoice.cargoNo ||
-                                      invoice.orderNumber ||
+                                    {invoice.cargo?.cargo_no ||
                                       invoice.id.slice(-6)}{" "}
                                     {expState.taric ? (
                                       <ChevronDown className="w-3 h-3" />
@@ -1362,29 +1363,25 @@ const InvoiceListPage: React.FC = () => {
                                   {activeInvTab === "open_invoices" ? (
                                     (() => {
                                       const cargoData =
+                                        invoice.cargo ||
                                         expandedStates[invoice.id]?.data?.cargo;
                                       if (cargoData) {
                                         return (
                                           <span className="font-medium">
                                             {cargoData.id} -{" "}
-                                            {cargoData.cargo_no}
+                                            {cargoData.cargo_no || "No Cargo"}
                                           </span>
                                         );
                                       }
                                       return (
-                                        <span className="font-medium">
-                                          {invoice.id.slice(-2)} -{" "}
-                                          {invoice.cargoNo ||
-                                            invoice.orderNumber ||
-                                            "No Cargo"}
+                                        <span className="font-medium text-[#ADB5BD]">
+                                          No Cargo
                                         </span>
                                       );
                                     })()
                                   ) : (
                                     <span className="font-medium">
-                                      {invoice.cargoNo ||
-                                        invoice.orderNumber ||
-                                        "No Cargo"}
+                                      {invoice.cargo?.cargo_no || "No Cargo"}
                                     </span>
                                   )}
                                 </td>
