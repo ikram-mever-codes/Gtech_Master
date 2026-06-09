@@ -1179,6 +1179,77 @@ export const updateOrderItemPrice = async (
   }
 };
 
+type ResolvedCustomerAddress = {
+  street: string;
+  city: string;
+  postalCode: string;
+  country: string;
+  phone: string;
+  contact: string;
+};
+
+const formatPostalCity = (
+  postalCode?: string | null,
+  city?: string | null,
+): string => {
+  return [postalCode, city]
+    .filter((value) => value && String(value).trim())
+    .join(" ")
+    .trim();
+};
+
+const resolveCustomerAddress = (
+  customer: Customer | null | undefined,
+): ResolvedCustomerAddress => {
+  if (!customer) {
+    return {
+      street: "",
+      city: "",
+      postalCode: "",
+      country: "",
+      phone: "",
+      contact: "",
+    };
+  }
+
+  const businessDetails = customer.businessDetails;
+  const starCustomerDetails = customer.starCustomerDetails;
+
+  const streetParts = [
+    customer.addressLine1 ||
+    starCustomerDetails?.deliveryAddressLine1 ||
+    businessDetails?.address ||
+    "",
+    customer.addressLine2 || starCustomerDetails?.deliveryAddressLine2 || "",
+  ].filter(Boolean);
+
+  return {
+    street: streetParts.join(" ").trim(),
+    city:
+      customer.city ||
+      starCustomerDetails?.deliveryCity ||
+      businessDetails?.city ||
+      "",
+    postalCode:
+      customer.postalCode ||
+      starCustomerDetails?.deliveryPostalCode ||
+      businessDetails?.postalCode ||
+      "",
+    country:
+      customer.country ||
+      starCustomerDetails?.deliveryCountry ||
+      businessDetails?.country ||
+      "",
+    phone:
+      customer.contactPhoneNumber ||
+      starCustomerDetails?.deliveryContactPhone ||
+      businessDetails?.contactPhone ||
+      "",
+    contact:
+      customer.legalName || starCustomerDetails?.deliveryContactName || "",
+  };
+};
+
 export const generateCommercialInvoicePDF = async (
   req: Request,
   res: Response,
@@ -1194,13 +1265,26 @@ export const generateCommercialInvoicePDF = async (
     const invoiceRepository = AppDataSource.getRepository(Invoice);
     const invoice = await invoiceRepository.findOne({
       where: { id: invoiceId },
-      relations: ["customer", "items", "items.item"],
+      relations: [
+        "customer",
+        "customer.businessDetails",
+        "customer.starCustomerDetails",
+        "items",
+        "items.item",
+      ],
     });
     if (!invoice) {
       return res.status(404).json({ success: false, message: "Invoice not found" });
     }
 
-    const cargo = await AppDataSource.getRepository(Cargo).findOne({ where: { cargo_no: invoice.orderNumber } });
+    const cargo = await AppDataSource.getRepository(Cargo).findOne({
+      where: { cargo_no: invoice.orderNumber },
+      relations: [
+        "customer",
+        "customer.businessDetails",
+        "customer.starCustomerDetails",
+      ],
+    });
 
     const orderItemRepo = AppDataSource.getRepository(OrderItem);
     let rawOrderItems: any[] = [];
@@ -1277,7 +1361,8 @@ export const generateCommercialInvoicePDF = async (
     const subTotal = lineItems.reduce((s, it) => s + Number(it.price), 0);
     const freightCost = invoice.freightCost !== undefined && invoice.freightCost !== null ? Number(invoice.freightCost) : 0;
     const grandTotal = (subTotal + freightCost).toFixed(2);
-    const customer = invoice.customer;
+    const customer = invoice.customer || cargo?.customer;
+    const customerAddress = resolveCustomerAddress(customer);
 
     const hasCargoBillTo = !!(cargo?.bill_to_display_name || cargo?.bill_to_company_name);
 
@@ -1290,23 +1375,39 @@ export const generateCommercialInvoicePDF = async (
       "GTech Industries GmbH";
 
     const billToStreet = hasCargoBillTo
-      ? (cargo?.bill_to_full_address || customer?.addressLine1 || "")
-      : (cargo?.ship_to_full_address || customer?.addressLine1 || "");
+      ? (cargo?.bill_to_full_address || customerAddress.street)
+      : (cargo?.ship_to_full_address || customerAddress.street);
     const billToCity = hasCargoBillTo
-      ? (cargo?.bill_to_city ? `${cargo.bill_to_postal_code || ""} ${cargo.bill_to_city}` : `${customer?.postalCode || ""} ${customer?.city || ""}`)
-      : (cargo?.ship_to_city ? `${cargo.ship_to_postal_code || ""} ${cargo.ship_to_city}` : `${customer?.postalCode || ""} ${customer?.city || ""}`);
+      ? (cargo?.bill_to_city
+        ? formatPostalCity(cargo.bill_to_postal_code, cargo.bill_to_city)
+        : formatPostalCity(customerAddress.postalCode, customerAddress.city))
+      : (cargo?.ship_to_city
+        ? formatPostalCity(cargo.ship_to_postal_code, cargo.ship_to_city)
+        : formatPostalCity(customerAddress.postalCode, customerAddress.city));
     const billToCountry = hasCargoBillTo
-      ? (cargo?.bill_to_country || customer?.country || "Germany")
-      : (cargo?.ship_to_country || customer?.country || "Germany");
+      ? (cargo?.bill_to_country || customerAddress.country || "Germany")
+      : (cargo?.ship_to_country || customerAddress.country || "Germany");
     const billToPhone = hasCargoBillTo
-      ? (cargo?.bill_to_phone_no || customer?.contactPhoneNumber || "")
-      : (cargo?.ship_to_contact_phone || customer?.contactPhoneNumber || "");
+      ? (cargo?.bill_to_phone_no || customerAddress.phone)
+      : (cargo?.ship_to_contact_phone || customerAddress.phone);
     const billToEori = hasCargoBillTo
       ? (cargo?.bill_to_tax_no || customer?.taxNumber || "")
       : (customer?.taxNumber || "");
 
-    const shipToCompany = cargo?.ship_to_display_name || cargo?.ship_to_company_name || customer?.companyName || "";
-    const shipToStreet = cargo?.ship_to_full_address || customer?.addressLine1 || "";
+    const shipToCompany =
+      cargo?.ship_to_display_name ||
+      cargo?.ship_to_company_name ||
+      customer?.companyName ||
+      "";
+    const shipToStreet = cargo?.ship_to_full_address || customerAddress.street;
+    const shipToCity = cargo?.ship_to_city
+      ? formatPostalCity(cargo.ship_to_postal_code, cargo.ship_to_city)
+      : formatPostalCity(customerAddress.postalCode, customerAddress.city);
+    const shipToCountry = cargo?.ship_to_country || customerAddress.country || "";
+    const shipToContact =
+      cargo?.ship_to_contact_person || customerAddress.contact || "";
+    const shipToPhone =
+      cargo?.ship_to_contact_phone || customerAddress.phone || "";
 
     const customerID: string = (() => {
       if ((customer as any)?.businessDetails?.customerNumber)
@@ -1331,11 +1432,11 @@ export const generateCommercialInvoicePDF = async (
       },
       shipTo: {
         company: shipToCompany,
-        contact: cargo?.ship_to_contact_person || "",
+        contact: shipToContact,
         street: shipToStreet,
-        city: cargo?.ship_to_city ? `${cargo.ship_to_postal_code || ""} ${cargo.ship_to_city}` : `${customer?.postalCode || ""} ${customer?.city || ""}`,
-        country: cargo?.ship_to_country || customer?.country || "",
-        phone: cargo?.ship_to_contact_phone || customer?.contactPhoneNumber || "",
+        city: shipToCity,
+        country: shipToCountry,
+        phone: shipToPhone,
       },
     };
 
