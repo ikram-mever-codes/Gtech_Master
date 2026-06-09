@@ -906,7 +906,7 @@ export const createBusiness = async (
       contactEmail: finalCustomer.contactEmail,
       contactPhoneNumber: finalCustomer.contactPhoneNumber,
       stage: finalCustomer.stage,
-      ...finalCustomer.businessDetails,
+      ...businessDetailsWithoutId,
       // Surface the stored note for the UI (mapped from description).
       note: finalCustomer.businessDetails?.description,
       starBusinessDetails: finalCustomer.starBusinessDetails
@@ -1410,7 +1410,7 @@ export const updateBusiness = async (
       contactEmail: finalCustomer.contactEmail,
       contactPhoneNumber: finalCustomer.contactPhoneNumber,
       stage: finalCustomer.stage,
-      ...finalCustomer.businessDetails,
+      ...businessDetailsWithoutId,
       // Surface the stored note for the UI (mapped from description).
       note: finalCustomer.businessDetails?.description,
       check_by: finalCustomer.businessDetails?.check_by
