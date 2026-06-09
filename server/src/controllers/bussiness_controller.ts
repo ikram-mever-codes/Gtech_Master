@@ -891,6 +891,9 @@ export const createBusiness = async (
       return next(new ErrorHandler("Business not found after creation", 404));
     }
 
+    const { id: detailsId, ...businessDetailsWithoutId } =
+      finalCustomer.businessDetails || {};
+
     const businessResponse = {
       id: finalCustomer.id,
       displayName: finalCustomer.companyName,
@@ -1391,6 +1394,9 @@ export const updateBusiness = async (
     if (!finalCustomer) {
       return next(new ErrorHandler("Business not found after update", 404));
     }
+
+    const { id: detailsId, ...businessDetailsWithoutId } =
+      finalCustomer.businessDetails || {};
 
     const businessResponse = {
       id: finalCustomer.id,
