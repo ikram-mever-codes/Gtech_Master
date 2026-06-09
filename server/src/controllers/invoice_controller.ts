@@ -762,6 +762,8 @@ export class InvoiceController {
           customItemCount,
           customTotalQty,
           cargoNo: cargoNo || inv.orderNumber,
+          cargoId: cargo?.id || null,
+          cargo: cargo ? { id: cargo.id, cargo_no: cargo.cargo_no } : null,
           orderComment,
         };
       })
@@ -1413,7 +1415,6 @@ export class InvoiceController {
       await invoiceRepository.save(invoice);
       return res.json({ success: true, message: "Invoice marked as paid", data: invoice });
     } catch (error) {
-      console.error("Error in markAsPaid:", error);
       return next(error);
     }
   };
