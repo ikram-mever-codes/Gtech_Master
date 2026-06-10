@@ -707,10 +707,10 @@ export class InvoiceController {
           SUM(oi.qty) as total_qty, 
           COUNT(oi.id) as count_items,
           SUM(oi.qty * COALESCE(
-            oi.eur_special_price, 
-            oi.price, 
-            i."transfer_price (EUR)",
-            i.price, 
+            NULLIF(oi.eur_special_price, 0), 
+            NULLIF(oi.price, 0), 
+            NULLIF(i."transfer_price (EUR)", 0),
+            NULLIF(i.price, 0), 
             CASE WHEN oi.rmb_special_price > 0 THEN oi.rmb_special_price * 0.13 ELSE 0 END,
             0
           )) as total_price
@@ -1505,6 +1505,25 @@ export class InvoiceController {
       (invoice as any).closedAt = new Date();
       await invoiceRepository.save(invoice);
       return res.json({ success: true, message: "Invoice cancelled" });
+    } catch (error) {
+      return next(error);
+    }
+  };
+
+  static reopenInvoice = async (req: Request, res: Response, next: NextFunction) => {
+    const invoiceRepository = AppDataSource.getRepository(Invoice);
+    try {
+      const { id } = req.params;
+      const invoice = await invoiceRepository.findOne({ where: { id } });
+      if (!invoice) return res.status(404).json({ message: "Invoice not found" });
+
+      invoice.status = "sent";
+      invoice.closedAt = undefined;
+      invoice.paidAmount = 0;
+      invoice.outstandingAmount = invoice.grossTotal;
+
+      await invoiceRepository.save(invoice);
+      return res.json({ success: true, message: "Invoice reopened", data: invoice });
     } catch (error) {
       return next(error);
     }

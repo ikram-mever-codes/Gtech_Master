@@ -34,6 +34,7 @@ export type Supplier = {
     created_at?: Date;
     updated_at?: Date;
     tags?: { id: string; name: string; category: string; color: string }[];
+    tagOrder?: string;
 };
 
 export const getAllSuppliers = async (params?: {

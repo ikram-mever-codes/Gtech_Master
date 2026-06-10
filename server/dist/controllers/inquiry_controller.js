@@ -459,7 +459,7 @@ class InquiryController {
                 }
                 const completeInquiry = yield this.inquiryRepository.findOne({
                     where: { id: savedInquiry.id },
-                    relations: ["customer", "contactPerson", "requests"],
+                    relations: ["customer", "contactPerson", "requests", "tags"],
                 });
                 const user = request.user;
                 const filteredData = (0, dataFilter_1.filterDataByRole)(completeInquiry, (user === null || user === void 0 ? void 0 : user.role) || users_1.UserRole.STAFF);

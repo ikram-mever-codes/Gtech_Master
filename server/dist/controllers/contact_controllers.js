@@ -173,7 +173,7 @@ const createContactPerson = (req, res, next) => __awaiter(void 0, void 0, void 0
         const savedContactPerson = yield contactPersonRepository.save(contactPerson);
         const contactPersonWithRelations = yield contactPersonRepository.findOne({
             where: { id: savedContactPerson.id },
-            relations: ["starBusinessDetails", "starBusinessDetails.customer"],
+            relations: ["starBusinessDetails", "starBusinessDetails.customer", "tags"],
         });
         return res.status(201).json({
             success: true,
@@ -194,7 +194,7 @@ const updateContactPerson = (req, res, next) => __awaiter(void 0, void 0, void 0
         const contactPersonRepository = database_1.AppDataSource.getRepository(contact_person_1.ContactPerson);
         const contactPerson = yield contactPersonRepository.findOne({
             where: { id },
-            relations: ["starBusinessDetails", "starBusinessDetails.customer"],
+            relations: ["starBusinessDetails", "starBusinessDetails.customer", "tags"],
         });
         if (!contactPerson) {
             return next(new errorHandler_1.default("Contact person not found", 404));
@@ -280,7 +280,11 @@ const updateContactPerson = (req, res, next) => __awaiter(void 0, void 0, void 0
         if (note !== undefined) {
             contactPerson.note = note ? note.trim() : null;
         }
-        const updatedContactPerson = yield contactPersonRepository.save(contactPerson);
+        const savedContactPerson = yield contactPersonRepository.save(contactPerson);
+        const updatedContactPerson = yield contactPersonRepository.findOne({
+            where: { id: savedContactPerson.id },
+            relations: ["starBusinessDetails", "starBusinessDetails.customer", "tags"],
+        });
         return res.status(200).json({
             success: true,
             message: "Contact person updated successfully",
@@ -568,7 +572,7 @@ const getContactPerson = (req, res, next) => __awaiter(void 0, void 0, void 0, f
         const contactPersonRepository = database_1.AppDataSource.getRepository(contact_person_1.ContactPerson);
         const contactPerson = yield contactPersonRepository.findOne({
             where: { id },
-            relations: ["starBusinessDetails", "starBusinessDetails.customer"],
+            relations: ["starBusinessDetails", "starBusinessDetails.customer", "tags"],
         });
         if (!contactPerson) {
             return next(new errorHandler_1.default("Contact person not found", 404));
@@ -752,6 +756,7 @@ const getAllContactPersons = (req, res, next) => __awaiter(void 0, void 0, void 
                 noteContactPreference: contactPerson.noteContactPreference || null,
                 positionOthers: null,
                 tags: contactPerson.tags || [],
+                tagOrder: contactPerson.tagOrder,
             };
         });
         return res.status(200).json({
@@ -784,6 +789,7 @@ const getContactPersonsByStarBusiness = (req, res, next) => __awaiter(void 0, vo
             relations: [
                 "starBusinessDetails",
                 "starBusinessDetails.contactPersons",
+                "starBusinessDetails.contactPersons.tags",
                 "businessDetails",
             ],
         });
@@ -831,6 +837,8 @@ const getContactPersonsByStarBusiness = (req, res, next) => __awaiter(void 0, vo
                 note: contactPerson.note || null,
                 noteContactPreference: contactPerson.noteContactPreference || null,
                 positionOthers: null,
+                tags: contactPerson.tags || [],
+                tagOrder: contactPerson.tagOrder,
             };
         });
         return res.status(200).json({
@@ -1176,6 +1184,7 @@ function formatContactPersonResponse(contactPerson) {
         decisionMakerNote: contactPerson.decisionMakerNote,
         note: contactPerson.note,
         tags: contactPerson.tags || [],
+        tagOrder: contactPerson.tagOrder,
         createdAt: contactPerson.createdAt,
         updatedAt: contactPerson.updatedAt,
     };

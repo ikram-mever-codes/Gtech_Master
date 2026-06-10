@@ -470,6 +470,7 @@ const getItems = (req, res, next) => __awaiter(void 0, void 0, void 0, function*
                 created_at: item.created_at,
                 updated_at: item.updated_at,
                 tags: item.tags || [],
+                tagOrder: item.tagOrder,
             };
         });
         const user = req.user;
@@ -616,6 +617,7 @@ const getItemById = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
             painPoints: item.painPoints || [],
             isActive: item.isActive === "Y",
             tags: item.tags || [],
+            tagOrder: item.tagOrder,
             is_updated: item.is_updated,
             isLabelPrint: item.isLabelPrint || false,
             transfer_price: item.transfer_price_EUR
@@ -917,7 +919,7 @@ const updateItem = (req, res, next) => __awaiter(void 0, void 0, void 0, functio
         const categoryRepository = database_1.AppDataSource.getRepository(categories_1.Category);
         if (!id)
             return next(new errorHandler_1.default("Item ID is required", 400));
-        const item = yield itemRepository.findOne({ where: { id: parseInt(id) } });
+        const item = yield itemRepository.findOne({ where: { id: parseInt(id) }, relations: ["tags"] });
         if (!item)
             return next(new errorHandler_1.default("Item not found", 404));
         let newSupplierId = req.body.supplier_id;

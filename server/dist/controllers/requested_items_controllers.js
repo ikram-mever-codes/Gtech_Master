@@ -421,6 +421,7 @@ class RequestedItemController {
                     .leftJoinAndSelect("requestedItem.business", "business")
                     .leftJoinAndSelect("requestedItem.contactPerson", "contactPerson")
                     .leftJoinAndSelect("requestedItem.inquiry", "inquiry")
+                    .leftJoinAndSelect("requestedItem.tags", "tags")
                     .where("requestedItem.businessId = :businessId", { businessId })
                     .orderBy("requestedItem.createdAt", "DESC");
                 if (status) {
@@ -493,6 +494,7 @@ class RequestedItemController {
                     .leftJoinAndSelect("requestedItem.business", "business")
                     .leftJoinAndSelect("requestedItem.contactPerson", "contactPerson")
                     .leftJoinAndSelect("requestedItem.inquiry", "inquiry")
+                    .leftJoinAndSelect("requestedItem.tags", "tags")
                     .where("requestedItem.inquiry.id = :inquiryId", { inquiryId })
                     .orderBy("requestedItem.createdAt", "DESC");
                 if (status) {

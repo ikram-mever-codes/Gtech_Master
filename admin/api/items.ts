@@ -34,6 +34,8 @@ export interface Item {
   created_at: Date;
   updated_at: Date;
   synced_at?: Date;
+  tags?: { id: string; name: string; category: string; color: string }[];
+  tagOrder?: string;
 }
 
 export interface Parent {

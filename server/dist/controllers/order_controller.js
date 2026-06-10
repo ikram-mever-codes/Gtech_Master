@@ -190,6 +190,7 @@ const createOrder = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
             return orderItemsRepo.create({
                 order_id: order.id,
                 item_id,
+                ItemID_DE: dbItem === null || dbItem === void 0 ? void 0 : dbItem.ItemID_DE,
                 qty,
                 remark_de: it.remark_de,
                 rmb_special_price: rmbPrice,
@@ -328,6 +329,7 @@ const updateOrder = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
                 return orderItemsRepo.create({
                     order_id: order.id,
                     item_id,
+                    ItemID_DE: dbItem === null || dbItem === void 0 ? void 0 : dbItem.ItemID_DE,
                     qty,
                     remark_de: it.remark_de,
                     rmb_special_price: rmbPrice,
@@ -709,7 +711,7 @@ const deleteOrder = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
 });
 exports.deleteOrder = deleteOrder;
 const generateLabelPDF = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b, _c, _d, _e, _f;
+    var _a, _b, _c, _d, _e, _f, _g;
     try {
         const { itemId } = req.params;
         const orderItemRepo = database_1.AppDataSource.getRepository(order_items_1.OrderItem);
@@ -721,25 +723,38 @@ const generateLabelPDF = (req, res, next) => __awaiter(void 0, void 0, void 0, f
         });
         if (!item)
             return next(new errorHandler_1.default("Item not found", 404));
-        const warehouseItem = yield warehouseItemRepo.findOne({
-            where: { ItemID_DE: item.ItemID_DE },
-        });
+        let warehouseItem = null;
+        if (item.ItemID_DE) {
+            warehouseItem = yield warehouseItemRepo.findOne({
+                where: { ItemID_DE: item.ItemID_DE },
+            });
+        }
+        if (!warehouseItem && item.item_id) {
+            warehouseItem = yield warehouseItemRepo.findOne({
+                where: { item_id: item.item_id },
+            });
+        }
+        if (!warehouseItem && ((_a = item.item) === null || _a === void 0 ? void 0 : _a.ItemID_DE)) {
+            warehouseItem = yield warehouseItemRepo.findOne({
+                where: { ItemID_DE: item.item.ItemID_DE },
+            });
+        }
         const order = yield orderRepo.findOne({ where: { id: item.order_id } });
         const doc = new pdfkit_1.default({ size: [252, 110], margin: 0 });
         const logo = path_1.default.join(__dirname, "../../public/logo.png");
         const k1 = path_1.default.join(__dirname, "../../public/k1.png");
         const k2 = path_1.default.join(__dirname, "../../public/k2.png");
         let logoPath = logo;
-        if ((((_a = item.item) === null || _a === void 0 ? void 0 : _a.item_name) && item.item.item_name.includes("K011111")) ||
-            ((_b = item.remarks_cn) === null || _b === void 0 ? void 0 : _b.includes("K011111"))) {
+        if ((((_b = item.item) === null || _b === void 0 ? void 0 : _b.item_name) && item.item.item_name.includes("K011111")) ||
+            ((_c = item.remarks_cn) === null || _c === void 0 ? void 0 : _c.includes("K011111"))) {
             logoPath = k1;
         }
-        else if ((((_c = item.item) === null || _c === void 0 ? void 0 : _c.item_name) && item.item.item_name.includes("K022222")) ||
-            ((_d = item.remarks_cn) === null || _d === void 0 ? void 0 : _d.includes("K022222"))) {
+        else if ((((_d = item.item) === null || _d === void 0 ? void 0 : _d.item_name) && item.item.item_name.includes("K022222")) ||
+            ((_e = item.remarks_cn) === null || _e === void 0 ? void 0 : _e.includes("K022222"))) {
             logoPath = k2;
         }
         res.setHeader("Content-Type", "application/pdf");
-        res.setHeader("Content-Disposition", `attachment; filename=label_${item.id}.pdf`);
+        res.setHeader("Content-Disposition", `inline; filename=label_${item.id}.pdf`);
         doc.pipe(res);
         const colA = 12;
         const valColA = 16;
@@ -780,7 +795,7 @@ const generateLabelPDF = (req, res, next) => __awaiter(void 0, void 0, void 0, f
             console.error("Logo missing at path:", logoPath);
         }
         doc.font("Helvetica").fontSize(8).fillColor("#222222");
-        const description = ((_e = item.item) === null || _e === void 0 ? void 0 : _e.item_name) || "No description available";
+        const description = ((_f = item.item) === null || _f === void 0 ? void 0 : _f.item_name) || "No description available";
         doc.text(description, valColA, 42, {
             width: 180,
             height: 20,
@@ -803,7 +818,7 @@ const generateLabelPDF = (req, res, next) => __awaiter(void 0, void 0, void 0, f
             .font("Helvetica")
             .fontSize(8)
             .text(item.remark_de || "/", valColA, bottomSectionY + 30);
-        const barcodeValue = ((_f = warehouseItem === null || warehouseItem === void 0 ? void 0 : warehouseItem.ean) === null || _f === void 0 ? void 0 : _f.toString()) || "";
+        const barcodeValue = ((_g = warehouseItem === null || warehouseItem === void 0 ? void 0 : warehouseItem.ean) === null || _g === void 0 ? void 0 : _g.toString()) || "";
         if (barcodeValue) {
             try {
                 const barcodeBuffer = yield bwip_js_1.default.toBuffer({

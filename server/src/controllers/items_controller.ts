@@ -606,6 +606,7 @@ export const getItems = async (
         created_at: item.created_at,
         updated_at: item.updated_at,
         tags: item.tags || [],
+        tagOrder: item.tagOrder,
       };
     });
 
@@ -804,6 +805,7 @@ export const getItemById = async (
       painPoints: item.painPoints || [],
       isActive: item.isActive === "Y",
       tags: item.tags || [],
+      tagOrder: item.tagOrder,
       is_updated: item.is_updated,
       isLabelPrint: item.isLabelPrint || false,
       transfer_price: item.transfer_price_EUR
@@ -1170,7 +1172,7 @@ export const updateItem = async (
 
     if (!id) return next(new ErrorHandler("Item ID is required", 400));
 
-    const item = await itemRepository.findOne({ where: { id: parseInt(id) } });
+    const item = await itemRepository.findOne({ where: { id: parseInt(id) }, relations: ["tags"] });
     if (!item) return next(new ErrorHandler("Item not found", 404));
 
     let newSupplierId = req.body.supplier_id;

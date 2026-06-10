@@ -1978,10 +1978,12 @@ const CombinedInquiriesPageContent = () => {
                             entityId={editingInquiryId!}
                             entityType="inquiry"
                             initialTags={(inquiryFormData as any).tags || []}
+                            tagOrder={(inquiryFormData as any).tagOrder}
                             onTagsUpdated={(updatedTags) =>
                               setInquiryFormData((prev: any) => ({
                                 ...prev,
                                 tags: updatedTags,
+                                tagOrder: updatedTags.map((t) => t.id).join(","),
                               }))
                             }
                             disabled={!editModeEnabled}

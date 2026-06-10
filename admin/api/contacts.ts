@@ -68,6 +68,8 @@ export type ContactPersonData = {
   contact: ContactType;
   note?: string;
   decisionMakerNote?: string;
+  tags?: { id: string; name: string; category: string; color: string }[];
+  tagOrder?: string;
   createdAt: string;
   updatedAt: string;
 };

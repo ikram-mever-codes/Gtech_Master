@@ -256,19 +256,10 @@ export const downloadItemLabel = async (itemId: number | string) => {
     const file = new Blob([response.data], { type: "application/pdf" });
 
     const fileURL = URL.createObjectURL(file);
-    const link = document.createElement("a");
-    link.href = fileURL;
-    link.download = `label_item_${itemId}.pdf`;
-    document.body.appendChild(link);
-    link.click();
-
-    setTimeout(() => {
-      document.body.removeChild(link);
-      URL.revokeObjectURL(fileURL);
-    }, 100);
+    window.open(fileURL, "_blank");
 
     toast.dismiss();
-    toast.success("Label generated!", successStyles);
+    toast.success("Label opened in new tab!", successStyles);
   } catch (error) {
     toast.dismiss();
     handleApiError(error, "Failed to generate label");
