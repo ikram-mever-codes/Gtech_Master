@@ -32,6 +32,7 @@ import { getAllCustomers } from "@/api/customers";
 import { errorStyles, successStyles } from "@/utils/constants";
 import BillToShipToForm, { BillToShipToData, WAREHOUSE_BILL_TO } from "../General/BillToShipToForm";
 import { getAllCargoTypes, CargoTypeObj } from "@/api/cargo_types";
+import SegmentedControl from "@/components/UI/SegmentedControl";
 
 
 type Customer = {
@@ -91,12 +92,18 @@ const CargosTab: React.FC<CargosTabProps> = ({ customers: externalCustomers }) =
     const [cargos, setCargos] = useState<CargoType[]>([]);
     const [loading, setLoading] = useState(false);
     const [search, setSearch] = useState("");
+    const [statusFilter, setStatusFilter] = useState("Open");
     const [pagination, setPagination] = useState({
         page: 1,
         limit: 30,
         totalRecords: 0,
         totalPages: 1,
     });
+
+    const handleStatusFilterChange = (newStatus: string) => {
+        setStatusFilter(newStatus);
+        setPagination((prev) => ({ ...prev, page: 1 }));
+    };
 
     const [showModal, setShowModal] = useState(false);
     const [modalMode, setModalMode] = useState<"create" | "edit" | "view">("create");
@@ -152,6 +159,7 @@ const CargosTab: React.FC<CargosTabProps> = ({ customers: externalCustomers }) =
                 page: pagination.page,
                 limit: pagination.limit,
                 search,
+                status: statusFilter,
             });
             setCargos(response.data || []);
             if (response.pagination) {
@@ -162,7 +170,7 @@ const CargosTab: React.FC<CargosTabProps> = ({ customers: externalCustomers }) =
         } finally {
             setLoading(false);
         }
-    }, [pagination.page, pagination.limit, search]);
+    }, [pagination.page, pagination.limit, search, statusFilter]);
 
     const fetchOrders = useCallback(async () => {
         setLoadingOrders(true);
@@ -450,23 +458,34 @@ const CargosTab: React.FC<CargosTabProps> = ({ customers: externalCustomers }) =
     return (
         <div>
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-3">
-                <div className="relative flex-1 max-w-md">
-                    <MagnifyingGlassIcon className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                    <input
-                        type="text"
-                        placeholder="Search cargos..."
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-[4px] focus:ring-2 focus:ring-gray-500 focus:border-gray-500 transition-all text-sm"
+                <div className="flex flex-wrap items-center gap-3 flex-1 w-full md:w-auto">
+                    <div className="relative w-full max-w-xs">
+                        <MagnifyingGlassIcon className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                        <input
+                            type="text"
+                            placeholder="Search cargos..."
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-[4px] focus:ring-2 focus:ring-gray-500 focus:border-gray-500 transition-all text-sm"
+                        />
+                        {search && (
+                            <button
+                                onClick={() => setSearch("")}
+                                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                            >
+                                <XMarkIcon className="w-4 h-4" />
+                            </button>
+                        )}
+                    </div>
+                    <SegmentedControl
+                        options={[
+                            { value: "Open", label: "Open" },
+                            { value: "Shipped", label: "Shipped" },
+                            { value: "Delivered", label: "Delivered" },
+                        ]}
+                        value={statusFilter}
+                        onChange={handleStatusFilterChange}
                     />
-                    {search && (
-                        <button
-                            onClick={() => setSearch("")}
-                            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                        >
-                            <XMarkIcon className="w-4 h-4" />
-                        </button>
-                    )}
                 </div>
                 <div className="flex gap-2">
                     <button

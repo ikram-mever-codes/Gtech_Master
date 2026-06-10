@@ -104,6 +104,9 @@ export class Customer {
   @JoinTable({ name: "customer_tags" })
   tags!: Tag[];
 
+  @Column({ type: "text", nullable: true })
+  tagOrder?: string;
+
   @AfterLoad()
   populateDetails() {
     if (this.businessDetails) {

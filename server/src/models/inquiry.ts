@@ -249,6 +249,9 @@ export class Inquiry {
   @JoinTable({ name: "inquiry_tags" })
   tags!: Tag[];
 
+  @Column({ type: "text", nullable: true })
+  tagOrder?: string;
+
   constructor(partial?: Partial<Inquiry>) {
     if (partial) {
       Object.assign(this, partial);

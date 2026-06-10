@@ -137,21 +137,55 @@ export const deleteTag = async (req: Request, res: Response) => {
       return res.status(404).json({ message: "Tag not found" });
     }
 
-    const totalAssigned =
-      (tag.customers?.length || 0) +
-      (tag.contacts?.length || 0) +
-      (tag.inquiries?.length || 0) +
-      (tag.requestedItems?.length || 0) +
-      (tag.items?.length || 0) +
-      (tag.suppliers?.length || 0);
+    let assignedCount = 0;
+    let categoryName = "";
 
-    if (totalAssigned > 0) {
+    if (tag.category === TagCategory.COMPANY) {
+      assignedCount = tag.customers?.length || 0;
+      categoryName = "company/business";
+    } else if (tag.category === TagCategory.CONTACT) {
+      assignedCount = tag.contacts?.length || 0;
+      categoryName = "contact";
+    } else if (tag.category === TagCategory.INQUIRY) {
+      assignedCount = tag.inquiries?.length || 0;
+      categoryName = "inquiry";
+    } else if (tag.category === TagCategory.REQUEST_ITEM) {
+      assignedCount = tag.requestedItems?.length || 0;
+      categoryName = "request item";
+    } else if (tag.category === TagCategory.ITEM) {
+      assignedCount = tag.items?.length || 0;
+      categoryName = "item";
+    } else if (tag.category === TagCategory.SUPPLIER) {
+      assignedCount = tag.suppliers?.length || 0;
+      categoryName = "supplier";
+    }
+
+    if (assignedCount > 0) {
       return res.status(400).json({
-        message: `Cannot delete tag "${tag.name}": it is currently assigned to ${totalAssigned} record(s). Remove all assignments first.`,
+        message: `Cannot delete tag "${tag.name}": it is currently assigned to ${assignedCount} ${categoryName} record(s). Remove all assignments first.`,
       });
     }
 
-    await tagRepo.remove(tag);
+    const queryRunner = AppDataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+    try {
+      await queryRunner.query('DELETE FROM "customer_tags" WHERE "tagId" = $1', [id]);
+      await queryRunner.query('DELETE FROM "contact_tags" WHERE "tagId" = $1', [id]);
+      await queryRunner.query('DELETE FROM "inquiry_tags" WHERE "tagId" = $1', [id]);
+      await queryRunner.query('DELETE FROM "requested_item_tags" WHERE "tagId" = $1', [id]);
+      await queryRunner.query('DELETE FROM "item_tags" WHERE "tagId" = $1', [id]);
+      await queryRunner.query('DELETE FROM "supplier_tag" WHERE "tag_id" = $1', [id]);
+
+      await queryRunner.manager.remove(tag);
+      await queryRunner.commitTransaction();
+    } catch (dbError) {
+      await queryRunner.rollbackTransaction();
+      throw dbError;
+    } finally {
+      await queryRunner.release();
+    }
+
     return res.status(200).json({ message: "Tag deleted successfully" });
   } catch (error: any) {
     console.error("Error deleting tag:", error);
@@ -197,6 +231,7 @@ export const syncEntityTags = async (req: Request, res: Response) => {
     }
 
     entity[config.relation] = tags;
+    entity.tagOrder = tagIds.join(",");
     await entityRepo.save(entity);
 
     return res.status(200).json({ message: "Tags synced successfully", data: entity });

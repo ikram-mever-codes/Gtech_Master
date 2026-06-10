@@ -44,6 +44,7 @@ import {
   TagPickerInput,
   EntityTagSelector,
   type Tag,
+  sortTags,
 } from "@/components/Tags/TagManager";
 import { TagFilterSelector } from "@/components/Tags/TagFilterSelector";
 import { syncEntityTags } from "@/api/tags";
@@ -222,6 +223,8 @@ const CombinedBusinessContactsContent: React.FC = () => {
     note: "",
     noteContactPreference: "",
     decisionMakerNote: "",
+    tags: [],
+    tagOrder: "",
   });
 
   const [showNotesModal, setShowNotesModal] = useState(false);
@@ -251,6 +254,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
     vatTaxId: "",
     note: "",
     tags: [] as any[],
+    tagOrder: "",
   };
   const [businessForm, setBusinessForm] = useState<any>({
     ...emptyBusinessForm,
@@ -493,6 +497,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
         noteContactPreference: (contact as any).noteContactPreference || "",
         decisionMakerNote: (contact as any).decisionMakerNote || "",
         tags: (contact as any).tags || [],
+        tagOrder: (contact as any).tagOrder || "",
       });
       setNewContactTags((contact as any).tags || []);
       if ((contact as any).starBusinessDetailsId) {
@@ -601,6 +606,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
       noteContactPreference: "",
       decisionMakerNote: "",
       tags: [],
+      tagOrder: "",
     });
     setSelectedBusiness(null);
     setEditModeEnabled(false);
@@ -779,6 +785,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
       website: business.website || "",
       note: business.note || "",
       tags: business.tags || [],
+      tagOrder: business.tagOrder || "",
     });
 
     setNewBusinessTags(business.tags || []);
@@ -1178,7 +1185,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
                                   </p>
                                   <div className="flex flex-wrap gap-1.5">
                                     {business.tags && business.tags.length > 0
-                                      ? business.tags.map((tag: any) => (
+                                      ? sortTags(business.tags, business.tagOrder).map((tag: any) => (
                                           <TagBadge
                                             key={tag.id}
                                             tag={tag}
@@ -1289,7 +1296,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
                                               {contact.tags &&
                                                 contact.tags.length > 0 && (
                                                   <div className="flex flex-wrap gap-1.5">
-                                                    {contact.tags.map(
+                                                    {sortTags(contact.tags, contact.tagOrder).map(
                                                       (tag: any) => (
                                                         <TagBadge
                                                           key={tag.id}
@@ -1794,10 +1801,12 @@ const CombinedBusinessContactsContent: React.FC = () => {
                           entityId={editingBusinessId!}
                           entityType="company"
                           initialTags={businessForm.tags || []}
+                          tagOrder={businessForm.tagOrder}
                           onTagsUpdated={(updatedTags) =>
                             setBusinessForm((prev: any) => ({
                               ...prev,
                               tags: updatedTags,
+                              tagOrder: updatedTags.map(t => t.id).join(","),
                             }))
                           }
                           disabled={businessFieldDisabled}
@@ -2343,10 +2352,12 @@ const CombinedBusinessContactsContent: React.FC = () => {
                         entityId={editingContactId!}
                         entityType="contact"
                         initialTags={createForm.tags || []}
+                        tagOrder={createForm.tagOrder}
                         onTagsUpdated={(updatedTags) =>
                           setCreateForm((prev: any) => ({
                             ...prev,
                             tags: updatedTags,
+                            tagOrder: updatedTags.map(t => t.id).join(","),
                           }))
                         }
                         disabled={modalMode === "edit" && !editModeEnabled}

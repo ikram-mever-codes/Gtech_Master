@@ -374,16 +374,16 @@ const ItemsManagementPage: React.FC = () => {
     try {
       switch (activeTab) {
         case "items":
-          const isFilterActive = !!searchParams.get("filter");
           const itemsResponse: any = await getItems({
-            page: isFilterActive ? 1 : pagination.page,
-            limit: isFilterActive ? 10000 : pagination.limit,
+            page: pagination.page,
+            limit: pagination.limit,
             search: debouncedFilters.search,
             isActive: debouncedFilters.isActive,
             category: debouncedFilters.category,
             eanSearch: debouncedFilters.eanSearch,
             supplier: debouncedFilters.supplier,
             tags: debouncedFilters.tags,
+            filter: searchParams.get("filter") || undefined,
           });
           setItems(itemsResponse.data);
           setPagination(itemsResponse.pagination);
@@ -401,12 +401,12 @@ const ItemsManagementPage: React.FC = () => {
           break;
 
         case "warehouse":
-          const isWarehouseFilterActive = !!searchParams.get("filter");
           const warehouseResponse: any = await getWarehouseItems({
-            page: isWarehouseFilterActive ? 1 : pagination.page,
-            limit: isWarehouseFilterActive ? 10000 : pagination.limit,
+            page: pagination.page,
+            limit: pagination.limit,
             search: debouncedFilters.search,
             hasStock: debouncedFilters.status,
+            filter: searchParams.get("filter") || undefined,
           });
           setWarehouseItems(warehouseResponse.data);
           setPagination(warehouseResponse.pagination);
@@ -953,58 +953,7 @@ const ItemsManagementPage: React.FC = () => {
 
       const filterParam = searchParams.get("filter");
       if (filterParam) {
-        if (filterParam === "rmb_special_no_value") {
-          if (it.is_rmb_special !== "Y" || (it.rmb_price && parseFloat(it.rmb_price) > 0)) return false;
-        } else if (filterParam === "eur_special_no_value") {
-          const hasEUR = (it.price && parseFloat(it.price) > 0) || (it.transfer_price_EUR && parseFloat(it.transfer_price_EUR) > 0);
-          if (it.is_eur_special !== "Y" || hasEUR) return false;
-        } else if (filterParam === "dimension_special_no_value") {
-          const hasDim = (it.weight && parseFloat(it.weight) > 0) && (it.length && parseFloat(it.length) > 0) && (it.width && parseFloat(it.width) > 0) && (it.height && parseFloat(it.height) > 0);
-          if (it.is_dimension_special !== "Y" || hasDim) return false;
-        } else if (filterParam === "missing_var_values_en") {
-          if (it.name_en || !it.name_de) return false;
-        } else if (filterParam === "no_taric") {
-          if (it.taric_id && it.taric_id !== 0 && it.taric_code) return false;
-        } else if (filterParam === "mismatched_tarics") {
-          if (!it.taric_id || !it.parent_taric_id || it.taric_id === it.parent_taric_id) return false;
-        } else if (filterParam === "null_category") {
-          if (it.category_id && it.category_id !== 0) return false;
-        } else if (filterParam === "wrong_shipping_class") {
-          const shipClass = (it.ship_class || "").trim().toLowerCase();
-          if (shipClass !== "" && shipClass !== "na") return false;
-        } else if (filterParam === "no_supplier") {
-          if (it.supplier_id && it.supplier_id !== 0) return false;
-        } else if (filterParam === "no_rmb_price") {
-          if (it.is_active !== "Y" || (it.rmb_price && parseFloat(it.rmb_price) > 0)) return false;
-        } else if (filterParam === "is_po_no_url_null") {
-          if (it.is_po !== "No" || (it.url && it.url !== "" && it.url !== "null")) return false;
-        } else if (filterParam === "is_po_null") {
-          if (it.is_po && it.is_po !== "" && it.is_po !== "null") return false;
-        } else if (filterParam === "new_picture_required") {
-          if (it.is_npr !== "Y") return false;
-        } else if (filterParam === "no_picture") {
-          if (it.is_active !== "Y" || (it.photo && it.photo !== "" && it.photo !== "null")) return false;
-        } else if (filterParam === "unused_pictures") {
-          return false;
-        } else if (filterParam === "multiple_parents_pictures") {
-          const photoToParentIds = new Map<string, Set<number | string>>();
-          data.forEach((item: any) => {
-            if (item.photo && item.photo !== "null" && item.photo !== "" && item.parent_id) {
-              const photoName = item.photo.trim();
-              if (!photoToParentIds.has(photoName)) {
-                photoToParentIds.set(photoName, new Set());
-              }
-              photoToParentIds.get(photoName)!.add(item.parent_id);
-            }
-          });
-          const multipleParentPhotos = new Set<string>();
-          photoToParentIds.forEach((parentIds, photo) => {
-            if (parentIds.size > 1) {
-              multipleParentPhotos.add(photo);
-            }
-          });
-          if (!it.photo || !multipleParentPhotos.has(it.photo.trim())) return false;
-        }
+        // Bypassed: Server-side filtering is active for health audit filters.
       }
 
       if (activeTab === "items" && debouncedFilters.eanSearch) {

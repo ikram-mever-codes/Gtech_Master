@@ -1522,12 +1522,28 @@ const OrderPage: React.FC = () => {
   }, [fetchOrders]);
 
   useEffect(() => {
-    const params = new URLSearchParams();
+    const params = new URLSearchParams(searchParams.toString());
     if (activeTab !== "orders") params.set("tab", activeTab);
+    else params.delete("tab");
     if (orderNoFilter) params.set("order_no", orderNoFilter);
+    else params.delete("order_no");
     const qs = params.toString();
     router.replace(qs ? `/orders?${qs}` : "/orders", { scroll: false });
-  }, [activeTab, orderNoFilter, router]);
+  }, [activeTab, orderNoFilter, router, searchParams]);
+
+  useEffect(() => {
+    const tabParam = searchParams.get("tab");
+    if (tabParam) {
+      const validTabs = ["orders", "order_items", "nso", "supplier_orders", "purchase_order", "problems", "label_print"];
+      if (validTabs.includes(tabParam)) {
+        setActiveTab(tabParam as any);
+      }
+    }
+    const orderNoParam = searchParams.get("order_no");
+    if (orderNoParam !== null) {
+      setOrderNoFilter(orderNoParam);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     fetchCustomers();

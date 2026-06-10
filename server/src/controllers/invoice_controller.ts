@@ -771,6 +771,13 @@ export class InvoiceController {
           }
         }
 
+        if (customItemCount === 0) {
+          AppDataSource.getRepository(InvoiceItem).delete({ invoice: { id: inv.id } })
+            .then(() => invoiceRepository.delete(inv.id))
+            .catch(err => console.error("Error deleting empty invoice:", err));
+          return null;
+        }
+
         const cargoNo = cargo?.cargo_no || (inv.orderNumber && !orderIdMap.has(inv.orderNumber) ? inv.orderNumber : undefined);
 
         const order = orders.find(o => o.order_no === inv.orderNumber);
@@ -809,10 +816,7 @@ export class InvoiceController {
       })
         .filter((inv): inv is any => inv !== null)
         .filter(inv => {
-          if (req.query.status === 'draft') {
-            return inv.customItemCount > 0;
-          }
-          return true;
+          return inv.customItemCount > 0;
         });
 
       const finalDataMap = new Map();
@@ -930,16 +934,19 @@ export class InvoiceController {
 
       const getEffectiveTaricCode = (oi: any): string => {
         const itemTaricCode = oi.item?.taric?.code || "";
-        const isProjectItem = !itemTaricCode || itemTaricCode === "0" || itemTaricCode === "0000000000";
-        if (isProjectItem && oi.set_taric_code) {
-          return oi.set_taric_code.toString();
+        const rawCode = oi.set_taric_code ? oi.set_taric_code.toString() : itemTaricCode;
+        if (rawCode) {
+          const codes = rawCode.split("/");
+          return codes.length > 1 ? codes[1].trim() : codes[0].trim();
         }
-        return itemTaricCode || "unknown";
+        return "unknown";
       };
 
       const getGroupKey = (oi: any): string => {
         if (oi.set_taric_code) {
-          return `set_${oi.set_taric_code}`;
+          const codes = oi.set_taric_code.split("/");
+          const target = codes.length > 1 ? codes[1].trim() : codes[0].trim();
+          return `set_${target}`;
         }
         const taricId = oi.item?.taric?.id;
         return taricId ? `taric_${taricId}` : "unknown";
@@ -975,9 +982,9 @@ export class InvoiceController {
           let displayRate = taric?.duty_rate || 0;
 
           if (oi.set_taric_code) {
-            displayCode = `${oi.set_taric_code}`;
-            const codes = displayCode.split("/");
+            const codes = oi.set_taric_code.split("/");
             const targetCode = codes.length > 1 ? codes[1].trim() : codes[0].trim();
+            displayCode = targetCode;
 
             const mTaric = manualTaricMap.get(targetCode);
             if (mTaric) {
@@ -1012,7 +1019,14 @@ export class InvoiceController {
         group.totalPrice += (oi.qty || 0) * (Number(currentPrice) || 0);
       });
 
-      const taricGroups = Array.from(taricGroupsMap.values());
+      const taricGroups = Array.from(taricGroupsMap.values()).map((g: any) => {
+        if (g.totalQty > 0) {
+          g.unitPrice = g.totalPrice / g.totalQty;
+        } else {
+          g.unitPrice = 0;
+        }
+        return g;
+      });
 
       const itemsWithFallbacks = await Promise.all([...orderItems]
         .map(async (oi: any) => {
@@ -1457,6 +1471,7 @@ export class InvoiceController {
         const mm = (now.getMonth() + 1).toString().padStart(2, "0");
         const prefix = `CI${yy}${mm}`;
         invoice.invoiceNumber = `${prefix}${nextSeq.toString().padStart(3, "0")}`;
+        invoice.invoiceDate = now;
 
         const pdfUrl = await InvoiceController.generateInvoicePDF(invoice);
         invoice.pdfUrl = pdfUrl;
