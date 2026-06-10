@@ -754,7 +754,7 @@ const generateLabelPDF = (req, res, next) => __awaiter(void 0, void 0, void 0, f
             logoPath = k2;
         }
         res.setHeader("Content-Type", "application/pdf");
-        res.setHeader("Content-Disposition", `attachment; filename=label_${item.id}.pdf`);
+        res.setHeader("Content-Disposition", `inline; filename=label_${item.id}.pdf`);
         doc.pipe(res);
         const colA = 12;
         const valColA = 16;

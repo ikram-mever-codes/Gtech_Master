@@ -15,6 +15,7 @@ router.get("/customer/:customerId", (0, authorized_1.authorize)(users_1.UserRole
 router.get("/:id/expanded", (0, authorized_1.authorize)(users_1.UserRole.SALES), invoice_controller_1.InvoiceController.getInvoiceExpandedDetails);
 router.patch("/:id/paid", (0, authorized_1.authorize)(users_1.UserRole.SALES), invoice_controller_1.InvoiceController.markAsPaid);
 router.patch("/:id/cancel", (0, authorized_1.authorize)(users_1.UserRole.SALES), invoice_controller_1.InvoiceController.cancelInvoice);
+router.patch("/:id/reopen", (0, authorized_1.authorize)(users_1.UserRole.SALES), invoice_controller_1.InvoiceController.reopenInvoice);
 router.patch("/:id/packing-list", (0, authorized_1.authorize)(users_1.UserRole.SALES), invoice_controller_1.InvoiceController.updatePackingListData);
 router.get("/:id/packing-list/pdf", (0, authorized_1.authorize)(users_1.UserRole.SALES), invoice_controller_1.InvoiceController.downloadPackingListPDF);
 exports.default = router;

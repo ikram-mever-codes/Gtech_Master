@@ -37,6 +37,7 @@ import {
   cancelInvoice,
   getExpandedInvoiceDetails,
   updateInvoice,
+  reopenInvoice,
 } from "@/api/invoice";
 import SpreadSheet from "@/components/UI/SpreadSheet";
 import { useRouter } from "next/navigation";
@@ -1517,6 +1518,35 @@ const InvoiceListPage: React.FC = () => {
                                         <button className="px-3.5 py-1 bg-[#F15A24] text-white text-[10px] font-bold rounded-[4px] flex items-center gap-1 hover:bg-[#D9481B] transition-colors">
                                           <RefreshCw className="w-3 h-3" /> Ship
                                         </button>
+                                        <button
+                                           onClick={async () => {
+                                             if (!window.confirm(`Reopen invoice ${invoice.invoiceNumber || invoice.id}?`)) return;
+                                             try {
+                                               setActionLoading((prev) => ({
+                                                 ...prev,
+                                                 [`reopen-${invoice.id}`]: true,
+                                               }));
+                                               await reopenInvoice(invoice.id);
+                                               await loadInvoices();
+                                             } catch (error) {
+                                               console.error("Failed to reopen invoice:", error);
+                                             } finally {
+                                               setActionLoading((prev) => ({
+                                                 ...prev,
+                                                 [`reopen-${invoice.id}`]: false,
+                                               }));
+                                             }
+                                           }}
+                                           disabled={actionLoading[`reopen-${invoice.id}`]}
+                                           className="px-3.5 py-1 bg-[#006FBA] text-white text-[10px] font-bold rounded-[4px] flex items-center gap-1 hover:bg-[#005A9E] transition-colors disabled:opacity-50"
+                                         >
+                                           {actionLoading[`reopen-${invoice.id}`] ? (
+                                             <Loader2 className="w-3 h-3 animate-spin" />
+                                           ) : (
+                                             <RefreshCw className="w-3 h-3" />
+                                           )}
+                                           Reopen
+                                         </button>
                                       </>
                                     )}
                                   </div>

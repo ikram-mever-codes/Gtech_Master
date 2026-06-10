@@ -180,6 +180,21 @@ export const cancelInvoice = async (invoiceId: string) => {
     throw error;
   }
 };
+
+export const reopenInvoice = async (invoiceId: string) => {
+  try {
+    toast.loading("Reopening invoice...", loadingStyles);
+    const response = await api.patch<InvoiceResponse>(
+      `/invoices/${invoiceId}/reopen`
+    );
+    toast.dismiss();
+    toast.success("Invoice reopened successfully", successStyles);
+    return response.data;
+  } catch (error) {
+    handleApiError(error, "Failed to reopen invoice");
+    throw error;
+  }
+};
 export const updatePackingList = async (id: string, packingListData: any) => {
   try {
     toast.loading("Saving packing list...", loadingStyles);

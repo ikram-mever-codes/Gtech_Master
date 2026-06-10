@@ -860,7 +860,7 @@ export const generateLabelPDF = async (
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader(
       "Content-Disposition",
-      `attachment; filename=label_${item.id}.pdf`,
+      `inline; filename=label_${item.id}.pdf`,
     );
     doc.pipe(res);
 
