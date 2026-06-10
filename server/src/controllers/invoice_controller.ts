@@ -771,6 +771,13 @@ export class InvoiceController {
           }
         }
 
+        if (customItemCount === 0) {
+          AppDataSource.getRepository(InvoiceItem).delete({ invoice: { id: inv.id } })
+            .then(() => invoiceRepository.delete(inv.id))
+            .catch(err => console.error("Error deleting empty invoice:", err));
+          return null;
+        }
+
         const cargoNo = cargo?.cargo_no || (inv.orderNumber && !orderIdMap.has(inv.orderNumber) ? inv.orderNumber : undefined);
 
         const order = orders.find(o => o.order_no === inv.orderNumber);
@@ -809,10 +816,7 @@ export class InvoiceController {
       })
         .filter((inv): inv is any => inv !== null)
         .filter(inv => {
-          if (req.query.status === 'draft') {
-            return inv.customItemCount > 0;
-          }
-          return true;
+          return inv.customItemCount > 0;
         });
 
       const finalDataMap = new Map();
@@ -1467,6 +1471,7 @@ export class InvoiceController {
         const mm = (now.getMonth() + 1).toString().padStart(2, "0");
         const prefix = `CI${yy}${mm}`;
         invoice.invoiceNumber = `${prefix}${nextSeq.toString().padStart(3, "0")}`;
+        invoice.invoiceDate = now;
 
         const pdfUrl = await InvoiceController.generateInvoicePDF(invoice);
         invoice.pdfUrl = pdfUrl;
