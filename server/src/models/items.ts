@@ -20,6 +20,7 @@ import { PurchasePrice } from "./purchase_prices";
 import { SalesPrice } from "./sales_prices";
 import { ItemQuality } from "./item_qualities";
 import { Tag } from "./tags";
+import { Customer } from "./customers";
 
 @Entity()
 export class Item {
@@ -140,6 +141,9 @@ export class Item {
   @Column({ nullable: true })
   supplier_id?: number;
 
+  @Column({ type: "uuid", nullable: true })
+  customer_id?: string;
+
   @Column({ type: "boolean", default: false })
   is_updated!: boolean;
 
@@ -191,6 +195,10 @@ export class Item {
   @ManyToOne(() => Supplier, { nullable: true })
   @JoinColumn({ name: "supplier_id" })
   supplier: Supplier | null;
+
+  @ManyToOne(() => Customer, { nullable: true })
+  @JoinColumn({ name: "customer_id" })
+  customer: Customer | null;
 
   @OneToMany(() => OrderItem, (orderItem) => orderItem.item)
   orderItems: OrderItem[];

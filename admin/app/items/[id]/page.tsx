@@ -35,9 +35,15 @@ import {
 } from "@/api/items";
 import { getAllSuppliers, Supplier } from "@/api/suppliers";
 import { getCategories } from "@/api/categories";
+import { getAllCustomers } from "@/api/customers";
 import { uploadFile } from "@/api/library";
 import CustomModal from "@/components/UI/CustomModal";
-import { loadingStyles, successStyles, errorStyles, BASE_URL } from "@/utils/constants";
+import {
+  loadingStyles,
+  successStyles,
+  errorStyles,
+  BASE_URL,
+} from "@/utils/constants";
 import { Package } from "lucide-react";
 import PageHeader from "@/components/UI/PageHeader";
 import { EntityTagSelector } from "@/components/Tags/TagManager";
@@ -52,8 +58,9 @@ const StatusIndicator = ({
   label?: string;
 }) => (
   <span
-    className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${value ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
-      }`}
+    className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+      value ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+    }`}
   >
     {value ? (
       <CheckCircleIcon className="h-3 w-3" />
@@ -226,7 +233,7 @@ const ItemDetailsPage = () => {
     if (!itemData || !id) return;
     if (
       !confirm(
-        "Are you sure you want to delete this item? This action cannot be undone."
+        "Are you sure you want to delete this item? This action cannot be undone.",
       )
     )
       return;
@@ -243,33 +250,47 @@ const ItemDetailsPage = () => {
 
   const [supplierItems, setSupplierItems] = useState<any[]>([]);
   const [loadingSupplierItems, setLoadingSupplierItems] = useState(false);
-  const [openSupplierDropdownId, setOpenSupplierDropdownId] = useState<number | null>(null);
+  const [openSupplierDropdownId, setOpenSupplierDropdownId] = useState<
+    number | null
+  >(null);
   const [supplierItemSearch, setSupplierItemSearch] = useState("");
 
-  const [supplierRelatedItems, setSupplierRelatedItems] = useState<Record<number, any[]>>({});
-  const [loadingSupplierRelatedItems, setLoadingSupplierRelatedItems] = useState<Record<number, boolean>>({});
-  const [supplierSearchTerms, setSupplierSearchTerms] = useState<Record<number, string>>({});
+  const [supplierRelatedItems, setSupplierRelatedItems] = useState<
+    Record<number, any[]>
+  >({});
+  const [loadingSupplierRelatedItems, setLoadingSupplierRelatedItems] =
+    useState<Record<number, boolean>>({});
+  const [supplierSearchTerms, setSupplierSearchTerms] = useState<
+    Record<number, string>
+  >({});
 
   const fetchSupplierRelatedItems = async (supplierId: string | number) => {
     const sId = Number(supplierId);
     if (supplierRelatedItems[sId]) {
       return;
     }
-    setLoadingSupplierRelatedItems(prev => ({ ...prev, [sId]: true }));
+    setLoadingSupplierRelatedItems((prev) => ({ ...prev, [sId]: true }));
     try {
-      const response: any = await getItems({ supplier: String(supplierId), limit: 1000 });
+      const response: any = await getItems({
+        supplier: String(supplierId),
+        limit: 1000,
+      });
       if (response && response.data) {
-        setSupplierRelatedItems(prev => ({ ...prev, [sId]: response.data }));
+        setSupplierRelatedItems((prev) => ({ ...prev, [sId]: response.data }));
       }
     } catch (error) {
       console.error(`Failed to fetch items for supplier ${sId}:`, error);
     } finally {
-      setLoadingSupplierRelatedItems(prev => ({ ...prev, [sId]: false }));
+      setLoadingSupplierRelatedItems((prev) => ({ ...prev, [sId]: false }));
     }
   };
 
   useEffect(() => {
-    if (activeTab === "supplier" && itemData?.supplierItems && itemData.supplierItems.length > 0) {
+    if (
+      activeTab === "supplier" &&
+      itemData?.supplierItems &&
+      itemData.supplierItems.length > 0
+    ) {
       itemData.supplierItems.forEach((si: any) => {
         if (si.supplierId) {
           fetchSupplierRelatedItems(si.supplierId);
@@ -279,12 +300,18 @@ const ItemDetailsPage = () => {
   }, [activeTab, itemData?.supplierItems]);
 
   const fetchSupplierItems = async (supplierId: string | number) => {
-    if (supplierItems.length > 0 && supplierItems[0]?.supplier_id === Number(supplierId)) {
+    if (
+      supplierItems.length > 0 &&
+      supplierItems[0]?.supplier_id === Number(supplierId)
+    ) {
       return;
     }
     setLoadingSupplierItems(true);
     try {
-      const response: any = await getItems({ supplier: String(supplierId), limit: 1000 });
+      const response: any = await getItems({
+        supplier: String(supplierId),
+        limit: 1000,
+      });
       if (response && response.data) {
         setSupplierItems(response.data);
       }
@@ -297,25 +324,51 @@ const ItemDetailsPage = () => {
   };
 
   const setItemData = (
-    newData: ItemDetails | null | ((prev: ItemDetails | null) => ItemDetails | null)
+    newData:
+      | ItemDetails
+      | null
+      | ((prev: ItemDetails | null) => ItemDetails | null),
   ) => {
     setItemDataRaw((prev) => {
       const resolved = typeof newData === "function" ? newData(prev) : newData;
       if (!resolved) return null;
 
-      const activeSupplierId = resolved.supplier_id || resolved.supplierItems?.find((si: any) => si.isDefault)?.supplierId;
+      const activeSupplierId =
+        resolved.supplier_id ||
+        resolved.supplierItems?.find((si: any) => si.isDefault)?.supplierId;
       if (activeSupplierId && resolved.supplierItem && resolved.supplierItems) {
         resolved.supplierItems = resolved.supplierItems.map((si: any) => {
           if (Number(si.supplierId) === Number(activeSupplierId)) {
             return {
               ...si,
-              priceRMB: resolved.supplierItem.priceRMB !== undefined ? resolved.supplierItem.priceRMB : si.priceRMB,
-              isPO: resolved.supplierItem.isPO !== undefined ? resolved.supplierItem.isPO : si.isPO,
-              moq: resolved.supplierItem.moq !== undefined ? resolved.supplierItem.moq : si.moq,
-              interval: resolved.supplierItem.interval !== undefined ? resolved.supplierItem.interval : si.interval,
-              leadTime: resolved.supplierItem.leadTime !== undefined ? resolved.supplierItem.leadTime : si.leadTime,
-              noteCN: resolved.supplierItem.noteCN !== undefined ? resolved.supplierItem.noteCN : si.noteCN,
-              url: resolved.supplierItem.url !== undefined ? resolved.supplierItem.url : si.url,
+              priceRMB:
+                resolved.supplierItem.priceRMB !== undefined
+                  ? resolved.supplierItem.priceRMB
+                  : si.priceRMB,
+              isPO:
+                resolved.supplierItem.isPO !== undefined
+                  ? resolved.supplierItem.isPO
+                  : si.isPO,
+              moq:
+                resolved.supplierItem.moq !== undefined
+                  ? resolved.supplierItem.moq
+                  : si.moq,
+              interval:
+                resolved.supplierItem.interval !== undefined
+                  ? resolved.supplierItem.interval
+                  : si.interval,
+              leadTime:
+                resolved.supplierItem.leadTime !== undefined
+                  ? resolved.supplierItem.leadTime
+                  : si.leadTime,
+              noteCN:
+                resolved.supplierItem.noteCN !== undefined
+                  ? resolved.supplierItem.noteCN
+                  : si.noteCN,
+              url:
+                resolved.supplierItem.url !== undefined
+                  ? resolved.supplierItem.url
+                  : si.url,
               isDefault: true,
             };
           }
@@ -330,39 +383,52 @@ const ItemDetailsPage = () => {
     });
   };
 
-  const transformItemResponse = (rawItem: any, currentItemData?: any): ItemDetails => {
+  const transformItemResponse = (
+    rawItem: any,
+    currentItemData?: any,
+  ): ItemDetails => {
     const toBool = (val: any) =>
-      val === "Y" ||
-      val === "Yes" ||
-      val === true ||
-      val === 1 ||
-      val === "1";
+      val === "Y" || val === "Yes" || val === true || val === 1 || val === "1";
 
-    const activeSupplierId = rawItem.supplier_id || rawItem.supplierItems?.find((si: any) => si.isDefault)?.supplierId || null;
-    const defaultSupplierItem = rawItem.supplierItems?.find((si: any) => si.isDefault || Number(si.supplierId) === Number(activeSupplierId));
+    const activeSupplierId =
+      rawItem.supplier_id ||
+      rawItem.supplierItems?.find((si: any) => si.isDefault)?.supplierId ||
+      null;
+    const defaultSupplierItem = rawItem.supplierItems?.find(
+      (si: any) =>
+        si.isDefault || Number(si.supplierId) === Number(activeSupplierId),
+    );
 
     return {
       ...rawItem,
       id: rawItem.id || currentItemData?.id,
       supplier_id: activeSupplierId,
-      supplierItem: rawItem.supplierItem || (defaultSupplierItem ? {
-        priceRMB: defaultSupplierItem.priceRMB || "0",
-        isPO: defaultSupplierItem.isPO || "No",
-        moq: defaultSupplierItem.moq || "0",
-        interval: defaultSupplierItem.interval || "0",
-        leadTime: defaultSupplierItem.leadTime || "",
-        noteCN: defaultSupplierItem.noteCN || "",
-        url: defaultSupplierItem.url || "",
-      } : {
-        priceRMB: "0",
-        isPO: "No",
-        moq: "0",
-        interval: "0",
-        leadTime: "",
-        noteCN: "",
-        url: "",
-      }),
-      isLabelPrint: rawItem.isLabelPrint !== undefined ? toBool(rawItem.isLabelPrint) : false,
+      customer_id: rawItem.customer_id ?? rawItem.customer?.id ?? null,
+      supplierItem:
+        rawItem.supplierItem ||
+        (defaultSupplierItem
+          ? {
+              priceRMB: defaultSupplierItem.priceRMB || "0",
+              isPO: defaultSupplierItem.isPO || "No",
+              moq: defaultSupplierItem.moq || "0",
+              interval: defaultSupplierItem.interval || "0",
+              leadTime: defaultSupplierItem.leadTime || "",
+              noteCN: defaultSupplierItem.noteCN || "",
+              url: defaultSupplierItem.url || "",
+            }
+          : {
+              priceRMB: "0",
+              isPO: "No",
+              moq: "0",
+              interval: "0",
+              leadTime: "",
+              noteCN: "",
+              url: "",
+            }),
+      isLabelPrint:
+        rawItem.isLabelPrint !== undefined
+          ? toBool(rawItem.isLabelPrint)
+          : false,
       supplierItems: rawItem.supplierItems || [],
       isActive: toBool(rawItem.isActive),
       parent: {
@@ -410,6 +476,9 @@ const ItemDetailsPage = () => {
   const attachmentInputRef = React.useRef<HTMLInputElement>(null);
   const [allSuppliers, setAllSuppliers] = useState<Supplier[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
+  const [allCustomers, setAllCustomers] = useState<any[]>([]);
+  const [customerSearch, setCustomerSearch] = useState("");
+  const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
   const [uploadingAttachments, setUploadingAttachments] = useState(false);
   const [attachments, setAttachments] = useState<any[]>([]);
   const [isLinkSupplierModalOpen, setIsLinkSupplierModalOpen] = useState(false);
@@ -425,6 +494,56 @@ const ItemDetailsPage = () => {
       year: "numeric",
     }).format(date);
   };
+
+  // Currently selected customer derived from itemData.customer_id
+  const selectedCustomer = allCustomers.find(
+    (c) => String(c.id) === String((itemData as any)?.customer_id),
+  );
+
+  const selectedCustomerName =
+    selectedCustomer?.companyName ||
+    (itemData as any)?.customer?.companyName ||
+    ((itemData as any)?.customer_id ? "Customer assigned" : "");
+
+  const filteredCustomers = (() => {
+    const term = customerSearch.trim().toLowerCase();
+    const list = term
+      ? allCustomers.filter((c) =>
+          (c.companyName || "").toLowerCase().includes(term),
+        )
+      : allCustomers;
+    return list.slice(0, 50);
+  })();
+
+  const handleSelectCustomer = (customer: any) => {
+    setItemData((prev) =>
+      prev ? ({ ...prev, customer_id: customer.id } as any) : prev,
+    );
+    setCustomerSearch(customer.companyName || "");
+    setShowCustomerDropdown(false);
+  };
+
+  const handleClearCustomer = () => {
+    setItemData((prev) =>
+      prev ? ({ ...prev, customer_id: null } as any) : prev,
+    );
+    setCustomerSearch("");
+    setShowCustomerDropdown(false);
+  };
+
+  // Keep the customer search input in sync with the current selection when
+  // entering/leaving edit mode.
+  useEffect(() => {
+    if (editMode) {
+      const cust = allCustomers.find(
+        (c) => String(c.id) === String((itemData as any)?.customer_id),
+      );
+      setCustomerSearch(cust?.companyName || "");
+    } else {
+      setShowCustomerDropdown(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editMode]);
 
   const getCorrectUrl = (url: string) => {
     if (!url) return "";
@@ -538,15 +657,18 @@ const ItemDetailsPage = () => {
 
   const handleRemoveSupplier = async (linkId: number) => {
     if (!itemData) return;
-    const link = itemData.supplierItems?.find(si => si.id === linkId);
+    const link = itemData.supplierItems?.find((si) => si.id === linkId);
     if (link?.isDefault) {
-      toast.error("Cannot remove the default supplier. Set another as default first.", errorStyles);
+      toast.error(
+        "Cannot remove the default supplier. Set another as default first.",
+        errorStyles,
+      );
       return;
     }
 
     const updated: ItemDetails = {
       ...itemData,
-      supplierItems: itemData.supplierItems.filter(si => si.id !== linkId)
+      supplierItems: itemData.supplierItems.filter((si) => si.id !== linkId),
     };
     setItemData(updated);
 
@@ -777,12 +899,14 @@ const ItemDetailsPage = () => {
           qualityResponse,
           suppliersRes,
           catsRes,
+          customersRes,
         ]: any = await Promise.all([
           getItemById(itemId),
           getItemVariations(itemId),
           getItemQualityCriteria(itemId),
           getAllSuppliers({ limit: 1000 }),
           getCategories(),
+          getAllCustomers({ limit: 1000 }),
         ]);
 
         if (suppliersRes?.data) setAllSuppliers(suppliersRes.data);
@@ -792,6 +916,8 @@ const ItemDetailsPage = () => {
           );
           setCategories(regularCategories);
         }
+        console.log("Fetched customers:", customersRes);
+        if (customersRes?.data) setAllCustomers(customersRes.data.customers);
 
         const rawItem = itemResponse.data;
         const transformedItem = transformItemResponse(rawItem);
@@ -830,7 +956,7 @@ const ItemDetailsPage = () => {
       let finalEan = updatedData.ean;
       if (!finalEan || finalEan.trim() === "") {
         finalEan = generateEAN(itemId);
-        setItemData(prev => prev ? ({ ...prev, ean: finalEan }) : null);
+        setItemData((prev) => (prev ? { ...prev, ean: finalEan } : null));
       }
 
       if (!updatedData.supplier_id || updatedData.supplier_id === 0) {
@@ -868,6 +994,7 @@ const ItemDetailsPage = () => {
         is_npr: updatedData.others?.isNPR ? "Y" : "N",
         isLabelPrint: updatedData.isLabelPrint ? true : false,
         supplier_id: toInt(updatedData.supplier_id),
+        customer_id: updatedData.customer_id ?? null,
         supplierItems: updatedData.supplierItems,
 
         supplierItem: {
@@ -1013,10 +1140,11 @@ const ItemDetailsPage = () => {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`px-4 py-2 text-sm font-medium whitespace-nowrap transition-colors ${activeTab === tab.id
-                  ? "text-gray-900 border-b-2 border-gray-600"
-                  : "text-gray-500 hover:text-gray-700"
-                  }`}
+                className={`px-4 py-2 text-sm font-medium whitespace-nowrap transition-colors ${
+                  activeTab === tab.id
+                    ? "text-gray-900 border-b-2 border-gray-600"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
               >
                 {tab.label}
               </button>
@@ -1076,7 +1204,9 @@ const ItemDetailsPage = () => {
                   setItemData={setItemData}
                 />
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 py-3 border-b border-gray-100">
-                  <div className="text-sm font-medium text-gray-700">Supplier</div>
+                  <div className="text-sm font-medium text-gray-700">
+                    Supplier
+                  </div>
                   <div className="md:col-span-2">
                     {editMode ? (
                       <select
@@ -1088,19 +1218,30 @@ const ItemDetailsPage = () => {
                           const updated = { ...itemData };
                           updated.supplier_id = newSupplierId;
 
-                          const supplierDetail = allSuppliers.find((s) => s.id === newSupplierId);
+                          const supplierDetail = allSuppliers.find(
+                            (s) => s.id === newSupplierId,
+                          );
                           const supplierName = supplierDetail
-                            ? String(!hasChinese(supplierDetail.name || "") ? supplierDetail.name : supplierDetail.company_name || "Unknown")
+                            ? String(
+                                !hasChinese(supplierDetail.name || "")
+                                  ? supplierDetail.name
+                                  : supplierDetail.company_name || "Unknown",
+                              )
                             : "Unknown";
                           let existingItem = updated.supplierItems?.find(
-                            (si: any) => Number(si.supplierId) === Number(newSupplierId)
+                            (si: any) =>
+                              Number(si.supplierId) === Number(newSupplierId),
                           );
 
                           if (existingItem) {
-                            updated.supplierItems = updated.supplierItems.map((si: any) => ({
-                              ...si,
-                              isDefault: Number(si.supplierId) === Number(newSupplierId),
-                            }));
+                            updated.supplierItems = updated.supplierItems.map(
+                              (si: any) => ({
+                                ...si,
+                                isDefault:
+                                  Number(si.supplierId) ===
+                                  Number(newSupplierId),
+                              }),
+                            );
                           } else {
                             const newLink = {
                               id: -Math.floor(Date.now() % 1000000000),
@@ -1116,10 +1257,12 @@ const ItemDetailsPage = () => {
                               isDefault: true,
                             };
                             updated.supplierItems = [
-                              ...(updated.supplierItems || []).map((si: any) => ({
-                                ...si,
-                                isDefault: false,
-                              })),
+                              ...(updated.supplierItems || []).map(
+                                (si: any) => ({
+                                  ...si,
+                                  isDefault: false,
+                                }),
+                              ),
                               newLink,
                             ];
                             existingItem = newLink;
@@ -1136,7 +1279,8 @@ const ItemDetailsPage = () => {
                           };
 
                           if (updated.others) {
-                            updated.others.rmbPrice = existingItem.priceRMB || "0";
+                            updated.others.rmbPrice =
+                              existingItem.priceRMB || "0";
                           }
 
                           setItemData(updated);
@@ -1153,12 +1297,124 @@ const ItemDetailsPage = () => {
                     ) : (
                       <span className="text-gray-900">
                         {(() => {
-                          const currentId = itemData.supplier_id || itemData.supplierItems?.find((si: any) => si.isDefault)?.supplierId;
-                          const matched = allSuppliers.find((s) => s.id === currentId);
+                          const currentId =
+                            itemData.supplier_id ||
+                            itemData.supplierItems?.find(
+                              (si: any) => si.isDefault,
+                            )?.supplierId;
+                          const matched = allSuppliers.find(
+                            (s) => s.id === currentId,
+                          );
                           return matched
                             ? `[ID: ${matched.id}] ${!hasChinese(matched.name || "") ? matched.name : matched.company_name || ""}`
-                            : (currentId ? `[ID: ${currentId}]` : "—");
+                            : currentId
+                              ? `[ID: ${currentId}]`
+                              : "—";
                         })()}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                {/* Customer (searchable autocomplete) */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 py-3 border-b border-gray-100">
+                  <div className="text-sm font-medium text-gray-700">
+                    Customer
+                  </div>
+                  <div className="md:col-span-2">
+                    {editMode ? (
+                      <div className="relative">
+                        <div className="relative">
+                          <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+                          <input
+                            type="text"
+                            placeholder="Search customer by name..."
+                            value={customerSearch}
+                            onChange={(e) => {
+                              setCustomerSearch(e.target.value);
+                              setShowCustomerDropdown(true);
+                            }}
+                            onFocus={() => setShowCustomerDropdown(true)}
+                            className="w-full pl-9 pr-9 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary"
+                          />
+                          {(customerSearch ||
+                            (itemData as any).customer_id) && (
+                            <button
+                              type="button"
+                              onClick={handleClearCustomer}
+                              className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500 transition-colors"
+                              title="Clear customer"
+                            >
+                              <XCircleIcon className="h-4 w-4" />
+                            </button>
+                          )}
+                        </div>
+
+                        {showCustomerDropdown && (
+                          <>
+                            {/* click-away overlay */}
+                            <div
+                              className="fixed inset-0 z-10"
+                              onClick={() => setShowCustomerDropdown(false)}
+                            />
+                            <div className="absolute z-20 mt-1 w-full max-h-64 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg scrollbar-thin">
+                              {filteredCustomers.length > 0 ? (
+                                filteredCustomers.map((customer: any) => {
+                                  const isSelected =
+                                    String(customer.id) ===
+                                    String((itemData as any).customer_id);
+                                  return (
+                                    <div
+                                      key={customer.id}
+                                      onClick={() =>
+                                        handleSelectCustomer(customer)
+                                      }
+                                      className={`px-3.5 py-2.5 text-sm cursor-pointer flex items-center justify-between transition-colors ${
+                                        isSelected
+                                          ? "bg-[#8CC21B]/10 text-[#5f8512] font-semibold"
+                                          : "hover:bg-gray-50 text-gray-700"
+                                      }`}
+                                    >
+                                      <div className="flex flex-col min-w-0 pr-3">
+                                        <span className="font-medium line-clamp-1">
+                                          {customer.companyName ||
+                                            "Unnamed Customer"}
+                                        </span>
+                                        {(customer.customerNumber ||
+                                          customer.email) && (
+                                          <span className="text-[11px] text-gray-400 line-clamp-1">
+                                            {customer.customerNumber
+                                              ? `No: ${customer.customerNumber}`
+                                              : customer.email}
+                                          </span>
+                                        )}
+                                      </div>
+                                      {isSelected && (
+                                        <CheckCircleIcon className="h-4 w-4 text-[#8CC21B] shrink-0" />
+                                      )}
+                                    </div>
+                                  );
+                                })
+                              ) : (
+                                <div className="px-3.5 py-4 text-center text-xs text-gray-400">
+                                  No customers found.
+                                </div>
+                              )}
+                            </div>
+                          </>
+                        )}
+
+                        {selectedCustomer && (
+                          <p className="mt-2 text-xs text-gray-500">
+                            Selected:{" "}
+                            <span className="font-semibold text-gray-700">
+                              {selectedCustomer.companyName}
+                            </span>
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-gray-900">
+                        {selectedCustomerName || "—"}
                       </span>
                     )}
                   </div>
@@ -1181,7 +1437,10 @@ const ItemDetailsPage = () => {
                 />
                 <EditableInfoRow
                   label="Price (RMB) ¥"
-                  value={itemData.supplierItem?.priceRMB || (itemData as any).others?.rmbPrice}
+                  value={
+                    itemData.supplierItem?.priceRMB ||
+                    (itemData as any).others?.rmbPrice
+                  }
                   field="supplierItem.priceRMB"
                   editMode={editMode}
                   itemData={itemData}
@@ -1750,18 +2009,20 @@ const ItemDetailsPage = () => {
                   itemData.supplierItems.map((si: any) => (
                     <div
                       key={si.id}
-                      className={`p-5 rounded-xl border transition-all flex flex-col gap-4 ${si.isDefault
-                        ? "bg-blue-50/20 border-blue-200 shadow-sm"
-                        : "bg-white border-gray-100 hover:border-gray-200"
-                        }`}
+                      className={`p-5 rounded-xl border transition-all flex flex-col gap-4 ${
+                        si.isDefault
+                          ? "bg-blue-50/20 border-blue-200 shadow-sm"
+                          : "bg-white border-gray-100 hover:border-gray-200"
+                      }`}
                     >
                       <div className="flex items-center justify-between flex-wrap gap-3">
                         <div className="flex items-center gap-4">
                           <div
-                            className={`p-2 rounded-lg ${si.isDefault
-                              ? "bg-blue-100 text-blue-600"
-                              : "bg-gray-100 text-gray-400"
-                              }`}
+                            className={`p-2 rounded-lg ${
+                              si.isDefault
+                                ? "bg-blue-100 text-blue-600"
+                                : "bg-gray-100 text-gray-400"
+                            }`}
                           >
                             <Package className="h-5 w-5" />
                           </div>
@@ -1769,9 +2030,20 @@ const ItemDetailsPage = () => {
                             <div className="flex items-center gap-2">
                               <h4 className="font-bold text-gray-900 line-clamp-1">
                                 {(() => {
-                                  const sDetail = allSuppliers.find((s) => String(s.id) === String(si.supplierId));
-                                  const bestName = sDetail?.company_name || sDetail?.name || sDetail?.name_de || si.supplierName;
-                                  return (bestName && bestName !== "Unknown" && bestName !== "-") ? bestName : "Supplier #" + si.supplierId;
+                                  const sDetail = allSuppliers.find(
+                                    (s) =>
+                                      String(s.id) === String(si.supplierId),
+                                  );
+                                  const bestName =
+                                    sDetail?.company_name ||
+                                    sDetail?.name ||
+                                    sDetail?.name_de ||
+                                    si.supplierName;
+                                  return bestName &&
+                                    bestName !== "Unknown" &&
+                                    bestName !== "-"
+                                    ? bestName
+                                    : "Supplier #" + si.supplierId;
                                 })()}
                               </h4>
                               <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded font-medium">
@@ -1792,10 +2064,11 @@ const ItemDetailsPage = () => {
                           <button
                             onClick={() => window.open(si.url, "_blank")}
                             disabled={!si.url}
-                            className={`p-2 rounded-lg transition-all ${si.url
-                              ? "text-blue-500 hover:bg-blue-50"
-                              : "text-gray-300 cursor-not-allowed"
-                              }`}
+                            className={`p-2 rounded-lg transition-all ${
+                              si.url
+                                ? "text-blue-500 hover:bg-blue-50"
+                                : "text-gray-300 cursor-not-allowed"
+                            }`}
                           >
                             <LinkIcon className="h-5 w-5" />
                           </button>
@@ -1806,12 +2079,11 @@ const ItemDetailsPage = () => {
                                 onClick={async () => {
                                   const updated = { ...itemData };
                                   updated.supplier_id = si.supplierId;
-                                  updated.supplierItems = updated.supplierItems.map(
-                                    (x: any) => ({
+                                  updated.supplierItems =
+                                    updated.supplierItems.map((x: any) => ({
                                       ...x,
                                       isDefault: x.id === si.id,
-                                    }),
-                                  );
+                                    }));
                                   updated.supplierItem = {
                                     priceRMB: si.priceRMB || "0",
                                     isPO: si.isPO || "No",
@@ -1822,16 +2094,21 @@ const ItemDetailsPage = () => {
                                     url: si.url || "",
                                   };
                                   if (updated.others) {
-                                    updated.others.rmbPrice = si.priceRMB || "0";
+                                    updated.others.rmbPrice =
+                                      si.priceRMB || "0";
                                   }
                                   setItemData(updated);
                                   await handleUpdateItem(updated);
-                                  toast.success("Default supplier source updated", successStyles);
+                                  toast.success(
+                                    "Default supplier source updated",
+                                    successStyles,
+                                  );
                                 }}
-                                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${si.isDefault
-                                  ? "bg-blue-600 text-white"
-                                  : "bg-white border border-blue-200 text-blue-600 hover:bg-blue-50"
-                                  }`}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                                  si.isDefault
+                                    ? "bg-blue-600 text-white"
+                                    : "bg-white border border-blue-200 text-blue-600 hover:bg-blue-50"
+                                }`}
                               >
                                 {si.isDefault ? "Default" : "Set Default"}
                               </button>
@@ -1849,16 +2126,21 @@ const ItemDetailsPage = () => {
                       </div>
                       <div className="mt-2 border-t border-gray-100 pt-4 grid grid-cols-2 md:grid-cols-4 gap-4">
                         <div>
-                          <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">Price (RMB)</label>
+                          <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
+                            Price (RMB)
+                          </label>
                           {editMode ? (
                             <input
                               type="number"
                               value={si.priceRMB || ""}
                               onChange={(e) => {
                                 const updated = { ...itemData };
-                                updated.supplierItems = updated.supplierItems.map((x: any) =>
-                                  x.id === si.id ? { ...x, priceRMB: e.target.value } : x
-                                );
+                                updated.supplierItems =
+                                  updated.supplierItems.map((x: any) =>
+                                    x.id === si.id
+                                      ? { ...x, priceRMB: e.target.value }
+                                      : x,
+                                  );
                                 if (si.isDefault) {
                                   updated.supplierItem = {
                                     ...updated.supplierItem,
@@ -1873,20 +2155,27 @@ const ItemDetailsPage = () => {
                               className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#8CC21B]/20"
                             />
                           ) : (
-                            <span className="text-sm font-semibold text-gray-900">¥{si.priceRMB || "0"}</span>
+                            <span className="text-sm font-semibold text-gray-900">
+                              ¥{si.priceRMB || "0"}
+                            </span>
                           )}
                         </div>
                         <div>
-                          <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">MOQ</label>
+                          <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
+                            MOQ
+                          </label>
                           {editMode ? (
                             <input
                               type="number"
                               value={si.moq || ""}
                               onChange={(e) => {
                                 const updated = { ...itemData };
-                                updated.supplierItems = updated.supplierItems.map((x: any) =>
-                                  x.id === si.id ? { ...x, moq: e.target.value } : x
-                                );
+                                updated.supplierItems =
+                                  updated.supplierItems.map((x: any) =>
+                                    x.id === si.id
+                                      ? { ...x, moq: e.target.value }
+                                      : x,
+                                  );
                                 if (si.isDefault) {
                                   updated.supplierItem = {
                                     ...updated.supplierItem,
@@ -1898,20 +2187,27 @@ const ItemDetailsPage = () => {
                               className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#8CC21B]/20"
                             />
                           ) : (
-                            <span className="text-sm font-semibold text-gray-900">{si.moq || "0"}</span>
+                            <span className="text-sm font-semibold text-gray-900">
+                              {si.moq || "0"}
+                            </span>
                           )}
                         </div>
                         <div>
-                          <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">Lead Time</label>
+                          <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
+                            Lead Time
+                          </label>
                           {editMode ? (
                             <input
                               type="text"
                               value={si.leadTime || ""}
                               onChange={(e) => {
                                 const updated = { ...itemData };
-                                updated.supplierItems = updated.supplierItems.map((x: any) =>
-                                  x.id === si.id ? { ...x, leadTime: e.target.value } : x
-                                );
+                                updated.supplierItems =
+                                  updated.supplierItems.map((x: any) =>
+                                    x.id === si.id
+                                      ? { ...x, leadTime: e.target.value }
+                                      : x,
+                                  );
                                 if (si.isDefault) {
                                   updated.supplierItem = {
                                     ...updated.supplierItem,
@@ -1923,19 +2219,26 @@ const ItemDetailsPage = () => {
                               className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#8CC21B]/20"
                             />
                           ) : (
-                            <span className="text-sm font-semibold text-gray-900">{si.leadTime || "—"}</span>
+                            <span className="text-sm font-semibold text-gray-900">
+                              {si.leadTime || "—"}
+                            </span>
                           )}
                         </div>
                         <div>
-                          <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">Is PO</label>
+                          <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
+                            Is PO
+                          </label>
                           {editMode ? (
                             <select
                               value={si.isPO || "No"}
                               onChange={(e) => {
                                 const updated = { ...itemData };
-                                updated.supplierItems = updated.supplierItems.map((x: any) =>
-                                  x.id === si.id ? { ...x, isPO: e.target.value } : x
-                                );
+                                updated.supplierItems =
+                                  updated.supplierItems.map((x: any) =>
+                                    x.id === si.id
+                                      ? { ...x, isPO: e.target.value }
+                                      : x,
+                                  );
                                 if (si.isDefault) {
                                   updated.supplierItem = {
                                     ...updated.supplierItem,
@@ -1950,20 +2253,27 @@ const ItemDetailsPage = () => {
                               <option value="No">No</option>
                             </select>
                           ) : (
-                            <span className="text-sm font-semibold text-gray-900">{si.isPO || "No"}</span>
+                            <span className="text-sm font-semibold text-gray-900">
+                              {si.isPO || "No"}
+                            </span>
                           )}
                         </div>
                         <div className="col-span-2">
-                          <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">URL</label>
+                          <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
+                            URL
+                          </label>
                           {editMode ? (
                             <input
                               type="text"
                               value={si.url || ""}
                               onChange={(e) => {
                                 const updated = { ...itemData };
-                                updated.supplierItems = updated.supplierItems.map((x: any) =>
-                                  x.id === si.id ? { ...x, url: e.target.value } : x
-                                );
+                                updated.supplierItems =
+                                  updated.supplierItems.map((x: any) =>
+                                    x.id === si.id
+                                      ? { ...x, url: e.target.value }
+                                      : x,
+                                  );
                                 if (si.isDefault) {
                                   updated.supplierItem = {
                                     ...updated.supplierItem,
@@ -1976,21 +2286,37 @@ const ItemDetailsPage = () => {
                             />
                           ) : (
                             <span className="text-sm text-blue-500 truncate block">
-                              {si.url ? <a href={si.url} target="_blank" rel="noreferrer" className="hover:underline">{si.url}</a> : "—"}
+                              {si.url ? (
+                                <a
+                                  href={si.url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="hover:underline"
+                                >
+                                  {si.url}
+                                </a>
+                              ) : (
+                                "—"
+                              )}
                             </span>
                           )}
                         </div>
                         <div className="col-span-2">
-                          <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">Note (CN)</label>
+                          <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
+                            Note (CN)
+                          </label>
                           {editMode ? (
                             <input
                               type="text"
                               value={si.noteCN || ""}
                               onChange={(e) => {
                                 const updated = { ...itemData };
-                                updated.supplierItems = updated.supplierItems.map((x: any) =>
-                                  x.id === si.id ? { ...x, noteCN: e.target.value } : x
-                                );
+                                updated.supplierItems =
+                                  updated.supplierItems.map((x: any) =>
+                                    x.id === si.id
+                                      ? { ...x, noteCN: e.target.value }
+                                      : x,
+                                  );
                                 if (si.isDefault) {
                                   updated.supplierItem = {
                                     ...updated.supplierItem,
@@ -2002,7 +2328,9 @@ const ItemDetailsPage = () => {
                               className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#8CC21B]/20"
                             />
                           ) : (
-                            <span className="text-sm font-semibold text-gray-900 truncate block">{si.noteCN || "—"}</span>
+                            <span className="text-sm font-semibold text-gray-900 truncate block">
+                              {si.noteCN || "—"}
+                            </span>
                           )}
                         </div>
                       </div>
@@ -2014,7 +2342,10 @@ const ItemDetailsPage = () => {
                               Supplier Item Catalog
                             </span>
                             <span className="text-[11px] font-medium text-gray-500 bg-gray-200/50 px-2 py-0.5 rounded-full">
-                              Total: {supplierRelatedItems[Number(si.supplierId)]?.length || 0} items
+                              Total:{" "}
+                              {supplierRelatedItems[Number(si.supplierId)]
+                                ?.length || 0}{" "}
+                              items
                             </span>
                           </div>
 
@@ -2023,66 +2354,97 @@ const ItemDetailsPage = () => {
                             <input
                               type="text"
                               placeholder="Search catalog items..."
-                              value={supplierSearchTerms[Number(si.supplierId)] || ""}
-                              onChange={(e) => setSupplierSearchTerms(prev => ({ ...prev, [Number(si.supplierId)]: e.target.value }))}
+                              value={
+                                supplierSearchTerms[Number(si.supplierId)] || ""
+                              }
+                              onChange={(e) =>
+                                setSupplierSearchTerms((prev) => ({
+                                  ...prev,
+                                  [Number(si.supplierId)]: e.target.value,
+                                }))
+                              }
                               className="w-full pl-9 pr-4 py-1.5 text-xs bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#8CC21B]/20 focus:border-[#8CC21B] transition-all"
                             />
                           </div>
 
                           <div className="max-h-64 overflow-y-auto space-y-1.5 pr-1 scrollbar-thin">
-                            {loadingSupplierRelatedItems[Number(si.supplierId)] ? (
+                            {loadingSupplierRelatedItems[
+                              Number(si.supplierId)
+                            ] ? (
                               <div className="py-6 text-center text-xs text-gray-500 flex items-center justify-center gap-2">
                                 <div className="w-4 h-4 border-2 border-[#8CC21B] border-t-transparent rounded-full animate-spin"></div>
                                 Loading items...
                               </div>
-                            ) : (() => {
-                              const items = supplierRelatedItems[Number(si.supplierId)] || [];
-                              const term = (supplierSearchTerms[Number(si.supplierId)] || "").toLowerCase();
-                              const filtered = items.filter(item =>
-                                String(item.id).includes(term) ||
-                                (item.item_name && item.item_name.toLowerCase().includes(term)) ||
-                                (item.name_de && item.name_de.toLowerCase().includes(term))
-                              );
-
-                              if (filtered.length === 0) {
-                                return (
-                                  <div className="py-6 text-center text-xs text-gray-400">
-                                    No items found.
-                                  </div>
+                            ) : (
+                              (() => {
+                                const items =
+                                  supplierRelatedItems[Number(si.supplierId)] ||
+                                  [];
+                                const term = (
+                                  supplierSearchTerms[Number(si.supplierId)] ||
+                                  ""
+                                ).toLowerCase();
+                                const filtered = items.filter(
+                                  (item) =>
+                                    String(item.id).includes(term) ||
+                                    (item.item_name &&
+                                      item.item_name
+                                        .toLowerCase()
+                                        .includes(term)) ||
+                                    (item.name_de &&
+                                      item.name_de
+                                        .toLowerCase()
+                                        .includes(term)),
                                 );
-                              }
 
-                              return filtered.map((item: any) => {
-                                const isCurrent = Number(item.id) === Number(id);
-                                return (
-                                  <div
-                                    key={item.id}
-                                    onClick={() => router.push(`/items/${item.id}`)}
-                                    className={`w-full text-left px-3.5 py-2.5 text-xs rounded-xl transition-all flex items-center justify-between cursor-pointer group/item border ${isCurrent
-                                      ? "bg-blue-50 border-blue-200 text-blue-700 font-semibold"
-                                      : "bg-white border-gray-100 hover:border-[#8CC21B]/30 hover:bg-[#8CC21B]/5 text-gray-700"
-                                      }`}
-                                  >
-                                    <div className="flex flex-col gap-0.5 flex-1 min-w-0 pr-4">
-                                      <span className="font-semibold line-clamp-1 group-hover/item:text-[#8CC21B] transition-colors">
-                                        {item.item_name || item.name_de || "Unnamed Item"}
-                                      </span>
-                                      <span className="text-[10px] text-gray-400 flex items-center gap-2">
-                                        <span>ID: {item.id}</span>
-                                        {item.ean && <span>• EAN: {item.ean}</span>}
-                                      </span>
+                                if (filtered.length === 0) {
+                                  return (
+                                    <div className="py-6 text-center text-xs text-gray-400">
+                                      No items found.
                                     </div>
-                                    {isCurrent ? (
-                                      <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider shrink-0">
-                                        Current
-                                      </span>
-                                    ) : (
-                                      <ChevronRightIcon className="h-3.5 w-3.5 text-gray-400 group-hover/item:translate-x-0.5 transition-transform shrink-0" />
-                                    )}
-                                  </div>
-                                );
-                              });
-                            })()}
+                                  );
+                                }
+
+                                return filtered.map((item: any) => {
+                                  const isCurrent =
+                                    Number(item.id) === Number(id);
+                                  return (
+                                    <div
+                                      key={item.id}
+                                      onClick={() =>
+                                        router.push(`/items/${item.id}`)
+                                      }
+                                      className={`w-full text-left px-3.5 py-2.5 text-xs rounded-xl transition-all flex items-center justify-between cursor-pointer group/item border ${
+                                        isCurrent
+                                          ? "bg-blue-50 border-blue-200 text-blue-700 font-semibold"
+                                          : "bg-white border-gray-100 hover:border-[#8CC21B]/30 hover:bg-[#8CC21B]/5 text-gray-700"
+                                      }`}
+                                    >
+                                      <div className="flex flex-col gap-0.5 flex-1 min-w-0 pr-4">
+                                        <span className="font-semibold line-clamp-1 group-hover/item:text-[#8CC21B] transition-colors">
+                                          {item.item_name ||
+                                            item.name_de ||
+                                            "Unnamed Item"}
+                                        </span>
+                                        <span className="text-[10px] text-gray-400 flex items-center gap-2">
+                                          <span>ID: {item.id}</span>
+                                          {item.ean && (
+                                            <span>• EAN: {item.ean}</span>
+                                          )}
+                                        </span>
+                                      </div>
+                                      {isCurrent ? (
+                                        <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider shrink-0">
+                                          Current
+                                        </span>
+                                      ) : (
+                                        <ChevronRightIcon className="h-3.5 w-3.5 text-gray-400 group-hover/item:translate-x-0.5 transition-transform shrink-0" />
+                                      )}
+                                    </div>
+                                  );
+                                });
+                              })()
+                            )}
                           </div>
                         </div>
                       </div>
@@ -2164,7 +2526,13 @@ const ItemDetailsPage = () => {
                             {criteria.picture ? (
                               <button
                                 onClick={() =>
-                                  window.open(getCorrectUrl(criteria.picture).replace('/upload/fl_attachment/', '/upload/'), "_blank")
+                                  window.open(
+                                    getCorrectUrl(criteria.picture).replace(
+                                      "/upload/fl_attachment/",
+                                      "/upload/",
+                                    ),
+                                    "_blank",
+                                  )
                                 }
                                 className="text-blue-600 hover:text-blue-800"
                                 title="View Picture"
@@ -2268,35 +2636,64 @@ const ItemDetailsPage = () => {
                             <tr key={index} className="hover:bg-gray-50">
                               <td className="px-4 py-3 text-sm text-gray-900 font-medium">
                                 <div className="flex items-start gap-3 py-1">
-                                  {finalUrl.toLowerCase().match(/\.(pdf|jpg|jpeg|png|webp|gif)$/) ? (
+                                  {finalUrl
+                                    .toLowerCase()
+                                    .match(/\.(pdf|jpg|jpeg|png|webp|gif)$/) ? (
                                     <div className="h-10 w-10 min-w-[40px] rounded border border-gray-200 overflow-hidden bg-gray-50 flex items-center justify-center mt-0.5">
                                       <img
-                                        src={finalUrl.replace('/upload/', '/upload/w_100,h_100,c_fill,g_auto,pg_1/')}
+                                        src={finalUrl.replace(
+                                          "/upload/",
+                                          "/upload/w_100,h_100,c_fill,g_auto,pg_1/",
+                                        )}
                                         alt="preview"
                                         className="h-full w-full object-cover"
                                         onError={(e) => {
-                                          (e.target as HTMLImageElement).style.display = 'none';
-                                          (e.target as HTMLImageElement).parentElement!.innerHTML = '<svg class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>';
+                                          (
+                                            e.target as HTMLImageElement
+                                          ).style.display = "none";
+                                          (
+                                            e.target as HTMLImageElement
+                                          ).parentElement!.innerHTML =
+                                            '<svg class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>';
                                         }}
                                       />
                                     </div>
                                   ) : (
                                     <DocumentIcon className="h-8 w-8 text-gray-400 mt-0.5" />
                                   )}
-                                  <span className="whitespace-normal break-all" title={attachment.originalName || attachment.filename}>
-                                    {attachment.originalName || attachment.filename || "Unnamed Attachment"}
+                                  <span
+                                    className="whitespace-normal break-all"
+                                    title={
+                                      attachment.originalName ||
+                                      attachment.filename
+                                    }
+                                  >
+                                    {attachment.originalName ||
+                                      attachment.filename ||
+                                      "Unnamed Attachment"}
                                   </span>
                                 </div>
                               </td>
                               <td className="px-4 py-3 text-sm text-gray-500">
-                                {attachment.createdAt ? formatDate(attachment.createdAt) : (attachment.uploadedAt ? formatDate(attachment.uploadedAt) : "—")}
+                                {attachment.createdAt
+                                  ? formatDate(attachment.createdAt)
+                                  : attachment.uploadedAt
+                                    ? formatDate(attachment.uploadedAt)
+                                    : "—"}
                               </td>
                               <td className="px-4 py-3 text-sm">
                                 <div className="flex items-center gap-4">
                                   <button
                                     onClick={() => {
-                                      const viewUrl = finalUrl.replace('/upload/fl_attachment/', '/upload/');
-                                      window.open(viewUrl, "_blank", "noreferrer");
+                                      const viewUrl = finalUrl.replace(
+                                        "/upload/fl_attachment/",
+                                        "/upload/",
+                                      );
+                                      window.open(
+                                        viewUrl,
+                                        "_blank",
+                                        "noreferrer",
+                                      );
                                     }}
                                     className="text-blue-600 hover:text-blue-800 flex items-center gap-1.5 font-medium"
                                     title="View PDF/Image"
@@ -2305,10 +2702,19 @@ const ItemDetailsPage = () => {
                                     View
                                   </button>
                                   <a
-                                    href={finalUrl.includes('cloudinary') && !finalUrl.includes('/raw/')
-                                      ? finalUrl.replace('/upload/', '/upload/fl_attachment/')
-                                      : finalUrl}
-                                    download={attachment.originalName || attachment.filename}
+                                    href={
+                                      finalUrl.includes("cloudinary") &&
+                                      !finalUrl.includes("/raw/")
+                                        ? finalUrl.replace(
+                                            "/upload/",
+                                            "/upload/fl_attachment/",
+                                          )
+                                        : finalUrl
+                                    }
+                                    download={
+                                      attachment.originalName ||
+                                      attachment.filename
+                                    }
                                     target="_blank"
                                     rel="noreferrer"
                                     className="text-[#8CC21B] hover:text-[#7ab318] flex items-center gap-1.5 font-medium"
@@ -2318,7 +2724,9 @@ const ItemDetailsPage = () => {
                                     Download
                                   </a>
                                   <button
-                                    onClick={() => handleDeleteAttachment(attachment.id)}
+                                    onClick={() =>
+                                      handleDeleteAttachment(attachment.id)
+                                    }
                                     className="text-red-600 hover:text-red-800 flex items-center gap-1.5 font-medium"
                                     title="Delete Attachment"
                                   >
@@ -2358,11 +2766,11 @@ const ItemDetailsPage = () => {
               </div>
 
               {itemData.pictures &&
-                [
-                  itemData.pictures.shopPicture,
-                  itemData.pictures.ebayPictures,
-                  ...(itemData.pictures.pixPath || "").split(",").filter(Boolean),
-                ].filter(Boolean).length > 0 ? (
+              [
+                itemData.pictures.shopPicture,
+                itemData.pictures.ebayPictures,
+                ...(itemData.pictures.pixPath || "").split(",").filter(Boolean),
+              ].filter(Boolean).length > 0 ? (
                 <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
                   {[
                     {
@@ -2396,7 +2804,15 @@ const ItemDetailsPage = () => {
                         />
                         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                           <button
-                            onClick={() => window.open(getCorrectUrl(pic.url).replace('/upload/fl_attachment/', '/upload/'), "_blank")}
+                            onClick={() =>
+                              window.open(
+                                getCorrectUrl(pic.url).replace(
+                                  "/upload/fl_attachment/",
+                                  "/upload/",
+                                ),
+                                "_blank",
+                              )
+                            }
                             className="p-2 bg-white rounded-full text-gray-700 hover:text-primary transition-colors"
                             title="View Full Size"
                           >
@@ -2453,7 +2869,8 @@ const ItemDetailsPage = () => {
               <SectionHeader title="Tags" />
               <div className="py-4">
                 <p className="text-sm text-gray-500 mb-4">
-                  Add or remove tags for this item. Tags help you filter and categorize items across the system.
+                  Add or remove tags for this item. Tags help you filter and
+                  categorize items across the system.
                 </p>
                 <EntityTagSelector
                   entityId={parseInt(id as string)}
@@ -2489,8 +2906,9 @@ const ItemDetailsPage = () => {
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={uploadingPictures}
-              className={`px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 text-gray-700 ${uploadingPictures ? "opacity-50 cursor-not-allowed" : ""
-                }`}
+              className={`px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 text-gray-700 ${
+                uploadingPictures ? "opacity-50 cursor-not-allowed" : ""
+              }`}
             >
               <PhotoIcon className="h-4 w-4" />
               {uploadingPictures ? "Uploading..." : "Add Pictures"}
@@ -2505,7 +2923,10 @@ const ItemDetailsPage = () => {
           </div>
 
           <div className="text-sm text-gray-500">
-            Last updated: {itemData?.updated_at ? formatDate(itemData.updated_at) : formatDate(new Date())}
+            Last updated:{" "}
+            {itemData?.updated_at
+              ? formatDate(itemData.updated_at)
+              : formatDate(new Date())}
           </div>
         </div>
       </div>

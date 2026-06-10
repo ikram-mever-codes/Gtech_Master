@@ -17,6 +17,7 @@ import { StarBusinessDetails } from "./star_business_details";
 import { StarCustomerDetails } from "./star_customer_details";
 import { Inquiry } from "./inquiry";
 import { Tag } from "./tags";
+import { Item } from "./items";
 
 @Entity()
 export class Customer {
@@ -93,6 +94,9 @@ export class Customer {
 
   @OneToMany(() => Inquiry, (inquiry) => inquiry.customer)
   inquiries!: Inquiry;
+
+  @OneToMany(() => Item, (item) => item.customer)
+  items!: Item[];
 
   @CreateDateColumn()
   createdAt!: Date;
