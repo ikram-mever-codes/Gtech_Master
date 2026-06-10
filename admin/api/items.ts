@@ -233,6 +233,7 @@ export const getItems = async (params?: {
   isNew?: string;
   eanSearch?: string;
   tags?: string;
+  filter?: string;
 }) => {
   try {
     const response = await api.get("/items", {
@@ -985,6 +986,7 @@ export const getWarehouseItems = async (params?: {
   isStockItem?: string;
   sortBy?: string;
   sortOrder?: "ASC" | "DESC";
+  filter?: string;
 }) => {
   try {
     const response = await api.get("/items/warehouse/items", { params });

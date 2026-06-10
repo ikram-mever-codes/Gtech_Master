@@ -104,7 +104,7 @@ export const getAuditReports = async (req: Request, res: Response) => {
       supplierItemsIsPoNullCount,
       newPictureRequiredCount,
       itemsWithoutPictureCount,
-      multipleParentsPicturesCount,
+      multipleParentsPicturesRaw,
     ] = await Promise.all([
       AppDataSource.getRepository(OrderItem)
         .createQueryBuilder("oi")
@@ -168,7 +168,10 @@ export const getAuditReports = async (req: Request, res: Response) => {
 
       AppDataSource.getRepository(Item)
         .createQueryBuilder("item")
-        .where("item.supplier_id IS NULL OR item.supplier_id = 0")
+        .leftJoin("supplier_item", "si", "si.item_id = item.id AND si.is_default = 'Y'")
+        .where("item.isActive = 'Y'")
+        .andWhere("(item.supplier_id IS NULL OR item.supplier_id = 0)")
+        .andWhere("(si.supplier_id IS NULL OR si.supplier_id = 0)")
         .getCount(),
 
       AppDataSource.getRepository(Item)
@@ -178,15 +181,19 @@ export const getAuditReports = async (req: Request, res: Response) => {
         .andWhere("(si.price_rmb IS NULL OR si.price_rmb = 0)")
         .getCount(),
 
-      AppDataSource.getRepository(SupplierItem)
-        .createQueryBuilder("si")
-        .where("si.is_po = 'No'")
+      AppDataSource.getRepository(Item)
+        .createQueryBuilder("item")
+        .innerJoin("supplier_item", "si", "si.item_id = item.id AND si.is_default = 'Y'")
+        .where("item.isActive = 'Y'")
+        .andWhere("si.is_po = 'No'")
         .andWhere("(si.url IS NULL OR si.url = '' OR si.url = 'null' OR si.url = 'NULL')")
         .getCount(),
 
-      AppDataSource.getRepository(SupplierItem)
-        .createQueryBuilder("si")
-        .where("si.is_po IS NULL OR si.is_po = '' OR si.is_po = 'null' OR si.is_po = 'NULL'")
+      AppDataSource.getRepository(Item)
+        .createQueryBuilder("item")
+        .innerJoin("supplier_item", "si", "si.item_id = item.id AND si.is_default = 'Y'")
+        .where("item.isActive = 'Y'")
+        .andWhere("(si.is_po IS NULL OR si.is_po = '' OR si.is_po = 'null' OR si.is_po = 'NULL')")
         .getCount(),
 
       AppDataSource.getRepository(Item)
@@ -203,11 +210,13 @@ export const getAuditReports = async (req: Request, res: Response) => {
       AppDataSource.getRepository(Item)
         .createQueryBuilder("item")
         .select("item.photo")
-        .where("item.photo IS NOT NULL AND item.photo != '' AND item.parent_id IS NOT NULL")
+        .where("item.photo IS NOT NULL AND item.photo != '' AND item.photo != 'null' AND item.photo != 'NULL' AND item.parent_id IS NOT NULL")
         .groupBy("item.photo")
         .having("COUNT(DISTINCT item.parent_id) > 1")
-        .getCount(),
+        .getRawMany(),
     ]);
+
+    const multipleParentsPicturesCount = multipleParentsPicturesRaw.length;
 
     let unusedPicturesCount = 0;
     try {
@@ -217,6 +226,7 @@ export const getAuditReports = async (req: Request, res: Response) => {
         const itemsWithPhotos = await AppDataSource.getRepository(Item)
           .createQueryBuilder("item")
           .select(["item.photo", "item.pix_path", "item.pix_path_eBay"])
+          .where("item.photo IS NOT NULL OR item.pix_path IS NOT NULL OR item.pix_path_eBay IS NOT NULL")
           .getRawMany();
 
         const referencedPhotos = new Set<string>();
@@ -225,20 +235,24 @@ export const getAuditReports = async (req: Request, res: Response) => {
           const pixPath = item.item_pix_path || item.pix_path;
           const pixPathEbay = item.item_pix_path_eBay || item.pix_path_eBay;
 
-          if (photo) referencedPhotos.add(path.basename(photo));
-          if (pixPath) referencedPhotos.add(path.basename(pixPath));
-          if (pixPathEbay) referencedPhotos.add(path.basename(pixPathEbay));
+          if (photo) referencedPhotos.add(path.basename(photo).trim());
+          if (pixPath) referencedPhotos.add(path.basename(pixPath).trim());
+          if (pixPathEbay) referencedPhotos.add(path.basename(pixPathEbay).trim());
         });
 
-        const unusedFiles = files.filter((file) => {
-          try {
-            const stats = fs.statSync(path.join(uploadDir, file));
-            return stats.isFile() && !referencedPhotos.has(file);
-          } catch (e) {
-            return false;
+        let unusedCount = 0;
+        for (const file of files) {
+          if (!referencedPhotos.has(file)) {
+            try {
+              const stats = fs.statSync(path.join(uploadDir, file));
+              if (stats.isFile()) {
+                unusedCount++;
+              }
+            } catch (e) {
+            }
           }
-        });
-        unusedPicturesCount = unusedFiles.length;
+        }
+        unusedPicturesCount = unusedCount;
       }
     } catch (e) {
       console.error("Error listing unused pictures:", e);

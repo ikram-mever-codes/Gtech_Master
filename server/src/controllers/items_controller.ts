@@ -177,6 +177,7 @@ export const getItems = async (
       isNew,
       eanSearch,
       tags,
+      filter,
     } = req.query;
 
     let pageNum = parseInt(page as string);
@@ -299,6 +300,76 @@ export const getItems = async (
     }
     if (isNew === "Y") {
       queryBuilder.andWhere("item.is_new = :isNew", { isNew: "Y" });
+    }
+
+    if (filter) {
+      const filterStr = filter as string;
+      if (filterStr === "rmb_special_no_value") {
+        queryBuilder.leftJoin("supplier_item", "si_filter", "si_filter.item_id = item.id AND si_filter.is_default = 'Y'");
+        queryBuilder.andWhere("item.is_rmb_special = 'Y'");
+        queryBuilder.andWhere("(si_filter.price_rmb IS NULL OR si_filter.price_rmb = 0)");
+      } else if (filterStr === "eur_special_no_value") {
+        queryBuilder.andWhere("item.is_eur_special = 'Y'");
+        queryBuilder.andWhere("(item.price IS NULL OR item.price = 0 OR item.transfer_price_EUR IS NULL OR item.transfer_price_EUR = 0)");
+      } else if (filterStr === "dimension_special_no_value") {
+        queryBuilder.andWhere("item.is_dimension_special = 'Y'");
+        queryBuilder.andWhere("(item.weight IS NULL OR item.weight = 0 OR item.length IS NULL OR item.length = 0 OR item.width IS NULL OR item.width = 0 OR item.height IS NULL OR item.height = 0)");
+      } else if (filterStr === "missing_var_values_en") {
+        queryBuilder.andWhere((qb) => {
+          const subQuery = qb
+            .subQuery()
+            .select("1")
+            .from(VariationValue, "vv")
+            .where("vv.item_id = item.id")
+            .andWhere(
+              "((vv.value_de IS NOT NULL AND vv.value_de != '' AND (vv.value_en IS NULL OR vv.value_en = '')) OR " +
+              "(vv.value_de_2 IS NOT NULL AND vv.value_de_2 != '' AND (vv.value_en_2 IS NULL OR vv.value_en_2 = '')) OR " +
+              "(vv.value_de_3 IS NOT NULL AND vv.value_de_3 != '' AND (vv.value_en_3 IS NULL OR vv.value_en_3 = '')))"
+            );
+          return `EXISTS ${subQuery.getQuery()}`;
+        });
+      } else if (filterStr === "no_taric") {
+        queryBuilder.andWhere("(item.taric_id IS NULL OR item.taric_id = 0)");
+      } else if (filterStr === "mismatched_tarics") {
+        queryBuilder.innerJoin("item.parent", "p_filter");
+        queryBuilder.andWhere("item.taric_id IS NOT NULL AND item.taric_id != 0");
+        queryBuilder.andWhere("p_filter.taric_id IS NOT NULL AND p_filter.taric_id != 0");
+        queryBuilder.andWhere("item.taric_id <> p_filter.taric_id");
+      } else if (filterStr === "null_category") {
+        queryBuilder.andWhere("(item.cat_id IS NULL OR item.cat_id = 0)");
+      } else if (filterStr === "no_supplier") {
+        queryBuilder.leftJoin("supplier_item", "si_filter", "si_filter.item_id = item.id AND si_filter.is_default = 'Y'");
+        queryBuilder.andWhere("item.isActive = 'Y'");
+        queryBuilder.andWhere("(item.supplier_id IS NULL OR item.supplier_id = 0)");
+        queryBuilder.andWhere("(si_filter.supplier_id IS NULL OR si_filter.supplier_id = 0)");
+      } else if (filterStr === "no_rmb_price") {
+        queryBuilder.leftJoin("supplier_item", "si_filter", "si_filter.item_id = item.id AND si_filter.is_default = 'Y'");
+        queryBuilder.andWhere("item.isActive = 'Y'");
+        queryBuilder.andWhere("(si_filter.price_rmb IS NULL OR si_filter.price_rmb = 0)");
+      } else if (filterStr === "is_po_no_url_null") {
+        queryBuilder.leftJoin("supplier_item", "si_filter", "si_filter.item_id = item.id AND si_filter.is_default = 'Y'");
+        queryBuilder.andWhere("si_filter.is_po = 'No'");
+        queryBuilder.andWhere("(si_filter.url IS NULL OR si_filter.url = '' OR si_filter.url = 'null' OR si_filter.url = 'NULL')");
+      } else if (filterStr === "is_po_null") {
+        queryBuilder.leftJoin("supplier_item", "si_filter", "si_filter.item_id = item.id AND si_filter.is_default = 'Y'");
+        queryBuilder.andWhere("(si_filter.is_po IS NULL OR si_filter.is_po = '' OR si_filter.is_po = 'null' OR si_filter.is_po = 'NULL')");
+      } else if (filterStr === "new_picture_required") {
+        queryBuilder.andWhere("item.is_npr = 'Y'");
+      } else if (filterStr === "no_picture") {
+        queryBuilder.andWhere("item.isActive = 'Y'");
+        queryBuilder.andWhere("(item.photo IS NULL OR item.photo = '' OR item.photo = 'null' OR item.photo = 'NULL')");
+      } else if (filterStr === "multiple_parents_pictures") {
+        queryBuilder.andWhere((qb) => {
+          const subQuery = qb
+            .subQuery()
+            .select("sub_item.photo")
+            .from(Item, "sub_item")
+            .where("sub_item.photo IS NOT NULL AND sub_item.photo != '' AND sub_item.photo != 'null' AND sub_item.photo != 'NULL' AND sub_item.parent_id IS NOT NULL")
+            .groupBy("sub_item.photo")
+            .having("COUNT(DISTINCT sub_item.parent_id) > 1");
+          return `item.photo IN ${subQuery.getQuery()}`;
+        });
+      }
     }
 
     queryBuilder.orderBy(
@@ -2237,6 +2308,7 @@ export const getWarehouseItems = async (
       isStockItem = "",
       sortBy = "created_at",
       sortOrder = "DESC",
+      filter = "",
     } = req.query;
 
     const pageNum = parseInt(page as string);
@@ -2271,6 +2343,10 @@ export const getWarehouseItems = async (
       query.andWhere("warehouse.is_stock_item = :isStockItem", { isStockItem });
     }
 
+    if (filter === "wrong_shipping_class") {
+      query.andWhere("(warehouse.ship_class IS NULL OR warehouse.ship_class = 'Na' OR warehouse.ship_class = 'NA' OR warehouse.ship_class = '')");
+    }
+
     const totalRecords = await query.getCount();
 
     const warehouseItems = await query
@@ -2290,8 +2366,7 @@ export const getWarehouseItems = async (
       buffer: warehouse.buffer,
       is_active: warehouse.is_active,
       is_stock_item: warehouse.is_stock_item,
-      //   parent_de_no: warehouse.ite?.parent?.de_no || null,
-      //   parent_name_de: warehouse.item?.parent?.name_de || null,
+      ship_class: warehouse.ship_class,
       created_at: warehouse.created_at,
     }));
 
