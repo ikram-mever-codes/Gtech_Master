@@ -149,6 +149,7 @@ export const updateSupplier = async (req: Request, res: Response, next: NextFunc
 
         const supplier = await supplierRepo.findOne({
             where: { id: Number(id) },
+            relations: ["tags"],
         });
 
         if (!supplier) {

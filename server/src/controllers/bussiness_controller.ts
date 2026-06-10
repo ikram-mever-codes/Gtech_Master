@@ -1449,6 +1449,7 @@ export const updateBusiness = async (
       isDeviceMaker: finalCustomer.businessDetails?.isDeviceMaker,
       isStarCustomer: !!finalCustomer.starCustomerDetails,
       tags: finalCustomer.tags,
+      tagOrder: finalCustomer.tagOrder,
       createdAt: finalCustomer.createdAt,
       updatedAt: finalCustomer.updatedAt,
     };
@@ -1595,6 +1596,7 @@ export const getBusinessById = async (
       note: customer.businessDetails?.description,
       status: BUSINESS_STATUS.ACTIVE,
       tags: customer.tags,
+      tagOrder: customer.tagOrder,
       createdAt: customer.createdAt,
       updatedAt: customer.updatedAt,
     };
@@ -1809,6 +1811,7 @@ export const getAllBusinesses = async (
         status: BUSINESS_STATUS.ACTIVE,
         source: customer.businessDetails?.businessSource,
         tags: customer.tags,
+        tagOrder: customer.tagOrder,
         createdAt: customer.createdAt,
         updatedAt: customer.updatedAt,
       };

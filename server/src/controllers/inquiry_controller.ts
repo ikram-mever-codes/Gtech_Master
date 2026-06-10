@@ -502,7 +502,7 @@ export class InquiryController {
 
       const completeInquiry = await this.inquiryRepository.findOne({
         where: { id: savedInquiry.id },
-        relations: ["customer", "contactPerson", "requests"],
+        relations: ["customer", "contactPerson", "requests", "tags"],
       });
 
       const user = (request as AuthorizedRequest).user;

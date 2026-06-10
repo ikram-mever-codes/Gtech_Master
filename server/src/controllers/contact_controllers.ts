@@ -237,7 +237,7 @@ export const createContactPerson = async (
 
     const contactPersonWithRelations = await contactPersonRepository.findOne({
       where: { id: savedContactPerson.id },
-      relations: ["starBusinessDetails", "starBusinessDetails.customer"],
+      relations: ["starBusinessDetails", "starBusinessDetails.customer", "tags"],
     });
 
     return res.status(201).json({
@@ -280,7 +280,7 @@ export const updateContactPerson = async (
 
     const contactPerson = await contactPersonRepository.findOne({
       where: { id },
-      relations: ["starBusinessDetails", "starBusinessDetails.customer"],
+      relations: ["starBusinessDetails", "starBusinessDetails.customer", "tags"],
     });
 
     if (!contactPerson) {
@@ -392,8 +392,13 @@ export const updateContactPerson = async (
     if (note !== undefined) {
       contactPerson.note = note ? note.trim() : null;
     }
-    const updatedContactPerson =
+    const savedContactPerson =
       await contactPersonRepository.save(contactPerson);
+
+    const updatedContactPerson = await contactPersonRepository.findOne({
+      where: { id: savedContactPerson.id },
+      relations: ["starBusinessDetails", "starBusinessDetails.customer", "tags"],
+    });
 
     return res.status(200).json({
       success: true,
@@ -778,7 +783,7 @@ export const getContactPerson = async (
 
     const contactPerson = await contactPersonRepository.findOne({
       where: { id },
-      relations: ["starBusinessDetails", "starBusinessDetails.customer"],
+      relations: ["starBusinessDetails", "starBusinessDetails.customer", "tags"],
     });
 
     if (!contactPerson) {
@@ -1037,6 +1042,7 @@ export const getAllContactPersons = async (
           noteContactPreference: contactPerson.noteContactPreference || null,
           positionOthers: null,
           tags: contactPerson.tags || [],
+          tagOrder: contactPerson.tagOrder,
         };
       },
     );
@@ -1076,6 +1082,7 @@ export const getContactPersonsByStarBusiness = async (
       relations: [
         "starBusinessDetails",
         "starBusinessDetails.contactPersons",
+        "starBusinessDetails.contactPersons.tags",
         "businessDetails",
       ],
     });
@@ -1133,6 +1140,8 @@ export const getContactPersonsByStarBusiness = async (
         note: contactPerson.note || null,
         noteContactPreference: contactPerson.noteContactPreference || null,
         positionOthers: null,
+        tags: contactPerson.tags || [],
+        tagOrder: contactPerson.tagOrder,
       };
     });
 
@@ -1565,6 +1574,7 @@ function formatContactPersonResponse(contactPerson: any) {
     decisionMakerNote: contactPerson.decisionMakerNote,
     note: contactPerson.note,
     tags: contactPerson.tags || [],
+    tagOrder: contactPerson.tagOrder,
     createdAt: contactPerson.createdAt,
     updatedAt: contactPerson.updatedAt,
   };
