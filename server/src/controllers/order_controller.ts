@@ -1313,12 +1313,12 @@ export const generateCommercialInvoicePDF = async (
       if (oi.set_taric_code) {
         const codes = oi.set_taric_code.split("/");
         const target = codes.length > 1 ? codes[1].trim() : codes[0].trim();
-        groupKey = `set_${target}`;
+        groupKey = `hs_${target}`;
         hsCode = target;
         const mt = manualTaricMap.get(target);
         desc = mt?.name_en || item?.item_name || "Unknown";
       } else if (item?.taric?.id && !isProject) {
-        groupKey = `taric_${item.taric.id}`;
+        groupKey = `hs_${taricCode}`;
         hsCode = taricCode;
         desc = item.taric.name_en || item.item_name || "Unknown";
       } else {

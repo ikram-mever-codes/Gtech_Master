@@ -943,13 +943,19 @@ export class InvoiceController {
       };
 
       const getGroupKey = (oi: any): string => {
+        const itemTaricCode = oi.item?.taric?.code || "";
+        const isProjectItem = !itemTaricCode || itemTaricCode === "0" || itemTaricCode === "0000000000";
+
         if (oi.set_taric_code) {
           const codes = oi.set_taric_code.split("/");
           const target = codes.length > 1 ? codes[1].trim() : codes[0].trim();
-          return `set_${target}`;
+          return `hs_${target}`;
         }
         const taricId = oi.item?.taric?.id;
-        return taricId ? `taric_${taricId}` : "unknown";
+        if (taricId && !isProjectItem) {
+          return `hs_${itemTaricCode}`;
+        }
+        return `item_${oi.item?.id || Math.random()}`;
       };
 
       const manualTaricCodes: string[] = [];
