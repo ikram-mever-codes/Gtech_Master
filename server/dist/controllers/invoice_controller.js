@@ -555,10 +555,10 @@ InvoiceController.getAllInvoices = (req, res, next) => __awaiter(void 0, void 0,
           SUM(oi.qty) as total_qty, 
           COUNT(oi.id) as count_items,
           SUM(oi.qty * COALESCE(
-            oi.eur_special_price, 
-            oi.price, 
-            i."transfer_price (EUR)",
-            i.price, 
+            NULLIF(oi.eur_special_price, 0), 
+            NULLIF(oi.price, 0), 
+            NULLIF(i."transfer_price (EUR)", 0),
+            NULLIF(i.price, 0), 
             CASE WHEN oi.rmb_special_price > 0 THEN oi.rmb_special_price * 0.13 ELSE 0 END,
             0
           )) as total_price
