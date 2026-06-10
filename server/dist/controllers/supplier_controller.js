@@ -155,6 +155,7 @@ const updateSupplier = (req, res, next) => __awaiter(void 0, void 0, void 0, fun
         const supplierRepo = database_1.AppDataSource.getRepository(suppliers_1.Supplier);
         const supplier = yield supplierRepo.findOne({
             where: { id: Number(id) },
+            relations: ["tags"],
         });
         if (!supplier) {
             res.status(404).json({

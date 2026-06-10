@@ -2459,6 +2459,16 @@ const ItemDetailsPage = () => {
                   entityId={parseInt(id as string)}
                   entityType="item"
                   initialTags={(itemData as any).tags || []}
+                  tagOrder={(itemData as any).tagOrder}
+                  onTagsUpdated={(newTags) => {
+                    setItemData((prev: any) =>
+                      prev ? {
+                        ...prev,
+                        tags: newTags,
+                        tagOrder: newTags.map((t: any) => t.id).join(","),
+                      } : null
+                    );
+                  }}
                 />
               </div>
             </div>

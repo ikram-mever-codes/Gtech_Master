@@ -25,7 +25,7 @@ import {
     Supplier,
 } from "@/api/suppliers";
 import { loadingStyles, successStyles, errorStyles } from "@/utils/constants";
-import { EntityTagSelector, TagBadge, type Tag } from "@/components/Tags/TagManager";
+import { EntityTagSelector, TagBadge, sortTags, type Tag } from "@/components/Tags/TagManager";
 import { TagFilterSelector } from "@/components/Tags/TagFilterSelector";
 
 interface PaginationState {
@@ -388,7 +388,7 @@ const SuppliersPage: React.FC = () => {
                                                     </td>
                                                     <td className="px-2 py-1.5">
                                                         <div className="flex flex-wrap gap-1 max-w-[150px]">
-                                                            {(supplier.tags || []).map((tag: Tag) => (
+                                                            {sortTags(supplier.tags || [], supplier.tagOrder).map((tag: Tag) => (
                                                                 <TagBadge key={tag.id} tag={tag} size="sm" />
                                                             ))}
                                                             {(!supplier.tags || supplier.tags.length === 0) && (
@@ -628,8 +628,12 @@ const SuppliersPage: React.FC = () => {
                                                     entityId={editingId}
                                                     entityType="supplier"
                                                     initialTags={(formData.tags as Tag[]) || []}
+                                                    tagOrder={formData.tagOrder}
                                                     disabled={!isEditEnabled}
-                                                    onTagsUpdated={(tags) => updateField("tags", tags)}
+                                                    onTagsUpdated={(tags) => {
+                                                        updateField("tags", tags);
+                                                        updateField("tagOrder", tags.map((t) => t.id).join(","));
+                                                    }}
                                                 />
                                             </div>
                                         </div>

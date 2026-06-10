@@ -170,6 +170,7 @@ export const createOrder = async (
       return orderItemsRepo.create({
         order_id: order.id,
         item_id,
+        ItemID_DE: dbItem?.ItemID_DE,
         qty,
         remark_de: it.remark_de,
         rmb_special_price: rmbPrice,
@@ -337,6 +338,7 @@ export const updateOrder = async (
         return orderItemsRepo.create({
           order_id: order.id,
           item_id,
+          ItemID_DE: dbItem?.ItemID_DE,
           qty,
           remark_de: it.remark_de,
           rmb_special_price: rmbPrice,
@@ -819,9 +821,22 @@ export const generateLabelPDF = async (
 
     if (!item) return next(new ErrorHandler("Item not found", 404));
 
-    const warehouseItem = await warehouseItemRepo.findOne({
-      where: { ItemID_DE: item.ItemID_DE },
-    });
+    let warehouseItem = null;
+    if (item.ItemID_DE) {
+      warehouseItem = await warehouseItemRepo.findOne({
+        where: { ItemID_DE: item.ItemID_DE },
+      });
+    }
+    if (!warehouseItem && item.item_id) {
+      warehouseItem = await warehouseItemRepo.findOne({
+        where: { item_id: item.item_id },
+      });
+    }
+    if (!warehouseItem && item.item?.ItemID_DE) {
+      warehouseItem = await warehouseItemRepo.findOne({
+        where: { ItemID_DE: item.item.ItemID_DE },
+      });
+    }
     const order = await orderRepo.findOne({ where: { id: item.order_id } });
 
     const doc = new PDFDocument({ size: [252, 110], margin: 0 });

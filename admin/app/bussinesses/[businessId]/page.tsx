@@ -258,9 +258,14 @@ const BusinessProfilePage = () => {
                         entityId={business.id}
                         entityType="company"
                         initialTags={business.tags || []}
+                        tagOrder={(business as any).tagOrder}
                         onTagsUpdated={(newTags) => {
                           setBusiness((prev) =>
-                            prev ? { ...prev, tags: newTags } : null
+                            prev ? {
+                              ...prev,
+                              tags: newTags,
+                              tagOrder: newTags.map((t) => t.id).join(","),
+                            } : null
                           );
                         }}
                       />

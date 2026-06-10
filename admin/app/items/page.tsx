@@ -85,7 +85,7 @@ import { getAllSuppliers, Supplier } from "@/api/suppliers";
 import { getCategories } from "@/api/categories";
 import { loadingStyles, successStyles, errorStyles } from "@/utils/constants";
 import { TagFilterSelector } from "@/components/Tags/TagFilterSelector";
-import { TagBadge, TagPickerInput, type Tag } from "@/components/Tags/TagManager";
+import { TagBadge, TagPickerInput, sortTags, type Tag } from "@/components/Tags/TagManager";
 import { syncEntityTags } from "@/api/tags";
 
 type TabType = "items" | "parents" | "warehouse" | "tarics" | "suppliers";
@@ -1466,7 +1466,7 @@ const ItemsManagementPage: React.FC = () => {
             <td className="px-4 py-3">{supplier.email}</td>
             <td className="px-4 py-3">
               <div className="flex flex-wrap gap-1 max-w-[150px]">
-                {(supplier.tags || []).map((tag: Tag) => (
+                {sortTags(supplier.tags || [], supplier.tagOrder).map((tag: Tag) => (
                   <TagBadge key={tag.id} tag={tag} size="sm" />
                 ))}
                 {(!supplier.tags || supplier.tags.length === 0) && (

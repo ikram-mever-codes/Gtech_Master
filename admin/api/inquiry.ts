@@ -97,6 +97,8 @@ export interface Inquiry {
   urgency1?: string;
   urgency2?: string;
   painPoints?: string[];
+  tags?: { id: string; name: string; category: string; color: string }[];
+  tagOrder?: string;
   createdAt: Date;
   updatedAt: Date;
 }

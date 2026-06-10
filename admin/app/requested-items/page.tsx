@@ -1259,7 +1259,21 @@ const RequestedItemsPage: React.FC = () => {
                           entityId={editingItemId!}
                           entityType="request_item"
                           initialTags={(requestedItems.find((i) => i.id === editingItemId) as any)?.tags || []}
+                          tagOrder={(requestedItems.find((i) => i.id === editingItemId) as any)?.tagOrder}
                           disabled={!editModeEnabled}
+                          onTagsUpdated={(newTags) => {
+                            setRequestedItems((prev: any) =>
+                              prev.map((item: any) =>
+                                item.id === editingItemId
+                                  ? {
+                                      ...item,
+                                      tags: newTags,
+                                      tagOrder: newTags.map((t) => t.id).join(","),
+                                    }
+                                  : item
+                              )
+                            );
+                          }}
                         />
                       )}
                     </div>
