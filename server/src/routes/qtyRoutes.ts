@@ -1,14 +1,15 @@
 import express from "express";
 
-import { getCategories, } from "../controllers/category_controller";
+import {
+  getCategories,
+  migrateAndCleanupCategories,
+} from "../controllers/category_controller";
 import { authenticateUser } from "../middlewares/authorized";
+
 const router: any = express.Router();
 
-// category Routes
-
 router.get("/", getCategories);
-// router.get("/:categoryId", getcategoryById);
-// router.put("/:categoryId", updatecategory);
-// router.delete("/:categoryId", deletecategory);
+
+router.post("/migrate-cleanup", migrateAndCleanupCategories);
 
 export default router;
