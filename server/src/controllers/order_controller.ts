@@ -978,7 +978,7 @@ export const generateLabelPDF = async (
       lineBreak: true,
     });
 
-    const bottomSectionY = Math.min(descriptionY + descriptionHeight + 3, 70);
+    const bottomSectionY = Math.max(56, Math.min(descriptionY + descriptionHeight + 4, 65));
 
     let remarkCNText = item.remarks_cn || "/";
     doc.font("Helvetica-Oblique").fontSize(6.5).fillColor("black");
@@ -1003,7 +1003,7 @@ export const generateLabelPDF = async (
     });
 
     let remarkWText = item.remark_de || "/";
-    const remarkWLabelY = bottomSectionY + 8 + fontSizeCN + 3;
+    const remarkWLabelY = bottomSectionY + 8 + Math.max(fontSizeCN, 8) + 7;
     doc.font("Helvetica-Oblique").fontSize(6.5).fillColor("black");
     doc.text("RemarkW", colA, remarkWLabelY);
 
