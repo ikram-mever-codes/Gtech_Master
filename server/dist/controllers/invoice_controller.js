@@ -1255,21 +1255,3 @@ InvoiceController.cancelInvoice = (req, res, next) => __awaiter(void 0, void 0, 
         return next(error);
     }
 });
-InvoiceController.reopenInvoice = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    const invoiceRepository = database_1.AppDataSource.getRepository(invoice_1.Invoice);
-    try {
-        const { id } = req.params;
-        const invoice = yield invoiceRepository.findOne({ where: { id } });
-        if (!invoice)
-            return res.status(404).json({ message: "Invoice not found" });
-        invoice.status = "sent";
-        invoice.closedAt = undefined;
-        invoice.paidAmount = 0;
-        invoice.outstandingAmount = invoice.grossTotal;
-        yield invoiceRepository.save(invoice);
-        return res.json({ success: true, message: "Invoice reopened", data: invoice });
-    }
-    catch (error) {
-        return next(error);
-    }
-});
