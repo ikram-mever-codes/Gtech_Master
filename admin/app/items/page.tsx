@@ -85,7 +85,12 @@ import { getAllSuppliers, Supplier } from "@/api/suppliers";
 import { getCategories } from "@/api/categories";
 import { loadingStyles, successStyles, errorStyles } from "@/utils/constants";
 import { TagFilterSelector } from "@/components/Tags/TagFilterSelector";
-import { TagBadge, TagPickerInput, sortTags, type Tag } from "@/components/Tags/TagManager";
+import {
+  TagBadge,
+  TagPickerInput,
+  sortTags,
+  type Tag,
+} from "@/components/Tags/TagManager";
 import { syncEntityTags } from "@/api/tags";
 
 type TabType = "items" | "parents" | "warehouse" | "tarics" | "suppliers";
@@ -115,7 +120,12 @@ const ItemsManagementPage: React.FC = () => {
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<TabType>(() => {
     const tabParam = searchParams.get("tab");
-    if (tabParam === "parents" || tabParam === "warehouse" || tabParam === "tarics" || tabParam === "suppliers") {
+    if (
+      tabParam === "parents" ||
+      tabParam === "warehouse" ||
+      tabParam === "tarics" ||
+      tabParam === "suppliers"
+    ) {
       return tabParam;
     }
     return "items";
@@ -173,8 +183,10 @@ const ItemsManagementPage: React.FC = () => {
     search: "",
   });
 
-  const [debouncedFilters, setDebouncedFilters] = useState<FilterState>(filters);
-  const [debouncedTaricFilters, setDebouncedTaricFilters] = useState<TaricFilterState>(taricFilters);
+  const [debouncedFilters, setDebouncedFilters] =
+    useState<FilterState>(filters);
+  const [debouncedTaricFilters, setDebouncedTaricFilters] =
+    useState<TaricFilterState>(taricFilters);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -226,7 +238,7 @@ const ItemsManagementPage: React.FC = () => {
     price: 0,
     currency: "CNY",
     isActive: true,
-    is_qty_dividable: true,
+    is_qty_dividable: false,
     is_npr: false,
     is_eur_special: false,
     is_rmb_special: false,
@@ -440,7 +452,13 @@ const ItemsManagementPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [activeTab, pagination.page, pagination.limit, debouncedFilters, debouncedTaricFilters]);
+  }, [
+    activeTab,
+    pagination.page,
+    pagination.limit,
+    debouncedFilters,
+    debouncedTaricFilters,
+  ]);
 
   const fetchStatistics = useCallback(async () => {
     try {
@@ -454,7 +472,13 @@ const ItemsManagementPage: React.FC = () => {
   useEffect(() => {
     const tabParam = searchParams.get("tab");
     if (tabParam) {
-      const validTabs = ["items", "parents", "warehouse", "tarics", "suppliers"];
+      const validTabs = [
+        "items",
+        "parents",
+        "warehouse",
+        "tarics",
+        "suppliers",
+      ];
       if (validTabs.includes(tabParam)) {
         setActiveTab(tabParam as TabType);
       }
@@ -587,7 +611,7 @@ const ItemsManagementPage: React.FC = () => {
       await deleteItem(itemId);
       fetchData();
       fetchPendingSyncCount();
-    } catch (error) { }
+    } catch (error) {}
   };
 
   const handleDeleteParent = async (parentId: number) => {
@@ -599,7 +623,7 @@ const ItemsManagementPage: React.FC = () => {
     try {
       await deleteParent(parentId);
       fetchData();
-    } catch (error) { }
+    } catch (error) {}
   };
 
   const handleToggleStatus = async (itemId: number, currentStatus: string) => {
@@ -612,7 +636,7 @@ const ItemsManagementPage: React.FC = () => {
       );
       fetchData();
       fetchPendingSyncCount();
-    } catch (error) { }
+    } catch (error) {}
   };
 
   const handleOpenCreateItemModal = () => {
@@ -633,7 +657,7 @@ const ItemsManagementPage: React.FC = () => {
       price: 0,
       currency: "CNY",
       isActive: true,
-      is_qty_dividable: true,
+      is_qty_dividable: false,
       is_npr: false,
       is_eur_special: false,
       is_rmb_special: false,
@@ -684,9 +708,14 @@ const ItemsManagementPage: React.FC = () => {
         is_rmb_special: itemFormData.is_rmb_special ? "Y" : "N",
       });
 
-      const createdId = (result as any)?.data?.id || (result as any)?.data?.data?.id;
+      const createdId =
+        (result as any)?.data?.id || (result as any)?.data?.data?.id;
       if (createdId && newItemTags.length > 0) {
-        await syncEntityTags(createdId, "item", newItemTags.map((t) => t.id));
+        await syncEntityTags(
+          createdId,
+          "item",
+          newItemTags.map((t) => t.id),
+        );
       }
 
       setShowItemModal(false);
@@ -812,7 +841,7 @@ const ItemsManagementPage: React.FC = () => {
       }
       setSelectedTarics(new Set());
       fetchData();
-    } catch (error) { }
+    } catch (error) {}
   };
 
   const handleBulkDelete = async () => {
@@ -849,7 +878,9 @@ const ItemsManagementPage: React.FC = () => {
     }
 
     try {
-      let allIds: number[] = Array.from(selectedItems).map((id) => parseInt(id));
+      let allIds: number[] = Array.from(selectedItems).map((id) =>
+        parseInt(id),
+      );
       const totalRecs = pagination.totalRecords;
       if (selectedItems.size === items.length && totalRecs > items.length) {
         const allRes: any = await getItems({
@@ -883,7 +914,9 @@ const ItemsManagementPage: React.FC = () => {
     }
 
     try {
-      let allIds: number[] = Array.from(selectedItems).map((id) => parseInt(id));
+      let allIds: number[] = Array.from(selectedItems).map((id) =>
+        parseInt(id),
+      );
       const totalRecs = pagination.totalRecords;
       if (selectedItems.size === items.length && totalRecs > items.length) {
         const allRes: any = await getItems({
@@ -980,31 +1013,25 @@ const ItemsManagementPage: React.FC = () => {
         return (
           <>
             <th className="px-4 py-3 text-left text-xs text-nowrap font-semibold text-gray-600 uppercase tracking-wider">
-              DE Number
-            </th>
-            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-              EAN
+              Item No
             </th>
             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
               Name
             </th>
             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-              English Name
+              Name CN
             </th>
             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-              Category
+              Company
             </th>
             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-              Status
+              IsLabel
             </th>
             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-              Sync Status
+              Cat
             </th>
             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-              Created
-            </th>
-            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-              Actions
+              RemarkEN/Cn
             </th>
           </>
         );
@@ -1128,9 +1155,23 @@ const ItemsManagementPage: React.FC = () => {
     switch (activeTab) {
       case "items":
         return data.map((item: any) => {
-          const eanMatches =
-            filters.search && matchesEANSearch(item.ean, filters.search);
           const isNewItem = item.is_new === "Y";
+          const itemNo = item.item_no_de || item.de_no || "-";
+          const nameCn = item.item_name_cn || item.name_cn || "-";
+          const company =
+            item.company_display_name ||
+            item.companyDisplayName ||
+            item.customer?.displayName ||
+            item.customer?.display_name ||
+            item.customer?.companyName ||
+            item.customer?.company_name ||
+            item.customer?.name ||
+            item.company_name ||
+            item.company ||
+            "-";
+          const isLabel = item.isLabelPrint ?? item.is_label_print ?? false;
+          const remarkEn = item.remark || item.remark_en || "";
+          const remarkCn = item.remark_cn || item.remarks_cn || "";
 
           return (
             <tr
@@ -1138,10 +1179,11 @@ const ItemsManagementPage: React.FC = () => {
               onClick={() => {
                 router.push(`/items/${item.id}`);
               }}
-              className={`cursor-pointer transition-colors ${isNewItem
-                ? "bg-blue-50 hover:bg-blue-100 border-l-4 border-l-blue-400"
-                : "hover:bg-gray-50"
-                }`}
+              className={`cursor-pointer transition-colors ${
+                isNewItem
+                  ? "bg-blue-50 hover:bg-blue-100 border-l-4 border-l-blue-400"
+                  : "hover:bg-gray-50"
+              }`}
             >
               <td className="p-4" onClick={(e) => e.stopPropagation()}>
                 <input
@@ -1155,21 +1197,7 @@ const ItemsManagementPage: React.FC = () => {
                 />
               </td>
               <td className="px-4 py-3">
-                <div className="font-medium text-gray-900">
-                  {item.de_no || "-"}
-                </div>
-              </td>
-              <td className="px-4 py-3">
-                <div
-                  className={`text-sm font-medium ${eanMatches ? "text-green-600 font-bold" : "text-gray-900"}`}
-                >
-                  {item.ean?.toString() || "-"}
-                  {eanMatches && (
-                    <span className="ml-2 text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
-                      Match
-                    </span>
-                  )}
-                </div>
+                <div className="font-medium text-gray-900">{itemNo}</div>
               </td>
               <td className="px-4 py-3">
                 <div className="text-sm text-gray-900">
@@ -1177,9 +1205,21 @@ const ItemsManagementPage: React.FC = () => {
                 </div>
               </td>
               <td className="px-4 py-3">
-                <div className="text-sm text-gray-900">
-                  {item.name_en || "-"}
-                </div>
+                <div className="text-sm text-gray-900">{nameCn}</div>
+              </td>
+              <td className="px-4 py-3">
+                <div className="text-sm text-gray-900">{company}</div>
+              </td>
+              <td className="px-4 py-3">
+                <span
+                  className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                    isLabel
+                      ? "bg-green-100 text-green-700"
+                      : "bg-gray-100 text-gray-600"
+                  }`}
+                >
+                  {isLabel ? "Yes" : "No"}
+                </span>
               </td>
               <td className="px-4 py-3">
                 <div className="text-sm text-gray-900">
@@ -1187,62 +1227,28 @@ const ItemsManagementPage: React.FC = () => {
                 </div>
               </td>
               <td className="px-4 py-3">
-                <span
-                  className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusBadgeColor(
-                    item.is_active,
-                  )}`}
-                >
-                  {item.is_active === "Y" ? "Active" : "Inactive"}
-                </span>
-              </td>
-              <td className="px-4 py-3">
-                <span
-                  className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${item.is_updated
-                    ? "bg-yellow-100 text-yellow-700"
-                    : "bg-green-100 text-green-700"
-                    }`}
-                >
-                  {item.is_updated ? "Pending Sync" : "Synced"}
-                </span>
-              </td>
-
-              <td className="px-4 py-3">
-                <div className="text-sm text-gray-600 text-nowrap">
-                  {(() => {
-                    const d =
-                      item.created_at || item.synced_at || item.updated_at;
-                    if (!d || d === "0000-00-00 00:00:00") return "-";
-                    const dateObj = new Date(d);
-                    if (isNaN(dateObj.getTime())) return "-";
-                    return new Intl.DateTimeFormat("de-DE", {
-                      day: "2-digit",
-                      month: "2-digit",
-                      year: "numeric",
-                    }).format(dateObj);
-                  })()}
-                </div>
-              </td>
-              <td className="px-4 py-3">
-                <div className="flex gap-2">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleViewItem(item.id);
-                    }}
-                    className="text-blue-600 hover:text-blue-900 p-1"
-                  >
-                    <EyeIcon className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleEditItem(item.id);
-                    }}
-                    className="text-green-600 hover:text-green-900 p-1"
-                  >
-                    <EditIcon className="w-4 h-4" />
-                  </button>
-                </div>
+                {remarkEn || remarkCn ? (
+                  <div className="max-w-[240px]">
+                    {remarkEn && (
+                      <div
+                        className="text-sm text-gray-900 truncate"
+                        title={remarkEn}
+                      >
+                        {remarkEn}
+                      </div>
+                    )}
+                    {remarkCn && (
+                      <div
+                        className="text-xs text-gray-500 truncate"
+                        title={remarkCn}
+                      >
+                        {remarkCn}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <span className="text-gray-400 text-xs">-</span>
+                )}
               </td>
             </tr>
           );
@@ -1439,9 +1445,11 @@ const ItemsManagementPage: React.FC = () => {
             <td className="px-4 py-3">{supplier.email}</td>
             <td className="px-4 py-3">
               <div className="flex flex-wrap gap-1 max-w-[150px]">
-                {sortTags(supplier.tags || [], supplier.tagOrder).map((tag: Tag) => (
-                  <TagBadge key={tag.id} tag={tag} size="sm" />
-                ))}
+                {sortTags(supplier.tags || [], supplier.tagOrder).map(
+                  (tag: Tag) => (
+                    <TagBadge key={tag.id} tag={tag} size="sm" />
+                  ),
+                )}
                 {(!supplier.tags || supplier.tags.length === 0) && (
                   <span className="text-xs text-gray-400">—</span>
                 )}
@@ -1625,10 +1633,11 @@ const ItemsManagementPage: React.FC = () => {
               <button
                 onClick={handleExportNewItemsCSV}
                 disabled={exportingNew || newItemsCount === 0}
-                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all flex items-center gap-1.5 ${exportingNew || newItemsCount === 0
-                  ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                  : "bg-emerald-600 text-white hover:bg-emerald-700"
-                  }`}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all flex items-center gap-1.5 ${
+                  exportingNew || newItemsCount === 0
+                    ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                    : "bg-emerald-600 text-white hover:bg-emerald-700"
+                }`}
               >
                 {exportingNew ? (
                   <>
@@ -1649,10 +1658,11 @@ const ItemsManagementPage: React.FC = () => {
                 <button
                   onClick={() => handleExportCSV()}
                   disabled={exporting || pendingSyncCount === 0}
-                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all flex items-center gap-1.5 ${exporting || pendingSyncCount === 0
-                    ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                    : "bg-blue-600 text-white hover:bg-blue-700"
-                    }`}
+                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all flex items-center gap-1.5 ${
+                    exporting || pendingSyncCount === 0
+                      ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                      : "bg-blue-600 text-white hover:bg-blue-700"
+                  }`}
                 >
                   {exporting ? (
                     <>
@@ -1716,10 +1726,11 @@ const ItemsManagementPage: React.FC = () => {
 
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all flex items-center gap-1.5 ${showFilters
-                ? "bg-[#8CC21B] text-white"
-                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                }`}
+              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all flex items-center gap-1.5 ${
+                showFilters
+                  ? "bg-[#8CC21B] text-white"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+              }`}
             >
               <FunnelIcon className="w-4 h-4" />
               Filters
@@ -1763,46 +1774,66 @@ const ItemsManagementPage: React.FC = () => {
           </div>
         </div>
 
-        {searchParams.get("filter") && searchParams.get("hide_banner") !== "true" && (
-          <div className="mb-6 px-5 py-3 bg-[#FFF3CD] border border-[#FFEBA2] rounded-md text-[#856404] flex items-center justify-between text-sm shadow-sm animate-pulse">
-            <div className="flex items-center gap-2">
-              <span className="font-bold">⚠️ Reports & Control Health Audit View Active:</span>
-              <span className="font-semibold text-gray-800">
-                {(() => {
-                  switch (searchParams.get("filter")) {
-                    case "rmb_special_no_value": return "RMB Special SET with no value";
-                    case "eur_special_no_value": return "EUR Special SET with no value";
-                    case "dimension_special_no_value": return "Dimension Special SET with no value";
-                    case "missing_var_values_en": return "Missing Var Values EN";
-                    case "no_taric": return "Items with No Taric Code";
-                    case "mismatched_tarics": return "Items with mismatched tarics";
-                    case "null_category": return "Items with null category";
-                    case "wrong_shipping_class": return "Items with wrong shipping class (Na)";
-                    case "no_supplier": return "Items without suppliers";
-                    case "no_rmb_price": return "Items without RMB Price";
-                    case "is_po_no_url_null": return "Items isPO ='No' with URL='null'";
-                    case "is_po_null": return "Suppliers items isPO ='null'";
-                    case "new_picture_required": return "Is New Picture Required";
-                    case "no_picture": return "Items without picture";
-                    case "unused_pictures": return "Unused Pictures";
-                    case "multiple_parents_pictures": return "Picture with multiple parents";
-                    default: return searchParams.get("filter");
-                  }
-                })()}
-              </span>
+        {searchParams.get("filter") &&
+          searchParams.get("hide_banner") !== "true" && (
+            <div className="mb-6 px-5 py-3 bg-[#FFF3CD] border border-[#FFEBA2] rounded-md text-[#856404] flex items-center justify-between text-sm shadow-sm animate-pulse">
+              <div className="flex items-center gap-2">
+                <span className="font-bold">
+                  ⚠️ Reports & Control Health Audit View Active:
+                </span>
+                <span className="font-semibold text-gray-800">
+                  {(() => {
+                    switch (searchParams.get("filter")) {
+                      case "rmb_special_no_value":
+                        return "RMB Special SET with no value";
+                      case "eur_special_no_value":
+                        return "EUR Special SET with no value";
+                      case "dimension_special_no_value":
+                        return "Dimension Special SET with no value";
+                      case "missing_var_values_en":
+                        return "Missing Var Values EN";
+                      case "no_taric":
+                        return "Items with No Taric Code";
+                      case "mismatched_tarics":
+                        return "Items with mismatched tarics";
+                      case "null_category":
+                        return "Items with null category";
+                      case "wrong_shipping_class":
+                        return "Items with wrong shipping class (Na)";
+                      case "no_supplier":
+                        return "Items without suppliers";
+                      case "no_rmb_price":
+                        return "Items without RMB Price";
+                      case "is_po_no_url_null":
+                        return "Items isPO ='No' with URL='null'";
+                      case "is_po_null":
+                        return "Suppliers items isPO ='null'";
+                      case "new_picture_required":
+                        return "Is New Picture Required";
+                      case "no_picture":
+                        return "Items without picture";
+                      case "unused_pictures":
+                        return "Unused Pictures";
+                      case "multiple_parents_pictures":
+                        return "Picture with multiple parents";
+                      default:
+                        return searchParams.get("filter");
+                    }
+                  })()}
+                </span>
+              </div>
+              <button
+                onClick={() => {
+                  const params = new URLSearchParams(searchParams.toString());
+                  params.delete("filter");
+                  window.location.href = `/items?${params.toString()}`;
+                }}
+                className="px-3 py-1 bg-amber-800 hover:bg-amber-900 text-white rounded text-xs font-bold transition-all"
+              >
+                Clear Audit Filter
+              </button>
             </div>
-            <button
-              onClick={() => {
-                const params = new URLSearchParams(searchParams.toString());
-                params.delete("filter");
-                window.location.href = `/items?${params.toString()}`;
-              }}
-              className="px-3 py-1 bg-amber-800 hover:bg-amber-900 text-white rounded text-xs font-bold transition-all"
-            >
-              Clear Audit Filter
-            </button>
-          </div>
-        )}
+          )}
 
         <div className="mb-6">
           <div className="border-b border-gray-200">
@@ -1817,10 +1848,11 @@ const ItemsManagementPage: React.FC = () => {
                 <button
                   key={tab.key}
                   onClick={() => setActiveTab(tab.key as TabType)}
-                  className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${activeTab === tab.key
-                    ? "border-primary text-primary"
-                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                    }`}
+                  className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${
+                    activeTab === tab.key
+                      ? "border-primary text-primary"
+                      : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                  }`}
                 >
                   <tab.icon className="w-5 h-5" />
                   {tab.label}
@@ -1841,117 +1873,117 @@ const ItemsManagementPage: React.FC = () => {
         </div>
 
         {showFilters && (
-          <div className="mb-6 p-5 bg-white border border-gray-200 rounded-xl space-y-4 shadow-sm">
+          <div className="mb-6 p-3 bg-white border border-gray-200 rounded-md shadow-sm">
             {activeTab === "items" ? (
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1 flex items-center gap-1">
-                      <Hash className="w-3.5 h-3.5 text-green-600" /> EAN Search
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        placeholder="Scan or type EAN..."
-                        value={filters.eanSearch}
-                        onChange={(e) =>
-                          setFilters({ ...filters, eanSearch: e.target.value })
-                        }
-                        className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
-                      />
-                      {filters.eanSearch && (
-                        <button
-                          onClick={() => setFilters({ ...filters, eanSearch: "" })}
-                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500"
-                        >
-                          <XMarkIcon className="w-4 h-4" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">
-                      Status
-                    </label>
-                    <select
-                      value={filters.isActive}
+              <div className="flex flex-wrap lg:flex-nowrap items-end gap-2">
+                <div className="flex-1 min-w-[150px]">
+                  <label className="block text-[11px] font-semibold text-gray-600 uppercase tracking-wider mb-1 flex items-center gap-1">
+                    <Hash className="w-3 h-3 text-green-600" /> EAN
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="Scan or type EAN..."
+                      value={filters.eanSearch}
                       onChange={(e) =>
-                        setFilters({ ...filters, isActive: e.target.value })
+                        setFilters({ ...filters, eanSearch: e.target.value })
                       }
-                      className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
-                    >
-                      <option value="">All Status</option>
-                      <option value="Y">Active</option>
-                      <option value="N">Inactive</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">
-                      Category
-                    </label>
-                    <select
-                      value={filters.category}
-                      onChange={(e) =>
-                        setFilters({ ...filters, category: e.target.value })
-                      }
-                      className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
-                    >
-                      <option value="">All Categories</option>
-                      {Array.from(
-                        new Set(
-                          categories.map((c) => c.name?.toString().trim()),
-                        ),
-                      )
-                        .filter(Boolean)
-                        .sort()
-                        .map((name) => {
-                          return (
-                            <option key={name} value={name}>
-                              {name}
-                            </option>
-                          );
-                        })}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">
-                      Supplier
-                    </label>
-                    <select
-                      value={filters.supplier}
-                      onChange={(e) =>
-                        setFilters({ ...filters, supplier: e.target.value })
-                      }
-                      className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
-                    >
-                      <option value="">All Suppliers</option>
-                      {suppliers.map((s) => (
-                        <option key={s.id} value={s.id.toString()}>
-                          {`[ID: ${s.id}] ${s.company_name || s.name || ""}`}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end pt-3 border-t border-gray-100">
-                  <div className="md:col-span-3">
-                    <TagFilterSelector
-                      category="item"
-                      onChange={(tagString) => setFilters((prev) => ({ ...prev, tags: tagString }))}
-                      onReset={() => setFilters((prev) => ({ ...prev, tags: "" }))}
+                      className="w-full px-2 py-1.5 pr-7 text-xs bg-white border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
                     />
-                  </div>
-                  <div className="flex justify-end">
-                    <button
-                      onClick={resetFilters}
-                      className="px-4 py-2 text-xs font-semibold text-rose-600 hover:text-rose-800 transition-colors flex items-center gap-1.5 border border-rose-200 rounded-lg bg-rose-50/50 hover:bg-rose-50"
-                    >
-                      <ArrowPathIcon className="w-3.5 h-3.5" />
-                      Reset Filters
-                    </button>
+                    {filters.eanSearch && (
+                      <button
+                        onClick={() =>
+                          setFilters({ ...filters, eanSearch: "" })
+                        }
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500"
+                      >
+                        <XMarkIcon className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                   </div>
                 </div>
+                <div className="flex-1 min-w-[110px]">
+                  <label className="block text-[11px] font-semibold text-gray-600 uppercase tracking-wider mb-1">
+                    Status
+                  </label>
+                  <select
+                    value={filters.isActive}
+                    onChange={(e) =>
+                      setFilters({ ...filters, isActive: e.target.value })
+                    }
+                    className="w-full px-2 py-1.5 text-xs bg-white border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                  >
+                    <option value="">All Status</option>
+                    <option value="Y">Active</option>
+                    <option value="N">Inactive</option>
+                  </select>
+                </div>
+                <div className="flex-1 min-w-[130px]">
+                  <label className="block text-[11px] font-semibold text-gray-600 uppercase tracking-wider mb-1">
+                    Category
+                  </label>
+                  <select
+                    value={filters.category}
+                    onChange={(e) =>
+                      setFilters({ ...filters, category: e.target.value })
+                    }
+                    className="w-full px-2 py-1.5 text-xs bg-white border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                  >
+                    <option value="">All Categories</option>
+                    {Array.from(
+                      new Set(categories.map((c) => c.name?.toString().trim())),
+                    )
+                      .filter(Boolean)
+                      .sort()
+                      .map((name) => {
+                        return (
+                          <option key={name} value={name}>
+                            {name}
+                          </option>
+                        );
+                      })}
+                  </select>
+                </div>
+                <div className="flex-1 min-w-[140px]">
+                  <label className="block text-[11px] font-semibold text-gray-600 uppercase tracking-wider mb-1">
+                    Supplier
+                  </label>
+                  <select
+                    value={filters.supplier}
+                    onChange={(e) =>
+                      setFilters({ ...filters, supplier: e.target.value })
+                    }
+                    className="w-full px-2 py-1.5 text-xs bg-white border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                  >
+                    <option value="">All Suppliers</option>
+                    {suppliers.map((s) => (
+                      <option key={s.id} value={s.id.toString()}>
+                        {`[ID: ${s.id}] ${s.company_name || s.name || ""}`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex-1 min-w-[160px]">
+                  <label className="block text-[11px] font-semibold text-gray-600 uppercase tracking-wider mb-1">
+                    Tags
+                  </label>
+                  <TagFilterSelector
+                    category="item"
+                    onChange={(tagString) =>
+                      setFilters((prev) => ({ ...prev, tags: tagString }))
+                    }
+                    onReset={() =>
+                      setFilters((prev) => ({ ...prev, tags: "" }))
+                    }
+                  />
+                </div>
+                <button
+                  onClick={resetFilters}
+                  className="px-3 py-1.5 text-xs font-semibold text-rose-600 hover:text-rose-800 transition-colors flex items-center gap-1.5 border border-rose-200 rounded-md bg-rose-50/50 hover:bg-rose-50 whitespace-nowrap shrink-0"
+                >
+                  <ArrowPathIcon className="w-3.5 h-3.5" />
+                  Reset
+                </button>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -2430,16 +2462,16 @@ const ItemsManagementPage: React.FC = () => {
                     value={
                       itemFormData.parent_id
                         ? {
-                          value: itemFormData.parent_id,
-                          label: (() => {
-                            const p = parents?.find(
-                              (x) => x.id === itemFormData.parent_id,
-                            );
-                            return p
-                              ? `${p.name_de} (${p.de_no})`
-                              : "Unknown";
-                          })(),
-                        }
+                            value: itemFormData.parent_id,
+                            label: (() => {
+                              const p = parents?.find(
+                                (x) => x.id === itemFormData.parent_id,
+                              );
+                              return p
+                                ? `${p.name_de} (${p.de_no})`
+                                : "Unknown";
+                            })(),
+                          }
                         : null
                     }
                     onChange={(opt) =>
@@ -2469,14 +2501,14 @@ const ItemsManagementPage: React.FC = () => {
                     value={
                       itemFormData.taric_id
                         ? {
-                          value: itemFormData.taric_id,
-                          label: (() => {
-                            const t = tarics?.find(
-                              (x) => x.id === itemFormData.taric_id,
-                            );
-                            return t ? `${t.code} - ${t.name_de}` : "Unknown";
-                          })(),
-                        }
+                            value: itemFormData.taric_id,
+                            label: (() => {
+                              const t = tarics?.find(
+                                (x) => x.id === itemFormData.taric_id,
+                              );
+                              return t ? `${t.code} - ${t.name_de}` : "Unknown";
+                            })(),
+                          }
                         : null
                     }
                     onChange={(opt) =>
@@ -2506,12 +2538,12 @@ const ItemsManagementPage: React.FC = () => {
                     value={
                       itemFormData.cat_id
                         ? {
-                          value: itemFormData.cat_id,
-                          label:
-                            categories?.find(
-                              (x) => x.id === itemFormData.cat_id,
-                            )?.name || "Unknown",
-                        }
+                            value: itemFormData.cat_id,
+                            label:
+                              categories?.find(
+                                (x) => x.id === itemFormData.cat_id,
+                              )?.name || "Unknown",
+                          }
                         : null
                     }
                     onChange={(opt) =>
@@ -2541,14 +2573,14 @@ const ItemsManagementPage: React.FC = () => {
                     value={
                       itemFormData.supplier_id
                         ? {
-                          value: itemFormData.supplier_id,
-                          label: (() => {
-                            const s = suppliers?.find(
-                              (x) => x.id === itemFormData.supplier_id,
-                            );
-                            return s ? getSupplierLabel(s) : "Unknown";
-                          })(),
-                        }
+                            value: itemFormData.supplier_id,
+                            label: (() => {
+                              const s = suppliers?.find(
+                                (x) => x.id === itemFormData.supplier_id,
+                              );
+                              return s ? getSupplierLabel(s) : "Unknown";
+                            })(),
+                          }
                         : null
                     }
                     onChange={(opt) =>
@@ -2761,7 +2793,13 @@ const ItemsManagementPage: React.FC = () => {
                     Quantity Dividable
                   </label>
                   <select
-                    value={itemFormData.is_qty_dividable ? "Y" : "N"}
+                    value={
+                      itemFormData.is_qty_dividable !== undefined
+                        ? itemFormData.is_qty_dividable
+                          ? "Y"
+                          : "N"
+                        : "N"
+                    }
                     onChange={(e) =>
                       setItemFormData({
                         ...itemFormData,
@@ -2774,7 +2812,6 @@ const ItemsManagementPage: React.FC = () => {
                     <option value="N">No</option>
                   </select>
                 </div>
-
                 <div className="flex items-center gap-6 pt-6">
                   <div className="flex items-center gap-2">
                     <input
