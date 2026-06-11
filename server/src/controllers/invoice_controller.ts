@@ -1509,23 +1509,4 @@ export class InvoiceController {
       return next(error);
     }
   };
-
-  static reopenInvoice = async (req: Request, res: Response, next: NextFunction) => {
-    const invoiceRepository = AppDataSource.getRepository(Invoice);
-    try {
-      const { id } = req.params;
-      const invoice = await invoiceRepository.findOne({ where: { id } });
-      if (!invoice) return res.status(404).json({ message: "Invoice not found" });
-
-      invoice.status = "sent";
-      invoice.closedAt = undefined;
-      invoice.paidAmount = 0;
-      invoice.outstandingAmount = invoice.grossTotal;
-
-      await invoiceRepository.save(invoice);
-      return res.json({ success: true, message: "Invoice reopened", data: invoice });
-    } catch (error) {
-      return next(error);
-    }
-  };
 }

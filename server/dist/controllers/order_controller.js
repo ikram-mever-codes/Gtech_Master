@@ -753,41 +753,55 @@ const generateLabelPDF = (req, res, next) => __awaiter(void 0, void 0, void 0, f
             ((_e = item.remarks_cn) === null || _e === void 0 ? void 0 : _e.includes("K022222"))) {
             logoPath = k2;
         }
+        const safeOrderNo = ((order === null || order === void 0 ? void 0 : order.order_no) || "N/A").replace(/[/\\?%*:|"<>\s]/g, "-");
+        const safeItemNo = ((warehouseItem === null || warehouseItem === void 0 ? void 0 : warehouseItem.item_no_de) || "N/A").replace(/[/\\?%*:|"<>\s]/g, "-");
+        const qtyLabel = item.qty_label || 0;
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, "0");
+        const day = String(now.getDate()).padStart(2, "0");
+        const dateStr = `${year}${month}${day}`;
+        const filename = `label_${safeOrderNo}_${safeItemNo}_${qtyLabel}pcs_${dateStr}.pdf`;
         res.setHeader("Content-Type", "application/pdf");
-        res.setHeader("Content-Disposition", `inline; filename=label_${item.id}.pdf`);
+        res.setHeader("Access-Control-Expose-Headers", "Content-Disposition");
+        res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
         doc.pipe(res);
         const colA = 12;
         const valColA = 16;
-        const colB = 85;
-        const colD = 180;
-        const colLogo = 205;
+        const colLogo = 207;
+        const qtyLabelColStart = 169;
+        const rightEdgeOrderQty = 155;
         const row1LabelY = 10;
         const row1ValueY = 22;
+        const orderNo = (order === null || order === void 0 ? void 0 : order.order_no) || "N/A";
+        const qtyOrderText = `/${item.qty}`;
+        doc.font("Helvetica-Bold").fontSize(10);
+        const orderNoWidth = doc.widthOfString(orderNo);
+        doc.font("Helvetica").fontSize(9);
+        const qtyOrderWidth = doc.widthOfString(qtyOrderText);
+        const orderNoX = rightEdgeOrderQty - qtyOrderWidth - 2 - orderNoWidth;
+        const qtyOrderX = rightEdgeOrderQty - qtyOrderWidth;
+        const itemNoWWidth = orderNoX - 3 - valColA;
         doc.fillColor("black").font("Helvetica-Oblique").fontSize(6.5);
         doc.text("ItemNoW", colA, row1LabelY);
-        doc.text("Order No / Qty", colB, row1LabelY);
-        doc.text("Qty", colD, row1LabelY);
+        doc.text("Order No / Qty", orderNoX, row1LabelY);
+        doc.text("Qty", qtyLabelColStart, row1LabelY, { width: 32, align: "right" });
         doc.font("Helvetica-Bold").fontSize(10);
-        /**
-         * ITEM NO DE TRUNCATION
-         * If length > 10, take first 10 chars and add "..."
-         */
         let itemNoDE = (warehouseItem === null || warehouseItem === void 0 ? void 0 : warehouseItem.item_no_de) || "N/A";
-        if (itemNoDE.length > 10) {
-            itemNoDE = itemNoDE.substring(0, 10) + "...";
-        }
+        const itemNoWHeight = doc.heightOfString(itemNoDE, { width: itemNoWWidth });
         doc.text(itemNoDE, valColA, row1ValueY, {
-            width: 68,
-            lineBreak: false,
+            width: itemNoWWidth,
+            lineBreak: true,
         });
-        const orderNo = (order === null || order === void 0 ? void 0 : order.order_no) || "N/A";
-        doc.text(orderNo, colB, row1ValueY);
-        doc.text(`${item.qty_label || 0}`, colD, row1ValueY);
-        const orderNoWidth = doc.widthOfString(orderNo);
-        doc
-            .font("Helvetica")
-            .fontSize(9)
-            .text(`/${item.qty}`, colB + orderNoWidth + 2, row1ValueY + 4);
+        doc.font("Helvetica-Bold").fontSize(10);
+        doc.text(orderNo, orderNoX, row1ValueY);
+        doc.font("Helvetica").fontSize(9);
+        doc.text(qtyOrderText, qtyOrderX, row1ValueY + 1.5);
+        doc.font("Helvetica-Bold").fontSize(10);
+        doc.text(`${item.qty_label || 0}`, qtyLabelColStart, row1ValueY, {
+            width: 32,
+            align: "right",
+        });
         try {
             doc.image(logoPath, colLogo, 14, { width: 40 });
         }
@@ -796,28 +810,47 @@ const generateLabelPDF = (req, res, next) => __awaiter(void 0, void 0, void 0, f
         }
         doc.font("Helvetica").fontSize(8).fillColor("#222222");
         const description = ((_f = item.item) === null || _f === void 0 ? void 0 : _f.item_name) || "No description available";
-        doc.text(description, valColA, 42, {
+        const descriptionY = row1ValueY + itemNoWHeight + 1.5;
+        const descriptionHeight = Math.min(doc.heightOfString(description, { width: 180 }), 18);
+        doc.text(description, valColA, descriptionY, {
             width: 180,
-            height: 20,
+            height: descriptionHeight,
             lineBreak: true,
         });
-        const bottomSectionY = 68;
-        doc
-            .font("Helvetica-Oblique")
-            .fontSize(6.5)
-            .text("RemarkCN", colA, bottomSectionY);
-        doc
-            .font("Helvetica")
-            .fontSize(10)
-            .text(item.remarks_cn || "/", valColA, bottomSectionY + 8);
-        doc
-            .font("Helvetica-Oblique")
-            .fontSize(6.5)
-            .text("RemarkW", colA, bottomSectionY + 22);
-        doc
-            .font("Helvetica")
-            .fontSize(8)
-            .text(item.remark_de || "/", valColA, bottomSectionY + 30);
+        const bottomSectionY = Math.min(descriptionY + descriptionHeight + 3, 70);
+        let remarkCNText = item.remarks_cn || "/";
+        doc.font("Helvetica-Oblique").fontSize(6.5).fillColor("black");
+        doc.text("RemarkCN", colA, bottomSectionY);
+        let fontSizeCN = 10;
+        doc.font("Helvetica");
+        while (fontSizeCN > 4.5) {
+            doc.fontSize(fontSizeCN);
+            if (doc.widthOfString(remarkCNText) <= 125) {
+                break;
+            }
+            fontSizeCN -= 0.5;
+        }
+        doc.text(remarkCNText, valColA, bottomSectionY + 8, {
+            width: 125,
+            lineBreak: false,
+        });
+        let remarkWText = item.remark_de || "/";
+        const remarkWLabelY = bottomSectionY + 8 + fontSizeCN + 3;
+        doc.font("Helvetica-Oblique").fontSize(6.5).fillColor("black");
+        doc.text("RemarkW", colA, remarkWLabelY);
+        let fontSizeW = 8;
+        doc.font("Helvetica");
+        while (fontSizeW > 4.5) {
+            doc.fontSize(fontSizeW);
+            if (doc.widthOfString(remarkWText) <= 125) {
+                break;
+            }
+            fontSizeW -= 0.5;
+        }
+        doc.text(remarkWText, valColA, remarkWLabelY + 8, {
+            width: 125,
+            lineBreak: false,
+        });
         const barcodeValue = ((_g = warehouseItem === null || warehouseItem === void 0 ? void 0 : warehouseItem.ean) === null || _g === void 0 ? void 0 : _g.toString()) || "";
         if (barcodeValue) {
             try {
@@ -831,7 +864,7 @@ const generateLabelPDF = (req, res, next) => __awaiter(void 0, void 0, void 0, f
                     textgaps: 4,
                     textxalign: "center",
                 });
-                doc.image(barcodeBuffer, 145, 62, { width: 100 });
+                doc.image(barcodeBuffer, 145, 68, { width: 100 });
             }
             catch (barcodeErr) {
                 console.error("Barcode generation failed:", barcodeErr);

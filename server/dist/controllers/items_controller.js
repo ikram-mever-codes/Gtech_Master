@@ -201,7 +201,9 @@ const getItems = (req, res, next) => __awaiter(void 0, void 0, void 0, function*
             }
         }
         if (isActive) {
-            queryBuilder.andWhere("item.isActive = :isActive", { isActive });
+            queryBuilder.andWhere(new typeorm_1.Brackets((qb) => {
+                qb.where('EXISTS (SELECT 1 FROM warehouse_item wi WHERE (wi.item_id = item.id OR (wi."ItemID_DE" = item."ItemID_DE" AND item."ItemID_DE" IS NOT NULL)) AND wi.is_active = :isActive)', { isActive }).orWhere('NOT EXISTS (SELECT 1 FROM warehouse_item wi WHERE wi.item_id = item.id OR (wi."ItemID_DE" = item."ItemID_DE" AND item."ItemID_DE" IS NOT NULL)) AND item.isActive = :isActive', { isActive });
+            }));
         }
         if (category) {
             const categoryValue = category.trim();
@@ -431,7 +433,7 @@ const getItems = (req, res, next) => __awaiter(void 0, void 0, void 0, function*
                 item_name_cn: item.item_name_cn,
                 ean: item.ean || (warehouseData === null || warehouseData === void 0 ? void 0 : warehouseData.ean) || null,
                 ItemID_DE: item.ItemID_DE || null,
-                is_active: item.isActive,
+                is_active: warehouseData ? warehouseData.is_active : (item.isActive || "N"),
                 parent_id: item.parent_id || null,
                 taric_id: item.taric_id || null,
                 category_id: item.cat_id || null,
@@ -603,7 +605,7 @@ const getItemById = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
             is_new: item.is_new || "N",
             itemNo: `${item.id} / ${de_no}`,
             item_name: item.item_name || "",
-            is_active: item.isActive || "N",
+            is_active: primaryWarehouseItem ? primaryWarehouseItem.is_active : (item.isActive || "N"),
             created_at: item.created_at,
             name: item.item_name || "",
             nameCN: item.item_name_cn || "",
@@ -615,7 +617,7 @@ const getItemById = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
             supplier_id: item.supplier_id,
             supplier_name: ((_c = item.supplier) === null || _c === void 0 ? void 0 : _c.company_name) || ((_d = item.supplier) === null || _d === void 0 ? void 0 : _d.name) || "",
             painPoints: item.painPoints || [],
-            isActive: item.isActive === "Y",
+            isActive: primaryWarehouseItem ? primaryWarehouseItem.is_active === "Y" : item.isActive === "Y",
             tags: item.tags || [],
             tagOrder: item.tagOrder,
             is_updated: item.is_updated,
@@ -672,7 +674,7 @@ const getItemById = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
                 noDE: (primaryWarehouseItem === null || primaryWarehouseItem === void 0 ? void 0 : primaryWarehouseItem.item_no_de) || item.parent_no_de || "",
                 nameDE: (primaryWarehouseItem === null || primaryWarehouseItem === void 0 ? void 0 : primaryWarehouseItem.item_name_de) || ((_1 = item.parent) === null || _1 === void 0 ? void 0 : _1.name_de) || "",
                 nameEN: (primaryWarehouseItem === null || primaryWarehouseItem === void 0 ? void 0 : primaryWarehouseItem.item_name_en) || ((_2 = item.parent) === null || _2 === void 0 ? void 0 : _2.name_en) || "",
-                isActive: item.isActive === "Y",
+                isActive: primaryWarehouseItem ? primaryWarehouseItem.is_active === "Y" : item.isActive === "Y",
                 isStock: warehouseItems.some((wi) => (wi.stock_qty || 0) > 0),
                 qty: warehouseItems
                     .reduce((sum, wi) => sum + (wi.stock_qty || 0), 0)
@@ -1351,6 +1353,18 @@ const toggleItemStatus = (req, res, next) => __awaiter(void 0, void 0, void 0, f
             item.is_updated = true;
             item.updated_at = new Date();
             yield itemRepository.save(item);
+            const warehouseRepository = database_1.AppDataSource.getRepository(warehouse_items_1.WarehouseItem);
+            const whereConditions = [{ item_id: item.id }];
+            if (item.ItemID_DE) {
+                whereConditions.push({ ItemID_DE: item.ItemID_DE });
+            }
+            const warehouseItems = yield warehouseRepository.find({
+                where: whereConditions,
+            });
+            for (const wi of warehouseItems) {
+                wi.is_active = newStatus;
+                yield warehouseRepository.save(wi);
+            }
         }
         return res.status(200).json({
             success: true,
@@ -1398,6 +1412,20 @@ const bulkUpdateItems = (req, res, next) => __awaiter(void 0, void 0, void 0, fu
                     item.is_updated = true;
                     item.updated_at = new Date();
                     yield itemRepository.save(item);
+                    if (updates.isActive !== undefined) {
+                        const warehouseRepository = database_1.AppDataSource.getRepository(warehouse_items_1.WarehouseItem);
+                        const whereConditions = [{ item_id: item.id }];
+                        if (item.ItemID_DE) {
+                            whereConditions.push({ ItemID_DE: item.ItemID_DE });
+                        }
+                        const warehouseItems = yield warehouseRepository.find({
+                            where: whereConditions,
+                        });
+                        for (const wi of warehouseItems) {
+                            wi.is_active = updates.isActive;
+                            yield warehouseRepository.save(wi);
+                        }
+                    }
                     updatedItems.push(item);
                 }
             }

@@ -254,12 +254,25 @@ export const downloadItemLabel = async (itemId: number | string) => {
     });
 
     const file = new Blob([response.data], { type: "application/pdf" });
-
     const fileURL = URL.createObjectURL(file);
-    window.open(fileURL, "_blank");
+
+    const contentDisposition = response.headers ? response.headers["content-disposition"] : null;
+    let filename = `label_${itemId}.pdf`;
+    if (contentDisposition) {
+      const filenameMatch = contentDisposition.match(/filename="?([^";]+)"?/);
+      if (filenameMatch && filenameMatch[1]) {
+        filename = filenameMatch[1];
+      }
+    }
+
+    const link = document.createElement("a");
+    link.href = fileURL;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
 
     toast.dismiss();
-    toast.success("Label opened in new tab!", successStyles);
   } catch (error) {
     toast.dismiss();
     handleApiError(error, "Failed to generate label");
