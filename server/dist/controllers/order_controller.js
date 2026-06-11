@@ -711,7 +711,7 @@ const deleteOrder = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
 });
 exports.deleteOrder = deleteOrder;
 const generateLabelPDF = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b, _c, _d, _e, _f, _g;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j;
     try {
         const { itemId } = req.params;
         const orderItemRepo = database_1.AppDataSource.getRepository(order_items_1.OrderItem);
@@ -739,7 +739,10 @@ const generateLabelPDF = (req, res, next) => __awaiter(void 0, void 0, void 0, f
                 where: { ItemID_DE: item.item.ItemID_DE },
             });
         }
-        const order = yield orderRepo.findOne({ where: { id: item.order_id } });
+        const order = yield orderRepo.findOne({
+            where: { id: item.order_id },
+            relations: ["customer"],
+        });
         const doc = new pdfkit_1.default({ size: [252, 110], margin: 0 });
         const logo = path_1.default.join(__dirname, "../../public/logo.png");
         const k1 = path_1.default.join(__dirname, "../../public/k1.png");
@@ -752,6 +755,34 @@ const generateLabelPDF = (req, res, next) => __awaiter(void 0, void 0, void 0, f
         else if ((((_d = item.item) === null || _d === void 0 ? void 0 : _d.item_name) && item.item.item_name.includes("K022222")) ||
             ((_e = item.remarks_cn) === null || _e === void 0 ? void 0 : _e.includes("K022222"))) {
             logoPath = k2;
+        }
+        let logoSource = logoPath;
+        let isCustomLogoUsed = false;
+        if (((_f = item.item) === null || _f === void 0 ? void 0 : _f.isLabelPrint) && ((_g = order === null || order === void 0 ? void 0 : order.customer) === null || _g === void 0 ? void 0 : _g.companyLabelPrintLogo)) {
+            const logoStr = order.customer.companyLabelPrintLogo.trim();
+            if (logoStr.startsWith("data:image/")) {
+                const matches = logoStr.match(/^data:image\/([a-zA-Z+-]+);base64,(.+)$/);
+                if (matches && matches[2]) {
+                    try {
+                        logoSource = Buffer.from(matches[2], "base64");
+                        isCustomLogoUsed = true;
+                    }
+                    catch (err) {
+                        console.error("Failed to parse base64 customer logo:", err);
+                    }
+                }
+            }
+            else {
+                try {
+                    if (/^[a-zA-Z0-9+/=]+$/.test(logoStr)) {
+                        logoSource = Buffer.from(logoStr, "base64");
+                        isCustomLogoUsed = true;
+                    }
+                }
+                catch (err) {
+                    console.error("Failed to parse customer logo from plain base64:", err);
+                }
+            }
         }
         const safeOrderNo = ((order === null || order === void 0 ? void 0 : order.order_no) || "N/A").replace(/[/\\?%*:|"<>\s]/g, "-");
         const safeItemNo = ((warehouseItem === null || warehouseItem === void 0 ? void 0 : warehouseItem.item_no_de) || "N/A").replace(/[/\\?%*:|"<>\s]/g, "-");
@@ -803,13 +834,20 @@ const generateLabelPDF = (req, res, next) => __awaiter(void 0, void 0, void 0, f
             align: "right",
         });
         try {
-            doc.image(logoPath, colLogo, 14, { width: 40 });
+            doc.image(logoSource, colLogo, 14, { width: 40 });
         }
         catch (e) {
-            console.error("Logo missing at path:", logoPath);
+            console.error("Logo missing or invalid:", isCustomLogoUsed ? "customer logo" : logoPath, e);
         }
-        doc.font("Helvetica").fontSize(8).fillColor("#222222");
-        const description = ((_f = item.item) === null || _f === void 0 ? void 0 : _f.item_name) || "No description available";
+        const fontSource = exports._cachedCjkFontBuffer || exports._cachedCjkFontPath;
+        if (fontSource) {
+            doc.font(fontSource, 0);
+        }
+        else {
+            doc.font("Helvetica");
+        }
+        doc.fontSize(8).fillColor("#222222");
+        const description = ((_h = item.item) === null || _h === void 0 ? void 0 : _h.item_name) || "No description available";
         const descriptionY = row1ValueY + itemNoWHeight + 1.5;
         const descriptionHeight = Math.min(doc.heightOfString(description, { width: 180 }), 18);
         doc.text(description, valColA, descriptionY, {
@@ -822,7 +860,12 @@ const generateLabelPDF = (req, res, next) => __awaiter(void 0, void 0, void 0, f
         doc.font("Helvetica-Oblique").fontSize(6.5).fillColor("black");
         doc.text("RemarkCN", colA, bottomSectionY);
         let fontSizeCN = 10;
-        doc.font("Helvetica");
+        if (fontSource) {
+            doc.font(fontSource, 0);
+        }
+        else {
+            doc.font("Helvetica");
+        }
         while (fontSizeCN > 4.5) {
             doc.fontSize(fontSizeCN);
             if (doc.widthOfString(remarkCNText) <= 125) {
@@ -839,7 +882,12 @@ const generateLabelPDF = (req, res, next) => __awaiter(void 0, void 0, void 0, f
         doc.font("Helvetica-Oblique").fontSize(6.5).fillColor("black");
         doc.text("RemarkW", colA, remarkWLabelY);
         let fontSizeW = 8;
-        doc.font("Helvetica");
+        if (fontSource) {
+            doc.font(fontSource, 0);
+        }
+        else {
+            doc.font("Helvetica");
+        }
         while (fontSizeW > 4.5) {
             doc.fontSize(fontSizeW);
             if (doc.widthOfString(remarkWText) <= 125) {
@@ -851,7 +899,7 @@ const generateLabelPDF = (req, res, next) => __awaiter(void 0, void 0, void 0, f
             width: 125,
             lineBreak: false,
         });
-        const barcodeValue = ((_g = warehouseItem === null || warehouseItem === void 0 ? void 0 : warehouseItem.ean) === null || _g === void 0 ? void 0 : _g.toString()) || "";
+        const barcodeValue = ((_j = warehouseItem === null || warehouseItem === void 0 ? void 0 : warehouseItem.ean) === null || _j === void 0 ? void 0 : _j.toString()) || "";
         if (barcodeValue) {
             try {
                 const barcodeBuffer = yield bwip_js_1.default.toBuffer({

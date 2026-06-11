@@ -837,7 +837,10 @@ export const generateLabelPDF = async (
         where: { ItemID_DE: item.item.ItemID_DE },
       });
     }
-    const order = await orderRepo.findOne({ where: { id: item.order_id } });
+    const order = await orderRepo.findOne({
+      where: { id: item.order_id },
+      relations: ["customer"],
+    });
 
     const doc = new PDFDocument({ size: [252, 110], margin: 0 });
     const logo = path.join(__dirname, "../../public/logo.png");
@@ -855,6 +858,33 @@ export const generateLabelPDF = async (
       item.remarks_cn?.includes("K022222")
     ) {
       logoPath = k2;
+    }
+
+    let logoSource: string | Buffer = logoPath;
+    let isCustomLogoUsed = false;
+
+    if (item.item?.isLabelPrint && order?.customer?.companyLabelPrintLogo) {
+      const logoStr = order.customer.companyLabelPrintLogo.trim();
+      if (logoStr.startsWith("data:image/")) {
+        const matches = logoStr.match(/^data:image\/([a-zA-Z+-]+);base64,(.+)$/);
+        if (matches && matches[2]) {
+          try {
+            logoSource = Buffer.from(matches[2], "base64");
+            isCustomLogoUsed = true;
+          } catch (err) {
+            console.error("Failed to parse base64 customer logo:", err);
+          }
+        }
+      } else {
+        try {
+          if (/^[a-zA-Z0-9+/=]+$/.test(logoStr)) {
+            logoSource = Buffer.from(logoStr, "base64");
+            isCustomLogoUsed = true;
+          }
+        } catch (err) {
+          console.error("Failed to parse customer logo from plain base64:", err);
+        }
+      }
     }
 
     const safeOrderNo = (order?.order_no || "N/A").replace(/[/\\?%*:|"<>\s]/g, "-");
@@ -924,12 +954,18 @@ export const generateLabelPDF = async (
     });
 
     try {
-      doc.image(logoPath, colLogo, 14, { width: 40 });
+      doc.image(logoSource, colLogo, 14, { width: 40 });
     } catch (e) {
-      console.error("Logo missing at path:", logoPath);
+      console.error("Logo missing or invalid:", isCustomLogoUsed ? "customer logo" : logoPath, e);
     }
 
-    doc.font("Helvetica").fontSize(8).fillColor("#222222");
+    const fontSource = _cachedCjkFontBuffer || _cachedCjkFontPath;
+    if (fontSource) {
+      doc.font(fontSource, 0);
+    } else {
+      doc.font("Helvetica");
+    }
+    doc.fontSize(8).fillColor("#222222");
     const description = item.item?.item_name || "No description available";
     const descriptionY = row1ValueY + itemNoWHeight + 1.5;
     const descriptionHeight = Math.min(
@@ -949,7 +985,11 @@ export const generateLabelPDF = async (
     doc.text("RemarkCN", colA, bottomSectionY);
 
     let fontSizeCN = 10;
-    doc.font("Helvetica");
+    if (fontSource) {
+      doc.font(fontSource, 0);
+    } else {
+      doc.font("Helvetica");
+    }
     while (fontSizeCN > 4.5) {
       doc.fontSize(fontSizeCN);
       if (doc.widthOfString(remarkCNText) <= 125) {
@@ -968,7 +1008,11 @@ export const generateLabelPDF = async (
     doc.text("RemarkW", colA, remarkWLabelY);
 
     let fontSizeW = 8;
-    doc.font("Helvetica");
+    if (fontSource) {
+      doc.font(fontSource, 0);
+    } else {
+      doc.font("Helvetica");
+    }
     while (fontSizeW > 4.5) {
       doc.fontSize(fontSizeW);
       if (doc.widthOfString(remarkWText) <= 125) {
