@@ -822,6 +822,7 @@ export const deleteOrder = async (
     } catch {}
   }
 };
+
 export const generateLabelPDF = async (
   req: Request,
   res: Response,
@@ -832,6 +833,7 @@ export const generateLabelPDF = async (
     const orderItemRepo = AppDataSource.getRepository(OrderItem);
     const orderRepo = AppDataSource.getRepository(Order);
     const warehouseItemRepo = AppDataSource.getRepository(WarehouseItem);
+    const customerRepo = AppDataSource.getRepository(Customer);
 
     const item = await orderItemRepo.findOne({
       where: { id: Number(itemId) },
@@ -841,8 +843,7 @@ export const generateLabelPDF = async (
     if (!item) return next(new ErrorHandler("Item not found", 404));
 
     // Resolve the underlying Item for this order item. This is the record that
-    // carries the `isLabelPrint` flag used to decide whether a customer-branded
-    // logo should replace our own.
+    // carries the `isLabelPrint` flag AND the `customer_id` of the brand owner.
     let resolvedItem: Item | null = item.item;
     if (!resolvedItem && item.ItemID_DE) {
       resolvedItem = await AppDataSource.getRepository(Item).findOne({
@@ -881,9 +882,8 @@ export const generateLabelPDF = async (
 
     // Sniff the real image format from the buffer's magic bytes. PDFKit's
     // doc.image() ONLY supports PNG and JPEG — webp/gif/bmp/svg will throw at
-    // draw time and silently leave the logo area blank, which is exactly the
-    // "image exists but nothing prints" symptom. Detecting up front lets us log
-    // a clear reason and keep the default logo.
+    // draw time and silently leave the logo area blank. Detecting up front lets
+    // us log a clear reason and keep the default logo.
     const detectImageFormat = (buf: Buffer): string => {
       if (
         buf.length >= 8 &&
@@ -923,18 +923,39 @@ export const generateLabelPDF = async (
       return "unknown";
     };
 
-    // ---- Customer-branded logo resolution -----------------------------------
-    const hasCustomerLogo = !!order?.customer?.companyLabelPrintLogo;
+    // ---- Resolve the branding customer --------------------------------------
+    // The custom logo lives on a Customer. It is NOT necessarily the order's
+    // customer (an order may have none). The brand owner is the customer linked
+    // to the item itself (Item.customer_id), so prefer that, then fall back to
+    // the order's customer.
+    let brandingCustomer: Customer | null = null;
+
+    if (resolvedItem?.customer_id) {
+      brandingCustomer = await customerRepo.findOne({
+        where: { id: resolvedItem.customer_id },
+      });
+    }
+    // If the item's customer has no usable logo, try the order's customer.
+    if (
+      !brandingCustomer?.companyLabelPrintLogo &&
+      order?.customer?.companyLabelPrintLogo
+    ) {
+      brandingCustomer = order.customer;
+    }
+
     console.log("[label] logo decision:", {
       itemId,
       orderId: item.order_id,
       isLabelPrint: !!resolvedItem?.isLabelPrint,
-      hasCustomerLogo,
-      customerId: order?.customer?.id,
+      itemCustomerId: resolvedItem?.customer_id ?? null,
+      orderCustomerId: order?.customer?.id ?? null,
+      brandingCustomerId: brandingCustomer?.id ?? null,
+      hasBrandingLogo: !!brandingCustomer?.companyLabelPrintLogo,
     });
 
-    if (resolvedItem?.isLabelPrint && order?.customer?.companyLabelPrintLogo) {
-      const raw = order.customer.companyLabelPrintLogo.trim();
+    // ---- Customer-branded logo resolution -----------------------------------
+    if (resolvedItem?.isLabelPrint && brandingCustomer?.companyLabelPrintLogo) {
+      const raw = brandingCustomer.companyLabelPrintLogo.trim();
       let base64Part = "";
       let declaredMime = "";
 
@@ -1196,7 +1217,6 @@ export const generateLabelPDF = async (
     return next(error);
   }
 };
-
 export const updateOrderItemStatus = async (
   req: Request,
   res: Response,
