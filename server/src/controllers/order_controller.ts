@@ -821,20 +821,27 @@ export const generateLabelPDF = async (
 
     if (!item) return next(new ErrorHandler("Item not found", 404));
 
+    let resolvedItem: Item | null = item.item;
+    if (!resolvedItem && item.ItemID_DE) {
+      resolvedItem = await AppDataSource.getRepository(Item).findOne({
+        where: { ItemID_DE: item.ItemID_DE },
+      });
+    }
+
     let warehouseItem = null;
     if (item.ItemID_DE) {
       warehouseItem = await warehouseItemRepo.findOne({
         where: { ItemID_DE: item.ItemID_DE },
       });
     }
-    if (!warehouseItem && item.item_id) {
+    if (!warehouseItem && (item.item_id || resolvedItem?.id)) {
       warehouseItem = await warehouseItemRepo.findOne({
-        where: { item_id: item.item_id },
+        where: { item_id: item.item_id || resolvedItem?.id },
       });
     }
-    if (!warehouseItem && item.item?.ItemID_DE) {
+    if (!warehouseItem && resolvedItem?.ItemID_DE) {
       warehouseItem = await warehouseItemRepo.findOne({
-        where: { ItemID_DE: item.item.ItemID_DE },
+        where: { ItemID_DE: resolvedItem.ItemID_DE },
       });
     }
     const order = await orderRepo.findOne({
@@ -849,12 +856,12 @@ export const generateLabelPDF = async (
     let logoPath = logo;
 
     if (
-      (item.item?.item_name && item.item.item_name.includes("K011111")) ||
+      (resolvedItem?.item_name && resolvedItem.item_name.includes("K011111")) ||
       item.remarks_cn?.includes("K011111")
     ) {
       logoPath = k1;
     } else if (
-      (item.item?.item_name && item.item.item_name.includes("K022222")) ||
+      (resolvedItem?.item_name && resolvedItem.item_name.includes("K022222")) ||
       item.remarks_cn?.includes("K022222")
     ) {
       logoPath = k2;
@@ -863,7 +870,7 @@ export const generateLabelPDF = async (
     let logoSource: string | Buffer = logoPath;
     let isCustomLogoUsed = false;
 
-    if (item.item?.isLabelPrint && order?.customer?.companyLabelPrintLogo) {
+    if (resolvedItem?.isLabelPrint && order?.customer?.companyLabelPrintLogo) {
       const logoStr = order.customer.companyLabelPrintLogo.trim();
       if (logoStr.startsWith("data:image/")) {
         const matches = logoStr.match(/^data:image\/([a-zA-Z+-]+);base64,(.+)$/);
@@ -966,7 +973,7 @@ export const generateLabelPDF = async (
       doc.font("Helvetica");
     }
     doc.fontSize(8).fillColor("#222222");
-    const description = item.item?.item_name || "No description available";
+    const description = resolvedItem?.item_name || "No description available";
     const descriptionY = row1ValueY + itemNoWHeight + 1.5;
     const descriptionHeight = Math.min(
       doc.heightOfString(description, { width: 180 }),
@@ -978,7 +985,7 @@ export const generateLabelPDF = async (
       lineBreak: true,
     });
 
-    const bottomSectionY = Math.min(descriptionY + descriptionHeight + 3, 70);
+    const bottomSectionY = Math.max(56, Math.min(descriptionY + descriptionHeight + 4, 65));
 
     let remarkCNText = item.remarks_cn || "/";
     doc.font("Helvetica-Oblique").fontSize(6.5).fillColor("black");
@@ -1003,7 +1010,7 @@ export const generateLabelPDF = async (
     });
 
     let remarkWText = item.remark_de || "/";
-    const remarkWLabelY = bottomSectionY + 8 + fontSizeCN + 3;
+    const remarkWLabelY = bottomSectionY + 8 + Math.max(fontSizeCN, 8) + 7;
     doc.font("Helvetica-Oblique").fontSize(6.5).fillColor("black");
     doc.text("RemarkW", colA, remarkWLabelY);
 
@@ -1025,8 +1032,8 @@ export const generateLabelPDF = async (
       lineBreak: false,
     });
 
-    const barcodeValue = warehouseItem?.ean?.toString() || "";
-    if (barcodeValue) {
+    const barcodeValue = (warehouseItem?.ean?.toString() || resolvedItem?.ean?.toString() || "").trim();
+    if (barcodeValue && barcodeValue !== "-") {
       try {
         const barcodeBuffer = await bwipjs.toBuffer({
           bcid: "code128",
