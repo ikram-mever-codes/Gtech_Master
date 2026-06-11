@@ -20,8 +20,21 @@ import { generateInvoicesForOrders } from "./cargo_controller";
 
 const _cjkFontCandidates: string[] = [
   path.join(process.cwd(), "assets", "noto-sans-sc", "NotoSansSC-Regular.otf"),
-  path.resolve(__dirname, "..", "..", "assets", "noto-sans-sc", "NotoSansSC-Regular.otf"),
-  path.join(process.cwd(), "server", "assets", "noto-sans-sc", "NotoSansSC-Regular.otf"),
+  path.resolve(
+    __dirname,
+    "..",
+    "..",
+    "assets",
+    "noto-sans-sc",
+    "NotoSansSC-Regular.otf",
+  ),
+  path.join(
+    process.cwd(),
+    "server",
+    "assets",
+    "noto-sans-sc",
+    "NotoSansSC-Regular.otf",
+  ),
   "/home/ubuntu/Master/server/assets/noto-sans-sc/NotoSansSC-Regular.otf",
   "/var/www/Master/server/assets/noto-sans-sc/NotoSansSC-Regular.otf",
   "C:\\Windows\\Fonts\\arialuni.ttf",
@@ -58,7 +71,9 @@ export let _cachedCjkFontBuffer: Buffer | null = null;
 
   const finalCandidates = [..._cjkFontCandidates];
   if (assetsBase) {
-    finalCandidates.unshift(path.join(assetsBase, "noto-sans-sc", "NotoSansSC-Regular.otf"));
+    finalCandidates.unshift(
+      path.join(assetsBase, "noto-sans-sc", "NotoSansSC-Regular.otf"),
+    );
     finalCandidates.unshift(path.join(assetsBase, "NotoSansCJK-Regular.ttf"));
   }
 
@@ -71,8 +86,7 @@ export let _cachedCjkFontBuffer: Buffer | null = null;
         _cachedCjkFontBuffer = buf;
         _cachedCjkFontPath = p;
         return;
-      } catch (e: any) {
-      }
+      } catch (e: any) {}
     }
   }
 })();
@@ -230,12 +244,12 @@ export const createOrder = async (
   } catch (error) {
     try {
       await queryRunner.rollbackTransaction();
-    } catch { }
+    } catch {}
     return next(error);
   } finally {
     try {
       await queryRunner.release();
-    } catch { }
+    } catch {}
   }
 };
 
@@ -402,12 +416,12 @@ export const updateOrder = async (
   } catch (error) {
     try {
       await queryRunner.rollbackTransaction();
-    } catch { }
+    } catch {}
     return next(error);
   } finally {
     try {
       await queryRunner.release();
-    } catch { }
+    } catch {}
   }
 };
 
@@ -499,7 +513,10 @@ export const getAllOrders = async (
       supplierItems.map((si) => [si.item_id, si.price_rmb]),
     );
 
-    const defaultSupplierMap = new Map<number, { id: number; name: string | null }>();
+    const defaultSupplierMap = new Map<
+      number,
+      { id: number; name: string | null }
+    >();
     supplierItems.forEach((si) => {
       if (si.is_default === "Y" && si.supplier) {
         defaultSupplierMap.set(si.item_id, {
@@ -577,20 +594,20 @@ export const getAllOrders = async (
           item: itemDetails,
           warehouse_data: warehouseItem
             ? {
-              id: warehouseItem.id,
-              item_no_de: warehouseItem.item_no_de,
-              item_name_de: warehouseItem.item_name_de,
-              item_name_en: warehouseItem.item_name_en,
-              stock_qty: warehouseItem.stock_qty,
-              msq: warehouseItem.msq,
-              buffer: warehouseItem.buffer,
-              is_stock_item: warehouseItem.is_stock_item,
-              is_SnSI: warehouseItem.is_SnSI,
-              ship_class: warehouseItem.ship_class,
-              is_active: warehouseItem.is_active,
-              is_no_auto_order: warehouseItem.is_no_auto_order,
-              category_id: warehouseItem.category_id,
-            }
+                id: warehouseItem.id,
+                item_no_de: warehouseItem.item_no_de,
+                item_name_de: warehouseItem.item_name_de,
+                item_name_en: warehouseItem.item_name_en,
+                stock_qty: warehouseItem.stock_qty,
+                msq: warehouseItem.msq,
+                buffer: warehouseItem.buffer,
+                is_stock_item: warehouseItem.is_stock_item,
+                is_SnSI: warehouseItem.is_SnSI,
+                ship_class: warehouseItem.ship_class,
+                is_active: warehouseItem.is_active,
+                is_no_auto_order: warehouseItem.is_no_auto_order,
+                category_id: warehouseItem.category_id,
+              }
             : null,
         };
       }),
@@ -649,7 +666,10 @@ export const getOrderById = async (
       supplierItems.map((si) => [si.item_id, si.price_rmb]),
     );
 
-    const defaultSupplierMap = new Map<number, { id: number; name: string | null }>();
+    const defaultSupplierMap = new Map<
+      number,
+      { id: number; name: string | null }
+    >();
     supplierItems.forEach((si) => {
       if (si.is_default === "Y" && si.supplier) {
         defaultSupplierMap.set(si.item_id, {
@@ -794,12 +814,12 @@ export const deleteOrder = async (
   } catch (error) {
     try {
       await queryRunner.rollbackTransaction();
-    } catch { }
+    } catch {}
     return next(error);
   } finally {
     try {
       await queryRunner.release();
-    } catch { }
+    } catch {}
   }
 };
 
@@ -813,6 +833,7 @@ export const generateLabelPDF = async (
     const orderItemRepo = AppDataSource.getRepository(OrderItem);
     const orderRepo = AppDataSource.getRepository(Order);
     const warehouseItemRepo = AppDataSource.getRepository(WarehouseItem);
+    const customerRepo = AppDataSource.getRepository(Customer);
 
     const item = await orderItemRepo.findOne({
       where: { id: Number(itemId) },
@@ -821,6 +842,8 @@ export const generateLabelPDF = async (
 
     if (!item) return next(new ErrorHandler("Item not found", 404));
 
+    // Resolve the underlying Item for this order item. This is the record that
+    // carries the `isLabelPrint` flag AND the `customer_id` of the brand owner.
     let resolvedItem: Item | null = item.item;
     if (!resolvedItem && item.ItemID_DE) {
       resolvedItem = await AppDataSource.getRepository(Item).findOne({
@@ -850,52 +873,159 @@ export const generateLabelPDF = async (
     });
 
     const doc = new PDFDocument({ size: [252, 110], margin: 0 });
-    const logo = path.join(__dirname, "../../public/logo.png");
-    const k1 = path.join(__dirname, "../../public/k1.png");
-    const k2 = path.join(__dirname, "../../public/k2.png");
-    let logoPath = logo;
 
-    if (
-      (resolvedItem?.item_name && resolvedItem.item_name.includes("K011111")) ||
-      item.remarks_cn?.includes("K011111")
-    ) {
-      logoPath = k1;
-    } else if (
-      (resolvedItem?.item_name && resolvedItem.item_name.includes("K022222")) ||
-      item.remarks_cn?.includes("K022222")
-    ) {
-      logoPath = k2;
-    }
+    // Default: every label uses OUR company logo.
+    const logoPath = path.join(__dirname, "../../public/logo.png");
 
     let logoSource: string | Buffer = logoPath;
     let isCustomLogoUsed = false;
 
-    if (resolvedItem?.isLabelPrint && order?.customer?.companyLabelPrintLogo) {
-      const logoStr = order.customer.companyLabelPrintLogo.trim();
-      if (logoStr.startsWith("data:image/")) {
-        const matches = logoStr.match(/^data:image\/([a-zA-Z+-]+);base64,(.+)$/);
-        if (matches && matches[2]) {
-          try {
-            logoSource = Buffer.from(matches[2], "base64");
-            isCustomLogoUsed = true;
-          } catch (err) {
-            console.error("Failed to parse base64 customer logo:", err);
-          }
-        }
-      } else {
-        try {
-          if (/^[a-zA-Z0-9+/=]+$/.test(logoStr)) {
-            logoSource = Buffer.from(logoStr, "base64");
-            isCustomLogoUsed = true;
-          }
-        } catch (err) {
-          console.error("Failed to parse customer logo from plain base64:", err);
-        }
-      }
+    // Sniff the real image format from the buffer's magic bytes. PDFKit's
+    // doc.image() ONLY supports PNG and JPEG — webp/gif/bmp/svg will throw at
+    // draw time and silently leave the logo area blank. Detecting up front lets
+    // us log a clear reason and keep the default logo.
+    const detectImageFormat = (buf: Buffer): string => {
+      if (
+        buf.length >= 8 &&
+        buf[0] === 0x89 &&
+        buf[1] === 0x50 &&
+        buf[2] === 0x4e &&
+        buf[3] === 0x47
+      )
+        return "png";
+      if (
+        buf.length >= 3 &&
+        buf[0] === 0xff &&
+        buf[1] === 0xd8 &&
+        buf[2] === 0xff
+      )
+        return "jpeg";
+      if (
+        buf.length >= 4 &&
+        buf[0] === 0x47 &&
+        buf[1] === 0x49 &&
+        buf[2] === 0x46 &&
+        buf[3] === 0x38
+      )
+        return "gif";
+      if (
+        buf.length >= 12 &&
+        buf.toString("ascii", 0, 4) === "RIFF" &&
+        buf.toString("ascii", 8, 12) === "WEBP"
+      )
+        return "webp";
+      if (buf.length >= 2 && buf[0] === 0x42 && buf[1] === 0x4d) return "bmp";
+      const head = buf
+        .toString("utf8", 0, Math.min(buf.length, 200))
+        .trim()
+        .toLowerCase();
+      if (head.startsWith("<?xml") || head.startsWith("<svg")) return "svg";
+      return "unknown";
+    };
+
+    // ---- Resolve the branding customer --------------------------------------
+    // The custom logo lives on a Customer. It is NOT necessarily the order's
+    // customer (an order may have none). The brand owner is the customer linked
+    // to the item itself (Item.customer_id), so prefer that, then fall back to
+    // the order's customer.
+    let brandingCustomer: Customer | null = null;
+
+    if (resolvedItem?.customer_id) {
+      brandingCustomer = await customerRepo.findOne({
+        where: { id: resolvedItem.customer_id },
+      });
+    }
+    // If the item's customer has no usable logo, try the order's customer.
+    if (
+      !brandingCustomer?.companyLabelPrintLogo &&
+      order?.customer?.companyLabelPrintLogo
+    ) {
+      brandingCustomer = order.customer;
     }
 
-    const safeOrderNo = (order?.order_no || "N/A").replace(/[/\\?%*:|"<>\s]/g, "-");
-    const safeItemNo = (warehouseItem?.item_no_de || "N/A").replace(/[/\\?%*:|"<>\s]/g, "-");
+    console.log("[label] logo decision:", {
+      itemId,
+      orderId: item.order_id,
+      isLabelPrint: !!resolvedItem?.isLabelPrint,
+      itemCustomerId: resolvedItem?.customer_id ?? null,
+      orderCustomerId: order?.customer?.id ?? null,
+      brandingCustomerId: brandingCustomer?.id ?? null,
+      hasBrandingLogo: !!brandingCustomer?.companyLabelPrintLogo,
+    });
+
+    // ---- Customer-branded logo resolution -----------------------------------
+    if (resolvedItem?.isLabelPrint && brandingCustomer?.companyLabelPrintLogo) {
+      const raw = brandingCustomer.companyLabelPrintLogo.trim();
+      let base64Part = "";
+      let declaredMime = "";
+
+      if (raw.startsWith("data:image/")) {
+        // Broadened subtype char-class (handles e.g. svg+xml) and a payload
+        // matcher that tolerates newlines inside the base64.
+        const matches = raw.match(
+          /^data:image\/([a-zA-Z0-9.+-]+);base64,([\s\S]+)$/,
+        );
+        if (matches) {
+          declaredMime = matches[1];
+          base64Part = matches[2];
+        } else {
+          console.warn(
+            "[label] customer logo starts with `data:image/` but does not match the expected `data:image/<type>;base64,<data>` shape — using default logo",
+          );
+        }
+      } else {
+        // Assume a plain (non-data-URI) base64 string.
+        base64Part = raw;
+      }
+
+      // Remove any whitespace / line breaks the encoder may have inserted so
+      // Buffer.from receives a clean base64 string.
+      base64Part = base64Part.replace(/\s/g, "");
+
+      if (base64Part) {
+        try {
+          const buf = Buffer.from(base64Part, "base64");
+          const detectedFormat = detectImageFormat(buf);
+          console.log("[label] customer logo parsed:", {
+            declaredMime: declaredMime || "(plain base64)",
+            detectedFormat,
+            bytes: buf.length,
+          });
+
+          if (buf.length === 0) {
+            console.warn(
+              "[label] customer logo decoded to 0 bytes — using default logo",
+            );
+          } else if (detectedFormat === "png" || detectedFormat === "jpeg") {
+            logoSource = buf;
+            isCustomLogoUsed = true;
+          } else {
+            console.warn(
+              `[label] customer logo format "${detectedFormat}" is NOT supported by PDFKit (PNG/JPEG only) — using default logo. Ask the customer to re-upload a PNG or JPEG.`,
+            );
+          }
+        } catch (err) {
+          console.error(
+            "[label] failed to decode customer logo base64 — using default logo:",
+            err instanceof Error ? err.message : err,
+          );
+        }
+      } else {
+        console.warn(
+          "[label] customer logo present but no base64 payload could be extracted — using default logo",
+        );
+      }
+    }
+    // -------------------------------------------------------------------------
+
+    const safeOrderNo = (order?.order_no || "N/A").replace(
+      /[/\\?%*:|"<>\s]/g,
+      "-",
+    );
+    const safeItemNo = (warehouseItem?.item_no_de || "N/A").replace(
+      /[/\\?%*:|"<>\s]/g,
+      "-",
+    );
     const qtyLabel = item.qty_label || 0;
 
     const now = new Date();
@@ -908,10 +1038,7 @@ export const generateLabelPDF = async (
 
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Access-Control-Expose-Headers", "Content-Disposition");
-    res.setHeader(
-      "Content-Disposition",
-      `inline; filename="${filename}"`,
-    );
+    res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
     doc.pipe(res);
 
     const colA = 12;
@@ -938,7 +1065,10 @@ export const generateLabelPDF = async (
     doc.fillColor("black").font("Helvetica-Oblique").fontSize(6.5);
     doc.text("ItemNoW", colA, row1LabelY);
     doc.text("Order No / Qty", orderNoX, row1LabelY);
-    doc.text("Qty", qtyLabelColStart, row1LabelY, { width: 32, align: "right" });
+    doc.text("Qty", qtyLabelColStart, row1LabelY, {
+      width: 32,
+      align: "right",
+    });
 
     doc.font("Helvetica-Bold").fontSize(10);
     let itemNoDE = warehouseItem?.item_no_de || "N/A";
@@ -960,10 +1090,33 @@ export const generateLabelPDF = async (
       align: "right",
     });
 
+    // Draw the logo. If a custom (customer) logo is in play but fails to render
+    // for any reason, fall back to the default company logo so a logo always
+    // appears on the label. Dimensions/position are identical in both cases.
     try {
       doc.image(logoSource, colLogo, 14, { width: 40 });
+      console.log(
+        "[label] drew",
+        isCustomLogoUsed ? "customer logo" : "default logo",
+      );
     } catch (e) {
-      console.error("Logo missing or invalid:", isCustomLogoUsed ? "customer logo" : logoPath, e);
+      console.error(
+        "[label] failed to draw",
+        isCustomLogoUsed ? "customer logo" : "default logo",
+        "-",
+        e instanceof Error ? e.message : e,
+      );
+      if (isCustomLogoUsed) {
+        try {
+          doc.image(logoPath, colLogo, 14, { width: 40 });
+          console.log("[label] drew default logo as fallback");
+        } catch (fallbackErr) {
+          console.error(
+            "[label] default logo ALSO failed to draw:",
+            fallbackErr instanceof Error ? fallbackErr.message : fallbackErr,
+          );
+        }
+      }
     }
 
     const fontSource = _cachedCjkFontBuffer || _cachedCjkFontPath;
@@ -985,7 +1138,10 @@ export const generateLabelPDF = async (
       lineBreak: true,
     });
 
-    const bottomSectionY = Math.max(56, Math.min(descriptionY + descriptionHeight + 4, 65));
+    const bottomSectionY = Math.max(
+      56,
+      Math.min(descriptionY + descriptionHeight + 4, 65),
+    );
 
     let remarkCNText = item.remarks_cn || "/";
     doc.font("Helvetica-Oblique").fontSize(6.5).fillColor("black");
@@ -1032,7 +1188,11 @@ export const generateLabelPDF = async (
       lineBreak: false,
     });
 
-    const barcodeValue = (warehouseItem?.ean?.toString() || resolvedItem?.ean?.toString() || "").trim();
+    const barcodeValue = (
+      warehouseItem?.ean?.toString() ||
+      resolvedItem?.ean?.toString() ||
+      ""
+    ).trim();
     if (barcodeValue && barcodeValue !== "-") {
       try {
         const barcodeBuffer = await bwipjs.toBuffer({
@@ -1057,7 +1217,6 @@ export const generateLabelPDF = async (
     return next(error);
   }
 };
-
 export const updateOrderItemStatus = async (
   req: Request,
   res: Response,
@@ -1325,9 +1484,9 @@ const resolveCustomerAddress = (
 
   const streetParts = [
     customer.addressLine1 ||
-    starCustomerDetails?.deliveryAddressLine1 ||
-    businessDetails?.address ||
-    "",
+      starCustomerDetails?.deliveryAddressLine1 ||
+      businessDetails?.address ||
+      "",
     customer.addressLine2 || starCustomerDetails?.deliveryAddressLine2 || "",
   ].filter(Boolean);
 
@@ -1382,7 +1541,9 @@ export const generateCommercialInvoicePDF = async (
       ],
     });
     if (!invoice) {
-      return res.status(404).json({ success: false, message: "Invoice not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Invoice not found" });
     }
 
     const cargo = await AppDataSource.getRepository(Cargo).findOne({
@@ -1397,27 +1558,49 @@ export const generateCommercialInvoicePDF = async (
     const orderItemRepo = AppDataSource.getRepository(OrderItem);
     let rawOrderItems: any[] = [];
     if (cargo) {
-      rawOrderItems = await orderItemRepo.find({ where: { cargo_id: cargo.id }, relations: ["item", "item.taric"] });
+      rawOrderItems = await orderItemRepo.find({
+        where: { cargo_id: cargo.id },
+        relations: ["item", "item.taric"],
+      });
     } else {
-      const order = await AppDataSource.getRepository(Order).findOne({ where: { order_no: invoice.orderNumber } });
-      if (order) rawOrderItems = await orderItemRepo.find({ where: { order_id: order.id }, relations: ["item", "item.taric"] });
+      const order = await AppDataSource.getRepository(Order).findOne({
+        where: { order_no: invoice.orderNumber },
+      });
+      if (order)
+        rawOrderItems = await orderItemRepo.find({
+          where: { order_id: order.id },
+          relations: ["item", "item.taric"],
+        });
     }
 
     const manualCodes: string[] = [];
     rawOrderItems.forEach((oi: any) => {
-      if (oi.set_taric_code) oi.set_taric_code.split("/").forEach((c: string) => { if (c.trim()) manualCodes.push(c.trim()); });
+      if (oi.set_taric_code)
+        oi.set_taric_code.split("/").forEach((c: string) => {
+          if (c.trim()) manualCodes.push(c.trim());
+        });
     });
     const uniqueCodes = [...new Set(manualCodes)];
-    const manualTarics = uniqueCodes.length > 0
-      ? await AppDataSource.getRepository(Taric).find({ where: { code: In(uniqueCodes) } }) : [];
-    const manualTaricMap = new Map(manualTarics.map(t => [t.code, t]));
+    const manualTarics =
+      uniqueCodes.length > 0
+        ? await AppDataSource.getRepository(Taric).find({
+            where: { code: In(uniqueCodes) },
+          })
+        : [];
+    const manualTaricMap = new Map(manualTarics.map((t) => [t.code, t]));
 
-    const taricGroupsMap = new Map<string, { hsCode: string; desc: string; qty: number; totalPrice: number }>();
+    const taricGroupsMap = new Map<
+      string,
+      { hsCode: string; desc: string; qty: number; totalPrice: number }
+    >();
     rawOrderItems.forEach((oi: any) => {
       const item = oi.item;
       const taricCode = item?.taric?.code || "";
-      const isProject = !taricCode || taricCode === "0" || taricCode === "0000000000";
-      let groupKey: string; let hsCode: string; let desc: string;
+      const isProject =
+        !taricCode || taricCode === "0" || taricCode === "0000000000";
+      let groupKey: string;
+      let hsCode: string;
+      let desc: string;
       if (oi.set_taric_code) {
         const codes = oi.set_taric_code.split("/");
         const target = codes.length > 1 ? codes[1].trim() : codes[0].trim();
@@ -1435,12 +1618,23 @@ export const generateCommercialInvoicePDF = async (
         desc = item?.item_name || "Unknown";
       }
       let unitPrice = 0;
-      if (item?.transfer_price_EUR !== undefined && item?.transfer_price_EUR !== null) unitPrice = Number(item.transfer_price_EUR);
-      else if (oi.eur_special_price !== undefined && oi.eur_special_price !== null) unitPrice = Number(oi.eur_special_price);
-      else if (oi.price !== undefined && oi.price !== null) unitPrice = Number(oi.price);
-      else if (item?.price !== undefined && item?.price !== null) unitPrice = Number(item.price);
+      if (
+        item?.transfer_price_EUR !== undefined &&
+        item?.transfer_price_EUR !== null
+      )
+        unitPrice = Number(item.transfer_price_EUR);
+      else if (
+        oi.eur_special_price !== undefined &&
+        oi.eur_special_price !== null
+      )
+        unitPrice = Number(oi.eur_special_price);
+      else if (oi.price !== undefined && oi.price !== null)
+        unitPrice = Number(oi.price);
+      else if (item?.price !== undefined && item?.price !== null)
+        unitPrice = Number(item.price);
       const qty = Number(oi.qty || 0);
-      if (!taricGroupsMap.has(groupKey)) taricGroupsMap.set(groupKey, { hsCode, desc, qty: 0, totalPrice: 0 });
+      if (!taricGroupsMap.has(groupKey))
+        taricGroupsMap.set(groupKey, { hsCode, desc, qty: 0, totalPrice: 0 });
       const g = taricGroupsMap.get(groupKey)!;
       g.qty += qty;
       g.totalPrice += qty * unitPrice;
@@ -1448,59 +1642,80 @@ export const generateCommercialInvoicePDF = async (
 
     const groupedItems = Array.from(taricGroupsMap.values());
 
-    type LineItem = { no: number; desc: string; hs: string; qty: number; unit: string; price: string };
+    type LineItem = {
+      no: number;
+      desc: string;
+      hs: string;
+      qty: number;
+      unit: string;
+      price: string;
+    };
     let lineItems: LineItem[];
     if (groupedItems.length > 0) {
       lineItems = groupedItems.map((g, i) => ({
-        no: i + 1, desc: g.desc, hs: g.hsCode,
+        no: i + 1,
+        desc: g.desc,
+        hs: g.hsCode,
         qty: g.qty,
         unit: g.qty > 0 ? (g.totalPrice / g.qty).toFixed(3) : "0.000",
         price: g.totalPrice.toFixed(2),
       }));
     } else {
       lineItems = (invoice.items || []).map((item: any, i: number) => ({
-        no: i + 1, desc: item.description || item.item?.item_name || "Unknown Item",
-        hs: item.articleNumber || "n/a", qty: Number(item.quantity || 0),
-        unit: Number(item.unitPrice || 0).toFixed(3), price: Number(item.netPrice || 0).toFixed(2),
+        no: i + 1,
+        desc: item.description || item.item?.item_name || "Unknown Item",
+        hs: item.articleNumber || "n/a",
+        qty: Number(item.quantity || 0),
+        unit: Number(item.unitPrice || 0).toFixed(3),
+        price: Number(item.netPrice || 0).toFixed(2),
       }));
     }
 
     const totalQty = lineItems.reduce((s, it) => s + it.qty, 0);
     const subTotal = lineItems.reduce((s, it) => s + Number(it.price), 0);
-    const freightCost = invoice.freightCost !== undefined && invoice.freightCost !== null ? Number(invoice.freightCost) : 0;
+    const freightCost =
+      invoice.freightCost !== undefined && invoice.freightCost !== null
+        ? Number(invoice.freightCost)
+        : 0;
     const grandTotal = (subTotal + freightCost).toFixed(2);
     const customer = invoice.customer || cargo?.customer;
     const customerAddress = resolveCustomerAddress(customer);
 
-    const hasCargoBillTo = !!(cargo?.bill_to_display_name || cargo?.bill_to_company_name);
+    const hasCargoBillTo = !!(
+      cargo?.bill_to_display_name || cargo?.bill_to_company_name
+    );
 
     const rawBillName = hasCargoBillTo
-      ? (cargo!.bill_to_display_name || cargo!.bill_to_company_name || "")
-      : (cargo?.ship_to_display_name || cargo?.ship_to_company_name || customer?.companyName || "");
-    const billToName = rawBillName
-      .replace(/^GTech$/i, "GTech Industries GmbH")
-      .replace(/^GTech[-\s]?Warehouse$/i, "GTech Industries GmbH") ||
+      ? cargo!.bill_to_display_name || cargo!.bill_to_company_name || ""
+      : cargo?.ship_to_display_name ||
+        cargo?.ship_to_company_name ||
+        customer?.companyName ||
+        "";
+    const billToName =
+      rawBillName
+        .replace(/^GTech$/i, "GTech Industries GmbH")
+        .replace(/^GTech[-\s]?Warehouse$/i, "GTech Industries GmbH") ||
       "GTech Industries GmbH";
 
     const billToStreet = hasCargoBillTo
-      ? (cargo?.bill_to_full_address || customerAddress.street)
-      : (cargo?.ship_to_full_address || customerAddress.street);
+      ? cargo?.bill_to_full_address || customerAddress.street
+      : cargo?.ship_to_full_address || customerAddress.street;
     const billToCity = hasCargoBillTo
-      ? (cargo?.bill_to_city
+      ? cargo?.bill_to_city
         ? formatPostalCity(cargo.bill_to_postal_code, cargo.bill_to_city)
-        : formatPostalCity(customerAddress.postalCode, customerAddress.city))
-      : (cargo?.ship_to_city
+        : formatPostalCity(customerAddress.postalCode, customerAddress.city)
+      : cargo?.ship_to_city
         ? formatPostalCity(cargo.ship_to_postal_code, cargo.ship_to_city)
-        : formatPostalCity(customerAddress.postalCode, customerAddress.city));
+        : formatPostalCity(customerAddress.postalCode, customerAddress.city);
     const billToCountry = hasCargoBillTo
-      ? (cargo?.bill_to_country || customerAddress.country || "Germany")
-      : (cargo?.ship_to_country || customerAddress.country || "Germany");
+      ? cargo?.bill_to_country || customerAddress.country || "Germany"
+      : cargo?.ship_to_country || customerAddress.country || "Germany";
     const billToPhone = hasCargoBillTo
-      ? (cargo?.bill_to_phone_no || customerAddress.phone)
-      : (cargo?.ship_to_contact_phone || customerAddress.phone);
+      ? cargo?.bill_to_phone_no || customerAddress.phone
+      : cargo?.ship_to_contact_phone || customerAddress.phone;
     const billToEori = hasCargoBillTo
-      ? (cargo?.bill_to_tax_no || customer?.taxNumber || "")
-      : (customer?.taxNumber || "");
+      ? cargo?.bill_to_tax_no || customer?.taxNumber || ""
+      : customer?.taxNumber || "";
 
     const shipToCompany =
       cargo?.ship_to_display_name ||
@@ -1511,7 +1726,8 @@ export const generateCommercialInvoicePDF = async (
     const shipToCity = cargo?.ship_to_city
       ? formatPostalCity(cargo.ship_to_postal_code, cargo.ship_to_city)
       : formatPostalCity(customerAddress.postalCode, customerAddress.city);
-    const shipToCountry = cargo?.ship_to_country || customerAddress.country || "";
+    const shipToCountry =
+      cargo?.ship_to_country || customerAddress.country || "";
     const shipToContact =
       cargo?.ship_to_contact_person || customerAddress.contact || "";
     const shipToPhone =
@@ -1521,13 +1737,19 @@ export const generateCommercialInvoicePDF = async (
       if ((customer as any)?.businessDetails?.customerNumber)
         return String((customer as any).businessDetails.customerNumber);
       if (customer?.id)
-        return (parseInt(customer.id.replace(/-/g, "").substring(0, 8), 16) % 100000).toString().padStart(5, "0");
+        return (
+          parseInt(customer.id.replace(/-/g, "").substring(0, 8), 16) % 100000
+        )
+          .toString()
+          .padStart(5, "0");
       return "";
     })();
 
     const data = {
       invoiceNo: (invoice.invoiceNumber || "").replace(/-/g, ""),
-      date: invoice.invoiceDate ? new Date(invoice.invoiceDate).toISOString().split("T")[0] : "",
+      date: invoice.invoiceDate
+        ? new Date(invoice.invoiceDate).toISOString().split("T")[0]
+        : "",
       cargoNo: cargo?.cargo_no || invoice.orderNumber || "",
       customerID,
       billTo: {
@@ -1550,36 +1772,94 @@ export const generateCommercialInvoicePDF = async (
 
     const doc = new PDFDocument({ size: "A4", margin: 40, bufferPages: true });
     res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `attachment; filename=Invoice_${data.invoiceNo}.pdf`);
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename=Invoice_${data.invoiceNo}.pdf`,
+    );
     doc.pipe(res);
 
-    doc.fillColor("#777777").font("Helvetica").fontSize(22).text("GTech Industries Limited", 40, 20, { align: "right" });
+    doc
+      .fillColor("#777777")
+      .font("Helvetica")
+      .fontSize(22)
+      .text("GTech Industries Limited", 40, 20, { align: "right" });
     const tickColor = "#777777";
     doc.fontSize(11).fillColor("#777777");
     doc.text("Engineering", 325, 48);
-    doc.save().translate(387, 48).scale(0.8).moveTo(0, 5).lineTo(3, 8).lineTo(8, 0).strokeColor(tickColor).lineWidth(2).stroke().restore();
+    doc
+      .save()
+      .translate(387, 48)
+      .scale(0.8)
+      .moveTo(0, 5)
+      .lineTo(3, 8)
+      .lineTo(8, 0)
+      .strokeColor(tickColor)
+      .lineWidth(2)
+      .stroke()
+      .restore();
     doc.text("Design", 412, 48);
-    doc.save().translate(448, 48).scale(0.8).moveTo(0, 5).lineTo(3, 8).lineTo(8, 0).strokeColor(tickColor).lineWidth(2).stroke().restore();
+    doc
+      .save()
+      .translate(448, 48)
+      .scale(0.8)
+      .moveTo(0, 5)
+      .lineTo(3, 8)
+      .lineTo(8, 0)
+      .strokeColor(tickColor)
+      .lineWidth(2)
+      .stroke()
+      .restore();
     doc.text("Manufacturing", 473, 48);
-    doc.save().translate(546, 48).scale(0.8).moveTo(0, 5).lineTo(3, 8).lineTo(8, 0).strokeColor(tickColor).lineWidth(2).stroke().restore();
-    doc.moveTo(40, 65).lineTo(555, 65).strokeColor("#cccccc").lineWidth(1).stroke();
+    doc
+      .save()
+      .translate(546, 48)
+      .scale(0.8)
+      .moveTo(0, 5)
+      .lineTo(3, 8)
+      .lineTo(8, 0)
+      .strokeColor(tickColor)
+      .lineWidth(2)
+      .stroke()
+      .restore();
+    doc
+      .moveTo(40, 65)
+      .lineTo(555, 65)
+      .strokeColor("#cccccc")
+      .lineWidth(1)
+      .stroke();
 
     doc.fontSize(9).fillColor("#666666");
-    doc.text("GTech Industries Limited:   3A, 12/F, Kaiser Centre, N. 18 Centre Street, Sai Ying Pun, Hong Kong", 40, 75);
-    doc.text("GTech Establishment China: West Dafeng Metallurgical Plant, Bowang Huisheng Square, Bowang, Ma'anshan, Anhui", 40, 88);
+    doc.text(
+      "GTech Industries Limited:   3A, 12/F, Kaiser Centre, N. 18 Centre Street, Sai Ying Pun, Hong Kong",
+      40,
+      75,
+    );
+    doc.text(
+      "GTech Establishment China: West Dafeng Metallurgical Plant, Bowang Huisheng Square, Bowang, Ma'anshan, Anhui",
+      40,
+      88,
+    );
 
     const fontSource = _cachedCjkFontBuffer || _cachedCjkFontPath;
     if (fontSource) {
       try {
-        const chineseAddress = "中国安徽省马鞍山市博望区博望汇盛广场西大丰冶金厂区";
-        doc.font(fontSource, 0).fontSize(9).fillColor("#666666").text(chineseAddress, 152, 101, { lineBreak: false });
+        const chineseAddress =
+          "中国安徽省马鞍山市博望区博望汇盛广场西大丰冶金厂区";
+        doc
+          .font(fontSource, 0)
+          .fontSize(9)
+          .fillColor("#666666")
+          .text(chineseAddress, 152, 101, { lineBreak: false });
         doc.font("Helvetica").fillColor("#000000");
       } catch (err: any) {
         console.error(`[CJK-PDF] Render failed:`, err.message);
         if (process.platform === "win32") {
           try {
-            doc.font("C:\\Windows\\Fonts\\msyh.ttc", 0).fontSize(9).text("中国安徽...", 152, 101);
-          } catch (e) { }
+            doc
+              .font("C:\\Windows\\Fonts\\msyh.ttc", 0)
+              .fontSize(9)
+              .text("中国安徽...", 152, 101);
+          } catch (e) {}
         }
         doc.font("Helvetica").fillColor("#000000");
       }
@@ -1595,8 +1875,10 @@ export const generateCommercialInvoicePDF = async (
     };
     const isGTechBillTo = data.billTo.name === "GTech Industries GmbH";
 
-    const isSameAddr = !hasCargoBillTo ||
-      (data.billTo.name === data.shipTo.company && data.billTo.street === data.shipTo.street);
+    const isSameAddr =
+      !hasCargoBillTo ||
+      (data.billTo.name === data.shipTo.company &&
+        data.billTo.street === data.shipTo.street);
     const addrY = 125;
     if (isSameAddr) {
       const bName = isGTechBillTo ? GTECH_GMBH.name : data.billTo.name;
@@ -1606,8 +1888,14 @@ export const generateCommercialInvoicePDF = async (
       const bPhone = isGTechBillTo ? GTECH_GMBH.phone : data.billTo.phone;
       const bEori = isGTechBillTo ? GTECH_GMBH.eori : data.billTo.eori;
 
-      doc.fillColor("black").font("Helvetica-Bold").fontSize(11).text(bName, 40, addrY);
-      doc.font("Helvetica").fontSize(10)
+      doc
+        .fillColor("black")
+        .font("Helvetica-Bold")
+        .fontSize(11)
+        .text(bName, 40, addrY);
+      doc
+        .font("Helvetica")
+        .fontSize(10)
         .text(bStreet, 40, addrY + 15)
         .text(bCity, 40, addrY + 28)
         .text(bCountry, 40, addrY + 41)
@@ -1621,38 +1909,90 @@ export const generateCommercialInvoicePDF = async (
       const bPhone = isGTechBillTo ? GTECH_GMBH.phone : data.billTo.phone;
       const bEori = isGTechBillTo ? GTECH_GMBH.eori : data.billTo.eori;
 
-      doc.fillColor("black").font("Helvetica-Bold").fontSize(10.5).text("BILL TO:", 40, addrY - 3).text("SHIP TO:", 240, addrY - 3);
-      doc.font("Helvetica-Bold").fontSize(11).text(bName, 40, addrY + 13);
-      doc.font("Helvetica").fontSize(10)
+      doc
+        .fillColor("black")
+        .font("Helvetica-Bold")
+        .fontSize(10.5)
+        .text("BILL TO:", 40, addrY - 3)
+        .text("SHIP TO:", 240, addrY - 3);
+      doc
+        .font("Helvetica-Bold")
+        .fontSize(11)
+        .text(bName, 40, addrY + 13);
+      doc
+        .font("Helvetica")
+        .fontSize(10)
         .text(bStreet, 40, addrY + 33)
         .text(bCity, 40, addrY + 46)
         .text(bCountry, 40, addrY + 59)
         .text(bPhone, 40, addrY + 73);
       doc.font("Helvetica-Bold").text(`EORI: ${bEori}`, 40, addrY + 87);
 
-      doc.font("Helvetica-Bold").fontSize(11).text(data.shipTo.company, 240, addrY + 13);
-      doc.font("Helvetica").fontSize(10).text(data.shipTo.contact, 240, addrY + 27)
-        .text(data.shipTo.street, 240, addrY + 41).text(data.shipTo.city, 240, addrY + 57)
-        .text(data.shipTo.country, 240, addrY + 70).text(data.shipTo.phone, 240, addrY + 83);
+      doc
+        .font("Helvetica-Bold")
+        .fontSize(11)
+        .text(data.shipTo.company, 240, addrY + 13);
+      doc
+        .font("Helvetica")
+        .fontSize(10)
+        .text(data.shipTo.contact, 240, addrY + 27)
+        .text(data.shipTo.street, 240, addrY + 41)
+        .text(data.shipTo.city, 240, addrY + 57)
+        .text(data.shipTo.country, 240, addrY + 70)
+        .text(data.shipTo.phone, 240, addrY + 83);
     }
     let rightY = 130;
-    doc.font("Helvetica").fontSize(12).text("Customer ID: ", 420, rightY, { continued: true }).font("Helvetica-Bold").text(data.customerID || "");
+    doc
+      .font("Helvetica")
+      .fontSize(12)
+      .text("Customer ID: ", 420, rightY, { continued: true })
+      .font("Helvetica-Bold")
+      .text(data.customerID || "");
     rightY = 157;
-    doc.font("Helvetica").fontSize(12).text("Date: ", 420, rightY, { continued: true }).font("Helvetica-Bold").text(data.date);
+    doc
+      .font("Helvetica")
+      .fontSize(12)
+      .text("Date: ", 420, rightY, { continued: true })
+      .font("Helvetica-Bold")
+      .text(data.date);
     rightY = 184;
-    doc.font("Helvetica").text("Invoice No: ", 420, rightY, { continued: true }).font("Helvetica-Bold").text(data.invoiceNo);
+    doc
+      .font("Helvetica")
+      .text("Invoice No: ", 420, rightY, { continued: true })
+      .font("Helvetica-Bold")
+      .text(data.invoiceNo);
     rightY = 211;
-    doc.font("Helvetica").text("Cargo No.: ", 420, rightY, { continued: true }).font("Helvetica-Bold").text(data.cargoNo);
-    doc.fontSize(15).font("Helvetica-Bold").text("Commercial Invoice", 0, 240, { align: "center" });
+    doc
+      .font("Helvetica")
+      .text("Cargo No.: ", 420, rightY, { continued: true })
+      .font("Helvetica-Bold")
+      .text(data.cargoNo);
+    doc
+      .fontSize(15)
+      .font("Helvetica-Bold")
+      .text("Commercial Invoice", 0, 240, { align: "center" });
 
     const tableTop = 272;
-    doc.moveTo(40, tableTop).lineTo(555, tableTop).strokeColor("#bb0000").lineWidth(1.5).stroke();
+    doc
+      .moveTo(40, tableTop)
+      .lineTo(555, tableTop)
+      .strokeColor("#bb0000")
+      .lineWidth(1.5)
+      .stroke();
     doc.fontSize(11).font("Helvetica-Bold");
-    doc.text("No", 40, tableTop + 10).text("Description", 75, tableTop + 10).text("(EU HS code)", 340, tableTop + 10);
+    doc
+      .text("No", 40, tableTop + 10)
+      .text("Description", 75, tableTop + 10)
+      .text("(EU HS code)", 340, tableTop + 10);
     doc.text("Qty", 425, tableTop + 4).text("(pcs)", 425, tableTop + 16);
     doc.text("Unit", 470, tableTop + 4).text("(€)*", 470, tableTop + 16);
     doc.text("Price", 525, tableTop + 4).text("(€)", 525, tableTop + 16);
-    doc.moveTo(40, tableTop + 32).lineTo(555, tableTop + 32).strokeColor("#cccccc").lineWidth(1).stroke();
+    doc
+      .moveTo(40, tableTop + 32)
+      .lineTo(555, tableTop + 32)
+      .strokeColor("#cccccc")
+      .lineWidth(1)
+      .stroke();
 
     let itemY = tableTop + 46;
     const pageH = 841.89;
@@ -1665,7 +2005,10 @@ export const generateCommercialInvoicePDF = async (
       const descH = doc.heightOfString(item.desc, { width: 250 });
       const actualRowH = Math.max(minRowH, descH + rowPad);
 
-      if (itemY + actualRowH > pageH - footerReserve) { doc.addPage(); itemY = 50; }
+      if (itemY + actualRowH > pageH - footerReserve) {
+        doc.addPage();
+        itemY = 50;
+      }
 
       const midOffset = (actualRowH - 13) / 2;
       doc.text(item.no.toString(), 40, itemY + midOffset);
@@ -1673,30 +2016,62 @@ export const generateCommercialInvoicePDF = async (
       doc.text(item.hs, 340, itemY + midOffset);
       doc.text(item.qty.toString(), 425, itemY + midOffset);
       doc.text(item.unit, 463, itemY + midOffset);
-      doc.text(item.price, 510, itemY + midOffset, { align: "right", width: 45 });
+      doc.text(item.price, 510, itemY + midOffset, {
+        align: "right",
+        width: 45,
+      });
 
-      doc.moveTo(40, itemY + actualRowH - 2).lineTo(555, itemY + actualRowH - 2)
-        .strokeColor("#eeeeee").lineWidth(0.5).stroke();
+      doc
+        .moveTo(40, itemY + actualRowH - 2)
+        .lineTo(555, itemY + actualRowH - 2)
+        .strokeColor("#eeeeee")
+        .lineWidth(0.5)
+        .stroke();
 
       itemY += actualRowH;
     });
 
-    if (itemY + minRowH > pageH - footerReserve) { doc.addPage(); itemY = 50; }
+    if (itemY + minRowH > pageH - footerReserve) {
+      doc.addPage();
+      itemY = 50;
+    }
     doc.font("Helvetica").fontSize(11);
     doc.text("Freight cost", 75, itemY);
     doc.text("n/a", 340, itemY).text("n/a", 425, itemY).text("n/a", 470, itemY);
     doc.text(freightCost.toFixed(2), 510, itemY, { align: "right", width: 45 });
     itemY += minRowH + 4;
 
-    doc.moveTo(40, itemY).lineTo(555, itemY).strokeColor("black").lineWidth(1).stroke();
+    doc
+      .moveTo(40, itemY)
+      .lineTo(555, itemY)
+      .strokeColor("black")
+      .lineWidth(1)
+      .stroke();
     itemY += 12;
-    doc.font("Helvetica-Bold").fontSize(11).text("Total :", 360, itemY, { underline: true });
+    doc
+      .font("Helvetica-Bold")
+      .fontSize(11)
+      .text("Total :", 360, itemY, { underline: true });
     doc.text(totalQty.toString(), 425, itemY, { underline: true });
-    doc.text(`${grandTotal} €`, 485, itemY, { width: 70, align: "right", underline: true });
+    doc.text(`${grandTotal} €`, 485, itemY, {
+      width: 70,
+      align: "right",
+      underline: true,
+    });
 
     itemY += 25;
-    if (itemY + 110 > pageH - footerReserve) { doc.addPage(); itemY = 50; }
-    doc.fontSize(10).font("Helvetica-Bold").text("* Unit price is calculated and can have errors from rounding", 40, itemY);
+    if (itemY + 110 > pageH - footerReserve) {
+      doc.addPage();
+      itemY = 50;
+    }
+    doc
+      .fontSize(10)
+      .font("Helvetica-Bold")
+      .text(
+        "* Unit price is calculated and can have errors from rounding",
+        40,
+        itemY,
+      );
     itemY += 25;
     doc.fontSize(10).font("Helvetica").text("Remark:", 40, itemY);
     const remarkX = 100;
@@ -1704,7 +2079,9 @@ export const generateCommercialInvoicePDF = async (
     if (cargo?.cargo_no) {
       remarkLines.push(`${cargo.cargo_no}`);
     }
-    const orderForRemark = await AppDataSource.getRepository(Order).findOne({ where: { order_no: invoice.orderNumber } });
+    const orderForRemark = await AppDataSource.getRepository(Order).findOne({
+      where: { order_no: invoice.orderNumber },
+    });
     const orderComment = orderForRemark?.comment || "";
     if (orderComment) remarkLines.push(orderComment);
     if (invoice.remark) remarkLines.push(invoice.remark);
@@ -1714,11 +2091,27 @@ export const generateCommercialInvoicePDF = async (
     const nextRemarkY = itemY + Math.max(remarkLines.length, 1) * 15;
 
     itemY = nextRemarkY + 30;
-    if (itemY + 30 > pageH - footerReserve) { doc.addPage(); itemY = 50; }
-    doc.fontSize(9).font("Helvetica").fillColor("#000000")
-      .text("We hereby confirm that no raw material from Russia were used", 100, itemY, { lineBreak: false });
+    if (itemY + 30 > pageH - footerReserve) {
+      doc.addPage();
+      itemY = 50;
+    }
+    doc
+      .fontSize(9)
+      .font("Helvetica")
+      .fillColor("#000000")
+      .text(
+        "We hereby confirm that no raw material from Russia were used",
+        100,
+        itemY,
+        { lineBreak: false },
+      );
     itemY += 14;
-    doc.text("in the production of the goods mentioned in this invoice.", 100, itemY, { lineBreak: false });
+    doc.text(
+      "in the production of the goods mentioned in this invoice.",
+      100,
+      itemY,
+      { lineBreak: false },
+    );
 
     const originalBottomMargin = doc.page.margins.bottom;
     doc.page.margins.bottom = 0;
@@ -1730,7 +2123,12 @@ export const generateCommercialInvoicePDF = async (
 
     doc.switchToPage(lastPageIdx);
 
-    doc.moveTo(40, footerY).lineTo(555, footerY).strokeColor("#cccccc").lineWidth(0.5).stroke();
+    doc
+      .moveTo(40, footerY)
+      .lineTo(555, footerY)
+      .strokeColor("#cccccc")
+      .lineWidth(0.5)
+      .stroke();
     doc.fontSize(8).fillColor("#000000").font("Helvetica-Bold");
     doc.text("GTech Industries Limited", 40, footerY + 10);
     doc.fontSize(8).font("Helvetica").fillColor("#444444");
@@ -1748,7 +2146,7 @@ export const generateCommercialInvoicePDF = async (
       if (existsSync(footerLogo)) {
         doc.image(footerLogo, 420, footerY + 8, { width: 100 });
       }
-    } catch (e) { }
+    } catch (e) {}
 
     range = doc.bufferedPageRange();
     totalPagesCount = range.count;
@@ -1756,8 +2154,12 @@ export const generateCommercialInvoicePDF = async (
     for (let i = 0; i < totalPagesCount; i++) {
       doc.switchToPage(range.start + i);
       doc.fontSize(8).fillColor("#999999").font("Helvetica");
-      const numY = (i === totalPagesCount - 1) ? footerY + 55 : 780;
-      doc.text(`${i + 1} / ${totalPagesCount}`, 490, numY, { align: "right", width: 60, lineBreak: false });
+      const numY = i === totalPagesCount - 1 ? footerY + 55 : 780;
+      doc.text(`${i + 1} / ${totalPagesCount}`, 490, numY, {
+        align: "right",
+        width: 60,
+        lineBreak: false,
+      });
     }
 
     doc.page.margins.bottom = originalBottomMargin;

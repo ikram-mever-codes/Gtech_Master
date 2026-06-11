@@ -27,6 +27,7 @@ import ErrorHandler from "../utils/errorHandler";
 import { UserRole } from "../models/users";
 import { filterDataByRole } from "../utils/dataFilter";
 import { AuthorizedRequest } from "../middlewares/authorized";
+import { Customer } from "../models/customers";
 
 export const getRMBPriceFromSupplier = async (
   itemId: number,
@@ -186,13 +187,18 @@ export const getItems = async (
     if (isNaN(limitNum)) limitNum = 50;
     const skip = (pageNum - 1) * limitNum;
 
-    const queryBuilder = itemRepository.createQueryBuilder("item")
+    const queryBuilder = itemRepository
+      .createQueryBuilder("item")
       .leftJoinAndSelect("item.tags", "tags");
 
     if (tags) {
       const tagIds = (tags as string).split(",");
-      const includeTagIds = tagIds.filter((id) => !id.startsWith("!")).map((id) => id.trim());
-      const excludeTagIds = tagIds.filter((id) => id.startsWith("!")).map((id) => id.substring(1).trim());
+      const includeTagIds = tagIds
+        .filter((id) => !id.startsWith("!"))
+        .map((id) => id.trim());
+      const excludeTagIds = tagIds
+        .filter((id) => id.startsWith("!"))
+        .map((id) => id.substring(1).trim());
 
       if (includeTagIds.length > 0) {
         queryBuilder.andWhere((qb) => {
@@ -315,15 +321,25 @@ export const getItems = async (
     if (filter) {
       const filterStr = filter as string;
       if (filterStr === "rmb_special_no_value") {
-        queryBuilder.leftJoin("supplier_item", "si_filter", "si_filter.item_id = item.id AND si_filter.is_default = 'Y'");
+        queryBuilder.leftJoin(
+          "supplier_item",
+          "si_filter",
+          "si_filter.item_id = item.id AND si_filter.is_default = 'Y'",
+        );
         queryBuilder.andWhere("item.is_rmb_special = 'Y'");
-        queryBuilder.andWhere("(si_filter.price_rmb IS NULL OR si_filter.price_rmb = 0)");
+        queryBuilder.andWhere(
+          "(si_filter.price_rmb IS NULL OR si_filter.price_rmb = 0)",
+        );
       } else if (filterStr === "eur_special_no_value") {
         queryBuilder.andWhere("item.is_eur_special = 'Y'");
-        queryBuilder.andWhere("(item.price IS NULL OR item.price = 0 OR item.transfer_price_EUR IS NULL OR item.transfer_price_EUR = 0)");
+        queryBuilder.andWhere(
+          "(item.price IS NULL OR item.price = 0 OR item.transfer_price_EUR IS NULL OR item.transfer_price_EUR = 0)",
+        );
       } else if (filterStr === "dimension_special_no_value") {
         queryBuilder.andWhere("item.is_dimension_special = 'Y'");
-        queryBuilder.andWhere("(item.weight IS NULL OR item.weight = 0 OR item.length IS NULL OR item.length = 0 OR item.width IS NULL OR item.width = 0 OR item.height IS NULL OR item.height = 0)");
+        queryBuilder.andWhere(
+          "(item.weight IS NULL OR item.weight = 0 OR item.length IS NULL OR item.length = 0 OR item.width IS NULL OR item.width = 0 OR item.height IS NULL OR item.height = 0)",
+        );
       } else if (filterStr === "missing_var_values_en") {
         queryBuilder.andWhere((qb) => {
           const subQuery = qb
@@ -333,8 +349,8 @@ export const getItems = async (
             .where("vv.item_id = item.id")
             .andWhere(
               "((vv.value_de IS NOT NULL AND vv.value_de != '' AND (vv.value_en IS NULL OR vv.value_en = '')) OR " +
-              "(vv.value_de_2 IS NOT NULL AND vv.value_de_2 != '' AND (vv.value_en_2 IS NULL OR vv.value_en_2 = '')) OR " +
-              "(vv.value_de_3 IS NOT NULL AND vv.value_de_3 != '' AND (vv.value_en_3 IS NULL OR vv.value_en_3 = '')))"
+                "(vv.value_de_2 IS NOT NULL AND vv.value_de_2 != '' AND (vv.value_en_2 IS NULL OR vv.value_en_2 = '')) OR " +
+                "(vv.value_de_3 IS NOT NULL AND vv.value_de_3 != '' AND (vv.value_en_3 IS NULL OR vv.value_en_3 = '')))",
             );
           return `EXISTS ${subQuery.getQuery()}`;
         });
@@ -342,39 +358,73 @@ export const getItems = async (
         queryBuilder.andWhere("(item.taric_id IS NULL OR item.taric_id = 0)");
       } else if (filterStr === "mismatched_tarics") {
         queryBuilder.innerJoin("item.parent", "p_filter");
-        queryBuilder.andWhere("item.taric_id IS NOT NULL AND item.taric_id != 0");
-        queryBuilder.andWhere("p_filter.taric_id IS NOT NULL AND p_filter.taric_id != 0");
+        queryBuilder.andWhere(
+          "item.taric_id IS NOT NULL AND item.taric_id != 0",
+        );
+        queryBuilder.andWhere(
+          "p_filter.taric_id IS NOT NULL AND p_filter.taric_id != 0",
+        );
         queryBuilder.andWhere("item.taric_id <> p_filter.taric_id");
       } else if (filterStr === "null_category") {
         queryBuilder.andWhere("(item.cat_id IS NULL OR item.cat_id = 0)");
       } else if (filterStr === "no_supplier") {
-        queryBuilder.leftJoin("supplier_item", "si_filter", "si_filter.item_id = item.id AND si_filter.is_default = 'Y'");
+        queryBuilder.leftJoin(
+          "supplier_item",
+          "si_filter",
+          "si_filter.item_id = item.id AND si_filter.is_default = 'Y'",
+        );
         queryBuilder.andWhere("item.isActive = 'Y'");
-        queryBuilder.andWhere("(item.supplier_id IS NULL OR item.supplier_id = 0)");
-        queryBuilder.andWhere("(si_filter.supplier_id IS NULL OR si_filter.supplier_id = 0)");
+        queryBuilder.andWhere(
+          "(item.supplier_id IS NULL OR item.supplier_id = 0)",
+        );
+        queryBuilder.andWhere(
+          "(si_filter.supplier_id IS NULL OR si_filter.supplier_id = 0)",
+        );
       } else if (filterStr === "no_rmb_price") {
-        queryBuilder.leftJoin("supplier_item", "si_filter", "si_filter.item_id = item.id AND si_filter.is_default = 'Y'");
+        queryBuilder.leftJoin(
+          "supplier_item",
+          "si_filter",
+          "si_filter.item_id = item.id AND si_filter.is_default = 'Y'",
+        );
         queryBuilder.andWhere("item.isActive = 'Y'");
-        queryBuilder.andWhere("(si_filter.price_rmb IS NULL OR si_filter.price_rmb = 0)");
+        queryBuilder.andWhere(
+          "(si_filter.price_rmb IS NULL OR si_filter.price_rmb = 0)",
+        );
       } else if (filterStr === "is_po_no_url_null") {
-        queryBuilder.leftJoin("supplier_item", "si_filter", "si_filter.item_id = item.id AND si_filter.is_default = 'Y'");
+        queryBuilder.leftJoin(
+          "supplier_item",
+          "si_filter",
+          "si_filter.item_id = item.id AND si_filter.is_default = 'Y'",
+        );
         queryBuilder.andWhere("si_filter.is_po = 'No'");
-        queryBuilder.andWhere("(si_filter.url IS NULL OR si_filter.url = '' OR si_filter.url = 'null' OR si_filter.url = 'NULL')");
+        queryBuilder.andWhere(
+          "(si_filter.url IS NULL OR si_filter.url = '' OR si_filter.url = 'null' OR si_filter.url = 'NULL')",
+        );
       } else if (filterStr === "is_po_null") {
-        queryBuilder.leftJoin("supplier_item", "si_filter", "si_filter.item_id = item.id AND si_filter.is_default = 'Y'");
-        queryBuilder.andWhere("(si_filter.is_po IS NULL OR si_filter.is_po = '' OR si_filter.is_po = 'null' OR si_filter.is_po = 'NULL')");
+        queryBuilder.leftJoin(
+          "supplier_item",
+          "si_filter",
+          "si_filter.item_id = item.id AND si_filter.is_default = 'Y'",
+        );
+        queryBuilder.andWhere(
+          "(si_filter.is_po IS NULL OR si_filter.is_po = '' OR si_filter.is_po = 'null' OR si_filter.is_po = 'NULL')",
+        );
       } else if (filterStr === "new_picture_required") {
         queryBuilder.andWhere("item.is_npr = 'Y'");
       } else if (filterStr === "no_picture") {
         queryBuilder.andWhere("item.isActive = 'Y'");
-        queryBuilder.andWhere("(item.photo IS NULL OR item.photo = '' OR item.photo = 'null' OR item.photo = 'NULL')");
+        queryBuilder.andWhere(
+          "(item.photo IS NULL OR item.photo = '' OR item.photo = 'null' OR item.photo = 'NULL')",
+        );
       } else if (filterStr === "multiple_parents_pictures") {
         queryBuilder.andWhere((qb) => {
           const subQuery = qb
             .subQuery()
             .select("sub_item.photo")
             .from(Item, "sub_item")
-            .where("sub_item.photo IS NOT NULL AND sub_item.photo != '' AND sub_item.photo != 'null' AND sub_item.photo != 'NULL' AND sub_item.parent_id IS NOT NULL")
+            .where(
+              "sub_item.photo IS NOT NULL AND sub_item.photo != '' AND sub_item.photo != 'null' AND sub_item.photo != 'NULL' AND sub_item.parent_id IS NOT NULL",
+            )
             .groupBy("sub_item.photo")
             .having("COUNT(DISTINCT sub_item.parent_id) > 1");
           return `item.photo IN ${subQuery.getQuery()}`;
@@ -590,7 +640,6 @@ export const getItems = async (
     return next(error);
   }
 };
-
 export const getItemById = async (
   req: Request,
   res: Response,
@@ -622,6 +671,7 @@ export const getItemById = async (
     const qualityRepository = AppDataSource.getRepository(ItemQuality);
     const orderItemRepository = AppDataSource.getRepository(OrderItem);
     const supplierItemRepository = AppDataSource.getRepository(SupplierItem);
+    const customerRepository = AppDataSource.getRepository(Customer);
 
     const item = await itemRepository.findOne({
       where: { id: parseInt(id) },
@@ -701,6 +751,19 @@ export const getItemById = async (
       console.warn("supplier_items table not available:", e.message);
     }
 
+    // Load the linked customer (if any). Done defensively so a missing
+    // customer_id column or customers table never breaks item loading.
+    let customer: Customer | null = null;
+    try {
+      if (item?.customer?.id) {
+        customer = await customerRepository.findOne({
+          where: { id: item.customer.id as any },
+        });
+      }
+    } catch (e: any) {
+      console.warn("customers table not available:", e.message);
+    }
+
     const primaryWarehouseItem = warehouseItems[0] || null;
 
     let attachments: any[] = [];
@@ -738,6 +801,17 @@ export const getItemById = async (
       remark: item.remark || "",
       supplier_id: item.supplier_id,
       supplier_name: item.supplier?.company_name || item.supplier?.name || "",
+      customer_id: item.customer_id || null,
+      customer_name: customer?.companyName || "",
+      customer: customer
+        ? {
+            id: customer.id,
+            companyName: customer.companyName,
+            legalName: customer.legalName || "",
+            customerNumber: customer.customerNumber || "",
+            email: customer.email || "",
+          }
+        : null,
       painPoints: item.painPoints || [],
       isActive: primaryWarehouseItem ? primaryWarehouseItem.is_active === "Y" : item.isActive === "Y",
       tags: item.tags || [],
@@ -1193,6 +1267,7 @@ export const updateItem = async (
       "taric_id",
       "cat_id",
       "supplier_id",
+      "customer_id",
       "weight",
       "length",
       "width",
@@ -1263,10 +1338,20 @@ export const updateItem = async (
         if (siData.id > 0) {
           await supplierItemRepository.update(siData.id, {
             is_default: siData.isDefault ? "Y" : "N",
-            price_rmb: siData.priceRMB !== undefined && siData.priceRMB !== "" ? parseFloat(siData.priceRMB) : undefined,
-            moq: siData.moq !== undefined && siData.moq !== "" ? parseInt(siData.moq) : undefined,
-            oi: siData.interval !== undefined && siData.interval !== "" ? parseInt(siData.interval) : undefined,
-            lead_time: siData.leadTime !== undefined ? siData.leadTime : undefined,
+            price_rmb:
+              siData.priceRMB !== undefined && siData.priceRMB !== ""
+                ? parseFloat(siData.priceRMB)
+                : undefined,
+            moq:
+              siData.moq !== undefined && siData.moq !== ""
+                ? parseInt(siData.moq)
+                : undefined,
+            oi:
+              siData.interval !== undefined && siData.interval !== ""
+                ? parseInt(siData.interval)
+                : undefined,
+            lead_time:
+              siData.leadTime !== undefined ? siData.leadTime : undefined,
             url: siData.url !== undefined ? siData.url : undefined,
             note_cn: siData.noteCN !== undefined ? siData.noteCN : undefined,
             is_po: siData.isPO !== undefined ? siData.isPO : undefined,
@@ -2392,7 +2477,9 @@ export const getWarehouseItems = async (
     }
 
     if (filter === "wrong_shipping_class") {
-      query.andWhere("(warehouse.ship_class IS NULL OR warehouse.ship_class = 'Na' OR warehouse.ship_class = 'NA' OR warehouse.ship_class = '')");
+      query.andWhere(
+        "(warehouse.ship_class IS NULL OR warehouse.ship_class = 'Na' OR warehouse.ship_class = 'NA' OR warehouse.ship_class = '')",
+      );
     }
 
     const totalRecords = await query.getCount();

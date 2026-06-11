@@ -1,7 +1,12 @@
 "use client";
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { getTags } from "@/api/tags";
-import { PlusIcon, XMarkIcon, FunnelIcon, ArrowPathIcon } from "@heroicons/react/24/outline";
+import {
+  PlusIcon,
+  XMarkIcon,
+  FunnelIcon,
+  ArrowPathIcon,
+} from "@heroicons/react/24/outline";
 import { colorClasses, Tag } from "./TagManager";
 
 interface TagFilter {
@@ -10,7 +15,13 @@ interface TagFilter {
 }
 
 interface TagFilterSelectorProps {
-  category: "company" | "contact" | "inquiry" | "request_item" | "item" | "supplier";
+  category:
+    | "company"
+    | "contact"
+    | "inquiry"
+    | "request_item"
+    | "item"
+    | "supplier";
   onChange: (filterString: string) => void;
   onReset?: () => void;
 }
@@ -48,7 +59,10 @@ export const TagFilterSelector: React.FC<TagFilterSelectorProps> = ({
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
         setIsDropdownOpen(false);
       }
     };
@@ -73,7 +87,6 @@ export const TagFilterSelector: React.FC<TagFilterSelectorProps> = ({
     onChangeRef.current(filterString);
   }, [selectedFilters]);
 
-
   const handleToggleTag = (tag: Tag) => {
     const isAlreadySelected = selectedFilters.some((f) => f.tag.id === tag.id);
     if (isAlreadySelected) {
@@ -94,7 +107,7 @@ export const TagFilterSelector: React.FC<TagFilterSelectorProps> = ({
           return { ...f, mode: f.mode === "include" ? "exclude" : "include" };
         }
         return f;
-      })
+      }),
     );
   };
 
@@ -104,16 +117,12 @@ export const TagFilterSelector: React.FC<TagFilterSelectorProps> = ({
   };
 
   const filteredDropdownTags = availableTags.filter((tag) =>
-    tag.name.toLowerCase().includes(searchQuery.toLowerCase())
+    tag.name.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
   return (
     <div className="space-y-2.5 w-full max-w-lg" ref={dropdownRef}>
       <label className="block text-sm font-medium text-gray-700 flex items-center justify-between">
-        <span className="flex items-center gap-1.5">
-          <FunnelIcon className="w-4 h-4 text-primary" />
-          Filter by Tags Combination
-        </span>
         {selectedFilters.length > 0 && (
           <button
             type="button"
@@ -132,7 +141,9 @@ export const TagFilterSelector: React.FC<TagFilterSelectorProps> = ({
           className="min-h-[46px] w-full px-3 py-2 border border-gray-200 rounded-xl bg-white focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary transition-all cursor-pointer flex flex-wrap items-center gap-2"
         >
           {selectedFilters.length === 0 && (
-            <span className="text-gray-400 text-sm">Select tags to filter in combinations...</span>
+            <span className="text-gray-400 text-sm">
+              Select tags to filter in combinations...
+            </span>
           )}
 
           {selectedFilters.map((filter) => {
@@ -143,23 +154,27 @@ export const TagFilterSelector: React.FC<TagFilterSelectorProps> = ({
               <div
                 key={filter.tag.id}
                 onClick={(e) => e.stopPropagation()}
-                className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold select-none border transition-all ${isInclude
+                className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold select-none border transition-all ${
+                  isInclude
                     ? "bg-emerald-50 text-emerald-700 border-emerald-200/60 hover:bg-emerald-100/50"
                     : "bg-rose-50 text-rose-700 border-rose-200/60 hover:bg-rose-100/50"
-                  }`}
+                }`}
               >
                 <button
                   type="button"
                   onClick={() => handleToggleMode(filter.tag.id)}
-                  className={`px-1.5 py-0.5 rounded font-black text-[9px] uppercase tracking-wider transition-all ${isInclude
+                  className={`px-1.5 py-0.5 rounded font-black text-[9px] uppercase tracking-wider transition-all ${
+                    isInclude
                       ? "bg-emerald-200/70 text-emerald-800 hover:bg-emerald-300"
                       : "bg-rose-200/70 text-rose-800 hover:bg-rose-300"
-                    }`}
+                  }`}
                   title="Click to toggle Include/Exclude"
                 >
                   {isInclude ? "Include" : "Exclude"}
                 </button>
-                <span className="max-w-[120px] truncate">{filter.tag.name}</span>
+                <span className="max-w-[120px] truncate">
+                  {filter.tag.name}
+                </span>
                 <button
                   type="button"
                   onClick={() => handleRemoveFilter(filter.tag.id)}
@@ -194,27 +209,46 @@ export const TagFilterSelector: React.FC<TagFilterSelectorProps> = ({
               ) : (
                 filteredDropdownTags.map((tag) => {
                   const styles = colorClasses[tag.color] || colorClasses.gray;
-                  const isSelected = selectedFilters.some((f) => f.tag.id === tag.id);
+                  const isSelected = selectedFilters.some(
+                    (f) => f.tag.id === tag.id,
+                  );
                   return (
                     <button
                       key={tag.id}
                       type="button"
                       onClick={() => handleToggleTag(tag)}
-                      className={`w-full text-left px-3 py-2 text-xs rounded-lg flex items-center justify-between text-gray-700 transition-colors ${isSelected ? "bg-[#8CC21B]/10 hover:bg-[#8CC21B]/15" : "hover:bg-gray-50"
-                        }`}
+                      className={`w-full text-left px-3 py-2 text-xs rounded-lg flex items-center justify-between text-gray-700 transition-colors ${
+                        isSelected
+                          ? "bg-[#8CC21B]/10 hover:bg-[#8CC21B]/15"
+                          : "hover:bg-gray-50"
+                      }`}
                     >
                       <div className="flex items-center gap-2.5">
-                        <div className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${isSelected
-                            ? "bg-[#8CC21B] border-[#8CC21B] text-white scale-100"
-                            : "border-gray-300 bg-white"
-                          }`}>
+                        <div
+                          className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${
+                            isSelected
+                              ? "bg-[#8CC21B] border-[#8CC21B] text-white scale-100"
+                              : "border-gray-300 bg-white"
+                          }`}
+                        >
                           {isSelected && (
-                            <svg className="w-2.5 h-2.5 stroke-[3]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                            <svg
+                              className="w-2.5 h-2.5 stroke-[3]"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M4.5 12.75l6 6 9-13.5"
+                              />
                             </svg>
                           )}
                         </div>
-                        <span className={`w-2 h-2 rounded-full ${styles.dot}`} />
+                        <span
+                          className={`w-2 h-2 rounded-full ${styles.dot}`}
+                        />
                         <span className="font-semibold">{tag.name}</span>
                       </div>
                       <span className="text-[9px] bg-gray-100 text-gray-400 px-1.5 py-0.5 rounded font-bold uppercase">
@@ -232,7 +266,8 @@ export const TagFilterSelector: React.FC<TagFilterSelectorProps> = ({
       {selectedFilters.length > 0 && (
         <p className="text-[10px] text-gray-400 italic">
           💡 Filtering logic: Showing items that have **all**{" "}
-          <span className="text-emerald-600 font-semibold">Include</span> tags AND **none** of the{" "}
+          <span className="text-emerald-600 font-semibold">Include</span> tags
+          AND **none** of the{" "}
           <span className="text-rose-600 font-semibold">Exclude</span> tags.
         </p>
       )}
