@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef, Suspense } from "react";
 import Select from "react-select";
 import {
   Search,
@@ -39,7 +39,7 @@ import {
   updateInvoice,
 } from "@/api/invoice";
 import SpreadSheet from "@/components/UI/SpreadSheet";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import PageHeader from "@/components/UI/PageHeader";
 import Link from "next/link";
 import CargosTab from "@/components/cargos/CargosTab";
@@ -55,9 +55,21 @@ import {
   splitOrderItem,
   updateOrderItemPrice,
   downloadCommercialInvoice,
+  getAllOrders,
+  getOrderStatusColor,
+  getOrderById,
+  createOrder,
+  updateOrder,
+  deleteOrder,
 } from "@/api/orders";
 import { getAllCargos, CargoType, assignOrdersToCargo } from "@/api/cargos";
-import { getAllTaricsSimple } from "@/api/items";
+import { getAllTaricsSimple, getItems, updateItem } from "@/api/items";
+import { getAllSuppliers, getSupplierItems } from "@/api/suppliers";
+import { getCategories } from "@/api/categories";
+import { useSelector } from "react-redux";
+import { RootState } from "@/app/Redux/store";
+import { DataTable, ColumnDef } from "@/components/UI/DataTable";
+import { ShoppingCart } from "lucide-react";
 import BillToShipToForm, {
   BillToShipToData,
   WAREHOUSE_BILL_TO,
@@ -65,6 +77,11 @@ import BillToShipToForm, {
 import { toast } from "react-hot-toast";
 import CustomModal from "@/components/UI/CustomModal";
 import { Pencil, Scissors, MoveRight } from "lucide-react";
+import ItemSelectorWithQuantity from "@/components/orders/ItemSelectorWithQuantity";
+import OrdersTable from "@/components/orders/OrdersTable";
+import OrderDetailsModal from "@/components/orders/OrderDetailsModal";
+
+const hasChinese = (str: string) => /[\u4e00-\u9fa5]/.test(str || "");
 
 interface Invoice {
   id: string;
@@ -128,6 +145,8 @@ interface FilterOptions {
 }
 
 const invoiceTabs = [
+  { id: "orders", label: "Orders" },
+  { id: "order_items", label: "Order Items" },
   { id: "open_invoices", label: "Open Invoices" },
   { id: "closed_invoices", label: "Closed Invoices" },
   { id: "billto_shipto", label: "Bill To / Ship To" },
@@ -136,14 +155,43 @@ const invoiceTabs = [
   { id: "packing_list", label: "Packing List" },
 ] as const;
 
+type Item = {
+  id: string | number;
+  item_name?: string;
+  name?: string;
+  ean?: number | string;
+  RMB_Price?: number;
+  supplier_id?: string | number;
+  length?: number;
+  width?: number;
+  height?: number;
+  weight?: number;
+  item: any;
+  taric?: any;
+  price?: number;
+  currency?: string;
+  supplier_name?: string;
+};
+
+type Option = { value: string; label: string };
+
+
+
 type InvoiceTab = (typeof invoiceTabs)[number]["id"];
 
+
 const InvoiceListPage: React.FC = () => {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { user } = useSelector((state: RootState) => state.user);
+
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [filteredInvoices, setFilteredInvoices] = useState<Invoice[]>([]);
   const [customers, setCustomers] = useState<APICustomerData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeInvTab, setActiveInvTab] = useState<InvoiceTab>("open_invoices");
+  const [activeInvTab, setActiveInvTab] = useState<InvoiceTab>(
+    () => (searchParams.get("tab") as InvoiceTab) || "orders",
+  );
   const [searchTerm, setSearchTerm] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const [sortField, setSortField] = useState<keyof Invoice>("createdAt");
@@ -154,7 +202,6 @@ const InvoiceListPage: React.FC = () => {
   const [actionLoading, setActionLoading] = useState<Record<string, boolean>>(
     {},
   );
-  const router = useRouter();
 
   const [filters, setFilters] = useState<FilterOptions>({
     status: "",
@@ -209,6 +256,298 @@ const InvoiceListPage: React.FC = () => {
   const [showTaricModal, setShowTaricModal] = useState(false);
   const [selectedTaricGroup, setSelectedTaricGroup] = useState<any>(null);
   const [qtyRemarks, setQtyRemarks] = useState("");
+
+  const [orders, setOrders] = useState<any[]>([]);
+  const [loadingOrders, setLoadingOrders] = useState(false);
+  const [categories, setCategories] = useState<any[]>([]);
+  const [suppliers, setSuppliers] = useState<any[]>([]);
+  const [itemsAll, setItemsAll] = useState<any[]>([]);
+  const [itemsByCategory, setItemsByCategory] = useState<any[]>([]);
+  const [itemsBySupplier, setItemsBySupplier] = useState<any[]>([]);
+  const [loadingItemsAll, setLoadingItemsAll] = useState(false);
+  const [loadingItemsByCategory, setLoadingItemsByCategory] = useState(false);
+  const [loadingItemsBySupplier, setLoadingItemsBySupplier] = useState(false);
+  const [orderNoFilter, setOrderNoFilter] = useState<string>(
+    () => searchParams.get("order_no") || "",
+  );
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [viewOrder, setViewOrder] = useState<any>(null);
+  const [viewItems, setViewItems] = useState<any[]>([]);
+  const [remarksCN, setRemarksCN] = useState("");
+
+  const [showModal, setShowModal] = useState(false);
+  const [mode, setMode] = useState<"create" | "edit" | "convert">("create");
+  const [selectedOrder, setSelectedOrder] = useState<any>(null);
+  const [orderItems, setOrderItems] = useState<any[]>([]);
+  const [selectedItemId, setSelectedItemId] = useState<string>("");
+  const [form, setForm] = useState({
+    comment: "",
+    customer_id: "",
+    category_id: "",
+    supplier_id: "",
+    status: "",
+    ref_no: "",
+  });
+
+  const isTab1 = activeInvTab !== "order_items";
+  const isTab2 = false;
+  const isConvertMode = mode === "convert";
+
+  const effectiveItems = useMemo(() => {
+    if (form.supplier_id) return itemsBySupplier;
+    if (form.category_id) return itemsByCategory;
+    return itemsAll;
+  }, [form.supplier_id, itemsBySupplier, form.category_id, itemsByCategory, itemsAll]);
+
+  const loadingItems =
+    loadingItemsAll ||
+    (isTab1 && !!form.supplier_id && loadingItemsBySupplier) ||
+    (isTab1 && !!form.category_id && loadingItemsByCategory);
+
+  const canSubmit = useMemo(() => {
+    if (isConvertMode) return orderItems.length > 0;
+    const hasItems = orderItems.length > 0;
+    const hasComment = !!form.comment?.trim();
+    const tabOk =
+      (isTab1 ? !!form.category_id || !!form.supplier_id : true) &&
+      (isTab2 ? !!form.customer_id : true);
+    return hasItems && hasComment && tabOk;
+  }, [isConvertMode, orderItems.length, form.comment, form.category_id, form.supplier_id, form.customer_id, isTab1, isTab2]);
+
+  const resetForm = useCallback(() => {
+    setForm({
+      comment: "",
+      customer_id: "",
+      category_id: "",
+      supplier_id: "",
+      status: "",
+      ref_no: "",
+    });
+    setSelectedItemId("");
+    setOrderItems([]);
+    setItemsByCategory([]);
+    setItemsBySupplier([]);
+    setSelectedOrder(null);
+    setMode("create");
+  }, []);
+
+  const fetchItemsByCategory = useCallback(async (category_id: string) => {
+    if (!category_id) {
+      setItemsByCategory([]);
+      return;
+    }
+    try {
+      setLoadingItemsByCategory(true);
+      const response = await getItems({ category: category_id });
+      const data = response?.data ?? response;
+      const arr = Array.isArray(data) ? data : data?.items || [];
+      setItemsByCategory(arr);
+    } catch (error) {
+      console.error("Error fetching category items:", error);
+      setItemsByCategory([]);
+    } finally {
+      setLoadingItemsByCategory(false);
+    }
+  }, []);
+
+  const handleCustomerChange = (customer_id: string) =>
+    setForm((prev) => ({ ...prev, customer_id }));
+
+  const handleCategoryChange = async (
+    category_id: string,
+    resetOrderItemsFlag: boolean = true,
+  ) => {
+    setForm((prev) => ({ ...prev, category_id }));
+    setSelectedItemId("");
+    if (resetOrderItemsFlag) setOrderItems([]);
+
+    if (category_id) {
+      await fetchItemsByCategory(category_id);
+      return;
+    }
+    setItemsByCategory([]);
+  };
+
+  const handleSupplierChange = async (
+    supplier_id: string,
+    resetOrderItemsFlag: boolean = true,
+  ) => {
+    setForm((prev) => ({ ...prev, supplier_id }));
+    setSelectedItemId("");
+    if (resetOrderItemsFlag) setOrderItems([]);
+
+    if (supplier_id) {
+      setLoadingItemsBySupplier(true);
+      try {
+        const response: any = await getSupplierItems(supplier_id);
+        const data = response?.data ?? response;
+        const arr = Array.isArray(data) ? data : data?.items || [];
+        setItemsBySupplier(arr);
+      } catch (e) {
+        console.error(e);
+        toast.error("Failed to fetch supplier items");
+        setItemsBySupplier([]);
+      } finally {
+        setLoadingItemsBySupplier(false);
+      }
+      return;
+    }
+    setItemsBySupplier([]);
+  };
+
+  const handleAddItemToOrder = (item_id: string, qty: number) => {
+    const item = itemById.get(String(item_id));
+    const itemName = item?.item_name || item?.name || "Unnamed Item";
+
+    setOrderItems((prev) => {
+      const idx = prev.findIndex((x) => x.item_id === String(item_id));
+      if (idx >= 0) {
+        const next = [...prev];
+        next[idx] = { ...next[idx], qty: next[idx].qty + qty };
+        return next;
+      }
+      return [
+        ...prev,
+        {
+          item_id: String(item_id),
+          itemName,
+          qty,
+          remark_de: "",
+          price: item?.price
+            ? Number(item.price)
+            : item?.RMB_Price
+              ? Number(item.RMB_Price)
+              : undefined,
+          currency: item?.currency || "CNY",
+        },
+      ];
+    });
+    toast.success(`Added ${qty}x ${itemName} to order`);
+  };
+
+  const handleRemoveOrderItem = (item_id: string) =>
+    setOrderItems((prev) => prev.filter((x) => x.item_id !== item_id));
+
+  const handleUpdateOrderItemQty = (item_id: string, qty: number) => {
+    if (!qty || qty <= 0) return;
+    setOrderItems((prev) =>
+      prev.map((x) => (x.item_id === item_id ? { ...x, qty } : x)),
+    );
+  };
+
+  const handleUpdateOrderItemRemark = (item_id: string, remark_de: string) => {
+    setOrderItems((prev) =>
+      prev.map((x) => (x.item_id === item_id ? { ...x, remark_de } : x)),
+    );
+  };
+
+  const handleEditOrder = async (order: any) => {
+    setForm({
+      category_id: String(order.category_id ?? ""),
+      customer_id: String(order.customer_id ?? ""),
+      supplier_id: String(order.supplier_id ?? ""),
+      comment: order.comment ?? "",
+      status: String(order.status ?? ""),
+      ref_no: "",
+    });
+
+    setMode("edit");
+    setSelectedOrder(order);
+    setShowModal(true);
+
+    const category_id = String(order.category_id ?? "");
+    if (category_id) await fetchItemsByCategory(category_id);
+    else setItemsByCategory([]);
+
+    const supplier_id = String(order.supplier_id ?? "");
+    if (supplier_id) await handleSupplierChange(supplier_id, false);
+    else setItemsBySupplier([]);
+
+    const detailRes: any = await getOrderById(order.id);
+    const detail = detailRes?.data ?? detailRes;
+    const lines = detail?.items ?? detail?.data?.items ?? [];
+
+    if (Array.isArray(lines)) {
+      setOrderItems(
+        lines.map((l: any) => {
+          const id = String(l.item_id ?? "");
+          const item = itemById.get(id);
+          return {
+            item_id: id,
+            itemName: item?.item_name || item?.name || "Unknown item",
+            qty: Number(l.qty ?? 1),
+            remark_de: String(l.remark_de ?? ""),
+          };
+        }),
+      );
+    } else {
+      setOrderItems([]);
+    }
+  };
+
+  const closeModal = () => {
+    setShowModal(false);
+    resetForm();
+  };
+
+  const handleCreateOrder = async () => {
+    if (!form.comment?.trim()) return toast.error("Please add a comment");
+    if (orderItems.length === 0)
+      return toast.error("Please add at least one item");
+    if (isTab1 && !form.category_id && !form.supplier_id)
+      return toast.error("Please select a category or supplier for Orders");
+
+    const payload = {
+      customer_id: form.customer_id || null,
+      category_id: form.category_id || null,
+      supplier_id: form.supplier_id || null,
+      comment: form.comment?.slice(0, 200) || null,
+      status: 1,
+      items: orderItems.map((x) => ({
+        item_id: Number(x.item_id),
+        qty: Number(x.qty),
+        remark_de: x.remark_de || null,
+      })),
+    };
+
+    const res = await createOrder(payload as any);
+    if (res?.success) {
+      toast.success("Order created successfully");
+    }
+    setShowModal(false);
+    resetForm();
+    fetchOrders();
+  };
+
+  const handleUpdateOrder = async () => {
+    if (!selectedOrder?.id) return;
+    if (orderItems.length === 0)
+      return toast.error("Please add at least one item");
+
+    const payload = {
+      customer_id: (form.customer_id || null) as any,
+      category_id: (form.category_id || null) as any,
+      supplier_id: (form.supplier_id || null) as any,
+      comment: (form.comment || "").slice(0, 200),
+      status: Number(form.status || selectedOrder.status || 1),
+      items: orderItems.map((x) => ({
+        item_id: Number(x.item_id),
+        qty: Number(x.qty),
+        remark_de: x.remark_de || null,
+      })),
+    };
+
+    await updateOrder(selectedOrder.id, payload);
+    setShowModal(false);
+    resetForm();
+    fetchOrders();
+  };
+
+  const handleDeleteOrder = async (orderId: string | number) => {
+    if (!window.confirm("Are you sure you want to delete this Order?")) return;
+    await deleteOrder(orderId);
+    fetchOrders();
+  };
 
   const handleSetPrice = async (itemId: string | number) => {
     try {
@@ -600,12 +939,204 @@ const InvoiceListPage: React.FC = () => {
     }
   };
 
+  const fetchCategories = useCallback(async () => {
+    try {
+      const response = await getCategories();
+      const data = response?.data ?? response;
+      const arr = Array.isArray(data) ? data : data?.categories || [];
+      setCategories(arr);
+    } catch (error) {
+      console.error("Error fetching categories:", error);
+    }
+  }, []);
+
+  const fetchSuppliers = useCallback(async () => {
+    try {
+      const response = await getAllSuppliers({ limit: 1000 });
+      const data = response?.data ?? response;
+      const arr = Array.isArray(data) ? data : data?.suppliers || [];
+      setSuppliers(arr);
+    } catch (error) {
+      console.error("Error fetching suppliers:", error);
+    }
+  }, []);
+
+  const fetchAllItems = useCallback(async () => {
+    try {
+      setLoadingItemsAll(true);
+      const response = await getItems({ limit: 10000 });
+      const data = response?.data ?? response;
+      const arr = Array.isArray(data) ? data : data?.items || [];
+      setItemsAll(arr);
+    } catch (error) {
+      console.error("Error fetching items:", error);
+      setItemsAll([]);
+    } finally {
+      setLoadingItemsAll(false);
+    }
+  }, []);
+
+  const fetchOrders = useCallback(async () => {
+    setLoadingOrders(true);
+    try {
+      const response = await getAllOrders();
+      if (response?.success) setOrders(response.data);
+      else if (response?.data) setOrders(response.data);
+    } catch (error) {
+      console.error("Error fetching Orders:", error);
+      toast.error("Failed to fetch orders");
+    } finally {
+      setLoadingOrders(false);
+    }
+  }, []);
+
+  const itemById = useMemo(() => {
+    const map = new Map<string, any>();
+    for (const it of itemsAll) map.set(String(it.id), it);
+    return map;
+  }, [itemsAll]);
+
+  const getCategoryName = useCallback(
+    (categoryId: string | number) =>
+      categories.find((c) => String(c.id) === String(categoryId))?.name ?? "-",
+    [categories],
+  );
+
+  const getSupplierName = useCallback(
+    (supplierId: any) => {
+      const s = suppliers.find((c) => String(c.id) === String(supplierId));
+      if (!s) return String(supplierId);
+      const englishName = (s.name && !hasChinese(s.name)) ? s.name : ((s.company_name && !hasChinese(s.company_name)) ? s.company_name : null);
+      if (englishName) return englishName;
+      const chineseName = s.name_cn || s.company_name || s.name;
+      if (chineseName) return chineseName;
+      return s.name_de || String(s.id);
+    },
+    [suppliers],
+  );
+
+  const orderItemsFlat = useMemo(() => {
+    const allItems = orders.flatMap((o: any) =>
+      (o.items || []).map((i: any) => ({
+        ...i,
+        order_id: o.id,
+        parentOrder: o,
+        order_no: o.order_no,
+        order_status: o.status,
+        item_status: i.status || "NSO",
+        supplier_id: i.supplier_id || i.item?.supplier_id || o.supplier_id,
+        category_id: o.category_id,
+        comment: o.comment,
+      })),
+    );
+
+    if (!orderNoFilter) return allItems;
+    const s = orderNoFilter.toLowerCase();
+    return allItems.filter((i) =>
+      String(i.order_no).toLowerCase().includes(s) ||
+      String(i.ean || i.item?.ean || "").toLowerCase().includes(s) ||
+      String(i.item_name || i.itemName || i.item?.item_name || "").toLowerCase().includes(s)
+    );
+  }, [orders, orderNoFilter]);
+
+  const filteredOrders = useMemo(() => {
+    if (!orderNoFilter) return orders;
+    const s = orderNoFilter.toLowerCase();
+    return orders.filter((o: any) =>
+      String(o.order_no).toLowerCase().includes(s) ||
+      String(o.id).toLowerCase().includes(s) ||
+      (o.comment || "").toLowerCase().includes(s),
+    );
+  }, [orders, orderNoFilter]);
+
+  const handleGoToItems = (orderNo: string) => {
+    setOrderNoFilter(orderNo);
+    setActiveInvTab("order_items");
+  };
+
+  const handleViewOrder = (order: any) => {
+    setViewOrder(order);
+    setViewItems(
+      (order.items || []).map((it: any) => ({
+        ...it,
+        itemName: it.item?.item_name || it.item?.name || it.itemName || "Unknown",
+      }))
+    );
+    setShowViewModal(true);
+  };
+
+  const closeView = () => {
+    setShowViewModal(false);
+    setViewOrder(null);
+    setViewItems([]);
+  };
+
+  const handleOpenReassignModal = (item: any) => {
+    setSelectedItem(item);
+    setTargetCargoId(item.cargo_id ? String(item.cargo_id) : "");
+    setShowREModal(true);
+  };
+
+  const handleOpenSplitModal = (item: any) => {
+    setSelectedItem(item);
+    setSplitQty(item.qty_label || item.qty || 0);
+    setRemarksCN(item.remarks_cn || "");
+    setShowSPModal(true);
+  };
+
+  const handleAssignSupplier = async (orderItemId: number | string, supplierId: number, baseItemId?: number | string) => {
+    try {
+      await updateOrderItemStatus(orderItemId, { supplier_id: supplierId });
+      if (baseItemId) {
+        await updateItem(Number(baseItemId), { supplier_id: supplierId });
+      }
+      await Promise.all([
+        fetchOrders(),
+        fetchAllItems()
+      ]);
+      toast.success("Supplier assigned successfully");
+    } catch (error) {
+      console.error("Failed to assign supplier:", error);
+      toast.error("Failed to assign supplier");
+    }
+  };
+
   useEffect(() => {
     loadInvoices();
     if (activeInvTab === "billto_shipto") {
       fetchCustomers();
     }
+    if (activeInvTab === "orders" || activeInvTab === "order_items") {
+      fetchOrders();
+      fetchCustomers();
+      fetchCategories();
+      fetchSuppliers();
+      fetchAllItems();
+    }
   }, [activeInvTab]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("tab", activeInvTab);
+    if (orderNoFilter) params.set("order_no", orderNoFilter);
+    else params.delete("order_no");
+    const qs = params.toString();
+    router.replace(qs ? `/invoices?${qs}` : "/invoices", { scroll: false });
+  }, [activeInvTab, orderNoFilter, router, searchParams]);
+
+  useEffect(() => {
+    const tabParam = searchParams.get("tab");
+    if (tabParam) {
+      const validTabs = ["orders", "order_items", "open_invoices", "closed_invoices", "billto_shipto", "cargos", "cargo_type", "packing_list"];
+      if (validTabs.includes(tabParam)) {
+        setActiveInvTab(tabParam as InvoiceTab);
+      }
+    }
+    const orderNo = searchParams.get("order_no");
+    if (orderNo !== null) {
+      setOrderNoFilter(orderNo);
+    }
+  }, [searchParams]);
 
   const fetchCustomers = async () => {
     try {
@@ -894,23 +1425,76 @@ const InvoiceListPage: React.FC = () => {
       <div className="w-full mx-auto p-0">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-3">
           <div>
-            <PageHeader title="Invoice Management" icon={FileText} />
+            <PageHeader
+              title={
+                activeInvTab === "orders"
+                  ? "Orders"
+                  : activeInvTab === "order_items"
+                    ? "Order Items"
+                    : "Delivery"
+              }
+              icon={
+                activeInvTab === "orders" || activeInvTab === "order_items"
+                  ? ShoppingCart
+                  : FileText
+              }
+            />
           </div>
           <div className="flex flex-col sm:flex-row gap-3">
+            {(activeInvTab === "orders" || activeInvTab === "order_items") && (
+              <div className="relative">
+                <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
+                  <Search className="h-4 w-4 text-gray-400" />
+                </div>
+                <input
+                  type="text"
+                  placeholder="Search Order No / Details..."
+                  value={orderNoFilter}
+                  onChange={(e) => setOrderNoFilter(e.target.value)}
+                  className="pl-9 pr-8 py-2 text-sm border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-green-500 focus:border-transparent w-64 shadow-sm text-black"
+                />
+                {orderNoFilter && (
+                  <button
+                    onClick={() => setOrderNoFilter("")}
+                    className="absolute inset-y-0 right-2 flex items-center text-gray-400 hover:text-gray-600"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+            )}
             <button
               onClick={() => {
-                setLoading(true);
-                loadInvoices();
-                if (activeInvTab === "billto_shipto") fetchCustomers();
+                if (activeInvTab === "orders" || activeInvTab === "order_items") {
+                  fetchOrders();
+                } else {
+                  setLoading(true);
+                  loadInvoices();
+                  if (activeInvTab === "billto_shipto") fetchCustomers();
+                }
               }}
-              disabled={loading}
+              disabled={loading || loadingOrders}
               className="px-4 py-2.5 bg-gray-100 text-gray-700 rounded-[4px] font-medium hover:bg-gray-200 transition-all flex items-center gap-2 disabled:opacity-50"
             >
               <RefreshCw
-                className={`w-4 h-4 ${loading ? "animate-spin" : ""}`}
+                className={`w-4 h-4 ${loading || loadingOrders ? "animate-spin" : ""
+                  }`}
               />
-              {loading ? "Loading..." : "Refresh"}
+              {loading || loadingOrders ? "Loading..." : "Refresh"}
             </button>
+            {(activeInvTab === "orders" || activeInvTab === "order_items") && (
+              <button
+                onClick={() => {
+                  resetForm();
+                  setMode("create");
+                  setShowModal(true);
+                }}
+                className="px-4 py-2.5 bg-[#059669] text-white rounded-[4px] font-bold hover:bg-green-700 transition-all flex items-center gap-2 shadow-md"
+              >
+                <Plus className="w-4 h-4" />
+                New Order
+              </button>
+            )}
           </div>
         </div>
 
@@ -919,11 +1503,10 @@ const InvoiceListPage: React.FC = () => {
             <button
               key={tab.id}
               onClick={() => setActiveInvTab(tab.id)}
-              className={`px-6 py-3 text-sm font-semibold transition-all relative min-w-fit ${
-                activeInvTab === tab.id
+              className={`px-6 py-3 text-sm font-semibold transition-all relative min-w-fit ${activeInvTab === tab.id
                   ? "text-[#8CC21B]"
                   : "text-gray-500 hover:text-gray-700"
-              }`}
+                }`}
             >
               {tab.label}
               {activeInvTab === tab.id && (
@@ -933,647 +1516,688 @@ const InvoiceListPage: React.FC = () => {
           ))}
         </div>
 
+        {(activeInvTab === "orders" || activeInvTab === "order_items") && (
+          <div className="bg-white rounded-[4px] border border-[#E9ECEF] p-4 shadow-sm mb-6">
+            {activeInvTab === "order_items" && orderNoFilter && (
+              <div className="flex items-center gap-3 px-4 py-2 bg-blue-50 border border-blue-100 mb-4 rounded-[4px]">
+                <span className="text-xs text-blue-700 font-medium">
+                  🔍 Showing items for order:&nbsp;
+                  <span className="font-bold bg-blue-100 px-1.5 py-0.5 rounded text-blue-800">
+                    {orderNoFilter}
+                  </span>
+                </span>
+                <button
+                  onClick={() => setOrderNoFilter("")}
+                  className="text-[10px] text-blue-600 hover:text-blue-800 underline font-semibold ml-1"
+                >
+                  Clear filter (show all)
+                </button>
+              </div>
+            )}
+            <OrdersTable
+              orders={activeInvTab === "orders" ? filteredOrders : orderItemsFlat}
+              loading={loadingOrders}
+              getCategoryName={getCategoryName}
+              getSupplierName={getSupplierName}
+              getOrderStatusColor={getOrderStatusColor}
+              onView={handleViewOrder}
+              onEdit={handleEditOrder}
+              onDelete={handleDeleteOrder}
+              canDelete={user?.role === "ADMIN"}
+              showConvert={false}
+              onConvert={undefined}
+              onReassign={handleOpenReassignModal}
+              onGoToItems={handleGoToItems}
+              activeTab={activeInvTab}
+              itemById={itemById}
+              suppliers={suppliers}
+              onAssignSupplier={handleAssignSupplier}
+              onSplit={handleOpenSplitModal}
+              router={router}
+            />
+          </div>
+        )}
+
         {(activeInvTab === "open_invoices" ||
           activeInvTab === "closed_invoices") && (
-          <>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 mb-6">
-              <div
-                className="bg-white rounded-[4px] p-4 lg:p-6 border border-[#E9ECEF]"
-                style={{ boxShadow: "0 2px 8px rgba(0, 0, 0, 0.05)" }}
-              >
-                <div className="flex items-center gap-3">
-                  <div
-                    className="p-2 rounded-[4px]"
-                    style={{ backgroundColor: "#E8F5E8" }}
-                  >
-                    <FileText
-                      className="w-5 h-5"
-                      style={{ color: "#059669" }}
-                    />
-                  </div>
-                  <div>
-                    <p
-                      className="text-sm font-medium"
-                      style={{ color: "#6C757D" }}
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 mb-6">
+                <div
+                  className="bg-white rounded-[4px] p-4 lg:p-6 border border-[#E9ECEF]"
+                  style={{ boxShadow: "0 2px 8px rgba(0, 0, 0, 0.05)" }}
+                >
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="p-2 rounded-[4px]"
+                      style={{ backgroundColor: "#E8F5E8" }}
                     >
-                      Total Invoices
-                    </p>
-                    <p
-                      className="text-xl font-bold"
-                      style={{ color: "#212529" }}
-                    >
-                      {filteredInvoices.length}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div
-                className="bg-white rounded-[4px] p-4 lg:p-6 border border-[#E9ECEF]"
-                style={{ boxShadow: "0 2px 8px rgba(0, 0, 0, 0.05)" }}
-              >
-                <div className="flex items-center gap-3">
-                  <div
-                    className="p-2 rounded-[4px]"
-                    style={{ backgroundColor: "#E8F5E8" }}
-                  >
-                    <DollarSign
-                      className="w-5 h-5"
-                      style={{ color: "#2E7D32" }}
-                    />
-                  </div>
-                  <div>
-                    <p
-                      className="text-sm font-medium"
-                      style={{ color: "#6C757D" }}
-                    >
-                      Total Amount
-                    </p>
-                    <p
-                      className="text-xl font-bold"
-                      style={{ color: "#212529" }}
-                    >
-                      $
-                      {Number(totalAmount).toLocaleString(undefined, {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div
-                className="bg-white rounded-[4px] p-4 lg:p-6 border border-[#E9ECEF]"
-                style={{ boxShadow: "0 2px 8px rgba(0, 0, 0, 0.05)" }}
-              >
-                <div className="flex items-center gap-3">
-                  <div
-                    className="p-2 rounded-[4px]"
-                    style={{ backgroundColor: "#E8F4D6" }}
-                  >
-                    <CheckCircle
-                      className="w-5 h-5"
-                      style={{ color: "#8CC21B" }}
-                    />
-                  </div>
-                  <div>
-                    <p
-                      className="text-sm font-medium"
-                      style={{ color: "#6C757D" }}
-                    >
-                      Paid Amount
-                    </p>
-                    <p
-                      className="text-xl font-bold"
-                      style={{ color: "#212529" }}
-                    >
-                      ${Number(totalPaid).toFixed(2)}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div
-                className="bg-white rounded-[4px] p-4 lg:p-6 border border-[#E9ECEF]"
-                style={{ boxShadow: "0 2px 8px rgba(0, 0, 0, 0.05)" }}
-              >
-                <div className="flex items-center gap-3">
-                  <div
-                    className="p-2 rounded-[4px]"
-                    style={{ backgroundColor: "#FFF3E0" }}
-                  >
-                    <Clock className="w-5 h-5" style={{ color: "#F57C00" }} />
-                  </div>
-                  <div>
-                    <p
-                      className="text-sm font-medium"
-                      style={{ color: "#6C757D" }}
-                    >
-                      Outstanding
-                    </p>
-                    <p
-                      className="text-xl font-bold"
-                      style={{ color: "#212529" }}
-                    >
-                      ${Number(outstandingAmount).toFixed(2)}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div
-              className="bg-white rounded-[4px] border border-[#E9ECEF] mb-6"
-              style={{ boxShadow: "0 2px 8px rgba(0, 0, 0, 0.05)" }}
-            >
-              <div className="p-4 lg:p-6">
-                <div className="flex flex-col lg:flex-row gap-4">
-                  <div className="flex-1 relative">
-                    <Search
-                      className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4"
-                      style={{ color: "#ADB5BD" }}
-                    />
-                    <input
-                      type="text"
-                      placeholder="Search invoices, customers, or order numbers..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="w-full pl-10 pr-4 py-2 border rounded-[4px] transition-all duration-200 text-sm"
-                      style={{ borderColor: "#E9ECEF", color: "#212529" }}
-                    />
-                  </div>
-
-                  <button
-                    onClick={() => setShowFilters(!showFilters)}
-                    className="flex items-center gap-2 px-4 py-2 border rounded-[4px] transition-colors text-sm font-medium"
-                    style={{ borderColor: "#E9ECEF", color: "#495057" }}
-                  >
-                    <Filter className="w-4 h-4" />
-                    Filters
-                    <ChevronDown
-                      className={`w-4 h-4 transition-transform ${
-                        showFilters ? "rotate-180" : ""
-                      }`}
-                    />
-                  </button>
-                </div>
-
-                {showFilters && (
-                  <div className="mt-4 pt-4 border-t border-[#E9ECEF]">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-                      <div>
-                        <label
-                          className="block text-sm font-medium mb-1"
-                          style={{ color: "#212529" }}
-                        >
-                          Status
-                        </label>
-                        <select
-                          value={filters.status}
-                          onChange={(e) =>
-                            setFilters({ ...filters, status: e.target.value })
-                          }
-                          className="w-full px-3 py-2 border rounded-[4px] text-sm"
-                          style={{ borderColor: "#E9ECEF", color: "#212529" }}
-                        >
-                          <option value="">All Status</option>
-                          <option value="draft">Draft</option>
-                          <option value="sent">Sent</option>
-                          <option value="paid">Paid</option>
-                          <option value="overdue">Overdue</option>
-                          <option value="cancelled">Cancelled</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label
-                          className="block text-sm font-medium mb-1"
-                          style={{ color: "#212529" }}
-                        >
-                          From Date
-                        </label>
-                        <input
-                          type="date"
-                          value={filters.dateFrom}
-                          onChange={(e) =>
-                            setFilters({ ...filters, dateFrom: e.target.value })
-                          }
-                          className="w-full px-3 py-2 border rounded-[4px] text-sm"
-                          style={{ borderColor: "#E9ECEF", color: "#212529" }}
-                        />
-                      </div>
-
-                      <div>
-                        <label
-                          className="block text-sm font-medium mb-1"
-                          style={{ color: "#212529" }}
-                        >
-                          To Date
-                        </label>
-                        <input
-                          type="date"
-                          value={filters.dateTo}
-                          onChange={(e) =>
-                            setFilters({ ...filters, dateTo: e.target.value })
-                          }
-                          className="w-full px-3 py-2 border rounded-[4px] text-sm"
-                          style={{ borderColor: "#E9ECEF", color: "#212529" }}
-                        />
-                      </div>
-
-                      <div>
-                        <label
-                          className="block text-sm font-medium mb-1"
-                          style={{ color: "#212529" }}
-                        >
-                          Customer
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="Customer name"
-                          value={filters.customer}
-                          onChange={(e) =>
-                            setFilters({ ...filters, customer: e.target.value })
-                          }
-                          className="w-full px-3 py-2 border rounded-[4px] text-sm"
-                          style={{ borderColor: "#E9ECEF", color: "#212529" }}
-                        />
-                      </div>
-
-                      <div>
-                        <label
-                          className="block text-sm font-medium mb-1"
-                          style={{ color: "#212529" }}
-                        >
-                          Min Amount
-                        </label>
-                        <input
-                          type="number"
-                          placeholder="0.00"
-                          value={filters.minAmount}
-                          onChange={(e) =>
-                            setFilters({
-                              ...filters,
-                              minAmount: e.target.value,
-                            })
-                          }
-                          className="w-full px-3 py-2 border rounded-[4px] text-sm"
-                          style={{ borderColor: "#E9ECEF", color: "#212529" }}
-                        />
-                      </div>
-
-                      <div>
-                        <label
-                          className="block text-sm font-medium mb-1"
-                          style={{ color: "#212529" }}
-                        >
-                          Max Amount
-                        </label>
-                        <input
-                          type="number"
-                          placeholder="0.00"
-                          value={filters.maxAmount}
-                          onChange={(e) =>
-                            setFilters({
-                              ...filters,
-                              maxAmount: e.target.value,
-                            })
-                          }
-                          className="w-full px-3 py-2 border rounded-[4px] text-sm"
-                          style={{ borderColor: "#E9ECEF", color: "#212529" }}
-                        />
-                      </div>
+                      <FileText
+                        className="w-5 h-5"
+                        style={{ color: "#059669" }}
+                      />
                     </div>
-
-                    <div className="flex flex-wrap gap-2 mt-4">
-                      <button
-                        onClick={() =>
-                          setFilters({
-                            status: "",
-                            dateFrom: "",
-                            dateTo: "",
-                            customer: "",
-                            minAmount: "",
-                            maxAmount: "",
-                          })
-                        }
-                        className="px-3 py-1 text-sm border rounded-[4px] transition-colors"
-                        style={{ borderColor: "#E9ECEF", color: "#495057" }}
+                    <div>
+                      <p
+                        className="text-sm font-medium"
+                        style={{ color: "#6C757D" }}
                       >
-                        Clear Filters
-                      </button>
+                        Total Invoices
+                      </p>
+                      <p
+                        className="text-xl font-bold"
+                        style={{ color: "#212529" }}
+                      >
+                        {filteredInvoices.length}
+                      </p>
                     </div>
                   </div>
-                )}
+                </div>
+
+                <div
+                  className="bg-white rounded-[4px] p-4 lg:p-6 border border-[#E9ECEF]"
+                  style={{ boxShadow: "0 2px 8px rgba(0, 0, 0, 0.05)" }}
+                >
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="p-2 rounded-[4px]"
+                      style={{ backgroundColor: "#E8F5E8" }}
+                    >
+                      <DollarSign
+                        className="w-5 h-5"
+                        style={{ color: "#2E7D32" }}
+                      />
+                    </div>
+                    <div>
+                      <p
+                        className="text-sm font-medium"
+                        style={{ color: "#6C757D" }}
+                      >
+                        Total Amount
+                      </p>
+                      <p
+                        className="text-xl font-bold"
+                        style={{ color: "#212529" }}
+                      >
+                        $
+                        {Number(totalAmount).toLocaleString(undefined, {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div
+                  className="bg-white rounded-[4px] p-4 lg:p-6 border border-[#E9ECEF]"
+                  style={{ boxShadow: "0 2px 8px rgba(0, 0, 0, 0.05)" }}
+                >
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="p-2 rounded-[4px]"
+                      style={{ backgroundColor: "#E8F4D6" }}
+                    >
+                      <CheckCircle
+                        className="w-5 h-5"
+                        style={{ color: "#8CC21B" }}
+                      />
+                    </div>
+                    <div>
+                      <p
+                        className="text-sm font-medium"
+                        style={{ color: "#6C757D" }}
+                      >
+                        Paid Amount
+                      </p>
+                      <p
+                        className="text-xl font-bold"
+                        style={{ color: "#212529" }}
+                      >
+                        ${Number(totalPaid).toFixed(2)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div
+                  className="bg-white rounded-[4px] p-4 lg:p-6 border border-[#E9ECEF]"
+                  style={{ boxShadow: "0 2px 8px rgba(0, 0, 0, 0.05)" }}
+                >
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="p-2 rounded-[4px]"
+                      style={{ backgroundColor: "#FFF3E0" }}
+                    >
+                      <Clock className="w-5 h-5" style={{ color: "#F57C00" }} />
+                    </div>
+                    <div>
+                      <p
+                        className="text-sm font-medium"
+                        style={{ color: "#6C757D" }}
+                      >
+                        Outstanding
+                      </p>
+                      <p
+                        className="text-xl font-bold"
+                        style={{ color: "#212529" }}
+                      >
+                        ${Number(outstandingAmount).toFixed(2)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </div>
-            </div>
 
-            <div
-              className="bg-white rounded-[4px] border border-[#E9ECEF] overflow-hidden"
-              style={{ boxShadow: "0 2px 8px rgba(0, 0, 0, 0.05)" }}
-            >
-              {loading ? (
-                <div className="flex items-center justify-center py-12">
-                  <div className="text-center">
-                    <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-[#8CC21B]" />
-                    <p className="text-xs text-[#6C757D]">
-                      Loading invoices...
-                    </p>
-                  </div>
-                </div>
-              ) : filteredInvoices.length === 0 ? (
-                <div className="flex items-center justify-center py-12">
-                  <div className="text-center">
-                    <FileText className="w-12 h-12 mx-auto mb-4 text-[#ADB5BD]" />
-                    <h3 className="text-lg font-medium mb-1 text-[#212529]">
-                      No invoices found
-                    </h3>
-                    <p className="text-xs text-[#6C757D]">
-                      Try adjusting your search or filters
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                <>
-                  <div className="hidden lg:block overflow-x-auto">
-                    <table className="w-full border-collapse">
-                      <thead className="bg-[#F8F9FA] border-b border-[#E9ECEF]">
-                        <tr>
-                          {activeInvTab === "closed_invoices" && (
-                            <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
-                              #
-                            </th>
-                          )}
-                          <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
-                            <div className="flex items-center gap-1.5">ID</div>
-                          </th>
-                          {activeInvTab === "closed_invoices" && (
-                            <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
-                              Invoice No
-                            </th>
-                          )}
-                          <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
-                            Bill To
-                          </th>
-                          <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
-                            Ship To
-                          </th>
-                          <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
-                            Cargo No.
-                          </th>
-                          <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
-                            {activeInvTab === "open_invoices"
-                              ? "Date created"
-                              : "Closed Date"}
-                          </th>
-                          <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
-                            {activeInvTab === "open_invoices"
-                              ? "Count Item"
-                              : "Item Count"}
-                          </th>
-                          <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
-                            {activeInvTab === "open_invoices"
-                              ? "QTY"
-                              : "Total Qty"}
-                          </th>
-                          {activeInvTab === "closed_invoices" && (
-                            <th className="text-right py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
-                              Total Price
-                            </th>
-                          )}
-                          <th className="text-center py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
-                            Actions
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-[#F1F3F5]">
-                        {currentInvoices.map((invoice, index) => {
-                          const expState = expandedStates[invoice.id] || {};
-                          const showExpanded = expState.taric || expState.items;
+              <div
+                className="bg-white rounded-[4px] border border-[#E9ECEF] mb-6"
+                style={{ boxShadow: "0 2px 8px rgba(0, 0, 0, 0.05)" }}
+              >
+                <div className="p-4 lg:p-6">
+                  <div className="flex flex-col lg:flex-row gap-4">
+                    <div className="flex-1 relative">
+                      <Search
+                        className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4"
+                        style={{ color: "#ADB5BD" }}
+                      />
+                      <input
+                        type="text"
+                        placeholder="Search invoices, customers, or order numbers..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2 border rounded-[4px] transition-all duration-200 text-sm"
+                        style={{ borderColor: "#E9ECEF", color: "#212529" }}
+                      />
+                    </div>
 
-                          return (
-                            <React.Fragment key={invoice.id}>
-                              <tr className="hover:bg-[#F8F9FA] transition-colors group">
-                                {activeInvTab === "closed_invoices" && (
+                    <button
+                      onClick={() => setShowFilters(!showFilters)}
+                      className="flex items-center gap-2 px-4 py-2 border rounded-[4px] transition-colors text-sm font-medium"
+                      style={{ borderColor: "#E9ECEF", color: "#495057" }}
+                    >
+                      <Filter className="w-4 h-4" />
+                      Filters
+                      <ChevronDown
+                        className={`w-4 h-4 transition-transform ${showFilters ? "rotate-180" : ""
+                          }`}
+                      />
+                    </button>
+                  </div>
+
+                  {showFilters && (
+                    <div className="mt-4 pt-4 border-t border-[#E9ECEF]">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+                        <div>
+                          <label
+                            className="block text-sm font-medium mb-1"
+                            style={{ color: "#212529" }}
+                          >
+                            Status
+                          </label>
+                          <select
+                            value={filters.status}
+                            onChange={(e) =>
+                              setFilters({ ...filters, status: e.target.value })
+                            }
+                            className="w-full px-3 py-2 border rounded-[4px] text-sm"
+                            style={{ borderColor: "#E9ECEF", color: "#212529" }}
+                          >
+                            <option value="">All Status</option>
+                            <option value="draft">Draft</option>
+                            <option value="sent">Sent</option>
+                            <option value="paid">Paid</option>
+                            <option value="overdue">Overdue</option>
+                            <option value="cancelled">Cancelled</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label
+                            className="block text-sm font-medium mb-1"
+                            style={{ color: "#212529" }}
+                          >
+                            From Date
+                          </label>
+                          <input
+                            type="date"
+                            value={filters.dateFrom}
+                            onChange={(e) =>
+                              setFilters({ ...filters, dateFrom: e.target.value })
+                            }
+                            className="w-full px-3 py-2 border rounded-[4px] text-sm"
+                            style={{ borderColor: "#E9ECEF", color: "#212529" }}
+                          />
+                        </div>
+
+                        <div>
+                          <label
+                            className="block text-sm font-medium mb-1"
+                            style={{ color: "#212529" }}
+                          >
+                            To Date
+                          </label>
+                          <input
+                            type="date"
+                            value={filters.dateTo}
+                            onChange={(e) =>
+                              setFilters({ ...filters, dateTo: e.target.value })
+                            }
+                            className="w-full px-3 py-2 border rounded-[4px] text-sm"
+                            style={{ borderColor: "#E9ECEF", color: "#212529" }}
+                          />
+                        </div>
+
+                        <div>
+                          <label
+                            className="block text-sm font-medium mb-1"
+                            style={{ color: "#212529" }}
+                          >
+                            Customer
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Customer name"
+                            value={filters.customer}
+                            onChange={(e) =>
+                              setFilters({ ...filters, customer: e.target.value })
+                            }
+                            className="w-full px-3 py-2 border rounded-[4px] text-sm"
+                            style={{ borderColor: "#E9ECEF", color: "#212529" }}
+                          />
+                        </div>
+
+                        <div>
+                          <label
+                            className="block text-sm font-medium mb-1"
+                            style={{ color: "#212529" }}
+                          >
+                            Min Amount
+                          </label>
+                          <input
+                            type="number"
+                            placeholder="0.00"
+                            value={filters.minAmount}
+                            onChange={(e) =>
+                              setFilters({
+                                ...filters,
+                                minAmount: e.target.value,
+                              })
+                            }
+                            className="w-full px-3 py-2 border rounded-[4px] text-sm"
+                            style={{ borderColor: "#E9ECEF", color: "#212529" }}
+                          />
+                        </div>
+
+                        <div>
+                          <label
+                            className="block text-sm font-medium mb-1"
+                            style={{ color: "#212529" }}
+                          >
+                            Max Amount
+                          </label>
+                          <input
+                            type="number"
+                            placeholder="0.00"
+                            value={filters.maxAmount}
+                            onChange={(e) =>
+                              setFilters({
+                                ...filters,
+                                maxAmount: e.target.value,
+                              })
+                            }
+                            className="w-full px-3 py-2 border rounded-[4px] text-sm"
+                            style={{ borderColor: "#E9ECEF", color: "#212529" }}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2 mt-4">
+                        <button
+                          onClick={() =>
+                            setFilters({
+                              status: "",
+                              dateFrom: "",
+                              dateTo: "",
+                              customer: "",
+                              minAmount: "",
+                              maxAmount: "",
+                            })
+                          }
+                          className="px-3 py-1 text-sm border rounded-[4px] transition-colors"
+                          style={{ borderColor: "#E9ECEF", color: "#495057" }}
+                        >
+                          Clear Filters
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div
+                className="bg-white rounded-[4px] border border-[#E9ECEF] overflow-hidden"
+                style={{ boxShadow: "0 2px 8px rgba(0, 0, 0, 0.05)" }}
+              >
+                {loading ? (
+                  <div className="flex items-center justify-center py-12">
+                    <div className="text-center">
+                      <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-[#8CC21B]" />
+                      <p className="text-xs text-[#6C757D]">
+                        Loading invoices...
+                      </p>
+                    </div>
+                  </div>
+                ) : filteredInvoices.length === 0 ? (
+                  <div className="flex items-center justify-center py-12">
+                    <div className="text-center">
+                      <FileText className="w-12 h-12 mx-auto mb-4 text-[#ADB5BD]" />
+                      <h3 className="text-lg font-medium mb-1 text-[#212529]">
+                        No invoices found
+                      </h3>
+                      <p className="text-xs text-[#6C757D]">
+                        Try adjusting your search or filters
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="hidden lg:block overflow-x-auto">
+                      <table className="w-full border-collapse">
+                        <thead className="bg-[#F8F9FA] border-b border-[#E9ECEF]">
+                          <tr>
+                            {activeInvTab === "closed_invoices" && (
+                              <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
+                                #
+                              </th>
+                            )}
+                            <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
+                              <div className="flex items-center gap-1.5">ID</div>
+                            </th>
+                            {activeInvTab === "closed_invoices" && (
+                              <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
+                                Invoice No
+                              </th>
+                            )}
+                            <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
+                              Bill To
+                            </th>
+                            <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
+                              Ship To
+                            </th>
+                            <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
+                              Cargo No.
+                            </th>
+                            <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
+                              {activeInvTab === "open_invoices"
+                                ? "Date created"
+                                : "Closed Date"}
+                            </th>
+                            <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
+                              {activeInvTab === "open_invoices"
+                                ? "Count Item"
+                                : "Item Count"}
+                            </th>
+                            <th className="text-left py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
+                              {activeInvTab === "open_invoices"
+                                ? "QTY"
+                                : "Total Qty"}
+                            </th>
+                            {activeInvTab === "closed_invoices" && (
+                              <th className="text-right py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
+                                Total Price
+                              </th>
+                            )}
+                            <th className="text-center py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
+                              Actions
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[#F1F3F5]">
+                          {currentInvoices.map((invoice, index) => {
+                            const expState = expandedStates[invoice.id] || {};
+                            const showExpanded = expState.taric || expState.items;
+
+                            return (
+                              <React.Fragment key={invoice.id}>
+                                <tr className="hover:bg-[#F8F9FA] transition-colors group">
+                                  {activeInvTab === "closed_invoices" && (
+                                    <td className="py-4 px-4 text-xs text-[#212529]">
+                                      {startIndex + index + 1}
+                                    </td>
+                                  )}
+                                  <td className="py-4 px-4">
+                                    <button
+                                      onClick={() =>
+                                        toggleExpansion(invoice.id, "taric")
+                                      }
+                                      className="flex items-center gap-1.5 px-2.5 py-1 bg-[#495057] text-white text-[10px] font-bold rounded-[4px] hover:bg-[#343A40] transition-colors whitespace-nowrap"
+                                    >
+                                      {invoice.cargo?.cargo_no || "No Cargo"}{" "}
+                                      {expState.taric ? (
+                                        <ChevronDown className="w-3 h-3" />
+                                      ) : (
+                                        <ChevronRight className="w-3 h-3" />
+                                      )}
+                                    </button>
+                                  </td>
+                                  {activeInvTab === "closed_invoices" && (
+                                    <td className="py-4 px-4 text-xs font-semibold text-[#212529]">
+                                      {invoice.invoiceNumber || "N/A"}
+                                    </td>
+                                  )}
                                   <td className="py-4 px-4 text-xs text-[#212529]">
-                                    {startIndex + index + 1}
+                                    {(() => {
+                                      const v = invoice.bill_to;
+                                      if (!v || typeof v === "object")
+                                        return "N/A";
+                                      const s = String(v).trim();
+                                      return s.length > 1 ? s : "N/A";
+                                    })()}
                                   </td>
-                                )}
-                                <td className="py-4 px-4">
-                                  <button
-                                    onClick={() =>
-                                      toggleExpansion(invoice.id, "taric")
-                                    }
-                                    className="flex items-center gap-1.5 px-2.5 py-1 bg-[#495057] text-white text-[10px] font-bold rounded-[4px] hover:bg-[#343A40] transition-colors whitespace-nowrap"
-                                  >
-                                    {invoice.cargo?.cargo_no || "No Cargo"}{" "}
-                                    {expState.taric ? (
-                                      <ChevronDown className="w-3 h-3" />
-                                    ) : (
-                                      <ChevronRight className="w-3 h-3" />
-                                    )}
-                                  </button>
-                                </td>
-                                {activeInvTab === "closed_invoices" && (
-                                  <td className="py-4 px-4 text-xs font-semibold text-[#212529]">
-                                    {invoice.invoiceNumber || "N/A"}
+                                  <td className="py-4 px-4 text-xs text-[#6C757D]">
+                                    {(() => {
+                                      const v = invoice.ship_to;
+                                      if (!v || typeof v === "object") return "-";
+                                      const s = String(v).trim();
+                                      return s.length > 1 ? s : "-";
+                                    })()}
                                   </td>
-                                )}
-                                <td className="py-4 px-4 text-xs text-[#212529]">
-                                  {(() => {
-                                    const v = invoice.bill_to;
-                                    if (!v || typeof v === "object")
-                                      return "N/A";
-                                    const s = String(v).trim();
-                                    return s.length > 1 ? s : "N/A";
-                                  })()}
-                                </td>
-                                <td className="py-4 px-4 text-xs text-[#6C757D]">
-                                  {(() => {
-                                    const v = invoice.ship_to;
-                                    if (!v || typeof v === "object") return "-";
-                                    const s = String(v).trim();
-                                    return s.length > 1 ? s : "-";
-                                  })()}
-                                </td>
-                                <td className="py-4 px-4 text-xs text-[#212529]">
-                                  {activeInvTab === "open_invoices" ? (
-                                    (() => {
-                                      const cargoData =
-                                        invoice.cargo ||
-                                        expandedStates[invoice.id]?.data?.cargo;
-                                      if (cargoData) {
+                                  <td className="py-4 px-4 text-xs text-[#212529]">
+                                    {activeInvTab === "open_invoices" ? (
+                                      (() => {
+                                        const cargoData =
+                                          invoice.cargo ||
+                                          expandedStates[invoice.id]?.data?.cargo;
+                                        if (cargoData) {
+                                          return (
+                                            <span className="font-medium">
+                                              {cargoData.cargo_no || "No Cargo"}
+                                            </span>
+                                          );
+                                        }
                                         return (
-                                          <span className="font-medium">
-                                            {cargoData.cargo_no || "No Cargo"}
+                                          <span className="font-medium text-[#ADB5BD]">
+                                            No Cargo
                                           </span>
                                         );
-                                      }
-                                      return (
-                                        <span className="font-medium text-[#ADB5BD]">
-                                          No Cargo
-                                        </span>
-                                      );
-                                    })()
-                                  ) : (
-                                    <span className="font-medium">
-                                      {invoice.cargo?.cargo_no || "No Cargo"}
-                                    </span>
-                                  )}
-                                </td>
-                                <td className="py-4 px-4 text-xs text-[#495057]">
-                                  {new Date(
-                                    invoice.invoiceDate,
-                                  ).toLocaleDateString("de-DE", {
-                                    day: "2-digit",
-                                    month: "2-digit",
-                                  })}
-                                </td>
-                                <td className="py-4 px-4 text-xs">
-                                  <span
-                                    onClick={() =>
-                                      toggleExpansion(invoice.id, "items")
-                                    }
-                                    className="text-[#059669] font-bold hover:underline cursor-pointer"
-                                  >
-                                    {invoice.customItemCount ??
-                                      invoice.items?.length ??
-                                      0}
-                                  </span>
-                                </td>
-                                <td className="py-4 px-4 text-xs text-[#212529] font-medium">
-                                  {invoice.customTotalQty ??
-                                    invoice.items?.reduce(
-                                      (sum: any, item: any) =>
-                                        sum + item.quantity,
-                                      0,
-                                    ) ??
-                                    0}
-                                </td>
-                                {activeInvTab === "closed_invoices" && (
-                                  <td className="py-4 px-4 text-xs text-right font-bold text-[#212529]">
-                                    {Number(invoice.grossTotal).toLocaleString(
-                                      undefined,
-                                      {
-                                        minimumFractionDigits: 2,
-                                        maximumFractionDigits: 2,
-                                      },
+                                      })()
+                                    ) : (
+                                      <span className="font-medium">
+                                        {invoice.cargo?.cargo_no || "No Cargo"}
+                                      </span>
                                     )}
                                   </td>
-                                )}
-                                <td className="py-4 px-4">
-                                  <div className="flex items-center justify-center gap-2">
-                                    {activeInvTab === "open_invoices" ? (
-                                      <div className="flex items-center gap-2">
-                                        <button
-                                          onClick={() =>
-                                            handleMarkAsPaid(invoice.id)
-                                          }
-                                          className="flex items-center gap-1.5 px-4 py-1.5 bg-[#059669] text-white text-[10px] font-bold rounded-[4px] hover:bg-green-700 transition-all shadow-md"
-                                        >
-                                          <CheckCircle className="w-3.5 h-3.5" />{" "}
-                                          VERIFY
-                                        </button>
-                                        <button
-                                          onClick={() => {
-                                            if (editingInvoiceId === invoice.id)
-                                              setEditingInvoiceId(null);
-                                            else {
-                                              setEditingInvoiceId(invoice.id);
-                                              setInvoiceEditForm({
-                                                description:
-                                                  invoice.description || "",
-                                                freightCost:
-                                                  invoice.freightCost?.toString() ||
-                                                  "",
-                                                remark: invoice.remark || "",
-                                              });
-                                            }
-                                          }}
-                                          className="px-3.5 py-1 bg-[#28A745] text-white text-[10px] font-bold rounded-[4px] hover:bg-green-600 transition-colors"
-                                        >
-                                          Edit
-                                        </button>
-                                      </div>
-                                    ) : (
-                                      <>
-                                        <button
-                                          className="text-[#DC3545] hover:text-red-700 transition-colors disabled:opacity-50"
-                                          title="Download PDF"
-                                          disabled={
-                                            actionLoading[`pdf-${invoice.id}`]
-                                          }
-                                          onClick={async () => {
-                                            try {
-                                              setActionLoading((prev) => ({
-                                                ...prev,
-                                                [`pdf-${invoice.id}`]: true,
-                                              }));
-                                              await downloadCommercialInvoice(
-                                                invoice.id,
-                                              );
-                                            } catch (error) {
-                                              console.error(
-                                                "PDF Generation failed",
-                                                error,
-                                              );
-                                            } finally {
-                                              setActionLoading((prev) => ({
-                                                ...prev,
-                                                [`pdf-${invoice.id}`]: false,
-                                              }));
-                                            }
-                                          }}
-                                        >
-                                          {actionLoading[
-                                            `pdf-${invoice.id}`
-                                          ] ? (
-                                            <Loader2 className="w-5 h-5 animate-spin" />
-                                          ) : (
-                                            <FileText className="w-5 h-5" />
-                                          )}
-                                        </button>
-                                        <button className="px-3.5 py-1 bg-[#F15A24] text-white text-[10px] font-bold rounded-[4px] flex items-center gap-1 hover:bg-[#D9481B] transition-colors">
-                                          <RefreshCw className="w-3 h-3" /> Ship
-                                        </button>
-                                      </>
-                                    )}
-                                  </div>
-                                </td>
-                              </tr>
-                              {showExpanded && (
-                                <tr>
-                                  <td
-                                    colSpan={
-                                      activeInvTab === "closed_invoices"
-                                        ? 11
-                                        : 8
-                                    }
-                                    className="p-0 bg-[#F8F9FA]"
-                                  >
-                                    <div className="p-4 space-y-4">
-                                      {expState.data?.cargo && (
-                                        <div className="flex items-center gap-4 px-4 py-2 bg-[#EFF6FF] border border-[#BFDBFE] rounded-[4px] text-xs">
-                                          <span className="font-bold text-[#1D4ED8]">
-                                            Cargo: {expState.data.cargo.cargo_no}
-                                          </span>
-                                          {expState.data.orderNosInCargo
-                                            ?.length > 0 && (
-                                            <span className="text-[#374151]">
-                                              Orders:{" "}
-                                              <span className="font-semibold">
-                                                {expState.data.orderNosInCargo.join(
-                                                  ", ",
-                                                )}
-                                              </span>
-                                            </span>
-                                          )}
-                                          {expState.data.cargo.ship_to && (
-                                            <span className="text-[#374151]">
-                                              Ship To:{" "}
-                                              <span className="font-semibold">
-                                                {expState.data.cargo.ship_to}
-                                              </span>
-                                            </span>
-                                          )}
-                                        </div>
+                                  <td className="py-4 px-4 text-xs text-[#495057]">
+                                    {new Date(
+                                      invoice.invoiceDate,
+                                    ).toLocaleDateString("de-DE", {
+                                      day: "2-digit",
+                                      month: "2-digit",
+                                    })}
+                                  </td>
+                                  <td className="py-4 px-4 text-xs">
+                                    <span
+                                      onClick={() =>
+                                        toggleExpansion(invoice.id, "items")
+                                      }
+                                      className="text-[#059669] font-bold hover:underline cursor-pointer"
+                                    >
+                                      {invoice.customItemCount ??
+                                        invoice.items?.length ??
+                                        0}
+                                    </span>
+                                  </td>
+                                  <td className="py-4 px-4 text-xs text-[#212529] font-medium">
+                                    {invoice.customTotalQty ??
+                                      invoice.items?.reduce(
+                                        (sum: any, item: any) =>
+                                          sum + item.quantity,
+                                        0,
+                                      ) ??
+                                      0}
+                                  </td>
+                                  {activeInvTab === "closed_invoices" && (
+                                    <td className="py-4 px-4 text-xs text-right font-bold text-[#212529]">
+                                      {Number(invoice.grossTotal).toLocaleString(
+                                        undefined,
+                                        {
+                                          minimumFractionDigits: 2,
+                                          maximumFractionDigits: 2,
+                                        },
                                       )}
-                                      {expState.taric && (
-                                        <div className="space-y-2">
-                                          <h4 className="text-[11px] font-bold text-[#495057] uppercase tracking-wider mb-2">
-                                            Items to be shown in invoice based
-                                            on Taric
-                                          </h4>
-                                          <SpreadSheet
-                                            data={
-                                              expState.data?.taricGroups || []
+                                    </td>
+                                  )}
+                                  <td className="py-4 px-4">
+                                    <div className="flex items-center justify-center gap-2">
+                                      {activeInvTab === "open_invoices" ? (
+                                        <div className="flex items-center gap-2">
+                                          <button
+                                            onClick={() =>
+                                              handleMarkAsPaid(invoice.id)
                                             }
-                                            loading={expState.loading}
-                                            showTotals={true}
-                                            columns={
-                                              activeInvTab === "closed_invoices"
-                                                ? [
+                                            className="flex items-center gap-1.5 px-4 py-1.5 bg-[#059669] text-white text-[10px] font-bold rounded-[4px] hover:bg-green-700 transition-all shadow-md"
+                                          >
+                                            <CheckCircle className="w-3.5 h-3.5" />{" "}
+                                            VERIFY
+                                          </button>
+                                          <button
+                                            onClick={() => {
+                                              if (editingInvoiceId === invoice.id)
+                                                setEditingInvoiceId(null);
+                                              else {
+                                                setEditingInvoiceId(invoice.id);
+                                                setInvoiceEditForm({
+                                                  description:
+                                                    invoice.description || "",
+                                                  freightCost:
+                                                    invoice.freightCost?.toString() ||
+                                                    "",
+                                                  remark: invoice.remark || "",
+                                                });
+                                              }
+                                            }}
+                                            className="px-3.5 py-1 bg-[#28A745] text-white text-[10px] font-bold rounded-[4px] hover:bg-green-600 transition-colors"
+                                          >
+                                            Edit
+                                          </button>
+                                        </div>
+                                      ) : (
+                                        <>
+                                          <button
+                                            className="text-[#DC3545] hover:text-red-700 transition-colors disabled:opacity-50"
+                                            title="Download PDF"
+                                            disabled={
+                                              actionLoading[`pdf-${invoice.id}`]
+                                            }
+                                            onClick={async () => {
+                                              try {
+                                                setActionLoading((prev) => ({
+                                                  ...prev,
+                                                  [`pdf-${invoice.id}`]: true,
+                                                }));
+                                                await downloadCommercialInvoice(
+                                                  invoice.id,
+                                                );
+                                              } catch (error) {
+                                                console.error(
+                                                  "PDF Generation failed",
+                                                  error,
+                                                );
+                                              } finally {
+                                                setActionLoading((prev) => ({
+                                                  ...prev,
+                                                  [`pdf-${invoice.id}`]: false,
+                                                }));
+                                              }
+                                            }}
+                                          >
+                                            {actionLoading[
+                                              `pdf-${invoice.id}`
+                                            ] ? (
+                                              <Loader2 className="w-5 h-5 animate-spin" />
+                                            ) : (
+                                              <FileText className="w-5 h-5" />
+                                            )}
+                                          </button>
+                                          <button className="px-3.5 py-1 bg-[#F15A24] text-white text-[10px] font-bold rounded-[4px] flex items-center gap-1 hover:bg-[#D9481B] transition-colors">
+                                            <RefreshCw className="w-3 h-3" /> Ship
+                                          </button>
+                                        </>
+                                      )}
+                                    </div>
+                                  </td>
+                                </tr>
+                                {showExpanded && (
+                                  <tr>
+                                    <td
+                                      colSpan={
+                                        activeInvTab === "closed_invoices"
+                                          ? 11
+                                          : 8
+                                      }
+                                      className="p-0 bg-[#F8F9FA]"
+                                    >
+                                      <div className="p-4 space-y-4">
+                                        {expState.data?.cargo && (
+                                          <div className="flex items-center gap-4 px-4 py-2 bg-[#EFF6FF] border border-[#BFDBFE] rounded-[4px] text-xs">
+                                            <span className="font-bold text-[#1D4ED8]">
+                                              Cargo: {expState.data.cargo.cargo_no}
+                                            </span>
+                                            {expState.data.orderNosInCargo
+                                              ?.length > 0 && (
+                                                <span className="text-[#374151]">
+                                                  Orders:{" "}
+                                                  <span className="font-semibold">
+                                                    {expState.data.orderNosInCargo.join(
+                                                      ", ",
+                                                    )}
+                                                  </span>
+                                                </span>
+                                              )}
+                                            {expState.data.cargo.ship_to && (
+                                              <span className="text-[#374151]">
+                                                Ship To:{" "}
+                                                <span className="font-semibold">
+                                                  {expState.data.cargo.ship_to}
+                                                </span>
+                                              </span>
+                                            )}
+                                          </div>
+                                        )}
+                                        {expState.taric && (
+                                          <div className="space-y-2">
+                                            <h4 className="text-[11px] font-bold text-[#495057] uppercase tracking-wider mb-2">
+                                              Items to be shown in invoice based
+                                              on Taric
+                                            </h4>
+                                            <SpreadSheet
+                                              data={
+                                                expState.data?.taricGroups || []
+                                              }
+                                              loading={expState.loading}
+                                              showTotals={true}
+                                              columns={
+                                                activeInvTab === "closed_invoices"
+                                                  ? [
                                                     {
                                                       header: "Position",
                                                       render: (
@@ -1595,10 +2219,10 @@ const InvoiceListPage: React.FC = () => {
                                                           style={
                                                             it.isProjectItem
                                                               ? {
-                                                                  color:
-                                                                    "#F59E0B",
-                                                                  fontWeight: 600,
-                                                                }
+                                                                color:
+                                                                  "#F59E0B",
+                                                                fontWeight: 600,
+                                                              }
                                                               : undefined
                                                           }
                                                         >
@@ -1644,7 +2268,7 @@ const InvoiceListPage: React.FC = () => {
                                                       width: "120px",
                                                     },
                                                   ]
-                                                : [
+                                                  : [
                                                     {
                                                       header: "Position",
                                                       render: (
@@ -1666,10 +2290,10 @@ const InvoiceListPage: React.FC = () => {
                                                           style={
                                                             it.isProjectItem
                                                               ? {
-                                                                  color:
-                                                                    "#F59E0B",
-                                                                  fontWeight: 600,
-                                                                }
+                                                                color:
+                                                                  "#F59E0B",
+                                                                fontWeight: 600,
+                                                              }
                                                               : undefined
                                                           }
                                                         >
@@ -1738,11 +2362,11 @@ const InvoiceListPage: React.FC = () => {
                                                       width: "120px",
                                                     },
                                                   ]
-                                            }
-                                            expandedRowId={null}
-                                            totalCols={
-                                              activeInvTab === "closed_invoices"
-                                                ? [
+                                              }
+                                              expandedRowId={null}
+                                              totalCols={
+                                                activeInvTab === "closed_invoices"
+                                                  ? [
                                                     {
                                                       label: "Grand Total",
                                                       value: "",
@@ -1782,7 +2406,7 @@ const InvoiceListPage: React.FC = () => {
                                                       align: "left",
                                                     },
                                                   ]
-                                                : [
+                                                  : [
                                                     {
                                                       label: "Grand Total",
                                                       value: "",
@@ -1826,19 +2450,19 @@ const InvoiceListPage: React.FC = () => {
                                                       width: "120px",
                                                     },
                                                   ]
+                                              }
+                                            />
+                                          </div>
+                                        )}
+                                        {expState.items && (
+                                          <SpreadSheet
+                                            data={
+                                              expState.data?.detailedItems || []
                                             }
-                                          />
-                                        </div>
-                                      )}
-                                      {expState.items && (
-                                        <SpreadSheet
-                                          data={
-                                            expState.data?.detailedItems || []
-                                          }
-                                          loading={expState.loading}
-                                          columns={
-                                            activeInvTab === "closed_invoices"
-                                              ? [
+                                            loading={expState.loading}
+                                            columns={
+                                              activeInvTab === "closed_invoices"
+                                                ? [
                                                   {
                                                     header: "#",
                                                     render: (
@@ -1902,7 +2526,7 @@ const InvoiceListPage: React.FC = () => {
                                                       const unitPrice =
                                                         Number(
                                                           it.eur_special_price ||
-                                                            it._fallbackEk,
+                                                          it._fallbackEk,
                                                         ) || 0;
                                                       const totalPrice =
                                                         (it.qty || 0) *
@@ -1919,7 +2543,7 @@ const InvoiceListPage: React.FC = () => {
                                                     align: "center",
                                                   },
                                                 ]
-                                              : [
+                                                : [
                                                   {
                                                     header: "ID",
                                                     render: (it: any) => (
@@ -1936,11 +2560,11 @@ const InvoiceListPage: React.FC = () => {
                                                               );
                                                               setNewQty(
                                                                 it.qty_label ||
-                                                                  it.qty,
+                                                                it.qty,
                                                               );
                                                               setQtyRemarks(
                                                                 it.remarks_cn ||
-                                                                  "",
+                                                                "",
                                                               );
                                                               setShowQTYModal(
                                                                 true,
@@ -1968,7 +2592,7 @@ const InvoiceListPage: React.FC = () => {
                                                               );
                                                               setSplitRemarks(
                                                                 it.remarks_cn ||
-                                                                  "",
+                                                                "",
                                                               );
                                                               setShowSPModal(
                                                                 true,
@@ -1988,7 +2612,7 @@ const InvoiceListPage: React.FC = () => {
                                                               );
                                                               setTargetCargoId(
                                                                 it.cargo_id ||
-                                                                  "",
+                                                                "",
                                                               );
                                                               setShowREModal(
                                                                 true,
@@ -2103,7 +2727,7 @@ const InvoiceListPage: React.FC = () => {
                                                       const unitPrice =
                                                         Number(
                                                           it.eur_special_price ||
-                                                            it._fallbackEk,
+                                                          it._fallbackEk,
                                                         ) || 0;
                                                       const totalPrice =
                                                         (it.qty || 0) *
@@ -2125,10 +2749,10 @@ const InvoiceListPage: React.FC = () => {
                                                       it.item
                                                         ?.is_eur_special ===
                                                         "Y" &&
-                                                      (!it.eur_special_price ||
-                                                        Number(
-                                                          it.eur_special_price,
-                                                        ) === 0) ? (
+                                                        (!it.eur_special_price ||
+                                                          Number(
+                                                            it.eur_special_price,
+                                                          ) === 0) ? (
                                                         <button
                                                           onClick={() => {
                                                             setExpandedPriceItemId(
@@ -2139,7 +2763,7 @@ const InvoiceListPage: React.FC = () => {
                                                             );
                                                             setEditingPrice(
                                                               it.eur_special_price ||
-                                                                0,
+                                                              0,
                                                             );
                                                           }}
                                                           className="flex items-center gap-1.5 px-3 py-1.5 bg-[#EF4444] text-white text-[10px] font-bold rounded-[4px] hover:bg-red-600 transition-all shadow-md whitespace-nowrap"
@@ -2151,451 +2775,450 @@ const InvoiceListPage: React.FC = () => {
                                                     width: "120px",
                                                   },
                                                 ]
-                                          }
-                                          expandedRowId={expandedPriceItemId}
-                                          renderRowDetails={(it: any) => (
-                                            <div className="bg-[#F8F9FA] p-4 rounded-md border border-gray-200 mt-2 shadow-inner">
-                                              <h4 className="text-[11px] font-bold text-[#495057] uppercase mb-3 tracking-wider flex items-center gap-2">
-                                                <div className="w-1.5 h-1.5 bg-[#EF4444] rounded-full"></div>
-                                                Set EUR Price for Item {it.id}
-                                              </h4>
-                                              <div className="space-y-3">
-                                                <div>
-                                                  <label className="block text-[10px] font-bold text-[#6C757D] uppercase mb-1.5">
-                                                    EUR Special Price
-                                                  </label>
-                                                  <div className="relative">
-                                                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                                      <span className="text-gray-500 text-xs text-black"></span>
+                                            }
+                                            expandedRowId={expandedPriceItemId}
+                                            renderRowDetails={(it: any) => (
+                                              <div className="bg-[#F8F9FA] p-4 rounded-md border border-gray-200 mt-2 shadow-inner">
+                                                <h4 className="text-[11px] font-bold text-[#495057] uppercase mb-3 tracking-wider flex items-center gap-2">
+                                                  <div className="w-1.5 h-1.5 bg-[#EF4444] rounded-full"></div>
+                                                  Set EUR Price for Item {it.id}
+                                                </h4>
+                                                <div className="space-y-3">
+                                                  <div>
+                                                    <label className="block text-[10px] font-bold text-[#6C757D] uppercase mb-1.5">
+                                                      EUR Special Price
+                                                    </label>
+                                                    <div className="relative">
+                                                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                                        <span className="text-gray-500 text-xs text-black"></span>
+                                                      </div>
+                                                      <input
+                                                        type="number"
+                                                        step="0.01"
+                                                        value={editingPrice}
+                                                        onChange={(e) =>
+                                                          setEditingPrice(
+                                                            Number(
+                                                              e.target.value,
+                                                            ),
+                                                          )
+                                                        }
+                                                        className="w-full pl-7 pr-3 py-2 bg-white border border-gray-300 rounded-[4px] text-sm focus:ring-2 focus:ring-[#EF4444] focus:border-transparent outline-none transition-all shadow-sm font-medium text-black"
+                                                        placeholder="0.00"
+                                                      />
                                                     </div>
-                                                    <input
-                                                      type="number"
-                                                      step="0.01"
-                                                      value={editingPrice}
-                                                      onChange={(e) =>
-                                                        setEditingPrice(
-                                                          Number(
-                                                            e.target.value,
-                                                          ),
+                                                  </div>
+                                                  <div className="flex gap-2 pt-1">
+                                                    <button
+                                                      onClick={() =>
+                                                        setExpandedPriceItemId(
+                                                          null,
                                                         )
                                                       }
-                                                      className="w-full pl-7 pr-3 py-2 bg-white border border-gray-300 rounded-[4px] text-sm focus:ring-2 focus:ring-[#EF4444] focus:border-transparent outline-none transition-all shadow-sm font-medium text-black"
-                                                      placeholder="0.00"
-                                                    />
+                                                      className="px-4 py-2 text-[11px] font-bold text-[#495057] bg-white border border-[#DEE2E6] rounded-[4px] hover:bg-gray-50 transition-all uppercase shadow-sm"
+                                                    >
+                                                      Cancel
+                                                    </button>
+                                                    <button
+                                                      onClick={() =>
+                                                        handleSetPrice(it.id)
+                                                      }
+                                                      className="px-5 py-2 text-[11px] font-bold text-white bg-[#10B981] rounded-[4px] hover:bg-[#059669] transition-all uppercase shadow-md flex items-center gap-2"
+                                                    >
+                                                      <Check className="w-3.5 h-3.5" />{" "}
+                                                      Set Price
+                                                    </button>
                                                   </div>
                                                 </div>
-                                                <div className="flex gap-2 pt-1">
-                                                  <button
-                                                    onClick={() =>
-                                                      setExpandedPriceItemId(
-                                                        null,
-                                                      )
-                                                    }
-                                                    className="px-4 py-2 text-[11px] font-bold text-[#495057] bg-white border border-[#DEE2E6] rounded-[4px] hover:bg-gray-50 transition-all uppercase shadow-sm"
-                                                  >
-                                                    Cancel
-                                                  </button>
-                                                  <button
-                                                    onClick={() =>
-                                                      handleSetPrice(it.id)
-                                                    }
-                                                    className="px-5 py-2 text-[11px] font-bold text-white bg-[#10B981] rounded-[4px] hover:bg-[#059669] transition-all uppercase shadow-md flex items-center gap-2"
-                                                  >
-                                                    <Check className="w-3.5 h-3.5" />{" "}
-                                                    Set Price
-                                                  </button>
-                                                </div>
+                                              </div>
+                                            )}
+                                            showTotals={false}
+                                          />
+                                        )}
+                                      </div>
+                                    </td>
+                                  </tr>
+                                )}
+                                {editingInvoiceId === invoice.id && (
+                                  <tr>
+                                    <td
+                                      colSpan={
+                                        activeInvTab === "closed_invoices"
+                                          ? 11
+                                          : 9
+                                      }
+                                      className="p-0 border-b border-[#E9ECEF] bg-[#F8F9FA]"
+                                    >
+                                      <div className="p-6 flex justify-center w-full">
+                                        <div className="bg-white p-6 rounded-[8px] border border-[#E9ECEF] shadow-sm w-full max-w-2xl">
+                                          <div className="space-y-4">
+                                            <div className="grid grid-cols-1 gap-4">
+                                              <div>
+                                                <label className="block text-[11px] font-bold text-[#495057] mb-1.5">
+                                                  Description *
+                                                </label>
+                                                <input
+                                                  type="text"
+                                                  value={
+                                                    invoiceEditForm.description
+                                                  }
+                                                  onChange={(e) =>
+                                                    setInvoiceEditForm({
+                                                      ...invoiceEditForm,
+                                                      description: e.target.value,
+                                                    })
+                                                  }
+                                                  className="w-full px-3 py-2 border border-[#DEE2E6] rounded-[4px] text-sm focus:outline-none focus:border-[#8CC21B]"
+                                                  placeholder="Freight cost"
+                                                />
+                                              </div>
+                                              <div>
+                                                <label className="block text-[11px] font-bold text-[#495057] mb-1.5">
+                                                  Freight Cost *
+                                                </label>
+                                                <input
+                                                  type="number"
+                                                  step="0.01"
+                                                  value={
+                                                    invoiceEditForm.freightCost
+                                                  }
+                                                  onChange={(e) =>
+                                                    setInvoiceEditForm({
+                                                      ...invoiceEditForm,
+                                                      freightCost: e.target.value,
+                                                    })
+                                                  }
+                                                  className="w-full px-3 py-2 border border-[#DEE2E6] rounded-[4px] text-sm focus:outline-none focus:border-[#8CC21B]"
+                                                  placeholder="Enter Freight Cost"
+                                                />
+                                              </div>
+                                              <div>
+                                                <label className="block text-[11px] font-bold text-[#495057] mb-1.5">
+                                                  Remark
+                                                </label>
+                                                <textarea
+                                                  value={invoiceEditForm.remark}
+                                                  onChange={(e) =>
+                                                    setInvoiceEditForm({
+                                                      ...invoiceEditForm,
+                                                      remark: e.target.value,
+                                                    })
+                                                  }
+                                                  rows={3}
+                                                  className="w-full px-3 py-2 border border-[#DEE2E6] rounded-[4px] text-sm focus:outline-none focus:border-[#8CC21B]"
+                                                  placeholder="Enter extra info"
+                                                />
                                               </div>
                                             </div>
-                                          )}
-                                          showTotals={false}
-                                        />
-                                      )}
-                                    </div>
-                                  </td>
-                                </tr>
-                              )}
-                              {editingInvoiceId === invoice.id && (
-                                <tr>
-                                  <td
-                                    colSpan={
-                                      activeInvTab === "closed_invoices"
-                                        ? 11
-                                        : 9
-                                    }
-                                    className="p-0 border-b border-[#E9ECEF] bg-[#F8F9FA]"
-                                  >
-                                    <div className="p-6 flex justify-center w-full">
-                                      <div className="bg-white p-6 rounded-[8px] border border-[#E9ECEF] shadow-sm w-full max-w-2xl">
-                                        <div className="space-y-4">
-                                          <div className="grid grid-cols-1 gap-4">
-                                            <div>
-                                              <label className="block text-[11px] font-bold text-[#495057] mb-1.5">
-                                                Description *
-                                              </label>
-                                              <input
-                                                type="text"
-                                                value={
-                                                  invoiceEditForm.description
+                                            <div className="flex justify-center gap-3 pt-4">
+                                              <button
+                                                onClick={() =>
+                                                  setEditingInvoiceId(null)
                                                 }
-                                                onChange={(e) =>
-                                                  setInvoiceEditForm({
-                                                    ...invoiceEditForm,
-                                                    description: e.target.value,
-                                                  })
+                                                className="px-6 py-2 text-[11px] font-bold text-[#495057] bg-white border border-[#DEE2E6] rounded-[20px] hover:bg-gray-50 flex items-center gap-1.5 shadow-sm transition-all"
+                                              >
+                                                <XCircle className="w-3.5 h-3.5" />{" "}
+                                                Cancel
+                                              </button>
+                                              <button
+                                                onClick={() =>
+                                                  handleSaveInvoiceEdit(
+                                                    invoice.id,
+                                                  )
                                                 }
-                                                className="w-full px-3 py-2 border border-[#DEE2E6] rounded-[4px] text-sm focus:outline-none focus:border-[#8CC21B]"
-                                                placeholder="Freight cost"
-                                              />
-                                            </div>
-                                            <div>
-                                              <label className="block text-[11px] font-bold text-[#495057] mb-1.5">
-                                                Freight Cost *
-                                              </label>
-                                              <input
-                                                type="number"
-                                                step="0.01"
-                                                value={
-                                                  invoiceEditForm.freightCost
-                                                }
-                                                onChange={(e) =>
-                                                  setInvoiceEditForm({
-                                                    ...invoiceEditForm,
-                                                    freightCost: e.target.value,
-                                                  })
-                                                }
-                                                className="w-full px-3 py-2 border border-[#DEE2E6] rounded-[4px] text-sm focus:outline-none focus:border-[#8CC21B]"
-                                                placeholder="Enter Freight Cost"
-                                              />
-                                            </div>
-                                            <div>
-                                              <label className="block text-[11px] font-bold text-[#495057] mb-1.5">
-                                                Remark
-                                              </label>
-                                              <textarea
-                                                value={invoiceEditForm.remark}
-                                                onChange={(e) =>
-                                                  setInvoiceEditForm({
-                                                    ...invoiceEditForm,
-                                                    remark: e.target.value,
-                                                  })
-                                                }
-                                                rows={3}
-                                                className="w-full px-3 py-2 border border-[#DEE2E6] rounded-[4px] text-sm focus:outline-none focus:border-[#8CC21B]"
-                                                placeholder="Enter extra info"
-                                              />
-                                            </div>
-                                          </div>
-                                          <div className="flex justify-center gap-3 pt-4">
-                                            <button
-                                              onClick={() =>
-                                                setEditingInvoiceId(null)
-                                              }
-                                              className="px-6 py-2 text-[11px] font-bold text-[#495057] bg-white border border-[#DEE2E6] rounded-[20px] hover:bg-gray-50 flex items-center gap-1.5 shadow-sm transition-all"
-                                            >
-                                              <XCircle className="w-3.5 h-3.5" />{" "}
-                                              Cancel
-                                            </button>
-                                            <button
-                                              onClick={() =>
-                                                handleSaveInvoiceEdit(
-                                                  invoice.id,
-                                                )
-                                              }
-                                              disabled={
-                                                actionLoading[
+                                                disabled={
+                                                  actionLoading[
                                                   `save-${invoice.id}`
-                                                ]
-                                              }
-                                              className="px-6 py-2 text-[11px] font-bold text-white bg-[#059669] rounded-[20px] hover:bg-green-700 flex items-center gap-1.5 shadow-md transition-all disabled:opacity-50"
-                                            >
-                                              {actionLoading[
-                                                `save-${invoice.id}`
-                                              ] ? (
-                                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                              ) : (
-                                                <PlusCircle className="w-3.5 h-3.5" />
-                                              )}
-                                              Save
-                                            </button>
+                                                  ]
+                                                }
+                                                className="px-6 py-2 text-[11px] font-bold text-white bg-[#059669] rounded-[20px] hover:bg-green-700 flex items-center gap-1.5 shadow-md transition-all disabled:opacity-50"
+                                              >
+                                                {actionLoading[
+                                                  `save-${invoice.id}`
+                                                ] ? (
+                                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                                ) : (
+                                                  <PlusCircle className="w-3.5 h-3.5" />
+                                                )}
+                                                Save
+                                              </button>
+                                            </div>
                                           </div>
                                         </div>
                                       </div>
-                                    </div>
-                                  </td>
-                                </tr>
-                              )}
-                            </React.Fragment>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  <div className="lg:hidden divide-y divide-[#F1F3F5]">
-                    {currentInvoices.map((invoice) => (
-                      <div key={invoice.id} className="p-4">
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center gap-2">
-                            <div className="px-2 py-1 bg-[#495057] text-white text-[10px] font-bold rounded-[4px]">
-                              {invoice.id.slice(-2)}
-                            </div>
-                            <div className="font-bold text-sm text-[#212529]">
-                              {activeInvTab === "closed_invoices"
-                                ? invoice.invoiceNumber
-                                : `ID: ${invoice.id.slice(-5)}`}
-                            </div>
-                          </div>
-                          <span
-                            className="text-[10px] font-bold px-2 py-0.5 rounded-[4px] uppercase"
-                            style={getStatusColor(invoice.status)}
-                          >
-                            {invoice.status}
-                          </span>
-                        </div>
-
-                        <div className="space-y-2 mb-4">
-                          <div className="flex justify-between text-xs">
-                            <span className="text-[#6C757D]">Customer</span>
-                            <span className="font-medium text-[#212529]">
-                              {invoice.customer?.companyName}
-                            </span>
-                          </div>
-                          <div className="flex justify-between text-xs">
-                            <span className="text-[#6C757D]">
-                              {activeInvTab === "open_invoices"
-                                ? "Cargo"
-                                : "Cargo No."}
-                            </span>
-                            <span className="font-medium text-[#212529]">
-                              {invoice.cargoNo || "-"}
-                            </span>
-                          </div>
-                          <div className="flex justify-between text-xs">
-                            <span className="text-[#6C757D]">Items / Qty</span>
-                            <span className="font-medium text-[#212529]">
-                              {invoice.items?.length || 0} /{" "}
-                              {invoice.items?.reduce(
-                                (sum, item) => sum + item.quantity,
-                                0,
-                              ) || 0}
-                            </span>
-                          </div>
-                          {activeInvTab === "closed_invoices" && (
-                            <div className="flex justify-between text-xs font-bold pt-1 border-t border-dashed border-gray-100">
-                              <span className="text-[#6C757D]">
-                                Total Price
-                              </span>
-                              <span className="text-[#212529]">
-                                ${Number(invoice.grossTotal).toFixed(2)}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="flex gap-2">
-                          {activeInvTab === "open_invoices" ? (
-                            <>
-                              <button
-                                onClick={() => handleMarkAsPaid(invoice.id)}
-                                disabled={actionLoading[`paid-${invoice.id}`]}
-                                className="flex-1 flex items-center justify-center gap-2 py-2 bg-[#059669] text-white text-[11px] font-bold rounded-[4px] shadow-md disabled:opacity-50"
-                              >
-                                {actionLoading[`paid-${invoice.id}`] ? (
-                                  <Loader2 className="w-4 h-4 animate-spin" />
-                                ) : (
-                                  <CheckCircle className="w-4 h-4" />
+                                    </td>
+                                  </tr>
                                 )}
-                                VERIFY
-                              </button>
-                              <button
-                                onClick={() => {
-                                  if (editingInvoiceId === invoice.id)
-                                    setEditingInvoiceId(null);
-                                  else {
-                                    setEditingInvoiceId(invoice.id);
-                                    setInvoiceEditForm({
-                                      description: invoice.description || "",
-                                      freightCost:
-                                        invoice.freightCost?.toString() || "",
-                                      remark: invoice.remark || "",
-                                    });
-                                  }
-                                }}
-                                className="flex-1 py-2 bg-[#28A745] text-white text-[11px] font-bold rounded-[4px]"
-                              >
-                                Edit
-                              </button>
-                            </>
-                          ) : (
-                            <>
-                              <button
-                                disabled={actionLoading[`pdf-${invoice.id}`]}
-                                onClick={async () => {
-                                  try {
-                                    setActionLoading((prev) => ({
-                                      ...prev,
-                                      [`pdf-${invoice.id}`]: true,
-                                    }));
-                                    await downloadCommercialInvoice(invoice.id);
-                                  } catch (error) {
-                                    console.error(
-                                      "PDF Generation failed",
-                                      error,
-                                    );
-                                  } finally {
-                                    setActionLoading((prev) => ({
-                                      ...prev,
-                                      [`pdf-${invoice.id}`]: false,
-                                    }));
-                                  }
-                                }}
-                                className="flex-1 py-2 border border-[#DC3545] text-[#DC3545] text-[11px] font-bold rounded-[4px] flex items-center justify-center gap-1.5 disabled:opacity-50"
-                              >
-                                {actionLoading[`pdf-${invoice.id}`] ? (
-                                  <Loader2 className="w-4 h-4 animate-spin" />
-                                ) : (
-                                  <FileText className="w-4 h-4" />
-                                )}
-                                PDF
-                              </button>
-                              <button className="flex-1 py-2 bg-[#F15A24] text-white text-[11px] font-bold rounded-[4px] flex items-center justify-center gap-1 hover:bg-[#D9481B]">
-                                <RefreshCw className="w-3.5 h-3.5" /> Ship
-                              </button>
-                            </>
-                          )}
-                        </div>
-                        {editingInvoiceId === invoice.id && (
-                          <div className="mt-4 p-4 bg-[#F8F9FA] border border-[#E9ECEF] rounded-[4px] space-y-4">
-                            <div>
-                              <label className="block text-[11px] font-bold text-[#495057] mb-1.5">
-                                Description *
-                              </label>
-                              <input
-                                type="text"
-                                value={invoiceEditForm.description}
-                                onChange={(e) =>
-                                  setInvoiceEditForm({
-                                    ...invoiceEditForm,
-                                    description: e.target.value,
-                                  })
-                                }
-                                className="w-full px-3 py-2 bg-white border border-[#DEE2E6] rounded-[4px] text-sm focus:outline-none focus:border-[#8CC21B] text-black font-medium"
-                                placeholder="Freight cost"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-[11px] font-bold text-[#495057] mb-1.5">
-                                Freight Cost *
-                              </label>
-                              <input
-                                type="number"
-                                step="0.01"
-                                value={invoiceEditForm.freightCost}
-                                onChange={(e) =>
-                                  setInvoiceEditForm({
-                                    ...invoiceEditForm,
-                                    freightCost: e.target.value,
-                                  })
-                                }
-                                className="w-full px-3 py-2 bg-white border border-[#DEE2E6] rounded-[4px] text-sm focus:outline-none focus:border-[#8CC21B] text-black font-medium"
-                                placeholder="Enter Freight Cost"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-[11px] font-bold text-[#495057] mb-1.5">
-                                Remark
-                              </label>
-                              <textarea
-                                value={invoiceEditForm.remark}
-                                onChange={(e) =>
-                                  setInvoiceEditForm({
-                                    ...invoiceEditForm,
-                                    remark: e.target.value,
-                                  })
-                                }
-                                rows={3}
-                                className="w-full px-3 py-2 bg-white border border-[#DEE2E6] rounded-[4px] text-sm focus:outline-none focus:border-[#8CC21B] text-black font-medium"
-                                placeholder="Enter extra info"
-                              />
-                            </div>
-                            <div className="flex gap-2 pt-2">
-                              <button
-                                onClick={() => setEditingInvoiceId(null)}
-                                className="flex-1 py-2 text-[11px] font-bold text-[#495057] bg-white border border-[#DEE2E6] rounded-[20px] hover:bg-gray-50 flex items-center justify-center gap-1.5 shadow-sm transition-all"
-                              >
-                                <XCircle className="w-3.5 h-3.5" /> Cancel
-                              </button>
-                              <button
-                                onClick={() =>
-                                  handleSaveInvoiceEdit(invoice.id)
-                                }
-                                disabled={actionLoading[`save-${invoice.id}`]}
-                                className="flex-1 py-2 text-[11px] font-bold text-white bg-[#059669] rounded-[20px] hover:bg-green-700 flex items-center justify-center gap-1.5 shadow-md transition-all disabled:opacity-50"
-                              >
-                                {actionLoading[`save-${invoice.id}`] ? (
-                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                ) : (
-                                  <PlusCircle className="w-3.5 h-3.5" />
-                                )}
-                                Save
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-
-                  {totalPages > 1 && (
-                    <div className="flex items-center justify-between p-4 border-t border-[#E9ECEF] bg-[#F8F9FA]">
-                      <div className="text-[11px] font-medium text-[#6C757D]">
-                        Showing {startIndex + 1} to{" "}
-                        {Math.min(endIndex, filteredInvoices.length)} of{" "}
-                        {filteredInvoices.length} invoices
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          onClick={() =>
-                            setCurrentPage(Math.max(1, currentPage - 1))
-                          }
-                          disabled={currentPage === 1}
-                          className="p-1.5 rounded-[4px] border border-[#DEE2E6] bg-white disabled:opacity-30 hover:bg-gray-50 transition-colors"
-                        >
-                          <ChevronLeft className="w-3.5 h-3.5 text-[#495057]" />
-                        </button>
-                        {[...Array(totalPages)].map((_, i) => (
-                          <button
-                            key={i + 1}
-                            onClick={() => setCurrentPage(i + 1)}
-                            className={`min-w-[28px] h-7 text-[11px] font-bold rounded-[4px] border transition-all ${
-                              currentPage === i + 1
-                                ? "bg-[#8CC21B] text-white border-[#8CC21B] shadow-md"
-                                : "bg-white text-[#495057] border-[#DEE2E6] hover:bg-gray-50"
-                            }`}
-                          >
-                            {i + 1}
-                          </button>
-                        ))}
-                        <button
-                          onClick={() =>
-                            setCurrentPage(
-                              Math.min(totalPages, currentPage + 1),
-                            )
-                          }
-                          disabled={currentPage === totalPages}
-                          className="p-1.5 rounded-[4px] border border-[#DEE2E6] bg-white disabled:opacity-30 hover:bg-gray-50 transition-colors"
-                        >
-                          <ChevronRight className="w-3.5 h-3.5 text-[#495057]" />
-                        </button>
-                      </div>
+                              </React.Fragment>
+                            );
+                          })}
+                        </tbody>
+                      </table>
                     </div>
-                  )}
-                </>
-              )}
-            </div>
-          </>
-        )}
+
+                    <div className="lg:hidden divide-y divide-[#F1F3F5]">
+                      {currentInvoices.map((invoice) => (
+                        <div key={invoice.id} className="p-4">
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-2">
+                              <div className="px-2 py-1 bg-[#495057] text-white text-[10px] font-bold rounded-[4px]">
+                                {invoice.id.slice(-2)}
+                              </div>
+                              <div className="font-bold text-sm text-[#212529]">
+                                {activeInvTab === "closed_invoices"
+                                  ? invoice.invoiceNumber
+                                  : `ID: ${invoice.id.slice(-5)}`}
+                              </div>
+                            </div>
+                            <span
+                              className="text-[10px] font-bold px-2 py-0.5 rounded-[4px] uppercase"
+                              style={getStatusColor(invoice.status)}
+                            >
+                              {invoice.status}
+                            </span>
+                          </div>
+
+                          <div className="space-y-2 mb-4">
+                            <div className="flex justify-between text-xs">
+                              <span className="text-[#6C757D]">Customer</span>
+                              <span className="font-medium text-[#212529]">
+                                {invoice.customer?.companyName}
+                              </span>
+                            </div>
+                            <div className="flex justify-between text-xs">
+                              <span className="text-[#6C757D]">
+                                {activeInvTab === "open_invoices"
+                                  ? "Cargo"
+                                  : "Cargo No."}
+                              </span>
+                              <span className="font-medium text-[#212529]">
+                                {invoice.cargoNo || "-"}
+                              </span>
+                            </div>
+                            <div className="flex justify-between text-xs">
+                              <span className="text-[#6C757D]">Items / Qty</span>
+                              <span className="font-medium text-[#212529]">
+                                {invoice.items?.length || 0} /{" "}
+                                {invoice.items?.reduce(
+                                  (sum, item) => sum + item.quantity,
+                                  0,
+                                ) || 0}
+                              </span>
+                            </div>
+                            {activeInvTab === "closed_invoices" && (
+                              <div className="flex justify-between text-xs font-bold pt-1 border-t border-dashed border-gray-100">
+                                <span className="text-[#6C757D]">
+                                  Total Price
+                                </span>
+                                <span className="text-[#212529]">
+                                  ${Number(invoice.grossTotal).toFixed(2)}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="flex gap-2">
+                            {activeInvTab === "open_invoices" ? (
+                              <>
+                                <button
+                                  onClick={() => handleMarkAsPaid(invoice.id)}
+                                  disabled={actionLoading[`paid-${invoice.id}`]}
+                                  className="flex-1 flex items-center justify-center gap-2 py-2 bg-[#059669] text-white text-[11px] font-bold rounded-[4px] shadow-md disabled:opacity-50"
+                                >
+                                  {actionLoading[`paid-${invoice.id}`] ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                  ) : (
+                                    <CheckCircle className="w-4 h-4" />
+                                  )}
+                                  VERIFY
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    if (editingInvoiceId === invoice.id)
+                                      setEditingInvoiceId(null);
+                                    else {
+                                      setEditingInvoiceId(invoice.id);
+                                      setInvoiceEditForm({
+                                        description: invoice.description || "",
+                                        freightCost:
+                                          invoice.freightCost?.toString() || "",
+                                        remark: invoice.remark || "",
+                                      });
+                                    }
+                                  }}
+                                  className="flex-1 py-2 bg-[#28A745] text-white text-[11px] font-bold rounded-[4px]"
+                                >
+                                  Edit
+                                </button>
+                              </>
+                            ) : (
+                              <>
+                                <button
+                                  disabled={actionLoading[`pdf-${invoice.id}`]}
+                                  onClick={async () => {
+                                    try {
+                                      setActionLoading((prev) => ({
+                                        ...prev,
+                                        [`pdf-${invoice.id}`]: true,
+                                      }));
+                                      await downloadCommercialInvoice(invoice.id);
+                                    } catch (error) {
+                                      console.error(
+                                        "PDF Generation failed",
+                                        error,
+                                      );
+                                    } finally {
+                                      setActionLoading((prev) => ({
+                                        ...prev,
+                                        [`pdf-${invoice.id}`]: false,
+                                      }));
+                                    }
+                                  }}
+                                  className="flex-1 py-2 border border-[#DC3545] text-[#DC3545] text-[11px] font-bold rounded-[4px] flex items-center justify-center gap-1.5 disabled:opacity-50"
+                                >
+                                  {actionLoading[`pdf-${invoice.id}`] ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                  ) : (
+                                    <FileText className="w-4 h-4" />
+                                  )}
+                                  PDF
+                                </button>
+                                <button className="flex-1 py-2 bg-[#F15A24] text-white text-[11px] font-bold rounded-[4px] flex items-center justify-center gap-1 hover:bg-[#D9481B]">
+                                  <RefreshCw className="w-3.5 h-3.5" /> Ship
+                                </button>
+                              </>
+                            )}
+                          </div>
+                          {editingInvoiceId === invoice.id && (
+                            <div className="mt-4 p-4 bg-[#F8F9FA] border border-[#E9ECEF] rounded-[4px] space-y-4">
+                              <div>
+                                <label className="block text-[11px] font-bold text-[#495057] mb-1.5">
+                                  Description *
+                                </label>
+                                <input
+                                  type="text"
+                                  value={invoiceEditForm.description}
+                                  onChange={(e) =>
+                                    setInvoiceEditForm({
+                                      ...invoiceEditForm,
+                                      description: e.target.value,
+                                    })
+                                  }
+                                  className="w-full px-3 py-2 bg-white border border-[#DEE2E6] rounded-[4px] text-sm focus:outline-none focus:border-[#8CC21B] text-black font-medium"
+                                  placeholder="Freight cost"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[11px] font-bold text-[#495057] mb-1.5">
+                                  Freight Cost *
+                                </label>
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  value={invoiceEditForm.freightCost}
+                                  onChange={(e) =>
+                                    setInvoiceEditForm({
+                                      ...invoiceEditForm,
+                                      freightCost: e.target.value,
+                                    })
+                                  }
+                                  className="w-full px-3 py-2 bg-white border border-[#DEE2E6] rounded-[4px] text-sm focus:outline-none focus:border-[#8CC21B] text-black font-medium"
+                                  placeholder="Enter Freight Cost"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[11px] font-bold text-[#495057] mb-1.5">
+                                  Remark
+                                </label>
+                                <textarea
+                                  value={invoiceEditForm.remark}
+                                  onChange={(e) =>
+                                    setInvoiceEditForm({
+                                      ...invoiceEditForm,
+                                      remark: e.target.value,
+                                    })
+                                  }
+                                  rows={3}
+                                  className="w-full px-3 py-2 bg-white border border-[#DEE2E6] rounded-[4px] text-sm focus:outline-none focus:border-[#8CC21B] text-black font-medium"
+                                  placeholder="Enter extra info"
+                                />
+                              </div>
+                              <div className="flex gap-2 pt-2">
+                                <button
+                                  onClick={() => setEditingInvoiceId(null)}
+                                  className="flex-1 py-2 text-[11px] font-bold text-[#495057] bg-white border border-[#DEE2E6] rounded-[20px] hover:bg-gray-50 flex items-center justify-center gap-1.5 shadow-sm transition-all"
+                                >
+                                  <XCircle className="w-3.5 h-3.5" /> Cancel
+                                </button>
+                                <button
+                                  onClick={() =>
+                                    handleSaveInvoiceEdit(invoice.id)
+                                  }
+                                  disabled={actionLoading[`save-${invoice.id}`]}
+                                  className="flex-1 py-2 text-[11px] font-bold text-white bg-[#059669] rounded-[20px] hover:bg-green-700 flex items-center justify-center gap-1.5 shadow-md transition-all disabled:opacity-50"
+                                >
+                                  {actionLoading[`save-${invoice.id}`] ? (
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                  ) : (
+                                    <PlusCircle className="w-3.5 h-3.5" />
+                                  )}
+                                  Save
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+
+                    {totalPages > 1 && (
+                      <div className="flex items-center justify-between p-4 border-t border-[#E9ECEF] bg-[#F8F9FA]">
+                        <div className="text-[11px] font-medium text-[#6C757D]">
+                          Showing {startIndex + 1} to{" "}
+                          {Math.min(endIndex, filteredInvoices.length)} of{" "}
+                          {filteredInvoices.length} invoices
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            onClick={() =>
+                              setCurrentPage(Math.max(1, currentPage - 1))
+                            }
+                            disabled={currentPage === 1}
+                            className="p-1.5 rounded-[4px] border border-[#DEE2E6] bg-white disabled:opacity-30 hover:bg-gray-50 transition-colors"
+                          >
+                            <ChevronLeft className="w-3.5 h-3.5 text-[#495057]" />
+                          </button>
+                          {[...Array(totalPages)].map((_, i) => (
+                            <button
+                              key={i + 1}
+                              onClick={() => setCurrentPage(i + 1)}
+                              className={`min-w-[28px] h-7 text-[11px] font-bold rounded-[4px] border transition-all ${currentPage === i + 1
+                                  ? "bg-[#8CC21B] text-white border-[#8CC21B] shadow-md"
+                                  : "bg-white text-[#495057] border-[#DEE2E6] hover:bg-gray-50"
+                                }`}
+                            >
+                              {i + 1}
+                            </button>
+                          ))}
+                          <button
+                            onClick={() =>
+                              setCurrentPage(
+                                Math.min(totalPages, currentPage + 1),
+                              )
+                            }
+                            disabled={currentPage === totalPages}
+                            className="p-1.5 rounded-[4px] border border-[#DEE2E6] bg-white disabled:opacity-30 hover:bg-gray-50 transition-colors"
+                          >
+                            <ChevronRight className="w-3.5 h-3.5 text-[#495057]" />
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </>
+          )}
 
         {activeInvTab === "cargos" && (
           <div
@@ -2996,9 +3619,160 @@ const InvoiceListPage: React.FC = () => {
             />
           </CustomModal>
         )}
+
+        <OrderDetailsModal
+          isOpen={showViewModal}
+          onClose={closeView}
+          viewOrder={viewOrder}
+          viewItems={viewItems}
+          getCategoryName={getCategoryName}
+          getSupplierName={getSupplierName}
+        />
+
+        {showModal && (
+          <CustomModal
+            isOpen={showModal}
+            onClose={closeModal}
+            width="max-w-4xl"
+            title={
+              mode === "edit"
+                ? "Edit Order"
+                : "Create New Order"
+            }
+            footer={
+              <div className="flex gap-3">
+                <button
+                  onClick={closeModal}
+                  className="px-6 py-2 rounded-lg border border-gray-200 text-gray-600 font-semibold hover:bg-gray-50 transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={mode === "edit" ? handleUpdateOrder : handleCreateOrder}
+                  className="px-6 py-2 rounded-lg bg-[#059669] text-white font-semibold hover:bg-green-700 shadow-md transition-all font-bold"
+                >
+                  {mode === "edit" ? "Update Order" : "Create Order"}
+                </button>
+              </div>
+            }
+          >
+            <div className="space-y-4 text-black">
+              <div className="flex gap-4">
+                <div className="flex-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Select Category:</label>
+                  <select
+                    value={form.category_id}
+                    onChange={(e) => handleCategoryChange(e.target.value)}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:bg-gray-50 text-black"
+                  >
+                    <option value="">Select Category</option>
+                    {categories.map((cat) => (
+                      <option key={cat.id} value={String(cat.id)}>
+                        {cat.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Select Supplier:</label>
+                  <select
+                    value={form.supplier_id}
+                    onChange={(e) => handleSupplierChange(e.target.value)}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:bg-gray-50 text-black"
+                  >
+                    <option value="">Select Supplier</option>
+                    {suppliers.map((s) => (
+                      <option key={s.id} value={String(s.id)}>
+                        {s.company_name || s.name || "Unnamed Supplier"}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Select Item then quantity:</label>
+                <ItemSelectorWithQuantity
+                  items={effectiveItems}
+                  selectedItemId={selectedItemId}
+                  onItemChange={setSelectedItemId}
+                  onAdd={handleAddItemToOrder}
+                  disabled={loadingItems}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Comment:</label>
+                <textarea
+                  value={form.comment}
+                  onChange={(e) => setForm((prev) => ({ ...prev, comment: e.target.value }))}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500 focus:border-transparent disabled:bg-gray-50 text-black"
+                  placeholder="Enter order comment..."
+                  rows={3}
+                />
+              </div>
+              {orderItems.length > 0 && (
+                <div className="mt-3 overflow-x-auto">
+                  <table className="min-w-full bg-white border border-gray-200 rounded-[4px] shadow-md">
+                    <thead className="bg-gray-100 text-gray-800">
+                      <tr>
+                        <th className="px-4 py-2 text-left text-sm font-medium border-b">ID</th>
+                        <th className="px-4 py-2 text-left text-sm font-medium border-b w-[120px]">Item name</th>
+                        <th className="px-4 py-2 text-left text-sm font-medium border-b">Qty</th>
+                        <th className="px-4 py-2 text-left text-sm font-medium border-b">Item remark</th>
+                        <th className="px-4 py-2 text-left text-sm font-medium border-b">Price</th>
+                        <th className="px-4 py-2 text-center text-sm font-medium border-b">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="text-gray-700">
+                      {orderItems.map((row) => (
+                        <tr key={row.item_id} className="hover:bg-gray-50">
+                          <td className="px-4 py-2 text-sm border-b">{row.item_id}</td>
+                          <td className="px-4 py-2 text-sm border-b"><div className="line-clamp-2 leading-tight max-w-[120px]">{row.itemName}</div></td>
+                          <td className="px-4 py-2 text-sm border-b">
+                            <input
+                              type="number"
+                              min={1}
+                              value={row.qty}
+                              onChange={(e) => handleUpdateOrderItemQty(row.item_id, Number(e.target.value))}
+                              className="w-16 px-2 py-1 border border-gray-300 rounded-[4px] text-black"
+                            />
+                          </td>
+                          <td className="px-4 py-2 text-sm border-b">
+                            <input
+                              type="text"
+                              value={row.remark_de}
+                              onChange={(e) => handleUpdateOrderItemRemark(row.item_id, e.target.value)}
+                              className="w-full px-2 py-1 border border-gray-300 rounded-[4px] text-black"
+                            />
+                          </td>
+                          <td className="px-4 py-2 text-sm border-b">{row.price} {row.currency}</td>
+                          <td className="px-4 py-2 text-center border-b">
+                            <button
+                              onClick={() => handleRemoveOrderItem(row.item_id)}
+                              className="text-red-500 hover:text-red-700"
+                            >
+                              <Trash2 className="h-5 w-5" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </CustomModal>
+        )}
       </div>
     </div>
   );
 };
 
-export default InvoiceListPage;
+const InvoiceListPageWrapper: React.FC = () => (
+  <Suspense
+    fallback={<div className="p-8 text-center text-gray-400">Loading...</div>}
+  >
+    <InvoiceListPage />
+  </Suspense>
+);
+
+export default InvoiceListPageWrapper;

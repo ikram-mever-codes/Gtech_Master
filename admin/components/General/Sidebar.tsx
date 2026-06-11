@@ -106,12 +106,12 @@ const allMenuItems: MenuEntry[] = [
       //   path: "/order-confirmations",
       //   resource: "OrderConfirmations",
       // },
-      {
-        icon: Receipt,
-        text: "Invoice",
-        path: "/invoices",
-        resource: "Invoices",
-      },
+      // {
+      //   icon: Receipt,
+      //   text: "Invoice",
+      //   path: "/invoices",
+      //   resource: "Invoices",
+      // },
       // {
       //   icon: ReceiptText,
       //   text: "Invoice Correction",
@@ -128,12 +128,18 @@ const allMenuItems: MenuEntry[] = [
   },
   {
     icon: Truck,
-    text: "Delivery",
+    text: "Fulfillment",
     resource: "Delivery",
     children: [
       {
+        icon: Receipt,
+        text: "Delivery",
+        path: "/invoices",
+        resource: "Invoices",
+      },
+      {
         icon: ShoppingCart,
-        text: "Orders",
+        text: "Order Processing",
         path: "/orders",
         resource: "Orders",
       },

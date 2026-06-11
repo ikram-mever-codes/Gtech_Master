@@ -870,17 +870,11 @@ export const generateLabelPDF = async (
     });
 
     const doc = new PDFDocument({ size: [252, 110], margin: 0 });
-
-    // Default: every label uses OUR company logo.
     const logoPath = path.join(__dirname, "../../public/logo.png");
 
     let logoSource: string | Buffer = logoPath;
     let isCustomLogoUsed = false;
 
-    // Sniff the real image format from the buffer's magic bytes. PDFKit's
-    // doc.image() ONLY supports PNG and JPEG — webp/gif/bmp/svg will throw at
-    // draw time and silently leave the logo area blank. Detecting up front lets
-    // us log a clear reason and keep the default logo.
     const detectImageFormat = (buf: Buffer): string => {
       if (
         buf.length >= 8 &&
@@ -920,11 +914,6 @@ export const generateLabelPDF = async (
       return "unknown";
     };
 
-    // ---- Resolve the branding customer --------------------------------------
-    // The custom logo lives on a Customer. It is NOT necessarily the order's
-    // customer (an order may have none). The brand owner is the customer linked
-    // to the item itself (Item.customer_id), so prefer that, then fall back to
-    // the order's customer.
     let brandingCustomer: Customer | null = null;
 
     if (resolvedItem?.customer_id) {
@@ -932,7 +921,7 @@ export const generateLabelPDF = async (
         where: { id: resolvedItem.customer_id },
       });
     }
-    // If the item's customer has no usable logo, try the order's customer.
+
     if (
       !brandingCustomer?.companyLabelPrintLogo &&
       order?.customer?.companyLabelPrintLogo
@@ -950,15 +939,12 @@ export const generateLabelPDF = async (
       hasBrandingLogo: !!brandingCustomer?.companyLabelPrintLogo,
     });
 
-    // ---- Customer-branded logo resolution -----------------------------------
     if (resolvedItem?.isLabelPrint && brandingCustomer?.companyLabelPrintLogo) {
       const raw = brandingCustomer.companyLabelPrintLogo.trim();
       let base64Part = "";
       let declaredMime = "";
 
       if (raw.startsWith("data:image/")) {
-        // Broadened subtype char-class (handles e.g. svg+xml) and a payload
-        // matcher that tolerates newlines inside the base64.
         const matches = raw.match(
           /^data:image\/([a-zA-Z0-9.+-]+);base64,([\s\S]+)$/,
         );
@@ -971,12 +957,8 @@ export const generateLabelPDF = async (
           );
         }
       } else {
-        // Assume a plain (non-data-URI) base64 string.
         base64Part = raw;
       }
-
-      // Remove any whitespace / line breaks the encoder may have inserted so
-      // Buffer.from receives a clean base64 string.
       base64Part = base64Part.replace(/\s/g, "");
 
       if (base64Part) {
@@ -2108,7 +2090,6 @@ export const generateCommercialInvoicePDF = async (
     const footerY = pageH - 100;
 
     doc.switchToPage(lastPageIdx);
-
     doc
       .moveTo(40, footerY)
       .lineTo(555, footerY)
@@ -2121,7 +2102,6 @@ export const generateCommercialInvoicePDF = async (
     doc.text("Acc. No 478798112483", 40, footerY + 22);
     doc.text("Swift Code: DHBKHKHH", 40, footerY + 34);
     doc.text("DBS Bank (Hong Kong)", 40, footerY + 46);
-
     doc.text("+86 555 6767 199", 220, footerY + 10);
     doc.text("+86 17355524828", 220, footerY + 22);
     doc.text("Contact: lili", 220, footerY + 34);
