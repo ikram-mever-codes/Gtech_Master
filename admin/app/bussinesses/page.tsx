@@ -1031,7 +1031,8 @@ const CombinedBusinessContactsContent: React.FC = () => {
         <div className="mb-6 p-3 bg-white border border-gray-200 rounded-md shadow-sm">
           <div className="flex flex-wrap lg:flex-nowrap items-end gap-2">
             <div className="flex-1 min-w-[160px]">
-              <label className="block text-[11px] font-medium text-gray-600 mb-1">
+              <label className=" text-[11px] font-medium flex justify-start items-center gap-2 text-gray-600 mb-1">
+                <FunnelIcon className="w-4 h-4 text-primary" />
                 Tags
               </label>
               <TagFilterSelector
@@ -1042,7 +1043,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
                 onReset={() => setFilters((prev) => ({ ...prev, tags: "" }))}
               />
             </div>
-            <div className="flex-1 min-w-[110px]">
+            <div className="flex-1 max-w-[250px]">
               <label className="block text-[11px] font-medium text-gray-600 mb-1">
                 Company Name
               </label>
@@ -1059,7 +1060,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
                 className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all"
               />
             </div>
-            <div className="flex-1 min-w-[100px]">
+            <div className="flex-1 max-w-[150px]">
               <label className="block text-[11px] font-medium text-gray-600 mb-1">
                 Customer No
               </label>
@@ -1076,7 +1077,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
                 className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all"
               />
             </div>
-            <div className="flex-1 min-w-[100px]">
+            <div className="flex-1 max-w-[150px]">
               <label className="block text-[11px] font-medium text-gray-600 mb-1">
                 City
               </label>
@@ -1090,7 +1091,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
                 className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all"
               />
             </div>
-            <div className="flex-1 min-w-[90px]">
+            <div className="flex-1 max-w-[150px]">
               <label className="block text-[11px] font-medium text-gray-600 mb-1">
                 Postal Code
               </label>
@@ -1257,7 +1258,9 @@ const CombinedBusinessContactsContent: React.FC = () => {
                           </td>
                           {/* Note cell: roomy (≥4 lines) and clickable to open
                               the note popup. */}
-                          <td className="px-3 py-3 align-top">
+                          <td className="px-3 py-3 align-top max-w-[300px]">
+                            {" "}
+                            {/* 1. Constrain the table cell */}
                             {business.note ? (
                               <button
                                 type="button"
@@ -1266,15 +1269,11 @@ const CombinedBusinessContactsContent: React.FC = () => {
                                   handleOpenBusinessNote(business);
                                 }}
                                 title="Click to view note"
-                                className="text-left text-sm text-gray-600 w-[320px] hover:bg-gray-100 rounded-md p-1.5 transition-colors leading-snug"
-                                style={{
-                                  display: "-webkit-box",
-                                  WebkitLineClamp: 4,
-                                  WebkitBoxOrient: "vertical",
-                                  overflow: "hidden",
-                                }}
+                                /* 2. Added 'block', 'w-full', 'break-words', and 'line-clamp-4' */
+                                className="block w-full text-left text-sm text-gray-600 break-words line-clamp-4 hover:bg-gray-100 rounded-md p-1.5 transition-colors leading-snug"
                               >
-                                {business.note}
+                                {business.note.slice(0, 160)}...{" "}
+                                {/* Optionally limit the displayed text */}
                               </button>
                             ) : (
                               <span className="text-gray-400 text-xs">-</span>
@@ -2549,12 +2548,14 @@ const CombinedBusinessContactsContent: React.FC = () => {
                   <XMarkIcon className="h-6 w-6" />
                 </button>
               </div>
-              <div className="bg-blue-50 rounded-lg p-4">
+              <div className="bg-blue-50 rounded-lg p-4 max-w-full">
+                {" "}
+                {/* Optional: Add max-w to the container if you want it strictly bounded like the table cell */}
                 <div className="flex items-center gap-2 mb-2">
                   <span className="text-blue-500 text-xl">📝</span>
                   <h3 className="font-semibold text-gray-900">Note</h3>
                 </div>
-                <p className="text-gray-700 whitespace-pre-wrap">
+                <p className="text-gray-700 break-words line-clamp-4">
                   {businessNoteData.note || ""}
                 </p>
               </div>
