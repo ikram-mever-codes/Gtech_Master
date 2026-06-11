@@ -108,6 +108,24 @@ const COUNTRY_OPTIONS = [
   { value: "CH", label: "CH" },
 ];
 
+// Default the Sex selector to "Male" for NEW contacts. The exact option value
+// is resolved defensively from SEX_OPTIONS because value/label may be DE or EN
+// (e.g. "male", "m", "männlich", "Herr"). Falls back to "" if nothing matches.
+const DEFAULT_SEX_VALUE: string =
+  (SEX_OPTIONS as any).find((o: any) => {
+    const v = String(o?.value ?? "").toLowerCase();
+    const l = String(o?.label ?? "").toLowerCase();
+    return (
+      v === "male" ||
+      v === "m" ||
+      v.startsWith("männ") ||
+      v.startsWith("mann") ||
+      l.includes("männlich") ||
+      l.includes("male") ||
+      l.includes("herr")
+    );
+  })?.value ?? "";
+
 // Normalize any stored country value (full name or code) to a 2-letter code.
 const toCountryCode = (country?: string) => {
   if (!country) return "";
@@ -211,7 +229,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
     starBusinessDetailsId: "",
     name: "",
     familyName: "",
-    sex: "",
+    sex: DEFAULT_SEX_VALUE,
     position: "",
     positionOthers: "",
     email: "",
@@ -229,6 +247,10 @@ const CombinedBusinessContactsContent: React.FC = () => {
 
   const [showNotesModal, setShowNotesModal] = useState(false);
   const [notesModalData, setNotesModalData] = useState<any>(null);
+
+  // Business note popup (opened by clicking a business note cell).
+  const [showBusinessNoteModal, setShowBusinessNoteModal] = useState(false);
+  const [businessNoteData, setBusinessNoteData] = useState<any>(null);
 
   const [showBusinessModal, setShowBusinessModal] = useState(false);
   const [businessModalMode, setBusinessModalMode] =
@@ -593,7 +615,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
       starBusinessDetailsId: "",
       name: "",
       familyName: "",
-      sex: "",
+      sex: DEFAULT_SEX_VALUE,
       position: "",
       positionOthers: "",
       email: "",
@@ -628,6 +650,12 @@ const CombinedBusinessContactsContent: React.FC = () => {
   const handleOpenNotesModal = (contact: any) => {
     setNotesModalData(contact);
     setShowNotesModal(true);
+  };
+
+  // Open the business note popup (clicking a business note cell).
+  const handleOpenBusinessNote = (business: any) => {
+    setBusinessNoteData(business);
+    setShowBusinessNoteModal(true);
   };
 
   // Display Name: first word if unique; otherwise "first second" (space between
@@ -998,109 +1026,93 @@ const CombinedBusinessContactsContent: React.FC = () => {
           </div>
         </div>
 
-        {/* Filters: tag filter component (handles include + Not/exclude), then
-            text searches for company name, customer no, city and postal code. */}
-        <div className="mb-6 p-5 bg-white border border-gray-200 rounded-xl space-y-4 shadow-sm">
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">
-              Tags (include / exclude)
-            </label>
-            <TagFilterSelector
-              category="company"
-              onChange={(tagString) =>
-                setFilters((prev) => ({ ...prev, tags: tagString }))
-              }
-              onReset={() => setFilters((prev) => ({ ...prev, tags: "" }))}
-            />
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">
+        {/* Compact single-row filter bar: Tags + Company + Customer No + City +
+            Postal Code + Reset, all on one line on large screens. */}
+        <div className="mb-6 p-3 bg-white border border-gray-200 rounded-md shadow-sm">
+          <div className="flex flex-wrap lg:flex-nowrap items-end gap-2">
+            <div className="flex-1 min-w-[160px]">
+              <label className="block text-[11px] font-medium text-gray-600 mb-1">
+                Tags
+              </label>
+              <TagFilterSelector
+                category="company"
+                onChange={(tagString) =>
+                  setFilters((prev) => ({ ...prev, tags: tagString }))
+                }
+                onReset={() => setFilters((prev) => ({ ...prev, tags: "" }))}
+              />
+            </div>
+            <div className="flex-1 min-w-[110px]">
+              <label className="block text-[11px] font-medium text-gray-600 mb-1">
                 Company Name
               </label>
-              <div className="relative">
-                <MagnifyingGlassIcon className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  value={clientFilters.companyName}
-                  onChange={(e) =>
-                    setClientFilters((p) => ({
-                      ...p,
-                      companyName: e.target.value,
-                    }))
-                  }
-                  placeholder="Search company…"
-                  className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all"
-                />
-              </div>
+              <input
+                type="text"
+                value={clientFilters.companyName}
+                onChange={(e) =>
+                  setClientFilters((p) => ({
+                    ...p,
+                    companyName: e.target.value,
+                  }))
+                }
+                placeholder="Company…"
+                className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all"
+              />
             </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">
+            <div className="flex-1 min-w-[100px]">
+              <label className="block text-[11px] font-medium text-gray-600 mb-1">
                 Customer No
               </label>
-              <div className="relative">
-                <MagnifyingGlassIcon className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  value={clientFilters.customerNumber}
-                  onChange={(e) =>
-                    setClientFilters((p) => ({
-                      ...p,
-                      customerNumber: e.target.value,
-                    }))
-                  }
-                  placeholder="K-1001"
-                  className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all"
-                />
-              </div>
+              <input
+                type="text"
+                value={clientFilters.customerNumber}
+                onChange={(e) =>
+                  setClientFilters((p) => ({
+                    ...p,
+                    customerNumber: e.target.value,
+                  }))
+                }
+                placeholder="K-1001"
+                className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all"
+              />
             </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">
+            <div className="flex-1 min-w-[100px]">
+              <label className="block text-[11px] font-medium text-gray-600 mb-1">
                 City
               </label>
-              <div className="relative">
-                <MagnifyingGlassIcon className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  value={clientFilters.city}
-                  onChange={(e) =>
-                    setClientFilters((p) => ({ ...p, city: e.target.value }))
-                  }
-                  placeholder="München"
-                  className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all"
-                />
-              </div>
+              <input
+                type="text"
+                value={clientFilters.city}
+                onChange={(e) =>
+                  setClientFilters((p) => ({ ...p, city: e.target.value }))
+                }
+                placeholder="München"
+                className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all"
+              />
             </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">
+            <div className="flex-1 min-w-[90px]">
+              <label className="block text-[11px] font-medium text-gray-600 mb-1">
                 Postal Code
               </label>
-              <div className="relative">
-                <MagnifyingGlassIcon className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  value={clientFilters.postalCode}
-                  onChange={(e) =>
-                    setClientFilters((p) => ({
-                      ...p,
-                      postalCode: e.target.value,
-                    }))
-                  }
-                  placeholder="80331"
-                  className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all"
-                />
-              </div>
+              <input
+                type="text"
+                value={clientFilters.postalCode}
+                onChange={(e) =>
+                  setClientFilters((p) => ({
+                    ...p,
+                    postalCode: e.target.value,
+                  }))
+                }
+                placeholder="80331"
+                className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all"
+              />
             </div>
-          </div>
-
-          <div className="flex justify-end pt-2 border-t border-gray-100">
             <button
               onClick={resetFilters}
-              className="px-3 py-1.5 text-xs font-semibold text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 rounded-lg transition-colors flex items-center gap-1"
+              className="px-3 py-1.5 text-xs font-semibold text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 rounded-md transition-colors flex items-center gap-1 whitespace-nowrap shrink-0"
             >
               <ArrowPathIcon className="w-3.5 h-3.5" />
-              Reset All Filters
+              Reset
             </button>
           </div>
         </div>
@@ -1143,7 +1155,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
                   <tbody className="divide-y divide-gray-100">
                     {businesses.map((business: any) => (
                       <React.Fragment key={business.id}>
-                        <tr className="hover:bg-gray-50 transition-colors">
+                        <tr className="hover:bg-gray-50 transition-colors align-top">
                           <td className="px-3 py-3">
                             <div className="flex items-start gap-2">
                               <button
@@ -1185,7 +1197,10 @@ const CombinedBusinessContactsContent: React.FC = () => {
                                   </p>
                                   <div className="flex flex-wrap gap-1.5">
                                     {business.tags && business.tags.length > 0
-                                      ? sortTags(business.tags, business.tagOrder).map((tag: any) => (
+                                      ? sortTags(
+                                          business.tags,
+                                          business.tagOrder,
+                                        ).map((tag: any) => (
                                           <TagBadge
                                             key={tag.id}
                                             tag={tag}
@@ -1240,17 +1255,27 @@ const CombinedBusinessContactsContent: React.FC = () => {
                               <span className="text-gray-400">-</span>
                             )}
                           </td>
-                          <td
-                            className="px-3 py-3 cursor-pointer"
-                            onClick={() => openBusinessModal(business)}
-                          >
+                          {/* Note cell: roomy (≥4 lines) and clickable to open
+                              the note popup. */}
+                          <td className="px-3 py-3 align-top">
                             {business.note ? (
-                              <p
-                                className="text-sm text-gray-600 w-[180px] truncate"
-                                title={business.note}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleOpenBusinessNote(business);
+                                }}
+                                title="Click to view note"
+                                className="text-left text-sm text-gray-600 w-[320px] hover:bg-gray-100 rounded-md p-1.5 transition-colors leading-snug"
+                                style={{
+                                  display: "-webkit-box",
+                                  WebkitLineClamp: 4,
+                                  WebkitBoxOrient: "vertical",
+                                  overflow: "hidden",
+                                }}
                               >
                                 {business.note}
-                              </p>
+                              </button>
                             ) : (
                               <span className="text-gray-400 text-xs">-</span>
                             )}
@@ -1296,15 +1321,16 @@ const CombinedBusinessContactsContent: React.FC = () => {
                                               {contact.tags &&
                                                 contact.tags.length > 0 && (
                                                   <div className="flex flex-wrap gap-1.5">
-                                                    {sortTags(contact.tags, contact.tagOrder).map(
-                                                      (tag: any) => (
-                                                        <TagBadge
-                                                          key={tag.id}
-                                                          tag={tag}
-                                                          size="sm"
-                                                        />
-                                                      ),
-                                                    )}
+                                                    {sortTags(
+                                                      contact.tags,
+                                                      contact.tagOrder,
+                                                    ).map((tag: any) => (
+                                                      <TagBadge
+                                                        key={tag.id}
+                                                        tag={tag}
+                                                        size="sm"
+                                                      />
+                                                    ))}
                                                   </div>
                                                 )}
                                             </div>
@@ -1806,7 +1832,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
                             setBusinessForm((prev: any) => ({
                               ...prev,
                               tags: updatedTags,
-                              tagOrder: updatedTags.map(t => t.id).join(","),
+                              tagOrder: updatedTags.map((t) => t.id).join(","),
                             }))
                           }
                           disabled={businessFieldDisabled}
@@ -2277,7 +2303,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
                   </div>
                   <div className="col-span-2">
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      <span className="text-green-500 text-xl">⭐</span> Contact
+                      <span className="text-green-500 text-xl">💬</span> Contact
                       Preference
                     </label>
                     <input
@@ -2300,7 +2326,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
                         className="text-purple-500"
                         title="Decision Maker Note"
                       >
-                        💼
+                        🤝
                       </span>{" "}
                       Decision Maker Note
                     </label>
@@ -2357,7 +2383,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
                           setCreateForm((prev: any) => ({
                             ...prev,
                             tags: updatedTags,
-                            tagOrder: updatedTags.map(t => t.id).join(","),
+                            tagOrder: updatedTags.map((t) => t.id).join(","),
                           }))
                         }
                         disabled={modalMode === "edit" && !editModeEnabled}
@@ -2453,7 +2479,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
                 </div>
                 <div className="bg-green-50 rounded-lg p-4">
                   <div className="flex items-center gap-2 mb-2">
-                    <span className="text-green-500 text-xl">⭐</span>
+                    <span className="text-green-500 text-xl">💬</span>
                     <h3 className="font-semibold text-gray-900">
                       Contact Preference
                     </h3>
@@ -2464,7 +2490,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
                 </div>
                 <div className="bg-purple-50 rounded-lg p-4 border-l-4 border-purple-500">
                   <div className="flex items-center gap-2 mb-2">
-                    <span className="text-purple-500 text-xl">💼</span>
+                    <span className="text-purple-500 text-xl">🤝</span>
                     <h3 className="font-semibold text-purple-900">
                       Decision Maker Note
                     </h3>
@@ -2491,6 +2517,64 @@ const CombinedBusinessContactsContent: React.FC = () => {
                   onClick={() => {
                     setShowNotesModal(false);
                     setNotesModalData(null);
+                  }}
+                  className="px-4 py-2 text-white bg-gray-600 rounded-lg hover:bg-gray-700"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showBusinessNoteModal && businessNoteData && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-bold text-gray-900">
+                  Note ·{" "}
+                  {businessNoteData.displayName ||
+                    businessNoteData.companyName ||
+                    businessNoteData.name}
+                </h2>
+                <button
+                  onClick={() => {
+                    setShowBusinessNoteModal(false);
+                    setBusinessNoteData(null);
+                  }}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <XMarkIcon className="h-6 w-6" />
+                </button>
+              </div>
+              <div className="bg-blue-50 rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-blue-500 text-xl">📝</span>
+                  <h3 className="font-semibold text-gray-900">Note</h3>
+                </div>
+                <p className="text-gray-700 whitespace-pre-wrap">
+                  {businessNoteData.note || ""}
+                </p>
+              </div>
+              <div className="mt-6 flex justify-end gap-3">
+                <button
+                  onClick={() => {
+                    const b = businessNoteData;
+                    setShowBusinessNoteModal(false);
+                    setBusinessNoteData(null);
+                    openBusinessModal(b);
+                  }}
+                  className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2"
+                >
+                  <PencilIcon className="h-4 w-4" />
+                  Edit Business
+                </button>
+                <button
+                  onClick={() => {
+                    setShowBusinessNoteModal(false);
+                    setBusinessNoteData(null);
                   }}
                   className="px-4 py-2 text-white bg-gray-600 rounded-lg hover:bg-gray-700"
                 >
