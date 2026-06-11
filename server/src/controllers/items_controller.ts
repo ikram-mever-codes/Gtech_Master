@@ -468,44 +468,44 @@ export const getItems = async (
     ] = await Promise.all([
       parentIds.length > 0
         ? parentRepository.find({
-            where: { id: In(parentIds) },
-            select: ["id", "de_no", "name_de", "name_en", "name_cn"],
-          })
+          where: { id: In(parentIds) },
+          select: ["id", "de_no", "name_de", "name_en", "name_cn"],
+        })
         : Promise.resolve([]),
       taricIds.length > 0
         ? taricRepository.find({
-            where: { id: In(taricIds) },
-            select: ["id", "code", "description_de"],
-          })
+          where: { id: In(taricIds) },
+          select: ["id", "code", "description_de"],
+        })
         : Promise.resolve([]),
       catIds.length > 0
         ? categoryRepository.find({
-            where: { id: In(catIds) },
-            select: ["id", "name"],
-          })
+          where: { id: In(catIds) },
+          select: ["id", "name"],
+        })
         : Promise.resolve([]),
       itemSupplierIds.length > 0
         ? supplierRepository.find({
-            where: { id: In(itemSupplierIds) },
-            select: ["id", "name", "company_name"],
-          })
+          where: { id: In(itemSupplierIds) },
+          select: ["id", "name", "company_name"],
+        })
         : Promise.resolve([]),
       itemIds.length > 0
         ? warehouseRepository.find({
-            where: [
-              { item_id: In(itemIds) },
-              {
-                ItemID_DE: In(
-                  items.map((i) => i.ItemID_DE).filter(Boolean) as number[],
-                ),
-              },
-            ],
-          })
+          where: [
+            { item_id: In(itemIds) },
+            {
+              ItemID_DE: In(
+                items.map((i) => i.ItemID_DE).filter(Boolean) as number[],
+              ),
+            },
+          ],
+        })
         : Promise.resolve([]),
       itemIds.length > 0
         ? AppDataSource.getRepository(SupplierItem).find({
-            where: { item_id: In(itemIds) },
-          })
+          where: { item_id: In(itemIds) },
+        })
         : Promise.resolve([]),
     ]);
 
@@ -605,13 +605,13 @@ export const getItems = async (
         transfer_price_EUR: item.transfer_price_EUR,
         warehouse_data: warehouseData
           ? {
-              id: warehouseData.id,
-              item_no_de: warehouseData.item_no_de,
-              stock_qty: warehouseData.stock_qty,
-              msq: warehouseData.msq,
-              buffer: warehouseData.buffer,
-              is_stock_item: warehouseData.is_stock_item,
-            }
+            id: warehouseData.id,
+            item_no_de: warehouseData.item_no_de,
+            stock_qty: warehouseData.stock_qty,
+            msq: warehouseData.msq,
+            buffer: warehouseData.buffer,
+            is_stock_item: warehouseData.is_stock_item,
+          }
           : null,
         created_at: item.created_at,
         updated_at: item.updated_at,
@@ -942,29 +942,29 @@ export const getItemById = async (
           supplierItems[0];
         return defaultSi
           ? {
-              id: defaultSi.id,
-              supplierId: defaultSi.supplier_id,
-              supplierName:
-                defaultSi.supplier?.company_name ||
-                defaultSi.supplier?.name ||
-                "Unknown",
-              priceRMB: defaultSi.price_rmb?.toString() || "0",
-              isPO: defaultSi.is_po || "No",
-              moq: defaultSi.moq?.toString() || "0",
-              interval: defaultSi.oi?.toString() || "0",
-              leadTime: defaultSi.lead_time || "",
-              noteCN: defaultSi.note_cn || "",
-              url: defaultSi.url || "",
-            }
+            id: defaultSi.id,
+            supplierId: defaultSi.supplier_id,
+            supplierName:
+              defaultSi.supplier?.company_name ||
+              defaultSi.supplier?.name ||
+              "Unknown",
+            priceRMB: defaultSi.price_rmb?.toString() || "0",
+            isPO: defaultSi.is_po || "No",
+            moq: defaultSi.moq?.toString() || "0",
+            interval: defaultSi.oi?.toString() || "0",
+            leadTime: defaultSi.lead_time || "",
+            noteCN: defaultSi.note_cn || "",
+            url: defaultSi.url || "",
+          }
           : {
-              priceRMB: "0",
-              isPO: "No",
-              moq: "0",
-              interval: "0",
-              leadTime: "",
-              noteCN: "",
-              url: "",
-            };
+            priceRMB: "0",
+            isPO: "No",
+            moq: "0",
+            interval: "0",
+            leadTime: "",
+            noteCN: "",
+            url: "",
+          };
       })(),
 
       nprRemarks: item.npr_remark || "",
@@ -1751,61 +1751,68 @@ export const bulkUpdateItems = async (
       return next(new ErrorHandler("Updates object is required", 400));
     }
 
+    const parsedIds: number[] = ids
+      .map((id: any) => parseInt(id))
+      .filter((id: number) => !isNaN(id));
+
+    if (parsedIds.length === 0) {
+      return next(new ErrorHandler("No valid Item IDs provided", 400));
+    }
+
     const itemRepository = AppDataSource.getRepository(Item);
+    const warehouseRepository = AppDataSource.getRepository(WarehouseItem);
 
-    const updatedItems = [];
-    for (const id of ids) {
-      const item = await itemRepository.findOne({
-        where: { id: parseInt(id) },
+    const itemUpdatePayload: Record<string, any> = {
+      is_updated: true,
+      updated_at: new Date(),
+    };
+
+    const allowedItemFields = ["isActive", "cat_id", "supplier_id", "taric_id"];
+    allowedItemFields.forEach((field) => {
+      if (updates[field] !== undefined) {
+        itemUpdatePayload[field] = updates[field];
+      }
+    });
+
+    await itemRepository
+      .createQueryBuilder()
+      .update(Item)
+      .set(itemUpdatePayload)
+      .where("id IN (:...parsedIds)", { parsedIds })
+      .execute();
+
+    if (updates.isActive !== undefined) {
+      await warehouseRepository
+        .createQueryBuilder()
+        .update(WarehouseItem)
+        .set({ is_active: updates.isActive })
+        .where("item_id IN (:...parsedIds)", { parsedIds })
+        .execute();
+
+      const itemsWithDE = await itemRepository.find({
+        where: { id: In(parsedIds) },
+        select: ["id", "ItemID_DE"],
       });
-      if (item) {
-        let hasChanges = false;
-        Object.keys(updates).forEach((key) => {
-          if (key in item && key !== "id") {
-            const currentValue = (item as any)[key];
-            const newValue = updates[key];
-            if (currentValue !== newValue) {
-              hasChanges = true;
-              (item as any)[key] = newValue;
-            }
-          }
-        });
-        if (hasChanges) {
-          item.is_updated = true;
-          item.updated_at = new Date();
-          await itemRepository.save(item);
+      const deIds = itemsWithDE
+        .map((i) => i.ItemID_DE)
+        .filter((id): id is number => !!id);
 
-          if (updates.isActive !== undefined) {
-            const warehouseRepository = AppDataSource.getRepository(WarehouseItem);
-            const whereConditions: any[] = [{ item_id: item.id }];
-            if (item.ItemID_DE) {
-              whereConditions.push({ ItemID_DE: item.ItemID_DE });
-            }
-            const warehouseItems = await warehouseRepository.find({
-              where: whereConditions,
-            });
-            for (const wi of warehouseItems) {
-              wi.is_active = updates.isActive;
-              await warehouseRepository.save(wi);
-            }
-          }
-
-          updatedItems.push(item);
-        }
+      if (deIds.length > 0) {
+        await warehouseRepository
+          .createQueryBuilder()
+          .update(WarehouseItem)
+          .set({ is_active: updates.isActive })
+          .where('"ItemID_DE" IN (:...deIds)', { deIds })
+          .execute();
       }
     }
 
     return res.status(200).json({
       success: true,
-      message: `${updatedItems.length} items updated successfully`,
+      message: `${parsedIds.length} items updated successfully`,
       data: {
-        count: updatedItems.length,
-        items: updatedItems.map((item) => ({
-          id: item.id,
-          item_name: item.item_name,
-          isActive: item.isActive,
-          is_updated: item.is_updated,
-        })),
+        count: parsedIds.length,
+        items: parsedIds.map((id) => ({ id, isActive: updates.isActive })),
       },
     });
   } catch (error) {
@@ -2054,9 +2061,9 @@ export const getParents = async (
       supplier_id: parent.supplier_id,
       supplier: parent.supplier
         ? {
-            id: parent.supplier.id,
-            name: parent.supplier.name,
-          }
+          id: parent.supplier.id,
+          name: parent.supplier.name,
+        }
         : null,
       item_count: parent.items?.length || 0,
       created_at: parent.created_at,
@@ -2132,17 +2139,17 @@ export const getParentById = async (
       is_active: parent.is_active,
       taric: parent.taric
         ? {
-            id: parent.taric.id,
-            code: parent.taric.code,
-            name_de: parent.taric.name_de,
-          }
+          id: parent.taric.id,
+          code: parent.taric.code,
+          name_de: parent.taric.name_de,
+        }
         : null,
       supplier: parent.supplier
         ? {
-            id: parent.supplier.id,
-            name: parent.supplier.name,
-            contact_person: parent.supplier.contact_person,
-          }
+          id: parent.supplier.id,
+          name: parent.supplier.name,
+          contact_person: parent.supplier.contact_person,
+        }
         : null,
       variations: {
         de: [parent.var_de_1, parent.var_de_2, parent.var_de_3].filter(Boolean),
@@ -3702,23 +3709,23 @@ export const getNewItems = async (
       items.map(async (item) => {
         const parentData = item.parent_id
           ? await parentRepository.findOne({
-              where: { id: item.parent_id },
-              select: ["id", "de_no", "name_de", "name_en"],
-            })
+            where: { id: item.parent_id },
+            select: ["id", "de_no", "name_de", "name_en"],
+          })
           : null;
 
         const categoryData = item.cat_id
           ? await categoryRepository.findOne({
-              where: { id: item.cat_id },
-              select: ["id", "name"],
-            })
+            where: { id: item.cat_id },
+            select: ["id", "name"],
+          })
           : null;
 
         const supplierData = item.supplier_id
           ? await supplierRepository.findOne({
-              where: { id: item.supplier_id },
-              select: ["id", "name", "company_name"],
-            })
+            where: { id: item.supplier_id },
+            select: ["id", "name", "company_name"],
+          })
           : null;
 
         let warehouseData: any = null;
@@ -3945,8 +3952,8 @@ export const exportNewItemsToCSV = async (
           item.ean?.toString() || "",
           parent?.de_no || "NONE",
           warehouseData?.item_no_de ||
-            item.ItemID_DE?.toString() ||
-            item.id.toString(),
+          item.ItemID_DE?.toString() ||
+          item.id.toString(),
           item.ItemID_DE?.toString() || "",
 
           item.supp_cat || item.category?.name || "STD",
