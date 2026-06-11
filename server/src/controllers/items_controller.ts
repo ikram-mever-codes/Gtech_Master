@@ -1666,61 +1666,73 @@ export const bulkUpdateItems = async (
       return next(new ErrorHandler("Updates object is required", 400));
     }
 
+    const parsedIds: number[] = ids
+      .map((id: any) => parseInt(id))
+      .filter((id: number) => !isNaN(id));
+
+    if (parsedIds.length === 0) {
+      return next(new ErrorHandler("No valid Item IDs provided", 400));
+    }
+
     const itemRepository = AppDataSource.getRepository(Item);
+    const warehouseRepository = AppDataSource.getRepository(WarehouseItem);
 
-    const updatedItems = [];
-    for (const id of ids) {
-      const item = await itemRepository.findOne({
-        where: { id: parseInt(id) },
+    // Build the update payload for the item table (only allowed fields)
+    const itemUpdatePayload: Record<string, any> = {
+      is_updated: true,
+      updated_at: new Date(),
+    };
+
+    const allowedItemFields = ["isActive", "cat_id", "supplier_id", "taric_id"];
+    allowedItemFields.forEach((field) => {
+      if (updates[field] !== undefined) {
+        itemUpdatePayload[field] = updates[field];
+      }
+    });
+
+    // Batch UPDATE: single SQL query instead of N+1 individual saves
+    await itemRepository
+      .createQueryBuilder()
+      .update(Item)
+      .set(itemUpdatePayload)
+      .where("id IN (:...parsedIds)", { parsedIds })
+      .execute();
+
+    // If isActive is being changed, also update all matching warehouse_item records
+    if (updates.isActive !== undefined) {
+      // Update by item_id
+      await warehouseRepository
+        .createQueryBuilder()
+        .update(WarehouseItem)
+        .set({ is_active: updates.isActive })
+        .where("item_id IN (:...parsedIds)", { parsedIds })
+        .execute();
+
+      // Also update by ItemID_DE for items that have it (some imported items link this way)
+      const itemsWithDE = await itemRepository.find({
+        where: { id: In(parsedIds) },
+        select: ["id", "ItemID_DE"],
       });
-      if (item) {
-        let hasChanges = false;
-        Object.keys(updates).forEach((key) => {
-          if (key in item && key !== "id") {
-            const currentValue = (item as any)[key];
-            const newValue = updates[key];
-            if (currentValue !== newValue) {
-              hasChanges = true;
-              (item as any)[key] = newValue;
-            }
-          }
-        });
-        if (hasChanges) {
-          item.is_updated = true;
-          item.updated_at = new Date();
-          await itemRepository.save(item);
+      const deIds = itemsWithDE
+        .map((i) => i.ItemID_DE)
+        .filter((id): id is number => !!id);
 
-          if (updates.isActive !== undefined) {
-            const warehouseRepository = AppDataSource.getRepository(WarehouseItem);
-            const whereConditions: any[] = [{ item_id: item.id }];
-            if (item.ItemID_DE) {
-              whereConditions.push({ ItemID_DE: item.ItemID_DE });
-            }
-            const warehouseItems = await warehouseRepository.find({
-              where: whereConditions,
-            });
-            for (const wi of warehouseItems) {
-              wi.is_active = updates.isActive;
-              await warehouseRepository.save(wi);
-            }
-          }
-
-          updatedItems.push(item);
-        }
+      if (deIds.length > 0) {
+        await warehouseRepository
+          .createQueryBuilder()
+          .update(WarehouseItem)
+          .set({ is_active: updates.isActive })
+          .where('"ItemID_DE" IN (:...deIds)', { deIds })
+          .execute();
       }
     }
 
     return res.status(200).json({
       success: true,
-      message: `${updatedItems.length} items updated successfully`,
+      message: `${parsedIds.length} items updated successfully`,
       data: {
-        count: updatedItems.length,
-        items: updatedItems.map((item) => ({
-          id: item.id,
-          item_name: item.item_name,
-          isActive: item.isActive,
-          is_updated: item.is_updated,
-        })),
+        count: parsedIds.length,
+        items: parsedIds.map((id) => ({ id, isActive: updates.isActive })),
       },
     });
   } catch (error) {
