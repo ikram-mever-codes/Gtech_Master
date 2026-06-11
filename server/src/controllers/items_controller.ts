@@ -525,7 +525,7 @@ export const getItems = async (
         parent_id: item.parent_id || null,
         taric_id: item.taric_id || null,
         category_id: item.cat_id || null,
-        category: item?.supp_cat || null,
+        category: (item.cat_id ? catMap.get(item.cat_id)?.name : null) || item.supp_cat || null,
         supplier_id: effectiveSupplierId,
         supplier_name: supplierData?.company_name || supplierData?.name || null,
         weight: item.weight,

@@ -849,10 +849,23 @@ const ItemsManagementPage: React.FC = () => {
     }
 
     try {
-      const ids = Array.from(selectedItems).map((id) => parseInt(id));
-      await bulkUpdateItems(ids, { isActive: "Y" });
+      let allIds: number[] = Array.from(selectedItems).map((id) => parseInt(id));
+      const totalRecs = pagination.totalRecords;
+      if (selectedItems.size === items.length && totalRecs > items.length) {
+        const allRes: any = await getItems({
+          page: 1,
+          limit: totalRecs,
+          isActive: debouncedFilters.isActive,
+          category: debouncedFilters.category,
+          search: debouncedFilters.search,
+          supplier: debouncedFilters.supplier,
+          tags: debouncedFilters.tags,
+        });
+        allIds = (allRes.data || []).map((it: any) => it.id);
+      }
+      await bulkUpdateItems(allIds, { isActive: "Y" });
       toast.success(
-        `${selectedItems.size} items activated successfully`,
+        `${allIds.length} items activated successfully`,
         successStyles,
       );
       setSelectedItems(new Set());
@@ -870,10 +883,23 @@ const ItemsManagementPage: React.FC = () => {
     }
 
     try {
-      const ids = Array.from(selectedItems).map((id) => parseInt(id));
-      await bulkUpdateItems(ids, { isActive: "N" });
+      let allIds: number[] = Array.from(selectedItems).map((id) => parseInt(id));
+      const totalRecs = pagination.totalRecords;
+      if (selectedItems.size === items.length && totalRecs > items.length) {
+        const allRes: any = await getItems({
+          page: 1,
+          limit: totalRecs,
+          isActive: debouncedFilters.isActive,
+          category: debouncedFilters.category,
+          search: debouncedFilters.search,
+          supplier: debouncedFilters.supplier,
+          tags: debouncedFilters.tags,
+        });
+        allIds = (allRes.data || []).map((it: any) => it.id);
+      }
+      await bulkUpdateItems(allIds, { isActive: "N" });
       toast.success(
-        `${selectedItems.size} items deactivated successfully`,
+        `${allIds.length} items deactivated successfully`,
         successStyles,
       );
       setSelectedItems(new Set());
@@ -945,61 +971,8 @@ const ItemsManagementPage: React.FC = () => {
   };
 
   const filteredData = useMemo(() => {
-    const data = getCurrentData();
-    const currentFilters = activeTab === "tarics" ? debouncedTaricFilters : debouncedFilters;
-
-    return data.filter((item) => {
-      const it = item as any;
-
-      const filterParam = searchParams.get("filter");
-      if (filterParam) {
-        // Bypassed: Server-side filtering is active for health audit filters.
-      }
-
-      if (activeTab === "items" && debouncedFilters.eanSearch) {
-        const eanMatches = matchesEANSearch(it.ean, debouncedFilters.eanSearch);
-        if (!eanMatches) return false;
-      }
-
-      if (currentFilters.search) {
-        const searchLower = currentFilters.search.toLowerCase();
-        let matchesGlobal = false;
-
-        if (activeTab === "suppliers") {
-          matchesGlobal =
-            it.id?.toString().includes(searchLower) ||
-            it.name?.toLowerCase().includes(searchLower) ||
-            it.company_name?.toLowerCase().includes(searchLower) ||
-            it.contact_person?.toLowerCase().includes(searchLower) ||
-            it.email?.toLowerCase().includes(searchLower);
-        } else {
-          matchesGlobal =
-            it.id?.toString().includes(searchLower) ||
-            it.name?.toLowerCase().includes(searchLower) ||
-            it.de_no?.toLowerCase().includes(searchLower) ||
-            it.item_name?.toLowerCase().includes(searchLower) ||
-            it.item_no_de?.toLowerCase().includes(searchLower) ||
-            it.name_en?.toLowerCase().includes(searchLower) ||
-            matchesEANSearch(it.ean, currentFilters.search);
-        }
-
-        if (!matchesGlobal) return false;
-      }
-
-      if (activeTab === "items" || activeTab === "parents" || activeTab === "warehouse") {
-        if (debouncedFilters.isActive && it.is_active?.trim() !== debouncedFilters.isActive.trim())
-          return false;
-        if (
-          debouncedFilters.category &&
-          it.category?.toString().trim().toLowerCase() !==
-          debouncedFilters.category.trim().toLowerCase()
-        )
-          return false;
-      }
-
-      return true;
-    });
-  }, [items, parents, warehouseItems, tarics, suppliers, activeTab, debouncedFilters, debouncedTaricFilters]);
+    return getCurrentData();
+  }, [items, parents, warehouseItems, tarics, suppliers, activeTab]);
 
   const renderTableHeaders = () => {
     switch (activeTab) {
@@ -1170,7 +1143,7 @@ const ItemsManagementPage: React.FC = () => {
                 : "hover:bg-gray-50"
                 }`}
             >
-              <td className="p-4">
+              <td className="p-4" onClick={(e) => e.stopPropagation()}>
                 <input
                   type="checkbox"
                   checked={selectedItems.has(item.id.toString())}
