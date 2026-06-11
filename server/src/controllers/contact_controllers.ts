@@ -237,7 +237,11 @@ export const createContactPerson = async (
 
     const contactPersonWithRelations = await contactPersonRepository.findOne({
       where: { id: savedContactPerson.id },
-      relations: ["starBusinessDetails", "starBusinessDetails.customer", "tags"],
+      relations: [
+        "starBusinessDetails",
+        "starBusinessDetails.customer",
+        "tags",
+      ],
     });
 
     return res.status(201).json({
@@ -280,7 +284,11 @@ export const updateContactPerson = async (
 
     const contactPerson = await contactPersonRepository.findOne({
       where: { id },
-      relations: ["starBusinessDetails", "starBusinessDetails.customer", "tags"],
+      relations: [
+        "starBusinessDetails",
+        "starBusinessDetails.customer",
+        "tags",
+      ],
     });
 
     if (!contactPerson) {
@@ -397,7 +405,11 @@ export const updateContactPerson = async (
 
     const updatedContactPerson = await contactPersonRepository.findOne({
       where: { id: savedContactPerson.id },
-      relations: ["starBusinessDetails", "starBusinessDetails.customer", "tags"],
+      relations: [
+        "starBusinessDetails",
+        "starBusinessDetails.customer",
+        "tags",
+      ],
     });
 
     return res.status(200).json({
@@ -783,7 +795,11 @@ export const getContactPerson = async (
 
     const contactPerson = await contactPersonRepository.findOne({
       where: { id },
-      relations: ["starBusinessDetails", "starBusinessDetails.customer", "tags"],
+      relations: [
+        "starBusinessDetails",
+        "starBusinessDetails.customer",
+        "tags",
+      ],
     });
 
     if (!contactPerson) {
