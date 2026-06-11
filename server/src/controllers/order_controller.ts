@@ -86,7 +86,7 @@ export let _cachedCjkFontBuffer: Buffer | null = null;
         _cachedCjkFontBuffer = buf;
         _cachedCjkFontPath = p;
         return;
-      } catch (e: any) {}
+      } catch (e: any) { }
     }
   }
 })();
@@ -244,12 +244,12 @@ export const createOrder = async (
   } catch (error) {
     try {
       await queryRunner.rollbackTransaction();
-    } catch {}
+    } catch { }
     return next(error);
   } finally {
     try {
       await queryRunner.release();
-    } catch {}
+    } catch { }
   }
 };
 
@@ -416,12 +416,12 @@ export const updateOrder = async (
   } catch (error) {
     try {
       await queryRunner.rollbackTransaction();
-    } catch {}
+    } catch { }
     return next(error);
   } finally {
     try {
       await queryRunner.release();
-    } catch {}
+    } catch { }
   }
 };
 
@@ -594,20 +594,20 @@ export const getAllOrders = async (
           item: itemDetails,
           warehouse_data: warehouseItem
             ? {
-                id: warehouseItem.id,
-                item_no_de: warehouseItem.item_no_de,
-                item_name_de: warehouseItem.item_name_de,
-                item_name_en: warehouseItem.item_name_en,
-                stock_qty: warehouseItem.stock_qty,
-                msq: warehouseItem.msq,
-                buffer: warehouseItem.buffer,
-                is_stock_item: warehouseItem.is_stock_item,
-                is_SnSI: warehouseItem.is_SnSI,
-                ship_class: warehouseItem.ship_class,
-                is_active: warehouseItem.is_active,
-                is_no_auto_order: warehouseItem.is_no_auto_order,
-                category_id: warehouseItem.category_id,
-              }
+              id: warehouseItem.id,
+              item_no_de: warehouseItem.item_no_de,
+              item_name_de: warehouseItem.item_name_de,
+              item_name_en: warehouseItem.item_name_en,
+              stock_qty: warehouseItem.stock_qty,
+              msq: warehouseItem.msq,
+              buffer: warehouseItem.buffer,
+              is_stock_item: warehouseItem.is_stock_item,
+              is_SnSI: warehouseItem.is_SnSI,
+              ship_class: warehouseItem.ship_class,
+              is_active: warehouseItem.is_active,
+              is_no_auto_order: warehouseItem.is_no_auto_order,
+              category_id: warehouseItem.category_id,
+            }
             : null,
         };
       }),
@@ -814,12 +814,12 @@ export const deleteOrder = async (
   } catch (error) {
     try {
       await queryRunner.rollbackTransaction();
-    } catch {}
+    } catch { }
     return next(error);
   } finally {
     try {
       await queryRunner.release();
-    } catch {}
+    } catch { }
   }
 };
 
@@ -841,9 +841,6 @@ export const generateLabelPDF = async (
     });
 
     if (!item) return next(new ErrorHandler("Item not found", 404));
-
-    // Resolve the underlying Item for this order item. This is the record that
-    // carries the `isLabelPrint` flag AND the `customer_id` of the brand owner.
     let resolvedItem: Item | null = item.item;
     if (!resolvedItem && item.ItemID_DE) {
       resolvedItem = await AppDataSource.getRepository(Item).findOne({
@@ -1016,8 +1013,6 @@ export const generateLabelPDF = async (
         );
       }
     }
-    // -------------------------------------------------------------------------
-
     const safeOrderNo = (order?.order_no || "N/A").replace(
       /[/\\?%*:|"<>\s]/g,
       "-",
@@ -1044,7 +1039,7 @@ export const generateLabelPDF = async (
     const colA = 12;
     const valColA = 16;
     const colLogo = 207;
-    const qtyLabelColStart = 169;
+    const qtyLabelColStart = 170;
     const rightEdgeOrderQty = 155;
     const row1LabelY = 10;
     const row1ValueY = 22;
@@ -1065,10 +1060,7 @@ export const generateLabelPDF = async (
     doc.fillColor("black").font("Helvetica-Oblique").fontSize(6.5);
     doc.text("ItemNoW", colA, row1LabelY);
     doc.text("Order No / Qty", orderNoX, row1LabelY);
-    doc.text("Qty", qtyLabelColStart, row1LabelY, {
-      width: 32,
-      align: "right",
-    });
+    doc.text("Qty", qtyLabelColStart, row1LabelY);
 
     doc.font("Helvetica-Bold").fontSize(10);
     let itemNoDE = warehouseItem?.item_no_de || "N/A";
@@ -1085,14 +1077,8 @@ export const generateLabelPDF = async (
     doc.text(qtyOrderText, qtyOrderX, row1ValueY + 1.5);
 
     doc.font("Helvetica-Bold").fontSize(10);
-    doc.text(`${item.qty_label || 0}`, qtyLabelColStart, row1ValueY, {
-      width: 32,
-      align: "right",
-    });
+    doc.text(`${item.qty_label || 0}`, qtyLabelColStart, row1ValueY);
 
-    // Draw the logo. If a custom (customer) logo is in play but fails to render
-    // for any reason, fall back to the default company logo so a logo always
-    // appears on the label. Dimensions/position are identical in both cases.
     try {
       doc.image(logoSource, colLogo, 14, { width: 40 });
       console.log(
@@ -1484,9 +1470,9 @@ const resolveCustomerAddress = (
 
   const streetParts = [
     customer.addressLine1 ||
-      starCustomerDetails?.deliveryAddressLine1 ||
-      businessDetails?.address ||
-      "",
+    starCustomerDetails?.deliveryAddressLine1 ||
+    businessDetails?.address ||
+    "",
     customer.addressLine2 || starCustomerDetails?.deliveryAddressLine2 || "",
   ].filter(Boolean);
 
@@ -1584,8 +1570,8 @@ export const generateCommercialInvoicePDF = async (
     const manualTarics =
       uniqueCodes.length > 0
         ? await AppDataSource.getRepository(Taric).find({
-            where: { code: In(uniqueCodes) },
-          })
+          where: { code: In(uniqueCodes) },
+        })
         : [];
     const manualTaricMap = new Map(manualTarics.map((t) => [t.code, t]));
 
@@ -1688,9 +1674,9 @@ export const generateCommercialInvoicePDF = async (
     const rawBillName = hasCargoBillTo
       ? cargo!.bill_to_display_name || cargo!.bill_to_company_name || ""
       : cargo?.ship_to_display_name ||
-        cargo?.ship_to_company_name ||
-        customer?.companyName ||
-        "";
+      cargo?.ship_to_company_name ||
+      customer?.companyName ||
+      "";
     const billToName =
       rawBillName
         .replace(/^GTech$/i, "GTech Industries GmbH")
@@ -1859,7 +1845,7 @@ export const generateCommercialInvoicePDF = async (
               .font("C:\\Windows\\Fonts\\msyh.ttc", 0)
               .fontSize(9)
               .text("中国安徽...", 152, 101);
-          } catch (e) {}
+          } catch (e) { }
         }
         doc.font("Helvetica").fillColor("#000000");
       }
@@ -2146,7 +2132,7 @@ export const generateCommercialInvoicePDF = async (
       if (existsSync(footerLogo)) {
         doc.image(footerLogo, 420, footerY + 8, { width: 100 });
       }
-    } catch (e) {}
+    } catch (e) { }
 
     range = doc.bufferedPageRange();
     totalPagesCount = range.count;
