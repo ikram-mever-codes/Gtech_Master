@@ -822,7 +822,6 @@ export const deleteOrder = async (
     } catch {}
   }
 };
-
 export const generateLabelPDF = async (
   req: Request,
   res: Response,
@@ -880,38 +879,123 @@ export const generateLabelPDF = async (
     let logoSource: string | Buffer = logoPath;
     let isCustomLogoUsed = false;
 
-    // Customer-branded labels:
-    // If the resolved item is flagged for custom label printing (isLabelPrint)
-    // AND the order's customer has uploaded their own company label logo, use
-    // the customer's logo instead of ours. The stored logo may be either a
-    // `data:image/...;base64,...` URI or a plain base64 string.
-    if (resolvedItem?.isLabelPrint && order?.customer?.companyLabelPrintLogo) {
-      const logoStr = order.customer.companyLabelPrintLogo.trim();
+    // Sniff the real image format from the buffer's magic bytes. PDFKit's
+    // doc.image() ONLY supports PNG and JPEG — webp/gif/bmp/svg will throw at
+    // draw time and silently leave the logo area blank, which is exactly the
+    // "image exists but nothing prints" symptom. Detecting up front lets us log
+    // a clear reason and keep the default logo.
+    const detectImageFormat = (buf: Buffer): string => {
+      if (
+        buf.length >= 8 &&
+        buf[0] === 0x89 &&
+        buf[1] === 0x50 &&
+        buf[2] === 0x4e &&
+        buf[3] === 0x47
+      )
+        return "png";
+      if (
+        buf.length >= 3 &&
+        buf[0] === 0xff &&
+        buf[1] === 0xd8 &&
+        buf[2] === 0xff
+      )
+        return "jpeg";
+      if (
+        buf.length >= 4 &&
+        buf[0] === 0x47 &&
+        buf[1] === 0x49 &&
+        buf[2] === 0x46 &&
+        buf[3] === 0x38
+      )
+        return "gif";
+      if (
+        buf.length >= 12 &&
+        buf.toString("ascii", 0, 4) === "RIFF" &&
+        buf.toString("ascii", 8, 12) === "WEBP"
+      )
+        return "webp";
+      if (buf.length >= 2 && buf[0] === 0x42 && buf[1] === 0x4d) return "bmp";
+      const head = buf
+        .toString("utf8", 0, Math.min(buf.length, 200))
+        .trim()
+        .toLowerCase();
+      if (head.startsWith("<?xml") || head.startsWith("<svg")) return "svg";
+      return "unknown";
+    };
 
-      if (logoStr.startsWith("data:image/")) {
-        const matches = logoStr.match(
-          /^data:image\/([a-zA-Z+-]+);base64,(.+)$/,
+    // ---- Customer-branded logo resolution -----------------------------------
+    const hasCustomerLogo = !!order?.customer?.companyLabelPrintLogo;
+    console.log("[label] logo decision:", {
+      itemId,
+      orderId: item.order_id,
+      isLabelPrint: !!resolvedItem?.isLabelPrint,
+      hasCustomerLogo,
+      customerId: order?.customer?.id,
+    });
+
+    if (resolvedItem?.isLabelPrint && order?.customer?.companyLabelPrintLogo) {
+      const raw = order.customer.companyLabelPrintLogo.trim();
+      let base64Part = "";
+      let declaredMime = "";
+
+      if (raw.startsWith("data:image/")) {
+        // Broadened subtype char-class (handles e.g. svg+xml) and a payload
+        // matcher that tolerates newlines inside the base64.
+        const matches = raw.match(
+          /^data:image\/([a-zA-Z0-9.+-]+);base64,([\s\S]+)$/,
         );
-        if (matches && matches[2]) {
-          try {
-            logoSource = Buffer.from(matches[2], "base64");
-            isCustomLogoUsed = true;
-          } catch (err) {
-            console.error("Failed to parse base64 customer logo:", err);
-          }
-        }
-      } else if (/^[a-zA-Z0-9+/=]+$/.test(logoStr)) {
-        try {
-          logoSource = Buffer.from(logoStr, "base64");
-          isCustomLogoUsed = true;
-        } catch (err) {
-          console.error(
-            "Failed to parse customer logo from plain base64:",
-            err,
+        if (matches) {
+          declaredMime = matches[1];
+          base64Part = matches[2];
+        } else {
+          console.warn(
+            "[label] customer logo starts with `data:image/` but does not match the expected `data:image/<type>;base64,<data>` shape — using default logo",
           );
         }
+      } else {
+        // Assume a plain (non-data-URI) base64 string.
+        base64Part = raw;
+      }
+
+      // Remove any whitespace / line breaks the encoder may have inserted so
+      // Buffer.from receives a clean base64 string.
+      base64Part = base64Part.replace(/\s/g, "");
+
+      if (base64Part) {
+        try {
+          const buf = Buffer.from(base64Part, "base64");
+          const detectedFormat = detectImageFormat(buf);
+          console.log("[label] customer logo parsed:", {
+            declaredMime: declaredMime || "(plain base64)",
+            detectedFormat,
+            bytes: buf.length,
+          });
+
+          if (buf.length === 0) {
+            console.warn(
+              "[label] customer logo decoded to 0 bytes — using default logo",
+            );
+          } else if (detectedFormat === "png" || detectedFormat === "jpeg") {
+            logoSource = buf;
+            isCustomLogoUsed = true;
+          } else {
+            console.warn(
+              `[label] customer logo format "${detectedFormat}" is NOT supported by PDFKit (PNG/JPEG only) — using default logo. Ask the customer to re-upload a PNG or JPEG.`,
+            );
+          }
+        } catch (err) {
+          console.error(
+            "[label] failed to decode customer logo base64 — using default logo:",
+            err instanceof Error ? err.message : err,
+          );
+        }
+      } else {
+        console.warn(
+          "[label] customer logo present but no base64 payload could be extracted — using default logo",
+        );
       }
     }
+    // -------------------------------------------------------------------------
 
     const safeOrderNo = (order?.order_no || "N/A").replace(
       /[/\\?%*:|"<>\s]/g,
@@ -985,14 +1069,33 @@ export const generateLabelPDF = async (
       align: "right",
     });
 
+    // Draw the logo. If a custom (customer) logo is in play but fails to render
+    // for any reason, fall back to the default company logo so a logo always
+    // appears on the label. Dimensions/position are identical in both cases.
     try {
       doc.image(logoSource, colLogo, 14, { width: 40 });
+      console.log(
+        "[label] drew",
+        isCustomLogoUsed ? "customer logo" : "default logo",
+      );
     } catch (e) {
       console.error(
-        "Logo missing or invalid:",
-        isCustomLogoUsed ? "customer logo" : logoPath,
-        e,
+        "[label] failed to draw",
+        isCustomLogoUsed ? "customer logo" : "default logo",
+        "-",
+        e instanceof Error ? e.message : e,
       );
+      if (isCustomLogoUsed) {
+        try {
+          doc.image(logoPath, colLogo, 14, { width: 40 });
+          console.log("[label] drew default logo as fallback");
+        } catch (fallbackErr) {
+          console.error(
+            "[label] default logo ALSO failed to draw:",
+            fallbackErr instanceof Error ? fallbackErr.message : fallbackErr,
+          );
+        }
+      }
     }
 
     const fontSource = _cachedCjkFontBuffer || _cachedCjkFontPath;
