@@ -1320,15 +1320,16 @@ const CombinedBusinessContactsContent: React.FC = () => {
                                               {contact.tags &&
                                                 contact.tags.length > 0 && (
                                                   <div className="flex flex-wrap gap-1.5">
-                                                    {contact.tags.map(
-                                                      (tag: any) => (
-                                                        <TagBadge
-                                                          key={tag.id}
-                                                          tag={tag}
-                                                          size="sm"
-                                                        />
-                                                      ),
-                                                    )}
+                                                    {sortTags(
+                                                      contact.tags,
+                                                      contact.tagOrder,
+                                                    ).map((tag: any) => (
+                                                      <TagBadge
+                                                        key={tag.id}
+                                                        tag={tag}
+                                                        size="sm"
+                                                      />
+                                                    ))}
                                                   </div>
                                                 )}
                                             </div>
