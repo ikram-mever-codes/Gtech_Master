@@ -491,12 +491,10 @@ export const createBusiness = async (
       customerNumber,
       companyLabelPrintLogo,
       address,
+      street,
+      addressAdditional,
       website,
       description,
-      // The merged Relationships UI sends the internal note under `note`.
-      // It is persisted into businessDetails.description (there is no dedicated
-      // note column). If you later add a real note column, change the
-      // `businessDetails.description = ...note...` lines below to write it.
       note,
       city,
       state,
@@ -505,9 +503,11 @@ export const createBusiness = async (
       latitude,
       longitude,
       phoneNumber,
+      phone,
       email,
       contactEmail,
       contactPhoneNumber,
+      vatTaxId,
       googleMapsUrl,
       reviewCount,
       category,
@@ -522,19 +522,13 @@ export const createBusiness = async (
 
     const user = (req as any).user;
 
-    // Fall back to the legal company name when no separate display name/name
-    // was sent, so a business can be created with just the company name.
     const dbCompanyName = displayName || name || companyName;
     const dbLegalName = companyName;
     const finalEmail = email;
-
-    // Only the company name is required. Postal code, city, website, source
-    // and device-maker are all optional now.
     if (!dbCompanyName) {
       return next(new ErrorHandler("Company name is required", 400));
     }
 
-    // If a device-maker value IS provided, it must be one of the allowed values.
     if (isDeviceMaker && !["Yes", "No", "Unsure"].includes(isDeviceMaker)) {
       return next(
         new ErrorHandler("Device maker must be one of Yes / No / Unsure", 400),
@@ -683,6 +677,8 @@ export const createBusiness = async (
         customer.companyLabelPrintLogo = companyLabelPrintLogo
           ? companyLabelPrintLogo.trim()
           : undefined;
+        customer.vatTaxId = vatTaxId ? vatTaxId.trim() : undefined;
+        customer.addressLine2 = addressAdditional ? addressAdditional.trim() : undefined;
 
         if (isStarCustomer) {
           customer.stage = "star_customer";
@@ -722,9 +718,11 @@ export const createBusiness = async (
 
         customer.contactPhoneNumber = contactPhoneNumber
           ? contactPhoneNumber.trim()
-          : phoneNumber
-            ? phoneNumber.trim()
-            : undefined;
+          : phone
+            ? phone.trim()
+            : phoneNumber
+              ? phoneNumber.trim()
+              : undefined;
 
         const savedCustomer = await transactionalEntityManager.save(
           Customer,
@@ -738,9 +736,12 @@ export const createBusiness = async (
           | "Unsure";
         businessDetails.check_timestamp = new Date();
         businessDetails.check_by = user;
-        businessDetails.address = address ? address.trim() : undefined;
+        businessDetails.address = street
+          ? street.trim()
+          : address
+            ? address.trim()
+            : undefined;
         businessDetails.website = normalizedWebsite || undefined;
-        // Persist the internal note (preferred) or a legacy description.
         businessDetails.description =
           note !== undefined
             ? note
@@ -755,9 +756,11 @@ export const createBusiness = async (
         businessDetails.postalCode = postalCode ? postalCode.trim() : undefined;
         businessDetails.latitude = sanitizeNumber(latitude);
         businessDetails.longitude = sanitizeNumber(longitude);
-        businessDetails.contactPhone = phoneNumber
-          ? phoneNumber.trim()
-          : undefined;
+        businessDetails.contactPhone = phone
+          ? phone.trim()
+          : phoneNumber
+            ? phoneNumber.trim()
+            : undefined;
         businessDetails.email = finalEmail
           ? finalEmail.trim().toLowerCase()
           : undefined;
@@ -905,6 +908,9 @@ export const createBusiness = async (
       contactPhoneNumber: finalCustomer.contactPhoneNumber,
       stage: finalCustomer.stage,
       ...businessDetailsWithoutId,
+      address: finalCustomer.businessDetails?.address,
+      street: finalCustomer.businessDetails?.address,
+      addressAdditional: finalCustomer.addressLine2,
       note: finalCustomer.businessDetails?.description,
       starBusinessDetails: finalCustomer.starBusinessDetails
         ? {
@@ -932,11 +938,13 @@ export const createBusiness = async (
       website: finalCustomer.businessDetails?.website,
       hasWebsite: !!finalCustomer.businessDetails?.website,
       phoneNumber: finalCustomer.businessDetails?.contactPhone,
+      phone: finalCustomer.businessDetails?.contactPhone,
       businessEmail: finalCustomer.businessDetails?.email,
       status: BUSINESS_STATUS.ACTIVE,
       source: finalCustomer.businessDetails?.businessSource,
       isDeviceMaker: finalCustomer.businessDetails?.isDeviceMaker,
       isStarCustomer: !!finalCustomer.starCustomerDetails,
+      vatTaxId: finalCustomer.vatTaxId,
       createdAt: finalCustomer.createdAt,
       updatedAt: finalCustomer.updatedAt,
     };
@@ -989,6 +997,10 @@ export const updateBusiness = async (
       isStarCustomer,
       starCustomerEmail,
       starBusinessDetails,
+      street,
+      addressAdditional,
+      phone,
+      vatTaxId,
     } = updateData;
 
     const user = (req as any).user;
@@ -1173,13 +1185,24 @@ export const updateBusiness = async (
         }
         if (contactPhoneNumber !== undefined) {
           customer.contactPhoneNumber = contactPhoneNumber.trim();
+        } else if (phone !== undefined) {
+          customer.contactPhoneNumber = phone ? phone.trim() : undefined;
+        }
+        if (vatTaxId !== undefined) {
+          customer.vatTaxId = vatTaxId ? vatTaxId.trim() : undefined;
+        }
+        if (addressAdditional !== undefined) {
+          customer.addressLine2 = addressAdditional ? addressAdditional.trim() : undefined;
         }
 
         if (customer.businessDetails) {
           const businessDetails = customer.businessDetails;
 
-          if (updateData.address !== undefined)
+          if (street !== undefined) {
+            businessDetails.address = street ? street.trim() : undefined;
+          } else if (updateData.address !== undefined) {
             businessDetails.address = updateData.address.trim();
+          }
           if (updateData.website !== undefined) {
             businessDetails.website = updateData.website
               ? normalizeWebsite(updateData.website)
@@ -1187,8 +1210,6 @@ export const updateBusiness = async (
           }
           if (updateData.description !== undefined)
             businessDetails.description = updateData.description.trim();
-          // Internal note (preferred field from the Relationships UI) is stored
-          // in businessDetails.description. Sending an empty note clears it.
           if (updateData.note !== undefined) {
             const trimmedNote = String(updateData.note ?? "").trim();
             businessDetails.description = trimmedNote ? trimmedNote : "";
@@ -1205,8 +1226,11 @@ export const updateBusiness = async (
             businessDetails.latitude = sanitizeNumber(updateData.latitude);
           if (updateData.longitude !== undefined)
             businessDetails.longitude = sanitizeNumber(updateData.longitude);
-          if (updateData.phoneNumber !== undefined)
+          if (phone !== undefined) {
+            businessDetails.contactPhone = phone ? phone.trim() : undefined;
+          } else if (updateData.phoneNumber !== undefined) {
             businessDetails.contactPhone = updateData.phoneNumber.trim();
+          }
           if (updateData.email !== undefined) {
             const trimmedEmail = updateData.email.trim()
               ? updateData.email.trim().toLowerCase()
@@ -1407,6 +1431,9 @@ export const updateBusiness = async (
       contactPhoneNumber: finalCustomer.contactPhoneNumber,
       stage: finalCustomer.stage,
       ...businessDetailsWithoutId,
+      address: finalCustomer.businessDetails?.address,
+      street: finalCustomer.businessDetails?.address,
+      addressAdditional: finalCustomer.addressLine2,
       note: finalCustomer.businessDetails?.description,
       check_by: finalCustomer.businessDetails?.check_by
         ? {
@@ -1443,11 +1470,13 @@ export const updateBusiness = async (
       website: finalCustomer.businessDetails?.website,
       hasWebsite: !!finalCustomer.businessDetails?.website,
       phoneNumber: finalCustomer.businessDetails?.contactPhone,
+      phone: finalCustomer.businessDetails?.contactPhone,
       businessEmail: finalCustomer.businessDetails?.email,
       status: BUSINESS_STATUS.ACTIVE,
       source: finalCustomer.businessDetails?.businessSource,
       isDeviceMaker: finalCustomer.businessDetails?.isDeviceMaker,
       isStarCustomer: !!finalCustomer.starCustomerDetails,
+      vatTaxId: finalCustomer.vatTaxId,
       tags: finalCustomer.tags,
       tagOrder: finalCustomer.tagOrder,
       createdAt: finalCustomer.createdAt,
@@ -1576,8 +1605,11 @@ export const getBusinessById = async (
       website: customer.businessDetails?.website,
       hasWebsite: !!customer.businessDetails?.website,
       phoneNumber: customer.businessDetails?.contactPhone,
+      phone: customer.businessDetails?.contactPhone,
       businessEmail: customer.businessDetails?.email,
       address: customer.businessDetails?.address,
+      street: customer.businessDetails?.address,
+      addressAdditional: customer.addressLine2,
       city: customer.businessDetails?.city,
       state: customer.businessDetails?.state,
       country: customer.businessDetails?.country,
@@ -1595,6 +1627,7 @@ export const getBusinessById = async (
       check_timestamp: customer.businessDetails?.check_timestamp,
       note: customer.businessDetails?.description,
       status: BUSINESS_STATUS.ACTIVE,
+      vatTaxId: customer.vatTaxId,
       tags: customer.tags,
       tagOrder: customer.tagOrder,
       createdAt: customer.createdAt,
@@ -1799,6 +1832,8 @@ export const getAllBusinesses = async (
         stage: customer.stage,
         ...businessDetailsWithoutId,
         address: customer.businessDetails?.address,
+        street: customer.businessDetails?.address,
+        addressAdditional: customer.addressLine2,
         city: customer.businessDetails?.city,
         state: customer.businessDetails?.state,
         country: customer.businessDetails?.country,
@@ -1806,10 +1841,12 @@ export const getAllBusinesses = async (
         website: customer.businessDetails?.website,
         hasWebsite: !!customer.businessDetails?.website,
         phoneNumber: customer.businessDetails?.contactPhone,
+        phone: customer.businessDetails?.contactPhone,
         businessEmail: customer.businessDetails?.email,
         note: customer.businessDetails?.description,
         status: BUSINESS_STATUS.ACTIVE,
         source: customer.businessDetails?.businessSource,
+        vatTaxId: customer.vatTaxId,
         tags: customer.tags,
         tagOrder: customer.tagOrder,
         createdAt: customer.createdAt,

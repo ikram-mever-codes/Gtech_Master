@@ -87,8 +87,6 @@ export const createContactPerson = async (
     const {
       sex,
       starBusinessDetailsId,
-      // The Relationships UI also sends the customer id under `businessId`;
-      // accept either so a contact can be attached to ANY business.
       businessId,
       name,
       familyName,
@@ -130,15 +128,11 @@ export const createContactPerson = async (
     const starBusinessDetailsRepository =
       AppDataSource.getRepository(StarBusinessDetails);
 
-    // 1) Try to resolve the reference as a StarBusinessDetails id directly.
     let starBusinessDetails = await starBusinessDetailsRepository.findOne({
       where: { id: businessRef },
       relations: ["customer"],
     });
 
-    // 2) Otherwise treat it as a Customer id. We attach contacts to ANY
-    //    business regardless of stage — if the customer has no
-    //    StarBusinessDetails yet, lazily create one as the contact anchor.
     if (!starBusinessDetails) {
       const customerRepository = AppDataSource.getRepository(Customer);
       const customer = await customerRepository.findOne({
@@ -150,12 +144,14 @@ export const createContactPerson = async (
         if (customer.starBusinessDetails) {
           starBusinessDetails = customer.starBusinessDetails;
         } else {
-          // No stage check anymore — every business can hold contacts.
           starBusinessDetails = starBusinessDetailsRepository.create({
             customer: customer,
           });
           starBusinessDetails =
             await starBusinessDetailsRepository.save(starBusinessDetails);
+
+          customer.starBusinessDetails = starBusinessDetails;
+          await customerRepository.save(customer);
         }
       }
     }
@@ -186,8 +182,6 @@ export const createContactPerson = async (
 
     const contactPerson = new ContactPerson();
     contactPerson.sex = sanitizeSex(sex);
-    // FIX: store the RESOLVED StarBusinessDetails id, not the raw reference
-    // (which may have been a customer id).
     contactPerson.starBusinessDetailsId = actualStarBusinessDetailsId;
     contactPerson.starBusinessDetails = starBusinessDetails;
     contactPerson.name = name.trim();
@@ -1034,9 +1028,8 @@ export const getAllContactPersons = async (
           industry:
             starBusinessDetails?.industry || businessDetails?.industry || null,
 
-          fullName: `${contactPerson.name || ""} ${
-            contactPerson.familyName || ""
-          }`.trim(),
+          fullName: `${contactPerson.name || ""} ${contactPerson.familyName || ""
+            }`.trim(),
           displayPosition: contactPerson.position || "",
           note: contactPerson.note || null,
           noteContactPreference: contactPerson.noteContactPreference || null,
@@ -1133,9 +1126,8 @@ export const getContactPersonsByStarBusiness = async (
         industry:
           starBusinessDetails?.industry || businessDetails?.industry || null,
 
-        fullName: `${contactPerson.name || ""} ${
-          contactPerson.familyName || ""
-        }`.trim(),
+        fullName: `${contactPerson.name || ""} ${contactPerson.familyName || ""
+          }`.trim(),
         displayPosition: contactPerson.position || "",
         note: contactPerson.note || null,
         noteContactPreference: contactPerson.noteContactPreference || null,
@@ -1831,10 +1823,10 @@ export const getStarBusinessesWithoutContacts = async (
           comment: starBusiness?.comment,
           daysSinceConverted: starBusiness?.converted_timestamp
             ? Math.floor(
-                (Date.now() -
-                  new Date(starBusiness.converted_timestamp).getTime()) /
-                  (1000 * 60 * 60 * 24),
-              )
+              (Date.now() -
+                new Date(starBusiness.converted_timestamp).getTime()) /
+              (1000 * 60 * 60 * 24),
+            )
             : null,
         };
       }
@@ -1855,11 +1847,11 @@ export const getStarBusinessesWithoutContacts = async (
     const averageDaysSinceConverted =
       starBusinessesWithDays.length > 0
         ? Math.round(
-            starBusinessesWithDays.reduce(
-              (acc, b: any) => acc + (b.daysSinceConverted || 0),
-              0,
-            ) / starBusinessesWithDays.length,
-          )
+          starBusinessesWithDays.reduce(
+            (acc, b: any) => acc + (b.daysSinceConverted || 0),
+            0,
+          ) / starBusinessesWithDays.length,
+        )
         : 0;
 
     return res.status(200).json({
@@ -1953,9 +1945,9 @@ export const getStarBusinessesWithContactSummary = async (
     const avgContactsPerBusiness =
       withContacts > 0
         ? allStarBusinesses.reduce(
-            (sum: number, b: any) => sum + (b.contactPersonsCount || 0),
-            0,
-          ) / withContacts
+          (sum: number, b: any) => sum + (b.contactPersonsCount || 0),
+          0,
+        ) / withContacts
         : 0;
 
     return res.status(200).json({
