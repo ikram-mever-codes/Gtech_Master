@@ -17,11 +17,10 @@ import { Invoice, InvoiceItem } from "../models/invoice";
 import { StarCustomerDetails } from "../models/star_customer_details";
 import { cookieOptions } from "../utils/cookieOptions";
 
-
 export const createUser = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     const {
@@ -36,7 +35,6 @@ export const createUser = async (
       address,
       country,
     } = req.body;
-
 
     if (!name || !email || !role) {
       return next(new ErrorHandler("Name, email and role are required", 400));
@@ -53,19 +51,19 @@ export const createUser = async (
       return next(new ErrorHandler("Email already exists", 400));
     }
 
-
     const tempPassword = crypto.randomBytes(8).toString("hex");
     const hashedPassword = await bcrypt.hash(tempPassword, 10);
 
-
     const emailVerificationCode = Math.floor(
-      100000 + Math.random() * 900000
+      100000 + Math.random() * 900000,
     ).toString();
     const emailVerificationExp = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
-
     let finalAssignedResources = assignedResources || [];
-    if (role === UserRole.PURCHASING && !finalAssignedResources.includes("Orders")) {
+    if (
+      role === UserRole.PURCHASING &&
+      !finalAssignedResources.includes("Orders")
+    ) {
       finalAssignedResources.push("Orders");
     }
 
@@ -83,7 +81,8 @@ export const createUser = async (
       partnerName: req.body.partnerName || null,
       emergencyContact: req.body.emergencyContact || null,
       joiningDate: req.body.joiningDate || null,
-      isLoginEnabled: req.body.isLoginEnabled !== undefined ? req.body.isLoginEnabled : true,
+      isLoginEnabled:
+        req.body.isLoginEnabled !== undefined ? req.body.isLoginEnabled : true,
       emailVerificationCode,
       emailVerificationExp,
       isEmailVerified: false,
@@ -91,12 +90,14 @@ export const createUser = async (
 
     await userRepository.save(user);
 
-
     const finalPermissions = permissions || [];
-    if (role === UserRole.PURCHASING && !finalPermissions.find((p: any) => p.resource === "Orders")) {
+    if (
+      role === UserRole.PURCHASING &&
+      !finalPermissions.find((p: any) => p.resource === "Orders")
+    ) {
       finalPermissions.push({
         resource: "Orders",
-        actions: ["create", "read", "update", "delete"]
+        actions: ["create", "read", "update", "delete"],
       });
     }
 
@@ -107,15 +108,15 @@ export const createUser = async (
           resource: perm.resource,
           actions: perm.actions,
           user,
-        })
+        }),
       );
       await permissionRepository.save(permissionEntities);
     }
 
-    const verificationLink = `https://master.gtech.de/verify?email=${encodeURIComponent(
-      email
+    const verificationLink = `https://system.gtech.de/verify?email=${encodeURIComponent(
+      email,
     )}&verificationCode=${emailVerificationCode}`;
-    const loginLink = `https://master.gtech.de/login`;
+    const loginLink = `https://system.gtech.de/login`;
 
     const message = `
         <h2>Welcome to Our Platform</h2>
@@ -154,14 +155,14 @@ export const createUser = async (
 export const verifyEmail = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     const { email, verificationCode } = req.query;
 
     if (!email || !verificationCode) {
       return next(
-        new ErrorHandler("Email and verification code are required", 400)
+        new ErrorHandler("Email and verification code are required", 400),
       );
     }
 
@@ -199,7 +200,7 @@ export const verifyEmail = async (
 export const login = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     const { email, password } = req.body;
@@ -207,7 +208,6 @@ export const login = async (
     if (!email || !password) {
       return next(new ErrorHandler("Email and password are required", 400));
     }
-
 
     const userRepository = AppDataSource.getRepository(User);
 
@@ -235,20 +235,29 @@ export const login = async (
     }
 
     if (!user.isLoginEnabled) {
-      return next(new ErrorHandler("Your account has been disabled. Please contact support.", 403));
+      return next(
+        new ErrorHandler(
+          "Your account has been disabled. Please contact support.",
+          403,
+        ),
+      );
     }
 
     const token = jwt.sign(
       { id: user.id, role: user.role },
-      process.env.JWT_SECRET!
+      process.env.JWT_SECRET!,
     );
 
-
-    const cleanRes = (user.assignedResources || []).map(r => r.trim()).filter(r => r.length > 0);
-    const derivedRes = user.permissions?.map(p => p.resource.trim()) || [];
+    const cleanRes = (user.assignedResources || [])
+      .map((r) => r.trim())
+      .filter((r) => r.length > 0);
+    const derivedRes = user.permissions?.map((p) => p.resource.trim()) || [];
     let finalResources = Array.from(new Set([...cleanRes, ...derivedRes]));
 
-    if (user.role === UserRole.PURCHASING && !finalResources.includes("Orders")) {
+    if (
+      user.role === UserRole.PURCHASING &&
+      !finalResources.includes("Orders")
+    ) {
       finalResources.push("Orders");
     }
 
@@ -267,14 +276,11 @@ export const login = async (
       isLoginEnabled: user.isLoginEnabled,
     };
 
-    return res
-      .status(200)
-      .cookie("token", token, cookieOptions)
-      .json({
-        success: true,
-        message: "Logged in successfully",
-        data: userData,
-      });
+    return res.status(200).cookie("token", token, cookieOptions).json({
+      success: true,
+      message: "Logged in successfully",
+      data: userData,
+    });
   } catch (error) {
     return next(error);
   }
@@ -283,16 +289,13 @@ export const login = async (
 export const logout = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
-    return res
-      .clearCookie("token", cookieOptions)
-      .status(200)
-      .json({
-        success: true,
-        message: "Logged out successfully",
-      });
+    return res.clearCookie("token", cookieOptions).status(200).json({
+      success: true,
+      message: "Logged out successfully",
+    });
   } catch (error) {
     return next(error);
   }
@@ -301,7 +304,7 @@ export const logout = async (
 export const getMe = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     const userId = (req as any).user.id;
@@ -315,12 +318,19 @@ export const getMe = async (
       return next(new ErrorHandler("User not found", 404));
     }
 
+    const cleanResources = (user.assignedResources || [])
+      .map((r) => r.trim())
+      .filter((r) => r.length > 0);
+    const derivedResources =
+      user.permissions?.map((p) => p.resource.trim()) || [];
+    let finalResources = Array.from(
+      new Set([...cleanResources, ...derivedResources]),
+    );
 
-    const cleanResources = (user.assignedResources || []).map(r => r.trim()).filter(r => r.length > 0);
-    const derivedResources = user.permissions?.map(p => p.resource.trim()) || [];
-    let finalResources = Array.from(new Set([...cleanResources, ...derivedResources]));
-
-    if (user.role === UserRole.PURCHASING && !finalResources.includes("Orders")) {
+    if (
+      user.role === UserRole.PURCHASING &&
+      !finalResources.includes("Orders")
+    ) {
       finalResources.push("Orders");
     }
 
@@ -357,7 +367,7 @@ export const getMe = async (
 export const refresh = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     const token = req.cookies.token;
@@ -380,9 +390,8 @@ export const refresh = async (
 
     const newToken = jwt.sign(
       { id: user.id, role: user.role },
-      process.env.JWT_SECRET!
+      process.env.JWT_SECRET!,
     );
-
 
     const userData = {
       id: user.id,
@@ -399,13 +408,10 @@ export const refresh = async (
       isLoginEnabled: user.isLoginEnabled,
     };
 
-    return res
-      .status(200)
-      .cookie("token", newToken, cookieOptions)
-      .json({
-        success: true,
-        data: userData,
-      });
+    return res.status(200).cookie("token", newToken, cookieOptions).json({
+      success: true,
+      data: userData,
+    });
   } catch (error) {
     return next(new ErrorHandler("Invalid token", 401));
   }
@@ -414,7 +420,7 @@ export const refresh = async (
 export const changePassword = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     const { currentPassword, newPassword } = req.body;
@@ -444,7 +450,6 @@ export const changePassword = async (
     user.password = hashedPassword;
     await userRepository.save(user);
 
-
     const message = `
         <h2>Password Changed</h2>
         <p>Your password was successfully changed.</p>
@@ -469,7 +474,7 @@ export const changePassword = async (
 export const editProfile = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     const userId = (req as any).user.id;
@@ -481,7 +486,7 @@ export const editProfile = async (
       address,
       partnerName,
       emergencyContact,
-      country
+      country,
     } = req.body;
 
     const userRepository = AppDataSource.getRepository(User);
@@ -516,7 +521,6 @@ export const editProfile = async (
       }
     }
 
-
     if (name) user.name = name;
     if (phoneNumber) {
       const existingUser = await userRepository.findOne({
@@ -532,10 +536,10 @@ export const editProfile = async (
     if (address) user.address = address;
     if (country) user.country = country;
     if (partnerName !== undefined) user.partnerName = partnerName;
-    if (emergencyContact !== undefined) user.emergencyContact = emergencyContact;
+    if (emergencyContact !== undefined)
+      user.emergencyContact = emergencyContact;
 
     await userRepository.save(user);
-
 
     const updatedUser = await userRepository.findOne({
       where: { id: userId },
@@ -546,10 +550,15 @@ export const editProfile = async (
       return next(new ErrorHandler("User not found after update", 404));
     }
 
-    const cleanResources = (updatedUser.assignedResources || []).map(r => r.trim()).filter(r => r.length > 0);
-    const derivedResources = updatedUser.permissions?.map(p => p.resource) || [];
-    const finalResources = cleanResources.length > 0 ? cleanResources : Array.from(new Set(derivedResources));
-
+    const cleanResources = (updatedUser.assignedResources || [])
+      .map((r) => r.trim())
+      .filter((r) => r.length > 0);
+    const derivedResources =
+      updatedUser.permissions?.map((p) => p.resource) || [];
+    const finalResources =
+      cleanResources.length > 0
+        ? cleanResources
+        : Array.from(new Set(derivedResources));
 
     const userData = {
       id: updatedUser.id,
@@ -583,7 +592,7 @@ export const editProfile = async (
 export const getAllUsers = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     const userRepo = AppDataSource.getRepository(User);
@@ -599,7 +608,7 @@ export const getAllUsers = async (
 export const getUserById = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     const { userId } = req.params;
@@ -618,12 +627,20 @@ export const getUserById = async (
       return next(new ErrorHandler("User not found", 404));
     }
 
+    const cleanResources = (user.assignedResources || [])
+      .map((r) => r.trim())
+      .filter((r) => r.length > 0);
+    const derivedResources =
+      user.permissions?.map((p) => p.resource.trim()) || [];
+    let finalResources =
+      cleanResources.length > 0
+        ? cleanResources
+        : Array.from(new Set(derivedResources));
 
-    const cleanResources = (user.assignedResources || []).map(r => r.trim()).filter(r => r.length > 0);
-    const derivedResources = user.permissions?.map(p => p.resource.trim()) || [];
-    let finalResources = cleanResources.length > 0 ? cleanResources : Array.from(new Set(derivedResources));
-
-    if (user.role === UserRole.PURCHASING && !finalResources.includes("Orders")) {
+    if (
+      user.role === UserRole.PURCHASING &&
+      !finalResources.includes("Orders")
+    ) {
       finalResources.push("Orders");
     }
 
@@ -659,7 +676,7 @@ export const getUserById = async (
 export const forgetPassword = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     const { email } = req.body;
@@ -726,7 +743,7 @@ export const forgetPassword = async (
 export const resetPassword = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     const { token, newPassword } = req.body;
@@ -786,7 +803,7 @@ export const resetPassword = async (
 export const createCompany = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     const {
@@ -803,7 +820,6 @@ export const createCompany = async (
       deliveryCountry,
     } = req.body;
 
-
     if (
       !companyName ||
       !legalName ||
@@ -815,8 +831,8 @@ export const createCompany = async (
       return next(
         new ErrorHandler(
           "Company name, legal Name, email, contact email, contact phone number and tax number are required",
-          400
-        )
+          400,
+        ),
       );
     }
 
@@ -862,9 +878,8 @@ export const createCompany = async (
           deliveryCountry,
         });
 
-        const savedStarCustomerDetails = await transactionalEntityManager.save(
-          starCustomerDetails
-        );
+        const savedStarCustomerDetails =
+          await transactionalEntityManager.save(starCustomerDetails);
         savedCustomer.starCustomerDetails = savedStarCustomerDetails;
         await transactionalEntityManager.save(savedCustomer);
 
@@ -885,7 +900,7 @@ export const createCompany = async (
           starCustomerDetails: savedStarCustomerDetails,
           list: savedList,
         };
-      }
+      },
     );
 
     const { customer, list } = result;
@@ -946,7 +961,7 @@ export const createCompany = async (
 export const updateCustomer = async (
   req: AuthorizedRequest,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     const {
@@ -1051,19 +1066,19 @@ export const updateCustomer = async (
       stage: updatedCustomer.stage,
       starCustomerDetails: updatedCustomer.starCustomerDetails
         ? {
-          taxNumber: updatedCustomer.starCustomerDetails.taxNumber,
-          accountVerificationStatus:
-            updatedCustomer.starCustomerDetails.accountVerificationStatus,
-          deliveryAddressLine1:
-            updatedCustomer.starCustomerDetails.deliveryAddressLine1,
-          deliveryAddressLine2:
-            updatedCustomer.starCustomerDetails.deliveryAddressLine2,
-          deliveryPostalCode:
-            updatedCustomer.starCustomerDetails.deliveryPostalCode,
-          deliveryCity: updatedCustomer.starCustomerDetails.deliveryCity,
-          deliveryCountry:
-            updatedCustomer.starCustomerDetails.deliveryCountry,
-        }
+            taxNumber: updatedCustomer.starCustomerDetails.taxNumber,
+            accountVerificationStatus:
+              updatedCustomer.starCustomerDetails.accountVerificationStatus,
+            deliveryAddressLine1:
+              updatedCustomer.starCustomerDetails.deliveryAddressLine1,
+            deliveryAddressLine2:
+              updatedCustomer.starCustomerDetails.deliveryAddressLine2,
+            deliveryPostalCode:
+              updatedCustomer.starCustomerDetails.deliveryPostalCode,
+            deliveryCity: updatedCustomer.starCustomerDetails.deliveryCity,
+            deliveryCountry:
+              updatedCustomer.starCustomerDetails.deliveryCountry,
+          }
         : null,
     };
 
@@ -1081,7 +1096,7 @@ export const updateCustomer = async (
 export const updateUser = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     const { userId } = req.params;
@@ -1142,19 +1157,24 @@ export const updateUser = async (
       user.email = email;
       user.role = role;
 
-      let rawResources = Array.isArray(assignedResources) ? assignedResources : [];
-      if (role === UserRole.PURCHASING && !rawResources.includes('Orders')) {
-        rawResources.push('Orders');
+      let rawResources = Array.isArray(assignedResources)
+        ? assignedResources
+        : [];
+      if (role === UserRole.PURCHASING && !rawResources.includes("Orders")) {
+        rawResources.push("Orders");
       }
 
-      user.assignedResources = rawResources.map((r: string) => r.trim()).filter((r: string) => r.length > 0);
+      user.assignedResources = rawResources
+        .map((r: string) => r.trim())
+        .filter((r: string) => r.length > 0);
       user.phoneNumber = phoneNumber || null;
       user.gender = gender || null;
       user.dateOfBirth = dateOfBirth || null;
       user.address = address || null;
       user.country = country || null;
       if (partnerName !== undefined) user.partnerName = partnerName || null;
-      if (emergencyContact !== undefined) user.emergencyContact = emergencyContact || null;
+      if (emergencyContact !== undefined)
+        user.emergencyContact = emergencyContact || null;
       if (joiningDate !== undefined) user.joiningDate = joiningDate || null;
       if (isLoginEnabled !== undefined) user.isLoginEnabled = isLoginEnabled;
 
@@ -1169,10 +1189,13 @@ export const updateUser = async (
         await tPermRepo.delete({ user: { id: user.id } });
 
         const finalPermissions = Array.isArray(permissions) ? permissions : [];
-        if (role === UserRole.PURCHASING && !finalPermissions.find((p: any) => p.resource === "Orders")) {
+        if (
+          role === UserRole.PURCHASING &&
+          !finalPermissions.find((p: any) => p.resource === "Orders")
+        ) {
           finalPermissions.push({
             resource: "Orders",
-            actions: ["create", "read", "update", "delete"]
+            actions: ["create", "read", "update", "delete"],
           });
         }
 
@@ -1184,7 +1207,7 @@ export const updateUser = async (
                 ? perm.actions.map((a: any) => String(a).trim())
                 : [],
               user,
-            })
+            }),
           );
           await tPermRepo.save(permissionEntities);
         }
@@ -1200,9 +1223,14 @@ export const updateUser = async (
       return next(new ErrorHandler("Failed to fetch updated user", 500));
     }
 
-    const cleanResources = (updatedUser.assignedResources || []).map(r => r.trim()).filter(r => r.length > 0);
-    const derivedResources = updatedUser.permissions?.map(p => p.resource.trim()) || [];
-    const finalResources = Array.from(new Set([...cleanResources, ...derivedResources]));
+    const cleanResources = (updatedUser.assignedResources || [])
+      .map((r) => r.trim())
+      .filter((r) => r.length > 0);
+    const derivedResources =
+      updatedUser.permissions?.map((p) => p.resource.trim()) || [];
+    const finalResources = Array.from(
+      new Set([...cleanResources, ...derivedResources]),
+    );
 
     const userData = {
       id: updatedUser.id,
@@ -1239,7 +1267,7 @@ export const updateUser = async (
 export const deleteCustomer = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     const { customerId } = req.params;
@@ -1251,7 +1279,6 @@ export const deleteCustomer = async (
     const customerRepository = AppDataSource.getRepository(Customer);
     const listRepository = AppDataSource.getRepository(List);
 
-
     const customer = await customerRepository.findOne({
       where: { id: customerId },
     });
@@ -1260,7 +1287,6 @@ export const deleteCustomer = async (
       return next(new ErrorHandler("Customer not found", 404));
     }
 
-
     const listsWithItems = await listRepository
       .createQueryBuilder("list")
       .innerJoinAndSelect("list.items", "items")
@@ -1268,15 +1294,15 @@ export const deleteCustomer = async (
       .getMany();
 
     const hasListItems = listsWithItems.some(
-      (list) => list.items && list.items.length > 0
+      (list) => list.items && list.items.length > 0,
     );
 
     if (hasListItems) {
       return next(
         new ErrorHandler(
           "Cannot delete customer. Customer has lists with items. Please delete all items first.",
-          400
-        )
+          400,
+        ),
       );
     }
 
@@ -1318,8 +1344,8 @@ export const deleteCustomer = async (
     return next(
       new ErrorHandler(
         "Failed to delete customer. Please check all associated data has been removed.",
-        500
-      )
+        500,
+      ),
     );
   }
 };
@@ -1327,7 +1353,7 @@ export const deleteCustomer = async (
 export const deleteUser = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     const { userId } = req.params;
@@ -1358,7 +1384,7 @@ export const deleteUser = async (
 
       if (adminCount <= 1) {
         return next(
-          new ErrorHandler("Cannot delete the last admin account", 400)
+          new ErrorHandler("Cannot delete the last admin account", 400),
         );
       }
     }
@@ -1388,7 +1414,7 @@ export const deleteUser = async (
   } catch (error) {
     console.error("Error deleting user:", error);
     return next(
-      new ErrorHandler("Failed to delete user. Please try again later.", 500)
+      new ErrorHandler("Failed to delete user. Please try again later.", 500),
     );
   }
 };
@@ -1396,7 +1422,7 @@ export const deleteUser = async (
 export const resendVerificationEmail = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     const { email } = req.body;
@@ -1421,15 +1447,15 @@ export const resendVerificationEmail = async (
     const now = new Date();
 
     const emailVerificationCode = Math.floor(
-      100000 + Math.random() * 900000
+      100000 + Math.random() * 900000,
     ).toString();
     const emailVerificationExp = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
 
     user.emailVerificationCode = emailVerificationCode;
     user.emailVerificationExp = emailVerificationExp;
     await userRepository.save(user);
-    const verificationLink = `https://master.gtech.de/verify?email=${encodeURIComponent(
-      email
+    const verificationLink = `https://system.gtech.de/verify?email=${encodeURIComponent(
+      email,
     )}&verificationCode=${emailVerificationCode}`;
 
     const message = `
