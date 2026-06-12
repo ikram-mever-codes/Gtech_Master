@@ -144,13 +144,17 @@ export const TagFilterSelector: React.FC<TagFilterSelectorProps> = ({
           onClick={() => setIsDropdownOpen(true)}
           className={
             compact
-              ? "min-h-[30px] w-full px-2 py-1 border border-gray-300 rounded-md bg-white focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary transition-all cursor-pointer flex flex-wrap items-center gap-1"
+              ? `min-h-[38px] w-full px-3 py-1.5 border rounded-md focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary transition-all cursor-pointer flex flex-wrap items-center gap-1 ${
+                  selectedFilters.length > 0
+                    ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+                    : "border-gray-300 bg-white"
+                }`
               : "min-h-[46px] w-full px-3 py-2 border border-gray-200 rounded-xl bg-white focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary transition-all cursor-pointer flex flex-wrap items-center gap-2"
           }
         >
           {selectedFilters.length === 0 && (
-            <span className={compact ? "text-gray-400 text-xs" : "text-gray-400 text-sm"}>
-              {compact ? "Tags..." : "Select tags to filter in combinations..."}
+            <span className="text-gray-400 text-sm">
+              Tags...
             </span>
           )}
 

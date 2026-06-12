@@ -96,6 +96,7 @@ interface ClientFilterState {
   customerNumber: string;
   city: string;
   postalCode: string;
+  country: string;
 }
 
 type BusinessWithContacts = Business & { contacts?: ContactPersonData[] };
@@ -159,6 +160,14 @@ const slugFromWebsite = (website?: string) => {
   return label.replace(/[^a-z0-9-]/g, "");
 };
 
+const getInputClass = (hasValue: boolean) => {
+  return `w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${
+    hasValue
+      ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+      : "text-gray-900 border-gray-300 bg-white"
+  }`;
+};
+
 const CombinedBusinessContactsContent: React.FC = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -200,6 +209,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
     customerNumber: "",
     city: "",
     postalCode: "",
+    country: "",
   });
   const [categories, setCategories] = useState<string[]>([]);
   const [cities, setCities] = useState<string[]>([]);
@@ -372,7 +382,8 @@ const CombinedBusinessContactsContent: React.FC = () => {
     const num = clientFilters.customerNumber.trim().toLowerCase();
     const city = clientFilters.city.trim().toLowerCase();
     const pc = clientFilters.postalCode.trim().toLowerCase();
-    if (!cn && !num && !city && !pc) return allBusinesses;
+    const country = clientFilters.country.trim().toUpperCase();
+    if (!cn && !num && !city && !pc && !country) return allBusinesses;
     return allBusinesses.filter((b: any) => {
       const name = (b.displayName || b.companyName || b.name || "")
         .toString()
@@ -381,10 +392,12 @@ const CombinedBusinessContactsContent: React.FC = () => {
       const number = (b.customerNumber || "").toString().toLowerCase();
       const bcity = (b.city || "").toString().toLowerCase();
       const bpc = (b.postalCode || "").toString().toLowerCase();
+      const bcountry = toCountryCode(b.country).toUpperCase();
       if (cn && !name.includes(cn) && !legal.includes(cn)) return false;
       if (num && !number.includes(num)) return false;
       if (city && !bcity.includes(city)) return false;
       if (pc && !bpc.includes(pc)) return false;
+      if (country && bcountry !== country) return false;
       return true;
     });
   }, [allBusinesses, clientFilters]);
@@ -885,6 +898,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
       customerNumber: "",
       city: "",
       postalCode: "",
+      country: "",
     });
   };
 
@@ -984,10 +998,10 @@ const CombinedBusinessContactsContent: React.FC = () => {
         <div className="mb-6 p-3 bg-white border border-gray-200 rounded-md shadow-sm">
           <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
             <div className="flex items-center gap-1.5 text-gray-400 shrink-0 select-none px-1">
-              <FunnelIcon className="w-4 h-4 text-primary" />
+              <FunnelIcon className="w-5 h-5 text-primary" />
             </div>
 
-            <div className="flex-1 min-w-[150px] lg:max-w-[250px]">
+            <div className="w-52 shrink-0">
               <input
                 type="text"
                 value={clientFilters.companyName}
@@ -998,53 +1012,11 @@ const CombinedBusinessContactsContent: React.FC = () => {
                   }))
                 }
                 placeholder="Company Name..."
-                className="w-full px-2.5 py-1.5 text-xs border border-gray-300 rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all"
+                className={getInputClass(!!clientFilters.companyName)}
               />
             </div>
 
-            <div className="flex-1 min-w-[100px] lg:max-w-[150px]">
-              <input
-                type="text"
-                value={clientFilters.customerNumber}
-                onChange={(e) =>
-                  setClientFilters((p) => ({
-                    ...p,
-                    customerNumber: e.target.value,
-                  }))
-                }
-                placeholder="Customer No..."
-                className="w-full px-2.5 py-1.5 text-xs border border-gray-300 rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all"
-              />
-            </div>
-
-            <div className="flex-1 min-w-[100px] lg:max-w-[150px]">
-              <input
-                type="text"
-                value={clientFilters.city}
-                onChange={(e) =>
-                  setClientFilters((p) => ({ ...p, city: e.target.value }))
-                }
-                placeholder="City..."
-                className="w-full px-2.5 py-1.5 text-xs border border-gray-300 rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all"
-              />
-            </div>
-
-            <div className="flex-1 min-w-[80px] lg:max-w-[120px]">
-              <input
-                type="text"
-                value={clientFilters.postalCode}
-                onChange={(e) =>
-                  setClientFilters((p) => ({
-                    ...p,
-                    postalCode: e.target.value,
-                  }))
-                }
-                placeholder="Postal Code..."
-                className="w-full px-2.5 py-1.5 text-xs border border-gray-300 rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all"
-              />
-            </div>
-
-            <div className="flex-1 min-w-[200px] lg:max-w-[350px]">
+            <div className="flex-1 min-w-[250px]">
               <TagFilterSelector
                 category="company"
                 compact={true}
@@ -1055,11 +1027,68 @@ const CombinedBusinessContactsContent: React.FC = () => {
               />
             </div>
 
+            <div className="w-28 shrink-0">
+              <input
+                type="text"
+                value={clientFilters.customerNumber}
+                onChange={(e) =>
+                  setClientFilters((p) => ({
+                    ...p,
+                    customerNumber: e.target.value,
+                  }))
+                }
+                placeholder="Customer No..."
+                className={getInputClass(!!clientFilters.customerNumber)}
+              />
+            </div>
+
+            <div className="w-28 shrink-0">
+              <input
+                type="text"
+                value={clientFilters.postalCode}
+                onChange={(e) =>
+                  setClientFilters((p) => ({
+                    ...p,
+                    postalCode: e.target.value,
+                  }))
+                }
+                placeholder="Postal Code..."
+                className={getInputClass(!!clientFilters.postalCode)}
+              />
+            </div>
+
+            <div className="w-32 shrink-0">
+              <input
+                type="text"
+                value={clientFilters.city}
+                onChange={(e) =>
+                  setClientFilters((p) => ({ ...p, city: e.target.value }))
+                }
+                placeholder="City..."
+                className={getInputClass(!!clientFilters.city)}
+              />
+            </div>
+
+            <div className="w-28 shrink-0">
+              <select
+                value={clientFilters.country}
+                onChange={(e) =>
+                  setClientFilters((p) => ({ ...p, country: e.target.value }))
+                }
+                className={getInputClass(!!clientFilters.country)}
+              >
+                <option value="">Country...</option>
+                <option value="DE">DE</option>
+                <option value="AT">AT</option>
+                <option value="CH">CH</option>
+              </select>
+            </div>
+
             <button
               onClick={resetFilters}
-              className="px-3 py-1.5 text-xs font-semibold text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 rounded-md transition-colors flex items-center gap-1 whitespace-nowrap shrink-0"
+              className="px-3 py-2 text-sm font-semibold text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 rounded-md transition-colors flex items-center gap-1 whitespace-nowrap shrink-0"
             >
-              <ArrowPathIcon className="w-3.5 h-3.5" />
+              <ArrowPathIcon className="w-4 h-4" />
               Reset
             </button>
           </div>
