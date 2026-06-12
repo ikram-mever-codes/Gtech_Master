@@ -91,7 +91,6 @@ interface FilterState {
   tags: string;
 }
 
-// Client-side text filters that run over the already-fetched list (no refetch).
 interface ClientFilterState {
   companyName: string;
   customerNumber: string;
@@ -101,16 +100,12 @@ interface ClientFilterState {
 
 type BusinessWithContacts = Business & { contacts?: ContactPersonData[] };
 
-// Country is restricted to DE / AT / CH and shown as the bare 2-letter code.
 const COUNTRY_OPTIONS = [
   { value: "DE", label: "DE" },
   { value: "AT", label: "AT" },
   { value: "CH", label: "CH" },
 ];
 
-// Default the Sex selector to "Male" for NEW contacts. The exact option value
-// is resolved defensively from SEX_OPTIONS because value/label may be DE or EN
-// (e.g. "male", "m", "männlich", "Herr"). Falls back to "" if nothing matches.
 const DEFAULT_SEX_VALUE: string =
   (SEX_OPTIONS as any).find((o: any) => {
     const v = String(o?.value ?? "").toLowerCase();
@@ -126,7 +121,6 @@ const DEFAULT_SEX_VALUE: string =
     );
   })?.value ?? "";
 
-// Normalize any stored country value (full name or code) to a 2-letter code.
 const toCountryCode = (country?: string) => {
   if (!country) return "";
   const c = country.trim();
@@ -155,18 +149,14 @@ const formatDateTime = (dateString: string | undefined) => {
   });
 };
 
-// Extract the label between "www." (or the host start) and the next "." of a
-// web URL. e.g. https://www.neumaerker.de/ -> "neumaerker".
-// This also sidesteps the German special-character problem (ä ü ö ß) that a
-// company-name-derived slug would otherwise carry.
 const slugFromWebsite = (website?: string) => {
   if (!website) return "";
   let host = website.trim().toLowerCase();
-  host = host.replace(/^https?:\/\//, ""); // drop protocol
-  host = host.replace(/^www\./, ""); // drop leading www.
-  host = host.split(/[\/?#]/)[0]; // drop any path / query / hash
-  const label = host.split(".")[0]; // text up to the first dot
-  return label.replace(/[^a-z0-9-]/g, ""); // keep it URL-safe
+  host = host.replace(/^https?:\/\//, "");
+  host = host.replace(/^www\./, "");
+  host = host.split(/[\/?#]/)[0];
+  const label = host.split(".")[0];
+  return label.replace(/[^a-z0-9-]/g, "");
 };
 
 const CombinedBusinessContactsContent: React.FC = () => {
@@ -185,7 +175,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
   const itemsPerPage = 30;
   const displayNameTouched = useRef(false);
   const starPortalTouched = useRef(false);
-  // Accordion: only one business's contacts are expanded at a time (folded by default).
   const [expandedBusinessIds, setExpandedBusinessIds] = useState<Set<string>>(
     new Set(),
   );
@@ -206,7 +195,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
     stage: "",
     tags: "",
   });
-  // Client-side text filters (responsive, no refetch).
   const [clientFilters, setClientFilters] = useState<ClientFilterState>({
     companyName: "",
     customerNumber: "",
@@ -248,7 +236,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
   const [showNotesModal, setShowNotesModal] = useState(false);
   const [notesModalData, setNotesModalData] = useState<any>(null);
 
-  // Business note popup (opened by clicking a business note cell).
   const [showBusinessNoteModal, setShowBusinessNoteModal] = useState(false);
   const [businessNoteData, setBusinessNoteData] = useState<any>(null);
 
@@ -346,8 +333,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
 
       setAllBusinesses(merged);
 
-      // Contacts are folded by default. Totals / pagination are derived from
-      // the client-filtered list in a dedicated effect below.
       setExpandedBusinessIds(new Set());
 
       setCategories([
@@ -374,7 +359,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
     setCurrentPage(1);
   }, [filters]);
 
-  // Reset to the first page whenever the client-side text filters change.
   useEffect(() => {
     setCurrentPage(1);
   }, [clientFilters]);
@@ -383,7 +367,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
     fetchData();
   }, [filters]);
 
-  // Client-side filtering: company name / customer no / city / postal code.
   const filteredBusinesses = useMemo(() => {
     const cn = clientFilters.companyName.trim().toLowerCase();
     const num = clientFilters.customerNumber.trim().toLowerCase();
@@ -406,7 +389,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
     });
   }, [allBusinesses, clientFilters]);
 
-  // Pagination over the filtered list.
   useEffect(() => {
     const total = filteredBusinesses.length;
     setTotalRecords(total);
@@ -450,7 +432,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
     }
   }, [searchParams, allBusinesses, urlParamHandled]);
 
-  // Accordion toggle: opening one business closes any other.
   const toggleBusinessContacts = (businessId: string) => {
     setExpandedBusinessIds((prev) => {
       const next = new Set<string>();
@@ -538,7 +519,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
     if (!window.confirm("Do you want to delete this contact?")) return;
     try {
       await deleteContactPerson(contactId);
-      // Close the contact modal if it was open (delete is now in its footer).
       setShowCreateModal(false);
       resetCreateForm();
       setModalMode("create");
@@ -570,10 +550,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
 
     try {
       const resolvedBusinessId = businessId || createForm.starBusinessDetailsId;
-      // Send the business id under BOTH keys so the contacts backend can attach
-      // the contact to ANY business regardless of stage (see note in the chat
-      // about the createContactPerson controller change required to drop the
-      // "Star business or customer not found" check).
       const payload: any = {
         ...createForm,
         starBusinessDetailsId: resolvedBusinessId,
@@ -652,14 +628,10 @@ const CombinedBusinessContactsContent: React.FC = () => {
     setShowNotesModal(true);
   };
 
-  // Open the business note popup (clicking a business note cell).
   const handleOpenBusinessNote = (business: any) => {
     setBusinessNoteData(business);
     setShowBusinessNoteModal(true);
   };
-
-  // Display Name: first word if unique; otherwise "first second" (space between
-  // the words) keeping the first word; otherwise "first N".
   const generateDisplayName = (
     companyName: string,
     existing: BusinessWithContacts[] = [],
@@ -677,7 +649,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
     if (!used.has(first.toLowerCase())) return first;
     const second = words[1];
     if (second) {
-      const combo = `${first} ${second}`; // first word + space + second word
+      const combo = `${first} ${second}`;
       if (!used.has(combo.toLowerCase())) return combo;
     }
     let i = 2;
@@ -685,11 +657,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
     return `${first} ${i}`;
   };
 
-  // Star Portal Link Name: PREFER the company web URL — take the label between
-  // "www." and the next ".".  e.g. https://www.neumaerker.de/ -> "neumaerker".
-  // This also avoids German special characters (ä ü ö ß). If no website is
-  // given, fall back to the first word of the company name. The result is
-  // uniqueness-checked; collisions get a "-2", "-3", ... suffix.
+
   const generateStarPortalLinkName = (
     companyName: string,
     website: string,
@@ -702,8 +670,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
         .map((b: any) => (b.starPortalLinkName || "").toLowerCase())
         .filter(Boolean),
     );
-
-    // Prefer the website-derived slug; fall back to first word of company name.
     let base = slugFromWebsite(website);
     if (!base) {
       const words = (companyName || "").trim().split(/\s+/).filter(Boolean);
@@ -717,27 +683,24 @@ const CombinedBusinessContactsContent: React.FC = () => {
     return `${base}-${i}`;
   };
 
-  // Auto-generation runs ONLY when the user leaves the legal-name field
-  // (onBlur) and ONLY in create mode. Typing the legal name no longer writes
-  // into Display Name / Star Portal Link Name on every keystroke.
   const handleCompanyNameBlur = () => {
     if (businessModalMode !== "create") return;
     setBusinessForm((prev: any) => {
       const autoDisplay = displayNameTouched.current
         ? prev.displayName
         : generateDisplayName(
-            prev.companyName,
-            allBusinesses,
-            editingBusinessId,
-          );
+          prev.companyName,
+          allBusinesses,
+          editingBusinessId,
+        );
       const autoStar = starPortalTouched.current
         ? prev.starPortalLinkName
         : generateStarPortalLinkName(
-            prev.companyName,
-            prev.website,
-            allBusinesses,
-            editingBusinessId,
-          );
+          prev.companyName,
+          prev.website,
+          allBusinesses,
+          editingBusinessId,
+        );
       return {
         ...prev,
         displayName: autoDisplay,
@@ -746,8 +709,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
     });
   };
 
-  // When the user enters / leaves the Web URL field, regenerate the Star Portal
-  // Link Name from the URL (create mode only, unless manually edited).
   const handleWebsiteBlur = () => {
     if (businessModalMode !== "create") return;
     if (starPortalTouched.current) return;
@@ -782,7 +743,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
       }));
     };
     reader.readAsDataURL(file);
-    e.target.value = ""; // allow re-uploading the same file
+    e.target.value = "";
   };
 
   const openCreateBusinessModal = () => {
@@ -817,8 +778,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
     });
 
     setNewBusinessTags(business.tags || []);
-    // Existing values count as "already set" so editing the legal name
-    // never auto-overwrites the saved display / star names.
     displayNameTouched.current = true;
     starPortalTouched.current = true;
     setShowBusinessModal(true);
@@ -830,10 +789,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
       return;
     }
     try {
-      // The legal name (businessForm.companyName) is sent under `legalName` —
-      // the field the read path checks FIRST. We also keep `companyName` for
-      // backends that use that column, and send displayName / starPortalLinkName
-      // / note as their own distinct fields.
       const payload: any = {
         legalName: businessForm.companyName,
         companyName: businessForm.companyName,
@@ -888,7 +843,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
       setShowBusinessModal(false);
       resetBusinessForm();
       fetchData();
-    } catch {}
+    } catch { }
   };
 
   const handleExportContacts = async () => {
@@ -1026,27 +981,13 @@ const CombinedBusinessContactsContent: React.FC = () => {
           </div>
         </div>
 
-        {/* Compact single-row filter bar: Tags + Company + Customer No + City +
-            Postal Code + Reset, all on one line on large screens. */}
         <div className="mb-6 p-3 bg-white border border-gray-200 rounded-md shadow-sm">
-          <div className="flex flex-wrap lg:flex-nowrap items-end gap-2">
-            <div className="flex-1 min-w-[160px]">
-              <label className=" text-[11px] font-medium flex justify-start items-center gap-2 text-gray-600 mb-1">
-                <FunnelIcon className="w-4 h-4 text-primary" />
-                Tags
-              </label>
-              <TagFilterSelector
-                category="company"
-                onChange={(tagString) =>
-                  setFilters((prev) => ({ ...prev, tags: tagString }))
-                }
-                onReset={() => setFilters((prev) => ({ ...prev, tags: "" }))}
-              />
+          <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
+            <div className="flex items-center gap-1.5 text-gray-400 shrink-0 select-none px-1">
+              <FunnelIcon className="w-4 h-4 text-primary" />
             </div>
-            <div className="flex-1 max-w-[250px]">
-              <label className="block text-[11px] font-medium text-gray-600 mb-1">
-                Company Name
-              </label>
+
+            <div className="flex-1 min-w-[150px] lg:max-w-[250px]">
               <input
                 type="text"
                 value={clientFilters.companyName}
@@ -1056,14 +997,12 @@ const CombinedBusinessContactsContent: React.FC = () => {
                     companyName: e.target.value,
                   }))
                 }
-                placeholder="Company…"
-                className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all"
+                placeholder="Company Name..."
+                className="w-full px-2.5 py-1.5 text-xs border border-gray-300 rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all"
               />
             </div>
-            <div className="flex-1 max-w-[150px]">
-              <label className="block text-[11px] font-medium text-gray-600 mb-1">
-                Customer No
-              </label>
+
+            <div className="flex-1 min-w-[100px] lg:max-w-[150px]">
               <input
                 type="text"
                 value={clientFilters.customerNumber}
@@ -1073,28 +1012,24 @@ const CombinedBusinessContactsContent: React.FC = () => {
                     customerNumber: e.target.value,
                   }))
                 }
-                placeholder="K-1001"
-                className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all"
+                placeholder="Customer No..."
+                className="w-full px-2.5 py-1.5 text-xs border border-gray-300 rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all"
               />
             </div>
-            <div className="flex-1 max-w-[150px]">
-              <label className="block text-[11px] font-medium text-gray-600 mb-1">
-                City
-              </label>
+
+            <div className="flex-1 min-w-[100px] lg:max-w-[150px]">
               <input
                 type="text"
                 value={clientFilters.city}
                 onChange={(e) =>
                   setClientFilters((p) => ({ ...p, city: e.target.value }))
                 }
-                placeholder="München"
-                className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all"
+                placeholder="City..."
+                className="w-full px-2.5 py-1.5 text-xs border border-gray-300 rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all"
               />
             </div>
-            <div className="flex-1 max-w-[150px]">
-              <label className="block text-[11px] font-medium text-gray-600 mb-1">
-                Postal Code
-              </label>
+
+            <div className="flex-1 min-w-[80px] lg:max-w-[120px]">
               <input
                 type="text"
                 value={clientFilters.postalCode}
@@ -1104,10 +1039,22 @@ const CombinedBusinessContactsContent: React.FC = () => {
                     postalCode: e.target.value,
                   }))
                 }
-                placeholder="80331"
-                className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all"
+                placeholder="Postal Code..."
+                className="w-full px-2.5 py-1.5 text-xs border border-gray-300 rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all"
               />
             </div>
+
+            <div className="flex-1 min-w-[200px] lg:max-w-[350px]">
+              <TagFilterSelector
+                category="company"
+                compact={true}
+                onChange={(tagString) =>
+                  setFilters((prev) => ({ ...prev, tags: tagString }))
+                }
+                onReset={() => setFilters((prev) => ({ ...prev, tags: "" }))}
+              />
+            </div>
+
             <button
               onClick={resetFilters}
               className="px-3 py-1.5 text-xs font-semibold text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 rounded-md transition-colors flex items-center gap-1 whitespace-nowrap shrink-0"
@@ -1172,16 +1119,13 @@ const CombinedBusinessContactsContent: React.FC = () => {
                                 }
                               >
                                 <ChevronRightIcon
-                                  className={`h-4 w-4 transition-transform duration-200 ${
-                                    expandedBusinessIds.has(business.id)
-                                      ? "rotate-90"
-                                      : ""
-                                  }`}
+                                  className={`h-4 w-4 transition-transform duration-200 ${expandedBusinessIds.has(business.id)
+                                    ? "rotate-90"
+                                    : ""
+                                    }`}
                                 />
                               </button>
                               <div className="min-w-0">
-                                {/* Business name + tags inline (tags sit where
-                                    the customer no used to be). */}
                                 <div className="flex items-center gap-2 flex-wrap">
                                   <p
                                     className="font-medium max-w-[220px] truncate text-gray-900 cursor-pointer"
@@ -1199,19 +1143,18 @@ const CombinedBusinessContactsContent: React.FC = () => {
                                   <div className="flex flex-wrap gap-1.5">
                                     {business.tags && business.tags.length > 0
                                       ? sortTags(
-                                          business.tags,
-                                          business.tagOrder,
-                                        ).map((tag: any) => (
-                                          <TagBadge
-                                            key={tag.id}
-                                            tag={tag}
-                                            size="sm"
-                                          />
-                                        ))
+                                        business.tags,
+                                        business.tagOrder,
+                                      ).map((tag: any) => (
+                                        <TagBadge
+                                          key={tag.id}
+                                          tag={tag}
+                                          size="sm"
+                                        />
+                                      ))
                                       : null}
                                   </div>
                                 </div>
-                                {/* Customer no on its own line under the name. */}
                                 {business.customerNumber && (
                                   <p
                                     className="text-xs text-gray-400 mt-0.5"
@@ -1256,11 +1199,8 @@ const CombinedBusinessContactsContent: React.FC = () => {
                               <span className="text-gray-400">-</span>
                             )}
                           </td>
-                          {/* Note cell: roomy (≥4 lines) and clickable to open
-                              the note popup. */}
                           <td className="px-3 py-3 align-top max-w-[300px]">
                             {" "}
-                            {/* 1. Constrain the table cell */}
                             {business.note ? (
                               <button
                                 type="button"
@@ -1269,11 +1209,9 @@ const CombinedBusinessContactsContent: React.FC = () => {
                                   handleOpenBusinessNote(business);
                                 }}
                                 title="Click to view note"
-                                /* 2. Added 'block', 'w-full', 'break-words', and 'line-clamp-4' */
                                 className="block w-full text-left text-sm text-gray-600 break-words line-clamp-4 hover:bg-gray-100 rounded-md p-1.5 transition-colors leading-snug"
                               >
                                 {business.note.slice(0, 160)}...{" "}
-                                {/* Optionally limit the displayed text */}
                               </button>
                             ) : (
                               <span className="text-gray-400 text-xs">-</span>
@@ -1540,15 +1478,13 @@ const CombinedBusinessContactsContent: React.FC = () => {
                     </span>
                     <button
                       type="button"
-                      className={`${
-                        businessEditMode ? "bg-gray-600" : "bg-gray-200"
-                      } relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2`}
+                      className={`${businessEditMode ? "bg-gray-600" : "bg-gray-200"
+                        } relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2`}
                       onClick={() => setBusinessEditMode(!businessEditMode)}
                     >
                       <span
-                        className={`${
-                          businessEditMode ? "translate-x-4" : "translate-x-0"
-                        } pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out`}
+                        className={`${businessEditMode ? "translate-x-4" : "translate-x-0"
+                          } pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out`}
                       />
                     </button>
                   </div>
@@ -1866,11 +1802,10 @@ const CombinedBusinessContactsContent: React.FC = () => {
                     />
                     <label
                       htmlFor="labelLogoInput"
-                      className={`px-3 py-1.5 text-xs rounded-lg border border-gray-300/80 bg-white/70 transition-all ${
-                        businessFieldDisabled
-                          ? "opacity-50 cursor-not-allowed"
-                          : "cursor-pointer hover:bg-white"
-                      }`}
+                      className={`px-3 py-1.5 text-xs rounded-lg border border-gray-300/80 bg-white/70 transition-all ${businessFieldDisabled
+                        ? "opacity-50 cursor-not-allowed"
+                        : "cursor-pointer hover:bg-white"
+                        }`}
                     >
                       Upload
                     </label>
@@ -2002,17 +1937,17 @@ const CombinedBusinessContactsContent: React.FC = () => {
                   </button>
                   {(businessModalMode === "create" ||
                     (businessModalMode === "edit" && businessEditMode)) && (
-                    <CustomButton
-                      gradient={true}
-                      onClick={handleBusinessSubmit}
-                      disabled={!businessForm.companyName?.trim()}
-                      className="px-3 py-2 text-xs bg-gray-600/90 backdrop-blur-sm text-white rounded hover:bg-gray-700/90 transition-all disabled:opacity-50"
-                    >
-                      {businessModalMode === "edit"
-                        ? "Update Business"
-                        : "Create Business"}
-                    </CustomButton>
-                  )}
+                      <CustomButton
+                        gradient={true}
+                        onClick={handleBusinessSubmit}
+                        disabled={!businessForm.companyName?.trim()}
+                        className="px-3 py-2 text-xs bg-gray-600/90 backdrop-blur-sm text-white rounded hover:bg-gray-700/90 transition-all disabled:opacity-50"
+                      >
+                        {businessModalMode === "edit"
+                          ? "Update Business"
+                          : "Create Business"}
+                      </CustomButton>
+                    )}
                 </div>
               </div>
             </div>
@@ -2054,18 +1989,16 @@ const CombinedBusinessContactsContent: React.FC = () => {
                     </span>
                     <button
                       type="button"
-                      className={`${
-                        editModeEnabled ? "bg-gray-600" : "bg-gray-200"
-                      } relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2`}
+                      className={`${editModeEnabled ? "bg-gray-600" : "bg-gray-200"
+                        } relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2`}
                       role="switch"
                       aria-checked={editModeEnabled}
                       onClick={() => setEditModeEnabled(!editModeEnabled)}
                     >
                       <span
                         aria-hidden="true"
-                        className={`${
-                          editModeEnabled ? "translate-x-5" : "translate-x-0"
-                        } pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out`}
+                        className={`${editModeEnabled ? "translate-x-5" : "translate-x-0"
+                          } pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out`}
                       />
                     </button>
                   </div>

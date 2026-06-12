@@ -1040,9 +1040,9 @@ export const generateLabelPDF = async (
     const itemNoWWidth = orderNoX - 3 - valColA;
 
     doc.fillColor("black").font("Helvetica-Oblique").fontSize(6.5);
-    doc.text("ItemNoW", colA, row1LabelY);
-    doc.text("Order No / Qty", orderNoX, row1LabelY);
-    doc.text("Qty", qtyLabelColStart, row1LabelY);
+    doc.text("Artikelnr.", colA, row1LabelY);
+    doc.text("Bestell-Nr. / Menge", orderNoX, row1LabelY);
+    doc.text("Menge", qtyLabelColStart, row1LabelY);
 
     doc.font("Helvetica-Bold").fontSize(10);
     let itemNoDE = warehouseItem?.item_no_de || "N/A";
@@ -1111,9 +1111,9 @@ export const generateLabelPDF = async (
       Math.min(descriptionY + descriptionHeight + 4, 65),
     );
 
-    let remarkCNText = item.remarks_cn || "/";
+    let remarkCNText = item.remarks_cn || "";
     doc.font("Helvetica-Oblique").fontSize(6.5).fillColor("black");
-    doc.text("RemarkCN", colA, bottomSectionY);
+    doc.text("Hinweis", colA, bottomSectionY);
 
     let fontSizeCN = 10;
     if (fontSource) {
@@ -1133,10 +1133,10 @@ export const generateLabelPDF = async (
       lineBreak: false,
     });
 
-    let remarkWText = item.remark_de || "/";
+    let remarkWText = item.remark_de || "";
     const remarkWLabelY = bottomSectionY + 8 + Math.max(fontSizeCN, 8) + 7;
     doc.font("Helvetica-Oblique").fontSize(6.5).fillColor("black");
-    doc.text("RemarkW", colA, remarkWLabelY);
+    doc.text("Bestellhinweis", colA, remarkWLabelY);
 
     let fontSizeW = 8;
     if (fontSource) {

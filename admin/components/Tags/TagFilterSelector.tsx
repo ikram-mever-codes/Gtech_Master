@@ -24,12 +24,14 @@ interface TagFilterSelectorProps {
     | "supplier";
   onChange: (filterString: string) => void;
   onReset?: () => void;
+  compact?: boolean;
 }
 
 export const TagFilterSelector: React.FC<TagFilterSelectorProps> = ({
   category,
   onChange,
   onReset,
+  compact = false,
 }) => {
   const [availableTags, setAvailableTags] = useState<Tag[]>([]);
   const [selectedFilters, setSelectedFilters] = useState<TagFilter[]>([]);
@@ -121,28 +123,34 @@ export const TagFilterSelector: React.FC<TagFilterSelectorProps> = ({
   );
 
   return (
-    <div className="space-y-2.5 w-full max-w-lg" ref={dropdownRef}>
-      <label className="block text-sm font-medium text-gray-700 flex items-center justify-between">
-        {selectedFilters.length > 0 && (
-          <button
-            type="button"
-            onClick={handleClearAll}
-            className="text-xs text-rose-600 hover:text-rose-800 font-semibold flex items-center gap-1"
-          >
-            <ArrowPathIcon className="w-3.5 h-3.5" />
-            Clear Tag Filters
-          </button>
-        )}
-      </label>
+    <div className={compact ? "w-full" : "space-y-2.5 w-full max-w-lg"} ref={dropdownRef}>
+      {!compact && (
+        <label className="block text-sm font-medium text-gray-700 flex items-center justify-between">
+          {selectedFilters.length > 0 && (
+            <button
+              type="button"
+              onClick={handleClearAll}
+              className="text-xs text-rose-600 hover:text-rose-800 font-semibold flex items-center gap-1"
+            >
+              <ArrowPathIcon className="w-3.5 h-3.5" />
+              Clear Tag Filters
+            </button>
+          )}
+        </label>
+      )}
 
       <div className="relative">
         <div
           onClick={() => setIsDropdownOpen(true)}
-          className="min-h-[46px] w-full px-3 py-2 border border-gray-200 rounded-xl bg-white focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary transition-all cursor-pointer flex flex-wrap items-center gap-2"
+          className={
+            compact
+              ? "min-h-[30px] w-full px-2 py-1 border border-gray-300 rounded-md bg-white focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary transition-all cursor-pointer flex flex-wrap items-center gap-1"
+              : "min-h-[46px] w-full px-3 py-2 border border-gray-200 rounded-xl bg-white focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary transition-all cursor-pointer flex flex-wrap items-center gap-2"
+          }
         >
           {selectedFilters.length === 0 && (
-            <span className="text-gray-400 text-sm">
-              Select tags to filter in combinations...
+            <span className={compact ? "text-gray-400 text-xs" : "text-gray-400 text-sm"}>
+              {compact ? "Tags..." : "Select tags to filter in combinations..."}
             </span>
           )}
 
@@ -154,25 +162,41 @@ export const TagFilterSelector: React.FC<TagFilterSelectorProps> = ({
               <div
                 key={filter.tag.id}
                 onClick={(e) => e.stopPropagation()}
-                className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold select-none border transition-all ${
-                  isInclude
-                    ? "bg-emerald-50 text-emerald-700 border-emerald-200/60 hover:bg-emerald-100/50"
-                    : "bg-rose-50 text-rose-700 border-rose-200/60 hover:bg-rose-100/50"
-                }`}
+                className={
+                  compact
+                    ? `inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold select-none border transition-all ${
+                        isInclude
+                          ? "bg-emerald-50 text-emerald-700 border-emerald-200/60 hover:bg-emerald-100/50"
+                          : "bg-rose-50 text-rose-700 border-rose-200/60 hover:bg-rose-100/50"
+                      }`
+                    : `inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold select-none border transition-all ${
+                        isInclude
+                          ? "bg-emerald-50 text-emerald-700 border-emerald-200/60 hover:bg-emerald-100/50"
+                          : "bg-rose-50 text-rose-700 border-rose-200/60 hover:bg-rose-100/50"
+                      }`
+                }
               >
                 <button
                   type="button"
                   onClick={() => handleToggleMode(filter.tag.id)}
-                  className={`px-1.5 py-0.5 rounded font-black text-[9px] uppercase tracking-wider transition-all ${
-                    isInclude
-                      ? "bg-emerald-200/70 text-emerald-800 hover:bg-emerald-300"
-                      : "bg-rose-200/70 text-rose-800 hover:bg-rose-300"
-                  }`}
+                  className={
+                    compact
+                      ? `px-1 py-0.2 rounded font-black text-[8px] uppercase tracking-wider transition-all ${
+                          isInclude
+                            ? "bg-emerald-200/70 text-emerald-800 hover:bg-emerald-300"
+                            : "bg-rose-200/70 text-rose-800 hover:bg-rose-300"
+                        }`
+                      : `px-1.5 py-0.5 rounded font-black text-[9px] uppercase tracking-wider transition-all ${
+                          isInclude
+                            ? "bg-emerald-200/70 text-emerald-800 hover:bg-emerald-300"
+                            : "bg-rose-200/70 text-rose-800 hover:bg-rose-300"
+                        }`
+                  }
                   title="Click to toggle Include/Exclude"
                 >
-                  {isInclude ? "Include" : "Exclude"}
+                  {compact ? (isInclude ? "Inc" : "Exc") : (isInclude ? "Include" : "Exclude")}
                 </button>
-                <span className="max-w-[120px] truncate">
+                <span className={compact ? "max-w-[70px] truncate" : "max-w-[120px] truncate"}>
                   {filter.tag.name}
                 </span>
                 <button
@@ -263,7 +287,7 @@ export const TagFilterSelector: React.FC<TagFilterSelectorProps> = ({
         )}
       </div>
 
-      {selectedFilters.length > 0 && (
+      {!compact && selectedFilters.length > 0 && (
         <p className="text-[10px] text-gray-400 italic">
           💡 Filtering logic: Showing items that have **all**{" "}
           <span className="text-emerald-600 font-semibold">Include</span> tags
