@@ -22,6 +22,7 @@ import {
   UserPlusIcon,
   PencilIcon,
   GlobeAltIcon,
+  MapPinIcon,
   StarIcon,
   ChartBarIcon,
   CalendarIcon,
@@ -161,13 +162,12 @@ const slugFromWebsite = (website?: string) => {
 };
 
 const getInputClass = (hasValue: boolean, isEmptySelect: boolean = false) => {
-  return `w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${
-    hasValue
-      ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
-      : isEmptySelect
+  return `w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${hasValue
+    ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+    : isEmptySelect
       ? "text-gray-400 border-gray-300 bg-white"
       : "text-gray-900 border-gray-300 bg-white"
-  }`;
+    }`;
 };
 
 const CombinedBusinessContactsContent: React.FC = () => {
@@ -273,6 +273,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
     phone: "",
     website: "",
     vatTaxId: "",
+    asanaLink: "",
     note: "",
     tags: [] as any[],
     tagOrder: "",
@@ -787,6 +788,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
       email: business.email || "",
       phone: business.phone || "",
       website: business.website || "",
+      asanaLink: business.asanaLink || "",
       note: business.note || "",
       tags: business.tags || [],
       tagOrder: business.tagOrder || "",
@@ -820,6 +822,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
         email: businessForm.email,
         phone: businessForm.phone,
         website: businessForm.website,
+        asanaLink: businessForm.asanaLink,
         note: businessForm.note,
       };
       if (businessModalMode === "edit" && editingBusinessId) {
@@ -916,16 +919,15 @@ const CombinedBusinessContactsContent: React.FC = () => {
   const buildFullAddress = (b: any) => {
     const code = toCountryCode(b.country);
     const isGerman = !code || code === "DE";
-    const parts: string[] = [];
-    if (b.addressAdditional?.trim()) parts.push(b.addressAdditional.trim());
-    if (b.street?.trim()) parts.push(b.street.trim());
     const cityLine = [b.postalCode, b.city]
       .filter((x: string) => x && x.trim())
       .join(" ")
       .trim();
-    if (cityLine) parts.push(cityLine);
-    if (!isGerman) parts.push(code);
-    return parts.length ? parts.join(", ") : null;
+    if (!cityLine) return null;
+    if (!isGerman && code) {
+      return `${cityLine}, ${code}`;
+    }
+    return cityLine;
   };
 
   const getLinkedInStateColor = (state: string) => {
@@ -1210,25 +1212,58 @@ const CombinedBusinessContactsContent: React.FC = () => {
                             </p>
                           </td>
                           <td className="px-3 py-3">
-                            {business.website ? (
-                              <a
-                                href={
-                                  business.website.startsWith("http")
-                                    ? business.website
-                                    : `https://${business.website}`
-                                }
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-primary hover:underline flex items-center gap-1"
+                            <div className="flex items-center gap-1.5">
+                              {business.website && (
+                                <a
+                                  href={
+                                    business.website.startsWith("http")
+                                      ? business.website
+                                      : `https://${business.website}`
+                                  }
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-blue-500 hover:text-blue-700 transition-colors p-1"
+                                  title="Open Website"
+                                >
+                                  <GlobeAltIcon className="w-5 h-5" />
+                                </a>
+                              )}
+
+                              <button
+                                onClick={() => {
+                                  const q = business.legalName || business.displayName || business.companyName || business.name || "";
+                                  window.open(
+                                    `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`,
+                                    "_blank"
+                                  );
+                                }}
+                                className="text-rose-500 hover:text-rose-700 transition-colors p-1"
+                                title="Search on Google Maps"
                               >
-                                <GlobeAltIcon className="w-4 h-4" />
-                                <span className="truncate max-w-[120px]">
-                                  View
-                                </span>
-                              </a>
-                            ) : (
-                              <span className="text-gray-400">-</span>
-                            )}
+                                <MapPinIcon className="w-5 h-5" />
+                              </button>
+
+                              {business.asanaLink && (
+                                <a
+                                  href={business.asanaLink}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-purple-500 hover:text-purple-700 transition-colors p-1"
+                                  title="Open Asana task"
+                                >
+                                  <svg
+                                    className="h-5 w-5"
+                                    viewBox="0 0 24 24"
+                                    fill="currentColor"
+                                  >
+                                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z" />
+                                    <circle cx="12" cy="8.5" r="1.5" />
+                                    <circle cx="8.5" cy="14.5" r="1.5" />
+                                    <circle cx="15.5" cy="14.5" r="1.5" />
+                                  </svg>
+                                </a>
+                              )}
+                            </div>
                           </td>
                           <td className="px-3 py-3 align-top max-w-[300px]">
                             {" "}
@@ -1757,9 +1792,24 @@ const CombinedBusinessContactsContent: React.FC = () => {
                         placeholder="DE123456789"
                       />
                     </div>
-
-                    {/* Company label print logo */}
-
+                    <div className="col-span-3 md:col-span-4">
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        Asana Link
+                      </label>
+                      <input
+                        type="url"
+                        value={businessForm.asanaLink || ""}
+                        onChange={(e) =>
+                          setBusinessForm({
+                            ...businessForm,
+                            asanaLink: e.target.value,
+                          })
+                        }
+                        disabled={businessFieldDisabled}
+                        className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                        placeholder="https://app.asana.com/..."
+                      />
+                    </div>
                     <div className="col-span-6">
                       <label className="block text-xs font-medium text-gray-700 mb-1">
                         Note
