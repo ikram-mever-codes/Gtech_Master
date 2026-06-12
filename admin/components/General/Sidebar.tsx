@@ -50,12 +50,6 @@ import { usePathname } from "next/navigation";
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useDispatch, useSelector } from "react-redux";
 
-// ── New information architecture ──────────────────────────────────────────
-// Dashboard is intentionally NOT a menu item — clicking the Gtech logo opens it.
-// Items with `children` render as collapsible groups.
-// NOTE: paths for pages that don't exist yet (Order Confirmation, Invoice
-// Correction, Delivery Note, Attention) are best guesses — adjust to your real
-// routes. Relationships points to the merged company+contacts page.
 type MenuChild = {
   icon: any;
   text: string;
@@ -74,13 +68,13 @@ const allMenuItems: MenuEntry[] = [
   {
     icon: Handshake,
     text: "Relationships",
-    path: "/bussinesses", // merged Company + Contacts page
+    path: "/bussinesses",
     resource: "Bussinesses",
   },
   {
     icon: MessagesSquare,
     text: "Collaboration",
-    path: "/inquiry", // merged Inquiry + Requests page
+    path: "/inquiry",
     resource: "Inquiries",
   },
   {
@@ -100,30 +94,6 @@ const allMenuItems: MenuEntry[] = [
         path: "/offers",
         resource: "Offers",
       },
-      // {
-      //   icon: FileCheck,
-      //   text: "Order Confirmation",
-      //   path: "/order-confirmations",
-      //   resource: "OrderConfirmations",
-      // },
-      // {
-      //   icon: Receipt,
-      //   text: "Invoice",
-      //   path: "/invoices",
-      //   resource: "Invoices",
-      // },
-      // {
-      //   icon: ReceiptText,
-      //   text: "Invoice Correction",
-      //   path: "/invoice-corrections",
-      //   resource: "InvoiceCorrections",
-      // },
-      // {
-      //   icon: ClipboardList,
-      //   text: "Delivery Note",
-      //   path: "/delivery-notes",
-      //   resource: "DeliveryNotes",
-      // },
     ],
   },
   {
@@ -196,20 +166,38 @@ const Sidebar = () => {
   const menuContainerRef = useRef<HTMLDivElement>(null);
   const menuContentRef = useRef<HTMLDivElement>(null);
 
-  // Access-aware menu (ADMIN sees everything). Groups appear if at least one
-  // child is permitted; permitted children are kept.
+  // Access-aware menu (ADMIN sees everything).
   const menuItems = useMemo<MenuEntry[]>(() => {
     if (!user || user.role === "ADMIN") return allMenuItems;
     const userResources = user.assignedResources || [];
-    const allowed = (resource: string) =>
-      userResources.includes(resource) ||
-      (user.role === "PURCHASING" && resource === "Orders");
+
+    const allowed = (resource: string) => {
+      // 1. "Tags" should be visible to users of any type
+      if (resource === "Tags") return true;
+
+      // 2. Purchasing Team must see everything under Fulfillment (Delivery, Invoices, Orders, Scheduled Items)
+      if (
+        user.role === "PURCHASING" &&
+        (resource === "Delivery" ||
+          resource === "Invoices" ||
+          resource === "Orders" ||
+          resource === "Scheduled Items")
+      ) {
+        return true;
+      }
+
+      // 3. Fallback to admin-assigned access lists
+      return userResources.includes(resource);
+    };
 
     return allMenuItems
       .map((item) => {
         if (item.children) {
           const kids = item.children.filter((c) => allowed(c.resource));
-          return kids.length ? { ...item, children: kids } : null;
+          // If the group parent text is allowed OR has valid child items, render it
+          return kids.length || allowed(item.resource)
+            ? { ...item, children: kids }
+            : null;
         }
         return allowed(item.resource) ? item : null;
       })
@@ -243,7 +231,6 @@ const Sidebar = () => {
   }, [activePath, menuItems, isPathActive]);
 
   const toggleGroup = (text: string) => {
-    // If collapsed, expand the rail first so children are visible
     if (isCollapsed) {
       setIsCollapsed(false);
       setOpenGroups((prev) => ({ ...prev, [text]: true }));
@@ -296,9 +283,7 @@ const Sidebar = () => {
     return () => window.removeEventListener("resize", handleResize);
   }, [updateScrollButtons, menuItems, isCollapsed, isMounted]);
 
-  // Reliable recalculation whenever the menu's height changes — covers group
-  // expand/collapse (the Collapse animation) and rail collapse/expand, which
-  // timeouts handled inconsistently before.
+  // Reliable recalculation whenever the menu's height changes
   useEffect(() => {
     if (!isMounted) return;
     const container = menuContainerRef.current;
@@ -316,7 +301,6 @@ const Sidebar = () => {
     if (isMounted) updateScrollButtons();
   };
 
-  // ── shared row styles ──
   const rowSx = (active: boolean) => ({
     borderTopLeftRadius: "5px",
     borderBottomLeftRadius: "5px",
@@ -373,7 +357,6 @@ const Sidebar = () => {
           overflow: "hidden",
         }}
       >
-        {/* Clicking the logo opens the Dashboard */}
         <Link href="/dashboard" style={{ flexShrink: 0 }}>
           <Image
             alt="Gtech"
@@ -421,7 +404,7 @@ const Sidebar = () => {
           display: "flex",
           flexDirection: "column",
           flex: 1,
-          minHeight: 0, // allow inner scroll area to shrink & scroll
+          minHeight: 0,
           overflow: "hidden",
         }}
       >
@@ -461,7 +444,7 @@ const Sidebar = () => {
           onScroll={handleScroll}
           sx={{
             flex: 1,
-            minHeight: 0, // critical: lets this flex child actually scroll
+            minHeight: 0,
             overflowY: "auto",
             overflowX: "hidden",
             scrollbarWidth: "none",
@@ -485,7 +468,6 @@ const Sidebar = () => {
               const hasChildren = !!item.children?.length;
               const isOpen = !!openGroups[item.text];
 
-              // Group header (collapsible)
               if (hasChildren) {
                 return (
                   <Box key={item.text}>
@@ -584,7 +566,6 @@ const Sidebar = () => {
                 );
               }
 
-              // Plain link item
               return (
                 <Tooltip
                   key={item.text}
