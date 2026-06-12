@@ -160,10 +160,12 @@ const slugFromWebsite = (website?: string) => {
   return label.replace(/[^a-z0-9-]/g, "");
 };
 
-const getInputClass = (hasValue: boolean) => {
+const getInputClass = (hasValue: boolean, isEmptySelect: boolean = false) => {
   return `w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${
     hasValue
       ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+      : isEmptySelect
+      ? "text-gray-400 border-gray-300 bg-white"
       : "text-gray-900 border-gray-300 bg-white"
   }`;
 };
@@ -1027,7 +1029,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
               />
             </div>
 
-            <div className="w-28 shrink-0">
+            <div className="w-36 shrink-0">
               <input
                 type="text"
                 value={clientFilters.customerNumber}
@@ -1037,12 +1039,12 @@ const CombinedBusinessContactsContent: React.FC = () => {
                     customerNumber: e.target.value,
                   }))
                 }
-                placeholder="Customer No..."
+                placeholder="CustomerNo..."
                 className={getInputClass(!!clientFilters.customerNumber)}
               />
             </div>
 
-            <div className="w-28 shrink-0">
+            <div className="w-36 shrink-0">
               <input
                 type="text"
                 value={clientFilters.postalCode}
@@ -1052,7 +1054,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
                     postalCode: e.target.value,
                   }))
                 }
-                placeholder="Postal Code..."
+                placeholder="PostalCode..."
                 className={getInputClass(!!clientFilters.postalCode)}
               />
             </div>
@@ -1075,12 +1077,12 @@ const CombinedBusinessContactsContent: React.FC = () => {
                 onChange={(e) =>
                   setClientFilters((p) => ({ ...p, country: e.target.value }))
                 }
-                className={getInputClass(!!clientFilters.country)}
+                className={getInputClass(!!clientFilters.country, !clientFilters.country)}
               >
-                <option value="">Country...</option>
-                <option value="DE">DE</option>
-                <option value="AT">AT</option>
-                <option value="CH">CH</option>
+                <option value="" className="text-gray-400">Country...</option>
+                <option value="DE" className="text-gray-900 font-normal">DE</option>
+                <option value="AT" className="text-gray-900 font-normal">AT</option>
+                <option value="CH" className="text-gray-900 font-normal">CH</option>
               </select>
             </div>
 
