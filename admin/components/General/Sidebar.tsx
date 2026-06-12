@@ -175,10 +175,11 @@ const Sidebar = () => {
       // 1. "Tags" should be visible to users of any type
       if (resource === "Tags") return true;
 
-      // 2. Purchasing Team must see everything under Fulfillment (Delivery, Invoices, Orders, Scheduled Items)
+      // 2. Purchasing Team must see everything under Fulfillment AND Items
       if (
         user.role === "PURCHASING" &&
-        (resource === "Delivery" ||
+        (resource === "Items" ||
+          resource === "Delivery" ||
           resource === "Invoices" ||
           resource === "Orders" ||
           resource === "Scheduled Items")
