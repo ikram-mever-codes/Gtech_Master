@@ -919,10 +919,21 @@ const CombinedBusinessContactsContent: React.FC = () => {
   const buildFullAddress = (b: any) => {
     const code = toCountryCode(b.country);
     const isGerman = !code || code === "DE";
-    const cityLine = [b.postalCode, b.city]
+
+    let postal = (b.postalCode || "").trim();
+    let city = (b.city || "").trim();
+
+    const zipMatch = `${postal} ${city}`.trim().match(/(\d{4,5})\s+([^,]+)/);
+    if (zipMatch) {
+      postal = zipMatch[1];
+      city = zipMatch[2].trim();
+    }
+
+    const cityLine = [postal, city]
       .filter((x: string) => x && x.trim())
       .join(" ")
       .trim();
+
     if (!cityLine) return null;
     if (!isGerman && code) {
       return `${cityLine}, ${code}`;
@@ -1144,11 +1155,10 @@ const CombinedBusinessContactsContent: React.FC = () => {
                                   e.stopPropagation();
                                   toggleBusinessContacts(business.id);
                                 }}
-                                className={`${
-                                  !business.contacts || business.contacts.length === 0
+                                className={`${!business.contacts || business.contacts.length === 0
                                     ? "text-red-500 hover:text-red-700"
                                     : "text-gray-400 hover:text-gray-700"
-                                } flex-shrink-0 mt-0.5`}
+                                  } flex-shrink-0 mt-0.5`}
                                 title={
                                   !business.contacts || business.contacts.length === 0
                                     ? "No contacts yet"
@@ -1504,11 +1514,34 @@ const CombinedBusinessContactsContent: React.FC = () => {
           <div className="backdrop-blur-md rounded-2xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto bg-white/95">
             <div className="p-6">
               <div className="flex items-start justify-between mb-6 gap-3">
-                <h2 className="text-xl font-bold text-gray-900">
-                  {businessModalMode === "edit"
-                    ? "Business Details"
-                    : "Add New Business"}
-                </h2>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-xl font-bold text-gray-900">
+                    {businessModalMode === "edit"
+                      ? "Business Details"
+                      : "Add New Business"}
+                  </h2>
+                  {businessModalMode === "edit" && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const q =
+                          businessForm.legalName ||
+                          businessForm.companyName ||
+                          "";
+                        window.open(
+                          `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                            q
+                          )}`,
+                          "_blank"
+                        );
+                      }}
+                      className="text-rose-500 hover:text-rose-700 transition-colors p-1"
+                      title="Search on Google Maps"
+                    >
+                      <MapPinIcon className="w-5 h-5" />
+                    </button>
+                  )}
+                </div>
                 <div className="flex items-center gap-3">
                   <div className="flex flex-col items-end">
                     <label className="block text-[10px] font-medium text-gray-500 mb-0.5">
