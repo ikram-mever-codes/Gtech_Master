@@ -3359,17 +3359,24 @@ const InvoiceListPage: React.FC = () => {
             onClose={() => setShowREModal(false)}
             title={`Reassign Item ${selectedItem.id}`}
           >
-            <div className="p-4 space-y-4">
+            <div className="p-4 space-y-4 min-h-[320px] flex flex-col justify-between">
               <div>
                 <label className="block text-sm font-bold text-gray-800 mb-2 uppercase tracking-wide">
                   Select Target Cargo
                 </label>
                 <Select
                   className="text-sm"
-                  options={cargos.map((c) => ({
-                    value: String(c.id),
-                    label: `${c.cargo_no} ${c.cargo_status ? `(${c.cargo_status})` : ""}`,
-                  }))}
+                  menuPortalTarget={typeof window !== "undefined" ? document.body : undefined}
+                  styles={{ menuPortal: (base) => ({ ...base, zIndex: 9999 }) }}
+                  options={cargos
+                    .filter((c) => {
+                      const status = (c.cargo_status || "").trim().toLowerCase();
+                      return status !== "shipped" && status !== "delivered";
+                    })
+                    .map((c) => ({
+                      value: String(c.id),
+                      label: `${c.cargo_no} ${c.cargo_status ? `(${c.cargo_status})` : ""}`,
+                    }))}
                   value={
                     cargos
                       .map((c) => ({
@@ -3437,10 +3444,17 @@ const InvoiceListPage: React.FC = () => {
                   Target Cargo (Optional)
                 </label>
                 <Select
-                  options={cargos.map((c) => ({
-                    value: String(c.id),
-                    label: `${c.cargo_no} (${c.cargo_status})`,
-                  }))}
+                  menuPortalTarget={typeof window !== "undefined" ? document.body : undefined}
+                  styles={{ menuPortal: (base) => ({ ...base, zIndex: 9999 }) }}
+                  options={cargos
+                    .filter((c) => {
+                      const status = (c.cargo_status || "").trim().toLowerCase();
+                      return status !== "shipped" && status !== "delivered";
+                    })
+                    .map((c) => ({
+                      value: String(c.id),
+                      label: `${c.cargo_no} (${c.cargo_status})`,
+                    }))}
                   value={
                     cargos
                       .map((c) => ({

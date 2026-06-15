@@ -1144,11 +1144,17 @@ const CombinedBusinessContactsContent: React.FC = () => {
                                   e.stopPropagation();
                                   toggleBusinessContacts(business.id);
                                 }}
-                                className="text-gray-400 hover:text-gray-700 flex-shrink-0 mt-0.5"
+                                className={`${
+                                  !business.contacts || business.contacts.length === 0
+                                    ? "text-red-500 hover:text-red-700"
+                                    : "text-gray-400 hover:text-gray-700"
+                                } flex-shrink-0 mt-0.5`}
                                 title={
-                                  expandedBusinessIds.has(business.id)
-                                    ? "Hide contacts"
-                                    : "Show contacts"
+                                  !business.contacts || business.contacts.length === 0
+                                    ? "No contacts yet"
+                                    : expandedBusinessIds.has(business.id)
+                                      ? "Hide contacts"
+                                      : "Show contacts"
                                 }
                               >
                                 <ChevronRightIcon
@@ -1277,7 +1283,9 @@ const CombinedBusinessContactsContent: React.FC = () => {
                                 title="Click to view note"
                                 className="block w-full text-left text-sm text-gray-600 break-words line-clamp-4 hover:bg-gray-100 rounded-md p-1.5 transition-colors leading-snug"
                               >
-                                {business.note.slice(0, 160)}...{" "}
+                                {business.note.length > 160
+                                  ? `${business.note.slice(0, 160)}...`
+                                  : business.note}
                               </button>
                             ) : (
                               <span className="text-gray-400 text-xs">-</span>
