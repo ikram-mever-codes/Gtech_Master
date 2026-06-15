@@ -72,7 +72,7 @@ import {
   deleteCustomer,
   getAllCustomers,
   updateCustomerStatus,
-  CustomerData
+  CustomerData,
 } from "@/api/customers";
 import { CustomerVerificationStatus } from "@/utils/interfaces";
 import { successStyles } from "@/utils/constants";
@@ -83,7 +83,7 @@ const CustomersPage = () => {
   const [searchText, setSearchText] = useState("");
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(
-    null
+    null,
   );
   const [customers, setCustomers] = useState<CustomerData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -114,9 +114,15 @@ const CustomersPage = () => {
       if (response && response.data) {
         if (Array.isArray(response.data)) {
           setCustomers(response.data);
-        } else if (response.data.businesses && Array.isArray(response.data.businesses)) {
+        } else if (
+          response.data.businesses &&
+          Array.isArray(response.data.businesses)
+        ) {
           setCustomers(response.data.businesses);
-        } else if (response.data.customers && Array.isArray(response.data.customers)) {
+        } else if (
+          response.data.customers &&
+          Array.isArray(response.data.customers)
+        ) {
           setCustomers(response.data.customers);
         } else {
           setCustomers([]);
@@ -143,12 +149,12 @@ const CustomersPage = () => {
 
   const handleActionClick = (
     event: React.MouseEvent<HTMLElement>,
-    customerId: string
+    customerId: string,
   ) => {
     setAnchorEl(event.currentTarget);
     setSelectedCustomerId(customerId);
     setSelectedCustomer(
-      customers.find((customer: any) => customer.id === customerId)
+      customers.find((customer: any) => customer.id === customerId),
     );
   };
 
@@ -161,7 +167,7 @@ const CustomersPage = () => {
     try {
       await updateCustomerStatus(
         selectedCustomer.id,
-        CustomerVerificationStatus.APPROVED
+        CustomerVerificationStatus.APPROVED,
       );
       setApproveDialogOpen(false);
       handleRefresh();
@@ -184,7 +190,7 @@ const CustomersPage = () => {
     try {
       await updateCustomerStatus(
         selectedCustomer.id,
-        CustomerVerificationStatus.REJECTED
+        CustomerVerificationStatus.REJECTED,
       );
       setRejectDialogOpen(false);
       handleRefresh();
@@ -344,7 +350,7 @@ const CustomersPage = () => {
             anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
             badgeContent={
               row.accountVerificationStatus ===
-                CustomerVerificationStatus.APPROVED ? (
+              CustomerVerificationStatus.APPROVED ? (
                 <Box
                   sx={{
                     width: 16,
@@ -366,7 +372,7 @@ const CustomersPage = () => {
               src={
                 row.avatar ||
                 `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                  row.companyName
+                  row.companyName,
                 )}&background=1976d2&color=fff`
               }
               variant="rounded"
@@ -443,43 +449,43 @@ const CustomersPage = () => {
         <Stack direction="row" spacing={0.5}>
           {row.accountVerificationStatus ===
             CustomerVerificationStatus.PENDING && (
-              <>
-                <Tooltip title="Approve" placement="top">
-                  <IconButton
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedCustomer(row);
-                      setApproveDialogOpen(true);
-                    }}
-                    size="small"
-                    sx={{
-                      backgroundColor: "#e8f5e8",
-                      color: "#2e7d32",
-                      "&:hover": { backgroundColor: "#c8e6c9" },
-                    }}
-                  >
-                    <LucideCheck size={16} />
-                  </IconButton>
-                </Tooltip>
-                <Tooltip title="Reject" placement="top">
-                  <IconButton
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedCustomer(row);
-                      setRejectDialogOpen(true);
-                    }}
-                    size="small"
-                    sx={{
-                      backgroundColor: "#ffebee",
-                      color: "#c62828",
-                      "&:hover": { backgroundColor: "#ffcdd2" },
-                    }}
-                  >
-                    <LucideX size={16} />
-                  </IconButton>
-                </Tooltip>
-              </>
-            )}
+            <>
+              <Tooltip title="Approve" placement="top">
+                <IconButton
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedCustomer(row);
+                    setApproveDialogOpen(true);
+                  }}
+                  size="small"
+                  sx={{
+                    backgroundColor: "#e8f5e8",
+                    color: "#2e7d32",
+                    "&:hover": { backgroundColor: "#c8e6c9" },
+                  }}
+                >
+                  <LucideCheck size={16} />
+                </IconButton>
+              </Tooltip>
+              <Tooltip title="Reject" placement="top">
+                <IconButton
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedCustomer(row);
+                    setRejectDialogOpen(true);
+                  }}
+                  size="small"
+                  sx={{
+                    backgroundColor: "#ffebee",
+                    color: "#c62828",
+                    "&:hover": { backgroundColor: "#ffcdd2" },
+                  }}
+                >
+                  <LucideX size={16} />
+                </IconButton>
+              </Tooltip>
+            </>
+          )}
           <IconButton
             onClick={(e) => {
               e.stopPropagation();
@@ -508,7 +514,7 @@ const CustomersPage = () => {
         customer.contactPhoneNumber,
       ].some(
         (field) =>
-          field && field.toLowerCase().includes(searchText.toLowerCase())
+          field && field.toLowerCase().includes(searchText.toLowerCase()),
       );
 
     const matchesStatus =
@@ -536,15 +542,17 @@ const CustomersPage = () => {
 
   const pendingCount = customers.filter(
     (customer: any) =>
-      customer.accountVerificationStatus === CustomerVerificationStatus.PENDING
+      customer.accountVerificationStatus === CustomerVerificationStatus.PENDING,
   ).length;
   const approvedCount = customers.filter(
     (customer: any) =>
-      customer.accountVerificationStatus === CustomerVerificationStatus.APPROVED
+      customer.accountVerificationStatus ===
+      CustomerVerificationStatus.APPROVED,
   ).length;
   const rejectedCount = customers.filter(
     (customer: any) =>
-      customer.accountVerificationStatus === CustomerVerificationStatus.REJECTED
+      customer.accountVerificationStatus ===
+      CustomerVerificationStatus.REJECTED,
   ).length;
 
   if (loading) {

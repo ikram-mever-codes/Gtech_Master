@@ -22,6 +22,7 @@ import {
   UserPlusIcon,
   PencilIcon,
   GlobeAltIcon,
+  ClipboardDocumentIcon,
   MapPinIcon,
   StarIcon,
   ChartBarIcon,
@@ -108,6 +109,8 @@ const COUNTRY_OPTIONS = [
   { value: "CH", label: "CH" },
 ];
 
+const BUSINESS_SHARE_BASE_URL = "https://system.gtech.de/bussinesses";
+
 const DEFAULT_SEX_VALUE: string =
   (SEX_OPTIONS as any).find((o: any) => {
     const v = String(o?.value ?? "").toLowerCase();
@@ -162,12 +165,13 @@ const slugFromWebsite = (website?: string) => {
 };
 
 const getInputClass = (hasValue: boolean, isEmptySelect: boolean = false) => {
-  return `w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${hasValue
-    ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
-    : isEmptySelect
-      ? "text-gray-400 border-gray-300 bg-white"
-      : "text-gray-900 border-gray-300 bg-white"
-    }`;
+  return `w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${
+    hasValue
+      ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+      : isEmptySelect
+        ? "text-gray-400 border-gray-300 bg-white"
+        : "text-gray-900 border-gray-300 bg-white"
+  }`;
 };
 
 const CombinedBusinessContactsContent: React.FC = () => {
@@ -285,6 +289,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
   const [newContactTags, setNewContactTags] = useState<Tag[]>([]);
 
   const [urlParamHandled, setUrlParamHandled] = useState(false);
+  const [displayNameHandled, setDisplayNameHandled] = useState(false);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -448,12 +453,64 @@ const CombinedBusinessContactsContent: React.FC = () => {
     }
   }, [searchParams, allBusinesses, urlParamHandled]);
 
+  // Deep link: ?displayName=abc opens that business's details popup by default.
+  useEffect(() => {
+    if (displayNameHandled) return;
+    const dn = searchParams?.get("displayName");
+    if (dn && allBusinesses.length > 0) {
+      const target = dn.trim().toLowerCase();
+      const found = allBusinesses.find(
+        (b: any) => (b.displayName || "").trim().toLowerCase() === target,
+      );
+      if (found) {
+        openBusinessModal(found);
+        setDisplayNameHandled(true);
+      }
+    }
+  }, [searchParams, allBusinesses, displayNameHandled]);
+
   const toggleBusinessContacts = (businessId: string) => {
     setExpandedBusinessIds((prev) => {
       const next = new Set<string>();
       if (!prev.has(businessId)) next.add(businessId);
       return next;
     });
+  };
+
+  // Copies the shareable business link to the clipboard.
+  const handleCopyBusinessLink = async (
+    business: any,
+    e?: React.MouseEvent,
+  ) => {
+    e?.stopPropagation();
+    const dn =
+      business.displayName || business.companyName || business.name || "";
+    const link = `${BUSINESS_SHARE_BASE_URL}?displayName=${encodeURIComponent(
+      dn,
+    )}`;
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(link);
+      } else {
+        throw new Error("Clipboard API unavailable");
+      }
+      toast.success("Business link copied");
+    } catch {
+      try {
+        const ta = document.createElement("textarea");
+        ta.value = link;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+        toast.success("Business link copied");
+      } catch {
+        toast.error("Failed to copy link");
+      }
+    }
   };
 
   const patchContactInState = (contactId: string, patch: any) => {
@@ -673,7 +730,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
     return `${first} ${i}`;
   };
 
-
   const generateStarPortalLinkName = (
     companyName: string,
     website: string,
@@ -705,18 +761,18 @@ const CombinedBusinessContactsContent: React.FC = () => {
       const autoDisplay = displayNameTouched.current
         ? prev.displayName
         : generateDisplayName(
-          prev.companyName,
-          allBusinesses,
-          editingBusinessId,
-        );
+            prev.companyName,
+            allBusinesses,
+            editingBusinessId,
+          );
       const autoStar = starPortalTouched.current
         ? prev.starPortalLinkName
         : generateStarPortalLinkName(
-          prev.companyName,
-          prev.website,
-          allBusinesses,
-          editingBusinessId,
-        );
+            prev.companyName,
+            prev.website,
+            allBusinesses,
+            editingBusinessId,
+          );
       return {
         ...prev,
         displayName: autoDisplay,
@@ -861,7 +917,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
       setShowBusinessModal(false);
       resetBusinessForm();
       fetchData();
-    } catch { }
+    } catch {}
   };
 
   const handleExportContacts = async () => {
@@ -1090,12 +1146,23 @@ const CombinedBusinessContactsContent: React.FC = () => {
                 onChange={(e) =>
                   setClientFilters((p) => ({ ...p, country: e.target.value }))
                 }
-                className={getInputClass(!!clientFilters.country, !clientFilters.country)}
+                className={getInputClass(
+                  !!clientFilters.country,
+                  !clientFilters.country,
+                )}
               >
-                <option value="" className="text-gray-400">Country...</option>
-                <option value="DE" className="text-gray-900 font-normal">DE</option>
-                <option value="AT" className="text-gray-900 font-normal">AT</option>
-                <option value="CH" className="text-gray-900 font-normal">CH</option>
+                <option value="" className="text-gray-400">
+                  Country...
+                </option>
+                <option value="DE" className="text-gray-900 font-normal">
+                  DE
+                </option>
+                <option value="AT" className="text-gray-900 font-normal">
+                  AT
+                </option>
+                <option value="CH" className="text-gray-900 font-normal">
+                  CH
+                </option>
               </select>
             </div>
 
@@ -1155,12 +1222,15 @@ const CombinedBusinessContactsContent: React.FC = () => {
                                   e.stopPropagation();
                                   toggleBusinessContacts(business.id);
                                 }}
-                                className={`${!business.contacts || business.contacts.length === 0
-                                  ? "text-red-500 hover:text-red-700"
-                                  : "text-gray-400 hover:text-gray-700"
-                                  } flex-shrink-0 mt-0.5`}
+                                className={`${
+                                  !business.contacts ||
+                                  business.contacts.length === 0
+                                    ? "text-red-500 hover:text-red-700"
+                                    : "text-gray-400 hover:text-gray-700"
+                                } flex-shrink-0 mt-0.5`}
                                 title={
-                                  !business.contacts || business.contacts.length === 0
+                                  !business.contacts ||
+                                  business.contacts.length === 0
                                     ? "No contacts yet"
                                     : expandedBusinessIds.has(business.id)
                                       ? "Hide contacts"
@@ -1168,10 +1238,11 @@ const CombinedBusinessContactsContent: React.FC = () => {
                                 }
                               >
                                 <ChevronRightIcon
-                                  className={`h-4 w-4 transition-transform duration-200 ${expandedBusinessIds.has(business.id)
-                                    ? "rotate-90"
-                                    : ""
-                                    }`}
+                                  className={`h-4 w-4 transition-transform duration-200 ${
+                                    expandedBusinessIds.has(business.id)
+                                      ? "rotate-90"
+                                      : ""
+                                  }`}
                                 />
                               </button>
                               <div className="min-w-0">
@@ -1192,15 +1263,15 @@ const CombinedBusinessContactsContent: React.FC = () => {
                                   <div className="flex flex-wrap gap-1.5">
                                     {business.tags && business.tags.length > 0
                                       ? sortTags(
-                                        business.tags,
-                                        business.tagOrder,
-                                      ).map((tag: any) => (
-                                        <TagBadge
-                                          key={tag.id}
-                                          tag={tag}
-                                          size="sm"
-                                        />
-                                      ))
+                                          business.tags,
+                                          business.tagOrder,
+                                        ).map((tag: any) => (
+                                          <TagBadge
+                                            key={tag.id}
+                                            tag={tag}
+                                            size="sm"
+                                          />
+                                        ))
                                       : null}
                                   </div>
                                 </div>
@@ -1228,7 +1299,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
                             </p>
                           </td>
                           <td className="px-3 py-3">
-                            <div className="flex items-center gap-1.5">
+                            <div className="flex items-center gap-0">
                               {business.website && (
                                 <a
                                   href={
@@ -1247,10 +1318,15 @@ const CombinedBusinessContactsContent: React.FC = () => {
 
                               <button
                                 onClick={() => {
-                                  const q = business.legalName || business.displayName || business.companyName || business.name || "";
+                                  const q =
+                                    business.legalName ||
+                                    business.displayName ||
+                                    business.companyName ||
+                                    business.name ||
+                                    "";
                                   window.open(
                                     `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`,
-                                    "_blank"
+                                    "_blank",
                                   );
                                 }}
                                 className="text-rose-500 hover:text-rose-700 transition-colors p-1"
@@ -1279,6 +1355,16 @@ const CombinedBusinessContactsContent: React.FC = () => {
                                   </svg>
                                 </a>
                               )}
+
+                              <button
+                                onClick={(e) =>
+                                  handleCopyBusinessLink(business, e)
+                                }
+                                className="text-gray-500 hover:text-gray-700 transition-colors p-1"
+                                title="Copy business link"
+                              >
+                                <ClipboardDocumentIcon className="w-5 h-5" />
+                              </button>
                             </div>
                           </td>
                           <td className="px-3 py-3 align-top max-w-[300px]">
@@ -1530,9 +1616,9 @@ const CombinedBusinessContactsContent: React.FC = () => {
                           "";
                         window.open(
                           `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-                            q
+                            q,
                           )}`,
-                          "_blank"
+                          "_blank",
                         );
                       }}
                       className="text-rose-500 hover:text-rose-700 transition-colors p-1"
@@ -1585,13 +1671,15 @@ const CombinedBusinessContactsContent: React.FC = () => {
                     </span>
                     <button
                       type="button"
-                      className={`${businessEditMode ? "bg-gray-600" : "bg-gray-200"
-                        } relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2`}
+                      className={`${
+                        businessEditMode ? "bg-gray-600" : "bg-gray-200"
+                      } relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2`}
                       onClick={() => setBusinessEditMode(!businessEditMode)}
                     >
                       <span
-                        className={`${businessEditMode ? "translate-x-4" : "translate-x-0"
-                          } pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out`}
+                        className={`${
+                          businessEditMode ? "translate-x-4" : "translate-x-0"
+                        } pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out`}
                       />
                     </button>
                   </div>
@@ -1924,10 +2012,11 @@ const CombinedBusinessContactsContent: React.FC = () => {
                     />
                     <label
                       htmlFor="labelLogoInput"
-                      className={`px-3 py-1.5 text-xs rounded-lg border border-gray-300/80 bg-white/70 transition-all ${businessFieldDisabled
-                        ? "opacity-50 cursor-not-allowed"
-                        : "cursor-pointer hover:bg-white"
-                        }`}
+                      className={`px-3 py-1.5 text-xs rounded-lg border border-gray-300/80 bg-white/70 transition-all ${
+                        businessFieldDisabled
+                          ? "opacity-50 cursor-not-allowed"
+                          : "cursor-pointer hover:bg-white"
+                      }`}
                     >
                       Upload
                     </label>
@@ -2059,17 +2148,17 @@ const CombinedBusinessContactsContent: React.FC = () => {
                   </button>
                   {(businessModalMode === "create" ||
                     (businessModalMode === "edit" && businessEditMode)) && (
-                      <CustomButton
-                        gradient={true}
-                        onClick={handleBusinessSubmit}
-                        disabled={!businessForm.companyName?.trim()}
-                        className="px-3 py-2 text-xs bg-gray-600/90 backdrop-blur-sm text-white rounded hover:bg-gray-700/90 transition-all disabled:opacity-50"
-                      >
-                        {businessModalMode === "edit"
-                          ? "Update Business"
-                          : "Create Business"}
-                      </CustomButton>
-                    )}
+                    <CustomButton
+                      gradient={true}
+                      onClick={handleBusinessSubmit}
+                      disabled={!businessForm.companyName?.trim()}
+                      className="px-3 py-2 text-xs bg-gray-600/90 backdrop-blur-sm text-white rounded hover:bg-gray-700/90 transition-all disabled:opacity-50"
+                    >
+                      {businessModalMode === "edit"
+                        ? "Update Business"
+                        : "Create Business"}
+                    </CustomButton>
+                  )}
                 </div>
               </div>
             </div>
@@ -2111,16 +2200,18 @@ const CombinedBusinessContactsContent: React.FC = () => {
                     </span>
                     <button
                       type="button"
-                      className={`${editModeEnabled ? "bg-gray-600" : "bg-gray-200"
-                        } relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2`}
+                      className={`${
+                        editModeEnabled ? "bg-gray-600" : "bg-gray-200"
+                      } relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2`}
                       role="switch"
                       aria-checked={editModeEnabled}
                       onClick={() => setEditModeEnabled(!editModeEnabled)}
                     >
                       <span
                         aria-hidden="true"
-                        className={`${editModeEnabled ? "translate-x-5" : "translate-x-0"
-                          } pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out`}
+                        className={`${
+                          editModeEnabled ? "translate-x-5" : "translate-x-0"
+                        } pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out`}
                       />
                     </button>
                   </div>
