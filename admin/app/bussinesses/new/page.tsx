@@ -861,6 +861,22 @@ const AddEditBusinessManual: React.FC = () => {
                 }
                 icon={isViewMode ? Eye : isEditMode ? Pencil : Building2}
               />
+              <button
+                type="button"
+                onClick={() => {
+                  const q = formData.name || "";
+                  window.open(
+                    `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                      q
+                    )}`,
+                    "_blank"
+                  );
+                }}
+                className="text-rose-500 hover:text-rose-700 transition-colors p-1 mt-1"
+                title="Search on Google Maps"
+              >
+                <MapPinIcon className="w-5 h-5" />
+              </button>
             </div>
           </div>
           <div className="flex items-center gap-4">
