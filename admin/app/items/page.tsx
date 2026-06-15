@@ -1,5 +1,11 @@
 "use client";
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, {
+  useState,
+  useEffect,
+  useMemo,
+  useCallback,
+  useRef,
+} from "react";
 import {
   MagnifyingGlassIcon,
   FunnelIcon,
@@ -130,6 +136,8 @@ const ItemsManagementPage: React.FC = () => {
     }
     return "items";
   });
+
+  // ---- Table data (paginated, per active tab) ----
   const [items, setItems] = useState<Item[]>([]);
   const [parents, setParents] = useState<Parent[]>([]);
   const [warehouseItems, setWarehouseItems] = useState<WarehouseItem[]>([]);
@@ -137,6 +145,11 @@ const ItemsManagementPage: React.FC = () => {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [newItems, setNewItems] = useState<any[]>([]);
   const [newItemsCount, setNewItemsCount] = useState(0);
+
+  // ---- Reference data (loaded ONCE, used by filters + create-item modal) ----
+  const [refParents, setRefParents] = useState<Parent[]>([]);
+  const [refTarics, setRefTarics] = useState<Taric[]>([]);
+  const [refSuppliers, setRefSuppliers] = useState<Supplier[]>([]);
 
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -172,6 +185,13 @@ const ItemsManagementPage: React.FC = () => {
     tags: "",
   });
 
+  // ---- Item preview modal ----
+  const [showItemPreview, setShowItemPreview] = useState(false);
+  const [previewItem, setPreviewItem] = useState<any | null>(null);
+
+  // Guards every fetch so stale/slow responses never overwrite the latest one.
+  const reqIdRef = useRef(0);
+
   const hasChinese = (str: string) => /[\u4e00-\u9fa5]/.test(str || "");
 
   const getSupplierLabel = (s: any) => {
@@ -179,6 +199,19 @@ const ItemsManagementPage: React.FC = () => {
     const isEnglish = name && !hasChinese(name);
     return `[ID: ${s.id}]${isEnglish ? " " + name : ""}`;
   };
+
+  const getCompany = (item: any) =>
+    item?.company_display_name ||
+    item?.companyDisplayName ||
+    item?.customer?.displayName ||
+    item?.customer?.display_name ||
+    item?.customer?.companyName ||
+    item?.customer?.company_name ||
+    item?.customer?.name ||
+    item?.company_name ||
+    item?.company ||
+    "-";
+
   const [taricFilters, setTaricFilters] = useState<TaricFilterState>({
     search: "",
   });
@@ -382,10 +415,11 @@ const ItemsManagementPage: React.FC = () => {
   };
 
   const fetchData = useCallback(async () => {
+    const reqId = ++reqIdRef.current;
     setLoading(true);
     try {
       switch (activeTab) {
-        case "items":
+        case "items": {
           const itemsResponse: any = await getItems({
             page: pagination.page,
             limit: pagination.limit,
@@ -397,22 +431,26 @@ const ItemsManagementPage: React.FC = () => {
             tags: debouncedFilters.tags,
             filter: searchParams.get("filter") || undefined,
           });
+          if (reqId !== reqIdRef.current) return;
           setItems(itemsResponse.data);
           setPagination(itemsResponse.pagination);
           break;
+        }
 
-        case "parents":
+        case "parents": {
           const parentsResponse: any = await getParents({
             page: pagination.page,
             limit: pagination.limit,
             search: debouncedFilters.search,
             isActive: debouncedFilters.isActive,
           });
+          if (reqId !== reqIdRef.current) return;
           setParents(parentsResponse.data);
           setPagination(parentsResponse.pagination);
           break;
+        }
 
-        case "warehouse":
+        case "warehouse": {
           const warehouseResponse: any = await getWarehouseItems({
             page: pagination.page,
             limit: pagination.limit,
@@ -420,37 +458,46 @@ const ItemsManagementPage: React.FC = () => {
             hasStock: debouncedFilters.status,
             filter: searchParams.get("filter") || undefined,
           });
+          if (reqId !== reqIdRef.current) return;
           setWarehouseItems(warehouseResponse.data);
           setPagination(warehouseResponse.pagination);
           break;
+        }
 
-        case "tarics":
+        case "tarics": {
           const taricsResponse: any = await getAllTarics({
             page: pagination.page,
             limit: pagination.limit,
             search: debouncedTaricFilters.search,
           });
+          if (reqId !== reqIdRef.current) return;
           setTarics(taricsResponse.data);
           setPagination(taricsResponse.pagination);
           break;
+        }
 
-        case "suppliers":
+        case "suppliers": {
           const suppliersResponse: any = await getAllSuppliers({
             page: pagination.page,
             limit: pagination.limit,
             search: debouncedFilters.search,
             tags: debouncedFilters.tags,
           });
+          if (reqId !== reqIdRef.current) return;
           setSuppliers(suppliersResponse.data);
           if (suppliersResponse.pagination) {
             setPagination(suppliersResponse.pagination);
           }
           break;
+        }
       }
     } catch (error) {
       console.error("Error fetching data:", error);
     } finally {
-      setLoading(false);
+      // Only the most recent request is allowed to clear the spinner.
+      if (reqId === reqIdRef.current) {
+        setLoading(false);
+      }
     }
   }, [
     activeTab,
@@ -458,6 +505,7 @@ const ItemsManagementPage: React.FC = () => {
     pagination.limit,
     debouncedFilters,
     debouncedTaricFilters,
+    searchParams,
   ]);
 
   const fetchStatistics = useCallback(async () => {
@@ -469,6 +517,7 @@ const ItemsManagementPage: React.FC = () => {
     }
   }, []);
 
+  // Sync tab + supplier filter from the URL.
   useEffect(() => {
     const tabParam = searchParams.get("tab");
     if (tabParam) {
@@ -492,27 +541,31 @@ const ItemsManagementPage: React.FC = () => {
     }
   }, [searchParams]);
 
+  // Reset to page 1 when filters/tab change — but only if not already there,
+  // so we never trigger an extra fetch on the common case.
   useEffect(() => {
-    setPagination((prev) => ({ ...prev, page: 1 }));
+    setPagination((prev) => (prev.page === 1 ? prev : { ...prev, page: 1 }));
   }, [debouncedFilters, activeTab, debouncedTaricFilters]);
 
+  // Single source of truth for table fetching.
   useEffect(() => {
     fetchData();
-    if (activeTab === "items") {
-      fetchStatistics();
-      fetchPendingSyncCount();
-      fetchNewItemsCount();
-    }
-  }, [
-    fetchData,
-    fetchStatistics,
-    fetchPendingSyncCount,
-    fetchNewItemsCount,
-    activeTab,
-  ]);
+  }, [fetchData]);
 
+  // Stats / counts are GLOBAL (not filter-dependent), so fetch them only when
+  // the items tab is shown — never on every keystroke or filter change.
   useEffect(() => {
-    const fetchInitialData = async () => {
+    if (activeTab !== "items") return;
+    fetchStatistics();
+    fetchPendingSyncCount();
+    fetchNewItemsCount();
+  }, [activeTab, fetchStatistics, fetchPendingSyncCount, fetchNewItemsCount]);
+
+  // Reference data for the filter dropdowns + create-item modal.
+  // Loaded ONCE on mount instead of on every tab switch.
+  useEffect(() => {
+    let active = true;
+    const fetchReferenceData = async () => {
       try {
         const [parentsRes, taricsRes, catsRes, suppliersRes]: any =
           await Promise.all([
@@ -522,29 +575,27 @@ const ItemsManagementPage: React.FC = () => {
             getAllSuppliers({ limit: 1000 }),
           ]);
 
-        if (parentsRes?.data) setParents(parentsRes.data);
-        if (taricsRes?.data) setTarics(taricsRes.data);
+        if (!active) return;
+
+        if (parentsRes?.data) setRefParents(parentsRes.data);
+        if (taricsRes?.data) setRefTarics(taricsRes.data);
         if (catsRes?.data) {
           const regularCategories = catsRes.data.filter(
             (cat: any) => !cat.name?.toString().trim().startsWith("Imported"),
           );
           setCategories(regularCategories);
         }
-        if (suppliersRes?.data) setSuppliers(suppliersRes.data);
-
-        if (
-          (!parentsRes?.data || parentsRes.data.length === 0) &&
-          activeTab === "items"
-        ) {
-          console.warn("No parents found in database.");
-        }
+        if (suppliersRes?.data) setRefSuppliers(suppliersRes.data);
       } catch (error) {
-        console.error("Failed to fetch initial data", error);
+        console.error("Failed to fetch reference data", error);
       }
     };
 
-    fetchInitialData();
-  }, [activeTab]);
+    fetchReferenceData();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const handleExportCSV = async (type: "updated" | "new" = "updated") => {
     if (exporting) return;
@@ -602,6 +653,19 @@ const ItemsManagementPage: React.FC = () => {
 
   const handleEditItem = (itemId: number) => {
     router.push(`/items/${itemId}`);
+  };
+
+  // Open the lightweight preview popup instead of navigating immediately.
+  const handleOpenItemPreview = (item: any) => {
+    setPreviewItem(item);
+    setShowItemPreview(true);
+  };
+
+  const handleViewItemDetails = () => {
+    if (!previewItem) return;
+    const id = previewItem.id;
+    setShowItemPreview(false);
+    router.push(`/items/${id}`);
   };
 
   const handleDeleteItem = async (itemId: number) => {
@@ -1158,17 +1222,7 @@ const ItemsManagementPage: React.FC = () => {
           const isNewItem = item.is_new === "Y";
           const itemNo = item.item_no_de || item.de_no || "-";
           const nameCn = item.item_name_cn || item.name_cn || "-";
-          const company =
-            item.company_display_name ||
-            item.companyDisplayName ||
-            item.customer?.displayName ||
-            item.customer?.display_name ||
-            item.customer?.companyName ||
-            item.customer?.company_name ||
-            item.customer?.name ||
-            item.company_name ||
-            item.company ||
-            "-";
+          const company = getCompany(item);
           const isLabel = item.isLabelPrint ?? item.is_label_print ?? false;
           const remarkEn = item.remark || item.remark_en || "";
           const remarkCn = item.remark_cn || item.remarks_cn || "";
@@ -1177,7 +1231,7 @@ const ItemsManagementPage: React.FC = () => {
             <tr
               key={item.id}
               onClick={() => {
-                router.push(`/items/${item.id}`);
+                handleOpenItemPreview(item);
               }}
               className={`cursor-pointer transition-colors ${
                 isNewItem
@@ -1594,20 +1648,6 @@ const ItemsManagementPage: React.FC = () => {
     return activeTab === "tarics" ? selectedTarics.size : selectedItems.size;
   };
 
-  useEffect(() => {
-    if (activeTab === "items" && filters.search) {
-      const itemsWithEAN = items
-        .filter((item) => item.ean)
-        .map((item) => ({
-          id: item.id,
-          ean: item.ean,
-          name: item.item_name,
-        }));
-      console.log("Items with EAN:", itemsWithEAN);
-      console.log("Filtered data:", filteredData);
-    }
-  }, [items, filters.search, filteredData, activeTab]);
-
   return (
     <div className="w-full mx-auto">
       <div
@@ -1956,7 +1996,7 @@ const ItemsManagementPage: React.FC = () => {
                     className="w-full px-2 py-1.5 text-xs bg-white border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
                   >
                     <option value="">All Suppliers</option>
-                    {suppliers.map((s) => (
+                    {refSuppliers.map((s) => (
                       <option key={s.id} value={s.id.toString()}>
                         {`[ID: ${s.id}] ${s.company_name || s.name || ""}`}
                       </option>
@@ -2155,6 +2195,241 @@ const ItemsManagementPage: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* ---- Item Preview Popup ---- */}
+      {showItemPreview && previewItem && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                  <Package className="w-5 h-5 text-[#8CC21B]" />
+                  Item Preview
+                </h2>
+                <button
+                  onClick={() => setShowItemPreview(false)}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <XMarkIcon className="h-5 w-5" />
+                </button>
+              </div>
+
+              {/* Primary fields (same order as the items table) */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+                <div>
+                  <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-0.5">
+                    Item No
+                  </p>
+                  <p className="text-sm font-medium text-gray-900 break-words">
+                    {previewItem.item_no_de || previewItem.de_no || "-"}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-0.5">
+                    Name
+                  </p>
+                  <p className="text-sm text-gray-900 break-words">
+                    {previewItem.item_name || "-"}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-0.5">
+                    Name CN
+                  </p>
+                  <p className="text-sm text-gray-900 break-words">
+                    {previewItem.item_name_cn || previewItem.name_cn || "-"}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-0.5">
+                    Company
+                  </p>
+                  <p className="text-sm text-gray-900 break-words">
+                    {getCompany(previewItem)}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-0.5">
+                    IsLabel
+                  </p>
+                  <span
+                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                      (previewItem.isLabelPrint ??
+                      previewItem.is_label_print ??
+                      false)
+                        ? "bg-green-100 text-green-700"
+                        : "bg-gray-100 text-gray-600"
+                    }`}
+                  >
+                    {(previewItem.isLabelPrint ??
+                    previewItem.is_label_print ??
+                    false)
+                      ? "Yes"
+                      : "No"}
+                  </span>
+                </div>
+
+                <div>
+                  <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-0.5">
+                    Category
+                  </p>
+                  <p className="text-sm text-gray-900 break-words">
+                    {previewItem.category || "-"}
+                  </p>
+                </div>
+
+                <div className="md:col-span-2">
+                  <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-0.5">
+                    Remark EN / CN
+                  </p>
+                  {previewItem.remark ||
+                  previewItem.remark_en ||
+                  previewItem.remark_cn ||
+                  previewItem.remarks_cn ? (
+                    <div>
+                      {(previewItem.remark || previewItem.remark_en) && (
+                        <p className="text-sm text-gray-900 break-words">
+                          {previewItem.remark || previewItem.remark_en}
+                        </p>
+                      )}
+                      {(previewItem.remark_cn || previewItem.remarks_cn) && (
+                        <p className="text-xs text-gray-500 break-words">
+                          {previewItem.remark_cn || previewItem.remarks_cn}
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-400">-</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Secondary details */}
+              <div className="mt-6 pt-6 border-t border-gray-200 grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+                <div>
+                  <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-0.5">
+                    EAN
+                  </p>
+                  <p className="text-sm text-gray-900 break-words">
+                    {previewItem.ean || "-"}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-0.5">
+                    Supplier
+                  </p>
+                  <p className="text-sm text-gray-900 break-words">
+                    {previewItem.supplier_name ||
+                      (previewItem.supplier_id
+                        ? `ID: ${previewItem.supplier_id}`
+                        : "-")}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-0.5">
+                    TARIC
+                  </p>
+                  <p className="text-sm text-gray-900 break-words">
+                    {previewItem.taric_code || "-"}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-0.5">
+                    Model
+                  </p>
+                  <p className="text-sm text-gray-900 break-words">
+                    {previewItem.model || "-"}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-0.5">
+                    Price
+                  </p>
+                  <p className="text-sm text-gray-900 break-words">
+                    {previewItem.price !== undefined &&
+                    previewItem.price !== null
+                      ? previewItem.price
+                      : "-"}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-0.5">
+                    Dimensions (W×L×W×H)
+                  </p>
+                  <p className="text-sm text-gray-900 break-words">
+                    {[
+                      previewItem.weight,
+                      previewItem.length,
+                      previewItem.width,
+                      previewItem.height,
+                    ].some((v) => v)
+                      ? `${previewItem.weight ?? "-"}kg · ${
+                          previewItem.length ?? "-"
+                        } × ${previewItem.width ?? "-"} × ${
+                          previewItem.height ?? "-"
+                        } cm`
+                      : "-"}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-0.5">
+                    Status
+                  </p>
+                  <span
+                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusBadgeColor(
+                      previewItem.is_active,
+                    )}`}
+                  >
+                    {previewItem.is_active === "Y" ? "Active" : "Inactive"}
+                  </span>
+                </div>
+
+                <div>
+                  <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-0.5">
+                    Tags
+                  </p>
+                  <div className="flex flex-wrap gap-1">
+                    {sortTags(previewItem.tags || [], previewItem.tagOrder).map(
+                      (tag: Tag) => (
+                        <TagBadge key={tag.id} tag={tag} size="sm" />
+                      ),
+                    )}
+                    {(!previewItem.tags || previewItem.tags.length === 0) && (
+                      <span className="text-sm text-gray-400">-</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-2 pt-6 mt-6 border-t">
+                <button
+                  onClick={() => setShowItemPreview(false)}
+                  className="flex-1 px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-all"
+                >
+                  Close
+                </button>
+                <button
+                  onClick={handleViewItemDetails}
+                  className="flex-1 px-4 py-2 bg-[#8CC21B] text-white rounded-lg hover:bg-[#7ab318] transition-all flex items-center justify-center gap-2"
+                >
+                  <EyeIconOutline className="w-4 h-4" />
+                  View Item Details
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showTaricModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
@@ -2454,7 +2729,7 @@ const ItemsManagementPage: React.FC = () => {
                   </label>
                   <ReactSelect
                     options={
-                      parents?.map((parent) => ({
+                      refParents?.map((parent) => ({
                         value: parent.id,
                         label: `${parent.name_de} (${parent.de_no})`,
                       })) || []
@@ -2464,7 +2739,7 @@ const ItemsManagementPage: React.FC = () => {
                         ? {
                             value: itemFormData.parent_id,
                             label: (() => {
-                              const p = parents?.find(
+                              const p = refParents?.find(
                                 (x) => x.id === itemFormData.parent_id,
                               );
                               return p
@@ -2493,7 +2768,7 @@ const ItemsManagementPage: React.FC = () => {
                   </label>
                   <ReactSelect
                     options={
-                      tarics?.map((taric) => ({
+                      refTarics?.map((taric) => ({
                         value: taric.id,
                         label: `${taric.code} - ${taric.name_de}`,
                       })) || []
@@ -2503,7 +2778,7 @@ const ItemsManagementPage: React.FC = () => {
                         ? {
                             value: itemFormData.taric_id,
                             label: (() => {
-                              const t = tarics?.find(
+                              const t = refTarics?.find(
                                 (x) => x.id === itemFormData.taric_id,
                               );
                               return t ? `${t.code} - ${t.name_de}` : "Unknown";
@@ -2565,7 +2840,7 @@ const ItemsManagementPage: React.FC = () => {
                   </label>
                   <ReactSelect
                     options={
-                      suppliers?.map((s) => ({
+                      refSuppliers?.map((s) => ({
                         value: s.id,
                         label: getSupplierLabel(s),
                       })) || []
@@ -2575,7 +2850,7 @@ const ItemsManagementPage: React.FC = () => {
                         ? {
                             value: itemFormData.supplier_id,
                             label: (() => {
-                              const s = suppliers?.find(
+                              const s = refSuppliers?.find(
                                 (x) => x.id === itemFormData.supplier_id,
                               );
                               return s ? getSupplierLabel(s) : "Unknown";
