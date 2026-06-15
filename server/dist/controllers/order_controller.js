@@ -954,7 +954,7 @@ const generateLabelPDF = (req, res, next) => __awaiter(void 0, void 0, void 0, f
         let remarkWText = item.remark_de || "";
         const remarkWLabelY = bottomSectionY + 8 + Math.max(fontSizeCN, 8) + 7;
         doc.font("Helvetica-Oblique").fontSize(6.5).fillColor("black");
-        doc.text("Bestellhinweis", colA, remarkWLabelY);
+        doc.text("Lieferhinweis", colA, remarkWLabelY);
         let fontSizeW = 8;
         if (fontSource) {
             doc.font(fontSource, 0);
