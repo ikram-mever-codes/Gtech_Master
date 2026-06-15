@@ -294,6 +294,7 @@ const OffersPage: React.FC = () => {
       try {
         await deleteOffer(offerId);
         fetchOffers();
+        setShowEditModal(false);
       } catch (error) {
         console.error("Error deleting offer:", error);
       }
@@ -1002,16 +1003,6 @@ const OffersPage: React.FC = () => {
                                 title="Generate PDF"
                               >
                                 <PrinterIcon className="h-4 w-4" />
-                              </button>
-                            )}
-
-                            {user?.role === UserRole.ADMIN && (
-                              <button
-                                onClick={() => handleDeleteOffer(offer.id)}
-                                className="text-red-600 hover:text-red-800 transition-colors p-1"
-                                title="Delete offer"
-                              >
-                                <TrashIcon className="h-4 w-4" />
                               </button>
                             )}
                           </div>
@@ -2651,21 +2642,35 @@ const OffersPage: React.FC = () => {
                   />
                 </div>
 
-                <div className="flex justify-end gap-2 pt-4">
-                  <button
-                    onClick={() => setShowEditModal(false)}
-                    className="px-4 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-all"
-                  >
-                    Cancel
-                  </button>
-                  <CustomButton
-                    gradient={true}
-                    onClick={handleUpdateOffer}
-                    disabled={!editFormData.title}
-                    className="px-4 py-2 text-sm bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-all"
-                  >
-                    Update Offer
-                  </CustomButton>
+                <div className="flex justify-between items-center pt-4">
+                  <div>
+                    {user?.role === UserRole.ADMIN && (
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteOffer(selectedOffer.id)}
+                        className="px-4 py-2 text-sm text-red-600 bg-white border border-red-300 rounded-lg hover:bg-red-50 hover:text-red-800 transition-all flex items-center gap-2"
+                      >
+                        <TrashIcon className="h-4 w-4" />
+                        Delete Offer
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setShowEditModal(false)}
+                      className="px-4 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-all"
+                    >
+                      Cancel
+                    </button>
+                    <CustomButton
+                      gradient={true}
+                      onClick={handleUpdateOffer}
+                      disabled={!editFormData.title}
+                      className="px-4 py-2 text-sm bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-all"
+                    >
+                      Update Offer
+                    </CustomButton>
+                  </div>
                 </div>
               </div>
             </div>
