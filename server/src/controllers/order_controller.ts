@@ -1041,7 +1041,7 @@ export const generateLabelPDF = async (
 
     doc.fillColor("black").font("Helvetica-Oblique").fontSize(6.5);
     doc.text("Artikelnr.", colA, row1LabelY);
-    doc.text("Bestell-Nr. / Menge", orderNoX, row1LabelY);
+    doc.text("Lieferung / Menge", orderNoX, row1LabelY);
     doc.text("Menge", qtyLabelColStart, row1LabelY);
 
     doc.font("Helvetica-Bold").fontSize(10);

@@ -882,7 +882,7 @@ const generateLabelPDF = (req, res, next) => __awaiter(void 0, void 0, void 0, f
         const itemNoWWidth = orderNoX - 3 - valColA;
         doc.fillColor("black").font("Helvetica-Oblique").fontSize(6.5);
         doc.text("Artikelnr.", colA, row1LabelY);
-        doc.text("Bestell-Nr. / Menge", orderNoX, row1LabelY);
+        doc.text("Lieferung / Menge", orderNoX, row1LabelY);
         doc.text("Menge", qtyLabelColStart, row1LabelY);
         doc.font("Helvetica-Bold").fontSize(10);
         let itemNoDE = (warehouseItem === null || warehouseItem === void 0 ? void 0 : warehouseItem.item_no_de) || "N/A";
