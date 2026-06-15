@@ -839,7 +839,6 @@ const AddEditBusinessManual: React.FC = () => {
           background: "linear-gradient(to bottom, #ffffff, #f9f9f9)",
         }}
       >
-        {/* Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <div>
             <div className="flex items-center gap-3 mb-2">
@@ -988,8 +987,6 @@ const AddEditBusinessManual: React.FC = () => {
                 undefined,
                 ["Yes", "No", "Unsure"]
               )}
-
-              {/* New View-Only Fields under Is Device Maker */}
               {(isEditMode || isViewMode) && formData.check_by && (
                 <>
                   {renderField(
@@ -1001,7 +998,7 @@ const AddEditBusinessManual: React.FC = () => {
                     "",
                     <UserIcon className="w-5 h-5" />,
                     undefined,
-                    true // Read-only
+                    true
                   )}
                 </>
               )}
@@ -1017,13 +1014,11 @@ const AddEditBusinessManual: React.FC = () => {
                     "",
                     <CalendarIcon className="w-5 h-5" />,
                     undefined,
-                    true // Read-only
+                    true
                   )}
                 </>
               )}
             </div>
-
-            {/* Star Customer Info Box */}
             {isStarCustomer && !isViewMode && (
               <div className="mt-6 p-4 bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-200 rounded-lg">
                 <div className="flex items-start gap-3">
@@ -1042,8 +1037,6 @@ const AddEditBusinessManual: React.FC = () => {
               </div>
             )}
           </div>
-
-          {/* Star Business Details Section */}
           {(isEditMode && formData.starBusinessDetails) ||
             (!isEditMode && !isViewMode && formData.isDeviceMaker === "Yes") ||
             (isViewMode &&
