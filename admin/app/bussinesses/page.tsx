@@ -1156,8 +1156,8 @@ const CombinedBusinessContactsContent: React.FC = () => {
                                   toggleBusinessContacts(business.id);
                                 }}
                                 className={`${!business.contacts || business.contacts.length === 0
-                                    ? "text-red-500 hover:text-red-700"
-                                    : "text-gray-400 hover:text-gray-700"
+                                  ? "text-red-500 hover:text-red-700"
+                                  : "text-gray-400 hover:text-gray-700"
                                   } flex-shrink-0 mt-0.5`}
                                 title={
                                   !business.contacts || business.contacts.length === 0

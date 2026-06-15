@@ -1196,7 +1196,7 @@ export const updateBusiness = async (
           customer.vatTaxId = vatTaxId ? vatTaxId.trim() : undefined;
         }
         if (asanaLink !== undefined) {
-          customer.asanaLink = asanaLink ? asanaLink.trim() : undefined;
+          customer.asanaLink = asanaLink ? asanaLink.trim() : null;
         }
         if (addressAdditional !== undefined) {
           customer.addressLine2 = addressAdditional ? addressAdditional.trim() : undefined;

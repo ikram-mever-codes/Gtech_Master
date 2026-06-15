@@ -623,34 +623,42 @@ const InvoiceListPage: React.FC = () => {
     if (!selectedItem || !targetCargoId) return;
     try {
       const cargoIdNum = Number(targetCargoId);
-      await updateOrderItemStatus(selectedItem.id, { cargo_id: cargoIdNum });
 
-      const orderId = selectedItem.order_id || selectedItem.order?.id;
-      if (orderId) {
-        await assignOrdersToCargo(cargoIdNum, [Number(orderId)], true);
+      if (activeInvTab === "orders") {
+        await assignOrdersToCargo(cargoIdNum, [Number(selectedItem.id)], false);
+        toast.success(`Order ${selectedItem.order_no} assigned to Cargo ${targetCargoId}`);
+        setShowREModal(false);
+        await fetchOrders();
+      } else {
+        await updateOrderItemStatus(selectedItem.id, { cargo_id: cargoIdNum });
+
+        const orderId = selectedItem.order_id || selectedItem.order?.id;
+        if (orderId) {
+          await assignOrdersToCargo(cargoIdNum, [Number(orderId)], true);
+        }
+
+        toast.success("Item reassigned successfully");
+        setShowREModal(false);
+
+        const invId = Object.keys(expandedStates).find((key) =>
+          expandedStates[key].data?.detailedItems?.some(
+            (it: any) => it.id === selectedItem.id,
+          ),
+        );
+
+        if (invId) {
+          setExpandedStates((prev) => {
+            const newState = { ...prev };
+            delete newState[invId];
+            return newState;
+          });
+        }
+
+        await loadInvoices();
       }
-
-      toast.success("Item reassigned successfully");
-      setShowREModal(false);
-
-      const invId = Object.keys(expandedStates).find((key) =>
-        expandedStates[key].data?.detailedItems?.some(
-          (it: any) => it.id === selectedItem.id,
-        ),
-      );
-
-      if (invId) {
-        setExpandedStates((prev) => {
-          const newState = { ...prev };
-          delete newState[invId];
-          return newState;
-        });
-      }
-
-      await loadInvoices();
     } catch (err) {
       console.error(err);
-      toast.error("Failed to reassign item refresh");
+      toast.error("Failed to assign/reassign cargo");
     }
   };
 
@@ -3357,7 +3365,15 @@ const InvoiceListPage: React.FC = () => {
           <CustomModal
             isOpen={showREModal}
             onClose={() => setShowREModal(false)}
-            title={`Reassign Item ${selectedItem.id}`}
+            title={
+              selectedItem.cargo_id
+                ? (selectedItem.order_no
+                  ? `Reassign Order No: ${selectedItem.order_no}`
+                  : `Reassign Item ID: ${selectedItem.id}`)
+                : (selectedItem.order_no
+                  ? `Assign Order No: ${selectedItem.order_no}`
+                  : `Assign Item ID: ${selectedItem.id}`)
+            }
           >
             <div className="p-4 space-y-4 min-h-[320px] flex flex-col justify-between">
               <div>
@@ -3405,7 +3421,7 @@ const InvoiceListPage: React.FC = () => {
                   className="px-6 py-2 text-sm bg-[#059669] text-white rounded-[4px] hover:bg-green-700 disabled:opacity-50 transition-all font-bold uppercase shadow-md flex items-center gap-2"
                 >
                   <RefreshCw className="w-4 h-4" />
-                  Confirm Reassign
+                  {selectedItem.cargo_id ? "Confirm Reassign" : "Confirm Assign"}
                 </button>
               </div>
             </div>
