@@ -3311,7 +3311,7 @@ const OrderPage: React.FC = () => {
                 : `Assign Item ID: ${selectedItem.id}`)
           }
         >
-          <div className="p-4 space-y-4">
+          <div className="p-4 space-y-4 min-h-[320px] flex flex-col justify-between">
             <div>
               <label className="block text-sm font-bold text-gray-800 mb-2 uppercase tracking-wide">
                 Select Target Cargo
@@ -3322,7 +3322,7 @@ const OrderPage: React.FC = () => {
                 styles={{ menuPortal: (base) => ({ ...base, zIndex: 9999 }) }}
                 options={cargos
                   .filter((c) => {
-                    const status = (c.cargo_status || "").toLowerCase();
+                    const status = (c.cargo_status || "").trim().toLowerCase();
                     return status !== "shipped" && status !== "delivered";
                   })
                   .map((c) => ({

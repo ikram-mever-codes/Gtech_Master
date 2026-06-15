@@ -518,6 +518,7 @@ export const createBusiness = async (
       starBusinessDetails,
       isStarCustomer,
       starCustomerEmail,
+      asanaLink,
     } = req.body;
 
     const user = (req as any).user;
@@ -678,6 +679,7 @@ export const createBusiness = async (
           ? companyLabelPrintLogo.trim()
           : undefined;
         customer.vatTaxId = vatTaxId ? vatTaxId.trim() : undefined;
+        customer.asanaLink = asanaLink ? asanaLink.trim() : undefined;
         customer.addressLine2 = addressAdditional ? addressAdditional.trim() : undefined;
 
         if (isStarCustomer) {
@@ -903,6 +905,7 @@ export const createBusiness = async (
       legalName: finalCustomer.legalName,
       customerNumber: finalCustomer.customerNumber,
       companyLabelPrintLogo: finalCustomer.companyLabelPrintLogo,
+      asanaLink: finalCustomer.asanaLink,
       email: finalCustomer.email,
       contactEmail: finalCustomer.contactEmail,
       contactPhoneNumber: finalCustomer.contactPhoneNumber,
@@ -1001,6 +1004,7 @@ export const updateBusiness = async (
       addressAdditional,
       phone,
       vatTaxId,
+      asanaLink,
     } = updateData;
 
     const user = (req as any).user;
@@ -1190,6 +1194,9 @@ export const updateBusiness = async (
         }
         if (vatTaxId !== undefined) {
           customer.vatTaxId = vatTaxId ? vatTaxId.trim() : undefined;
+        }
+        if (asanaLink !== undefined) {
+          customer.asanaLink = asanaLink ? asanaLink.trim() : undefined;
         }
         if (addressAdditional !== undefined) {
           customer.addressLine2 = addressAdditional ? addressAdditional.trim() : undefined;
@@ -1426,6 +1433,7 @@ export const updateBusiness = async (
       legalName: finalCustomer.legalName,
       customerNumber: finalCustomer.customerNumber,
       companyLabelPrintLogo: finalCustomer.companyLabelPrintLogo,
+      asanaLink: finalCustomer.asanaLink,
       email: finalCustomer.email,
       contactEmail: finalCustomer.contactEmail,
       contactPhoneNumber: finalCustomer.contactPhoneNumber,
@@ -1547,6 +1555,7 @@ export const getBusinessById = async (
       name: customer.companyName,
       customerNumber: customer.customerNumber,
       companyLabelPrintLogo: customer.companyLabelPrintLogo,
+      asanaLink: customer.asanaLink,
       email: customer.email,
       contactEmail: customer.contactEmail,
       contactPhoneNumber: customer.contactPhoneNumber,
@@ -1826,6 +1835,7 @@ export const getAllBusinesses = async (
         name: customer.companyName,
         customerNumber: customer.customerNumber,
         companyLabelPrintLogo: customer.companyLabelPrintLogo,
+        asanaLink: customer.asanaLink,
         email: customer.email,
         contactEmail: customer.contactEmail,
         contactPhoneNumber: customer.contactPhoneNumber,

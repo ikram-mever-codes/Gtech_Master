@@ -39,6 +39,9 @@ export class Customer {
   legalName?: string;
 
   @Column({ nullable: true })
+  asanaLink?: string;
+
+  @Column({ nullable: true })
   vatTaxId?: string;
 
   @Column({ unique: true, nullable: true })

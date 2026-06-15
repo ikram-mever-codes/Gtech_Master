@@ -22,6 +22,7 @@ import {
   UserPlusIcon,
   PencilIcon,
   GlobeAltIcon,
+  MapPinIcon,
   StarIcon,
   ChartBarIcon,
   CalendarIcon,
@@ -96,6 +97,7 @@ interface ClientFilterState {
   customerNumber: string;
   city: string;
   postalCode: string;
+  country: string;
 }
 
 type BusinessWithContacts = Business & { contacts?: ContactPersonData[] };
@@ -159,6 +161,15 @@ const slugFromWebsite = (website?: string) => {
   return label.replace(/[^a-z0-9-]/g, "");
 };
 
+const getInputClass = (hasValue: boolean, isEmptySelect: boolean = false) => {
+  return `w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${hasValue
+    ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+    : isEmptySelect
+      ? "text-gray-400 border-gray-300 bg-white"
+      : "text-gray-900 border-gray-300 bg-white"
+    }`;
+};
+
 const CombinedBusinessContactsContent: React.FC = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -200,6 +211,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
     customerNumber: "",
     city: "",
     postalCode: "",
+    country: "",
   });
   const [categories, setCategories] = useState<string[]>([]);
   const [cities, setCities] = useState<string[]>([]);
@@ -261,6 +273,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
     phone: "",
     website: "",
     vatTaxId: "",
+    asanaLink: "",
     note: "",
     tags: [] as any[],
     tagOrder: "",
@@ -372,7 +385,8 @@ const CombinedBusinessContactsContent: React.FC = () => {
     const num = clientFilters.customerNumber.trim().toLowerCase();
     const city = clientFilters.city.trim().toLowerCase();
     const pc = clientFilters.postalCode.trim().toLowerCase();
-    if (!cn && !num && !city && !pc) return allBusinesses;
+    const country = clientFilters.country.trim().toUpperCase();
+    if (!cn && !num && !city && !pc && !country) return allBusinesses;
     return allBusinesses.filter((b: any) => {
       const name = (b.displayName || b.companyName || b.name || "")
         .toString()
@@ -381,10 +395,12 @@ const CombinedBusinessContactsContent: React.FC = () => {
       const number = (b.customerNumber || "").toString().toLowerCase();
       const bcity = (b.city || "").toString().toLowerCase();
       const bpc = (b.postalCode || "").toString().toLowerCase();
+      const bcountry = toCountryCode(b.country).toUpperCase();
       if (cn && !name.includes(cn) && !legal.includes(cn)) return false;
       if (num && !number.includes(num)) return false;
       if (city && !bcity.includes(city)) return false;
       if (pc && !bpc.includes(pc)) return false;
+      if (country && bcountry !== country) return false;
       return true;
     });
   }, [allBusinesses, clientFilters]);
@@ -772,6 +788,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
       email: business.email || "",
       phone: business.phone || "",
       website: business.website || "",
+      asanaLink: business.asanaLink || "",
       note: business.note || "",
       tags: business.tags || [],
       tagOrder: business.tagOrder || "",
@@ -805,6 +822,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
         email: businessForm.email,
         phone: businessForm.phone,
         website: businessForm.website,
+        asanaLink: businessForm.asanaLink,
         note: businessForm.note,
       };
       if (businessModalMode === "edit" && editingBusinessId) {
@@ -885,6 +903,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
       customerNumber: "",
       city: "",
       postalCode: "",
+      country: "",
     });
   };
 
@@ -900,16 +919,26 @@ const CombinedBusinessContactsContent: React.FC = () => {
   const buildFullAddress = (b: any) => {
     const code = toCountryCode(b.country);
     const isGerman = !code || code === "DE";
-    const parts: string[] = [];
-    if (b.addressAdditional?.trim()) parts.push(b.addressAdditional.trim());
-    if (b.street?.trim()) parts.push(b.street.trim());
-    const cityLine = [b.postalCode, b.city]
+
+    let postal = (b.postalCode || "").trim();
+    let city = (b.city || "").trim();
+
+    const zipMatch = `${postal} ${city}`.trim().match(/(\d{4,5})\s+([^,]+)/);
+    if (zipMatch) {
+      postal = zipMatch[1];
+      city = zipMatch[2].trim();
+    }
+
+    const cityLine = [postal, city]
       .filter((x: string) => x && x.trim())
       .join(" ")
       .trim();
-    if (cityLine) parts.push(cityLine);
-    if (!isGerman) parts.push(code);
-    return parts.length ? parts.join(", ") : null;
+
+    if (!cityLine) return null;
+    if (!isGerman && code) {
+      return `${cityLine}, ${code}`;
+    }
+    return cityLine;
   };
 
   const getLinkedInStateColor = (state: string) => {
@@ -984,10 +1013,10 @@ const CombinedBusinessContactsContent: React.FC = () => {
         <div className="mb-6 p-3 bg-white border border-gray-200 rounded-md shadow-sm">
           <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
             <div className="flex items-center gap-1.5 text-gray-400 shrink-0 select-none px-1">
-              <FunnelIcon className="w-4 h-4 text-primary" />
+              <FunnelIcon className="w-5 h-5 text-primary" />
             </div>
 
-            <div className="flex-1 min-w-[150px] lg:max-w-[250px]">
+            <div className="w-52 shrink-0">
               <input
                 type="text"
                 value={clientFilters.companyName}
@@ -998,53 +1027,11 @@ const CombinedBusinessContactsContent: React.FC = () => {
                   }))
                 }
                 placeholder="Company Name..."
-                className="w-full px-2.5 py-1.5 text-xs border border-gray-300 rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all"
+                className={getInputClass(!!clientFilters.companyName)}
               />
             </div>
 
-            <div className="flex-1 min-w-[100px] lg:max-w-[150px]">
-              <input
-                type="text"
-                value={clientFilters.customerNumber}
-                onChange={(e) =>
-                  setClientFilters((p) => ({
-                    ...p,
-                    customerNumber: e.target.value,
-                  }))
-                }
-                placeholder="Customer No..."
-                className="w-full px-2.5 py-1.5 text-xs border border-gray-300 rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all"
-              />
-            </div>
-
-            <div className="flex-1 min-w-[100px] lg:max-w-[150px]">
-              <input
-                type="text"
-                value={clientFilters.city}
-                onChange={(e) =>
-                  setClientFilters((p) => ({ ...p, city: e.target.value }))
-                }
-                placeholder="City..."
-                className="w-full px-2.5 py-1.5 text-xs border border-gray-300 rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all"
-              />
-            </div>
-
-            <div className="flex-1 min-w-[80px] lg:max-w-[120px]">
-              <input
-                type="text"
-                value={clientFilters.postalCode}
-                onChange={(e) =>
-                  setClientFilters((p) => ({
-                    ...p,
-                    postalCode: e.target.value,
-                  }))
-                }
-                placeholder="Postal Code..."
-                className="w-full px-2.5 py-1.5 text-xs border border-gray-300 rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all"
-              />
-            </div>
-
-            <div className="flex-1 min-w-[200px] lg:max-w-[350px]">
+            <div className="flex-1 min-w-[250px]">
               <TagFilterSelector
                 category="company"
                 compact={true}
@@ -1055,11 +1042,68 @@ const CombinedBusinessContactsContent: React.FC = () => {
               />
             </div>
 
+            <div className="w-36 shrink-0">
+              <input
+                type="text"
+                value={clientFilters.customerNumber}
+                onChange={(e) =>
+                  setClientFilters((p) => ({
+                    ...p,
+                    customerNumber: e.target.value,
+                  }))
+                }
+                placeholder="CustomerNo..."
+                className={getInputClass(!!clientFilters.customerNumber)}
+              />
+            </div>
+
+            <div className="w-36 shrink-0">
+              <input
+                type="text"
+                value={clientFilters.postalCode}
+                onChange={(e) =>
+                  setClientFilters((p) => ({
+                    ...p,
+                    postalCode: e.target.value,
+                  }))
+                }
+                placeholder="PostalCode..."
+                className={getInputClass(!!clientFilters.postalCode)}
+              />
+            </div>
+
+            <div className="w-32 shrink-0">
+              <input
+                type="text"
+                value={clientFilters.city}
+                onChange={(e) =>
+                  setClientFilters((p) => ({ ...p, city: e.target.value }))
+                }
+                placeholder="City..."
+                className={getInputClass(!!clientFilters.city)}
+              />
+            </div>
+
+            <div className="w-28 shrink-0">
+              <select
+                value={clientFilters.country}
+                onChange={(e) =>
+                  setClientFilters((p) => ({ ...p, country: e.target.value }))
+                }
+                className={getInputClass(!!clientFilters.country, !clientFilters.country)}
+              >
+                <option value="" className="text-gray-400">Country...</option>
+                <option value="DE" className="text-gray-900 font-normal">DE</option>
+                <option value="AT" className="text-gray-900 font-normal">AT</option>
+                <option value="CH" className="text-gray-900 font-normal">CH</option>
+              </select>
+            </div>
+
             <button
               onClick={resetFilters}
-              className="px-3 py-1.5 text-xs font-semibold text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 rounded-md transition-colors flex items-center gap-1 whitespace-nowrap shrink-0"
+              className="px-3 py-2 text-sm font-semibold text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 rounded-md transition-colors flex items-center gap-1 whitespace-nowrap shrink-0"
             >
-              <ArrowPathIcon className="w-3.5 h-3.5" />
+              <ArrowPathIcon className="w-4 h-4" />
               Reset
             </button>
           </div>
@@ -1111,11 +1155,16 @@ const CombinedBusinessContactsContent: React.FC = () => {
                                   e.stopPropagation();
                                   toggleBusinessContacts(business.id);
                                 }}
-                                className="text-gray-400 hover:text-gray-700 flex-shrink-0 mt-0.5"
+                                className={`${!business.contacts || business.contacts.length === 0
+                                    ? "text-red-500 hover:text-red-700"
+                                    : "text-gray-400 hover:text-gray-700"
+                                  } flex-shrink-0 mt-0.5`}
                                 title={
-                                  expandedBusinessIds.has(business.id)
-                                    ? "Hide contacts"
-                                    : "Show contacts"
+                                  !business.contacts || business.contacts.length === 0
+                                    ? "No contacts yet"
+                                    : expandedBusinessIds.has(business.id)
+                                      ? "Hide contacts"
+                                      : "Show contacts"
                                 }
                               >
                                 <ChevronRightIcon
@@ -1179,25 +1228,58 @@ const CombinedBusinessContactsContent: React.FC = () => {
                             </p>
                           </td>
                           <td className="px-3 py-3">
-                            {business.website ? (
-                              <a
-                                href={
-                                  business.website.startsWith("http")
-                                    ? business.website
-                                    : `https://${business.website}`
-                                }
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-primary hover:underline flex items-center gap-1"
+                            <div className="flex items-center gap-1.5">
+                              {business.website && (
+                                <a
+                                  href={
+                                    business.website.startsWith("http")
+                                      ? business.website
+                                      : `https://${business.website}`
+                                  }
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-blue-500 hover:text-blue-700 transition-colors p-1"
+                                  title="Open Website"
+                                >
+                                  <GlobeAltIcon className="w-5 h-5" />
+                                </a>
+                              )}
+
+                              <button
+                                onClick={() => {
+                                  const q = business.legalName || business.displayName || business.companyName || business.name || "";
+                                  window.open(
+                                    `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`,
+                                    "_blank"
+                                  );
+                                }}
+                                className="text-rose-500 hover:text-rose-700 transition-colors p-1"
+                                title="Search on Google Maps"
                               >
-                                <GlobeAltIcon className="w-4 h-4" />
-                                <span className="truncate max-w-[120px]">
-                                  View
-                                </span>
-                              </a>
-                            ) : (
-                              <span className="text-gray-400">-</span>
-                            )}
+                                <MapPinIcon className="w-5 h-5" />
+                              </button>
+
+                              {business.asanaLink && (
+                                <a
+                                  href={business.asanaLink}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-purple-500 hover:text-purple-700 transition-colors p-1"
+                                  title="Open Asana task"
+                                >
+                                  <svg
+                                    className="h-5 w-5"
+                                    viewBox="0 0 24 24"
+                                    fill="currentColor"
+                                  >
+                                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z" />
+                                    <circle cx="12" cy="8.5" r="1.5" />
+                                    <circle cx="8.5" cy="14.5" r="1.5" />
+                                    <circle cx="15.5" cy="14.5" r="1.5" />
+                                  </svg>
+                                </a>
+                              )}
+                            </div>
                           </td>
                           <td className="px-3 py-3 align-top max-w-[300px]">
                             {" "}
@@ -1211,7 +1293,9 @@ const CombinedBusinessContactsContent: React.FC = () => {
                                 title="Click to view note"
                                 className="block w-full text-left text-sm text-gray-600 break-words line-clamp-4 hover:bg-gray-100 rounded-md p-1.5 transition-colors leading-snug"
                               >
-                                {business.note.slice(0, 160)}...{" "}
+                                {business.note.length > 160
+                                  ? `${business.note.slice(0, 160)}...`
+                                  : business.note}
                               </button>
                             ) : (
                               <span className="text-gray-400 text-xs">-</span>
@@ -1430,11 +1514,34 @@ const CombinedBusinessContactsContent: React.FC = () => {
           <div className="backdrop-blur-md rounded-2xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto bg-white/95">
             <div className="p-6">
               <div className="flex items-start justify-between mb-6 gap-3">
-                <h2 className="text-xl font-bold text-gray-900">
-                  {businessModalMode === "edit"
-                    ? "Business Details"
-                    : "Add New Business"}
-                </h2>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-xl font-bold text-gray-900">
+                    {businessModalMode === "edit"
+                      ? "Business Details"
+                      : "Add New Business"}
+                  </h2>
+                  {businessModalMode === "edit" && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const q =
+                          businessForm.legalName ||
+                          businessForm.companyName ||
+                          "";
+                        window.open(
+                          `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                            q
+                          )}`,
+                          "_blank"
+                        );
+                      }}
+                      className="text-rose-500 hover:text-rose-700 transition-colors p-1"
+                      title="Search on Google Maps"
+                    >
+                      <MapPinIcon className="w-5 h-5" />
+                    </button>
+                  )}
+                </div>
                 <div className="flex items-center gap-3">
                   <div className="flex flex-col items-end">
                     <label className="block text-[10px] font-medium text-gray-500 mb-0.5">
@@ -1726,9 +1833,24 @@ const CombinedBusinessContactsContent: React.FC = () => {
                         placeholder="DE123456789"
                       />
                     </div>
-
-                    {/* Company label print logo */}
-
+                    <div className="col-span-3 md:col-span-4">
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        Asana Link
+                      </label>
+                      <input
+                        type="url"
+                        value={businessForm.asanaLink || ""}
+                        onChange={(e) =>
+                          setBusinessForm({
+                            ...businessForm,
+                            asanaLink: e.target.value,
+                          })
+                        }
+                        disabled={businessFieldDisabled}
+                        className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                        placeholder="https://app.asana.com/..."
+                      />
+                    </div>
                     <div className="col-span-6">
                       <label className="block text-xs font-medium text-gray-700 mb-1">
                         Note
