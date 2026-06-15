@@ -61,6 +61,7 @@ const invoice_1 = require("../models/invoice");
 const cargos_1 = require("../models/cargos");
 const cargo_orders_1 = require("../models/cargo_orders");
 const tarics_1 = require("../models/tarics");
+const customers_1 = require("../models/customers");
 const supplier_items_1 = require("../models/supplier_items");
 const cargo_controller_1 = require("./cargo_controller");
 const _cjkFontCandidates = [
@@ -113,8 +114,7 @@ exports._cachedCjkFontBuffer = null;
                 exports._cachedCjkFontPath = p;
                 return;
             }
-            catch (e) {
-            }
+            catch (e) { }
         }
     }
 })();
@@ -711,32 +711,39 @@ const deleteOrder = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
 });
 exports.deleteOrder = deleteOrder;
 const generateLabelPDF = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _j;
+    var _a, _b, _c, _d, _e, _f, _g;
     try {
         const { itemId } = req.params;
         const orderItemRepo = database_1.AppDataSource.getRepository(order_items_1.OrderItem);
         const orderRepo = database_1.AppDataSource.getRepository(orders_1.Order);
         const warehouseItemRepo = database_1.AppDataSource.getRepository(warehouse_items_1.WarehouseItem);
+        const customerRepo = database_1.AppDataSource.getRepository(customers_1.Customer);
         const item = yield orderItemRepo.findOne({
             where: { id: Number(itemId) },
             relations: ["item"],
         });
         if (!item)
             return next(new errorHandler_1.default("Item not found", 404));
+        let resolvedItem = item.item;
+        if (!resolvedItem && item.ItemID_DE) {
+            resolvedItem = yield database_1.AppDataSource.getRepository(items_1.Item).findOne({
+                where: { ItemID_DE: item.ItemID_DE },
+            });
+        }
         let warehouseItem = null;
         if (item.ItemID_DE) {
             warehouseItem = yield warehouseItemRepo.findOne({
                 where: { ItemID_DE: item.ItemID_DE },
             });
         }
-        if (!warehouseItem && item.item_id) {
+        if (!warehouseItem && (item.item_id || (resolvedItem === null || resolvedItem === void 0 ? void 0 : resolvedItem.id))) {
             warehouseItem = yield warehouseItemRepo.findOne({
-                where: { item_id: item.item_id },
+                where: { item_id: item.item_id || (resolvedItem === null || resolvedItem === void 0 ? void 0 : resolvedItem.id) },
             });
         }
-        if (!warehouseItem && ((_a = item.item) === null || _a === void 0 ? void 0 : _a.ItemID_DE)) {
+        if (!warehouseItem && (resolvedItem === null || resolvedItem === void 0 ? void 0 : resolvedItem.ItemID_DE)) {
             warehouseItem = yield warehouseItemRepo.findOne({
-                where: { ItemID_DE: item.item.ItemID_DE },
+                where: { ItemID_DE: resolvedItem.ItemID_DE },
             });
         }
         const order = yield orderRepo.findOne({
@@ -744,44 +751,104 @@ const generateLabelPDF = (req, res, next) => __awaiter(void 0, void 0, void 0, f
             relations: ["customer"],
         });
         const doc = new pdfkit_1.default({ size: [252, 110], margin: 0 });
-        const logo = path_1.default.join(__dirname, "../../public/logo.png");
-        const k1 = path_1.default.join(__dirname, "../../public/k1.png");
-        const k2 = path_1.default.join(__dirname, "../../public/k2.png");
-        let logoPath = logo;
-        if ((((_b = item.item) === null || _b === void 0 ? void 0 : _b.item_name) && item.item.item_name.includes("K011111")) ||
-            ((_c = item.remarks_cn) === null || _c === void 0 ? void 0 : _c.includes("K011111"))) {
-            logoPath = k1;
-        }
-        else if ((((_d = item.item) === null || _d === void 0 ? void 0 : _d.item_name) && item.item.item_name.includes("K022222")) ||
-            ((_e = item.remarks_cn) === null || _e === void 0 ? void 0 : _e.includes("K022222"))) {
-            logoPath = k2;
-        }
+        const logoPath = path_1.default.join(__dirname, "../../public/logo.png");
         let logoSource = logoPath;
         let isCustomLogoUsed = false;
-        if (((_f = item.item) === null || _f === void 0 ? void 0 : _f.isLabelPrint) && ((_g = order === null || order === void 0 ? void 0 : order.customer) === null || _g === void 0 ? void 0 : _g.companyLabelPrintLogo)) {
-            const logoStr = order.customer.companyLabelPrintLogo.trim();
-            if (logoStr.startsWith("data:image/")) {
-                const matches = logoStr.match(/^data:image\/([a-zA-Z+-]+);base64,(.+)$/);
-                if (matches && matches[2]) {
-                    try {
-                        logoSource = Buffer.from(matches[2], "base64");
-                        isCustomLogoUsed = true;
-                    }
-                    catch (err) {
-                        console.error("Failed to parse base64 customer logo:", err);
-                    }
+        const detectImageFormat = (buf) => {
+            if (buf.length >= 8 &&
+                buf[0] === 0x89 &&
+                buf[1] === 0x50 &&
+                buf[2] === 0x4e &&
+                buf[3] === 0x47)
+                return "png";
+            if (buf.length >= 3 &&
+                buf[0] === 0xff &&
+                buf[1] === 0xd8 &&
+                buf[2] === 0xff)
+                return "jpeg";
+            if (buf.length >= 4 &&
+                buf[0] === 0x47 &&
+                buf[1] === 0x49 &&
+                buf[2] === 0x46 &&
+                buf[3] === 0x38)
+                return "gif";
+            if (buf.length >= 12 &&
+                buf.toString("ascii", 0, 4) === "RIFF" &&
+                buf.toString("ascii", 8, 12) === "WEBP")
+                return "webp";
+            if (buf.length >= 2 && buf[0] === 0x42 && buf[1] === 0x4d)
+                return "bmp";
+            const head = buf
+                .toString("utf8", 0, Math.min(buf.length, 200))
+                .trim()
+                .toLowerCase();
+            if (head.startsWith("<?xml") || head.startsWith("<svg"))
+                return "svg";
+            return "unknown";
+        };
+        let brandingCustomer = null;
+        if (resolvedItem === null || resolvedItem === void 0 ? void 0 : resolvedItem.customer_id) {
+            brandingCustomer = yield customerRepo.findOne({
+                where: { id: resolvedItem.customer_id },
+            });
+        }
+        if (!(brandingCustomer === null || brandingCustomer === void 0 ? void 0 : brandingCustomer.companyLabelPrintLogo) &&
+            ((_a = order === null || order === void 0 ? void 0 : order.customer) === null || _a === void 0 ? void 0 : _a.companyLabelPrintLogo)) {
+            brandingCustomer = order.customer;
+        }
+        console.log("[label] logo decision:", {
+            itemId,
+            orderId: item.order_id,
+            isLabelPrint: !!(resolvedItem === null || resolvedItem === void 0 ? void 0 : resolvedItem.isLabelPrint),
+            itemCustomerId: (_b = resolvedItem === null || resolvedItem === void 0 ? void 0 : resolvedItem.customer_id) !== null && _b !== void 0 ? _b : null,
+            orderCustomerId: (_d = (_c = order === null || order === void 0 ? void 0 : order.customer) === null || _c === void 0 ? void 0 : _c.id) !== null && _d !== void 0 ? _d : null,
+            brandingCustomerId: (_e = brandingCustomer === null || brandingCustomer === void 0 ? void 0 : brandingCustomer.id) !== null && _e !== void 0 ? _e : null,
+            hasBrandingLogo: !!(brandingCustomer === null || brandingCustomer === void 0 ? void 0 : brandingCustomer.companyLabelPrintLogo),
+        });
+        if ((resolvedItem === null || resolvedItem === void 0 ? void 0 : resolvedItem.isLabelPrint) && (brandingCustomer === null || brandingCustomer === void 0 ? void 0 : brandingCustomer.companyLabelPrintLogo)) {
+            const raw = brandingCustomer.companyLabelPrintLogo.trim();
+            let base64Part = "";
+            let declaredMime = "";
+            if (raw.startsWith("data:image/")) {
+                const matches = raw.match(/^data:image\/([a-zA-Z0-9.+-]+);base64,([\s\S]+)$/);
+                if (matches) {
+                    declaredMime = matches[1];
+                    base64Part = matches[2];
+                }
+                else {
+                    console.warn("[label] customer logo starts with `data:image/` but does not match the expected `data:image/<type>;base64,<data>` shape — using default logo");
                 }
             }
             else {
+                base64Part = raw;
+            }
+            base64Part = base64Part.replace(/\s/g, "");
+            if (base64Part) {
                 try {
-                    if (/^[a-zA-Z0-9+/=]+$/.test(logoStr)) {
-                        logoSource = Buffer.from(logoStr, "base64");
+                    const buf = Buffer.from(base64Part, "base64");
+                    const detectedFormat = detectImageFormat(buf);
+                    console.log("[label] customer logo parsed:", {
+                        declaredMime: declaredMime || "(plain base64)",
+                        detectedFormat,
+                        bytes: buf.length,
+                    });
+                    if (buf.length === 0) {
+                        console.warn("[label] customer logo decoded to 0 bytes — using default logo");
+                    }
+                    else if (detectedFormat === "png" || detectedFormat === "jpeg") {
+                        logoSource = buf;
                         isCustomLogoUsed = true;
+                    }
+                    else {
+                        console.warn(`[label] customer logo format "${detectedFormat}" is NOT supported by PDFKit (PNG/JPEG only) — using default logo. Ask the customer to re-upload a PNG or JPEG.`);
                     }
                 }
                 catch (err) {
-                    console.error("Failed to parse customer logo from plain base64:", err);
+                    console.error("[label] failed to decode customer logo base64 — using default logo:", err instanceof Error ? err.message : err);
                 }
+            }
+            else {
+                console.warn("[label] customer logo present but no base64 payload could be extracted — using default logo");
             }
         }
         const safeOrderNo = ((order === null || order === void 0 ? void 0 : order.order_no) || "N/A").replace(/[/\\?%*:|"<>\s]/g, "-");
@@ -800,7 +867,7 @@ const generateLabelPDF = (req, res, next) => __awaiter(void 0, void 0, void 0, f
         const colA = 12;
         const valColA = 16;
         const colLogo = 207;
-        const qtyLabelColStart = 169;
+        const qtyLabelColStart = 170;
         const rightEdgeOrderQty = 155;
         const row1LabelY = 10;
         const row1ValueY = 22;
@@ -814,9 +881,9 @@ const generateLabelPDF = (req, res, next) => __awaiter(void 0, void 0, void 0, f
         const qtyOrderX = rightEdgeOrderQty - qtyOrderWidth;
         const itemNoWWidth = orderNoX - 3 - valColA;
         doc.fillColor("black").font("Helvetica-Oblique").fontSize(6.5);
-        doc.text("ItemNoW", colA, row1LabelY);
-        doc.text("Order No / Qty", orderNoX, row1LabelY);
-        doc.text("Qty", qtyLabelColStart, row1LabelY, { width: 32, align: "right" });
+        doc.text("Artikelnr.", colA, row1LabelY);
+        doc.text("Bestell-Nr. / Menge", orderNoX, row1LabelY);
+        doc.text("Menge", qtyLabelColStart, row1LabelY);
         doc.font("Helvetica-Bold").fontSize(10);
         let itemNoDE = (warehouseItem === null || warehouseItem === void 0 ? void 0 : warehouseItem.item_no_de) || "N/A";
         const itemNoWHeight = doc.heightOfString(itemNoDE, { width: itemNoWWidth });
@@ -829,15 +896,22 @@ const generateLabelPDF = (req, res, next) => __awaiter(void 0, void 0, void 0, f
         doc.font("Helvetica").fontSize(9);
         doc.text(qtyOrderText, qtyOrderX, row1ValueY + 1.5);
         doc.font("Helvetica-Bold").fontSize(10);
-        doc.text(`${item.qty_label || 0}`, qtyLabelColStart, row1ValueY, {
-            width: 32,
-            align: "right",
-        });
+        doc.text(`${item.qty_label || 0}`, qtyLabelColStart, row1ValueY);
         try {
             doc.image(logoSource, colLogo, 14, { width: 40 });
+            console.log("[label] drew", isCustomLogoUsed ? "customer logo" : "default logo");
         }
         catch (e) {
-            console.error("Logo missing or invalid:", isCustomLogoUsed ? "customer logo" : logoPath, e);
+            console.error("[label] failed to draw", isCustomLogoUsed ? "customer logo" : "default logo", "-", e instanceof Error ? e.message : e);
+            if (isCustomLogoUsed) {
+                try {
+                    doc.image(logoPath, colLogo, 14, { width: 40 });
+                    console.log("[label] drew default logo as fallback");
+                }
+                catch (fallbackErr) {
+                    console.error("[label] default logo ALSO failed to draw:", fallbackErr instanceof Error ? fallbackErr.message : fallbackErr);
+                }
+            }
         }
         const fontSource = exports._cachedCjkFontBuffer || exports._cachedCjkFontPath;
         if (fontSource) {
@@ -847,7 +921,7 @@ const generateLabelPDF = (req, res, next) => __awaiter(void 0, void 0, void 0, f
             doc.font("Helvetica");
         }
         doc.fontSize(8).fillColor("#222222");
-        const description = ((_h = item.item) === null || _h === void 0 ? void 0 : _h.item_name) || "No description available";
+        const description = (resolvedItem === null || resolvedItem === void 0 ? void 0 : resolvedItem.item_name) || "No description available";
         const descriptionY = row1ValueY + itemNoWHeight + 1.5;
         const descriptionHeight = Math.min(doc.heightOfString(description, { width: 180 }), 18);
         doc.text(description, valColA, descriptionY, {
@@ -855,10 +929,10 @@ const generateLabelPDF = (req, res, next) => __awaiter(void 0, void 0, void 0, f
             height: descriptionHeight,
             lineBreak: true,
         });
-        const bottomSectionY = Math.min(descriptionY + descriptionHeight + 3, 70);
-        let remarkCNText = item.remarks_cn || "/";
+        const bottomSectionY = Math.max(56, Math.min(descriptionY + descriptionHeight + 4, 65));
+        let remarkCNText = item.remarks_cn || "";
         doc.font("Helvetica-Oblique").fontSize(6.5).fillColor("black");
-        doc.text("RemarkCN", colA, bottomSectionY);
+        doc.text("Hinweis", colA, bottomSectionY);
         let fontSizeCN = 10;
         if (fontSource) {
             doc.font(fontSource, 0);
@@ -877,10 +951,10 @@ const generateLabelPDF = (req, res, next) => __awaiter(void 0, void 0, void 0, f
             width: 125,
             lineBreak: false,
         });
-        let remarkWText = item.remark_de || "/";
-        const remarkWLabelY = bottomSectionY + 8 + fontSizeCN + 3;
+        let remarkWText = item.remark_de || "";
+        const remarkWLabelY = bottomSectionY + 8 + Math.max(fontSizeCN, 8) + 7;
         doc.font("Helvetica-Oblique").fontSize(6.5).fillColor("black");
-        doc.text("RemarkW", colA, remarkWLabelY);
+        doc.text("Bestellhinweis", colA, remarkWLabelY);
         let fontSizeW = 8;
         if (fontSource) {
             doc.font(fontSource, 0);
@@ -899,8 +973,10 @@ const generateLabelPDF = (req, res, next) => __awaiter(void 0, void 0, void 0, f
             width: 125,
             lineBreak: false,
         });
-        const barcodeValue = ((_j = warehouseItem === null || warehouseItem === void 0 ? void 0 : warehouseItem.ean) === null || _j === void 0 ? void 0 : _j.toString()) || "";
-        if (barcodeValue) {
+        const barcodeValue = (((_f = resolvedItem === null || resolvedItem === void 0 ? void 0 : resolvedItem.ean) === null || _f === void 0 ? void 0 : _f.toString()) ||
+            ((_g = warehouseItem === null || warehouseItem === void 0 ? void 0 : warehouseItem.ean) === null || _g === void 0 ? void 0 : _g.toString()) ||
+            "").trim();
+        if (barcodeValue && barcodeValue !== "-") {
             try {
                 const barcodeBuffer = yield bwip_js_1.default.toBuffer({
                     bcid: "code128",
@@ -1156,7 +1232,9 @@ const generateCommercialInvoicePDF = (req, res, next) => __awaiter(void 0, void 
             ],
         });
         if (!invoice) {
-            return res.status(404).json({ success: false, message: "Invoice not found" });
+            return res
+                .status(404)
+                .json({ success: false, message: "Invoice not found" });
         }
         const cargo = yield database_1.AppDataSource.getRepository(cargos_1.Cargo).findOne({
             where: { cargo_no: invoice.orderNumber },
@@ -1169,23 +1247,36 @@ const generateCommercialInvoicePDF = (req, res, next) => __awaiter(void 0, void 
         const orderItemRepo = database_1.AppDataSource.getRepository(order_items_1.OrderItem);
         let rawOrderItems = [];
         if (cargo) {
-            rawOrderItems = yield orderItemRepo.find({ where: { cargo_id: cargo.id }, relations: ["item", "item.taric"] });
+            rawOrderItems = yield orderItemRepo.find({
+                where: { cargo_id: cargo.id },
+                relations: ["item", "item.taric"],
+            });
         }
         else {
-            const order = yield database_1.AppDataSource.getRepository(orders_1.Order).findOne({ where: { order_no: invoice.orderNumber } });
+            const order = yield database_1.AppDataSource.getRepository(orders_1.Order).findOne({
+                where: { order_no: invoice.orderNumber },
+            });
             if (order)
-                rawOrderItems = yield orderItemRepo.find({ where: { order_id: order.id }, relations: ["item", "item.taric"] });
+                rawOrderItems = yield orderItemRepo.find({
+                    where: { order_id: order.id },
+                    relations: ["item", "item.taric"],
+                });
         }
         const manualCodes = [];
         rawOrderItems.forEach((oi) => {
             if (oi.set_taric_code)
-                oi.set_taric_code.split("/").forEach((c) => { if (c.trim())
-                    manualCodes.push(c.trim()); });
+                oi.set_taric_code.split("/").forEach((c) => {
+                    if (c.trim())
+                        manualCodes.push(c.trim());
+                });
         });
         const uniqueCodes = [...new Set(manualCodes)];
         const manualTarics = uniqueCodes.length > 0
-            ? yield database_1.AppDataSource.getRepository(tarics_1.Taric).find({ where: { code: (0, typeorm_1.In)(uniqueCodes) } }) : [];
-        const manualTaricMap = new Map(manualTarics.map(t => [t.code, t]));
+            ? yield database_1.AppDataSource.getRepository(tarics_1.Taric).find({
+                where: { code: (0, typeorm_1.In)(uniqueCodes) },
+            })
+            : [];
+        const manualTaricMap = new Map(manualTarics.map((t) => [t.code, t]));
         const taricGroupsMap = new Map();
         rawOrderItems.forEach((oi) => {
             var _a, _b;
@@ -1214,9 +1305,11 @@ const generateCommercialInvoicePDF = (req, res, next) => __awaiter(void 0, void 
                 desc = (item === null || item === void 0 ? void 0 : item.item_name) || "Unknown";
             }
             let unitPrice = 0;
-            if ((item === null || item === void 0 ? void 0 : item.transfer_price_EUR) !== undefined && (item === null || item === void 0 ? void 0 : item.transfer_price_EUR) !== null)
+            if ((item === null || item === void 0 ? void 0 : item.transfer_price_EUR) !== undefined &&
+                (item === null || item === void 0 ? void 0 : item.transfer_price_EUR) !== null)
                 unitPrice = Number(item.transfer_price_EUR);
-            else if (oi.eur_special_price !== undefined && oi.eur_special_price !== null)
+            else if (oi.eur_special_price !== undefined &&
+                oi.eur_special_price !== null)
                 unitPrice = Number(oi.eur_special_price);
             else if (oi.price !== undefined && oi.price !== null)
                 unitPrice = Number(oi.price);
@@ -1233,7 +1326,9 @@ const generateCommercialInvoicePDF = (req, res, next) => __awaiter(void 0, void 
         let lineItems;
         if (groupedItems.length > 0) {
             lineItems = groupedItems.map((g, i) => ({
-                no: i + 1, desc: g.desc, hs: g.hsCode,
+                no: i + 1,
+                desc: g.desc,
+                hs: g.hsCode,
                 qty: g.qty,
                 unit: g.qty > 0 ? (g.totalPrice / g.qty).toFixed(3) : "0.000",
                 price: g.totalPrice.toFixed(2),
@@ -1243,45 +1338,53 @@ const generateCommercialInvoicePDF = (req, res, next) => __awaiter(void 0, void 
             lineItems = (invoice.items || []).map((item, i) => {
                 var _a;
                 return ({
-                    no: i + 1, desc: item.description || ((_a = item.item) === null || _a === void 0 ? void 0 : _a.item_name) || "Unknown Item",
-                    hs: item.articleNumber || "n/a", qty: Number(item.quantity || 0),
-                    unit: Number(item.unitPrice || 0).toFixed(3), price: Number(item.netPrice || 0).toFixed(2),
+                    no: i + 1,
+                    desc: item.description || ((_a = item.item) === null || _a === void 0 ? void 0 : _a.item_name) || "Unknown Item",
+                    hs: item.articleNumber || "n/a",
+                    qty: Number(item.quantity || 0),
+                    unit: Number(item.unitPrice || 0).toFixed(3),
+                    price: Number(item.netPrice || 0).toFixed(2),
                 });
             });
         }
         const totalQty = lineItems.reduce((s, it) => s + it.qty, 0);
         const subTotal = lineItems.reduce((s, it) => s + Number(it.price), 0);
-        const freightCost = invoice.freightCost !== undefined && invoice.freightCost !== null ? Number(invoice.freightCost) : 0;
+        const freightCost = invoice.freightCost !== undefined && invoice.freightCost !== null
+            ? Number(invoice.freightCost)
+            : 0;
         const grandTotal = (subTotal + freightCost).toFixed(2);
         const customer = invoice.customer || (cargo === null || cargo === void 0 ? void 0 : cargo.customer);
         const customerAddress = resolveCustomerAddress(customer);
         const hasCargoBillTo = !!((cargo === null || cargo === void 0 ? void 0 : cargo.bill_to_display_name) || (cargo === null || cargo === void 0 ? void 0 : cargo.bill_to_company_name));
         const rawBillName = hasCargoBillTo
-            ? (cargo.bill_to_display_name || cargo.bill_to_company_name || "")
-            : ((cargo === null || cargo === void 0 ? void 0 : cargo.ship_to_display_name) || (cargo === null || cargo === void 0 ? void 0 : cargo.ship_to_company_name) || (customer === null || customer === void 0 ? void 0 : customer.companyName) || "");
+            ? cargo.bill_to_display_name || cargo.bill_to_company_name || ""
+            : (cargo === null || cargo === void 0 ? void 0 : cargo.ship_to_display_name) ||
+                (cargo === null || cargo === void 0 ? void 0 : cargo.ship_to_company_name) ||
+                (customer === null || customer === void 0 ? void 0 : customer.companyName) ||
+                "";
         const billToName = rawBillName
             .replace(/^GTech$/i, "GTech Industries GmbH")
             .replace(/^GTech[-\s]?Warehouse$/i, "GTech Industries GmbH") ||
             "GTech Industries GmbH";
         const billToStreet = hasCargoBillTo
-            ? ((cargo === null || cargo === void 0 ? void 0 : cargo.bill_to_full_address) || customerAddress.street)
-            : ((cargo === null || cargo === void 0 ? void 0 : cargo.ship_to_full_address) || customerAddress.street);
+            ? (cargo === null || cargo === void 0 ? void 0 : cargo.bill_to_full_address) || customerAddress.street
+            : (cargo === null || cargo === void 0 ? void 0 : cargo.ship_to_full_address) || customerAddress.street;
         const billToCity = hasCargoBillTo
-            ? ((cargo === null || cargo === void 0 ? void 0 : cargo.bill_to_city)
+            ? (cargo === null || cargo === void 0 ? void 0 : cargo.bill_to_city)
                 ? formatPostalCity(cargo.bill_to_postal_code, cargo.bill_to_city)
-                : formatPostalCity(customerAddress.postalCode, customerAddress.city))
-            : ((cargo === null || cargo === void 0 ? void 0 : cargo.ship_to_city)
+                : formatPostalCity(customerAddress.postalCode, customerAddress.city)
+            : (cargo === null || cargo === void 0 ? void 0 : cargo.ship_to_city)
                 ? formatPostalCity(cargo.ship_to_postal_code, cargo.ship_to_city)
-                : formatPostalCity(customerAddress.postalCode, customerAddress.city));
+                : formatPostalCity(customerAddress.postalCode, customerAddress.city);
         const billToCountry = hasCargoBillTo
-            ? ((cargo === null || cargo === void 0 ? void 0 : cargo.bill_to_country) || customerAddress.country || "Germany")
-            : ((cargo === null || cargo === void 0 ? void 0 : cargo.ship_to_country) || customerAddress.country || "Germany");
+            ? (cargo === null || cargo === void 0 ? void 0 : cargo.bill_to_country) || customerAddress.country || "Germany"
+            : (cargo === null || cargo === void 0 ? void 0 : cargo.ship_to_country) || customerAddress.country || "Germany";
         const billToPhone = hasCargoBillTo
-            ? ((cargo === null || cargo === void 0 ? void 0 : cargo.bill_to_phone_no) || customerAddress.phone)
-            : ((cargo === null || cargo === void 0 ? void 0 : cargo.ship_to_contact_phone) || customerAddress.phone);
+            ? (cargo === null || cargo === void 0 ? void 0 : cargo.bill_to_phone_no) || customerAddress.phone
+            : (cargo === null || cargo === void 0 ? void 0 : cargo.ship_to_contact_phone) || customerAddress.phone;
         const billToEori = hasCargoBillTo
-            ? ((cargo === null || cargo === void 0 ? void 0 : cargo.bill_to_tax_no) || (customer === null || customer === void 0 ? void 0 : customer.taxNumber) || "")
-            : ((customer === null || customer === void 0 ? void 0 : customer.taxNumber) || "");
+            ? (cargo === null || cargo === void 0 ? void 0 : cargo.bill_to_tax_no) || (customer === null || customer === void 0 ? void 0 : customer.taxNumber) || ""
+            : (customer === null || customer === void 0 ? void 0 : customer.taxNumber) || "";
         const shipToCompany = (cargo === null || cargo === void 0 ? void 0 : cargo.ship_to_display_name) ||
             (cargo === null || cargo === void 0 ? void 0 : cargo.ship_to_company_name) ||
             (customer === null || customer === void 0 ? void 0 : customer.companyName) ||
@@ -1298,12 +1401,16 @@ const generateCommercialInvoicePDF = (req, res, next) => __awaiter(void 0, void 
             if ((_a = customer === null || customer === void 0 ? void 0 : customer.businessDetails) === null || _a === void 0 ? void 0 : _a.customerNumber)
                 return String(customer.businessDetails.customerNumber);
             if (customer === null || customer === void 0 ? void 0 : customer.id)
-                return (parseInt(customer.id.replace(/-/g, "").substring(0, 8), 16) % 100000).toString().padStart(5, "0");
+                return (parseInt(customer.id.replace(/-/g, "").substring(0, 8), 16) % 100000)
+                    .toString()
+                    .padStart(5, "0");
             return "";
         })();
         const data = {
             invoiceNo: (invoice.invoiceNumber || "").replace(/-/g, ""),
-            date: invoice.invoiceDate ? new Date(invoice.invoiceDate).toISOString().split("T")[0] : "",
+            date: invoice.invoiceDate
+                ? new Date(invoice.invoiceDate).toISOString().split("T")[0]
+                : "",
             cargoNo: (cargo === null || cargo === void 0 ? void 0 : cargo.cargo_no) || invoice.orderNumber || "",
             customerID,
             billTo: {
@@ -1327,16 +1434,55 @@ const generateCommercialInvoicePDF = (req, res, next) => __awaiter(void 0, void 
         res.setHeader("Content-Type", "application/pdf");
         res.setHeader("Content-Disposition", `attachment; filename=Invoice_${data.invoiceNo}.pdf`);
         doc.pipe(res);
-        doc.fillColor("#777777").font("Helvetica").fontSize(22).text("GTech Industries Limited", 40, 20, { align: "right" });
+        doc
+            .fillColor("#777777")
+            .font("Helvetica")
+            .fontSize(22)
+            .text("GTech Industries Limited", 40, 20, { align: "right" });
         const tickColor = "#777777";
         doc.fontSize(11).fillColor("#777777");
         doc.text("Engineering", 325, 48);
-        doc.save().translate(387, 48).scale(0.8).moveTo(0, 5).lineTo(3, 8).lineTo(8, 0).strokeColor(tickColor).lineWidth(2).stroke().restore();
+        doc
+            .save()
+            .translate(387, 48)
+            .scale(0.8)
+            .moveTo(0, 5)
+            .lineTo(3, 8)
+            .lineTo(8, 0)
+            .strokeColor(tickColor)
+            .lineWidth(2)
+            .stroke()
+            .restore();
         doc.text("Design", 412, 48);
-        doc.save().translate(448, 48).scale(0.8).moveTo(0, 5).lineTo(3, 8).lineTo(8, 0).strokeColor(tickColor).lineWidth(2).stroke().restore();
+        doc
+            .save()
+            .translate(448, 48)
+            .scale(0.8)
+            .moveTo(0, 5)
+            .lineTo(3, 8)
+            .lineTo(8, 0)
+            .strokeColor(tickColor)
+            .lineWidth(2)
+            .stroke()
+            .restore();
         doc.text("Manufacturing", 473, 48);
-        doc.save().translate(546, 48).scale(0.8).moveTo(0, 5).lineTo(3, 8).lineTo(8, 0).strokeColor(tickColor).lineWidth(2).stroke().restore();
-        doc.moveTo(40, 65).lineTo(555, 65).strokeColor("#cccccc").lineWidth(1).stroke();
+        doc
+            .save()
+            .translate(546, 48)
+            .scale(0.8)
+            .moveTo(0, 5)
+            .lineTo(3, 8)
+            .lineTo(8, 0)
+            .strokeColor(tickColor)
+            .lineWidth(2)
+            .stroke()
+            .restore();
+        doc
+            .moveTo(40, 65)
+            .lineTo(555, 65)
+            .strokeColor("#cccccc")
+            .lineWidth(1)
+            .stroke();
         doc.fontSize(9).fillColor("#666666");
         doc.text("GTech Industries Limited:   3A, 12/F, Kaiser Centre, N. 18 Centre Street, Sai Ying Pun, Hong Kong", 40, 75);
         doc.text("GTech Establishment China: West Dafeng Metallurgical Plant, Bowang Huisheng Square, Bowang, Ma'anshan, Anhui", 40, 88);
@@ -1344,14 +1490,21 @@ const generateCommercialInvoicePDF = (req, res, next) => __awaiter(void 0, void 
         if (fontSource) {
             try {
                 const chineseAddress = "中国安徽省马鞍山市博望区博望汇盛广场西大丰冶金厂区";
-                doc.font(fontSource, 0).fontSize(9).fillColor("#666666").text(chineseAddress, 152, 101, { lineBreak: false });
+                doc
+                    .font(fontSource, 0)
+                    .fontSize(9)
+                    .fillColor("#666666")
+                    .text(chineseAddress, 152, 101, { lineBreak: false });
                 doc.font("Helvetica").fillColor("#000000");
             }
             catch (err) {
                 console.error(`[CJK-PDF] Render failed:`, err.message);
                 if (process.platform === "win32") {
                     try {
-                        doc.font("C:\\Windows\\Fonts\\msyh.ttc", 0).fontSize(9).text("中国安徽...", 152, 101);
+                        doc
+                            .font("C:\\Windows\\Fonts\\msyh.ttc", 0)
+                            .fontSize(9)
+                            .text("中国安徽...", 152, 101);
                     }
                     catch (e) { }
                 }
@@ -1368,7 +1521,8 @@ const generateCommercialInvoicePDF = (req, res, next) => __awaiter(void 0, void 
         };
         const isGTechBillTo = data.billTo.name === "GTech Industries GmbH";
         const isSameAddr = !hasCargoBillTo ||
-            (data.billTo.name === data.shipTo.company && data.billTo.street === data.shipTo.street);
+            (data.billTo.name === data.shipTo.company &&
+                data.billTo.street === data.shipTo.street);
         const addrY = 125;
         if (isSameAddr) {
             const bName = isGTechBillTo ? GTECH_GMBH.name : data.billTo.name;
@@ -1377,8 +1531,14 @@ const generateCommercialInvoicePDF = (req, res, next) => __awaiter(void 0, void 
             const bCountry = isGTechBillTo ? GTECH_GMBH.country : data.billTo.country;
             const bPhone = isGTechBillTo ? GTECH_GMBH.phone : data.billTo.phone;
             const bEori = isGTechBillTo ? GTECH_GMBH.eori : data.billTo.eori;
-            doc.fillColor("black").font("Helvetica-Bold").fontSize(11).text(bName, 40, addrY);
-            doc.font("Helvetica").fontSize(10)
+            doc
+                .fillColor("black")
+                .font("Helvetica-Bold")
+                .fontSize(11)
+                .text(bName, 40, addrY);
+            doc
+                .font("Helvetica")
+                .fontSize(10)
                 .text(bStreet, 40, addrY + 15)
                 .text(bCity, 40, addrY + 28)
                 .text(bCountry, 40, addrY + 41)
@@ -1392,36 +1552,88 @@ const generateCommercialInvoicePDF = (req, res, next) => __awaiter(void 0, void 
             const bCountry = isGTechBillTo ? GTECH_GMBH.country : data.billTo.country;
             const bPhone = isGTechBillTo ? GTECH_GMBH.phone : data.billTo.phone;
             const bEori = isGTechBillTo ? GTECH_GMBH.eori : data.billTo.eori;
-            doc.fillColor("black").font("Helvetica-Bold").fontSize(10.5).text("BILL TO:", 40, addrY - 3).text("SHIP TO:", 240, addrY - 3);
-            doc.font("Helvetica-Bold").fontSize(11).text(bName, 40, addrY + 13);
-            doc.font("Helvetica").fontSize(10)
+            doc
+                .fillColor("black")
+                .font("Helvetica-Bold")
+                .fontSize(10.5)
+                .text("BILL TO:", 40, addrY - 3)
+                .text("SHIP TO:", 240, addrY - 3);
+            doc
+                .font("Helvetica-Bold")
+                .fontSize(11)
+                .text(bName, 40, addrY + 13);
+            doc
+                .font("Helvetica")
+                .fontSize(10)
                 .text(bStreet, 40, addrY + 33)
                 .text(bCity, 40, addrY + 46)
                 .text(bCountry, 40, addrY + 59)
                 .text(bPhone, 40, addrY + 73);
             doc.font("Helvetica-Bold").text(`EORI: ${bEori}`, 40, addrY + 87);
-            doc.font("Helvetica-Bold").fontSize(11).text(data.shipTo.company, 240, addrY + 13);
-            doc.font("Helvetica").fontSize(10).text(data.shipTo.contact, 240, addrY + 27)
-                .text(data.shipTo.street, 240, addrY + 41).text(data.shipTo.city, 240, addrY + 57)
-                .text(data.shipTo.country, 240, addrY + 70).text(data.shipTo.phone, 240, addrY + 83);
+            doc
+                .font("Helvetica-Bold")
+                .fontSize(11)
+                .text(data.shipTo.company, 240, addrY + 13);
+            doc
+                .font("Helvetica")
+                .fontSize(10)
+                .text(data.shipTo.contact, 240, addrY + 27)
+                .text(data.shipTo.street, 240, addrY + 41)
+                .text(data.shipTo.city, 240, addrY + 57)
+                .text(data.shipTo.country, 240, addrY + 70)
+                .text(data.shipTo.phone, 240, addrY + 83);
         }
         let rightY = 130;
-        doc.font("Helvetica").fontSize(12).text("Customer ID: ", 420, rightY, { continued: true }).font("Helvetica-Bold").text(data.customerID || "");
+        doc
+            .font("Helvetica")
+            .fontSize(12)
+            .text("Customer ID: ", 420, rightY, { continued: true })
+            .font("Helvetica-Bold")
+            .text(data.customerID || "");
         rightY = 157;
-        doc.font("Helvetica").fontSize(12).text("Date: ", 420, rightY, { continued: true }).font("Helvetica-Bold").text(data.date);
+        doc
+            .font("Helvetica")
+            .fontSize(12)
+            .text("Date: ", 420, rightY, { continued: true })
+            .font("Helvetica-Bold")
+            .text(data.date);
         rightY = 184;
-        doc.font("Helvetica").text("Invoice No: ", 420, rightY, { continued: true }).font("Helvetica-Bold").text(data.invoiceNo);
+        doc
+            .font("Helvetica")
+            .text("Invoice No: ", 420, rightY, { continued: true })
+            .font("Helvetica-Bold")
+            .text(data.invoiceNo);
         rightY = 211;
-        doc.font("Helvetica").text("Cargo No.: ", 420, rightY, { continued: true }).font("Helvetica-Bold").text(data.cargoNo);
-        doc.fontSize(15).font("Helvetica-Bold").text("Commercial Invoice", 0, 240, { align: "center" });
+        doc
+            .font("Helvetica")
+            .text("Cargo No.: ", 420, rightY, { continued: true })
+            .font("Helvetica-Bold")
+            .text(data.cargoNo);
+        doc
+            .fontSize(15)
+            .font("Helvetica-Bold")
+            .text("Commercial Invoice", 0, 240, { align: "center" });
         const tableTop = 272;
-        doc.moveTo(40, tableTop).lineTo(555, tableTop).strokeColor("#bb0000").lineWidth(1.5).stroke();
+        doc
+            .moveTo(40, tableTop)
+            .lineTo(555, tableTop)
+            .strokeColor("#bb0000")
+            .lineWidth(1.5)
+            .stroke();
         doc.fontSize(11).font("Helvetica-Bold");
-        doc.text("No", 40, tableTop + 10).text("Description", 75, tableTop + 10).text("(EU HS code)", 340, tableTop + 10);
+        doc
+            .text("No", 40, tableTop + 10)
+            .text("Description", 75, tableTop + 10)
+            .text("(EU HS code)", 340, tableTop + 10);
         doc.text("Qty", 425, tableTop + 4).text("(pcs)", 425, tableTop + 16);
         doc.text("Unit", 470, tableTop + 4).text("(€)*", 470, tableTop + 16);
         doc.text("Price", 525, tableTop + 4).text("(€)", 525, tableTop + 16);
-        doc.moveTo(40, tableTop + 32).lineTo(555, tableTop + 32).strokeColor("#cccccc").lineWidth(1).stroke();
+        doc
+            .moveTo(40, tableTop + 32)
+            .lineTo(555, tableTop + 32)
+            .strokeColor("#cccccc")
+            .lineWidth(1)
+            .stroke();
         let itemY = tableTop + 46;
         const pageH = 841.89;
         const footerReserve = 140;
@@ -1441,9 +1653,16 @@ const generateCommercialInvoicePDF = (req, res, next) => __awaiter(void 0, void 
             doc.text(item.hs, 340, itemY + midOffset);
             doc.text(item.qty.toString(), 425, itemY + midOffset);
             doc.text(item.unit, 463, itemY + midOffset);
-            doc.text(item.price, 510, itemY + midOffset, { align: "right", width: 45 });
-            doc.moveTo(40, itemY + actualRowH - 2).lineTo(555, itemY + actualRowH - 2)
-                .strokeColor("#eeeeee").lineWidth(0.5).stroke();
+            doc.text(item.price, 510, itemY + midOffset, {
+                align: "right",
+                width: 45,
+            });
+            doc
+                .moveTo(40, itemY + actualRowH - 2)
+                .lineTo(555, itemY + actualRowH - 2)
+                .strokeColor("#eeeeee")
+                .lineWidth(0.5)
+                .stroke();
             itemY += actualRowH;
         });
         if (itemY + minRowH > pageH - footerReserve) {
@@ -1455,17 +1674,32 @@ const generateCommercialInvoicePDF = (req, res, next) => __awaiter(void 0, void 
         doc.text("n/a", 340, itemY).text("n/a", 425, itemY).text("n/a", 470, itemY);
         doc.text(freightCost.toFixed(2), 510, itemY, { align: "right", width: 45 });
         itemY += minRowH + 4;
-        doc.moveTo(40, itemY).lineTo(555, itemY).strokeColor("black").lineWidth(1).stroke();
+        doc
+            .moveTo(40, itemY)
+            .lineTo(555, itemY)
+            .strokeColor("black")
+            .lineWidth(1)
+            .stroke();
         itemY += 12;
-        doc.font("Helvetica-Bold").fontSize(11).text("Total :", 360, itemY, { underline: true });
+        doc
+            .font("Helvetica-Bold")
+            .fontSize(11)
+            .text("Total :", 360, itemY, { underline: true });
         doc.text(totalQty.toString(), 425, itemY, { underline: true });
-        doc.text(`${grandTotal} €`, 485, itemY, { width: 70, align: "right", underline: true });
+        doc.text(`${grandTotal} €`, 485, itemY, {
+            width: 70,
+            align: "right",
+            underline: true,
+        });
         itemY += 25;
         if (itemY + 110 > pageH - footerReserve) {
             doc.addPage();
             itemY = 50;
         }
-        doc.fontSize(10).font("Helvetica-Bold").text("* Unit price is calculated and can have errors from rounding", 40, itemY);
+        doc
+            .fontSize(10)
+            .font("Helvetica-Bold")
+            .text("* Unit price is calculated and can have errors from rounding", 40, itemY);
         itemY += 25;
         doc.fontSize(10).font("Helvetica").text("Remark:", 40, itemY);
         const remarkX = 100;
@@ -1473,7 +1707,9 @@ const generateCommercialInvoicePDF = (req, res, next) => __awaiter(void 0, void 
         if (cargo === null || cargo === void 0 ? void 0 : cargo.cargo_no) {
             remarkLines.push(`${cargo.cargo_no}`);
         }
-        const orderForRemark = yield database_1.AppDataSource.getRepository(orders_1.Order).findOne({ where: { order_no: invoice.orderNumber } });
+        const orderForRemark = yield database_1.AppDataSource.getRepository(orders_1.Order).findOne({
+            where: { order_no: invoice.orderNumber },
+        });
         const orderComment = (orderForRemark === null || orderForRemark === void 0 ? void 0 : orderForRemark.comment) || "";
         if (orderComment)
             remarkLines.push(orderComment);
@@ -1488,7 +1724,10 @@ const generateCommercialInvoicePDF = (req, res, next) => __awaiter(void 0, void 
             doc.addPage();
             itemY = 50;
         }
-        doc.fontSize(9).font("Helvetica").fillColor("#000000")
+        doc
+            .fontSize(9)
+            .font("Helvetica")
+            .fillColor("#000000")
             .text("We hereby confirm that no raw material from Russia were used", 100, itemY, { lineBreak: false });
         itemY += 14;
         doc.text("in the production of the goods mentioned in this invoice.", 100, itemY, { lineBreak: false });
@@ -1499,7 +1738,12 @@ const generateCommercialInvoicePDF = (req, res, next) => __awaiter(void 0, void 
         let lastPageIdx = range.start + totalPagesCount - 1;
         const footerY = pageH - 100;
         doc.switchToPage(lastPageIdx);
-        doc.moveTo(40, footerY).lineTo(555, footerY).strokeColor("#cccccc").lineWidth(0.5).stroke();
+        doc
+            .moveTo(40, footerY)
+            .lineTo(555, footerY)
+            .strokeColor("#cccccc")
+            .lineWidth(0.5)
+            .stroke();
         doc.fontSize(8).fillColor("#000000").font("Helvetica-Bold");
         doc.text("GTech Industries Limited", 40, footerY + 10);
         doc.fontSize(8).font("Helvetica").fillColor("#444444");
@@ -1522,8 +1766,12 @@ const generateCommercialInvoicePDF = (req, res, next) => __awaiter(void 0, void 
         for (let i = 0; i < totalPagesCount; i++) {
             doc.switchToPage(range.start + i);
             doc.fontSize(8).fillColor("#999999").font("Helvetica");
-            const numY = (i === totalPagesCount - 1) ? footerY + 55 : 780;
-            doc.text(`${i + 1} / ${totalPagesCount}`, 490, numY, { align: "right", width: 60, lineBreak: false });
+            const numY = i === totalPagesCount - 1 ? footerY + 55 : 780;
+            doc.text(`${i + 1} / ${totalPagesCount}`, 490, numY, {
+                align: "right",
+                width: 60,
+                lineBreak: false,
+            });
         }
         doc.page.margins.bottom = originalBottomMargin;
         doc.end();

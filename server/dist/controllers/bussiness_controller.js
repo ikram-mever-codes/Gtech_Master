@@ -403,26 +403,16 @@ const generateTempPassword = () => {
     return password;
 };
 const createBusiness = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b, _c, _d, _e, _f, _g;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k;
     try {
-        const { displayName, companyName, name, customerNumber, companyLabelPrintLogo, address, website, description, 
-        // The merged Relationships UI sends the internal note under `note`.
-        // It is persisted into businessDetails.description (there is no dedicated
-        // note column). If you later add a real note column, change the
-        // `businessDetails.description = ...note...` lines below to write it.
-        note, city, state, country = "Germany", postalCode, latitude, longitude, phoneNumber, email, contactEmail, contactPhoneNumber, googleMapsUrl, reviewCount, category, additionalCategories, socialMedia, source = exports.BUSINESS_SOURCE.MANUAL, isDeviceMaker, starBusinessDetails, isStarCustomer, starCustomerEmail, } = req.body;
+        const { displayName, companyName, name, customerNumber, companyLabelPrintLogo, address, street, addressAdditional, website, description, note, city, state, country = "Germany", postalCode, latitude, longitude, phoneNumber, phone, email, contactEmail, contactPhoneNumber, vatTaxId, googleMapsUrl, reviewCount, category, additionalCategories, socialMedia, source = exports.BUSINESS_SOURCE.MANUAL, isDeviceMaker, starBusinessDetails, isStarCustomer, starCustomerEmail, asanaLink, } = req.body;
         const user = req.user;
-        // Fall back to the legal company name when no separate display name/name
-        // was sent, so a business can be created with just the company name.
         const dbCompanyName = displayName || name || companyName;
         const dbLegalName = companyName;
         const finalEmail = email;
-        // Only the company name is required. Postal code, city, website, source
-        // and device-maker are all optional now.
         if (!dbCompanyName) {
             return next(new errorHandler_1.default("Company name is required", 400));
         }
-        // If a device-maker value IS provided, it must be one of the allowed values.
         if (isDeviceMaker && !["Yes", "No", "Unsure"].includes(isDeviceMaker)) {
             return next(new errorHandler_1.default("Device maker must be one of Yes / No / Unsure", 400));
         }
@@ -508,6 +498,9 @@ const createBusiness = (req, res, next) => __awaiter(void 0, void 0, void 0, fun
             customer.companyLabelPrintLogo = companyLabelPrintLogo
                 ? companyLabelPrintLogo.trim()
                 : undefined;
+            customer.vatTaxId = vatTaxId ? vatTaxId.trim() : undefined;
+            customer.asanaLink = asanaLink ? asanaLink.trim() : undefined;
+            customer.addressLine2 = addressAdditional ? addressAdditional.trim() : undefined;
             if (isStarCustomer) {
                 customer.stage = "star_customer";
                 customer.email = starCustomerEmail.trim().toLowerCase();
@@ -548,18 +541,23 @@ const createBusiness = (req, res, next) => __awaiter(void 0, void 0, void 0, fun
             }
             customer.contactPhoneNumber = contactPhoneNumber
                 ? contactPhoneNumber.trim()
-                : phoneNumber
-                    ? phoneNumber.trim()
-                    : undefined;
+                : phone
+                    ? phone.trim()
+                    : phoneNumber
+                        ? phoneNumber.trim()
+                        : undefined;
             const savedCustomer = yield transactionalEntityManager.save(customers_1.Customer, customer);
             const businessDetails = new business_details_1.BusinessDetails();
             businessDetails.businessSource = source;
             businessDetails.isDeviceMaker = isDeviceMaker;
             businessDetails.check_timestamp = new Date();
             businessDetails.check_by = user;
-            businessDetails.address = address ? address.trim() : undefined;
+            businessDetails.address = street
+                ? street.trim()
+                : address
+                    ? address.trim()
+                    : undefined;
             businessDetails.website = normalizedWebsite || undefined;
-            // Persist the internal note (preferred) or a legacy description.
             businessDetails.description =
                 note !== undefined
                     ? note
@@ -574,9 +572,11 @@ const createBusiness = (req, res, next) => __awaiter(void 0, void 0, void 0, fun
             businessDetails.postalCode = postalCode ? postalCode.trim() : undefined;
             businessDetails.latitude = sanitizeNumber(latitude);
             businessDetails.longitude = sanitizeNumber(longitude);
-            businessDetails.contactPhone = phoneNumber
-                ? phoneNumber.trim()
-                : undefined;
+            businessDetails.contactPhone = phone
+                ? phone.trim()
+                : phoneNumber
+                    ? phoneNumber.trim()
+                    : undefined;
             businessDetails.email = finalEmail
                 ? finalEmail.trim().toLowerCase()
                 : undefined;
@@ -670,8 +670,8 @@ const createBusiness = (req, res, next) => __awaiter(void 0, void 0, void 0, fun
         if (!finalCustomer) {
             return next(new errorHandler_1.default("Business not found after creation", 404));
         }
-        const _h = finalCustomer.businessDetails || {}, { id: detailsId } = _h, businessDetailsWithoutId = __rest(_h, ["id"]);
-        const businessResponse = Object.assign(Object.assign({ id: finalCustomer.id, displayName: finalCustomer.companyName, companyName: finalCustomer.companyName, name: finalCustomer.companyName, legalName: finalCustomer.legalName, customerNumber: finalCustomer.customerNumber, companyLabelPrintLogo: finalCustomer.companyLabelPrintLogo, email: finalCustomer.email, contactEmail: finalCustomer.contactEmail, contactPhoneNumber: finalCustomer.contactPhoneNumber, stage: finalCustomer.stage }, businessDetailsWithoutId), { note: (_a = finalCustomer.businessDetails) === null || _a === void 0 ? void 0 : _a.description, starBusinessDetails: finalCustomer.starBusinessDetails
+        const _l = finalCustomer.businessDetails || {}, { id: detailsId } = _l, businessDetailsWithoutId = __rest(_l, ["id"]);
+        const businessResponse = Object.assign(Object.assign({ id: finalCustomer.id, displayName: finalCustomer.companyName, companyName: finalCustomer.companyName, name: finalCustomer.companyName, legalName: finalCustomer.legalName, customerNumber: finalCustomer.customerNumber, companyLabelPrintLogo: finalCustomer.companyLabelPrintLogo, asanaLink: finalCustomer.asanaLink, email: finalCustomer.email, contactEmail: finalCustomer.contactEmail, contactPhoneNumber: finalCustomer.contactPhoneNumber, stage: finalCustomer.stage }, businessDetailsWithoutId), { address: (_a = finalCustomer.businessDetails) === null || _a === void 0 ? void 0 : _a.address, street: (_b = finalCustomer.businessDetails) === null || _b === void 0 ? void 0 : _b.address, addressAdditional: finalCustomer.addressLine2, note: (_c = finalCustomer.businessDetails) === null || _c === void 0 ? void 0 : _c.description, starBusinessDetails: finalCustomer.starBusinessDetails
                 ? {
                     inSeries: finalCustomer.starBusinessDetails.inSeries,
                     madeIn: finalCustomer.starBusinessDetails.madeIn,
@@ -691,7 +691,7 @@ const createBusiness = (req, res, next) => __awaiter(void 0, void 0, void 0, fun
                     id: defaultList.id,
                     name: defaultList.name,
                 }
-                : undefined, website: (_b = finalCustomer.businessDetails) === null || _b === void 0 ? void 0 : _b.website, hasWebsite: !!((_c = finalCustomer.businessDetails) === null || _c === void 0 ? void 0 : _c.website), phoneNumber: (_d = finalCustomer.businessDetails) === null || _d === void 0 ? void 0 : _d.contactPhone, businessEmail: (_e = finalCustomer.businessDetails) === null || _e === void 0 ? void 0 : _e.email, status: exports.BUSINESS_STATUS.ACTIVE, source: (_f = finalCustomer.businessDetails) === null || _f === void 0 ? void 0 : _f.businessSource, isDeviceMaker: (_g = finalCustomer.businessDetails) === null || _g === void 0 ? void 0 : _g.isDeviceMaker, isStarCustomer: !!finalCustomer.starCustomerDetails, createdAt: finalCustomer.createdAt, updatedAt: finalCustomer.updatedAt });
+                : undefined, website: (_d = finalCustomer.businessDetails) === null || _d === void 0 ? void 0 : _d.website, hasWebsite: !!((_e = finalCustomer.businessDetails) === null || _e === void 0 ? void 0 : _e.website), phoneNumber: (_f = finalCustomer.businessDetails) === null || _f === void 0 ? void 0 : _f.contactPhone, phone: (_g = finalCustomer.businessDetails) === null || _g === void 0 ? void 0 : _g.contactPhone, businessEmail: (_h = finalCustomer.businessDetails) === null || _h === void 0 ? void 0 : _h.email, status: exports.BUSINESS_STATUS.ACTIVE, source: (_j = finalCustomer.businessDetails) === null || _j === void 0 ? void 0 : _j.businessSource, isDeviceMaker: (_k = finalCustomer.businessDetails) === null || _k === void 0 ? void 0 : _k.isDeviceMaker, isStarCustomer: !!finalCustomer.starCustomerDetails, vatTaxId: finalCustomer.vatTaxId, createdAt: finalCustomer.createdAt, updatedAt: finalCustomer.updatedAt });
         let successMessage = "Business created successfully";
         if (isStarCustomer) {
             successMessage =
@@ -717,11 +717,11 @@ const createBusiness = (req, res, next) => __awaiter(void 0, void 0, void 0, fun
 });
 exports.createBusiness = createBusiness;
 const updateBusiness = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q;
     try {
         const { id } = req.params;
         const updateData = req.body;
-        const { displayName, name, customerNumber, companyLabelPrintLogo, contactEmail, contactPhoneNumber, isDeviceMaker, isStarCustomer, starCustomerEmail, starBusinessDetails, } = updateData;
+        const { displayName, name, customerNumber, companyLabelPrintLogo, contactEmail, contactPhoneNumber, isDeviceMaker, isStarCustomer, starCustomerEmail, starBusinessDetails, street, addressAdditional, phone, vatTaxId, asanaLink, } = updateData;
         const user = req.user;
         const customerRepository = database_1.AppDataSource.getRepository(customers_1.Customer);
         const businessDetailsRepository = database_1.AppDataSource.getRepository(business_details_1.BusinessDetails);
@@ -848,10 +848,26 @@ const updateBusiness = (req, res, next) => __awaiter(void 0, void 0, void 0, fun
             if (contactPhoneNumber !== undefined) {
                 customer.contactPhoneNumber = contactPhoneNumber.trim();
             }
+            else if (phone !== undefined) {
+                customer.contactPhoneNumber = phone ? phone.trim() : undefined;
+            }
+            if (vatTaxId !== undefined) {
+                customer.vatTaxId = vatTaxId ? vatTaxId.trim() : undefined;
+            }
+            if (asanaLink !== undefined) {
+                customer.asanaLink = asanaLink ? asanaLink.trim() : null;
+            }
+            if (addressAdditional !== undefined) {
+                customer.addressLine2 = addressAdditional ? addressAdditional.trim() : undefined;
+            }
             if (customer.businessDetails) {
                 const businessDetails = customer.businessDetails;
-                if (updateData.address !== undefined)
+                if (street !== undefined) {
+                    businessDetails.address = street ? street.trim() : undefined;
+                }
+                else if (updateData.address !== undefined) {
                     businessDetails.address = updateData.address.trim();
+                }
                 if (updateData.website !== undefined) {
                     businessDetails.website = updateData.website
                         ? normalizeWebsite(updateData.website)
@@ -859,8 +875,6 @@ const updateBusiness = (req, res, next) => __awaiter(void 0, void 0, void 0, fun
                 }
                 if (updateData.description !== undefined)
                     businessDetails.description = updateData.description.trim();
-                // Internal note (preferred field from the Relationships UI) is stored
-                // in businessDetails.description. Sending an empty note clears it.
                 if (updateData.note !== undefined) {
                     const trimmedNote = String((_a = updateData.note) !== null && _a !== void 0 ? _a : "").trim();
                     businessDetails.description = trimmedNote ? trimmedNote : "";
@@ -877,8 +891,12 @@ const updateBusiness = (req, res, next) => __awaiter(void 0, void 0, void 0, fun
                     businessDetails.latitude = sanitizeNumber(updateData.latitude);
                 if (updateData.longitude !== undefined)
                     businessDetails.longitude = sanitizeNumber(updateData.longitude);
-                if (updateData.phoneNumber !== undefined)
+                if (phone !== undefined) {
+                    businessDetails.contactPhone = phone ? phone.trim() : undefined;
+                }
+                else if (updateData.phoneNumber !== undefined) {
                     businessDetails.contactPhone = updateData.phoneNumber.trim();
+                }
                 if (updateData.email !== undefined) {
                     const trimmedEmail = updateData.email.trim()
                         ? updateData.email.trim().toLowerCase()
@@ -1014,8 +1032,8 @@ const updateBusiness = (req, res, next) => __awaiter(void 0, void 0, void 0, fun
         if (!finalCustomer) {
             return next(new errorHandler_1.default("Business not found after update", 404));
         }
-        const _o = finalCustomer.businessDetails || {}, { id: detailsId } = _o, businessDetailsWithoutId = __rest(_o, ["id"]);
-        const businessResponse = Object.assign(Object.assign({ id: finalCustomer.id, displayName: finalCustomer.companyName, companyName: finalCustomer.companyName, name: finalCustomer.companyName, legalName: finalCustomer.legalName, customerNumber: finalCustomer.customerNumber, companyLabelPrintLogo: finalCustomer.companyLabelPrintLogo, email: finalCustomer.email, contactEmail: finalCustomer.contactEmail, contactPhoneNumber: finalCustomer.contactPhoneNumber, stage: finalCustomer.stage }, businessDetailsWithoutId), { note: (_e = finalCustomer.businessDetails) === null || _e === void 0 ? void 0 : _e.description, check_by: ((_f = finalCustomer.businessDetails) === null || _f === void 0 ? void 0 : _f.check_by)
+        const _r = finalCustomer.businessDetails || {}, { id: detailsId } = _r, businessDetailsWithoutId = __rest(_r, ["id"]);
+        const businessResponse = Object.assign(Object.assign({ id: finalCustomer.id, displayName: finalCustomer.companyName, companyName: finalCustomer.companyName, name: finalCustomer.companyName, legalName: finalCustomer.legalName, customerNumber: finalCustomer.customerNumber, companyLabelPrintLogo: finalCustomer.companyLabelPrintLogo, asanaLink: finalCustomer.asanaLink, email: finalCustomer.email, contactEmail: finalCustomer.contactEmail, contactPhoneNumber: finalCustomer.contactPhoneNumber, stage: finalCustomer.stage }, businessDetailsWithoutId), { address: (_e = finalCustomer.businessDetails) === null || _e === void 0 ? void 0 : _e.address, street: (_f = finalCustomer.businessDetails) === null || _f === void 0 ? void 0 : _f.address, addressAdditional: finalCustomer.addressLine2, note: (_g = finalCustomer.businessDetails) === null || _g === void 0 ? void 0 : _g.description, check_by: ((_h = finalCustomer.businessDetails) === null || _h === void 0 ? void 0 : _h.check_by)
                 ? {
                     id: finalCustomer.businessDetails.check_by.id,
                     name: finalCustomer.businessDetails.check_by.name,
@@ -1043,7 +1061,7 @@ const updateBusiness = (req, res, next) => __awaiter(void 0, void 0, void 0, fun
                     id: defaultList.id,
                     name: defaultList.name,
                 }
-                : undefined, website: (_g = finalCustomer.businessDetails) === null || _g === void 0 ? void 0 : _g.website, hasWebsite: !!((_h = finalCustomer.businessDetails) === null || _h === void 0 ? void 0 : _h.website), phoneNumber: (_j = finalCustomer.businessDetails) === null || _j === void 0 ? void 0 : _j.contactPhone, businessEmail: (_k = finalCustomer.businessDetails) === null || _k === void 0 ? void 0 : _k.email, status: exports.BUSINESS_STATUS.ACTIVE, source: (_l = finalCustomer.businessDetails) === null || _l === void 0 ? void 0 : _l.businessSource, isDeviceMaker: (_m = finalCustomer.businessDetails) === null || _m === void 0 ? void 0 : _m.isDeviceMaker, isStarCustomer: !!finalCustomer.starCustomerDetails, tags: finalCustomer.tags, tagOrder: finalCustomer.tagOrder, createdAt: finalCustomer.createdAt, updatedAt: finalCustomer.updatedAt });
+                : undefined, website: (_j = finalCustomer.businessDetails) === null || _j === void 0 ? void 0 : _j.website, hasWebsite: !!((_k = finalCustomer.businessDetails) === null || _k === void 0 ? void 0 : _k.website), phoneNumber: (_l = finalCustomer.businessDetails) === null || _l === void 0 ? void 0 : _l.contactPhone, phone: (_m = finalCustomer.businessDetails) === null || _m === void 0 ? void 0 : _m.contactPhone, businessEmail: (_o = finalCustomer.businessDetails) === null || _o === void 0 ? void 0 : _o.email, status: exports.BUSINESS_STATUS.ACTIVE, source: (_p = finalCustomer.businessDetails) === null || _p === void 0 ? void 0 : _p.businessSource, isDeviceMaker: (_q = finalCustomer.businessDetails) === null || _q === void 0 ? void 0 : _q.isDeviceMaker, isStarCustomer: !!finalCustomer.starCustomerDetails, vatTaxId: finalCustomer.vatTaxId, tags: finalCustomer.tags, tagOrder: finalCustomer.tagOrder, createdAt: finalCustomer.createdAt, updatedAt: finalCustomer.updatedAt });
         let successMessage = "Business updated successfully";
         if (isStarCustomer && tempPassword) {
             successMessage =
@@ -1074,7 +1092,7 @@ const updateBusiness = (req, res, next) => __awaiter(void 0, void 0, void 0, fun
 });
 exports.updateBusiness = updateBusiness;
 const getBusinessById = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v, _w;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y;
     try {
         const { id } = req.params;
         const customerRepository = database_1.AppDataSource.getRepository(customers_1.Customer);
@@ -1099,6 +1117,7 @@ const getBusinessById = (req, res, next) => __awaiter(void 0, void 0, void 0, fu
             name: customer.companyName,
             customerNumber: customer.customerNumber,
             companyLabelPrintLogo: customer.companyLabelPrintLogo,
+            asanaLink: customer.asanaLink,
             email: customer.email,
             contactEmail: customer.contactEmail,
             contactPhoneNumber: customer.contactPhoneNumber,
@@ -1150,25 +1169,29 @@ const getBusinessById = (req, res, next) => __awaiter(void 0, void 0, void 0, fu
             website: (_a = customer.businessDetails) === null || _a === void 0 ? void 0 : _a.website,
             hasWebsite: !!((_b = customer.businessDetails) === null || _b === void 0 ? void 0 : _b.website),
             phoneNumber: (_c = customer.businessDetails) === null || _c === void 0 ? void 0 : _c.contactPhone,
-            businessEmail: (_d = customer.businessDetails) === null || _d === void 0 ? void 0 : _d.email,
-            address: (_e = customer.businessDetails) === null || _e === void 0 ? void 0 : _e.address,
-            city: (_f = customer.businessDetails) === null || _f === void 0 ? void 0 : _f.city,
-            state: (_g = customer.businessDetails) === null || _g === void 0 ? void 0 : _g.state,
-            country: (_h = customer.businessDetails) === null || _h === void 0 ? void 0 : _h.country,
-            postalCode: (_j = customer.businessDetails) === null || _j === void 0 ? void 0 : _j.postalCode,
-            latitude: (_k = customer.businessDetails) === null || _k === void 0 ? void 0 : _k.latitude,
-            longitude: (_l = customer.businessDetails) === null || _l === void 0 ? void 0 : _l.longitude,
-            googleMapsUrl: (_m = customer.businessDetails) === null || _m === void 0 ? void 0 : _m.googleMapsUrl,
-            reviewCount: (_o = customer.businessDetails) === null || _o === void 0 ? void 0 : _o.reviewCount,
-            category: (_p = customer.businessDetails) === null || _p === void 0 ? void 0 : _p.category,
-            additionalCategories: (_q = customer.businessDetails) === null || _q === void 0 ? void 0 : _q.additionalCategories,
-            socialMedia: (_r = customer.businessDetails) === null || _r === void 0 ? void 0 : _r.socialLinks,
-            source: (_s = customer.businessDetails) === null || _s === void 0 ? void 0 : _s.businessSource,
-            isDeviceMaker: (_t = customer.businessDetails) === null || _t === void 0 ? void 0 : _t.isDeviceMaker,
-            isStarCustomer: (_u = customer.businessDetails) === null || _u === void 0 ? void 0 : _u.isStarCustomer,
-            check_timestamp: (_v = customer.businessDetails) === null || _v === void 0 ? void 0 : _v.check_timestamp,
-            note: (_w = customer.businessDetails) === null || _w === void 0 ? void 0 : _w.description,
+            phone: (_d = customer.businessDetails) === null || _d === void 0 ? void 0 : _d.contactPhone,
+            businessEmail: (_e = customer.businessDetails) === null || _e === void 0 ? void 0 : _e.email,
+            address: (_f = customer.businessDetails) === null || _f === void 0 ? void 0 : _f.address,
+            street: (_g = customer.businessDetails) === null || _g === void 0 ? void 0 : _g.address,
+            addressAdditional: customer.addressLine2,
+            city: (_h = customer.businessDetails) === null || _h === void 0 ? void 0 : _h.city,
+            state: (_j = customer.businessDetails) === null || _j === void 0 ? void 0 : _j.state,
+            country: (_k = customer.businessDetails) === null || _k === void 0 ? void 0 : _k.country,
+            postalCode: (_l = customer.businessDetails) === null || _l === void 0 ? void 0 : _l.postalCode,
+            latitude: (_m = customer.businessDetails) === null || _m === void 0 ? void 0 : _m.latitude,
+            longitude: (_o = customer.businessDetails) === null || _o === void 0 ? void 0 : _o.longitude,
+            googleMapsUrl: (_p = customer.businessDetails) === null || _p === void 0 ? void 0 : _p.googleMapsUrl,
+            reviewCount: (_q = customer.businessDetails) === null || _q === void 0 ? void 0 : _q.reviewCount,
+            category: (_r = customer.businessDetails) === null || _r === void 0 ? void 0 : _r.category,
+            additionalCategories: (_s = customer.businessDetails) === null || _s === void 0 ? void 0 : _s.additionalCategories,
+            socialMedia: (_t = customer.businessDetails) === null || _t === void 0 ? void 0 : _t.socialLinks,
+            source: (_u = customer.businessDetails) === null || _u === void 0 ? void 0 : _u.businessSource,
+            isDeviceMaker: (_v = customer.businessDetails) === null || _v === void 0 ? void 0 : _v.isDeviceMaker,
+            isStarCustomer: (_w = customer.businessDetails) === null || _w === void 0 ? void 0 : _w.isStarCustomer,
+            check_timestamp: (_x = customer.businessDetails) === null || _x === void 0 ? void 0 : _x.check_timestamp,
+            note: (_y = customer.businessDetails) === null || _y === void 0 ? void 0 : _y.description,
             status: exports.BUSINESS_STATUS.ACTIVE,
+            vatTaxId: customer.vatTaxId,
             tags: customer.tags,
             tagOrder: customer.tagOrder,
             createdAt: customer.createdAt,
@@ -1307,9 +1330,9 @@ const getAllBusinesses = (req, res, next) => __awaiter(void 0, void 0, void 0, f
         queryBuilder.orderBy(orderByField, orderDirection);
         const customers = yield queryBuilder.skip(skip).take(limitNum).getMany();
         const businesses = customers.map((customer) => {
-            var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l;
-            const _m = customer.businessDetails || {}, { id: businessId } = _m, businessDetailsWithoutId = __rest(_m, ["id"]);
-            return Object.assign(Object.assign({ id: customer.id, companyName: customer.companyName, displayName: customer.companyName, legalName: customer.legalName, name: customer.companyName, customerNumber: customer.customerNumber, companyLabelPrintLogo: customer.companyLabelPrintLogo, email: customer.email, contactEmail: customer.contactEmail, contactPhoneNumber: customer.contactPhoneNumber, stage: customer.stage }, businessDetailsWithoutId), { address: (_a = customer.businessDetails) === null || _a === void 0 ? void 0 : _a.address, city: (_b = customer.businessDetails) === null || _b === void 0 ? void 0 : _b.city, state: (_c = customer.businessDetails) === null || _c === void 0 ? void 0 : _c.state, country: (_d = customer.businessDetails) === null || _d === void 0 ? void 0 : _d.country, postalCode: (_e = customer.businessDetails) === null || _e === void 0 ? void 0 : _e.postalCode, website: (_f = customer.businessDetails) === null || _f === void 0 ? void 0 : _f.website, hasWebsite: !!((_g = customer.businessDetails) === null || _g === void 0 ? void 0 : _g.website), phoneNumber: (_h = customer.businessDetails) === null || _h === void 0 ? void 0 : _h.contactPhone, businessEmail: (_j = customer.businessDetails) === null || _j === void 0 ? void 0 : _j.email, note: (_k = customer.businessDetails) === null || _k === void 0 ? void 0 : _k.description, status: exports.BUSINESS_STATUS.ACTIVE, source: (_l = customer.businessDetails) === null || _l === void 0 ? void 0 : _l.businessSource, tags: customer.tags, tagOrder: customer.tagOrder, createdAt: customer.createdAt, updatedAt: customer.updatedAt });
+            var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o;
+            const _p = customer.businessDetails || {}, { id: businessId } = _p, businessDetailsWithoutId = __rest(_p, ["id"]);
+            return Object.assign(Object.assign({ id: customer.id, companyName: customer.companyName, displayName: customer.companyName, legalName: customer.legalName, name: customer.companyName, customerNumber: customer.customerNumber, companyLabelPrintLogo: customer.companyLabelPrintLogo, asanaLink: customer.asanaLink, email: customer.email, contactEmail: customer.contactEmail, contactPhoneNumber: customer.contactPhoneNumber, stage: customer.stage }, businessDetailsWithoutId), { address: (_a = customer.businessDetails) === null || _a === void 0 ? void 0 : _a.address, street: (_b = customer.businessDetails) === null || _b === void 0 ? void 0 : _b.address, addressAdditional: customer.addressLine2, city: (_c = customer.businessDetails) === null || _c === void 0 ? void 0 : _c.city, state: (_d = customer.businessDetails) === null || _d === void 0 ? void 0 : _d.state, country: (_e = customer.businessDetails) === null || _e === void 0 ? void 0 : _e.country, postalCode: (_f = customer.businessDetails) === null || _f === void 0 ? void 0 : _f.postalCode, website: (_g = customer.businessDetails) === null || _g === void 0 ? void 0 : _g.website, hasWebsite: !!((_h = customer.businessDetails) === null || _h === void 0 ? void 0 : _h.website), phoneNumber: (_j = customer.businessDetails) === null || _j === void 0 ? void 0 : _j.contactPhone, phone: (_k = customer.businessDetails) === null || _k === void 0 ? void 0 : _k.contactPhone, businessEmail: (_l = customer.businessDetails) === null || _l === void 0 ? void 0 : _l.email, note: (_m = customer.businessDetails) === null || _m === void 0 ? void 0 : _m.description, status: exports.BUSINESS_STATUS.ACTIVE, source: (_o = customer.businessDetails) === null || _o === void 0 ? void 0 : _o.businessSource, vatTaxId: customer.vatTaxId, tags: customer.tags, tagOrder: customer.tagOrder, createdAt: customer.createdAt, updatedAt: customer.updatedAt });
         });
         return res.status(200).json({
             success: true,

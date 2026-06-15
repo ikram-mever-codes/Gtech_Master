@@ -234,10 +234,9 @@ export const getAllCargos = async (
     }
 
     if (availableOnly === "true") {
-      qb.andWhere("cargo.cargo_status != 'Shipped'");
       qb.leftJoin(Invoice, "invoice", "invoice.orderNumber = cargo.cargo_no");
       qb.andWhere(
-        "(invoice.id IS NULL OR invoice.status NOT IN ('sent', 'paid', 'overdue', 'cancelled'))",
+        "(cargo.cargo_status = 'Open' OR (cargo.cargo_status != 'Shipped' AND cargo.cargo_status != 'Delivered' AND (invoice.id IS NULL OR invoice.status NOT IN ('sent', 'paid', 'overdue', 'cancelled'))))",
       );
     }
 

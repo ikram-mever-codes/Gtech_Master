@@ -202,9 +202,8 @@ const getAllCargos = (req, res, next) => __awaiter(void 0, void 0, void 0, funct
             qb.andWhere("cargo.cargo_status IN (:...statuses)", { statuses });
         }
         if (availableOnly === "true") {
-            qb.andWhere("cargo.cargo_status != 'Shipped'");
             qb.leftJoin(invoice_1.Invoice, "invoice", "invoice.orderNumber = cargo.cargo_no");
-            qb.andWhere("(invoice.id IS NULL OR invoice.status NOT IN ('sent', 'paid', 'overdue', 'cancelled'))");
+            qb.andWhere("(cargo.cargo_status = 'Open' OR (cargo.cargo_status != 'Shipped' AND cargo.cargo_status != 'Delivered' AND (invoice.id IS NULL OR invoice.status NOT IN ('sent', 'paid', 'overdue', 'cancelled'))))");
         }
         if (search) {
             qb.andWhere("(cargo.cargo_no LIKE :search OR cargo.note LIKE :search OR cargo.remark LIKE :search OR cargo.cargo_status LIKE :search)", { search: `%${search}%` });
@@ -404,6 +403,26 @@ const assignOrdersToCargo = (req, res, next) => __awaiter(void 0, void 0, void 0
         }
         const cargoOrderRepo = database_1.AppDataSource.getRepository(cargo_orders_1.CargoOrder);
         const { isSplitMove } = req.body;
+        const oldCargoIds = [];
+        const orderItemRepo = database_1.AppDataSource.getRepository(order_items_1.OrderItem);
+        const orderRepo = database_1.AppDataSource.getRepository(orders_1.Order);
+        if (validOrderIds.length > 0 && !isSplitMove) {
+            const ordersForOldCargos = yield orderRepo.find({ where: { id: (0, typeorm_1.In)(validOrderIds) } });
+            for (const o of ordersForOldCargos) {
+                if (o.cargo_id && !oldCargoIds.includes(o.cargo_id)) {
+                    oldCargoIds.push(o.cargo_id);
+                }
+                const items = yield orderItemRepo.find({ where: { order_id: o.id } });
+                for (const item of items) {
+                    if (item.cargo_id && !oldCargoIds.includes(item.cargo_id)) {
+                        oldCargoIds.push(item.cargo_id);
+                    }
+                }
+            }
+            yield cargoOrderRepo.delete({
+                order_id: (0, typeorm_1.In)(validOrderIds)
+            });
+        }
         const existing = yield cargoOrderRepo.find({
             where: { cargo_id: cargo.id },
         });
@@ -417,29 +436,20 @@ const assignOrdersToCargo = (req, res, next) => __awaiter(void 0, void 0, void 0
         if (newEntries.length > 0) {
             yield cargoOrderRepo.save(newEntries);
         }
-        const orderItemRepo = database_1.AppDataSource.getRepository(order_items_1.OrderItem);
-        const orderRepo = database_1.AppDataSource.getRepository(orders_1.Order);
         if (validOrderIds.length > 0 && !isSplitMove) {
             const orders = yield orderRepo.find({ where: { id: (0, typeorm_1.In)(validOrderIds) } });
             for (const order of orders) {
-                const oldCargoId = order.cargo_id;
-                const qb = orderItemRepo
+                yield orderItemRepo
                     .createQueryBuilder()
                     .update(order_items_1.OrderItem)
                     .set({ cargo_id: cargo.id })
-                    .where("order_id = :orderId", { orderId: order.id });
-                if (oldCargoId) {
-                    qb.andWhere("cargo_id = :oldCargoId", { oldCargoId });
-                }
-                else {
-                    qb.andWhere("cargo_id IS NULL");
-                }
-                yield qb.execute();
+                    .where("order_id = :orderId", { orderId: order.id })
+                    .execute();
                 order.cargo_id = cargo.id;
                 yield orderRepo.save(order);
             }
         }
-        yield (0, exports.generateInvoicesForOrders)(validOrderIds);
+        yield (0, exports.generateInvoicesForOrders)(validOrderIds, oldCargoIds);
         res.status(200).json({
             success: true,
             message: `Assigned ${newEntries.length} order(s) to cargo`,

@@ -373,7 +373,6 @@ export const getItems = async (
           "si_filter",
           "si_filter.item_id = item.id AND si_filter.is_default = 'Y'",
         );
-        queryBuilder.andWhere("item.isActive = 'Y'");
         queryBuilder.andWhere(
           "(item.supplier_id IS NULL OR item.supplier_id = 0)",
         );
@@ -386,12 +385,11 @@ export const getItems = async (
           "si_filter",
           "si_filter.item_id = item.id AND si_filter.is_default = 'Y'",
         );
-        queryBuilder.andWhere("item.isActive = 'Y'");
         queryBuilder.andWhere(
           "(si_filter.price_rmb IS NULL OR si_filter.price_rmb = 0)",
         );
       } else if (filterStr === "is_po_no_url_null") {
-        queryBuilder.leftJoin(
+        queryBuilder.innerJoin(
           "supplier_item",
           "si_filter",
           "si_filter.item_id = item.id AND si_filter.is_default = 'Y'",
@@ -401,7 +399,7 @@ export const getItems = async (
           "(si_filter.url IS NULL OR si_filter.url = '' OR si_filter.url = 'null' OR si_filter.url = 'NULL')",
         );
       } else if (filterStr === "is_po_null") {
-        queryBuilder.leftJoin(
+        queryBuilder.innerJoin(
           "supplier_item",
           "si_filter",
           "si_filter.item_id = item.id AND si_filter.is_default = 'Y'",
@@ -412,7 +410,6 @@ export const getItems = async (
       } else if (filterStr === "new_picture_required") {
         queryBuilder.andWhere("item.is_npr = 'Y'");
       } else if (filterStr === "no_picture") {
-        queryBuilder.andWhere("item.isActive = 'Y'");
         queryBuilder.andWhere(
           "(item.photo IS NULL OR item.photo = '' OR item.photo = 'null' OR item.photo = 'NULL')",
         );

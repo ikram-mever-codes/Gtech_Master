@@ -30,6 +30,7 @@ const typeorm_1 = require("typeorm");
 const errorHandler_1 = __importDefault(require("../utils/errorHandler"));
 const users_1 = require("../models/users");
 const dataFilter_1 = require("../utils/dataFilter");
+const customers_1 = require("../models/customers");
 const getRMBPriceFromSupplier = (itemId, supplierId) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const supplierItemRepository = database_1.AppDataSource.getRepository(supplier_items_1.SupplierItem);
@@ -147,12 +148,17 @@ const getItems = (req, res, next) => __awaiter(void 0, void 0, void 0, function*
         if (isNaN(limitNum))
             limitNum = 50;
         const skip = (pageNum - 1) * limitNum;
-        const queryBuilder = itemRepository.createQueryBuilder("item")
+        const queryBuilder = itemRepository
+            .createQueryBuilder("item")
             .leftJoinAndSelect("item.tags", "tags");
         if (tags) {
             const tagIds = tags.split(",");
-            const includeTagIds = tagIds.filter((id) => !id.startsWith("!")).map((id) => id.trim());
-            const excludeTagIds = tagIds.filter((id) => id.startsWith("!")).map((id) => id.substring(1).trim());
+            const includeTagIds = tagIds
+                .filter((id) => !id.startsWith("!"))
+                .map((id) => id.trim());
+            const excludeTagIds = tagIds
+                .filter((id) => id.startsWith("!"))
+                .map((id) => id.substring(1).trim());
             if (includeTagIds.length > 0) {
                 queryBuilder.andWhere((qb) => {
                     const subQuery = qb
@@ -280,29 +286,26 @@ const getItems = (req, res, next) => __awaiter(void 0, void 0, void 0, function*
             }
             else if (filterStr === "no_supplier") {
                 queryBuilder.leftJoin("supplier_item", "si_filter", "si_filter.item_id = item.id AND si_filter.is_default = 'Y'");
-                queryBuilder.andWhere("item.isActive = 'Y'");
                 queryBuilder.andWhere("(item.supplier_id IS NULL OR item.supplier_id = 0)");
                 queryBuilder.andWhere("(si_filter.supplier_id IS NULL OR si_filter.supplier_id = 0)");
             }
             else if (filterStr === "no_rmb_price") {
                 queryBuilder.leftJoin("supplier_item", "si_filter", "si_filter.item_id = item.id AND si_filter.is_default = 'Y'");
-                queryBuilder.andWhere("item.isActive = 'Y'");
                 queryBuilder.andWhere("(si_filter.price_rmb IS NULL OR si_filter.price_rmb = 0)");
             }
             else if (filterStr === "is_po_no_url_null") {
-                queryBuilder.leftJoin("supplier_item", "si_filter", "si_filter.item_id = item.id AND si_filter.is_default = 'Y'");
+                queryBuilder.innerJoin("supplier_item", "si_filter", "si_filter.item_id = item.id AND si_filter.is_default = 'Y'");
                 queryBuilder.andWhere("si_filter.is_po = 'No'");
                 queryBuilder.andWhere("(si_filter.url IS NULL OR si_filter.url = '' OR si_filter.url = 'null' OR si_filter.url = 'NULL')");
             }
             else if (filterStr === "is_po_null") {
-                queryBuilder.leftJoin("supplier_item", "si_filter", "si_filter.item_id = item.id AND si_filter.is_default = 'Y'");
+                queryBuilder.innerJoin("supplier_item", "si_filter", "si_filter.item_id = item.id AND si_filter.is_default = 'Y'");
                 queryBuilder.andWhere("(si_filter.is_po IS NULL OR si_filter.is_po = '' OR si_filter.is_po = 'null' OR si_filter.is_po = 'NULL')");
             }
             else if (filterStr === "new_picture_required") {
                 queryBuilder.andWhere("item.is_npr = 'Y'");
             }
             else if (filterStr === "no_picture") {
-                queryBuilder.andWhere("item.isActive = 'Y'");
                 queryBuilder.andWhere("(item.photo IS NULL OR item.photo = '' OR item.photo = 'null' OR item.photo = 'NULL')");
             }
             else if (filterStr === "multiple_parents_pictures") {
@@ -413,7 +416,7 @@ const getItems = (req, res, next) => __awaiter(void 0, void 0, void 0, function*
             });
         }
         const formattedItems = items.map((item) => {
-            var _a, _b, _c;
+            var _a, _b, _c, _d;
             const parentData = item.parent_id ? parentMap.get(item.parent_id) : null;
             const taricData = item.taric_id ? taricMap.get(item.taric_id) : null;
             const warehouseData = (item.ItemID_DE ? warehouseByItemIdDE.get(item.ItemID_DE) : null) ||
@@ -437,7 +440,7 @@ const getItems = (req, res, next) => __awaiter(void 0, void 0, void 0, function*
                 parent_id: item.parent_id || null,
                 taric_id: item.taric_id || null,
                 category_id: item.cat_id || null,
-                category: (item === null || item === void 0 ? void 0 : item.supp_cat) || null,
+                category: (item.cat_id ? (_b = catMap.get(item.cat_id)) === null || _b === void 0 ? void 0 : _b.name : null) || item.supp_cat || null,
                 supplier_id: effectiveSupplierId,
                 supplier_name: (supplierData === null || supplierData === void 0 ? void 0 : supplierData.company_name) || (supplierData === null || supplierData === void 0 ? void 0 : supplierData.name) || null,
                 weight: item.weight,
@@ -454,8 +457,8 @@ const getItems = (req, res, next) => __awaiter(void 0, void 0, void 0, function*
                 is_dimension_special: item.is_dimension_special,
                 is_npr: item.is_npr,
                 ship_class: (warehouseData === null || warehouseData === void 0 ? void 0 : warehouseData.ship_class) || null,
-                is_po: ((_b = supplierItems.find((si) => si.item_id === item.id && si.is_default === "Y")) === null || _b === void 0 ? void 0 : _b.is_po) || null,
-                url: ((_c = supplierItems.find((si) => si.item_id === item.id && si.is_default === "Y")) === null || _c === void 0 ? void 0 : _c.url) || null,
+                is_po: ((_c = supplierItems.find((si) => si.item_id === item.id && si.is_default === "Y")) === null || _c === void 0 ? void 0 : _c.is_po) || null,
+                url: ((_d = supplierItems.find((si) => si.item_id === item.id && si.is_default === "Y")) === null || _d === void 0 ? void 0 : _d.url) || null,
                 rmb_price: rmbPriceMap.get(item.id) || null,
                 price: item.price,
                 transfer_price_EUR: item.transfer_price_EUR,
@@ -494,7 +497,7 @@ const getItems = (req, res, next) => __awaiter(void 0, void 0, void 0, function*
 });
 exports.getItems = getItems;
 const getItemById = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _0, _1, _2, _3, _4, _5, _6;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _0, _1, _2, _3, _4, _5, _6, _7;
     try {
         const { id } = req.params;
         if (!id) {
@@ -515,6 +518,7 @@ const getItemById = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
         const qualityRepository = database_1.AppDataSource.getRepository(item_qualities_1.ItemQuality);
         const orderItemRepository = database_1.AppDataSource.getRepository(order_items_1.OrderItem);
         const supplierItemRepository = database_1.AppDataSource.getRepository(supplier_items_1.SupplierItem);
+        const customerRepository = database_1.AppDataSource.getRepository(customers_1.Customer);
         const item = yield itemRepository.findOne({
             where: { id: parseInt(id) },
             relations: ["parent", "taric", "category", "supplier", "tags"],
@@ -585,6 +589,19 @@ const getItemById = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
         catch (e) {
             console.warn("supplier_items table not available:", e.message);
         }
+        // Load the linked customer (if any). Done defensively so a missing
+        // customer_id column or customers table never breaks item loading.
+        let customer = null;
+        try {
+            if ((_a = item === null || item === void 0 ? void 0 : item.customer) === null || _a === void 0 ? void 0 : _a.id) {
+                customer = yield customerRepository.findOne({
+                    where: { id: item.customer.id },
+                });
+            }
+        }
+        catch (e) {
+            console.warn("customers table not available:", e.message);
+        }
         const primaryWarehouseItem = warehouseItems[0] || null;
         let attachments = [];
         try {
@@ -596,9 +613,9 @@ const getItemById = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
         catch (e) {
             console.warn("library_files table not available:", e.message);
         }
-        const de_no = (primaryWarehouseItem === null || primaryWarehouseItem === void 0 ? void 0 : primaryWarehouseItem.item_no_de) || ((_a = item.parent) === null || _a === void 0 ? void 0 : _a.de_no) || "";
+        const de_no = (primaryWarehouseItem === null || primaryWarehouseItem === void 0 ? void 0 : primaryWarehouseItem.item_no_de) || ((_b = item.parent) === null || _b === void 0 ? void 0 : _b.de_no) || "";
         const ean = item.ean || (primaryWarehouseItem === null || primaryWarehouseItem === void 0 ? void 0 : primaryWarehouseItem.ean) || "";
-        const rmbPrice = yield (0, exports.getRMBPriceFromSupplier)(parseInt(id), (_b = item.supplier_id) !== null && _b !== void 0 ? _b : undefined);
+        const rmbPrice = yield (0, exports.getRMBPriceFromSupplier)(parseInt(id), (_c = item.supplier_id) !== null && _c !== void 0 ? _c : undefined);
         const formattedItem = {
             id: item.id,
             de_no: de_no,
@@ -615,7 +632,18 @@ const getItemById = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
             model: item.model || "",
             remark: item.remark || "",
             supplier_id: item.supplier_id,
-            supplier_name: ((_c = item.supplier) === null || _c === void 0 ? void 0 : _c.company_name) || ((_d = item.supplier) === null || _d === void 0 ? void 0 : _d.name) || "",
+            supplier_name: ((_d = item.supplier) === null || _d === void 0 ? void 0 : _d.company_name) || ((_e = item.supplier) === null || _e === void 0 ? void 0 : _e.name) || "",
+            customer_id: item.customer_id || null,
+            customer_name: (customer === null || customer === void 0 ? void 0 : customer.companyName) || "",
+            customer: customer
+                ? {
+                    id: customer.id,
+                    companyName: customer.companyName,
+                    legalName: customer.legalName || "",
+                    customerNumber: customer.customerNumber || "",
+                    email: customer.email || "",
+                }
+                : null,
             painPoints: item.painPoints || [],
             isActive: primaryWarehouseItem ? primaryWarehouseItem.is_active === "Y" : item.isActive === "Y",
             tags: item.tags || [],
@@ -626,11 +654,11 @@ const getItemById = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
                 ? Number(item.transfer_price_EUR).toFixed(2)
                 : "null",
             parent: {
-                noDE: ((_e = item.parent) === null || _e === void 0 ? void 0 : _e.de_no) || item.parent_no_de || "",
-                nameDE: ((_f = item.parent) === null || _f === void 0 ? void 0 : _f.name_de) || "",
-                nameEN: ((_g = item.parent) === null || _g === void 0 ? void 0 : _g.name_en) || "",
-                isActive: ((_h = item.parent) === null || _h === void 0 ? void 0 : _h.is_active) === "Y",
-                isSpecialItem: ((_j = item.parent) === null || _j === void 0 ? void 0 : _j.is_NwV) === "Y",
+                noDE: ((_f = item.parent) === null || _f === void 0 ? void 0 : _f.de_no) || item.parent_no_de || "",
+                nameDE: ((_g = item.parent) === null || _g === void 0 ? void 0 : _g.name_de) || "",
+                nameEN: ((_h = item.parent) === null || _h === void 0 ? void 0 : _h.name_en) || "",
+                isActive: ((_j = item.parent) === null || _j === void 0 ? void 0 : _j.is_active) === "Y",
+                isSpecialItem: ((_k = item.parent) === null || _k === void 0 ? void 0 : _k.is_NwV) === "Y",
                 priceEUR: 0,
                 priceRMB: rmbPrice || 0,
                 isEURSpecial: item.is_eur_special || "N",
@@ -638,53 +666,53 @@ const getItemById = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
                 isDimensionSpecial: item.is_dimension_special || "N",
             },
             dimensions: {
-                isbn: ((_k = item.ISBN) === null || _k === void 0 ? void 0 : _k.toString()) || "0",
-                weight: ((_l = item.weight) === null || _l === void 0 ? void 0 : _l.toString()) || "0",
-                length: ((_m = item.length) === null || _m === void 0 ? void 0 : _m.toString()) || "0",
-                width: ((_o = item.width) === null || _o === void 0 ? void 0 : _o.toString()) || "0",
-                height: ((_p = item.height) === null || _p === void 0 ? void 0 : _p.toString()) || "0",
+                isbn: ((_l = item.ISBN) === null || _l === void 0 ? void 0 : _l.toString()) || "0",
+                weight: ((_m = item.weight) === null || _m === void 0 ? void 0 : _m.toString()) || "0",
+                length: ((_o = item.length) === null || _o === void 0 ? void 0 : _o.toString()) || "0",
+                width: ((_p = item.width) === null || _p === void 0 ? void 0 : _p.toString()) || "0",
+                height: ((_q = item.height) === null || _q === void 0 ? void 0 : _q.toString()) || "0",
             },
             variationsDE: {
                 variations: [
-                    (_q = item.parent) === null || _q === void 0 ? void 0 : _q.var_de_1,
-                    (_r = item.parent) === null || _r === void 0 ? void 0 : _r.var_de_2,
-                    (_s = item.parent) === null || _s === void 0 ? void 0 : _s.var_de_3,
+                    (_r = item.parent) === null || _r === void 0 ? void 0 : _r.var_de_1,
+                    (_s = item.parent) === null || _s === void 0 ? void 0 : _s.var_de_2,
+                    (_t = item.parent) === null || _t === void 0 ? void 0 : _t.var_de_3,
                 ].filter(Boolean),
                 values: variationValues.map((v) => v.value_de).filter(Boolean),
             },
             variationsEN: {
                 variations: [
-                    (_t = item.parent) === null || _t === void 0 ? void 0 : _t.var_en_1,
-                    (_u = item.parent) === null || _u === void 0 ? void 0 : _u.var_en_2,
-                    (_v = item.parent) === null || _v === void 0 ? void 0 : _v.var_en_3,
+                    (_u = item.parent) === null || _u === void 0 ? void 0 : _u.var_en_1,
+                    (_v = item.parent) === null || _v === void 0 ? void 0 : _v.var_en_2,
+                    (_w = item.parent) === null || _w === void 0 ? void 0 : _w.var_en_3,
                 ].filter(Boolean),
                 values: variationValues.map((v) => v.value_en).filter(Boolean),
             },
             others: {
-                taricCode: ((_w = item.taric) === null || _w === void 0 ? void 0 : _w.code) || "",
+                taricCode: ((_x = item.taric) === null || _x === void 0 ? void 0 : _x.code) || "",
                 isQTYdiv: item.is_qty_dividable === "Y",
-                mc: ((_x = item.many_components) === null || _x === void 0 ? void 0 : _x.toString()) || "0",
-                er: ((_y = item.effort_rating) === null || _y === void 0 ? void 0 : _y.toString()) || "0",
+                mc: ((_y = item.many_components) === null || _y === void 0 ? void 0 : _y.toString()) || "0",
+                er: ((_z = item.effort_rating) === null || _z === void 0 ? void 0 : _z.toString()) || "0",
                 isMeter: item.is_meter_item === 1,
                 isPU: item.is_pu_item === 1,
                 isNPR: item.is_npr || "N",
                 isNew: item.is_new || "N",
-                warehouseItem: ((_z = primaryWarehouseItem === null || primaryWarehouseItem === void 0 ? void 0 : primaryWarehouseItem.id) === null || _z === void 0 ? void 0 : _z.toString()) || "",
-                idDE: ((_0 = item.ItemID_DE) === null || _0 === void 0 ? void 0 : _0.toString()) || "",
+                warehouseItem: ((_0 = primaryWarehouseItem === null || primaryWarehouseItem === void 0 ? void 0 : primaryWarehouseItem.id) === null || _0 === void 0 ? void 0 : _0.toString()) || "",
+                idDE: ((_1 = item.ItemID_DE) === null || _1 === void 0 ? void 0 : _1.toString()) || "",
                 noDE: (primaryWarehouseItem === null || primaryWarehouseItem === void 0 ? void 0 : primaryWarehouseItem.item_no_de) || item.parent_no_de || "",
-                nameDE: (primaryWarehouseItem === null || primaryWarehouseItem === void 0 ? void 0 : primaryWarehouseItem.item_name_de) || ((_1 = item.parent) === null || _1 === void 0 ? void 0 : _1.name_de) || "",
-                nameEN: (primaryWarehouseItem === null || primaryWarehouseItem === void 0 ? void 0 : primaryWarehouseItem.item_name_en) || ((_2 = item.parent) === null || _2 === void 0 ? void 0 : _2.name_en) || "",
+                nameDE: (primaryWarehouseItem === null || primaryWarehouseItem === void 0 ? void 0 : primaryWarehouseItem.item_name_de) || ((_2 = item.parent) === null || _2 === void 0 ? void 0 : _2.name_de) || "",
+                nameEN: (primaryWarehouseItem === null || primaryWarehouseItem === void 0 ? void 0 : primaryWarehouseItem.item_name_en) || ((_3 = item.parent) === null || _3 === void 0 ? void 0 : _3.name_en) || "",
                 isActive: primaryWarehouseItem ? primaryWarehouseItem.is_active === "Y" : item.isActive === "Y",
                 isStock: warehouseItems.some((wi) => (wi.stock_qty || 0) > 0),
                 qty: warehouseItems
                     .reduce((sum, wi) => sum + (wi.stock_qty || 0), 0)
                     .toString(),
-                msq: ((_3 = primaryWarehouseItem === null || primaryWarehouseItem === void 0 ? void 0 : primaryWarehouseItem.msq) === null || _3 === void 0 ? void 0 : _3.toString()) || "0",
+                msq: ((_4 = primaryWarehouseItem === null || primaryWarehouseItem === void 0 ? void 0 : primaryWarehouseItem.msq) === null || _4 === void 0 ? void 0 : _4.toString()) || "0",
                 isNAO: (primaryWarehouseItem === null || primaryWarehouseItem === void 0 ? void 0 : primaryWarehouseItem.is_no_auto_order) === "Y",
-                buffer: ((_4 = primaryWarehouseItem === null || primaryWarehouseItem === void 0 ? void 0 : primaryWarehouseItem.buffer) === null || _4 === void 0 ? void 0 : _4.toString()) || "0",
+                buffer: ((_5 = primaryWarehouseItem === null || primaryWarehouseItem === void 0 ? void 0 : primaryWarehouseItem.buffer) === null || _5 === void 0 ? void 0 : _5.toString()) || "0",
                 isSnSI: (primaryWarehouseItem === null || primaryWarehouseItem === void 0 ? void 0 : primaryWarehouseItem.is_SnSI) === "Y",
-                foq: ((_5 = item.FOQ) === null || _5 === void 0 ? void 0 : _5.toString()) || "0",
-                fsq: ((_6 = item.FSQ) === null || _6 === void 0 ? void 0 : _6.toString()) || "0",
+                foq: ((_6 = item.FOQ) === null || _6 === void 0 ? void 0 : _6.toString()) || "0",
+                fsq: ((_7 = item.FSQ) === null || _7 === void 0 ? void 0 : _7.toString()) || "0",
                 rmbPrice: (rmbPrice === null || rmbPrice === void 0 ? void 0 : rmbPrice.toString()) || "0",
                 isDimensionSpecial: item.is_dimension_special || "N",
                 pixPath: item.pix_path || "",
@@ -992,6 +1020,7 @@ const updateItem = (req, res, next) => __awaiter(void 0, void 0, void 0, functio
             "taric_id",
             "cat_id",
             "supplier_id",
+            "customer_id",
             "weight",
             "length",
             "width",
@@ -1054,9 +1083,15 @@ const updateItem = (req, res, next) => __awaiter(void 0, void 0, void 0, functio
                 if (siData.id > 0) {
                     yield supplierItemRepository.update(siData.id, {
                         is_default: siData.isDefault ? "Y" : "N",
-                        price_rmb: siData.priceRMB !== undefined && siData.priceRMB !== "" ? parseFloat(siData.priceRMB) : undefined,
-                        moq: siData.moq !== undefined && siData.moq !== "" ? parseInt(siData.moq) : undefined,
-                        oi: siData.interval !== undefined && siData.interval !== "" ? parseInt(siData.interval) : undefined,
+                        price_rmb: siData.priceRMB !== undefined && siData.priceRMB !== ""
+                            ? parseFloat(siData.priceRMB)
+                            : undefined,
+                        moq: siData.moq !== undefined && siData.moq !== ""
+                            ? parseInt(siData.moq)
+                            : undefined,
+                        oi: siData.interval !== undefined && siData.interval !== ""
+                            ? parseInt(siData.interval)
+                            : undefined,
                         lead_time: siData.leadTime !== undefined ? siData.leadTime : undefined,
                         url: siData.url !== undefined ? siData.url : undefined,
                         note_cn: siData.noteCN !== undefined ? siData.noteCN : undefined,
@@ -1390,57 +1425,59 @@ const bulkUpdateItems = (req, res, next) => __awaiter(void 0, void 0, void 0, fu
         if (!updates || typeof updates !== "object") {
             return next(new errorHandler_1.default("Updates object is required", 400));
         }
+        const parsedIds = ids
+            .map((id) => parseInt(id))
+            .filter((id) => !isNaN(id));
+        if (parsedIds.length === 0) {
+            return next(new errorHandler_1.default("No valid Item IDs provided", 400));
+        }
         const itemRepository = database_1.AppDataSource.getRepository(items_1.Item);
-        const updatedItems = [];
-        for (const id of ids) {
-            const item = yield itemRepository.findOne({
-                where: { id: parseInt(id) },
+        const warehouseRepository = database_1.AppDataSource.getRepository(warehouse_items_1.WarehouseItem);
+        const itemUpdatePayload = {
+            is_updated: true,
+            updated_at: new Date(),
+        };
+        const allowedItemFields = ["isActive", "cat_id", "supplier_id", "taric_id"];
+        allowedItemFields.forEach((field) => {
+            if (updates[field] !== undefined) {
+                itemUpdatePayload[field] = updates[field];
+            }
+        });
+        yield itemRepository
+            .createQueryBuilder()
+            .update(items_1.Item)
+            .set(itemUpdatePayload)
+            .where("id IN (:...parsedIds)", { parsedIds })
+            .execute();
+        if (updates.isActive !== undefined) {
+            yield warehouseRepository
+                .createQueryBuilder()
+                .update(warehouse_items_1.WarehouseItem)
+                .set({ is_active: updates.isActive })
+                .where("item_id IN (:...parsedIds)", { parsedIds })
+                .execute();
+            const itemsWithDE = yield itemRepository.find({
+                where: { id: (0, typeorm_1.In)(parsedIds) },
+                select: ["id", "ItemID_DE"],
             });
-            if (item) {
-                let hasChanges = false;
-                Object.keys(updates).forEach((key) => {
-                    if (key in item && key !== "id") {
-                        const currentValue = item[key];
-                        const newValue = updates[key];
-                        if (currentValue !== newValue) {
-                            hasChanges = true;
-                            item[key] = newValue;
-                        }
-                    }
-                });
-                if (hasChanges) {
-                    item.is_updated = true;
-                    item.updated_at = new Date();
-                    yield itemRepository.save(item);
-                    if (updates.isActive !== undefined) {
-                        const warehouseRepository = database_1.AppDataSource.getRepository(warehouse_items_1.WarehouseItem);
-                        const whereConditions = [{ item_id: item.id }];
-                        if (item.ItemID_DE) {
-                            whereConditions.push({ ItemID_DE: item.ItemID_DE });
-                        }
-                        const warehouseItems = yield warehouseRepository.find({
-                            where: whereConditions,
-                        });
-                        for (const wi of warehouseItems) {
-                            wi.is_active = updates.isActive;
-                            yield warehouseRepository.save(wi);
-                        }
-                    }
-                    updatedItems.push(item);
-                }
+            const deIds = itemsWithDE
+                .map((i) => i.ItemID_DE)
+                .filter((id) => !!id);
+            if (deIds.length > 0) {
+                yield warehouseRepository
+                    .createQueryBuilder()
+                    .update(warehouse_items_1.WarehouseItem)
+                    .set({ is_active: updates.isActive })
+                    .where('"ItemID_DE" IN (:...deIds)', { deIds })
+                    .execute();
             }
         }
         return res.status(200).json({
             success: true,
-            message: `${updatedItems.length} items updated successfully`,
+            message: `${parsedIds.length} items updated successfully`,
             data: {
-                count: updatedItems.length,
-                items: updatedItems.map((item) => ({
-                    id: item.id,
-                    item_name: item.item_name,
-                    isActive: item.isActive,
-                    is_updated: item.is_updated,
-                })),
+                count: parsedIds.length,
+                items: parsedIds.map((id) => ({ id, isActive: updates.isActive })),
             },
         });
     }

@@ -1157,8 +1157,8 @@ export const generateLabelPDF = async (
     });
 
     const barcodeValue = (
-      warehouseItem?.ean?.toString() ||
       resolvedItem?.ean?.toString() ||
+      warehouseItem?.ean?.toString() ||
       ""
     ).trim();
     if (barcodeValue && barcodeValue !== "-") {

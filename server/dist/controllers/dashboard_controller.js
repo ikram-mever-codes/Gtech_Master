@@ -89,51 +89,81 @@ const getAuditReports = (req, res) => __awaiter(void 0, void 0, void 0, function
                 console.warn("ExchangeRate-API offline, using cached fallbacks.");
             }
         }
+        const activeItemSql = `(
+      EXISTS (SELECT 1 FROM warehouse_item wi WHERE (wi.item_id = item.id OR (wi."ItemID_DE" = item."ItemID_DE" AND item."ItemID_DE" IS NOT NULL)) AND wi.is_active = 'Y')
+      OR
+      (NOT EXISTS (SELECT 1 FROM warehouse_item wi WHERE wi.item_id = item.id OR (wi."ItemID_DE" = item."ItemID_DE" AND item."ItemID_DE" IS NOT NULL)) AND item.isActive = 'Y')
+    )`;
         const [unassignedCargoCount, purchaseProblemsCount, checkProblemsCount, rmbSpecialNoValueCount, eurSpecialNoValueCount, dimensionSpecialNoValueCount, missingVarValuesEnCount, noTaricCodeCount, mismatchedTaricsCount, nullCategoryCount, wrongShippingClassCount, itemsWithoutSuppliersCount, itemsWithoutRmbPriceCount, isPoNoUrlNullCount, supplierItemsIsPoNullCount, newPictureRequiredCount, itemsWithoutPictureCount, multipleParentsPicturesRaw,] = yield Promise.all([
             database_1.AppDataSource.getRepository(order_items_1.OrderItem)
                 .createQueryBuilder("oi")
+                .innerJoin("oi.order", "o")
                 .where("oi.cargo_id IS NULL OR oi.cargo_id = 0")
                 .getCount(),
             database_1.AppDataSource.getRepository(order_items_1.OrderItem)
                 .createQueryBuilder("oi")
+                .innerJoin("oi.order", "o")
                 .where("oi.problems IS NOT NULL AND oi.problems != '' AND (oi.problems LIKE :p1 OR oi.problems LIKE :p2 OR oi.status LIKE :p1)", { p1: "%purchase%", p2: "%buy%" })
                 .getCount(),
             database_1.AppDataSource.getRepository(order_items_1.OrderItem)
                 .createQueryBuilder("oi")
+                .innerJoin("oi.order", "o")
                 .where("oi.problems IS NOT NULL AND oi.problems != '' AND (oi.problems LIKE :p1 OR oi.problems LIKE :p2 OR oi.status LIKE :p1)", { p1: "%check%", p2: "%verify%" })
                 .getCount(),
-            database_1.AppDataSource.getRepository(items_1.Item)
-                .createQueryBuilder("item")
+            database_1.AppDataSource.getRepository(order_items_1.OrderItem)
+                .createQueryBuilder("oi")
+                .innerJoin("oi.order", "o")
+                .innerJoin("oi.item", "item")
                 .leftJoin("supplier_item", "si", "si.item_id = item.id AND si.is_default = 'Y'")
                 .where("item.is_rmb_special = 'Y'")
                 .andWhere("(si.price_rmb IS NULL OR si.price_rmb = 0)")
                 .getCount(),
-            database_1.AppDataSource.getRepository(items_1.Item)
-                .createQueryBuilder("item")
+            database_1.AppDataSource.getRepository(order_items_1.OrderItem)
+                .createQueryBuilder("oi")
+                .innerJoin("oi.order", "o")
+                .innerJoin("oi.item", "item")
                 .where("item.is_eur_special = 'Y'")
                 .andWhere("(item.price IS NULL OR item.price = 0 OR item.transfer_price_EUR IS NULL OR item.transfer_price_EUR = 0)")
                 .getCount(),
-            database_1.AppDataSource.getRepository(items_1.Item)
-                .createQueryBuilder("item")
+            database_1.AppDataSource.getRepository(order_items_1.OrderItem)
+                .createQueryBuilder("oi")
+                .innerJoin("oi.order", "o")
+                .innerJoin("oi.item", "item")
                 .where("item.is_dimension_special = 'Y'")
                 .andWhere("(item.weight IS NULL OR item.weight = 0 OR item.length IS NULL OR item.length = 0 OR item.width IS NULL OR item.width = 0 OR item.height IS NULL OR item.height = 0)")
                 .getCount(),
-            database_1.AppDataSource.getRepository(variation_values_1.VariationValue)
-                .createQueryBuilder("vv")
-                .where("(vv.value_de IS NOT NULL AND vv.value_de != '' AND (vv.value_en IS NULL OR vv.value_en = '')) OR (vv.value_de_2 IS NOT NULL AND vv.value_de_2 != '' AND (vv.value_en_2 IS NULL OR vv.value_en_2 = '')) OR (vv.value_de_3 IS NOT NULL AND vv.value_de_3 != '' AND (vv.value_en_3 IS NULL OR vv.value_en_3 = ''))")
+            database_1.AppDataSource.getRepository(items_1.Item)
+                .createQueryBuilder("item")
+                .where(activeItemSql)
+                .andWhere((qb) => {
+                const subQuery = qb
+                    .subQuery()
+                    .select("1")
+                    .from(variation_values_1.VariationValue, "vv")
+                    .where("vv.item_id = item.id")
+                    .andWhere("((vv.value_de IS NOT NULL AND vv.value_de != '' AND (vv.value_en IS NULL OR vv.value_en = '')) OR " +
+                    "(vv.value_de_2 IS NOT NULL AND vv.value_de_2 != '' AND (vv.value_en_2 IS NULL OR vv.value_en_2 = '')) OR " +
+                    "(vv.value_de_3 IS NOT NULL AND vv.value_de_3 != '' AND (vv.value_en_3 IS NULL OR vv.value_en_3 = '')))");
+                return `EXISTS ${subQuery.getQuery()}`;
+            })
                 .getCount(),
             database_1.AppDataSource.getRepository(items_1.Item)
                 .createQueryBuilder("item")
-                .where("item.taric_id IS NULL OR item.taric_id = 0")
+                .where(activeItemSql)
+                .andWhere("(item.taric_id IS NULL OR item.taric_id = 0)")
                 .getCount(),
             database_1.AppDataSource.getRepository(items_1.Item)
                 .createQueryBuilder("item")
-                .innerJoin("parent", "p", "p.id = item.parent_id")
-                .where("item.taric_id IS NOT NULL AND p.taric_id IS NOT NULL AND item.taric_id <> p.taric_id")
+                .innerJoin("item.parent", "p")
+                .where(activeItemSql)
+                .andWhere("item.taric_id IS NOT NULL AND item.taric_id != 0")
+                .andWhere("p.taric_id IS NOT NULL AND p.taric_id != 0")
+                .andWhere("item.taric_id <> p.taric_id")
                 .getCount(),
             database_1.AppDataSource.getRepository(items_1.Item)
                 .createQueryBuilder("item")
-                .where("item.cat_id IS NULL OR item.cat_id = 0")
+                .where(activeItemSql)
+                .andWhere("(item.cat_id IS NULL OR item.cat_id = 0)")
                 .getCount(),
             database_1.AppDataSource.getRepository(warehouse_items_1.WarehouseItem)
                 .createQueryBuilder("wi")
@@ -142,47 +172,55 @@ const getAuditReports = (req, res) => __awaiter(void 0, void 0, void 0, function
             database_1.AppDataSource.getRepository(items_1.Item)
                 .createQueryBuilder("item")
                 .leftJoin("supplier_item", "si", "si.item_id = item.id AND si.is_default = 'Y'")
-                .where("item.isActive = 'Y'")
+                .where(activeItemSql)
                 .andWhere("(item.supplier_id IS NULL OR item.supplier_id = 0)")
                 .andWhere("(si.supplier_id IS NULL OR si.supplier_id = 0)")
                 .getCount(),
             database_1.AppDataSource.getRepository(items_1.Item)
                 .createQueryBuilder("item")
                 .leftJoin("supplier_item", "si", "si.item_id = item.id AND si.is_default = 'Y'")
-                .where("item.isActive = 'Y'")
+                .where(activeItemSql)
                 .andWhere("(si.price_rmb IS NULL OR si.price_rmb = 0)")
                 .getCount(),
             database_1.AppDataSource.getRepository(items_1.Item)
                 .createQueryBuilder("item")
                 .innerJoin("supplier_item", "si", "si.item_id = item.id AND si.is_default = 'Y'")
-                .where("item.isActive = 'Y'")
+                .where(activeItemSql)
                 .andWhere("si.is_po = 'No'")
                 .andWhere("(si.url IS NULL OR si.url = '' OR si.url = 'null' OR si.url = 'NULL')")
                 .getCount(),
             database_1.AppDataSource.getRepository(items_1.Item)
                 .createQueryBuilder("item")
                 .innerJoin("supplier_item", "si", "si.item_id = item.id AND si.is_default = 'Y'")
-                .where("item.isActive = 'Y'")
+                .where(activeItemSql)
                 .andWhere("(si.is_po IS NULL OR si.is_po = '' OR si.is_po = 'null' OR si.is_po = 'NULL')")
                 .getCount(),
             database_1.AppDataSource.getRepository(items_1.Item)
                 .createQueryBuilder("item")
-                .where("item.is_npr = 'Y'")
+                .where(activeItemSql)
+                .andWhere("item.is_npr = 'Y'")
                 .getCount(),
             database_1.AppDataSource.getRepository(items_1.Item)
                 .createQueryBuilder("item")
-                .where("item.isActive = 'Y'")
+                .where(activeItemSql)
                 .andWhere("(item.photo IS NULL OR item.photo = '' OR item.photo = 'null' OR item.photo = 'NULL')")
                 .getCount(),
             database_1.AppDataSource.getRepository(items_1.Item)
                 .createQueryBuilder("item")
-                .select("item.photo")
-                .where("item.photo IS NOT NULL AND item.photo != '' AND item.photo != 'null' AND item.photo != 'NULL' AND item.parent_id IS NOT NULL")
-                .groupBy("item.photo")
-                .having("COUNT(DISTINCT item.parent_id) > 1")
-                .getRawMany(),
+                .where(activeItemSql)
+                .andWhere((qb) => {
+                const subQuery = qb
+                    .subQuery()
+                    .select("sub_item.photo")
+                    .from(items_1.Item, "sub_item")
+                    .where("sub_item.photo IS NOT NULL AND sub_item.photo != '' AND sub_item.photo != 'null' AND sub_item.photo != 'NULL' AND sub_item.parent_id IS NOT NULL")
+                    .groupBy("sub_item.photo")
+                    .having("COUNT(DISTINCT sub_item.parent_id) > 1");
+                return `item.photo IN ${subQuery.getQuery()}`;
+            })
+                .getCount(),
         ]);
-        const multipleParentsPicturesCount = multipleParentsPicturesRaw.length;
+        const multipleParentsPicturesCount = multipleParentsPicturesRaw;
         let unusedPicturesCount = 0;
         try {
             const uploadDir = path_1.default.join(process.cwd(), "uploads");
