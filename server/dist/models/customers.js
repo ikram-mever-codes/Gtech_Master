@@ -17,6 +17,7 @@ const star_business_details_1 = require("./star_business_details");
 const star_customer_details_1 = require("./star_customer_details");
 const inquiry_1 = require("./inquiry");
 const tags_1 = require("./tags");
+const items_1 = require("./items");
 let Customer = class Customer {
     populateDetails() {
         if (this.businessDetails) {
@@ -62,6 +63,10 @@ __decorate([
     (0, typeorm_1.Column)({ nullable: true }),
     __metadata("design:type", String)
 ], Customer.prototype, "legalName", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ nullable: true }),
+    __metadata("design:type", String)
+], Customer.prototype, "asanaLink", void 0);
 __decorate([
     (0, typeorm_1.Column)({ nullable: true }),
     __metadata("design:type", String)
@@ -137,6 +142,10 @@ __decorate([
     (0, typeorm_1.OneToMany)(() => inquiry_1.Inquiry, (inquiry) => inquiry.customer),
     __metadata("design:type", inquiry_1.Inquiry)
 ], Customer.prototype, "inquiries", void 0);
+__decorate([
+    (0, typeorm_1.OneToMany)(() => items_1.Item, (item) => item.customer),
+    __metadata("design:type", Array)
+], Customer.prototype, "items", void 0);
 __decorate([
     (0, typeorm_1.CreateDateColumn)(),
     __metadata("design:type", Date)

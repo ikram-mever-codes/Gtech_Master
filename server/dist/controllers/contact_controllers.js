@@ -77,10 +77,7 @@ const sanitizeDecisionMakerState = (state) => {
 exports.sanitizeDecisionMakerState = sanitizeDecisionMakerState;
 const createContactPerson = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { sex, starBusinessDetailsId, 
-        // The Relationships UI also sends the customer id under `businessId`;
-        // accept either so a contact can be attached to ANY business.
-        businessId, name, familyName, position, positionOthers, email, phone, linkedInLink, noteContactPreference, stateLinkedIn = exports.LINKEDIN_STATES.OPEN, contact, decisionMakerState, note, decisionMakerNote, isDecisionMaker, } = req.body;
+        const { sex, starBusinessDetailsId, businessId, name, familyName, position, positionOthers, email, phone, linkedInLink, noteContactPreference, stateLinkedIn = exports.LINKEDIN_STATES.OPEN, contact, decisionMakerState, note, decisionMakerNote, isDecisionMaker, } = req.body;
         const businessRef = starBusinessDetailsId || businessId;
         if (!businessRef || !name || !familyName) {
             return next(new errorHandler_1.default("Business reference, name, and family name are required", 400));
@@ -90,14 +87,10 @@ const createContactPerson = (req, res, next) => __awaiter(void 0, void 0, void 0
         }
         const contactPersonRepository = database_1.AppDataSource.getRepository(contact_person_1.ContactPerson);
         const starBusinessDetailsRepository = database_1.AppDataSource.getRepository(star_business_details_1.StarBusinessDetails);
-        // 1) Try to resolve the reference as a StarBusinessDetails id directly.
         let starBusinessDetails = yield starBusinessDetailsRepository.findOne({
             where: { id: businessRef },
             relations: ["customer"],
         });
-        // 2) Otherwise treat it as a Customer id. We attach contacts to ANY
-        //    business regardless of stage — if the customer has no
-        //    StarBusinessDetails yet, lazily create one as the contact anchor.
         if (!starBusinessDetails) {
             const customerRepository = database_1.AppDataSource.getRepository(customers_1.Customer);
             const customer = yield customerRepository.findOne({
@@ -109,12 +102,13 @@ const createContactPerson = (req, res, next) => __awaiter(void 0, void 0, void 0
                     starBusinessDetails = customer.starBusinessDetails;
                 }
                 else {
-                    // No stage check anymore — every business can hold contacts.
                     starBusinessDetails = starBusinessDetailsRepository.create({
                         customer: customer,
                     });
                     starBusinessDetails =
                         yield starBusinessDetailsRepository.save(starBusinessDetails);
+                    customer.starBusinessDetails = starBusinessDetails;
+                    yield customerRepository.save(customer);
                 }
             }
         }
@@ -135,8 +129,6 @@ const createContactPerson = (req, res, next) => __awaiter(void 0, void 0, void 0
         }
         const contactPerson = new contact_person_1.ContactPerson();
         contactPerson.sex = sanitizeSex(sex);
-        // FIX: store the RESOLVED StarBusinessDetails id, not the raw reference
-        // (which may have been a customer id).
         contactPerson.starBusinessDetailsId = actualStarBusinessDetailsId;
         contactPerson.starBusinessDetails = starBusinessDetails;
         contactPerson.name = name.trim();

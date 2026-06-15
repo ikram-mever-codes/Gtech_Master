@@ -6,9 +6,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const category_controller_1 = require("../controllers/category_controller");
 const router = express_1.default.Router();
-// category Routes
 router.get("/", category_controller_1.getCategories);
-// router.get("/:categoryId", getcategoryById);
-// router.put("/:categoryId", updatecategory);
-// router.delete("/:categoryId", deletecategory);
+router.post("/migrate-cleanup", category_controller_1.migrateAndCleanupCategories);
 exports.default = router;

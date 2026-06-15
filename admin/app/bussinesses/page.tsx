@@ -1606,27 +1606,25 @@ const CombinedBusinessContactsContent: React.FC = () => {
                       ? "Business Details"
                       : "Add New Business"}
                   </h2>
-                  {businessModalMode === "edit" && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const q =
-                          businessForm.legalName ||
-                          businessForm.companyName ||
-                          "";
-                        window.open(
-                          `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-                            q,
-                          )}`,
-                          "_blank",
-                        );
-                      }}
-                      className="text-rose-500 hover:text-rose-700 transition-colors p-1"
-                      title="Search on Google Maps"
-                    >
-                      <MapPinIcon className="w-5 h-5" />
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const q =
+                        businessForm.legalName ||
+                        businessForm.companyName ||
+                        "";
+                      window.open(
+                        `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                          q,
+                        )}`,
+                        "_blank",
+                      );
+                    }}
+                    className="text-rose-500 hover:text-rose-700 transition-colors p-1"
+                    title="Search on Google Maps"
+                  >
+                    <MapPinIcon className="w-5 h-5" />
+                  </button>
                 </div>
                 <div className="flex items-center gap-3">
                   <div className="flex flex-col items-end">
@@ -1688,11 +1686,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
 
               <div className="space-y-6">
                 <div className="rounded-xl p-4 -mx-4 bg-transparent">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-3">
-                    Business Information
-                  </h3>
                   <div className="grid grid-cols-6 gap-4">
-                    {/* Names row (3 across) */}
                     <div className="col-span-6 md:col-span-2">
                       <label className="block text-xs font-medium text-gray-700 mb-1">
                         Company Name (full legal name) *
@@ -1750,7 +1744,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
                         placeholder="Auto from web URL (between www. and next .)"
                       />
                     </div>
-                    {/* Address line 1 + Street (2 across) */}
                     <div className="col-span-6 md:col-span-3">
                       <label className="block text-xs font-medium text-gray-700 mb-1">
                         Address Additional Line
@@ -1787,7 +1780,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
                         placeholder="Musterstraße 12"
                       />
                     </div>
-                    {/* Postal / City / Country (3 across) */}
                     <div className="col-span-2">
                       <label className="block text-xs font-medium text-gray-700 mb-1">
                         Postal Code
@@ -1846,7 +1838,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
                         ))}
                       </select>
                     </div>
-                    {/* Email / Phone / Web (3 across) */}
                     <div className="col-span-3 md:col-span-2">
                       <label className="block text-xs font-medium text-gray-700 mb-1">
                         Email
@@ -1902,7 +1893,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
                         placeholder="https://www.muster.de"
                       />
                     </div>
-                    {/* VAT / Tax ID */}
                     <div className="col-span-3 md:col-span-2">
                       <label className="block text-xs font-medium text-gray-700 mb-1">
                         VAT / Tax ID
@@ -2695,8 +2685,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
                 </button>
               </div>
               <div className="bg-blue-50 rounded-lg p-4 max-w-full">
-                {" "}
-                {/* Optional: Add max-w to the container if you want it strictly bounded like the table cell */}
                 <div className="flex items-center gap-2 mb-2">
                   <span className="text-blue-500 text-xl">📝</span>
                   <h3 className="font-semibold text-gray-900">Note</h3>

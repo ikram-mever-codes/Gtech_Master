@@ -97,7 +97,7 @@ export default function Dashboard() {
   const handleNavigation = (category: string, type: string) => {
     if (category === "orders") {
       if (type === "unassigned_cargo") {
-        router.push(`/orders?tab=order_items&filter=${type}&hide_banner=true`);
+        router.push(`/invoices?tab=order_items&filter=${type}&hide_banner=true`);
       } else if (type === "purchase_problem" || type === "check_problem") {
         router.push(`/orders?tab=problems&filter=${type}&hide_banner=true`);
       } else if (
@@ -105,9 +105,9 @@ export default function Dashboard() {
         type === "eur_special_no_value" ||
         type === "dimension_special_no_value"
       ) {
-        router.push(`/orders?tab=order_items&filter=${type}&hide_banner=true`);
+        router.push(`/invoices?tab=order_items&filter=${type}&hide_banner=true`);
       } else {
-        router.push(`/orders?tab=order_items&filter=${type}&hide_banner=true`);
+        router.push(`/invoices?tab=order_items&filter=${type}&hide_banner=true`);
       }
     } else if (category === "items") {
       if (type === "wrong_shipping_class") {

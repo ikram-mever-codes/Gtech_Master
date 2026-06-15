@@ -1430,7 +1430,7 @@ const OrderPage: React.FC = () => {
       } else if (filterParam === "rmb_special_no_value") {
         allItems = allItems.filter((i: any) => {
           const it = i.item || {};
-          const price = it.rmb_price || it.RMB_Price || 0;
+          const price = i.rmb_price || it.rmb_price || it.RMB_Price || 0;
           return it.is_rmb_special === "Y" && (!price || parseFloat(String(price)) === 0);
         });
       } else if (filterParam === "eur_special_no_value") {

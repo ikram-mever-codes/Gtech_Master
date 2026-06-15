@@ -1024,7 +1024,7 @@ const InvoiceListPage: React.FC = () => {
   );
 
   const orderItemsFlat = useMemo(() => {
-    const allItems = orders.flatMap((o: any) =>
+    let allItems = orders.flatMap((o: any) =>
       (o.items || []).map((i: any) => ({
         ...i,
         order_id: o.id,
@@ -1038,6 +1038,43 @@ const InvoiceListPage: React.FC = () => {
       })),
     );
 
+    const filterParam = searchParams.get("filter");
+    if (filterParam) {
+      if (filterParam === "unassigned_cargo") {
+        allItems = allItems.filter((i: any) => !i.cargo_id || i.cargo_id === 0);
+      } else if (filterParam === "purchase_problem") {
+        allItems = allItems.filter((i: any) =>
+          (i.problems && i.problems !== "" && (i.problems.toLowerCase().includes("purchase") || i.problems.toLowerCase().includes("buy"))) ||
+          (i.status && String(i.status).toLowerCase().includes("purchase"))
+        );
+      } else if (filterParam === "check_problem") {
+        allItems = allItems.filter((i: any) =>
+          (i.problems && i.problems !== "" && (i.problems.toLowerCase().includes("check") || i.problems.toLowerCase().includes("verify")))
+        );
+      } else if (filterParam === "rmb_special_no_value") {
+        allItems = allItems.filter((i: any) => {
+          const it = i.item || {};
+          const price = i.rmb_price || it.rmb_price || it.RMB_Price || 0;
+          return it.is_rmb_special === "Y" && (!price || parseFloat(String(price)) === 0);
+        });
+      } else if (filterParam === "eur_special_no_value") {
+        allItems = allItems.filter((i: any) => {
+          const it = i.item || {};
+          const hasEUR = (it.price && parseFloat(String(it.price)) > 0) || (it.transfer_price_EUR && parseFloat(String(it.transfer_price_EUR)) > 0);
+          return it.is_eur_special === "Y" && !hasEUR;
+        });
+      } else if (filterParam === "dimension_special_no_value") {
+        allItems = allItems.filter((i: any) => {
+          const it = i.item || {};
+          const hasDim = (it.weight && parseFloat(String(it.weight)) > 0) &&
+                          (it.length && parseFloat(String(it.length)) > 0) &&
+                          (it.width && parseFloat(String(it.width)) > 0) &&
+                          (it.height && parseFloat(String(it.height)) > 0);
+          return it.is_dimension_special === "Y" && !hasDim;
+        });
+      }
+    }
+
     if (!orderNoFilter) return allItems;
     const s = orderNoFilter.toLowerCase();
     return allItems.filter((i) =>
@@ -1045,7 +1082,7 @@ const InvoiceListPage: React.FC = () => {
       String(i.ean || i.item?.ean || "").toLowerCase().includes(s) ||
       String(i.item_name || i.itemName || i.item?.item_name || "").toLowerCase().includes(s)
     );
-  }, [orders, orderNoFilter]);
+  }, [orders, orderNoFilter, searchParams]);
 
   const filteredOrders = useMemo(() => {
     if (!orderNoFilter) return orders;
@@ -1431,6 +1468,34 @@ const InvoiceListPage: React.FC = () => {
       style={{ backgroundColor: "#F8F9FA", color: "#212529" }}
     >
       <div className="w-full mx-auto p-0">
+        {searchParams.get("filter") && searchParams.get("hide_banner") !== "true" && (
+          <div className="mb-6 px-5 py-3 bg-[#FFF3CD] border border-[#FFEBA2] rounded-md text-[#856404] flex items-center justify-between text-sm shadow-sm animate-pulse">
+            <div className="flex items-center gap-2">
+              <span className="font-bold">⚠️ Reports & Control Health Audit View Active:</span>
+              <span className="font-semibold text-gray-800">
+                {(() => {
+                  switch (searchParams.get("filter")) {
+                    case "unassigned_cargo": return "Order items unassigned to cargo";
+                    case "rmb_special_no_value": return "RMB Special SET with no value";
+                    case "eur_special_no_value": return "EUR Special SET with no value";
+                    case "dimension_special_no_value": return "Dimension Special SET with no value";
+                    default: return searchParams.get("filter");
+                  }
+                })()}
+              </span>
+            </div>
+            <button
+              onClick={() => {
+                const params = new URLSearchParams(searchParams.toString());
+                params.delete("filter");
+                window.location.href = `/invoices?${params.toString()}`;
+              }}
+              className="px-3 py-1 bg-amber-800 hover:bg-amber-900 text-white rounded text-xs font-bold transition-all"
+            >
+              Clear Audit Filter
+            </button>
+          </div>
+        )}
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-3">
           <div>
             <PageHeader

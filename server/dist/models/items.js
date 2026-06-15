@@ -21,6 +21,7 @@ const purchase_prices_1 = require("./purchase_prices");
 const sales_prices_1 = require("./sales_prices");
 const item_qualities_1 = require("./item_qualities");
 const tags_1 = require("./tags");
+const customers_1 = require("./customers");
 let Item = class Item {
 };
 exports.Item = Item;
@@ -181,6 +182,10 @@ __decorate([
     __metadata("design:type", Number)
 ], Item.prototype, "supplier_id", void 0);
 __decorate([
+    (0, typeorm_1.Column)({ type: "uuid", nullable: true }),
+    __metadata("design:type", String)
+], Item.prototype, "customer_id", void 0);
+__decorate([
     (0, typeorm_1.Column)({ type: "boolean", default: false }),
     __metadata("design:type", Boolean)
 ], Item.prototype, "is_updated", void 0);
@@ -246,6 +251,11 @@ __decorate([
     (0, typeorm_1.JoinColumn)({ name: "supplier_id" }),
     __metadata("design:type", Object)
 ], Item.prototype, "supplier", void 0);
+__decorate([
+    (0, typeorm_1.ManyToOne)(() => customers_1.Customer, { nullable: true }),
+    (0, typeorm_1.JoinColumn)({ name: "customer_id" }),
+    __metadata("design:type", Object)
+], Item.prototype, "customer", void 0);
 __decorate([
     (0, typeorm_1.OneToMany)(() => order_items_1.OrderItem, (orderItem) => orderItem.item),
     __metadata("design:type", Array)
