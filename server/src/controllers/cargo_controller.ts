@@ -134,8 +134,8 @@ const syncInvoiceRecord = async (
   const manualTaricsList =
     uniqueCodes.length > 0
       ? await AppDataSource.getRepository(Taric).find({
-          where: { code: In(uniqueCodes) },
-        })
+        where: { code: In(uniqueCodes) },
+      })
       : [];
   const manualTaricMap = new Map(manualTaricsList.map((t) => [t.code, t]));
 
@@ -501,6 +501,27 @@ export const assignOrdersToCargo = async (
 
     const cargoOrderRepo = AppDataSource.getRepository(CargoOrder);
     const { isSplitMove } = req.body;
+    const oldCargoIds: number[] = [];
+    const orderItemRepo = AppDataSource.getRepository(OrderItem);
+    const orderRepo = AppDataSource.getRepository(Order);
+
+    if (validOrderIds.length > 0 && !isSplitMove) {
+      const ordersForOldCargos = await orderRepo.find({ where: { id: In(validOrderIds) } });
+      for (const o of ordersForOldCargos) {
+        if (o.cargo_id && !oldCargoIds.includes(o.cargo_id)) {
+          oldCargoIds.push(o.cargo_id);
+        }
+        const items = await orderItemRepo.find({ where: { order_id: o.id } });
+        for (const item of items) {
+          if (item.cargo_id && !oldCargoIds.includes(item.cargo_id)) {
+            oldCargoIds.push(item.cargo_id);
+          }
+        }
+      }
+      await cargoOrderRepo.delete({
+        order_id: In(validOrderIds)
+      });
+    }
 
     const existing = await cargoOrderRepo.find({
       where: { cargo_id: cargo.id },
@@ -520,33 +541,23 @@ export const assignOrdersToCargo = async (
       await cargoOrderRepo.save(newEntries);
     }
 
-    const orderItemRepo = AppDataSource.getRepository(OrderItem);
-    const orderRepo = AppDataSource.getRepository(Order);
-
     if (validOrderIds.length > 0 && !isSplitMove) {
       const orders = await orderRepo.find({ where: { id: In(validOrderIds) } });
 
       for (const order of orders) {
-        const oldCargoId = order.cargo_id;
-
-        const qb = orderItemRepo
+        await orderItemRepo
           .createQueryBuilder()
           .update(OrderItem)
           .set({ cargo_id: cargo.id })
-          .where("order_id = :orderId", { orderId: order.id });
+          .where("order_id = :orderId", { orderId: order.id })
+          .execute();
 
-        if (oldCargoId) {
-          qb.andWhere("cargo_id = :oldCargoId", { oldCargoId });
-        } else {
-          qb.andWhere("cargo_id IS NULL");
-        }
-        await qb.execute();
         order.cargo_id = cargo.id;
         await orderRepo.save(order);
       }
     }
 
-    await generateInvoicesForOrders(validOrderIds);
+    await generateInvoicesForOrders(validOrderIds, oldCargoIds);
 
     res.status(200).json({
       success: true,
