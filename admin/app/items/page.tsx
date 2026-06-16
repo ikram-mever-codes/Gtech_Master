@@ -83,7 +83,7 @@ import {
 } from "@/api/items";
 import { getAllSuppliers, Supplier } from "@/api/suppliers";
 import { getCategories } from "@/api/categories";
-import { loadingStyles, successStyles, errorStyles } from "@/utils/constants";
+import { loadingStyles, successStyles, errorStyles, BASE_URL } from "@/utils/constants";
 import { TagFilterSelector } from "@/components/Tags/TagFilterSelector";
 import { TagBadge, TagPickerInput, sortTags, type Tag } from "@/components/Tags/TagManager";
 import { syncEntityTags } from "@/api/tags";
@@ -979,32 +979,20 @@ const ItemsManagementPage: React.FC = () => {
       case "items":
         return (
           <>
-            <th className="px-4 py-3 text-left text-xs text-nowrap font-semibold text-gray-600 uppercase tracking-wider">
-              DE Number
+            <th className="px-2 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-[8%]">
+              Pic
             </th>
-            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-              EAN
-            </th>
-            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-[40%]">
               Name
             </th>
-            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-              English Name
+            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-[22%]">
+              Name DE / CN
             </th>
-            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-[12%] flex-shrink-0">
               Category
             </th>
-            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-              Status
-            </th>
-            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-              Sync Status
-            </th>
-            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-              Created
-            </th>
-            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-              Actions
+            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-[18%]">
+              Remark EN / CN
             </th>
           </>
         );
@@ -1131,6 +1119,27 @@ const ItemsManagementPage: React.FC = () => {
           const eanMatches =
             filters.search && matchesEANSearch(item.ean, filters.search);
           const isNewItem = item.is_new === "Y";
+          const resolveUrl = (url: string | null | undefined): string | null => {
+            if (!url) return null;
+            if (url.includes("cloudinary.com")) return url;
+            if (url.includes("/uploads/")) {
+              const fileName = url.split("/uploads/").pop();
+              try {
+                const apiOrigin = new URL(BASE_URL).origin;
+                return `${apiOrigin}/uploads/${fileName}`;
+              } catch {
+                return url;
+              }
+            }
+            return url;
+          };
+
+          const rawPic =
+            item.photo ||
+            item.pix_path_eBay ||
+            (item.pix_path ? item.pix_path.split(",").filter(Boolean)[0] : null) ||
+            null;
+          const thumbUrl = resolveUrl(rawPic);
 
           return (
             <tr
@@ -1141,8 +1150,7 @@ const ItemsManagementPage: React.FC = () => {
               className={`cursor-pointer transition-colors ${isNewItem
                 ? "bg-blue-50 hover:bg-blue-100 border-l-4 border-l-blue-400"
                 : "hover:bg-gray-50"
-                }`}
-            >
+                }`}>
               <td className="p-4" onClick={(e) => e.stopPropagation()}>
                 <input
                   type="checkbox"
@@ -1154,94 +1162,67 @@ const ItemsManagementPage: React.FC = () => {
                   className="w-4 h-4 text-primary focus:ring-primary border-gray-300 rounded"
                 />
               </td>
-              <td className="px-4 py-3">
-                <div className="font-medium text-gray-900">
-                  {item.de_no || "-"}
-                </div>
-              </td>
-              <td className="px-4 py-3">
-                <div
-                  className={`text-sm font-medium ${eanMatches ? "text-green-600 font-bold" : "text-gray-900"}`}
-                >
-                  {item.ean?.toString() || "-"}
-                  {eanMatches && (
-                    <span className="ml-2 text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
-                      Match
-                    </span>
+              <td className="px-2 py-2">
+                <div className="w-10 h-10 rounded-md overflow-hidden bg-gray-100 flex items-center justify-center border border-gray-200 flex-shrink-0">
+                  {thumbUrl ? (
+                    <img
+                      src={thumbUrl}
+                      alt="thumb"
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        const t = e.target as HTMLImageElement;
+                        t.style.display = "none";
+                      }}
+                    />
+                  ) : (
+                    <span className="text-gray-300 text-xs">—</span>
                   )}
                 </div>
               </td>
               <td className="px-4 py-3">
-                <div className="text-sm text-gray-900">
+                <div className="text-sm font-medium text-gray-900 break-words">
                   {item.item_name || "-"}
                 </div>
-              </td>
-              <td className="px-4 py-3">
-                <div className="text-sm text-gray-900">
-                  {item.name_en || "-"}
+                <div className="text-xs text-gray-500 mt-1 flex items-center gap-1.5 flex-wrap">
+                  <span className="font-semibold text-gray-700">{item.de_no || "-"}</span>
+                  {item.customer_name && (
+                    <>
+                      <span>-</span>
+                      <span className="text-blue-600 font-medium">{item.customer_name}</span>
+                    </>
+                  )}
+                  {item.isLabelPrint && (
+                    <>
+                      <span>-</span>
+                      <span className="px-1.5 py-0.5 text-xs font-semibold bg-amber-100 text-amber-700 border border-amber-200 rounded">label</span>
+                    </>
+                  )}
                 </div>
+                {eanMatches && (
+                  <div className="mt-1">
+                    <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
+                      EAN Match
+                    </span>
+                  </div>
+                )}
               </td>
               <td className="px-4 py-3">
-                <div className="text-sm text-gray-900">
-                  {item.category || "-"}
-                </div>
+                {(item.item_name_de || item.name_de) && (
+                  <div className="text-xs text-gray-700 font-medium break-words">{item.item_name_de || item.name_de}</div>
+                )}
+                {item.item_name_cn && (
+                  <div className="text-xs text-gray-500 mt-0.5 break-words">{item.item_name_cn}</div>
+                )}
+                {!item.item_name_de && !item.name_de && !item.item_name_cn && (
+                  <span className="text-gray-400">—</span>
+                )}
               </td>
               <td className="px-4 py-3">
-                <span
-                  className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusBadgeColor(
-                    item.is_active,
-                  )}`}
-                >
-                  {item.is_active === "Y" ? "Active" : "Inactive"}
-                </span>
+                <div className="text-xs text-gray-600">{item.category || "—"}</div>
               </td>
               <td className="px-4 py-3">
-                <span
-                  className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${item.is_updated
-                    ? "bg-yellow-100 text-yellow-700"
-                    : "bg-green-100 text-green-700"
-                    }`}
-                >
-                  {item.is_updated ? "Pending Sync" : "Synced"}
-                </span>
-              </td>
-
-              <td className="px-4 py-3">
-                <div className="text-sm text-gray-600 text-nowrap">
-                  {(() => {
-                    const d =
-                      item.created_at || item.synced_at || item.updated_at;
-                    if (!d || d === "0000-00-00 00:00:00") return "-";
-                    const dateObj = new Date(d);
-                    if (isNaN(dateObj.getTime())) return "-";
-                    return new Intl.DateTimeFormat("de-DE", {
-                      day: "2-digit",
-                      month: "2-digit",
-                      year: "numeric",
-                    }).format(dateObj);
-                  })()}
-                </div>
-              </td>
-              <td className="px-4 py-3">
-                <div className="flex gap-2">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleViewItem(item.id);
-                    }}
-                    className="text-blue-600 hover:text-blue-900 p-1"
-                  >
-                    <EyeIcon className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleEditItem(item.id);
-                    }}
-                    className="text-green-600 hover:text-green-900 p-1"
-                  >
-                    <EditIcon className="w-4 h-4" />
-                  </button>
+                <div className="text-xs text-gray-500 max-w-[250px] break-words" title={item.remark || ""}>
+                  {item.remark || "—"}
                 </div>
               </td>
             </tr>
@@ -1281,9 +1262,10 @@ const ItemsManagementPage: React.FC = () => {
             </td>
             <td className="px-4 py-3">
               <span
-                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusBadgeColor(
-                  parent.is_active,
-                )}`}
+                className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border transition-all duration-200 ${parent.is_active === "Y"
+                  ? "bg-emerald-50 text-emerald-700 border-emerald-200/60"
+                  : "bg-gray-50 text-gray-600 border-gray-200"
+                  }`}
               >
                 {parent.is_active === "Y" ? "Active" : "Inactive"}
               </span>
@@ -1303,14 +1285,15 @@ const ItemsManagementPage: React.FC = () => {
                 })()}
               </div>
             </td>
-            <td className="px-4 py-3">
-              <div className="flex gap-2">
+            <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center gap-1">
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
                     router.push(`/parents/${parent.id}`);
                   }}
-                  className="text-blue-600 hover:text-blue-900 p-1"
+                  className="p-1.5 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors border border-transparent hover:border-blue-100"
+                  title="View Details"
                 >
                   <EyeIcon className="w-4 h-4" />
                 </button>
@@ -1319,7 +1302,8 @@ const ItemsManagementPage: React.FC = () => {
                     e.stopPropagation();
                     router.push(`/parents/${parent.id}/edit`);
                   }}
-                  className="text-green-600 hover:text-green-900 p-1"
+                  className="p-1.5 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors border border-transparent hover:border-emerald-100"
+                  title="Edit"
                 >
                   <EditIcon className="w-4 h-4" />
                 </button>
@@ -1328,7 +1312,8 @@ const ItemsManagementPage: React.FC = () => {
                     e.stopPropagation();
                     handleDeleteParent(parent.id);
                   }}
-                  className="text-red-600 hover:text-red-900 p-1"
+                  className="p-1.5 text-rose-600 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors border border-transparent hover:border-rose-100"
+                  title="Delete"
                 >
                   <Delete className="w-4 h-4" />
                 </button>
@@ -1369,18 +1354,20 @@ const ItemsManagementPage: React.FC = () => {
             </td>
             <td className="px-4 py-3">
               <span
-                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusBadgeColor(
-                  warehouse.is_stock_item,
-                )}`}
+                className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border transition-all duration-200 ${warehouse.is_stock_item === "Y"
+                  ? "bg-emerald-50 text-emerald-700 border-emerald-200/60"
+                  : "bg-gray-50 text-gray-600 border-gray-200"
+                  }`}
               >
                 {warehouse.is_stock_item === "Y" ? "Yes" : "No"}
               </span>
             </td>
             <td className="px-4 py-3">
               <span
-                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusBadgeColor(
-                  warehouse.is_active,
-                )}`}
+                className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border transition-all duration-200 ${warehouse.is_active === "Y"
+                  ? "bg-emerald-50 text-emerald-700 border-emerald-200/60"
+                  : "bg-gray-50 text-gray-600 border-gray-200"
+                  }`}
               >
                 {warehouse.is_active === "Y" ? "Active" : "Inactive"}
               </span>
@@ -1517,14 +1504,14 @@ const ItemsManagementPage: React.FC = () => {
                 })()}
               </div>
             </td>
-            <td className="px-4 py-3">
-              <div className="flex gap-2">
+            <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center gap-1">
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
                     handleViewTaric(taric.id);
                   }}
-                  className="text-blue-600 hover:text-blue-900 p-1"
+                  className="p-1.5 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors border border-transparent hover:border-blue-100"
                   title="View Details"
                 >
                   <EyeIconOutline className="w-4 h-4" />
@@ -1534,7 +1521,7 @@ const ItemsManagementPage: React.FC = () => {
                     e.stopPropagation();
                     handleEditTaric(taric);
                   }}
-                  className="text-green-600 hover:text-green-900 p-1"
+                  className="p-1.5 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors border border-transparent hover:border-emerald-100"
                   title="Edit"
                 >
                   <PencilIcon className="w-4 h-4" />
@@ -1544,7 +1531,7 @@ const ItemsManagementPage: React.FC = () => {
                     e.stopPropagation();
                     handleDeleteTaric(taric.id);
                   }}
-                  className="text-red-600 hover:text-red-900 p-1"
+                  className="p-1.5 text-rose-600 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors border border-transparent hover:border-rose-100"
                   title="Delete"
                 >
                   <TrashIcon className="w-4 h-4" />
@@ -1843,114 +1830,109 @@ const ItemsManagementPage: React.FC = () => {
         {showFilters && (
           <div className="mb-6 p-5 bg-white border border-gray-200 rounded-xl space-y-4 shadow-sm">
             {activeTab === "items" ? (
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1 flex items-center gap-1">
-                      <Hash className="w-3.5 h-3.5 text-green-600" /> EAN Search
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        placeholder="Scan or type EAN..."
-                        value={filters.eanSearch}
-                        onChange={(e) =>
-                          setFilters({ ...filters, eanSearch: e.target.value })
-                        }
-                        className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
-                      />
-                      {filters.eanSearch && (
-                        <button
-                          onClick={() => setFilters({ ...filters, eanSearch: "" })}
-                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500"
-                        >
-                          <XMarkIcon className="w-4 h-4" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">
-                      Status
-                    </label>
-                    <select
-                      value={filters.isActive}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-end">
+                <div className="lg:col-span-2">
+                  <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1 flex items-center gap-1">
+                    <Hash className="w-3.5 h-3.5 text-green-600" /> EAN Search
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="Scan or type EAN..."
+                      value={filters.eanSearch}
                       onChange={(e) =>
-                        setFilters({ ...filters, isActive: e.target.value })
+                        setFilters({ ...filters, eanSearch: e.target.value })
                       }
                       className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
-                    >
-                      <option value="">All Status</option>
-                      <option value="Y">Active</option>
-                      <option value="N">Inactive</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">
-                      Category
-                    </label>
-                    <select
-                      value={filters.category}
-                      onChange={(e) =>
-                        setFilters({ ...filters, category: e.target.value })
-                      }
-                      className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
-                    >
-                      <option value="">All Categories</option>
-                      {Array.from(
-                        new Set(
-                          categories.map((c) => c.name?.toString().trim()),
-                        ),
-                      )
-                        .filter(Boolean)
-                        .sort()
-                        .map((name) => {
-                          return (
-                            <option key={name} value={name}>
-                              {name}
-                            </option>
-                          );
-                        })}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">
-                      Supplier
-                    </label>
-                    <select
-                      value={filters.supplier}
-                      onChange={(e) =>
-                        setFilters({ ...filters, supplier: e.target.value })
-                      }
-                      className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
-                    >
-                      <option value="">All Suppliers</option>
-                      {suppliers.map((s) => (
-                        <option key={s.id} value={s.id.toString()}>
-                          {`[ID: ${s.id}] ${s.company_name || s.name || ""}`}
-                        </option>
-                      ))}
-                    </select>
+                    />
+                    {filters.eanSearch && (
+                      <button
+                        onClick={() => setFilters({ ...filters, eanSearch: "" })}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500"
+                      >
+                        <XMarkIcon className="w-4 h-4" />
+                      </button>
+                    )}
                   </div>
                 </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end pt-3 border-t border-gray-100">
-                  <div className="md:col-span-3">
-                    <TagFilterSelector
-                      category="item"
-                      onChange={(tagString) => setFilters((prev) => ({ ...prev, tags: tagString }))}
-                      onReset={() => setFilters((prev) => ({ ...prev, tags: "" }))}
-                    />
-                  </div>
-                  <div className="flex justify-end">
-                    <button
-                      onClick={resetFilters}
-                      className="px-4 py-2 text-xs font-semibold text-rose-600 hover:text-rose-800 transition-colors flex items-center gap-1.5 border border-rose-200 rounded-lg bg-rose-50/50 hover:bg-rose-50"
-                    >
-                      <ArrowPathIcon className="w-3.5 h-3.5" />
-                      Reset Filters
-                    </button>
-                  </div>
+                <div className="lg:col-span-2">
+                  <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">
+                    Status
+                  </label>
+                  <select
+                    value={filters.isActive}
+                    onChange={(e) =>
+                      setFilters({ ...filters, isActive: e.target.value })
+                    }
+                    className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                  >
+                    <option value="">All Status</option>
+                    <option value="Y">Active</option>
+                    <option value="N">Inactive</option>
+                  </select>
+                </div>
+                <div className="lg:col-span-2">
+                  <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">
+                    Category
+                  </label>
+                  <select
+                    value={filters.category}
+                    onChange={(e) =>
+                      setFilters({ ...filters, category: e.target.value })
+                    }
+                    className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                  >
+                    <option value="">All Categories</option>
+                    {Array.from(
+                      new Set(
+                        categories.map((c) => c.name?.toString().trim()),
+                      ),
+                    )
+                      .filter(Boolean)
+                      .sort()
+                      .map((name) => {
+                        return (
+                          <option key={name} value={name}>
+                            {name}
+                          </option>
+                        );
+                      })}
+                  </select>
+                </div>
+                <div className="lg:col-span-2">
+                  <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">
+                    Supplier
+                  </label>
+                  <select
+                    value={filters.supplier}
+                    onChange={(e) =>
+                      setFilters({ ...filters, supplier: e.target.value })
+                    }
+                    className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                  >
+                    <option value="">All Suppliers</option>
+                    {suppliers.map((s) => (
+                      <option key={s.id} value={s.id.toString()}>
+                        {`[ID: ${s.id}] ${s.company_name || s.name || ""}`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="lg:col-span-2">
+                  <TagFilterSelector
+                    category="item"
+                    onChange={(tagString) => setFilters((prev) => ({ ...prev, tags: tagString }))}
+                    onReset={() => setFilters((prev) => ({ ...prev, tags: "" }))}
+                  />
+                </div>
+                <div className="lg:col-span-2 flex justify-end">
+                  <button
+                    onClick={resetFilters}
+                    className="w-full lg:w-auto px-4 py-2 text-xs font-semibold text-rose-600 hover:text-rose-800 transition-colors flex items-center justify-center gap-1.5 border border-rose-200 rounded-lg bg-rose-50/50 hover:bg-rose-50"
+                  >
+                    <ArrowPathIcon className="w-3.5 h-3.5" />
+                    Reset Filters
+                  </button>
                 </div>
               </div>
             ) : (
