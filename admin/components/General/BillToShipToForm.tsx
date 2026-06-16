@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 
 export interface BillToShipToData {
     customer_type?: string;
@@ -76,19 +76,76 @@ const BillToShipToForm: React.FC<BillToShipToFormProps> = ({
         }
     }, [data.customer_type]);
 
+    const [addressProfile, setAddressProfile] = useState<string>("main");
+
+    const mainAddressStr = selectedCustomer ? [
+        selectedCustomer.addressLine1 || selectedCustomer.address || selectedCustomer.businessDetails?.address,
+        selectedCustomer.city || selectedCustomer.businessDetails?.city,
+        selectedCustomer.country || selectedCustomer.businessDetails?.country
+    ].filter(Boolean).join(", ") : "";
+
+    const deliveryAddressStr = selectedCustomer ? [
+        selectedCustomer.deliveryAddressLine1,
+        selectedCustomer.deliveryCity,
+        selectedCustomer.deliveryCountry
+    ].filter(Boolean).join(", ") : "";
+
+    const handleAddressProfileChange = (profileType: string) => {
+        if (!selectedCustomer) return;
+
+        if (profileType === "main") {
+            const mainFullAddress = [
+                selectedCustomer.addressLine1 || selectedCustomer.address || selectedCustomer.businessDetails?.address || "",
+                selectedCustomer.addressLine2 || ""
+            ].filter(Boolean).join(" ");
+
+            onBatchChange({
+                ship_to_company_name: selectedCustomer.companyName || "",
+                ship_to_display_name: selectedCustomer.companyName || "",
+                ship_to_contact_person: selectedCustomer.legalName || "",
+                ship_to_contact_phone: selectedCustomer.contactPhoneNumber || selectedCustomer.phoneNumber || selectedCustomer.contactPhone || selectedCustomer.businessDetails?.contactPhone || selectedCustomer.businessDetails?.phoneNumber || "",
+                ship_to_country: selectedCustomer.country || selectedCustomer.businessDetails?.country || "",
+                ship_to_city: selectedCustomer.city || selectedCustomer.businessDetails?.city || "",
+                ship_to_postal_code: selectedCustomer.postalCode || selectedCustomer.businessDetails?.postalCode || "",
+                ship_to_full_address: mainFullAddress,
+            });
+        } else if (profileType === "delivery") {
+            const deliveryFullAddress = [
+                selectedCustomer.deliveryAddressLine1 || "",
+                selectedCustomer.deliveryAddressLine2 || ""
+            ].filter(Boolean).join(" ");
+
+            onBatchChange({
+                ship_to_company_name: selectedCustomer.companyName || "",
+                ship_to_display_name: selectedCustomer.companyName || "",
+                ship_to_contact_person: selectedCustomer.legalName || "",
+                ship_to_contact_phone: selectedCustomer.contactPhoneNumber || selectedCustomer.phoneNumber || selectedCustomer.contactPhone || selectedCustomer.businessDetails?.contactPhone || selectedCustomer.businessDetails?.phoneNumber || "",
+                ship_to_country: selectedCustomer.deliveryCountry || "",
+                ship_to_city: selectedCustomer.deliveryCity || "",
+                ship_to_postal_code: selectedCustomer.deliveryPostalCode || "",
+                ship_to_full_address: deliveryFullAddress,
+            });
+        }
+    };
+
     useEffect(() => {
         if (selectedCustomer) {
+            const hasDelivery = !!(selectedCustomer.deliveryAddressLine1 || selectedCustomer.deliveryCity || selectedCustomer.deliveryCountry);
+            const initialProfile = hasDelivery ? "delivery" : "main";
+            setAddressProfile(initialProfile);
+
             onBatchChange({
                 customer_type: "Other Customer",
                 ship_to_company_name: selectedCustomer.companyName || "",
                 ship_to_display_name: selectedCustomer.companyName || "",
                 ship_to_contact_person: selectedCustomer.legalName || "",
                 ship_to_contact_phone: selectedCustomer.contactPhoneNumber || selectedCustomer.phoneNumber || selectedCustomer.contactPhone || selectedCustomer.businessDetails?.contactPhone || selectedCustomer.businessDetails?.phoneNumber || "",
-                ship_to_country: selectedCustomer.deliveryCountry || selectedCustomer.country || selectedCustomer.businessDetails?.country || "",
-                ship_to_city: selectedCustomer.deliveryCity || selectedCustomer.city || selectedCustomer.businessDetails?.city || "",
-                ship_to_postal_code: selectedCustomer.deliveryPostalCode || selectedCustomer.postalCode || selectedCustomer.businessDetails?.postalCode || "",
-                ship_to_full_address: (selectedCustomer.deliveryAddressLine1 || selectedCustomer.addressLine1 || selectedCustomer.address || selectedCustomer.businessDetails?.address || "") + 
-                    (selectedCustomer.deliveryAddressLine2 || selectedCustomer.addressLine2 ? " " + (selectedCustomer.deliveryAddressLine2 || selectedCustomer.addressLine2) : ""),
+                ship_to_country: hasDelivery ? (selectedCustomer.deliveryCountry || "") : (selectedCustomer.country || selectedCustomer.businessDetails?.country || ""),
+                ship_to_city: hasDelivery ? (selectedCustomer.deliveryCity || "") : (selectedCustomer.city || selectedCustomer.businessDetails?.city || ""),
+                ship_to_postal_code: hasDelivery ? (selectedCustomer.deliveryPostalCode || "") : (selectedCustomer.postalCode || selectedCustomer.businessDetails?.postalCode || ""),
+                ship_to_full_address: hasDelivery
+                    ? ((selectedCustomer.deliveryAddressLine1 || "") + (selectedCustomer.deliveryAddressLine2 ? " " + selectedCustomer.deliveryAddressLine2 : ""))
+                    : ((selectedCustomer.addressLine1 || selectedCustomer.address || selectedCustomer.businessDetails?.address || "") + (selectedCustomer.addressLine2 ? " " + selectedCustomer.addressLine2 : "")),
             });
         }
     }, [selectedCustomer]);
@@ -272,14 +329,30 @@ const BillToShipToForm: React.FC<BillToShipToFormProps> = ({
                     </div>
                 </div>
             </div>
-
             <div className="bg-white border border-gray-200 rounded-[4px] p-6 shadow-sm">
                 <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2 border-b border-gray-100 pb-3">
                     <span className="bg-green-100 text-green-600 p-1.5 rounded-[4px] text-sm">📦</span>
                     SHIP TO:
                 </h3>
-
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-x-5 gap-y-4">
+                    {selectedCustomer && (
+                        <div className="md:col-span-4 bg-gray-50/50 p-4 rounded-[4px] border border-gray-200/80 mb-2">
+                            <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Select Address Profile:</label>
+                            <select
+                                value={addressProfile}
+                                onChange={(e) => {
+                                    const val = e.target.value;
+                                    setAddressProfile(val);
+                                    handleAddressProfileChange(val);
+                                }}
+                                disabled={!isEditEnabled || isGTWarehouse}
+                                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-[4px] focus:ring-2 focus:ring-gray-500/50 focus:border-gray-500 transition-all disabled:bg-gray-100 bg-white cursor-pointer font-medium text-gray-700"
+                            >
+                                <option value="main">Main Address {mainAddressStr ? `— ${mainAddressStr}` : ""}</option>
+                                <option value="delivery">Delivery Address {deliveryAddressStr ? `— ${deliveryAddressStr}` : "— (Not Set)"}</option>
+                            </select>
+                        </div>
+                    )}
                     <div>
                         <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Delivery Company Name:</label>
                         <input

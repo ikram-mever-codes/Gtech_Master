@@ -6,6 +6,7 @@ export type CargoTypeObj = {
   id: number;
   type: string;
   duration?: number;
+  has_pl?: boolean;
   created_at?: Date;
   updated_at?: Date;
 };

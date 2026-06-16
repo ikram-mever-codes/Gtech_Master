@@ -29,6 +29,7 @@ const CargoTypesTab: React.FC = () => {
     const [formData, setFormData] = useState<Partial<CargoTypeObj>>({
         type: "",
         duration: undefined,
+        has_pl: true,
     });
 
     const fetchCargoTypes = useCallback(async () => {
@@ -49,7 +50,7 @@ const CargoTypesTab: React.FC = () => {
     }, [fetchCargoTypes]);
 
     const handleOpenCreate = () => {
-        setFormData({ type: "", duration: undefined });
+        setFormData({ type: "", duration: undefined, has_pl: true });
         setModalMode("create");
         setEditingId(null);
         setShowModal(true);
@@ -64,6 +65,7 @@ const CargoTypesTab: React.FC = () => {
                 setFormData({
                     type: ct.type || "",
                     duration: ct.duration,
+                    has_pl: ct.has_pl !== undefined ? ct.has_pl : true,
                 });
                 setModalMode("edit");
                 setEditingId(id);
@@ -85,6 +87,7 @@ const CargoTypesTab: React.FC = () => {
             const payload: any = {
                 type: formData.type,
                 duration: formData.duration ? Number(formData.duration) : null,
+                has_pl: formData.has_pl !== undefined ? formData.has_pl : true,
             };
 
             if (modalMode === "create") {
@@ -95,7 +98,6 @@ const CargoTypesTab: React.FC = () => {
             setShowModal(false);
             fetchCargoTypes();
         } catch (error: any) {
-            // error already handled in API
         } finally {
             setLoading(false);
         }
@@ -109,7 +111,6 @@ const CargoTypesTab: React.FC = () => {
             setShowModal(false);
             fetchCargoTypes();
         } catch (error) {
-            // error already handled
         } finally {
             setLoading(false);
         }
@@ -157,6 +158,7 @@ const CargoTypesTab: React.FC = () => {
                                 <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">ID</th>
                                 <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">Type</th>
                                 <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">Duration (Days)</th>
+                                <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">Create PL</th>
                                 <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase">Actions</th>
                             </tr>
                         </thead>
@@ -166,6 +168,11 @@ const CargoTypesTab: React.FC = () => {
                                     <td className="px-4 py-3 text-sm text-gray-800">{ct.id}</td>
                                     <td className="px-4 py-3 text-sm text-gray-800">{ct.type}</td>
                                     <td className="px-4 py-3 text-sm text-gray-800">{ct.duration ?? "-"}</td>
+                                    <td className="px-4 py-3 text-sm text-gray-800">
+                                        <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${ct.has_pl !== false ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}>
+                                            {ct.has_pl !== false ? "Yes" : "No"}
+                                        </span>
+                                    </td>
                                     <td className="px-4 py-3">
                                         <div className="flex justify-center gap-2">
                                             <button

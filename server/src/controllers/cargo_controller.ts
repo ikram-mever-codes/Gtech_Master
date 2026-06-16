@@ -7,6 +7,7 @@ import { OrderItem } from "../models/order_items";
 import { Invoice, InvoiceItem } from "../models/invoice";
 import { Customer } from "../models/customers";
 import { Taric } from "../models/tarics";
+import { CargoType } from "../models/cargo_types";
 import { Like, IsNull, In } from "typeorm";
 
 export const generateInvoicesForOrders = async (
@@ -20,6 +21,7 @@ export const generateInvoicesForOrders = async (
     const invoiceItemRepo = AppDataSource.getRepository(InvoiceItem);
     const customerRepo = AppDataSource.getRepository(Customer);
     const cargoRepo = AppDataSource.getRepository(Cargo);
+    const cargoTypeRepo = AppDataSource.getRepository(CargoType);
 
     const cargoNumbers = new Set<string>();
     const orderNumbers = new Set<string>();
@@ -52,6 +54,17 @@ export const generateInvoicesForOrders = async (
         relations: ["customer"],
       });
       if (!cargo) continue;
+      if (cargo.cargo_type_id) {
+        const cargoType = await cargoTypeRepo.findOne({ where: { id: cargo.cargo_type_id } });
+        if (cargoType && cargoType.has_pl === false) {
+          const existingInvoice = await invoiceRepo.findOne({ where: { orderNumber: cargoNo } });
+          if (existingInvoice) {
+            await invoiceItemRepo.delete({ invoice: { id: existingInvoice.id } });
+            await invoiceRepo.delete(existingInvoice.id);
+          }
+          continue;
+        }
+      }
 
       const items = await orderItemRepo.find({
         where: { cargo_id: cargo.id },

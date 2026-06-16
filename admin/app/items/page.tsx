@@ -95,6 +95,8 @@ interface FilterState {
   supplier: string;
   isActive: string;
   tags?: string;
+  company?: string;
+  isLabel?: string;
 }
 
 const PAGE_LIMIT = 30;
@@ -116,9 +118,6 @@ const ItemsManagementPage: React.FC = () => {
       return t;
     return "items";
   });
-
-  // ---- Full datasets, fetched ONCE per tab and cached. Filtering/paging is
-  // then done entirely client-side (no backend round-trip per keystroke). ----
   const [tabData, setTabData] = useState<Record<TabType, any[]>>({
     items: [],
     parents: [],
@@ -127,8 +126,6 @@ const ItemsManagementPage: React.FC = () => {
     suppliers: [],
   });
   const [loadedTabs, setLoadedTabs] = useState<Set<TabType>>(new Set());
-
-  // ---- Reference data (filters + create-item modal). Loaded once, never blocks the table. ----
   const [refParents, setRefParents] = useState<Parent[]>([]);
   const [refTarics, setRefTarics] = useState<Taric[]>([]);
   const [refSuppliers, setRefSuppliers] = useState<Supplier[]>([]);
@@ -159,15 +156,11 @@ const ItemsManagementPage: React.FC = () => {
     supplier: "",
     isActive: "Y",
     tags: "",
+    company: "",
+    isLabel: "",
   });
   const [taricSearch, setTaricSearch] = useState("");
-
-  // Guards each tab fetch so a stale response can't overwrite newer data.
   const reqIdRef = useRef(0);
-
-  // ----------------------------------------------------------------------
-  // Helpers
-  // ----------------------------------------------------------------------
   const hasChinese = (str: string) => /[\u4e00-\u9fa5]/.test(str || "");
 
   const getSupplierLabel = (s: any) => {
@@ -205,10 +198,10 @@ const ItemsManagementPage: React.FC = () => {
   const getThumb = (item: any) =>
     resolveUrl(
       item?.photo ||
-        item?.pix_path_eBay ||
-        item?.pictures?.shopPicture ||
-        (item?.pix_path ? item.pix_path.split(",").filter(Boolean)[0] : null) ||
-        null,
+      item?.pix_path_eBay ||
+      item?.pictures?.shopPicture ||
+      (item?.pix_path ? item.pix_path.split(",").filter(Boolean)[0] : null) ||
+      null,
     );
 
   const formatDate = (d: string | Date | null | undefined) => {
@@ -287,10 +280,6 @@ const ItemsManagementPage: React.FC = () => {
     return `${ean12}${calculateEAN13Checksum(ean12)}`;
   };
 
-  // ----------------------------------------------------------------------
-  // Data fetching — one call per tab, cached. Table renders the moment the
-  // active tab's call resolves; reference data loads independently.
-  // ----------------------------------------------------------------------
   const fetchTab = useCallback(
     async (tab: TabType, force = false) => {
       if (!force && loadedTabs.has(tab)) {
@@ -359,14 +348,9 @@ const ItemsManagementPage: React.FC = () => {
     },
     [auditFilter, loadedTabs],
   );
-
-  // Load active tab whenever it changes (uses cache if already loaded).
   useEffect(() => {
     fetchTab(activeTab);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
-
-  // Audit filter changes invalidate the affected caches.
   useEffect(() => {
     setLoadedTabs((prev) => {
       const next = new Set(prev);
@@ -376,10 +360,7 @@ const ItemsManagementPage: React.FC = () => {
     });
     setTabData((prev) => ({ ...prev, items: [], warehouse: [] }));
     fetchTab(activeTab, true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [auditFilter]);
-
-  // Reference data + global counts — independent of the table render.
   useEffect(() => {
     let active = true;
     (async () => {
@@ -429,13 +410,11 @@ const ItemsManagementPage: React.FC = () => {
     if (activeTab === "items") refreshCounts();
   }, [activeTab, refreshCounts]);
 
-  // Sync supplier filter from URL.
   useEffect(() => {
     const supplierParam = searchParams.get("supplier");
     if (supplierParam) setFilters((p) => ({ ...p, supplier: supplierParam }));
   }, [searchParams]);
 
-  // Reset to page 1 on any filter/tab change.
   useEffect(() => {
     setPage(1);
   }, [filters, taricSearch, activeTab]);
@@ -445,9 +424,6 @@ const ItemsManagementPage: React.FC = () => {
     if (activeTab === "items") refreshCounts();
   }, [fetchTab, activeTab, refreshCounts]);
 
-  // ----------------------------------------------------------------------
-  // Client-side filtering + pagination
-  // ----------------------------------------------------------------------
   const filteredAll = useMemo(() => {
     const data = tabData[activeTab] || [];
 
@@ -469,6 +445,14 @@ const ItemsManagementPage: React.FC = () => {
         if (filters.eanSearch && !matchesEANSearch(item.ean, filters.eanSearch))
           return false;
         if (filters.tags && !matchesTags(item, filters.tags)) return false;
+        if (filters.company) {
+          const companyVal = (item.customer_name || item.company_name || item.company || "").toLowerCase();
+          if (!companyVal.includes(filters.company.toLowerCase())) return false;
+        }
+        if (filters.isLabel) {
+          const labelMatch = filters.isLabel === "Y" ? !!item.isLabelPrint : !item.isLabelPrint;
+          if (!labelMatch) return false;
+        }
         if (search) {
           const hay = [
             item.item_name,
@@ -564,23 +548,23 @@ const ItemsManagementPage: React.FC = () => {
         raw.supplierItem ||
         (def
           ? {
-              priceRMB: def.priceRMB || "0",
-              isPO: def.isPO || "No",
-              moq: def.moq || "0",
-              interval: def.interval || "0",
-              leadTime: def.leadTime || "",
-              noteCN: def.noteCN || "",
-              url: def.url || "",
-            }
+            priceRMB: def.priceRMB || "0",
+            isPO: def.isPO || "No",
+            moq: def.moq || "0",
+            interval: def.interval || "0",
+            leadTime: def.leadTime || "",
+            noteCN: def.noteCN || "",
+            url: def.url || "",
+          }
           : {
-              priceRMB: "0",
-              isPO: "No",
-              moq: "0",
-              interval: "0",
-              leadTime: "",
-              noteCN: "",
-              url: "",
-            }),
+            priceRMB: "0",
+            isPO: "No",
+            moq: "0",
+            interval: "0",
+            leadTime: "",
+            noteCN: "",
+            url: "",
+          }),
       parent: {
         ...raw.parent,
         isActive: toBool(raw.parent?.isActive),
@@ -1090,7 +1074,7 @@ const ItemsManagementPage: React.FC = () => {
     try {
       await deleteParent(id);
       fetchTab("parents", true);
-    } catch {}
+    } catch { }
   };
 
   const handleBulk = async (action: "activate" | "deactivate" | "delete") => {
@@ -1123,7 +1107,7 @@ const ItemsManagementPage: React.FC = () => {
         await deleteTaric(id);
       setSelectedTarics(new Set());
       fetchTab("tarics", true);
-    } catch {}
+    } catch { }
   };
 
   const isTaricTab = activeTab === "tarics";
@@ -1155,6 +1139,8 @@ const ItemsManagementPage: React.FC = () => {
       supplier: "",
       isActive: "",
       tags: "",
+      company: "",
+      isLabel: "",
     });
 
   // ----------------------------------------------------------------------
@@ -1301,23 +1287,11 @@ const ItemsManagementPage: React.FC = () => {
             <tr
               key={item.id}
               onClick={() => openItemPreview(item)}
-              className={`cursor-pointer transition-colors ${
-                isNew
-                  ? "bg-blue-50 hover:bg-blue-100 border-l-4 border-l-blue-400"
-                  : "hover:bg-gray-50"
-              }`}
+              className={`cursor-pointer transition-colors ${isNew
+                ? "bg-blue-50 hover:bg-blue-100 border-l-4 border-l-blue-400"
+                : "hover:bg-gray-50"
+                }`}
             >
-              <td className="p-4" onClick={(e) => e.stopPropagation()}>
-                <input
-                  type="checkbox"
-                  checked={selectedItems.has(item.id.toString())}
-                  onChange={(e) => {
-                    e.stopPropagation();
-                    toggleSelect(item.id.toString());
-                  }}
-                  className="w-4 h-4 text-primary focus:ring-primary border-gray-300 rounded"
-                />
-              </td>
               <td className="px-2 py-2">
                 <div className="w-15 h-15 rounded-md overflow-hidden bg-gray-100 flex items-center justify-center border border-gray-200">
                   {thumb ? (
@@ -1339,25 +1313,19 @@ const ItemsManagementPage: React.FC = () => {
                   {item.item_name || "-"}
                 </div>
                 <div className="text-xs text-gray-500 mt-1 flex items-center gap-1.5 flex-wrap">
-                  <span className="font-semibold text-gray-700">
-                    {item.de_no || "-"}
-                  </span>
-                  {item.customer_name && (
-                    <>
-                      <span>-</span>
-                      <span className="text-blue-600 font-medium">
-                        {item.customer_name}
+                  {(() => {
+                    const parts = [
+                      item.de_no,
+                      item.customer_name || item.company_name || item.company,
+                      item.isLabelPrint ? "Label" : null
+                    ].filter(Boolean);
+                    if (parts.length === 0) return null;
+                    return (
+                      <span className="font-semibold text-gray-600">
+                        {parts.join(" - ")}
                       </span>
-                    </>
-                  )}
-                  {item.isLabelPrint && (
-                    <>
-                      <span>-</span>
-                      <span className="px-1.5 py-0.5 text-[10px] font-bold bg-green-50 text-green-700 border border-green-200 rounded uppercase">
-                        Label
-                      </span>
-                    </>
-                  )}
+                    );
+                  })()}
                 </div>
               </td>
               <td className="px-4 py-3">
@@ -1425,11 +1393,10 @@ const ItemsManagementPage: React.FC = () => {
             </td>
             <td className="px-4 py-3">
               <span
-                className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border ${
-                  parent.is_active === "Y"
-                    ? "bg-emerald-50 text-emerald-700 border-emerald-200/60"
-                    : "bg-gray-50 text-gray-600 border-gray-200"
-                }`}
+                className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border ${parent.is_active === "Y"
+                  ? "bg-emerald-50 text-emerald-700 border-emerald-200/60"
+                  : "bg-gray-50 text-gray-600 border-gray-200"
+                  }`}
               >
                 {parent.is_active === "Y" ? "Active" : "Inactive"}
               </span>
@@ -1695,7 +1662,6 @@ const ItemsManagementPage: React.FC = () => {
           background: "linear-gradient(to bottom, #ffffff, #f9f9f9)",
         }}
       >
-        {/* Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
           <div>
             <PageHeader title="Items Management" icon={Package} />
@@ -1830,8 +1796,6 @@ const ItemsManagementPage: React.FC = () => {
             )}
           </div>
         </div>
-
-        {/* Audit filter banner */}
         {auditFilter && searchParams.get("hide_banner") !== "true" && (
           <div className="mb-6 px-5 py-3 bg-[#FFF3CD] border border-[#FFEBA2] rounded-md text-[#856404] flex items-center justify-between text-sm shadow-sm">
             <div className="flex items-center gap-2">
@@ -1853,7 +1817,6 @@ const ItemsManagementPage: React.FC = () => {
           </div>
         )}
 
-        {/* Tabs */}
         <div className="mb-6">
           <div className="border-b border-gray-200">
             <nav className="-mb-px flex space-x-8">
@@ -1887,54 +1850,152 @@ const ItemsManagementPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Filters */}
         {showFilters && (
           <div className="mb-6 p-3 bg-white border border-gray-200 rounded-md shadow-sm">
             {activeTab === "items" ? (
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-end">
-                <div className="lg:col-span-2">
-                  <label className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1 flex items-center gap-1">
-                    <Hash className="w-3.5 h-3.5 text-green-600" /> EAN Search
+              <div className="flex flex-wrap items-end gap-4 w-full">
+                <div className="relative flex-grow flex-shrink flex-1 min-w-[140px]">
+                  <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">
+                    Name
                   </label>
                   <div className="relative">
+                    <MagnifyingGlassIcon className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                     <input
                       type="text"
-                      placeholder="Scan or type EAN..."
-                      value={filters.eanSearch}
+                      placeholder="Name..."
+                      value={filters.search}
                       onChange={(e) =>
-                        setFilters({ ...filters, eanSearch: e.target.value })
+                        setFilters({ ...filters, search: e.target.value })
                       }
-                      className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                      className={`w-full pl-8 pr-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${filters.search
+                        ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+                        : "text-gray-900 border-gray-300 bg-white"
+                        }`}
                     />
-                    {filters.eanSearch && (
+                    {filters.search && (
                       <button
-                        onClick={() =>
-                          setFilters({ ...filters, eanSearch: "" })
-                        }
-                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500"
+                        onClick={() => setFilters({ ...filters, search: "" })}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500"
                       >
-                        <XMarkIcon className="w-4 h-4" />
+                        <XMarkIcon className="w-3.5 h-3.5" />
                       </button>
                     )}
                   </div>
                 </div>
-                <div className="lg:col-span-2">
+                <div className="relative flex-grow flex-shrink flex-1 min-w-[120px]">
                   <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">
-                    Status
+                    Item No
+                  </label>
+                  <div className="relative">
+                    <Hash className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                    <input
+                      type="text"
+                      placeholder="Item No..."
+                      value={filters.eanSearch}
+                      onChange={(e) =>
+                        setFilters({ ...filters, eanSearch: e.target.value })
+                      }
+                      className={`w-full pl-8 pr-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${filters.eanSearch
+                        ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+                        : "text-gray-900 border-gray-300 bg-white"
+                        }`}
+                    />
+                    {filters.eanSearch && (
+                      <button
+                        onClick={() => setFilters({ ...filters, eanSearch: "" })}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500"
+                      >
+                        <XMarkIcon className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <div className="flex-grow flex-shrink flex-1 min-w-[180px]">
+                  <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">
+                    Tags
+                  </label>
+                  <TagFilterSelector
+                    category="item"
+                    compact={true}
+                    onChange={(tagString) =>
+                      setFilters((prev) => ({ ...prev, tags: tagString }))
+                    }
+                    onReset={() =>
+                      setFilters((prev) => ({ ...prev, tags: "" }))
+                    }
+                  />
+                </div>
+                <div className="relative flex-grow flex-shrink flex-1 min-w-[120px]">
+                  <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">
+                    Company
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="Company..."
+                      value={filters.company || ""}
+                      onChange={(e) =>
+                        setFilters({ ...filters, company: e.target.value })
+                      }
+                      className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${filters.company
+                        ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+                        : "text-gray-900 border-gray-300 bg-white"
+                        }`}
+                    />
+                    {filters.company && (
+                      <button
+                        onClick={() => setFilters({ ...filters, company: "" })}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500"
+                      >
+                        <XMarkIcon className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex-grow flex-shrink flex-1 min-w-[100px]">
+                  <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">
+                    isLabel
                   </label>
                   <select
-                    value={filters.isActive}
+                    value={filters.isLabel || ""}
                     onChange={(e) =>
-                      setFilters({ ...filters, isActive: e.target.value })
+                      setFilters({ ...filters, isLabel: e.target.value })
                     }
-                    className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                    className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${filters.isLabel
+                      ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+                      : "text-gray-400 border-gray-300 bg-white"
+                      }`}
                   >
-                    <option value="">All Status</option>
-                    <option value="Y">Active</option>
-                    <option value="N">Inactive</option>
+                    <option value="">isLabel...</option>
+                    <option value="Y">Yes</option>
+                    <option value="N">No</option>
                   </select>
                 </div>
-                <div className="lg:col-span-2">
+
+                <div className="flex-grow flex-shrink flex-1 min-w-[150px]">
+                  <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">
+                    Supplier
+                  </label>
+                  <select
+                    value={filters.supplier}
+                    onChange={(e) =>
+                      setFilters({ ...filters, supplier: e.target.value })
+                    }
+                    className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${filters.supplier
+                      ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+                      : "text-gray-400 border-gray-300 bg-white"
+                      }`}
+                  >
+                    <option value="">Supplier...</option>
+                    {refSuppliers.map((s) => (
+                      <option key={s.id} value={s.id.toString()}>
+                        {`[${s.id}] ${s.company_name || s.name || ""}`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex-grow flex-shrink flex-1 min-w-[140px]">
                   <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">
                     Category
                   </label>
@@ -1943,9 +2004,12 @@ const ItemsManagementPage: React.FC = () => {
                     onChange={(e) =>
                       setFilters({ ...filters, category: e.target.value })
                     }
-                    className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                    className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${filters.category
+                      ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+                      : "text-gray-400 border-gray-300 bg-white"
+                      }`}
                   >
-                    <option value="">All Categories</option>
+                    <option value="">Category...</option>
                     {Array.from(
                       new Set(categories.map((c) => c.name?.toString().trim())),
                     )
@@ -1958,41 +2022,10 @@ const ItemsManagementPage: React.FC = () => {
                       ))}
                   </select>
                 </div>
-                <div className="lg:col-span-2">
-                  <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">
-                    Supplier
-                  </label>
-                  <select
-                    value={filters.supplier}
-                    onChange={(e) =>
-                      setFilters({ ...filters, supplier: e.target.value })
-                    }
-                    className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                  >
-                    <option value="">All Suppliers</option>
-                    {refSuppliers.map((s) => (
-                      <option
-                        key={s.id}
-                        value={s.id.toString()}
-                      >{`[ID: ${s.id}] ${s.company_name || s.name || ""}`}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="lg:col-span-2">
-                  <TagFilterSelector
-                    category="item"
-                    onChange={(tagString) =>
-                      setFilters((prev) => ({ ...prev, tags: tagString }))
-                    }
-                    onReset={() =>
-                      setFilters((prev) => ({ ...prev, tags: "" }))
-                    }
-                  />
-                </div>
-                <div className="lg:col-span-2 flex justify-end">
+                <div className="shrink-0 flex items-end">
                   <button
                     onClick={resetFilters}
-                    className="w-full lg:w-auto px-4 py-2 text-xs font-semibold text-rose-600 hover:text-rose-800 flex items-center justify-center gap-1.5 border border-rose-200 rounded-lg bg-rose-50/50 hover:bg-rose-50"
+                    className="w-full lg:w-auto px-4 py-2 text-xs font-semibold text-rose-600 hover:text-rose-800 flex items-center justify-center gap-1.5 border border-rose-200 rounded-lg bg-rose-50/50 hover:bg-rose-50 whitespace-nowrap"
                   >
                     <ArrowPathIcon className="w-3.5 h-3.5" />
                     Reset Filters
@@ -2036,8 +2069,6 @@ const ItemsManagementPage: React.FC = () => {
             )}
           </div>
         )}
-
-        {/* Search bar */}
         {activeTab !== "tarics" && (
           <div className="mb-6">
             <div className="relative">
@@ -2062,8 +2093,6 @@ const ItemsManagementPage: React.FC = () => {
             </div>
           </div>
         )}
-
-        {/* Table */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
           {loading ? (
             <div className="p-20 flex justify-center items-center">
@@ -2078,19 +2107,21 @@ const ItemsManagementPage: React.FC = () => {
                 <table className="w-full">
                   <thead className="bg-gray-50 border-b border-gray-200">
                     <tr>
-                      <th className="p-4">
-                        <input
-                          type="checkbox"
-                          checked={
-                            pageData.length > 0 &&
-                            pageData.every((d: any) =>
-                              currentSelection.has(d.id.toString()),
-                            )
-                          }
-                          onChange={handleSelectAll}
-                          className="w-4 h-4 text-primary focus:ring-primary border-gray-300 rounded"
-                        />
-                      </th>
+                      {activeTab !== "items" && (
+                        <th className="p-4">
+                          <input
+                            type="checkbox"
+                            checked={
+                              pageData.length > 0 &&
+                              pageData.every((d: any) =>
+                                currentSelection.has(d.id.toString()),
+                              )
+                            }
+                            onChange={handleSelectAll}
+                            className="w-4 h-4 text-primary focus:ring-primary border-gray-300 rounded"
+                          />
+                        </th>
+                      )}
                       {renderTableHeaders()}
                     </tr>
                   </thead>
@@ -2098,7 +2129,7 @@ const ItemsManagementPage: React.FC = () => {
                     {pageData.length === 0 ? (
                       <tr>
                         <td
-                          colSpan={10}
+                          colSpan={activeTab === "items" ? 5 : 10}
                           className="px-4 py-8 text-center text-gray-500"
                         >
                           No {activeTab} found matching your criteria.
@@ -2149,13 +2180,10 @@ const ItemsManagementPage: React.FC = () => {
           )}
         </div>
       </div>
-
-      {/* ============================ ITEM POPUP ============================ */}
       {showItemPreview && previewRow && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6">
-              {/* Header: thumbnail + Item / Company(or CAT) / ItemNo */}
               <div className="flex items-start justify-between mb-4 gap-3">
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="w-12 h-12 rounded-lg overflow-hidden bg-gray-100 border border-gray-200 flex items-center justify-center flex-shrink-0">
@@ -2165,8 +2193,8 @@ const ItemsManagementPage: React.FC = () => {
                         alt="thumb"
                         className="w-full h-full object-cover"
                         onError={(e) =>
-                          ((e.target as HTMLImageElement).style.display =
-                            "none")
+                        ((e.target as HTMLImageElement).style.display =
+                          "none")
                         }
                       />
                     ) : (
@@ -2190,8 +2218,6 @@ const ItemsManagementPage: React.FC = () => {
                   <XMarkIcon className="h-5 w-5" />
                 </button>
               </div>
-
-              {/* Edit toggle (business-style) */}
               <div className="mb-4 flex items-center justify-between bg-gray-50 rounded-lg p-3">
                 <span className="text-sm font-medium text-gray-700">
                   Edit Mode
@@ -2212,8 +2238,6 @@ const ItemsManagementPage: React.FC = () => {
                   </button>
                 </div>
               </div>
-
-              {/* Tags — kept high so they're visible without scrolling */}
               <div className="mb-5">
                 <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
                   Tags
@@ -2228,10 +2252,10 @@ const ItemsManagementPage: React.FC = () => {
                       setPreviewItem((p: any) =>
                         p
                           ? {
-                              ...p,
-                              tags: newTags,
-                              tagOrder: newTags.map((t) => t.id).join(","),
-                            }
+                            ...p,
+                            tags: newTags,
+                            tagOrder: newTags.map((t) => t.id).join(","),
+                          }
                           : p,
                       )
                     }
@@ -2246,13 +2270,12 @@ const ItemsManagementPage: React.FC = () => {
                     ))}
                     {(!(previewItem || previewRow)?.tags ||
                       (previewItem || previewRow)?.tags.length === 0) && (
-                      <span className="text-sm text-gray-400">—</span>
-                    )}
+                        <span className="text-sm text-gray-400">—</span>
+                      )}
                   </div>
                 )}
               </div>
 
-              {/* Line 1: ItemNo Company IsLabel CAT EAN ID */}
               <div className="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-4">
                 <Field label="Item No">{previewItemNo}</Field>
                 <Field label="Company">{getCompany(previewRow) || "—"}</Field>
@@ -2294,8 +2317,6 @@ const ItemsManagementPage: React.FC = () => {
                 </Field>
                 <Field label="ID (system)">{previewRow.id}</Field>
               </div>
-
-              {/* Line 2: ItemName ItemNameDE ItemNameCN */}
               <div className="mt-5 grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-4">
                 <Field label="Item Name">
                   {previewEdit && previewItem ? (
@@ -2351,8 +2372,6 @@ const ItemsManagementPage: React.FC = () => {
                   )}
                 </Field>
               </div>
-
-              {/* Line 3: Remark DE / CN */}
               <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
                 <Field label="Remark (EN/DE)">
                   {previewEdit && previewItem ? (
@@ -2373,8 +2392,6 @@ const ItemsManagementPage: React.FC = () => {
                     "—"}
                 </Field>
               </div>
-
-              {/* Line 4: length width height weight */}
               <div className="mt-5 grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-4">
                 {(["length", "width", "height", "weight"] as const).map(
                   (dim) => (
@@ -2392,15 +2409,13 @@ const ItemsManagementPage: React.FC = () => {
                         />
                       ) : (
                         (previewItem?.dimensions?.[dim] ??
-                        previewRow[dim] ??
-                        "—")
+                          previewRow[dim] ??
+                          "—")
                       )}
                     </Field>
                   ),
                 )}
               </div>
-
-              {/* Line 5: Default Supplier, Price(RMB), transferPrice */}
               <div className="mt-5 grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-4">
                 <Field label="Default Supplier">
                   {previewEdit && previewItem ? (
@@ -2504,8 +2519,8 @@ const ItemsManagementPage: React.FC = () => {
                     />
                   ) : (
                     (previewItem?.supplierItem?.priceRMB ??
-                    previewRow.rmb_price ??
-                    "—")
+                      previewRow.rmb_price ??
+                      "—")
                   )}
                 </Field>
                 <Field label="Transfer Price (EUR)">
@@ -2521,9 +2536,9 @@ const ItemsManagementPage: React.FC = () => {
                     />
                   ) : (
                     (previewItem?.price ??
-                    previewItem?.transfer_price ??
-                    previewRow.transfer_price_EUR ??
-                    "—")
+                      previewItem?.transfer_price ??
+                      previewRow.transfer_price_EUR ??
+                      "—")
                   )}
                 </Field>
                 <Field label="Status">
@@ -2549,8 +2564,6 @@ const ItemsManagementPage: React.FC = () => {
                   )}
                 </Field>
               </div>
-
-              {/* Line 6: Sales Price per Qty (bulk prices) */}
               <div className="mt-5">
                 <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
                   Sales Price per Qty (Bulk Prices)
@@ -2578,8 +2591,6 @@ const ItemsManagementPage: React.FC = () => {
                   );
                 })()}
               </div>
-
-              {/* Line 7: Quality Criteria */}
               <div className="mt-6 pt-5 border-t border-gray-200">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-sm font-bold text-gray-900">
@@ -2653,8 +2664,6 @@ const ItemsManagementPage: React.FC = () => {
                   </div>
                 )}
               </div>
-
-              {/* Line 8: Attachments */}
               <div className="mt-6 pt-5 border-t border-gray-200">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-sm font-bold text-gray-900">
@@ -2717,11 +2726,11 @@ const ItemsManagementPage: React.FC = () => {
                             <a
                               href={
                                 url.includes("cloudinary") &&
-                                !url.includes("/raw/")
+                                  !url.includes("/raw/")
                                   ? url.replace(
-                                      "/upload/",
-                                      "/upload/fl_attachment/",
-                                    )
+                                    "/upload/",
+                                    "/upload/fl_attachment/",
+                                  )
                                   : url
                               }
                               download={att.originalName || att.filename}
@@ -2746,8 +2755,6 @@ const ItemsManagementPage: React.FC = () => {
                   </div>
                 )}
               </div>
-
-              {/* Pictures */}
               <div className="mt-6 pt-5 border-t border-gray-200">
                 <h3 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
                   <PhotoIcon className="w-4 h-4 text-blue-500" />
@@ -2756,12 +2763,12 @@ const ItemsManagementPage: React.FC = () => {
                 {(() => {
                   const pics = previewItem
                     ? [
-                        previewItem.pictures?.shopPicture,
-                        previewItem.pictures?.ebayPictures,
-                        ...(previewItem.pictures?.pixPath || "")
-                          .split(",")
-                          .filter(Boolean),
-                      ].filter(Boolean)
+                      previewItem.pictures?.shopPicture,
+                      previewItem.pictures?.ebayPictures,
+                      ...(previewItem.pictures?.pixPath || "")
+                        .split(",")
+                        .filter(Boolean),
+                    ].filter(Boolean)
                     : [getThumb(previewRow)].filter(Boolean);
                   if (!pics || pics.length === 0)
                     return (
@@ -2788,8 +2795,8 @@ const ItemsManagementPage: React.FC = () => {
                               )
                             }
                             onError={(e) =>
-                              ((e.target as HTMLImageElement).src =
-                                "https://placehold.co/200x200?text=—")
+                            ((e.target as HTMLImageElement).src =
+                              "https://placehold.co/200x200?text=—")
                             }
                           />
                         </div>
@@ -3149,16 +3156,16 @@ const ItemsManagementPage: React.FC = () => {
                     value={
                       itemFormData.parent_id
                         ? {
-                            value: itemFormData.parent_id,
-                            label: (() => {
-                              const p = refParents?.find(
-                                (x) => x.id === itemFormData.parent_id,
-                              );
-                              return p
-                                ? `${p.name_de} (${p.de_no})`
-                                : "Unknown";
-                            })(),
-                          }
+                          value: itemFormData.parent_id,
+                          label: (() => {
+                            const p = refParents?.find(
+                              (x) => x.id === itemFormData.parent_id,
+                            );
+                            return p
+                              ? `${p.name_de} (${p.de_no})`
+                              : "Unknown";
+                          })(),
+                        }
                         : null
                     }
                     onChange={(opt: any) =>
@@ -3187,14 +3194,14 @@ const ItemsManagementPage: React.FC = () => {
                     value={
                       itemFormData.taric_id
                         ? {
-                            value: itemFormData.taric_id,
-                            label: (() => {
-                              const t = refTarics?.find(
-                                (x) => x.id === itemFormData.taric_id,
-                              );
-                              return t ? `${t.code} - ${t.name_de}` : "Unknown";
-                            })(),
-                          }
+                          value: itemFormData.taric_id,
+                          label: (() => {
+                            const t = refTarics?.find(
+                              (x) => x.id === itemFormData.taric_id,
+                            );
+                            return t ? `${t.code} - ${t.name_de}` : "Unknown";
+                          })(),
+                        }
                         : null
                     }
                     onChange={(opt: any) =>
@@ -3223,12 +3230,12 @@ const ItemsManagementPage: React.FC = () => {
                     value={
                       itemFormData.cat_id
                         ? {
-                            value: itemFormData.cat_id,
-                            label:
-                              categories?.find(
-                                (x) => x.id === itemFormData.cat_id,
-                              )?.name || "Unknown",
-                          }
+                          value: itemFormData.cat_id,
+                          label:
+                            categories?.find(
+                              (x) => x.id === itemFormData.cat_id,
+                            )?.name || "Unknown",
+                        }
                         : null
                     }
                     onChange={(opt: any) =>
@@ -3257,14 +3264,14 @@ const ItemsManagementPage: React.FC = () => {
                     value={
                       itemFormData.supplier_id
                         ? {
-                            value: itemFormData.supplier_id,
-                            label: (() => {
-                              const s = refSuppliers?.find(
-                                (x) => x.id === itemFormData.supplier_id,
-                              );
-                              return s ? getSupplierLabel(s) : "Unknown";
-                            })(),
-                          }
+                          value: itemFormData.supplier_id,
+                          label: (() => {
+                            const s = refSuppliers?.find(
+                              (x) => x.id === itemFormData.supplier_id,
+                            );
+                            return s ? getSupplierLabel(s) : "Unknown";
+                          })(),
+                        }
                         : null
                     }
                     onChange={(opt: any) =>

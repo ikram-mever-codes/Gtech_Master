@@ -11,6 +11,9 @@ export class CargoType {
     @Column({ type: "int", nullable: true })
     duration?: number;
 
+    @Column({ type: "boolean", default: true })
+    has_pl!: boolean;
+
     @CreateDateColumn()
     created_at!: Date;
 
