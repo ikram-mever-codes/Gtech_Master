@@ -36,6 +36,13 @@ export interface Item {
   synced_at?: Date;
   tags?: { id: string; name: string; category: string; color: string }[];
   tagOrder?: string;
+  photo?: string | null;
+  pix_path?: string | null;
+  pix_path_eBay?: string | null;
+  isLabelPrint?: boolean;
+  customer_id?: string | null;
+  customer_name?: string | null;
+  item_name_de?: string | null;
 }
 
 export interface Parent {

@@ -161,6 +161,7 @@ export const getItems = async (
     const categoryRepository = AppDataSource.getRepository(Category);
     const supplierRepository = AppDataSource.getRepository(Supplier);
     const warehouseRepository = AppDataSource.getRepository(WarehouseItem);
+    const customerRepository = AppDataSource.getRepository(Customer);
 
     const {
       page = "1",
@@ -486,6 +487,11 @@ export const getItems = async (
         items.map((i: any) => i.supplier_id).filter(Boolean) as number[],
       ),
     ];
+    const customerIds = [
+      ...new Set(
+        items.map((i: any) => i.customer_id).filter(Boolean) as string[],
+      ),
+    ];
 
     const [
       parents,
@@ -494,6 +500,7 @@ export const getItems = async (
       suppliersList,
       warehouseItems,
       supplierItems,
+      customers,
     ] = await Promise.all([
       parentIds.length > 0
         ? parentRepository.find({
@@ -538,15 +545,19 @@ export const getItems = async (
             where: { item_id: In(itemIds) },
           })
         : Promise.resolve([]),
+      customerIds.length > 0
+        ? customerRepository.find({
+            where: { id: In(customerIds) },
+            select: ["id", "companyName"],
+          })
+        : Promise.resolve([]),
     ]);
 
-    const parentMap = new Map(parents.map((p) => [p.id, p]));
-    const taricMap = new Map(tarics.map((t) => [t.id, t]));
-    const catMap = new Map(cats.map((c) => [c.id, c]));
-    const supplierMap = new Map(suppliersList.map((s) => [s.id, s]));
-
-    // Build lookup maps ONCE instead of running array `.find()` per item
-    // inside the formatting loop (was O(items * supplierItems)).
+    const parentMap = new Map(parents.map((p: any) => [p.id, p]));
+    const taricMap = new Map(tarics.map((t: any) => [t.id, t]));
+    const catMap = new Map(cats.map((c: any) => [c.id, c]));
+    const supplierMap = new Map(suppliersList.map((s: any) => [s.id, s]));
+    const customerMap = new Map(customers.map((c: any) => [c.id, c]));
     const rmbPriceMap = new Map<number, any>();
     const defaultSIByItem = new Map<number, any>();
     supplierItems.forEach((si) => {
@@ -560,12 +571,14 @@ export const getItems = async (
     });
 
     const warehouseByItemId = new Map(
-      warehouseItems.filter((wi) => wi.item_id).map((wi) => [wi.item_id, wi]),
+      warehouseItems
+        .filter((wi: any) => wi.item_id)
+        .map((wi: any) => [wi.item_id, wi]),
     );
     const warehouseByItemIdDE = new Map(
       warehouseItems
-        .filter((wi) => wi.ItemID_DE)
-        .map((wi) => [wi.ItemID_DE, wi]),
+        .filter((wi: any) => wi.ItemID_DE)
+        .map((wi: any) => [wi.ItemID_DE, wi]),
     );
 
     const missingSupplierIds = items
@@ -587,18 +600,23 @@ export const getItems = async (
     }
 
     const formattedItems = items.map((item: any) => {
-      const parentData = item.parent_id ? parentMap.get(item.parent_id) : null;
-      const taricData = item.taric_id ? taricMap.get(item.taric_id) : null;
-      const warehouseData =
+      const parentData: any = item.parent_id
+        ? parentMap.get(item.parent_id)
+        : null;
+      const taricData: any = item.taric_id ? taricMap.get(item.taric_id) : null;
+      const warehouseData: any =
         (item.ItemID_DE ? warehouseByItemIdDE.get(item.ItemID_DE) : null) ||
         warehouseByItemId.get(item.id) ||
         null;
 
-      const supplierData = item.supplier_id
+      let supplierData: any = item.supplier_id
         ? supplierMap.get(item.supplier_id)
         : defaultSIMap.get(item.id);
       const effectiveSupplierId =
         item.supplier_id || defaultSIMap.get(item.id)?.id || null;
+      const customerData: any = item.customer_id
+        ? customerMap.get(item.customer_id)
+        : null;
 
       const defaultSI = defaultSIByItem.get(item.id);
 
@@ -624,6 +642,14 @@ export const getItems = async (
           null,
         supplier_id: effectiveSupplierId,
         supplier_name: supplierData?.company_name || supplierData?.name || null,
+        customer_id: item.customer_id || null,
+        customer_name: customerData?.companyName || null,
+        isLabelPrint: item.isLabelPrint || false,
+        item_name_de:
+          warehouseData?.item_name_de || parentData?.name_de || null,
+        photo: item.photo || null,
+        pix_path: item.pix_path || null,
+        pix_path_eBay: item.pix_path_eBay || null,
         weight: item.weight,
         length: item.length,
         width: item.width,
@@ -638,8 +664,14 @@ export const getItems = async (
         is_dimension_special: item.is_dimension_special,
         is_npr: item.is_npr,
         ship_class: warehouseData?.ship_class || null,
-        is_po: defaultSI?.is_po || null,
-        url: defaultSI?.url || null,
+        is_po:
+          supplierItems.find(
+            (si: any) => si.item_id === item.id && si.is_default === "Y",
+          )?.is_po || null,
+        url:
+          supplierItems.find(
+            (si: any) => si.item_id === item.id && si.is_default === "Y",
+          )?.url || null,
         rmb_price: rmbPriceMap.get(item.id) || null,
         price: item.price,
         transfer_price_EUR: item.transfer_price_EUR,
