@@ -1304,8 +1304,8 @@ const ItemsManagementPage: React.FC = () => {
                   {item.isLabelPrint && (
                     <>
                       <span>-</span>
-                      <span className="px-1.5 py-0.5 text-xs font-semibold bg-amber-100 text-amber-700 border border-amber-200 rounded">
-                        label
+                      <span className="px-1.5 py-0.5 text-[10px] font-bold bg-green-50 text-green-700 border border-green-200 rounded uppercase tracking-wider">
+                        Yes
                       </span>
                     </>
                   )}
