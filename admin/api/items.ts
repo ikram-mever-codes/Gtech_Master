@@ -227,32 +227,64 @@ export interface StatisticsResponse {
   };
 }
 
-export const getItems = async (params?: {
-  page?: number;
-  limit?: number;
-  search?: string;
-  category?: string;
-  supplier?: string;
-  isActive?: string;
-  parentId?: string;
-  taricId?: string;
-  sortBy?: string;
-  sortOrder?: "ASC" | "DESC";
-  includeOnlyUpdated?: boolean;
-  isNew?: string;
-  eanSearch?: string;
-  tags?: string;
-  filter?: string;
-}) => {
-  try {
-    const response = await api.get("/items", {
-      params,
-    });
-    return response;
-  } catch (error) {
-    handleApiError(error, "Failed to fetch items");
-    throw error;
+type CacheEntry = { ts: number; data: any };
+const itemsCache = new Map<string, CacheEntry>();
+const itemsInFlight = new Map<string, Promise<any>>();
+const ITEMS_TTL = 60_000; // 60s — tune to taste
+
+const keyFor = (params?: object) => JSON.stringify(params ?? {});
+
+// Call this after ANY write so the next read re-fetches.
+export const invalidateItemsCache = () => {
+  itemsCache.clear();
+  itemsInFlight.clear();
+};
+export const getItems = async (
+  params?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    category?: string;
+    supplier?: string;
+    isActive?: string;
+    parentId?: string;
+    taricId?: string;
+    sortBy?: string;
+    sortOrder?: "ASC" | "DESC";
+    includeOnlyUpdated?: boolean;
+    isNew?: string;
+    eanSearch?: string;
+    tags?: string;
+    filter?: string;
+  },
+  options?: { refresh?: boolean },
+) => {
+  const key = keyFor(params);
+
+  if (!options?.refresh) {
+    const hit = itemsCache.get(key);
+    if (hit && Date.now() - hit.ts < ITEMS_TTL) return hit.data;
+
+    // De-dupe concurrent identical calls (e.g. several components mounting at once)
+    const inflight = itemsInFlight.get(key);
+    if (inflight) return inflight;
   }
+
+  const request = (async () => {
+    try {
+      const response = await api.get("/items", { params });
+      itemsCache.set(key, { ts: Date.now(), data: response });
+      return response;
+    } catch (error) {
+      handleApiError(error, "Failed to fetch items");
+      throw error;
+    } finally {
+      itemsInFlight.delete(key);
+    }
+  })();
+
+  itemsInFlight.set(key, request);
+  return request;
 };
 
 export const getItemById = async (id: number) => {
@@ -310,68 +342,7 @@ export const createItem = async (itemData: {
   }
 };
 
-export const updateItem = async (
-  id: number,
-  itemData: Partial<{
-    item_name: string;
-    item_name_cn: string;
-    ean: string | null;
-    parent_id: number;
-    taric_id: number;
-    cat_id: number;
-    weight: number;
-    length: number;
-    width: number;
-    height: number;
-    remark: string;
-    model: string;
-    supplier_id: number;
-    isActive: string;
-    is_qty_dividable: string;
-    is_npr: string;
-    is_eur_special: string;
-    is_rmb_special: string;
-    isLabelPrint?: boolean;
-    ItemID_DE?: number;
-    is_dimension_special?: string;
-    FOQ?: number;
-    FSQ?: number;
-    ISBN?: number;
-    RMB_Price?: number;
-    price?: number;
-    currency?: string;
-    many_components?: number;
-    effort_rating?: number;
-    is_pu_item?: number;
-    is_meter_item?: number;
-    is_new?: string;
-    supp_cat?: string;
-    note?: string;
-    photo?: string;
-    pix_path?: string;
-    pix_path_eBay?: string;
-    npr_remark?: string;
-    warehouseItemData?: {
-      is_stock_item?: string;
-      is_active?: string;
-      msq?: number;
-      is_no_auto_order?: string;
-      buffer?: number;
-      is_SnSI?: string;
-      item_no_de?: string;
-      item_name_de?: string;
-    };
-    supplierItem?: {
-      price_rmb?: number;
-      is_po?: string;
-      moq?: number;
-      oi?: number;
-      lead_time?: string;
-      note_cn?: string;
-      url?: string;
-    };
-  }>,
-) => {
+export const updateItem = async (id: number, itemData: any) => {
   try {
     toast.loading("Updating item...", loadingStyles);
     const response = await api.put(`/items/${id}`, itemData);
@@ -545,7 +516,6 @@ export const exportItemsToCSV = async (
   }
 };
 
-
 export const getNewItems = async (params?: {
   page?: number;
   limit?: number;
@@ -615,7 +585,10 @@ export const exportNewItemsToCSV = async (showToast: boolean = true) => {
 
     if (showToast) {
       toast.dismiss();
-      toast.success("New items exported! is_new flag has been reset.", successStyles);
+      toast.success(
+        "New items exported! is_new flag has been reset.",
+        successStyles,
+      );
     }
 
     return { success: true };

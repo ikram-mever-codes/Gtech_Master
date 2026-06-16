@@ -162,6 +162,7 @@ export const getItems = async (
     const supplierRepository = AppDataSource.getRepository(Supplier);
     const warehouseRepository = AppDataSource.getRepository(WarehouseItem);
     const customerRepository = AppDataSource.getRepository(Customer);
+    const supplierItemRepository = AppDataSource.getRepository(SupplierItem);
 
     const {
       page = "1",
@@ -187,8 +188,6 @@ export const getItems = async (
     if (isNaN(limitNum)) limitNum = 50;
     const skip = (pageNum - 1) * limitNum;
 
-    // Whitelist the sort column. `sortBy` is interpolated into the SQL string,
-    // so this also closes a small SQL-injection hole.
     const ALLOWED_SORT_COLUMNS = new Set([
       "created_at",
       "updated_at",
@@ -203,11 +202,8 @@ export const getItems = async (
     const safeSortOrder = sortOrder === "ASC" ? "ASC" : "DESC";
 
     // ------------------------------------------------------------------
-    // Filters are applied to a fresh builder so we can run the COUNT and the
-    // DATA query in parallel on two independent builders. (Previously these ran
-    // one after the other, doubling DB round-trip time on every request.)
-    // The count builder intentionally omits the `tags` join — it isn't needed
-    // for counting and the to-many join makes the count query slower.
+    // Filters applied to a fresh builder so COUNT + DATA run in parallel.
+    // The count builder omits the tags join (not needed for counting).
     // ------------------------------------------------------------------
     const applyFilters = (qb: any) => {
       if (tags) {
@@ -303,10 +299,7 @@ export const getItems = async (
         if (!isNaN(parseInt(categoryValue))) {
           qb.andWhere(
             "(item.cat_id = :catId OR TRIM(cat.name) ILIKE :catNameExact)",
-            {
-              catId: parseInt(categoryValue),
-              catNameExact: categoryValue,
-            },
+            { catId: parseInt(categoryValue), catNameExact: categoryValue },
           );
         } else {
           qb.andWhere("TRIM(cat.name) ILIKE :catNameExact", {
@@ -450,12 +443,10 @@ export const getItems = async (
       return qb;
     };
 
-    // Lean builder for counting (no tags join).
     const countQueryBuilder = applyFilters(
       itemRepository.createQueryBuilder("item"),
     );
 
-    // Full builder for fetching the page of rows.
     const dataQueryBuilder = applyFilters(
       itemRepository.createQueryBuilder("item"),
     )
@@ -464,7 +455,7 @@ export const getItems = async (
       .skip(skip)
       .take(limitNum);
 
-    // Count + page fetch now run concurrently instead of sequentially.
+    // Count + page fetch run concurrently.
     const [totalRecords, items] = await Promise.all([
       countQueryBuilder.getCount(),
       dataQueryBuilder.getMany(),
@@ -492,6 +483,15 @@ export const getItems = async (
         items.map((i: any) => i.customer_id).filter(Boolean) as string[],
       ),
     ];
+    const itemIdDEs = items
+      .map((i: any) => i.ItemID_DE)
+      .filter(Boolean) as number[];
+
+    // Items missing a direct supplier_id — resolve their default supplier-item
+    // in the SAME parallel batch instead of a separate, sequential query.
+    const missingSupplierIds = items
+      .filter((i: any) => !i.supplier_id)
+      .map((i: any) => i.id);
 
     const [
       parents,
@@ -501,6 +501,7 @@ export const getItems = async (
       warehouseItems,
       supplierItems,
       customers,
+      defaultSIsForMissing,
     ] = await Promise.all([
       parentIds.length > 0
         ? parentRepository.find({
@@ -530,25 +531,23 @@ export const getItems = async (
         ? warehouseRepository.find({
             where: [
               { item_id: In(itemIds) },
-              {
-                ItemID_DE: In(
-                  items
-                    .map((i: any) => i.ItemID_DE)
-                    .filter(Boolean) as number[],
-                ),
-              },
+              ...(itemIdDEs.length > 0 ? [{ ItemID_DE: In(itemIdDEs) }] : []),
             ],
           })
         : Promise.resolve([]),
       itemIds.length > 0
-        ? AppDataSource.getRepository(SupplierItem).find({
-            where: { item_id: In(itemIds) },
-          })
+        ? supplierItemRepository.find({ where: { item_id: In(itemIds) } })
         : Promise.resolve([]),
       customerIds.length > 0
         ? customerRepository.find({
             where: { id: In(customerIds) },
             select: ["id", "companyName"],
+          })
+        : Promise.resolve([]),
+      missingSupplierIds.length > 0
+        ? supplierItemRepository.find({
+            where: { item_id: In(missingSupplierIds), is_default: "Y" },
+            relations: ["supplier"],
           })
         : Promise.resolve([]),
     ]);
@@ -558,9 +557,10 @@ export const getItems = async (
     const catMap = new Map(cats.map((c: any) => [c.id, c]));
     const supplierMap = new Map(suppliersList.map((s: any) => [s.id, s]));
     const customerMap = new Map(customers.map((c: any) => [c.id, c]));
+
     const rmbPriceMap = new Map<number, any>();
     const defaultSIByItem = new Map<number, any>();
-    supplierItems.forEach((si) => {
+    supplierItems.forEach((si: any) => {
       const existing = rmbPriceMap.get(si.item_id);
       if (!existing || si.is_default === "Y") {
         rmbPriceMap.set(si.item_id, si.price_rmb);
@@ -568,6 +568,15 @@ export const getItems = async (
       if (si.is_default === "Y" && !defaultSIByItem.has(si.item_id)) {
         defaultSIByItem.set(si.item_id, si);
       }
+    });
+
+    const defaultSIMap = new Map<number, any>();
+    defaultSIsForMissing.forEach((si: any) => {
+      defaultSIMap.set(si.item_id, {
+        id: si.supplier_id,
+        name: si.supplier?.name || null,
+        company_name: si.supplier?.company_name || null,
+      });
     });
 
     const warehouseByItemId = new Map(
@@ -581,24 +590,6 @@ export const getItems = async (
         .map((wi: any) => [wi.ItemID_DE, wi]),
     );
 
-    const missingSupplierIds = items
-      .filter((i: any) => !i.supplier_id)
-      .map((i: any) => i.id);
-    const defaultSIMap = new Map<number, any>();
-    if (missingSupplierIds.length > 0) {
-      const defaultSIs = await AppDataSource.getRepository(SupplierItem).find({
-        where: { item_id: In(missingSupplierIds), is_default: "Y" },
-        relations: ["supplier"],
-      });
-      defaultSIs.forEach((si: any) => {
-        defaultSIMap.set(si.item_id, {
-          id: si.supplier_id,
-          name: si.supplier?.name || null,
-          company_name: si.supplier?.company_name || null,
-        });
-      });
-    }
-
     const formattedItems = items.map((item: any) => {
       const parentData: any = item.parent_id
         ? parentMap.get(item.parent_id)
@@ -609,7 +600,7 @@ export const getItems = async (
         warehouseByItemId.get(item.id) ||
         null;
 
-      let supplierData: any = item.supplier_id
+      const supplierData: any = item.supplier_id
         ? supplierMap.get(item.supplier_id)
         : defaultSIMap.get(item.id);
       const effectiveSupplierId =
@@ -663,15 +654,10 @@ export const getItems = async (
         is_eur_special: item.is_eur_special,
         is_dimension_special: item.is_dimension_special,
         is_npr: item.is_npr,
+        is_new: item.is_new,
         ship_class: warehouseData?.ship_class || null,
-        is_po:
-          supplierItems.find(
-            (si: any) => si.item_id === item.id && si.is_default === "Y",
-          )?.is_po || null,
-        url:
-          supplierItems.find(
-            (si: any) => si.item_id === item.id && si.is_default === "Y",
-          )?.url || null,
+        is_po: defaultSI?.is_po || null,
+        url: defaultSI?.url || null,
         rmb_price: rmbPriceMap.get(item.id) || null,
         price: item.price,
         transfer_price_EUR: item.transfer_price_EUR,
@@ -712,6 +698,7 @@ export const getItems = async (
     return next(error);
   }
 };
+
 export const getItemById = async (
   req: Request,
   res: Response,
