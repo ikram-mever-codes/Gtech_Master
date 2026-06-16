@@ -2040,7 +2040,7 @@ const ItemsManagementPage: React.FC = () => {
                     className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
                   >
                     <option value="">All Suppliers</option>
-                    {suppliers.map((s) => (
+                    {refSuppliers.map((s) => (
                       <option key={s.id} value={s.id.toString()}>
                         {`[ID: ${s.id}] ${s.company_name || s.name || ""}`}
                       </option>
@@ -2067,88 +2067,6 @@ const ItemsManagementPage: React.FC = () => {
                     Reset Filters
                   </button>
                 </div>
-                <div className="flex-1 min-w-[110px]">
-                  <label className="block text-[11px] font-semibold text-gray-600 uppercase tracking-wider mb-1">
-                    Status
-                  </label>
-                  <select
-                    value={filters.isActive}
-                    onChange={(e) =>
-                      setFilters({ ...filters, isActive: e.target.value })
-                    }
-                    className="w-full px-2 py-1.5 text-xs bg-white border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
-                  >
-                    <option value="">All Status</option>
-                    <option value="Y">Active</option>
-                    <option value="N">Inactive</option>
-                  </select>
-                </div>
-                <div className="flex-1 min-w-[130px]">
-                  <label className="block text-[11px] font-semibold text-gray-600 uppercase tracking-wider mb-1">
-                    Category
-                  </label>
-                  <select
-                    value={filters.category}
-                    onChange={(e) =>
-                      setFilters({ ...filters, category: e.target.value })
-                    }
-                    className="w-full px-2 py-1.5 text-xs bg-white border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
-                  >
-                    <option value="">All Categories</option>
-                    {Array.from(
-                      new Set(categories.map((c) => c.name?.toString().trim())),
-                    )
-                      .filter(Boolean)
-                      .sort()
-                      .map((name) => {
-                        return (
-                          <option key={name} value={name}>
-                            {name}
-                          </option>
-                        );
-                      })}
-                  </select>
-                </div>
-                <div className="flex-1 min-w-[140px]">
-                  <label className="block text-[11px] font-semibold text-gray-600 uppercase tracking-wider mb-1">
-                    Supplier
-                  </label>
-                  <select
-                    value={filters.supplier}
-                    onChange={(e) =>
-                      setFilters({ ...filters, supplier: e.target.value })
-                    }
-                    className="w-full px-2 py-1.5 text-xs bg-white border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
-                  >
-                    <option value="">All Suppliers</option>
-                    {refSuppliers.map((s) => (
-                      <option key={s.id} value={s.id.toString()}>
-                        {`[ID: ${s.id}] ${s.company_name || s.name || ""}`}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="flex-1 min-w-[160px]">
-                  <label className="block text-[11px] font-semibold text-gray-600 uppercase tracking-wider mb-1">
-                    Tags
-                  </label>
-                  <TagFilterSelector
-                    category="item"
-                    onChange={(tagString) =>
-                      setFilters((prev) => ({ ...prev, tags: tagString }))
-                    }
-                    onReset={() =>
-                      setFilters((prev) => ({ ...prev, tags: "" }))
-                    }
-                  />
-                </div>
-                <button
-                  onClick={resetFilters}
-                  className="px-3 py-1.5 text-xs font-semibold text-rose-600 hover:text-rose-800 transition-colors flex items-center gap-1.5 border border-rose-200 rounded-md bg-rose-50/50 hover:bg-rose-50 whitespace-nowrap shrink-0"
-                >
-                  <ArrowPathIcon className="w-3.5 h-3.5" />
-                  Reset
-                </button>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
