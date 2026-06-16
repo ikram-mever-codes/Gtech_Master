@@ -1355,16 +1355,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
                                   </svg>
                                 </a>
                               )}
-
-                              <button
-                                onClick={(e) =>
-                                  handleCopyBusinessLink(business, e)
-                                }
-                                className="text-gray-500 hover:text-gray-700 transition-colors p-1"
-                                title="Copy business link"
-                              >
-                                <ClipboardDocumentIcon className="w-5 h-5" />
-                              </button>
                             </div>
                           </td>
                           <td className="px-3 py-3 align-top max-w-[300px]">
@@ -1687,6 +1677,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
               <div className="space-y-6">
                 <div className="rounded-xl p-4 -mx-4 bg-transparent">
                   <div className="grid grid-cols-6 gap-4">
+                    {/* Names row (3 across) */}
                     <div className="col-span-6 md:col-span-2">
                       <label className="block text-xs font-medium text-gray-700 mb-1">
                         Company Name (full legal name) *
@@ -1706,6 +1697,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
                         placeholder="Muster GmbH & Co. KG"
                       />
                     </div>
+
                     <div className="col-span-3 md:col-span-2">
                       <label className="block text-xs font-medium text-gray-700 mb-1">
                         Display Name
@@ -1725,25 +1717,41 @@ const CombinedBusinessContactsContent: React.FC = () => {
                         placeholder="Auto from first word (unique)"
                       />
                     </div>
-                    <div className="col-span-3 md:col-span-2">
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Star Portal Link Name
-                      </label>
-                      <input
-                        type="text"
-                        value={businessForm.starPortalLinkName}
-                        onChange={(e) => {
-                          starPortalTouched.current = true;
-                          setBusinessForm({
-                            ...businessForm,
-                            starPortalLinkName: e.target.value,
-                          });
-                        }}
-                        disabled={businessFieldDisabled}
-                        className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                        placeholder="Auto from web URL (between www. and next .)"
-                      />
+
+                    {/* Star Portal Field Wrapper - Adjusted with flex container to give icon inline room */}
+                    <div className="col-span-3 md:col-span-2 flex items-end gap-2">
+                      <div className="flex-1">
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                          Star Portal Link Name
+                        </label>
+                        <input
+                          type="text"
+                          value={businessForm.starPortalLinkName}
+                          onChange={(e) => {
+                            starPortalTouched.current = true;
+                            setBusinessForm({
+                              ...businessForm,
+                              starPortalLinkName: e.target.value,
+                            });
+                          }}
+                          disabled={businessFieldDisabled}
+                          className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                          placeholder="Auto from web URL (between www. and next .)"
+                        />
+                      </div>
+
+                      {/* Copy Button styled to sit neatly inline */}
+                      <button
+                        type="button"
+                        onClick={(e) => handleCopyBusinessLink(businessForm, e)}
+                        className="text-gray-500 hover:text-gray-700 transition-colors p-2 mb-0.5 hover:bg-gray-100/50 rounded-lg shrink-0"
+                        title="Copy business link"
+                      >
+                        <ClipboardDocumentIcon className="w-5 h-5" />
+                      </button>
                     </div>
+
+                    {/* Address line 1 + Street (2 across) */}
                     <div className="col-span-6 md:col-span-3">
                       <label className="block text-xs font-medium text-gray-700 mb-1">
                         Address Additional Line
@@ -1780,6 +1788,8 @@ const CombinedBusinessContactsContent: React.FC = () => {
                         placeholder="Musterstraße 12"
                       />
                     </div>
+
+                    {/* Postal / City / Country (3 across) */}
                     <div className="col-span-2">
                       <label className="block text-xs font-medium text-gray-700 mb-1">
                         Postal Code
@@ -1838,6 +1848,8 @@ const CombinedBusinessContactsContent: React.FC = () => {
                         ))}
                       </select>
                     </div>
+
+                    {/* Email / Phone / Web (3 across) */}
                     <div className="col-span-3 md:col-span-2">
                       <label className="block text-xs font-medium text-gray-700 mb-1">
                         Email
@@ -1893,6 +1905,8 @@ const CombinedBusinessContactsContent: React.FC = () => {
                         placeholder="https://www.muster.de"
                       />
                     </div>
+
+                    {/* VAT / Tax ID */}
                     <div className="col-span-3 md:col-span-2">
                       <label className="block text-xs font-medium text-gray-700 mb-1">
                         VAT / Tax ID
@@ -1929,6 +1943,8 @@ const CombinedBusinessContactsContent: React.FC = () => {
                         placeholder="https://app.asana.com/..."
                       />
                     </div>
+
+                    {/* Note */}
                     <div className="col-span-6">
                       <label className="block text-xs font-medium text-gray-700 mb-1">
                         Note
@@ -1947,6 +1963,8 @@ const CombinedBusinessContactsContent: React.FC = () => {
                         placeholder="Internal note…"
                       />
                     </div>
+
+                    {/* Tags */}
                     <div className="col-span-6">
                       <label className="block text-xs font-medium text-gray-700 mb-1">
                         Tags
@@ -1976,6 +1994,8 @@ const CombinedBusinessContactsContent: React.FC = () => {
                     </div>
                   </div>
                 </div>
+
+                {/* Logo Section */}
                 <div className="col-span-6">
                   <label className="block text-xs font-medium text-gray-700 mb-1">
                     Company Label Print Logo
@@ -2028,6 +2048,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
                   </div>
                 </div>
 
+                {/* Contacts sub-section */}
                 {businessModalMode === "edit" && (
                   <div className="rounded-xl p-4 -mx-4 bg-green-50 border border-green-200/70">
                     <div className="flex items-center justify-between mb-3">

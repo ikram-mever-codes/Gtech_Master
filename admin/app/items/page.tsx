@@ -1319,7 +1319,7 @@ const ItemsManagementPage: React.FC = () => {
                 />
               </td>
               <td className="px-2 py-2">
-                <div className="w-10 h-10 rounded-md overflow-hidden bg-gray-100 flex items-center justify-center border border-gray-200">
+                <div className="w-15 h-15 rounded-md overflow-hidden bg-gray-100 flex items-center justify-center border border-gray-200">
                   {thumb ? (
                     <img
                       src={thumb}
