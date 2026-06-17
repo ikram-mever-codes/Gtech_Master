@@ -2767,8 +2767,6 @@ const ItemsManagementPage: React.FC = () => {
                   );
                 })()}
               </div>
-
-              {/* Footer */}
               <div className="flex justify-between gap-2 pt-6 mt-6 border-t">
                 <button
                   onClick={handleDeletePreviewItem}
@@ -2806,8 +2804,6 @@ const ItemsManagementPage: React.FC = () => {
           </div>
         </div>
       )}
-
-      {/* Quality criterion add/edit modal */}
       <CustomModal
         isOpen={qualityModalOpen}
         onClose={() => setQualityModalOpen(false)}
@@ -2916,7 +2912,6 @@ const ItemsManagementPage: React.FC = () => {
         </div>
       </CustomModal>
 
-      {/* ============================ TARIC MODAL ============================ */}
       {showTaricModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl max-w-md w-full">
@@ -2995,8 +2990,6 @@ const ItemsManagementPage: React.FC = () => {
           </div>
         </div>
       )}
-
-      {/* ============================ CREATE ITEM MODAL ============================ */}
       {showItemModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
