@@ -264,7 +264,6 @@ const ItemsManagementPage: React.FC = () => {
     return true;
   };
 
-  // EAN generation for the create modal.
   const calculateEAN13Checksum = (ean12: string) => {
     let sum = 0;
     for (let i = 0; i < 12; i++) {
@@ -483,7 +482,6 @@ const ItemsManagementPage: React.FC = () => {
       );
     }
 
-    // parents / warehouse / suppliers
     const s = filters.search.trim().toLowerCase();
     let res = data;
     if (s) {
@@ -511,13 +509,9 @@ const ItemsManagementPage: React.FC = () => {
     () => filteredAll.slice((safePage - 1) * PAGE_LIMIT, safePage * PAGE_LIMIT),
     [filteredAll, safePage],
   );
-
-  // ----------------------------------------------------------------------
-  // Item preview / edit popup
-  // ----------------------------------------------------------------------
   const [showItemPreview, setShowItemPreview] = useState(false);
-  const [previewRow, setPreviewRow] = useState<any>(null); // list-level data (instant)
-  const [previewItem, setPreviewItem] = useState<any>(null); // transformed full detail
+  const [previewRow, setPreviewRow] = useState<any>(null);
+  const [previewItem, setPreviewItem] = useState<any>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewEdit, setPreviewEdit] = useState(false);
   const [previewSaving, setPreviewSaving] = useState(false);
@@ -729,7 +723,6 @@ const ItemsManagementPage: React.FC = () => {
     }
   };
 
-  // ---- Quality criteria (inside popup, add/edit/delete) ----
   const [qualityModalOpen, setQualityModalOpen] = useState(false);
   const [editingQuality, setEditingQuality] = useState<any>(null);
   const [qualityForm, setQualityForm] = useState<any>({
@@ -802,7 +795,6 @@ const ItemsManagementPage: React.FC = () => {
     }
   };
 
-  // ---- Attachments (inside popup, upload/delete) ----
   const attachmentInputRef = useRef<HTMLInputElement>(null);
   const [uploadingAttachments, setUploadingAttachments] = useState(false);
 
@@ -847,9 +839,6 @@ const ItemsManagementPage: React.FC = () => {
     }
   };
 
-  // ----------------------------------------------------------------------
-  // Create item modal
-  // ----------------------------------------------------------------------
   const [showItemModal, setShowItemModal] = useState(false);
   const [newItemTags, setNewItemTags] = useState<Tag[]>([]);
   const [itemFormData, setItemFormData] = useState<any>({
@@ -945,9 +934,6 @@ const ItemsManagementPage: React.FC = () => {
     }
   };
 
-  // ----------------------------------------------------------------------
-  // TARIC modal
-  // ----------------------------------------------------------------------
   const [showTaricModal, setShowTaricModal] = useState(false);
   const [taricMode, setTaricMode] = useState<"create" | "edit">("create");
   const [editingTaricId, setEditingTaricId] = useState<number | null>(null);
@@ -1028,9 +1014,6 @@ const ItemsManagementPage: React.FC = () => {
     }
   };
 
-  // ----------------------------------------------------------------------
-  // Export / sync / bulk / row actions
-  // ----------------------------------------------------------------------
   const handleExportCSV = async (type: "updated" | "new" = "updated") => {
     if (exporting) return;
     setExporting(true);
@@ -1143,21 +1126,18 @@ const ItemsManagementPage: React.FC = () => {
       isLabel: "",
     });
 
-  // ----------------------------------------------------------------------
-  // Table headers / rows (per tab)
-  // ----------------------------------------------------------------------
   const renderTableHeaders = () => {
     switch (activeTab) {
       case "items":
         return (
           <>
-            <th className="px-2 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-[8%]">
+            <th className="px-2 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-[6%]">
               Pic
             </th>
             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-[40%]">
               Name
             </th>
-            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-[22%]">
+            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-[24%]">
               Name DE / CN
             </th>
             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-[12%]">
@@ -1313,19 +1293,25 @@ const ItemsManagementPage: React.FC = () => {
                   {item.item_name || "-"}
                 </div>
                 <div className="text-xs text-gray-500 mt-1 flex items-center gap-1.5 flex-wrap">
-                  {(() => {
-                    const parts = [
-                      item.de_no,
-                      item.customer_name || item.company_name || item.company,
-                      item.isLabelPrint ? "Label" : null
-                    ].filter(Boolean);
-                    if (parts.length === 0) return null;
-                    return (
-                      <span className="font-semibold text-gray-600">
-                        {parts.join(" - ")}
+                  <span className="font-semibold text-gray-700">
+                    {item.de_no || "-"}
+                  </span>
+                  {(item.customer_name || item.company_name || item.company) && (
+                    <>
+                      <span>-</span>
+                      <span className="text-blue-600 font-medium">
+                        {item.customer_name || item.company_name || item.company}
                       </span>
-                    );
-                  })()}
+                    </>
+                  )}
+                  {item.isLabelPrint && (
+                    <>
+                      <span>-</span>
+                      <span className="px-1.5 py-0.5 text-[10px] font-bold bg-green-50 text-green-700 border border-green-200 rounded uppercase tracking-wider">
+                        Label
+                      </span>
+                    </>
+                  )}
                 </div>
               </td>
               <td className="px-4 py-3">
@@ -1624,9 +1610,6 @@ const ItemsManagementPage: React.FC = () => {
     }
   };
 
-  // ----------------------------------------------------------------------
-  // Small editable cell helper for the popup
-  // ----------------------------------------------------------------------
   const Field = ({
     label,
     children,
@@ -1853,11 +1836,8 @@ const ItemsManagementPage: React.FC = () => {
         {showFilters && (
           <div className="mb-6 p-3 bg-white border border-gray-200 rounded-md shadow-sm">
             {activeTab === "items" ? (
-              <div className="flex flex-wrap items-end gap-4 w-full">
+              <div className="flex flex-wrap items-center gap-4 w-full">
                 <div className="relative flex-grow flex-shrink flex-1 min-w-[140px]">
-                  <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">
-                    Name
-                  </label>
                   <div className="relative">
                     <MagnifyingGlassIcon className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                     <input
@@ -1883,9 +1863,6 @@ const ItemsManagementPage: React.FC = () => {
                   </div>
                 </div>
                 <div className="relative flex-grow flex-shrink flex-1 min-w-[120px]">
-                  <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">
-                    Item No
-                  </label>
                   <div className="relative">
                     <Hash className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                     <input
@@ -1911,9 +1888,6 @@ const ItemsManagementPage: React.FC = () => {
                   </div>
                 </div>
                 <div className="flex-grow flex-shrink flex-1 min-w-[180px]">
-                  <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">
-                    Tags
-                  </label>
                   <TagFilterSelector
                     category="item"
                     compact={true}
@@ -1926,9 +1900,6 @@ const ItemsManagementPage: React.FC = () => {
                   />
                 </div>
                 <div className="relative flex-grow flex-shrink flex-1 min-w-[120px]">
-                  <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">
-                    Company
-                  </label>
                   <div className="relative">
                     <input
                       type="text"
@@ -1953,10 +1924,7 @@ const ItemsManagementPage: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="flex-grow flex-shrink flex-1 min-w-[100px]">
-                  <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">
-                    isLabel
-                  </label>
+                <div className="w-[90px] flex-shrink-0">
                   <select
                     value={filters.isLabel || ""}
                     onChange={(e) =>
@@ -1974,9 +1942,6 @@ const ItemsManagementPage: React.FC = () => {
                 </div>
 
                 <div className="flex-grow flex-shrink flex-1 min-w-[150px]">
-                  <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">
-                    Supplier
-                  </label>
                   <select
                     value={filters.supplier}
                     onChange={(e) =>
@@ -1995,10 +1960,7 @@ const ItemsManagementPage: React.FC = () => {
                     ))}
                   </select>
                 </div>
-                <div className="flex-grow flex-shrink flex-1 min-w-[140px]">
-                  <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">
-                    Category
-                  </label>
+                <div className="w-[105px] flex-shrink-0">
                   <select
                     value={filters.category}
                     onChange={(e) =>
@@ -2009,7 +1971,7 @@ const ItemsManagementPage: React.FC = () => {
                       : "text-gray-400 border-gray-300 bg-white"
                       }`}
                   >
-                    <option value="">Category...</option>
+                    <option value="">Cat...</option>
                     {Array.from(
                       new Set(categories.map((c) => c.name?.toString().trim())),
                     )
@@ -2022,13 +1984,13 @@ const ItemsManagementPage: React.FC = () => {
                       ))}
                   </select>
                 </div>
-                <div className="shrink-0 flex items-end">
+                <div className="shrink-0">
                   <button
                     onClick={resetFilters}
-                    className="w-full lg:w-auto px-4 py-2 text-xs font-semibold text-rose-600 hover:text-rose-800 flex items-center justify-center gap-1.5 border border-rose-200 rounded-lg bg-rose-50/50 hover:bg-rose-50 whitespace-nowrap"
+                    className="w-full lg:w-auto px-2.5 py-2 text-xs font-semibold text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 rounded-md transition-colors flex items-center justify-center gap-1.5 whitespace-nowrap"
                   >
                     <ArrowPathIcon className="w-3.5 h-3.5" />
-                    Reset Filters
+                    Reset
                   </button>
                 </div>
               </div>
