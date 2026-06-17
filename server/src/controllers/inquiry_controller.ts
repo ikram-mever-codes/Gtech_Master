@@ -190,6 +190,41 @@ export class InquiryController {
   private contactPersonRepository: any =
     AppDataSource.getRepository(ContactPerson);
 
+  private getLetterSuffix(index: number): string {
+    let suffix = "";
+    let temp = index;
+    while (temp >= 0) {
+      suffix = String.fromCharCode((temp % 26) + 97) + suffix;
+      temp = Math.floor(temp / 26) - 1;
+    }
+    return suffix;
+  }
+
+  private async getNextInquiryNo(): Promise<string> {
+    const currentYear = new Date().getFullYear();
+    const yearSuffix = currentYear.toString().slice(-2);
+    const prefix = `AF${yearSuffix}-`;
+
+    const lastInquiry = await this.inquiryRepository
+      .createQueryBuilder("inquiry")
+      .where("inquiry.inquiryNo LIKE :prefix", { prefix: `${prefix}%` })
+      .orderBy("inquiry.inquiryNo", "DESC")
+      .getOne();
+
+    let nextCounter = 1;
+    if (lastInquiry && lastInquiry.inquiryNo) {
+      const parts = lastInquiry.inquiryNo.split("-");
+      if (parts.length === 2) {
+        const lastCounter = parseInt(parts[1], 10);
+        if (!isNaN(lastCounter)) {
+          nextCounter = lastCounter + 1;
+        }
+      }
+    }
+
+    return `${prefix}${String(nextCounter).padStart(3, "0")}`;
+  }
+
   async getAllInquiries(request: Request, response: Response) {
     try {
       const {
@@ -395,6 +430,10 @@ export class InquiryController {
         purchasePrice,
         purchasePriceCurrency,
         requests,
+        total_potential_k_eur,
+        next_followup_at,
+        owner_user_id,
+        next_action,
       } = request.body;
 
       if (!name || !customerId) {
@@ -430,11 +469,14 @@ export class InquiryController {
         }
       }
 
+      const inquiryNo = await this.getNextInquiryNo();
+
       const inquiry = this.inquiryRepository.create({
         name,
         description,
         image,
         isAssembly: isAssembly || false,
+        inquiryNo,
         customer,
         contactPerson,
         status: status || "Draft",
@@ -462,6 +504,10 @@ export class InquiryController {
         packageType,
         purchasePrice,
         purchasePriceCurrency,
+        total_potential_k_eur,
+        next_followup_at: next_followup_at || null,
+        owner_user_id,
+        next_action,
       });
 
       const savedInquiry = await this.inquiryRepository.save(inquiry);
@@ -477,7 +523,7 @@ export class InquiryController {
           await starBusinessDetailsRepository.save(starBusinessDetails);
         }
 
-        const requestEntities = requests.map((reqData: any) => {
+        const requestEntities = requests.map((reqData: any, index: number) => {
           let totalWeight = null;
           const currentQty = reqData.qty || reqData.quantity;
           if (reqData.unitWeight && currentQty) {
@@ -487,6 +533,7 @@ export class InquiryController {
           const { id: _ignored, ...reqDataWithoutId } = reqData;
           const requestItem = this.requestRepository.create({
             ...reqDataWithoutId,
+            itemNo: `${inquiryNo}${this.getLetterSuffix(index)}`,
             businessId: starBusinessDetails.id,
             business: starBusinessDetails,
             inquiry: savedInquiry,
@@ -564,6 +611,10 @@ export class InquiryController {
         purchasePrice,
         purchasePriceCurrency,
         requests,
+        total_potential_k_eur,
+        next_followup_at,
+        owner_user_id,
+        next_action,
       } = request.body;
 
       const existingInquiry = await this.inquiryRepository.findOne({
@@ -581,6 +632,13 @@ export class InquiryController {
           success: false,
           message: "Inquiry not found",
         });
+      }
+
+      let inquiryNo = existingInquiry.inquiryNo;
+      if (!inquiryNo) {
+        inquiryNo = await this.getNextInquiryNo();
+        existingInquiry.inquiryNo = inquiryNo;
+        await this.inquiryRepository.update(id, { inquiryNo });
       }
 
       let contactPerson = null;
@@ -629,6 +687,10 @@ export class InquiryController {
         ...(packageType !== undefined && { packageType }),
         ...(purchasePrice !== undefined && { purchasePrice }),
         ...(purchasePriceCurrency !== undefined && { purchasePriceCurrency }),
+        ...(total_potential_k_eur !== undefined && { total_potential_k_eur }),
+        ...(next_followup_at !== undefined && { next_followup_at: next_followup_at || null }),
+        ...(owner_user_id !== undefined && { owner_user_id }),
+        ...(next_action !== undefined && { next_action }),
       };
 
       if (contactPerson !== undefined) {
@@ -655,7 +717,7 @@ export class InquiryController {
           }
 
           if (starBusinessDetails) {
-            const requestEntities = requests.map((reqData: any) => {
+            const requestEntities = requests.map((reqData: any, index: number) => {
               let totalWeight = null;
               const currentQty = reqData.qty || reqData.quantity;
               if (reqData.unitWeight && currentQty) {
@@ -667,6 +729,7 @@ export class InquiryController {
 
               const requestItem = this.requestRepository.create({
                 ...reqDataWithoutId,
+                itemNo: `${inquiryNo}${this.getLetterSuffix(index)}`,
                 businessId: starBusinessDetails.id,
                 business: starBusinessDetails,
                 inquiry: existingInquiry,

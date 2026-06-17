@@ -54,6 +54,7 @@ import {
 } from "@/api/requested_items";
 import { getAllCustomers } from "@/api/customers";
 import { getAllContactPersons } from "@/api/contacts";
+import { getAllUsers } from "@/api/user";
 import CustomButton from "@/components/UI/CustomButton";
 import CustomModal from "@/components/UI/CustomModal";
 import { useSelector } from "react-redux";
@@ -262,6 +263,7 @@ const CombinedInquiriesPageContent = () => {
   const { user } = useSelector((state: RootState) => state.user);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [contactPersons, setContactPersons] = useState<ContactPerson[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
   const [editModeEnabled, setEditModeEnabled] = useState(false);
   const [existingDimensionFields, setExistingDimensionFields] = useState<{
@@ -323,10 +325,15 @@ const CombinedInquiriesPageContent = () => {
     taric: "",
     requestStatus: "Draft",
     itemNo: "",
+    inquiryNo: "",
     urgency1: "",
     urgency2: "",
     painPoints: [],
     requests: [],
+    total_potential_k_eur: 0,
+    next_followup_at: undefined,
+    owner_user_id: "",
+    next_action: "",
   });
   const [inquiryTagInput, setInquiryTagInput] = useState("");
   const [requestLoopTagInputs, setRequestLoopTagInputs] = useState<any>({});
@@ -408,14 +415,12 @@ const CombinedInquiriesPageContent = () => {
   } as any);
 
   const itemsPerPage = 20;
-
-  // ── NEW: track whether we've already auto-opened from the URL param ──
   const [urlParamHandled, setUrlParamHandled] = useState(false);
-
   useEffect(() => {
     fetchCustomers();
     fetchContactPersons();
     fetchTarics();
+    fetchUsers();
   }, []);
   const fetchTarics = async () => {
     try {
@@ -437,8 +442,6 @@ const CombinedInquiriesPageContent = () => {
     try {
       const targetInquiry = allInquiries.find((i) => i.id === inquiryId);
       if (!targetInquiry) return;
-
-      // Format nested requests data ensuring qty matches payload expectation
       const requestsData = (targetInquiry.requests || []).map((req: any) => ({
         ...req,
         qty: req.qty?.toString() || "1",
@@ -486,7 +489,6 @@ const CombinedInquiriesPageContent = () => {
       console.error("Error updating inquiry status:", error);
     }
   };
-  // ── UPDATED: open the inquiry from URL param once allInquiries is loaded ──
   useEffect(() => {
     if (urlParamHandled) return;
     const inquiryId = searchParams.get("inquiryId");
@@ -498,8 +500,6 @@ const CombinedInquiriesPageContent = () => {
       }
     }
   }, [searchParams, allInquiries, urlParamHandled]);
-
-  // ── NEW: copy a shareable link for a given inquiry ──
   const handleCopyInquiryLink = (e: React.MouseEvent, inquiryId: string) => {
     e.stopPropagation();
     const url = `${window.location.origin}${window.location.pathname}?inquiryId=${inquiryId}`;
@@ -573,6 +573,16 @@ const CombinedInquiriesPageContent = () => {
       console.error("Error fetching contact persons:", error);
     }
   };
+  const fetchUsers = async () => {
+    try {
+      const response = await getAllUsers();
+      if (response?.data) {
+        setUsers(response.data);
+      }
+    } catch (error) {
+      console.error("Error fetching users:", error);
+    }
+  };
   const fetchInquiries = useCallback(async () => {
     setInquiryLoading(true);
     try {
@@ -587,8 +597,6 @@ const CombinedInquiriesPageContent = () => {
         let inquiryData = Array.isArray(response.data)
           ? response.data
           : response.data.data || response.data.inquiries || [];
-
-        // Apply client-side request items tags filtering if selected
         if (inquiryFilters.requestItemTags) {
           const tagFilters = inquiryFilters.requestItemTags.split(",");
           const includeTagIds = tagFilters.filter((t: string) => !t.startsWith("!")).map((t: string) => t);
@@ -700,10 +708,15 @@ const CombinedInquiriesPageContent = () => {
       purchasePrice: inquiry.purchasePrice,
       purchasePriceCurrency: inquiry.purchasePriceCurrency || "RMB",
       itemNo: inquiry.itemNo || "",
+      inquiryNo: inquiry.inquiryNo || "",
       urgency1: inquiry.urgency1 || "",
       urgency2: inquiry.urgency2 || "",
       painPoints: inquiry.painPoints || [],
       requests: inquiry.requests || [],
+      total_potential_k_eur: inquiry.total_potential_k_eur || 0,
+      next_followup_at: inquiry.next_followup_at,
+      owner_user_id: inquiry.owner_user_id || "",
+      next_action: inquiry.next_action || "",
     });
     setNewInquiryTags((inquiry as any).tags || []);
     setInquiryImagePreview(inquiry.image || "");
@@ -880,10 +893,15 @@ const CombinedInquiriesPageContent = () => {
       taric: "",
       requestStatus: "Draft",
       itemNo: "",
+      inquiryNo: "",
       urgency1: "",
       urgency2: "",
       painPoints: [],
       requests: [],
+      total_potential_k_eur: 0,
+      next_followup_at: undefined,
+      owner_user_id: "",
+      next_action: "",
     });
     setInquiryRequests([
       {
@@ -1126,6 +1144,11 @@ const CombinedInquiriesPageContent = () => {
     };
     return colors[priority] || "bg-gray-100 text-gray-800";
   };
+  const getHighestPriority = (requests?: any[]) => {
+    if (!requests || requests.length === 0) return "-";
+    const hasHigh = requests.some(r => r.priority === "High");
+    return hasHigh ? "High" : "Normal";
+  };
   const formatDate = (dateString: string | Date) => {
     if (!dateString) return "-";
     return new Date(dateString).toLocaleDateString("de-DE", {
@@ -1297,22 +1320,31 @@ const CombinedInquiriesPageContent = () => {
                 <thead className="bg-gray-200/50 border-b border-gray-200/50">
                   <tr>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Inquiry Details
+                      Inquiry
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Customer & Contact
+                      Company / Contacts
                     </th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Items & Value
+                      Request Items
+                    </th>
+                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      VP
                     </th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Status
                     </th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Asana
+                      Highest Priority
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Next Action
                     </th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Actions
+                      Follow-up
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Owner
                     </th>
                   </tr>
                 </thead>
@@ -1320,27 +1352,49 @@ const CombinedInquiriesPageContent = () => {
                   {inquiries.map((inquiry) => (
                     <React.Fragment key={inquiry.id}>
                       <tr className="hover:bg-gray-50/50 transition-colors">
-                        <td
-                          className="px-4 py-3 cursor-pointer"
-                          onClick={() => handleInquiryClick(inquiry)}
-                        >
-                          <div className="w-[12rem]">
-                            <div className="text-sm font-medium text-gray-900 flex items-center gap-2">
-                              {inquiry.name}
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (inquiry.requests && inquiry.requests.length > 0) {
+                                  toggleInquiryRequests(inquiry.id);
+                                }
+                              }}
+                              className={`${!inquiry.requests || inquiry.requests.length === 0
+                                ? "text-red-500 hover:text-red-700 cursor-not-allowed"
+                                : "text-gray-400 hover:text-gray-700"
+                                } flex-shrink-0 mt-0.5`}
+                              title={
+                                !inquiry.requests || inquiry.requests.length === 0
+                                  ? "No requests yet"
+                                  : expandedInquiryIds.has(inquiry.id)
+                                    ? "Hide requests"
+                                    : "Show requests"
+                              }
+                              disabled={!inquiry.requests || inquiry.requests.length === 0}
+                            >
+                              <ChevronRightIcon
+                                className={`h-4 w-4 transition-transform duration-200 ${expandedInquiryIds.has(inquiry.id) ? "rotate-90" : ""
+                                  }`}
+                              />
+                            </button>
+                            <div
+                              className="cursor-pointer font-medium text-gray-900 flex items-center gap-1.5"
+                              onClick={() => handleInquiryClick(inquiry)}
+                            >
+                              {inquiry.inquiryNo && (
+                                <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded font-mono font-semibold">
+                                  {inquiry.inquiryNo}
+                                </span>
+                              )}
+                              <span>{inquiry.name}</span>
                               {inquiry.isAssembly && (
                                 <CubeIcon
                                   className="h-4 w-4 text-blue-500"
                                   title="Assembly Item"
                                 />
                               )}
-                            </div>
-                            {inquiry.description && (
-                              <div className="text-xs text-gray-500 truncate">
-                                {inquiry.description}
-                              </div>
-                            )}
-                            <div className="text-xs text-gray-400 mt-1">
-                              Created: {formatDate(inquiry.createdAt)}
                             </div>
                           </div>
                         </td>
@@ -1350,37 +1404,30 @@ const CombinedInquiriesPageContent = () => {
                         >
                           <div className="w-[10rem]">
                             <a
-                              href={`/customers/${inquiry.customer.id}`}
-                              className="text-sm text-blue-600 hover:text-blue-800 block"
+                              href={`/customers/${inquiry.customer?.id}`}
+                              className="text-sm text-blue-600 hover:text-blue-800 block font-medium"
                               onClick={(e: any) => e.stopPropagation()}
                             >
                               {inquiry.customer?.companyName || "-"}
                             </a>
                             {inquiry.contactPerson && (
-                              <div className="text-sm text-gray-600 truncate">
+                              <div className="text-xs text-gray-600 truncate mt-0.5">
                                 {inquiry.contactPerson?.name}{" "}
                                 {inquiry.contactPerson?.familyName}
                               </div>
                             )}
                           </div>
                         </td>
-                        <td className="px-4 py-3 text-center">
-                          <div className="space-y-1">
-                            <div className="text-sm font-medium text-gray-900">
-                              {inquiry.requests?.length || 0} items
-                            </div>
-                            {inquiry.totalEstimatedCost && (
-                              <div className="text-xs text-gray-500">
-                                {formatCurrency(
-                                  inquiry.totalEstimatedCost,
-                                  "USD",
-                                )}
-                              </div>
-                            )}
-                          </div>
+                        <td className="px-4 py-3 text-center text-sm font-medium text-gray-900">
+                          {inquiry.requests?.length || 0}
+                        </td>
+                        <td className="px-4 py-3 text-center text-sm text-gray-900 font-medium">
+                          {inquiry.total_potential_k_eur !== undefined && inquiry.total_potential_k_eur !== null
+                            ? `${inquiry.total_potential_k_eur} k €`
+                            : "-"}
                         </td>
                         <td className="px-4 py-3">
-                          <div className="flex flex-col gap-1 items-center">
+                          <div className="flex justify-center">
                             <select
                               value={inquiry.status}
                               onChange={async (e: any) => {
@@ -1389,7 +1436,7 @@ const CombinedInquiriesPageContent = () => {
                                   e.target.value,
                                 );
                               }}
-                              className={`text-xs w-[7rem] px-2 py-1 rounded-full font-medium border-0 cursor-pointer ${getInquiryStatusColor(
+                              className={`text-xs w-[7.5rem] px-2.5 py-1 rounded-full font-medium border-0 cursor-pointer ${getInquiryStatusColor(
                                 inquiry.status,
                               )}`}
                             >
@@ -1399,106 +1446,40 @@ const CombinedInquiriesPageContent = () => {
                                 </option>
                               ))}
                             </select>
-                            <span
-                              className={`text-xs px-2 py-1 rounded-full font-medium ${getInquiryPriorityColor(
-                                inquiry.priority,
-                              )}`}
-                            >
-                              {inquiry.priority}
-                            </span>
                           </div>
                         </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center justify-center">
-                            {inquiry.asanaLink ? (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  window.open(inquiry.asanaLink, "_blank");
-                                }}
-                                className="text-purple-500 hover:text-purple-700 transition-colors p-1"
-                                title="Open Asana task"
-                              >
-                                <svg
-                                  className="h-5 w-5"
-                                  viewBox="0 0 24 24"
-                                  fill="currentColor"
-                                >
-                                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z" />
-                                  <circle cx="12" cy="8.5" r="1.5" />
-                                  <circle cx="8.5" cy="14.5" r="1.5" />
-                                  <circle cx="15.5" cy="14.5" r="1.5" />
-                                </svg>
-                              </button>
-                            ) : (
-                              <span
-                                className="text-red-500 font-bold text-lg animate-pulse"
-                                title="Missing Asana Link"
-                              >
-                                !
-                              </span>
-                            )}
-                          </div>
+                        <td className="px-4 py-3 text-center">
+                          {(() => {
+                            const hp = getHighestPriority(inquiry.requests);
+                            if (hp === "-") return <span className="text-gray-400">-</span>;
+                            const badgeColor = hp === "High" ? "bg-orange-100 text-orange-800" : "bg-gray-100 text-gray-800";
+                            return (
+                              <div className="flex justify-center">
+                                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${badgeColor}`}>
+                                  {hp}
+                                </span>
+                              </div>
+                            );
+                          })()}
                         </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center justify-center gap-2">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                toggleInquiryRequests(inquiry.id);
-                              }}
-                              className={`px-2 py-1 text-xs rounded-lg transition-all flex items-center gap-1 ${expandedInquiryIds.has(inquiry.id)
-                                ? "bg-blue-100 text-blue-800"
-                                : "bg-blue-500 text-white hover:bg-blue-600"
-                                }`}
-                            >
-                              {expandedInquiryIds.has(inquiry.id) ? (
-                                <EyeSlashIcon className="h-3 w-3" />
-                              ) : (
-                                <EyeIcon className="h-3 w-3" />
-                              )}
-                              Requests ({inquiry.requests?.length || 0})
-                            </button>
-                            {inquiry.projectLink && (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  window.open(inquiry.projectLink, "_blank");
-                                }}
-                                className="text-blue-500 hover:text-blue-700 transition-colors p-1"
-                                title="Open project link"
-                              >
-                                <LinkIcon className="h-4 w-4" />
-                              </button>
-                            )}
-                            <button
-                              onClick={(e) =>
-                                handleCopyInquiryLink(e, inquiry.id)
-                              }
-                              className="text-gray-400 hover:text-gray-600 transition-colors p-1"
-                              title="Copy shareable link"
-                            >
-                              <ClipboardDocumentListIcon className="h-4 w-4" />
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleConvertInquiryClick(inquiry);
-                              }}
-                              className="px-2 py-1 text-xs bg-green-500 text-white rounded hover:bg-green-600 transition-all flex items-center gap-1"
-                              title="Convert to item"
-                            >
-                              <ArrowRightIcon className="h-3 w-3" />
-                              Convert
-                            </button>
-                          </div>
+                        <td className="px-4 py-3 text-left text-sm text-gray-700 max-w-[15rem] truncate" title={inquiry.next_action || ""}>
+                          {inquiry.next_action || <span className="text-gray-400">-</span>}
+                        </td>
+                        <td className="px-4 py-3 text-center text-sm text-gray-900 font-medium">
+                          {inquiry.next_followup_at ? formatDate(inquiry.next_followup_at) : <span className="text-gray-400">-</span>}
+                        </td>
+                        <td className="px-4 py-3 text-left text-sm text-gray-900 font-medium">
+                          {(() => {
+                            const ownerUser = users.find((u) => u.id === inquiry.owner_user_id);
+                            return ownerUser ? ownerUser.name : <span className="text-gray-400">-</span>;
+                          })()}
                         </td>
                       </tr>
                       {expandedInquiryIds.has(inquiry.id) &&
                         inquiry.requests &&
                         inquiry.requests.length > 0 && (
                           <tr className="bg-gray-50/30">
-                            <td colSpan={6} className="px-4 py-3">
+                            <td colSpan={9} className="px-4 py-3">
                               <div className="overflow-x-auto">
                                 <table className="w-full text-sm border border-gray-200 rounded-lg">
                                   <thead className="bg-gray-200/50 border-b border-gray-200/50">
@@ -1542,9 +1523,14 @@ const CombinedInquiriesPageContent = () => {
                                       >
                                         <td className="px-4 py-3">
                                           <div className="w-[8rem]">
-                                            <div className="text-sm font-medium text-gray-900">
-                                              {request.itemName}
-                                            </div>
+                                             <div className="text-sm font-medium text-gray-900 flex items-center gap-1.5 flex-wrap">
+                                               {request.itemNo && (
+                                                 <span className="text-[10px] font-mono text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded font-semibold">
+                                                   {request.itemNo}
+                                                 </span>
+                                               )}
+                                               <span>{request.itemName}</span>
+                                             </div>
                                             {request.material && (
                                               <div className="text-xs text-gray-500">
                                                 {request.material}
@@ -1919,7 +1905,20 @@ const CombinedInquiriesPageContent = () => {
                           placeholder="PT0171 - Untere Schiebemuffe"
                         />
                       </div>
-                      <div className="col-span-1">
+                      {inquiryFormData.inquiryNo && (
+                        <div className="col-span-1">
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            Inquiry Number
+                          </label>
+                          <input
+                            type="text"
+                            value={inquiryFormData.inquiryNo}
+                            disabled
+                            className="w-full px-3 py-2 text-sm border border-gray-300 bg-gray-100 rounded-lg font-mono font-semibold text-gray-600 cursor-not-allowed"
+                          />
+                        </div>
+                      )}
+                      <div className={inquiryFormData.inquiryNo ? "col-span-1" : "col-span-2"}>
                         <label className="block text-xs font-medium text-gray-700 mb-1">
                           Status
                         </label>
@@ -1989,6 +1988,95 @@ const CombinedInquiriesPageContent = () => {
                             disabled={!editModeEnabled}
                           />
                         )}
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                          VP (k EUR)
+                        </label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={inquiryFormData.total_potential_k_eur ?? 0}
+                          onChange={(e) =>
+                            setInquiryFormData({
+                              ...inquiryFormData,
+                              total_potential_k_eur: parseFloat(e.target.value) || 0,
+                            })
+                          }
+                          disabled={
+                            inquiryModalMode === "edit" && !editModeEnabled
+                          }
+                          className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                          placeholder="0.00"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                          Owner
+                        </label>
+                        <select
+                          value={inquiryFormData.owner_user_id || ""}
+                          onChange={(e) =>
+                            setInquiryFormData({
+                              ...inquiryFormData,
+                              owner_user_id: e.target.value,
+                            })
+                          }
+                          disabled={
+                            inquiryModalMode === "edit" && !editModeEnabled
+                          }
+                          className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                        >
+                          <option value="">Select Owner</option>
+                          {users.map((u) => (
+                            <option key={u.id} value={u.id}>
+                              {u.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                          Next Action
+                        </label>
+                        <input
+                          type="text"
+                          value={inquiryFormData.next_action || ""}
+                          onChange={(e) =>
+                            setInquiryFormData({
+                              ...inquiryFormData,
+                              next_action: e.target.value,
+                            })
+                          }
+                          disabled={
+                            inquiryModalMode === "edit" && !editModeEnabled
+                          }
+                          className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                          placeholder="e.g. Call client"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                          Follow-up Date
+                        </label>
+                        <input
+                          type="date"
+                          value={
+                            inquiryFormData.next_followup_at
+                              ? new Date(inquiryFormData.next_followup_at).toISOString().split("T")[0]
+                              : ""
+                          }
+                          onChange={(e) =>
+                            setInquiryFormData({
+                              ...inquiryFormData,
+                              next_followup_at: e.target.value || undefined,
+                            })
+                          }
+                          disabled={
+                            inquiryModalMode === "edit" && !editModeEnabled
+                          }
+                          className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                        />
                       </div>
                       <div className="col-span-2">
                         <div

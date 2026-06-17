@@ -52,6 +52,7 @@ export interface Request {
 export interface Inquiry {
   id: string;
   name: string;
+  inquiryNo?: string;
   description?: string;
   weight?: number;
   width?: number;
@@ -101,10 +102,15 @@ export interface Inquiry {
   tagOrder?: string;
   createdAt: Date;
   updatedAt: Date;
+  total_potential_k_eur?: number;
+  next_followup_at?: string;
+  owner_user_id?: string;
+  next_action?: string;
 }
 
 export interface CreateInquiryPayload {
   name: string;
+  inquiryNo?: string;
   description?: string;
   image?: string;
   weight?: number;
@@ -141,6 +147,10 @@ export interface CreateInquiryPayload {
   assemblyInstructions?: string;
   deliveryAddress?: Omit<DeliveryAddress, "id">;
   requests?: Omit<Request, "id" | "inquiryId" | "inquiry">[];
+  total_potential_k_eur?: number;
+  next_followup_at?: string;
+  owner_user_id?: string;
+  next_action?: string;
 }
 
 export interface UpdateInquiryPayload extends Partial<CreateInquiryPayload> {

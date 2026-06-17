@@ -1979,10 +1979,12 @@ const ItemsManagementPage: React.FC = () => {
         {showFilters && (
           <div className="mb-6 p-3 bg-white border border-gray-200 rounded-md shadow-sm">
             {activeTab === "items" ? (
-              <div className="flex flex-wrap items-center gap-4 w-full">
+              <div className="flex flex-wrap lg:flex-nowrap items-center gap-2 w-full">
+                <div className="flex items-center gap-1.5 text-gray-400 shrink-0 select-none px-1">
+                  <FunnelIcon className="w-5 h-5 text-primary" />
+                </div>
                 <div className="relative flex-grow flex-shrink flex-1 min-w-[140px]">
                   <div className="relative">
-                    <MagnifyingGlassIcon className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                     <input
                       type="text"
                       placeholder="Name..."
@@ -1990,11 +1992,10 @@ const ItemsManagementPage: React.FC = () => {
                       onChange={(e) =>
                         setFilters({ ...filters, search: e.target.value })
                       }
-                      className={`w-full pl-8 pr-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${
-                        filters.search
-                          ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
-                          : "text-gray-900 border-gray-300 bg-white"
-                      }`}
+                      className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${filters.search
+                        ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+                        : "text-gray-900 border-gray-300 bg-white"
+                        }`}
                     />
                     {filters.search && (
                       <button
@@ -2008,7 +2009,6 @@ const ItemsManagementPage: React.FC = () => {
                 </div>
                 <div className="relative flex-grow flex-shrink flex-1 min-w-[120px]">
                   <div className="relative">
-                    <Hash className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                     <input
                       type="text"
                       placeholder="Item No..."
@@ -2016,11 +2016,10 @@ const ItemsManagementPage: React.FC = () => {
                       onChange={(e) =>
                         setFilters({ ...filters, eanSearch: e.target.value })
                       }
-                      className={`w-full pl-8 pr-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${
-                        filters.eanSearch
-                          ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
-                          : "text-gray-900 border-gray-300 bg-white"
-                      }`}
+                      className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${filters.eanSearch
+                        ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+                        : "text-gray-900 border-gray-300 bg-white"
+                        }`}
                     />
                     {filters.eanSearch && (
                       <button
@@ -2116,13 +2115,12 @@ const ItemsManagementPage: React.FC = () => {
                     onChange={(e) =>
                       setFilters({ ...filters, category: e.target.value })
                     }
-                    className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${
-                      filters.category
-                        ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
-                        : "text-gray-400 border-gray-300 bg-white"
-                    }`}
+                    className={`w-full px-2 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${filters.category
+                      ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+                      : "text-gray-400 border-gray-300 bg-white"
+                      }`}
                   >
-                    <option value="">Cat...</option>
+                    <option value="">Category</option>
                     {Array.from(
                       new Set(categories.map((c) => c.name?.toString().trim())),
                     )
@@ -2182,7 +2180,7 @@ const ItemsManagementPage: React.FC = () => {
             )}
           </div>
         )}
-        {activeTab !== "tarics" && (
+        {activeTab !== "tarics" && activeTab !== "items" && (
           <div className="mb-6">
             <div className="relative">
               <MagnifyingGlassIcon className="w-6 h-6 absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -2193,7 +2191,7 @@ const ItemsManagementPage: React.FC = () => {
                 onChange={(e) =>
                   setFilters({ ...filters, search: e.target.value })
                 }
-                className="w-full pl-12 pr-4 py-3.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary text-gray-700 placeholder-gray-400"
+                className="w-full pr-4 py-3.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary text-gray-700 placeholder-gray-400 pl-12"
               />
               {filters.search && (
                 <button
