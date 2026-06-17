@@ -70,6 +70,9 @@ export class Inquiry {
   name!: string;
 
   @Column({ type: "varchar", length: 255, nullable: true })
+  inquiryNo?: string;
+
+  @Column({ type: "varchar", length: 255, nullable: true })
   itemNo?: string;
 
   @Column({ type: "text", nullable: true })
@@ -244,6 +247,24 @@ export class Inquiry {
 
   @UpdateDateColumn()
   updatedAt!: Date;
+
+  @Column({
+    type: "decimal",
+    precision: 12,
+    scale: 2,
+    nullable: true,
+    default: 0,
+  })
+  total_potential_k_eur?: number;
+
+  @Column({ type: "date", nullable: true })
+  next_followup_at?: Date;
+
+  @Column({ type: "varchar", length: 255, nullable: true })
+  owner_user_id?: string;
+
+  @Column({ type: "text", nullable: true })
+  next_action?: string;
 
   @ManyToMany(() => Tag, (tag) => tag.inquiries)
   @JoinTable({ name: "inquiry_tags" })
