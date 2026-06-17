@@ -67,6 +67,7 @@ import {
 } from "@/api/items";
 import { getAllSuppliers, Supplier } from "@/api/suppliers";
 import { getCategories } from "@/api/categories";
+import { getAllCustomers } from "@/api/customers";
 import { uploadFile, deleteFile } from "@/api/library";
 import {
   successStyles,
@@ -130,7 +131,10 @@ const ItemsManagementPage: React.FC = () => {
   const [refTarics, setRefTarics] = useState<Taric[]>([]);
   const [refSuppliers, setRefSuppliers] = useState<Supplier[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
-
+  const [allCustomers, setAllCustomers] = useState<any[]>([]);
+  const [refDataLoaded, setRefDataLoaded] = useState(false);
+  const refDataLoadingRef = useRef(false);
+  const [itemsFirstLoaded, setItemsFirstLoaded] = useState(false);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [exportingNew, setExportingNew] = useState(false);
@@ -211,10 +215,10 @@ const ItemsManagementPage: React.FC = () => {
   const getThumb = (item: any) =>
     resolveUrl(
       item?.photo ||
-      item?.pix_path_eBay ||
-      item?.pictures?.shopPicture ||
-      (item?.pix_path ? item.pix_path.split(",").filter(Boolean)[0] : null) ||
-      null,
+        item?.pix_path_eBay ||
+        item?.pictures?.shopPicture ||
+        (item?.pix_path ? item.pix_path.split(",").filter(Boolean)[0] : null) ||
+        null,
     );
 
   const formatDate = (d: string | Date | null | undefined) => {
@@ -421,35 +425,38 @@ const ItemsManagementPage: React.FC = () => {
     setTabData((prev) => ({ ...prev, items: [], warehouse: [] }));
     fetchTab(activeTab, true);
   }, [auditFilter]);
-  useEffect(() => {
-    let active = true;
-    (async () => {
-      try {
-        const [parentsRes, taricsRes, catsRes, suppliersRes]: any =
-          await Promise.all([
-            getParents({ limit: 1000, isActive: "Y" }),
-            getAllTarics({ limit: 1000 }),
-            getCategories(),
-            getAllSuppliers({ limit: 1000 }),
-          ]);
-        if (!active) return;
-        if (parentsRes?.data) setRefParents(parentsRes.data);
-        if (taricsRes?.data) setRefTarics(taricsRes.data);
-        if (catsRes?.data)
-          setCategories(
-            catsRes.data.filter(
-              (c: any) => !c.name?.toString().trim().startsWith("Imported"),
-            ),
-          );
-        if (suppliersRes?.data) setRefSuppliers(suppliersRes.data);
-      } catch (e) {
-        console.error("Failed to fetch reference data", e);
-      }
-    })();
-    return () => {
-      active = false;
-    };
-  }, []);
+
+  // items have painted, or the first time a modal that needs it opens.
+  const loadReferenceData = useCallback(async () => {
+    if (refDataLoadingRef.current || refDataLoaded) return;
+    refDataLoadingRef.current = true;
+    try {
+      const [parentsRes, taricsRes, catsRes, suppliersRes, customersRes]: any =
+        await Promise.all([
+          getParents({ limit: 1000, isActive: "Y" }),
+          getAllTarics({ limit: 1000 }),
+          getCategories(),
+          getAllSuppliers({ limit: 1000 }),
+          getAllCustomers({ limit: 1000 }),
+        ]);
+      if (parentsRes?.data) setRefParents(parentsRes.data);
+      if (taricsRes?.data) setRefTarics(taricsRes.data);
+      if (catsRes?.data)
+        setCategories(
+          catsRes.data.filter(
+            (c: any) => !c.name?.toString().trim().startsWith("Imported"),
+          ),
+        );
+      if (suppliersRes?.data) setRefSuppliers(suppliersRes.data);
+      if (customersRes?.data)
+        setAllCustomers(customersRes.data.customers || customersRes.data || []);
+      setRefDataLoaded(true);
+    } catch (e) {
+      console.error("Failed to fetch reference data", e);
+    } finally {
+      refDataLoadingRef.current = false;
+    }
+  }, [refDataLoaded]);
 
   const refreshCounts = useCallback(async () => {
     try {
@@ -467,8 +474,17 @@ const ItemsManagementPage: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (activeTab === "items") refreshCounts();
-  }, [activeTab, refreshCounts]);
+    if (!itemsFirstLoaded) return;
+    const t1 = setTimeout(() => loadReferenceData(), 300);
+    const t2 = setTimeout(() => {
+      if (activeTab === "items") refreshCounts();
+    }, 800);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [itemsFirstLoaded]);
 
   useEffect(() => {
     const supplierParam = searchParams.get("supplier");
@@ -521,11 +537,18 @@ const ItemsManagementPage: React.FC = () => {
     return res;
   }, [tabData, activeTab, filters, taricSearch]);
 
-  const totalRecords = activeTab === "items" ? itemsTotalRecords : filteredAll.length;
-  const totalPages = activeTab === "items" ? itemsTotalPages : Math.max(1, Math.ceil(totalRecords / PAGE_LIMIT));
+  const totalRecords =
+    activeTab === "items" ? itemsTotalRecords : filteredAll.length;
+  const totalPages =
+    activeTab === "items"
+      ? itemsTotalPages
+      : Math.max(1, Math.ceil(totalRecords / PAGE_LIMIT));
   const safePage = Math.min(page, totalPages);
   const pageData = useMemo(
-    () => activeTab === "items" ? filteredAll : filteredAll.slice((safePage - 1) * PAGE_LIMIT, safePage * PAGE_LIMIT),
+    () =>
+      activeTab === "items"
+        ? filteredAll
+        : filteredAll.slice((safePage - 1) * PAGE_LIMIT, safePage * PAGE_LIMIT),
     [filteredAll, safePage, activeTab],
   );
   const [showItemPreview, setShowItemPreview] = useState(false);
@@ -535,6 +558,10 @@ const ItemsManagementPage: React.FC = () => {
   const [previewEdit, setPreviewEdit] = useState(false);
   const [previewSaving, setPreviewSaving] = useState(false);
   const [previewQuality, setPreviewQuality] = useState<any[]>([]);
+  const [customerSearch, setCustomerSearch] = useState("");
+  const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
+  const pictureInputRef = useRef<HTMLInputElement>(null);
+  const [uploadingPictures, setUploadingPictures] = useState(false);
 
   const toBool = (v: any) =>
     v === "Y" || v === "Yes" || v === true || v === 1 || v === "1";
@@ -561,23 +588,23 @@ const ItemsManagementPage: React.FC = () => {
         raw.supplierItem ||
         (def
           ? {
-            priceRMB: def.priceRMB || "0",
-            isPO: def.isPO || "No",
-            moq: def.moq || "0",
-            interval: def.interval || "0",
-            leadTime: def.leadTime || "",
-            noteCN: def.noteCN || "",
-            url: def.url || "",
-          }
+              priceRMB: def.priceRMB || "0",
+              isPO: def.isPO || "No",
+              moq: def.moq || "0",
+              interval: def.interval || "0",
+              leadTime: def.leadTime || "",
+              noteCN: def.noteCN || "",
+              url: def.url || "",
+            }
           : {
-            priceRMB: "0",
-            isPO: "No",
-            moq: "0",
-            interval: "0",
-            leadTime: "",
-            noteCN: "",
-            url: "",
-          }),
+              priceRMB: "0",
+              isPO: "No",
+              moq: "0",
+              interval: "0",
+              leadTime: "",
+              noteCN: "",
+              url: "",
+            }),
       parent: {
         ...raw.parent,
         isActive: toBool(raw.parent?.isActive),
@@ -606,6 +633,7 @@ const ItemsManagementPage: React.FC = () => {
   };
 
   const openItemPreview = async (row: any) => {
+    loadReferenceData();
     setPreviewRow(row);
     setPreviewItem(null);
     setPreviewQuality([]);
@@ -631,6 +659,8 @@ const ItemsManagementPage: React.FC = () => {
     setPreviewRow(null);
     setPreviewItem(null);
     setPreviewEdit(false);
+    setShowCustomerDropdown(false);
+    setCustomerSearch("");
   };
 
   const patchPreview = (patch: any) =>
@@ -645,7 +675,45 @@ const ItemsManagementPage: React.FC = () => {
       ...p,
       supplierItem: { ...p.supplierItem, ...patch },
     }));
+  // Sync the company search box when entering edit mode.
+  useEffect(() => {
+    if (previewEdit && previewItem) {
+      const cust = allCustomers.find(
+        (c) => String(c.id) === String(previewItem?.customer_id),
+      );
+      setCustomerSearch(
+        cust?.companyName ||
+          (previewItem as any)?.customer_name ||
+          getCompany(previewItem) ||
+          "",
+      );
+    } else {
+      setShowCustomerDropdown(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [previewEdit]);
 
+  const previewFilteredCustomers = (() => {
+    const term = customerSearch.trim().toLowerCase();
+    const list = term
+      ? allCustomers.filter((c) =>
+          (c.companyName || "").toLowerCase().includes(term),
+        )
+      : allCustomers;
+    return list.slice(0, 50);
+  })();
+
+  const handleSelectPreviewCustomer = (customer: any) => {
+    patchPreview({ customer_id: customer.id });
+    setCustomerSearch(customer.companyName || "");
+    setShowCustomerDropdown(false);
+  };
+
+  const handleClearPreviewCustomer = () => {
+    patchPreview({ customer_id: null });
+    setCustomerSearch("");
+    setShowCustomerDropdown(false);
+  };
   const buildItemUpdatePayload = (d: any) => {
     const toNum = (v: any) => {
       if (v === null || v === undefined || v === "") return null;
@@ -663,6 +731,7 @@ const ItemsManagementPage: React.FC = () => {
       ean: (d.ean || "").toString(),
       model: d.model,
       remark: d.remark,
+      remark_cn: d.remarkCN ?? d.remark_cn,
       cat_id: toInt(d.category_id),
       isActive: d.isActive ? "Y" : "N",
       weight: toNum(d.dimensions?.weight),
@@ -741,7 +810,55 @@ const ItemsManagementPage: React.FC = () => {
       toast.error(e.message || "Failed to delete item", errorStyles);
     }
   };
+  const uploadPreviewPictures = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const files = e.target.files;
+    if (!files || files.length === 0 || !previewItem) return;
+    const tid = toast.loading("Uploading pictures...", loadingStyles);
+    setUploadingPictures(true);
+    try {
+      const newUrls: string[] = [];
+      for (let i = 0; i < files.length; i++) {
+        const fd = new FormData();
+        fd.append("file", files[i]);
+        const res: any = await uploadFile(fd, false);
+        if (res.data?.url) newUrls.push(res.data.url);
+      }
+      if (newUrls.length > 0) {
+        const pics = {
+          shopPicture: previewItem.pictures?.shopPicture || "",
+          ebayPictures: previewItem.pictures?.ebayPictures || "",
+          pixPath: previewItem.pictures?.pixPath || "",
+        };
+        const gallery = pics.pixPath
+          ? pics.pixPath.split(",").filter(Boolean)
+          : [];
+        newUrls.forEach((url) => {
+          if (!pics.shopPicture) pics.shopPicture = url;
+          else if (!pics.ebayPictures) pics.ebayPictures = url;
+          else gallery.push(url);
+        });
+        pics.pixPath = gallery.join(",");
 
+        const merged = { ...previewItem, pictures: pics };
+        setPreviewItem(merged);
+        await updateItem(merged.id, buildItemUpdatePayload(merged));
+        const fresh: any = await getItemById(merged.id);
+        setPreviewItem(transformDetail(fresh?.data || {}));
+        toast.success("Pictures uploaded", { id: tid, ...successStyles });
+        reloadItems();
+      } else {
+        toast.dismiss(tid);
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to upload pictures", { id: tid, ...errorStyles });
+    } finally {
+      setUploadingPictures(false);
+      if (pictureInputRef.current) pictureInputRef.current.value = "";
+    }
+  };
   const [qualityModalOpen, setQualityModalOpen] = useState(false);
   const [editingQuality, setEditingQuality] = useState<any>(null);
   const [qualityForm, setQualityForm] = useState<any>({
@@ -884,6 +1001,7 @@ const ItemsManagementPage: React.FC = () => {
   });
 
   const openCreateItemModal = () => {
+    loadReferenceData();
     setItemFormData({
       item_name: "",
       item_name_cn: "",
@@ -1076,7 +1194,7 @@ const ItemsManagementPage: React.FC = () => {
     try {
       await deleteParent(id);
       fetchTab("parents", true);
-    } catch { }
+    } catch {}
   };
 
   const handleBulk = async (action: "activate" | "deactivate" | "delete") => {
@@ -1109,7 +1227,7 @@ const ItemsManagementPage: React.FC = () => {
         await deleteTaric(id);
       setSelectedTarics(new Set());
       fetchTab("tarics", true);
-    } catch { }
+    } catch {}
   };
 
   const isTaricTab = activeTab === "tarics";
@@ -1286,10 +1404,11 @@ const ItemsManagementPage: React.FC = () => {
             <tr
               key={item.id}
               onClick={() => openItemPreview(item)}
-              className={`cursor-pointer transition-colors ${isNew
-                ? "bg-blue-50 hover:bg-blue-100 border-l-4 border-l-blue-400"
-                : "hover:bg-gray-50"
-                }`}
+              className={`cursor-pointer transition-colors ${
+                isNew
+                  ? "bg-blue-50 hover:bg-blue-100 border-l-4 border-l-blue-400"
+                  : "hover:bg-gray-50"
+              }`}
             >
               <td className="px-2 py-2">
                 <div className="w-15 h-15 rounded-md overflow-hidden bg-gray-100 flex items-center justify-center border border-gray-200">
@@ -1315,11 +1434,15 @@ const ItemsManagementPage: React.FC = () => {
                   <span className="font-semibold text-gray-700">
                     {item.de_no || "-"}
                   </span>
-                  {(item.customer_name || item.company_name || item.company) && (
+                  {(item.customer_name ||
+                    item.company_name ||
+                    item.company) && (
                     <>
                       <span>-</span>
                       <span className="text-blue-600 font-medium">
-                        {item.customer_name || item.company_name || item.company}
+                        {item.customer_name ||
+                          item.company_name ||
+                          item.company}
                       </span>
                     </>
                   )}
@@ -1398,10 +1521,11 @@ const ItemsManagementPage: React.FC = () => {
             </td>
             <td className="px-4 py-3">
               <span
-                className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border ${parent.is_active === "Y"
-                  ? "bg-emerald-50 text-emerald-700 border-emerald-200/60"
-                  : "bg-gray-50 text-gray-600 border-gray-200"
-                  }`}
+                className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border ${
+                  parent.is_active === "Y"
+                    ? "bg-emerald-50 text-emerald-700 border-emerald-200/60"
+                    : "bg-gray-50 text-gray-600 border-gray-200"
+                }`}
               >
                 {parent.is_active === "Y" ? "Active" : "Inactive"}
               </span>
@@ -1866,10 +1990,11 @@ const ItemsManagementPage: React.FC = () => {
                       onChange={(e) =>
                         setFilters({ ...filters, search: e.target.value })
                       }
-                      className={`w-full pl-8 pr-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${filters.search
-                        ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
-                        : "text-gray-900 border-gray-300 bg-white"
-                        }`}
+                      className={`w-full pl-8 pr-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${
+                        filters.search
+                          ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+                          : "text-gray-900 border-gray-300 bg-white"
+                      }`}
                     />
                     {filters.search && (
                       <button
@@ -1891,14 +2016,17 @@ const ItemsManagementPage: React.FC = () => {
                       onChange={(e) =>
                         setFilters({ ...filters, eanSearch: e.target.value })
                       }
-                      className={`w-full pl-8 pr-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${filters.eanSearch
-                        ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
-                        : "text-gray-900 border-gray-300 bg-white"
-                        }`}
+                      className={`w-full pl-8 pr-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${
+                        filters.eanSearch
+                          ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+                          : "text-gray-900 border-gray-300 bg-white"
+                      }`}
                     />
                     {filters.eanSearch && (
                       <button
-                        onClick={() => setFilters({ ...filters, eanSearch: "" })}
+                        onClick={() =>
+                          setFilters({ ...filters, eanSearch: "" })
+                        }
                         className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500"
                       >
                         <XMarkIcon className="w-3.5 h-3.5" />
@@ -1927,10 +2055,11 @@ const ItemsManagementPage: React.FC = () => {
                       onChange={(e) =>
                         setFilters({ ...filters, company: e.target.value })
                       }
-                      className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${filters.company
-                        ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
-                        : "text-gray-900 border-gray-300 bg-white"
-                        }`}
+                      className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${
+                        filters.company
+                          ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+                          : "text-gray-900 border-gray-300 bg-white"
+                      }`}
                     />
                     {filters.company && (
                       <button
@@ -1949,10 +2078,11 @@ const ItemsManagementPage: React.FC = () => {
                     onChange={(e) =>
                       setFilters({ ...filters, isLabel: e.target.value })
                     }
-                    className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${filters.isLabel
-                      ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
-                      : "text-gray-400 border-gray-300 bg-white"
-                      }`}
+                    className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${
+                      filters.isLabel
+                        ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+                        : "text-gray-400 border-gray-300 bg-white"
+                    }`}
                   >
                     <option value="">isLabel...</option>
                     <option value="Y">Yes</option>
@@ -1966,10 +2096,11 @@ const ItemsManagementPage: React.FC = () => {
                     onChange={(e) =>
                       setFilters({ ...filters, supplier: e.target.value })
                     }
-                    className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${filters.supplier
-                      ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
-                      : "text-gray-400 border-gray-300 bg-white"
-                      }`}
+                    className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${
+                      filters.supplier
+                        ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+                        : "text-gray-400 border-gray-300 bg-white"
+                    }`}
                   >
                     <option value="">Supplier...</option>
                     {refSuppliers.map((s) => (
@@ -1985,10 +2116,11 @@ const ItemsManagementPage: React.FC = () => {
                     onChange={(e) =>
                       setFilters({ ...filters, category: e.target.value })
                     }
-                    className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${filters.category
-                      ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
-                      : "text-gray-400 border-gray-300 bg-white"
-                      }`}
+                    className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${
+                      filters.category
+                        ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+                        : "text-gray-400 border-gray-300 bg-white"
+                    }`}
                   >
                     <option value="">Cat...</option>
                     {Array.from(
@@ -2174,8 +2306,8 @@ const ItemsManagementPage: React.FC = () => {
                         alt="thumb"
                         className="w-full h-full object-cover"
                         onError={(e) =>
-                        ((e.target as HTMLImageElement).style.display =
-                          "none")
+                          ((e.target as HTMLImageElement).style.display =
+                            "none")
                         }
                       />
                     ) : (
@@ -2233,10 +2365,10 @@ const ItemsManagementPage: React.FC = () => {
                       setPreviewItem((p: any) =>
                         p
                           ? {
-                            ...p,
-                            tags: newTags,
-                            tagOrder: newTags.map((t) => t.id).join(","),
-                          }
+                              ...p,
+                              tags: newTags,
+                              tagOrder: newTags.map((t) => t.id).join(","),
+                            }
                           : p,
                       )
                     }
@@ -2251,23 +2383,111 @@ const ItemsManagementPage: React.FC = () => {
                     ))}
                     {(!(previewItem || previewRow)?.tags ||
                       (previewItem || previewRow)?.tags.length === 0) && (
-                        <span className="text-sm text-gray-400">—</span>
-                      )}
+                      <span className="text-sm text-gray-400">—</span>
+                    )}
                   </div>
                 )}
               </div>
 
               <div className="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-4">
                 <Field label="Item No">{previewItemNo}</Field>
-                <Field label="Company">{getCompany(previewRow) || "—"}</Field>
+                <Field label="Company">
+                  {previewEdit && previewItem ? (
+                    <div className="relative">
+                      <div className="relative">
+                        <MagnifyingGlassIcon className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400 pointer-events-none" />
+                        <input
+                          type="text"
+                          placeholder="Search customer..."
+                          value={customerSearch}
+                          onChange={(e) => {
+                            setCustomerSearch(e.target.value);
+                            setShowCustomerDropdown(true);
+                          }}
+                          onFocus={() => setShowCustomerDropdown(true)}
+                          className="w-full pl-7 pr-7 py-1.5 text-sm border border-gray-300/80 bg-white/70 rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all"
+                        />
+                        {(customerSearch || previewItem.customer_id) && (
+                          <button
+                            type="button"
+                            onClick={handleClearPreviewCustomer}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500"
+                            title="Clear customer"
+                          >
+                            <XCircleIcon className="h-4 w-4" />
+                          </button>
+                        )}
+                      </div>
+                      {showCustomerDropdown && (
+                        <>
+                          <div
+                            className="fixed inset-0 z-10"
+                            onClick={() => setShowCustomerDropdown(false)}
+                          />
+                          <div className="absolute z-20 mt-1 w-full max-h-56 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg">
+                            {previewFilteredCustomers.length > 0 ? (
+                              previewFilteredCustomers.map((customer: any) => {
+                                const isSelected =
+                                  String(customer.id) ===
+                                  String(previewItem.customer_id);
+                                return (
+                                  <div
+                                    key={customer.id}
+                                    onClick={() =>
+                                      handleSelectPreviewCustomer(customer)
+                                    }
+                                    className={`px-3 py-2 text-sm cursor-pointer flex items-center justify-between ${
+                                      isSelected
+                                        ? "bg-[#8CC21B]/10 text-[#5f8512] font-semibold"
+                                        : "hover:bg-gray-50 text-gray-700"
+                                    }`}
+                                  >
+                                    <span className="font-medium line-clamp-1 pr-2">
+                                      {customer.companyName ||
+                                        "Unnamed Customer"}
+                                    </span>
+                                    {isSelected && (
+                                      <CheckCircleIcon className="h-4 w-4 text-[#8CC21B] shrink-0" />
+                                    )}
+                                  </div>
+                                );
+                              })
+                            ) : (
+                              <div className="px-3 py-3 text-center text-xs text-gray-400">
+                                {allCustomers.length === 0
+                                  ? "Loading customers…"
+                                  : "No customers found."}
+                              </div>
+                            )}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  ) : (
+                    getCompany(previewItem) || getCompany(previewRow) || "—"
+                  )}
+                </Field>{" "}
                 <Field label="IsLabel">
-                  <span
-                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${(previewItem?.isLabelPrint ?? previewRow.isLabelPrint) ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}`}
-                  >
-                    {(previewItem?.isLabelPrint ?? previewRow.isLabelPrint)
-                      ? "Yes"
-                      : "No"}
-                  </span>
+                  {previewEdit && previewItem ? (
+                    <select
+                      className={inputCls}
+                      value={previewItem.isLabelPrint ? "Y" : "N"}
+                      onChange={(e) =>
+                        patchPreview({ isLabelPrint: e.target.value === "Y" })
+                      }
+                    >
+                      <option value="Y">Yes</option>
+                      <option value="N">No</option>
+                    </select>
+                  ) : (
+                    <span
+                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${(previewItem?.isLabelPrint ?? previewRow.isLabelPrint) ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}`}
+                    >
+                      {(previewItem?.isLabelPrint ?? previewRow.isLabelPrint)
+                        ? "Yes"
+                        : "No"}
+                    </span>
+                  )}
                 </Field>
                 <Field label="CAT">
                   {previewEdit && previewItem ? (
@@ -2390,8 +2610,8 @@ const ItemsManagementPage: React.FC = () => {
                         />
                       ) : (
                         (previewItem?.dimensions?.[dim] ??
-                          previewRow[dim] ??
-                          "—")
+                        previewRow[dim] ??
+                        "—")
                       )}
                     </Field>
                   ),
@@ -2500,8 +2720,8 @@ const ItemsManagementPage: React.FC = () => {
                     />
                   ) : (
                     (previewItem?.supplierItem?.priceRMB ??
-                      previewRow.rmb_price ??
-                      "—")
+                    previewRow.rmb_price ??
+                    "—")
                   )}
                 </Field>
                 <Field label="Transfer Price (EUR)">
@@ -2517,9 +2737,9 @@ const ItemsManagementPage: React.FC = () => {
                     />
                   ) : (
                     (previewItem?.price ??
-                      previewItem?.transfer_price ??
-                      previewRow.transfer_price_EUR ??
-                      "—")
+                    previewItem?.transfer_price ??
+                    previewRow.transfer_price_EUR ??
+                    "—")
                   )}
                 </Field>
                 <Field label="Status">
@@ -2707,11 +2927,11 @@ const ItemsManagementPage: React.FC = () => {
                             <a
                               href={
                                 url.includes("cloudinary") &&
-                                  !url.includes("/raw/")
+                                !url.includes("/raw/")
                                   ? url.replace(
-                                    "/upload/",
-                                    "/upload/fl_attachment/",
-                                  )
+                                      "/upload/",
+                                      "/upload/fl_attachment/",
+                                    )
                                   : url
                               }
                               download={att.originalName || att.filename}
@@ -2736,55 +2956,27 @@ const ItemsManagementPage: React.FC = () => {
                   </div>
                 )}
               </div>
-              <div className="mt-6 pt-5 border-t border-gray-200">
-                <h3 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
                   <PhotoIcon className="w-4 h-4 text-blue-500" />
                   Pictures
                 </h3>
-                {(() => {
-                  const pics = previewItem
-                    ? [
-                      previewItem.pictures?.shopPicture,
-                      previewItem.pictures?.ebayPictures,
-                      ...(previewItem.pictures?.pixPath || "")
-                        .split(",")
-                        .filter(Boolean),
-                    ].filter(Boolean)
-                    : [getThumb(previewRow)].filter(Boolean);
-                  if (!pics || pics.length === 0)
-                    return (
-                      <p className="text-xs text-gray-400">No pictures.</p>
-                    );
-                  return (
-                    <div className="grid grid-cols-3 md:grid-cols-5 gap-3">
-                      {pics.map((url: any, i: number) => (
-                        <div
-                          key={i}
-                          className="aspect-square bg-gray-100 rounded-lg overflow-hidden border border-gray-200"
-                        >
-                          <img
-                            src={resolveUrl(url)!}
-                            alt={`pic-${i}`}
-                            className="w-full h-full object-cover cursor-pointer"
-                            onClick={() =>
-                              window.open(
-                                resolveUrl(url)!.replace(
-                                  "/upload/fl_attachment/",
-                                  "/upload/",
-                                ),
-                                "_blank",
-                              )
-                            }
-                            onError={(e) =>
-                            ((e.target as HTMLImageElement).src =
-                              "https://placehold.co/200x200?text=—")
-                            }
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  );
-                })()}
+                <button
+                  onClick={() => pictureInputRef.current?.click()}
+                  disabled={uploadingPictures || !previewItem}
+                  className="px-2.5 py-1 text-xs bg-[#8CC21B] text-white rounded-md hover:bg-[#7ab318] flex items-center gap-1 disabled:opacity-50"
+                >
+                  <PhotoIcon className="w-3.5 h-3.5" />
+                  {uploadingPictures ? "Uploading..." : "Add Pictures"}
+                </button>
+                <input
+                  ref={pictureInputRef}
+                  type="file"
+                  multiple
+                  accept="image/*"
+                  className="hidden"
+                  onChange={uploadPreviewPictures}
+                />
               </div>
               <div className="flex justify-between gap-2 pt-6 mt-6 border-t">
                 <button
@@ -3130,16 +3322,16 @@ const ItemsManagementPage: React.FC = () => {
                     value={
                       itemFormData.parent_id
                         ? {
-                          value: itemFormData.parent_id,
-                          label: (() => {
-                            const p = refParents?.find(
-                              (x) => x.id === itemFormData.parent_id,
-                            );
-                            return p
-                              ? `${p.name_de} (${p.de_no})`
-                              : "Unknown";
-                          })(),
-                        }
+                            value: itemFormData.parent_id,
+                            label: (() => {
+                              const p = refParents?.find(
+                                (x) => x.id === itemFormData.parent_id,
+                              );
+                              return p
+                                ? `${p.name_de} (${p.de_no})`
+                                : "Unknown";
+                            })(),
+                          }
                         : null
                     }
                     onChange={(opt: any) =>
@@ -3168,14 +3360,14 @@ const ItemsManagementPage: React.FC = () => {
                     value={
                       itemFormData.taric_id
                         ? {
-                          value: itemFormData.taric_id,
-                          label: (() => {
-                            const t = refTarics?.find(
-                              (x) => x.id === itemFormData.taric_id,
-                            );
-                            return t ? `${t.code} - ${t.name_de}` : "Unknown";
-                          })(),
-                        }
+                            value: itemFormData.taric_id,
+                            label: (() => {
+                              const t = refTarics?.find(
+                                (x) => x.id === itemFormData.taric_id,
+                              );
+                              return t ? `${t.code} - ${t.name_de}` : "Unknown";
+                            })(),
+                          }
                         : null
                     }
                     onChange={(opt: any) =>
@@ -3204,12 +3396,12 @@ const ItemsManagementPage: React.FC = () => {
                     value={
                       itemFormData.cat_id
                         ? {
-                          value: itemFormData.cat_id,
-                          label:
-                            categories?.find(
-                              (x) => x.id === itemFormData.cat_id,
-                            )?.name || "Unknown",
-                        }
+                            value: itemFormData.cat_id,
+                            label:
+                              categories?.find(
+                                (x) => x.id === itemFormData.cat_id,
+                              )?.name || "Unknown",
+                          }
                         : null
                     }
                     onChange={(opt: any) =>
@@ -3238,14 +3430,14 @@ const ItemsManagementPage: React.FC = () => {
                     value={
                       itemFormData.supplier_id
                         ? {
-                          value: itemFormData.supplier_id,
-                          label: (() => {
-                            const s = refSuppliers?.find(
-                              (x) => x.id === itemFormData.supplier_id,
-                            );
-                            return s ? getSupplierLabel(s) : "Unknown";
-                          })(),
-                        }
+                            value: itemFormData.supplier_id,
+                            label: (() => {
+                              const s = refSuppliers?.find(
+                                (x) => x.id === itemFormData.supplier_id,
+                              );
+                              return s ? getSupplierLabel(s) : "Unknown";
+                            })(),
+                          }
                         : null
                     }
                     onChange={(opt: any) =>

@@ -37,6 +37,7 @@ import { getAllSuppliers, Supplier } from "@/api/suppliers";
 import { getCategories } from "@/api/categories";
 import { getAllCustomers } from "@/api/customers";
 import { uploadFile } from "@/api/library";
+
 import CustomModal from "@/components/UI/CustomModal";
 import {
   loadingStyles,
@@ -2879,11 +2880,13 @@ const ItemDetailsPage = () => {
                   tagOrder={(itemData as any).tagOrder}
                   onTagsUpdated={(newTags) => {
                     setItemData((prev: any) =>
-                      prev ? {
-                        ...prev,
-                        tags: newTags,
-                        tagOrder: newTags.map((t: any) => t.id).join(","),
-                      } : null
+                      prev
+                        ? {
+                            ...prev,
+                            tags: newTags,
+                            tagOrder: newTags.map((t: any) => t.id).join(","),
+                          }
+                        : null,
                     );
                   }}
                 />
