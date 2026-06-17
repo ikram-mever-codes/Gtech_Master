@@ -160,6 +160,19 @@ const ItemsManagementPage: React.FC = () => {
     isLabel: "",
   });
   const [taricSearch, setTaricSearch] = useState("");
+  const [itemsTotalRecords, setItemsTotalRecords] = useState(0);
+  const [itemsTotalPages, setItemsTotalPages] = useState(1);
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [debouncedEanSearch, setDebouncedEanSearch] = useState("");
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(filters.search);
+      setDebouncedEanSearch(filters.eanSearch);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [filters.search, filters.eanSearch]);
+
   const reqIdRef = useRef(0);
   const hasChinese = (str: string) => /[\u4e00-\u9fa5]/.test(str || "");
 
@@ -293,13 +306,28 @@ const ItemsManagementPage: React.FC = () => {
           case "items": {
             const res: any = await getItems(
               {
-                page: 1,
-                limit: FETCH_ALL_LIMIT,
+                page: page,
+                limit: PAGE_LIMIT,
+                search: debouncedSearch || undefined,
+                eanSearch: debouncedEanSearch || undefined,
+                isActive: filters.isActive || undefined,
+                category: filters.category || undefined,
+                supplier: filters.supplier || undefined,
+                tags: filters.tags || undefined,
+                isLabel: filters.isLabel || undefined,
+                company: filters.company || undefined,
                 filter: auditFilter || undefined,
               },
-              { refresh: false },
+              { refresh: force },
             );
             data = res.data || [];
+            if (res.pagination) {
+              setItemsTotalRecords(res.pagination.totalRecords || 0);
+              setItemsTotalPages(res.pagination.totalPages || 1);
+            } else {
+              setItemsTotalRecords(data.length);
+              setItemsTotalPages(Math.ceil(data.length / PAGE_LIMIT));
+            }
             break;
           }
           case "parents": {
@@ -345,11 +373,44 @@ const ItemsManagementPage: React.FC = () => {
         if (reqId === reqIdRef.current) setLoading(false);
       }
     },
-    [auditFilter, loadedTabs],
+    [
+      auditFilter,
+      loadedTabs,
+      page,
+      debouncedSearch,
+      debouncedEanSearch,
+      filters.isActive,
+      filters.category,
+      filters.supplier,
+      filters.tags,
+      filters.isLabel,
+      filters.company,
+    ],
   );
+
   useEffect(() => {
-    fetchTab(activeTab);
+    if (activeTab === "items") {
+      fetchTab("items", true);
+    }
+  }, [
+    activeTab,
+    page,
+    debouncedSearch,
+    debouncedEanSearch,
+    filters.isActive,
+    filters.category,
+    filters.supplier,
+    filters.tags,
+    filters.isLabel,
+    filters.company,
+  ]);
+
+  useEffect(() => {
+    if (activeTab !== "items") {
+      fetchTab(activeTab);
+    }
   }, [activeTab]);
+
   useEffect(() => {
     setLoadedTabs((prev) => {
       const next = new Set(prev);
@@ -427,49 +488,7 @@ const ItemsManagementPage: React.FC = () => {
     const data = tabData[activeTab] || [];
 
     if (activeTab === "items") {
-      const search = filters.search.trim().toLowerCase();
-      return data.filter((item: any) => {
-        if (filters.isActive && (item.is_active || "N") !== filters.isActive)
-          return false;
-        if (
-          filters.category &&
-          (item.category || "").toString().trim() !== filters.category
-        )
-          return false;
-        if (
-          filters.supplier &&
-          String(item.supplier_id || "") !== String(filters.supplier)
-        )
-          return false;
-        if (filters.eanSearch && !matchesEANSearch(item.ean, filters.eanSearch))
-          return false;
-        if (filters.tags && !matchesTags(item, filters.tags)) return false;
-        if (filters.company) {
-          const companyVal = (item.customer_name || item.company_name || item.company || "").toLowerCase();
-          if (!companyVal.includes(filters.company.toLowerCase())) return false;
-        }
-        if (filters.isLabel) {
-          const labelMatch = filters.isLabel === "Y" ? !!item.isLabelPrint : !item.isLabelPrint;
-          if (!labelMatch) return false;
-        }
-        if (search) {
-          const hay = [
-            item.item_name,
-            item.item_name_cn,
-            item.item_name_de,
-            item.name_de,
-            item.ean,
-            item.model,
-            item.de_no,
-            String(item.id),
-          ]
-            .filter(Boolean)
-            .join(" ")
-            .toLowerCase();
-          if (!hay.includes(search)) return false;
-        }
-        return true;
-      });
+      return data;
     }
 
     if (activeTab === "tarics") {
@@ -502,12 +521,12 @@ const ItemsManagementPage: React.FC = () => {
     return res;
   }, [tabData, activeTab, filters, taricSearch]);
 
-  const totalRecords = filteredAll.length;
-  const totalPages = Math.max(1, Math.ceil(totalRecords / PAGE_LIMIT));
+  const totalRecords = activeTab === "items" ? itemsTotalRecords : filteredAll.length;
+  const totalPages = activeTab === "items" ? itemsTotalPages : Math.max(1, Math.ceil(totalRecords / PAGE_LIMIT));
   const safePage = Math.min(page, totalPages);
   const pageData = useMemo(
-    () => filteredAll.slice((safePage - 1) * PAGE_LIMIT, safePage * PAGE_LIMIT),
-    [filteredAll, safePage],
+    () => activeTab === "items" ? filteredAll : filteredAll.slice((safePage - 1) * PAGE_LIMIT, safePage * PAGE_LIMIT),
+    [filteredAll, safePage, activeTab],
   );
   const [showItemPreview, setShowItemPreview] = useState(false);
   const [previewRow, setPreviewRow] = useState<any>(null);

@@ -230,11 +230,9 @@ export interface StatisticsResponse {
 type CacheEntry = { ts: number; data: any };
 const itemsCache = new Map<string, CacheEntry>();
 const itemsInFlight = new Map<string, Promise<any>>();
-const ITEMS_TTL = 60_000; // 60s — tune to taste
+const ITEMS_TTL = 60_000;
 
 const keyFor = (params?: object) => JSON.stringify(params ?? {});
-
-// Call this after ANY write so the next read re-fetches.
 export const invalidateItemsCache = () => {
   itemsCache.clear();
   itemsInFlight.clear();
@@ -256,6 +254,8 @@ export const getItems = async (
     eanSearch?: string;
     tags?: string;
     filter?: string;
+    isLabel?: string;
+    company?: string;
   },
   options?: { refresh?: boolean },
 ) => {
@@ -264,8 +264,6 @@ export const getItems = async (
   if (!options?.refresh) {
     const hit = itemsCache.get(key);
     if (hit && Date.now() - hit.ts < ITEMS_TTL) return hit.data;
-
-    // De-dupe concurrent identical calls (e.g. several components mounting at once)
     const inflight = itemsInFlight.get(key);
     if (inflight) return inflight;
   }

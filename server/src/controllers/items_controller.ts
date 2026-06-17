@@ -180,6 +180,8 @@ export const getItems = async (
       eanSearch,
       tags,
       filter,
+      isLabel,
+      company,
     } = req.query;
 
     let pageNum = parseInt(page as string);
@@ -200,12 +202,23 @@ export const getItems = async (
       ? (sortBy as string)
       : "created_at";
     const safeSortOrder = sortOrder === "ASC" ? "ASC" : "DESC";
-
-    // ------------------------------------------------------------------
-    // Filters applied to a fresh builder so COUNT + DATA run in parallel.
-    // The count builder omits the tags join (not needed for counting).
-    // ------------------------------------------------------------------
     const applyFilters = (qb: any) => {
+      if (isLabel) {
+        if (isLabel === "Y") {
+          qb.andWhere("item.isLabelPrint = true");
+        } else {
+          qb.andWhere("(item.isLabelPrint = false OR item.isLabelPrint IS NULL)");
+        }
+      }
+
+      if (company) {
+        const companyStr = (company as string).trim();
+        qb.leftJoin("item.customer", "cust_filter");
+        qb.andWhere("cust_filter.companyName ILIKE :companySearch", {
+          companySearch: `%${companyStr}%`,
+        });
+      }
+
       if (tags) {
         const tagIds = (tags as string).split(",");
         const includeTagIds = tagIds
@@ -361,8 +374,8 @@ export const getItems = async (
               .where("vv.item_id = item.id")
               .andWhere(
                 "((vv.value_de IS NOT NULL AND vv.value_de != '' AND (vv.value_en IS NULL OR vv.value_en = '')) OR " +
-                  "(vv.value_de_2 IS NOT NULL AND vv.value_de_2 != '' AND (vv.value_en_2 IS NULL OR vv.value_en_2 = '')) OR " +
-                  "(vv.value_de_3 IS NOT NULL AND vv.value_de_3 != '' AND (vv.value_en_3 IS NULL OR vv.value_en_3 = '')))",
+                "(vv.value_de_2 IS NOT NULL AND vv.value_de_2 != '' AND (vv.value_en_2 IS NULL OR vv.value_en_2 = '')) OR " +
+                "(vv.value_de_3 IS NOT NULL AND vv.value_de_3 != '' AND (vv.value_en_3 IS NULL OR vv.value_en_3 = '')))",
               );
             return `EXISTS ${subQuery.getQuery()}`;
           });
@@ -455,7 +468,6 @@ export const getItems = async (
       .skip(skip)
       .take(limitNum);
 
-    // Count + page fetch run concurrently.
     const [totalRecords, items] = await Promise.all([
       countQueryBuilder.getCount(),
       dataQueryBuilder.getMany(),
@@ -486,9 +498,6 @@ export const getItems = async (
     const itemIdDEs = items
       .map((i: any) => i.ItemID_DE)
       .filter(Boolean) as number[];
-
-    // Items missing a direct supplier_id — resolve their default supplier-item
-    // in the SAME parallel batch instead of a separate, sequential query.
     const missingSupplierIds = items
       .filter((i: any) => !i.supplier_id)
       .map((i: any) => i.id);
@@ -505,50 +514,50 @@ export const getItems = async (
     ] = await Promise.all([
       parentIds.length > 0
         ? parentRepository.find({
-            where: { id: In(parentIds) },
-            select: ["id", "de_no", "name_de", "name_en", "name_cn"],
-          })
+          where: { id: In(parentIds) },
+          select: ["id", "de_no", "name_de", "name_en", "name_cn"],
+        })
         : Promise.resolve([]),
       taricIds.length > 0
         ? taricRepository.find({
-            where: { id: In(taricIds) },
-            select: ["id", "code", "description_de"],
-          })
+          where: { id: In(taricIds) },
+          select: ["id", "code", "description_de"],
+        })
         : Promise.resolve([]),
       catIds.length > 0
         ? categoryRepository.find({
-            where: { id: In(catIds) },
-            select: ["id", "name"],
-          })
+          where: { id: In(catIds) },
+          select: ["id", "name"],
+        })
         : Promise.resolve([]),
       itemSupplierIds.length > 0
         ? supplierRepository.find({
-            where: { id: In(itemSupplierIds) },
-            select: ["id", "name", "company_name"],
-          })
+          where: { id: In(itemSupplierIds) },
+          select: ["id", "name", "company_name"],
+        })
         : Promise.resolve([]),
       itemIds.length > 0
         ? warehouseRepository.find({
-            where: [
-              { item_id: In(itemIds) },
-              ...(itemIdDEs.length > 0 ? [{ ItemID_DE: In(itemIdDEs) }] : []),
-            ],
-          })
+          where: [
+            { item_id: In(itemIds) },
+            ...(itemIdDEs.length > 0 ? [{ ItemID_DE: In(itemIdDEs) }] : []),
+          ],
+        })
         : Promise.resolve([]),
       itemIds.length > 0
         ? supplierItemRepository.find({ where: { item_id: In(itemIds) } })
         : Promise.resolve([]),
       customerIds.length > 0
         ? customerRepository.find({
-            where: { id: In(customerIds) },
-            select: ["id", "companyName"],
-          })
+          where: { id: In(customerIds) },
+          select: ["id", "companyName"],
+        })
         : Promise.resolve([]),
       missingSupplierIds.length > 0
         ? supplierItemRepository.find({
-            where: { item_id: In(missingSupplierIds), is_default: "Y" },
-            relations: ["supplier"],
-          })
+          where: { item_id: In(missingSupplierIds), is_default: "Y" },
+          relations: ["supplier"],
+        })
         : Promise.resolve([]),
     ]);
 
@@ -663,13 +672,13 @@ export const getItems = async (
         transfer_price_EUR: item.transfer_price_EUR,
         warehouse_data: warehouseData
           ? {
-              id: warehouseData.id,
-              item_no_de: warehouseData.item_no_de,
-              stock_qty: warehouseData.stock_qty,
-              msq: warehouseData.msq,
-              buffer: warehouseData.buffer,
-              is_stock_item: warehouseData.is_stock_item,
-            }
+            id: warehouseData.id,
+            item_no_de: warehouseData.item_no_de,
+            stock_qty: warehouseData.stock_qty,
+            msq: warehouseData.msq,
+            buffer: warehouseData.buffer,
+            is_stock_item: warehouseData.is_stock_item,
+          }
           : null,
         created_at: item.created_at,
         updated_at: item.updated_at,
@@ -809,9 +818,6 @@ export const getItemById = async (
     } catch (e: any) {
       console.warn("supplier_items table not available:", e.message);
     }
-
-    // Load the linked customer (if any). Done defensively so a missing
-    // customer_id column or customers table never breaks item loading.
     let customer: Customer | null = null;
     try {
       if (item?.customer?.id) {
@@ -866,12 +872,12 @@ export const getItemById = async (
       customer_name: customer?.companyName || "",
       customer: customer
         ? {
-            id: customer.id,
-            companyName: customer.companyName,
-            legalName: customer.legalName || "",
-            customerNumber: customer.customerNumber || "",
-            email: customer.email || "",
-          }
+          id: customer.id,
+          companyName: customer.companyName,
+          legalName: customer.legalName || "",
+          customerNumber: customer.customerNumber || "",
+          email: customer.email || "",
+        }
         : null,
       painPoints: item.painPoints || [],
       isActive: primaryWarehouseItem
@@ -1007,29 +1013,29 @@ export const getItemById = async (
           supplierItems[0];
         return defaultSi
           ? {
-              id: defaultSi.id,
-              supplierId: defaultSi.supplier_id,
-              supplierName:
-                defaultSi.supplier?.company_name ||
-                defaultSi.supplier?.name ||
-                "Unknown",
-              priceRMB: defaultSi.price_rmb?.toString() || "0",
-              isPO: defaultSi.is_po || "No",
-              moq: defaultSi.moq?.toString() || "0",
-              interval: defaultSi.oi?.toString() || "0",
-              leadTime: defaultSi.lead_time || "",
-              noteCN: defaultSi.note_cn || "",
-              url: defaultSi.url || "",
-            }
+            id: defaultSi.id,
+            supplierId: defaultSi.supplier_id,
+            supplierName:
+              defaultSi.supplier?.company_name ||
+              defaultSi.supplier?.name ||
+              "Unknown",
+            priceRMB: defaultSi.price_rmb?.toString() || "0",
+            isPO: defaultSi.is_po || "No",
+            moq: defaultSi.moq?.toString() || "0",
+            interval: defaultSi.oi?.toString() || "0",
+            leadTime: defaultSi.lead_time || "",
+            noteCN: defaultSi.note_cn || "",
+            url: defaultSi.url || "",
+          }
           : {
-              priceRMB: "0",
-              isPO: "No",
-              moq: "0",
-              interval: "0",
-              leadTime: "",
-              noteCN: "",
-              url: "",
-            };
+            priceRMB: "0",
+            isPO: "No",
+            moq: "0",
+            interval: "0",
+            leadTime: "",
+            noteCN: "",
+            url: "",
+          };
       })(),
 
       nprRemarks: item.npr_remark || "",
@@ -2129,9 +2135,9 @@ export const getParents = async (
       supplier_id: parent.supplier_id,
       supplier: parent.supplier
         ? {
-            id: parent.supplier.id,
-            name: parent.supplier.name,
-          }
+          id: parent.supplier.id,
+          name: parent.supplier.name,
+        }
         : null,
       item_count: parent.items?.length || 0,
       created_at: parent.created_at,
@@ -2207,17 +2213,17 @@ export const getParentById = async (
       is_active: parent.is_active,
       taric: parent.taric
         ? {
-            id: parent.taric.id,
-            code: parent.taric.code,
-            name_de: parent.taric.name_de,
-          }
+          id: parent.taric.id,
+          code: parent.taric.code,
+          name_de: parent.taric.name_de,
+        }
         : null,
       supplier: parent.supplier
         ? {
-            id: parent.supplier.id,
-            name: parent.supplier.name,
-            contact_person: parent.supplier.contact_person,
-          }
+          id: parent.supplier.id,
+          name: parent.supplier.name,
+          contact_person: parent.supplier.contact_person,
+        }
         : null,
       variations: {
         de: [parent.var_de_1, parent.var_de_2, parent.var_de_3].filter(Boolean),
@@ -3777,23 +3783,23 @@ export const getNewItems = async (
       items.map(async (item) => {
         const parentData = item.parent_id
           ? await parentRepository.findOne({
-              where: { id: item.parent_id },
-              select: ["id", "de_no", "name_de", "name_en"],
-            })
+            where: { id: item.parent_id },
+            select: ["id", "de_no", "name_de", "name_en"],
+          })
           : null;
 
         const categoryData = item.cat_id
           ? await categoryRepository.findOne({
-              where: { id: item.cat_id },
-              select: ["id", "name"],
-            })
+            where: { id: item.cat_id },
+            select: ["id", "name"],
+          })
           : null;
 
         const supplierData = item.supplier_id
           ? await supplierRepository.findOne({
-              where: { id: item.supplier_id },
-              select: ["id", "name", "company_name"],
-            })
+            where: { id: item.supplier_id },
+            select: ["id", "name", "company_name"],
+          })
           : null;
 
         let warehouseData: any = null;
@@ -4020,8 +4026,8 @@ export const exportNewItemsToCSV = async (
           item.ean?.toString() || "",
           parent?.de_no || "NONE",
           warehouseData?.item_no_de ||
-            item.ItemID_DE?.toString() ||
-            item.id.toString(),
+          item.ItemID_DE?.toString() ||
+          item.id.toString(),
           item.ItemID_DE?.toString() || "",
 
           item.supp_cat || item.category?.name || "STD",
