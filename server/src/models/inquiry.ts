@@ -161,29 +161,15 @@ export class Inquiry {
   @Column({ type: "text", nullable: true })
   description?: string;
 
-  @Column({
-    type: "enum",
-    enum: [
-      "Draft",
-      "Submitted",
-      "In Review",
-      "Quoted",
-      "Negotiation",
-      "Accepted",
-      "Rejected",
-      "Cancelled",
-    ],
-    default: "Draft",
-  })
+  @Column({ type: "varchar", length: 100, default: "draft" })
   status!:
-    | "Draft"
-    | "Submitted"
-    | "In Review"
-    | "Quoted"
-    | "Negotiation"
-    | "Accepted"
-    | "Rejected"
-    | "Cancelled";
+    | "draft"
+    | "active"
+    | "waiting_customer"
+    | "blocked"
+    | "completed"
+    | "lost"
+    | "paused";
 
   @Column({ type: "decimal", precision: 12, scale: 2, nullable: true })
   totalEstimatedCost?: number;

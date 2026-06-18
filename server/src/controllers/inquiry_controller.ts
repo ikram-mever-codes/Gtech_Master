@@ -523,6 +523,7 @@ export class InquiryController {
           await starBusinessDetailsRepository.save(starBusinessDetails);
         }
 
+        let total_potential_k_eur = 0;
         const requestEntities = requests.map((reqData: any, index: number) => {
           let totalWeight = null;
           const currentQty = reqData.qty || reqData.quantity;
@@ -531,6 +532,28 @@ export class InquiryController {
               parseFloat(reqData.unitWeight) * parseFloat(currentQty);
           }
           const { id: _ignored, ...reqDataWithoutId } = reqData;
+
+          const qtyVal = parseInt(currentQty || "0", 10) || 0;
+          const targetPriceVal = parseFloat(reqData.targetPrice) || 0;
+          let factor = 12;
+          if (reqData.interval) {
+            const normalized = reqData.interval.toLowerCase().trim();
+            if (normalized === "jährlich" || normalized === "jaehrlich" || normalized === "yearly") {
+              factor = 1;
+            } else if (normalized === "halbjährlich" || normalized === "halbjaehrlich" || normalized === "half-yearly" || normalized === "half yearly" || normalized === "biannually") {
+              factor = 2;
+            } else if (normalized === "quartal" || normalized === "quarterly") {
+              factor = 4;
+            } else if (normalized === "2 monatlich" || normalized === "bimonthly") {
+              factor = 6;
+            } else if (normalized === "monatlich" || normalized === "monthly") {
+              factor = 12;
+            }
+          }
+          const annualPotential = qtyVal * targetPriceVal * factor;
+          const annualPotentialKEur = annualPotential / 1000;
+          total_potential_k_eur += annualPotentialKEur;
+
           const requestItem = this.requestRepository.create({
             ...reqDataWithoutId,
             itemNo: `${inquiryNo}${this.getLetterSuffix(index)}`,
@@ -539,12 +562,18 @@ export class InquiryController {
             inquiry: savedInquiry,
             qty: currentQty,
             totalWeight: totalWeight || reqData.totalWeight,
+            targetPrice: reqData.targetPrice || null,
+            annualPotential: annualPotential,
+            annualPotentialKEur: annualPotentialKEur,
           });
 
           return requestItem;
         });
 
         await this.requestRepository.save(requestEntities);
+
+        savedInquiry.total_potential_k_eur = total_potential_k_eur;
+        await this.inquiryRepository.save(savedInquiry);
       }
 
       const completeInquiry = await this.inquiryRepository.findOne({
@@ -579,6 +608,7 @@ export class InquiryController {
   async updateInquiry(request: Request, response: Response) {
     try {
       const { id } = request.params;
+      console.log("DEBUG: updateInquiry called with id:", id, "body requests:", JSON.stringify(request.body.requests));
       const {
         name,
         description,
@@ -704,6 +734,7 @@ export class InquiryController {
           await this.requestRepository.remove(existingInquiry.requests);
         }
 
+        let total_potential_k_eur = 0;
         if (requests.length > 0) {
           let starBusinessDetails =
             existingInquiry.customer?.starBusinessDetails;
@@ -727,6 +758,27 @@ export class InquiryController {
 
               const { id: _ignored, ...reqDataWithoutId } = reqData;
 
+              const qtyVal = parseInt(currentQty || "0", 10) || 0;
+              const targetPriceVal = parseFloat(reqData.targetPrice) || 0;
+              let factor = 12;
+              if (reqData.interval) {
+                const normalized = reqData.interval.toLowerCase().trim();
+                if (normalized === "jährlich" || normalized === "jaehrlich" || normalized === "yearly") {
+                  factor = 1;
+                } else if (normalized === "halbjährlich" || normalized === "halbjaehrlich" || normalized === "half-yearly" || normalized === "half yearly" || normalized === "biannually") {
+                  factor = 2;
+                } else if (normalized === "quartal" || normalized === "quarterly") {
+                  factor = 4;
+                } else if (normalized === "2 monatlich" || normalized === "bimonthly") {
+                  factor = 6;
+                } else if (normalized === "monatlich" || normalized === "monthly") {
+                  factor = 12;
+                }
+              }
+              const annualPotential = qtyVal * targetPriceVal * factor;
+              const annualPotentialKEur = annualPotential / 1000;
+              total_potential_k_eur += annualPotentialKEur;
+
               const requestItem = this.requestRepository.create({
                 ...reqDataWithoutId,
                 itemNo: `${inquiryNo}${this.getLetterSuffix(index)}`,
@@ -735,6 +787,9 @@ export class InquiryController {
                 inquiry: existingInquiry,
                 qty: currentQty,
                 totalWeight: totalWeight || reqData.totalWeight,
+                targetPrice: reqData.targetPrice || null,
+                annualPotential: annualPotential,
+                annualPotentialKEur: annualPotentialKEur,
               });
 
               return requestItem;
@@ -743,6 +798,9 @@ export class InquiryController {
             await this.requestRepository.save(requestEntities);
           }
         }
+
+        existingInquiry.total_potential_k_eur = total_potential_k_eur;
+        await this.inquiryRepository.update(id, { total_potential_k_eur });
       }
 
       if (status && status !== existingInquiry.status) {
@@ -1125,7 +1183,7 @@ export class InquiryController {
       const item = itemRepository.create(itemData);
       const savedItem = await itemRepository.save(item);
 
-      inquiry.status = "Quoted";
+      inquiry.status = "completed";
       await inquiryRepository.save(inquiry);
 
       return response.status(201).json({
@@ -1275,7 +1333,7 @@ export class InquiryController {
           );
 
           if (allConverted) {
-            inquiry.status = "Quoted";
+            inquiry.status = "completed";
             await inquiryRepository.save(inquiry);
           }
         }
