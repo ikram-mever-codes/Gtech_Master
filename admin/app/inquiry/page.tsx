@@ -1341,22 +1341,20 @@ const CombinedInquiriesPageContent = () => {
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                if (inquiry.requests && inquiry.requests.length > 0) {
-                                  toggleInquiryRequests(inquiry.id);
-                                }
+                                toggleInquiryRequests(inquiry.id);
                               }}
-                              className={`${!inquiry.requests || inquiry.requests.length === 0
-                                ? "text-red-500 hover:text-red-700 cursor-not-allowed"
-                                : "text-gray-400 hover:text-gray-700"
-                                } flex-shrink-0 mt-0.5`}
+                              className={`${
+                                !inquiry.requests || inquiry.requests.length === 0
+                                  ? "text-red-500 hover:text-red-700"
+                                  : "text-gray-400 hover:text-gray-700"
+                              } flex-shrink-0 mt-0.5`}
                               title={
                                 !inquiry.requests || inquiry.requests.length === 0
-                                  ? "No requests yet"
+                                  ? "No request items yet"
                                   : expandedInquiryIds.has(inquiry.id)
                                     ? "Hide requests"
                                     : "Show requests"
                               }
-                              disabled={!inquiry.requests || inquiry.requests.length === 0}
                             >
                               <ChevronRightIcon
                                 className={`h-4 w-4 transition-transform duration-200 ${expandedInquiryIds.has(inquiry.id) ? "rotate-90" : ""
@@ -1459,9 +1457,8 @@ const CombinedInquiriesPageContent = () => {
                           })()}
                         </td>
                       </tr>
-                      {expandedInquiryIds.has(inquiry.id) &&
-                        inquiry.requests &&
-                        inquiry.requests.length > 0 && (
+                      {expandedInquiryIds.has(inquiry.id) && (
+                        inquiry.requests && inquiry.requests.length > 0 ? (
                           <tr className="bg-gray-50/50 border-t border-b border-gray-100">
                             <td colSpan={9} className="px-6 py-4">
                               <div>
@@ -1708,6 +1705,17 @@ const CombinedInquiriesPageContent = () => {
                             </div>
                           </td>
                         </tr>
+                        ) : (
+                          <tr className="bg-gray-50/30">
+                            <td colSpan={9} className="px-6 py-5 text-center">
+                              <div className="flex flex-col items-center justify-center gap-2 text-gray-400">
+                                <ClipboardDocumentListIcon className="h-8 w-8 text-gray-300" />
+                                <p className="text-sm font-medium text-gray-500">No request items yet</p>
+                                <p className="text-xs text-gray-400">This inquiry has no requested items.</p>
+                              </div>
+                            </td>
+                          </tr>
+                        )
                         )}
                     </React.Fragment>
                   ))}
