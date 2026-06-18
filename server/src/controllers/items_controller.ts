@@ -149,7 +149,6 @@ export const feedTransferPrices = async (
     return next(error);
   }
 };
-
 export const getItems = async (
   req: Request,
   res: Response,
@@ -157,51 +156,151 @@ export const getItems = async (
 ) => {
   try {
     const itemRepository = AppDataSource.getRepository(Item);
+    const warehouseRepository = AppDataSource.getRepository(WarehouseItem);
 
-    // 1. Extract and sanitize basic pagination inputs
-    const { page = "1", limit = "50" } = req.query;
-
-    let pageNum = parseInt(page as string) || 1;
-    let limitNum = parseInt(limit as string) || 50;
-    if (limitNum > 200) limitNum = 200;
+    // Dynamic pagination configuration with safe fallbacks
+    const pageNum = parseInt(req.query.page as string, 10) || 1;
+    const limitNum = parseInt(req.query.limit as string, 10) || 50;
     const skip = (pageNum - 1) * limitNum;
 
-    // 2. Fetch records with specific relations and cache enabled
-    const [items, totalRecords] = await itemRepository.findAndCount({
-      relations: ["tags", "customer"], // Bring back target relations
-      skip,
-      take: limitNum,
-      order: { id: "DESC" },
-      cache: {
-        id: `get_items_page_${pageNum}_lim_${limitNum}`, // Unique identifier for this cache key
-        milliseconds: 30000, // Cache results for 30 seconds
-      },
-    });
+    // STEP 1: Get total record count and paginated IDs via a lightweight index lookup
+    const [idObjects, totalRecords] = await itemRepository
+      .createQueryBuilder("item")
+      .select("item.id")
+      .orderBy("item.created_at", "DESC")
+      .skip(skip)
+      .take(limitNum)
+      .getManyAndCount();
 
-    // 3. Map values directly from the joined entities
+    const targetIds = idObjects.map((io) => io.id);
+
+    if (targetIds.length === 0) {
+      return res.status(200).json({
+        success: true,
+        data: [],
+        pagination: {
+          page: pageNum,
+          limit: limitNum,
+          totalRecords: 0,
+          totalPages: 0,
+        },
+      });
+    }
+
+    // STEP 2: Pull exact data records for the matched IDs (Disables TypeORM subquery wrapper)
+    const items = await itemRepository
+      .createQueryBuilder("item")
+      .select([
+        "item.id",
+        "item.item_name",
+        "item.item_name_cn",
+        "item.ean",
+        "item.ItemID_DE",
+        "item.isActive",
+        "item.parent_id",
+        "item.taric_id",
+        "item.cat_id",
+        "item.supp_cat",
+        "item.supplier_id",
+        "item.customer_id",
+        "item.isLabelPrint",
+        "item.photo",
+        "item.pix_path",
+        "item.pix_path_eBay",
+        "item.weight",
+        "item.length",
+        "item.width",
+        "item.height",
+        "item.remark",
+        "item.model",
+        "item.is_rmb_special",
+        "item.is_eur_special",
+        "item.is_dimension_special",
+        "item.is_npr",
+        "item.is_new",
+        "item.price",
+        "item.transfer_price_EUR",
+        "item.created_at",
+        "item.updated_at",
+        "item.tagOrder",
+      ])
+      .leftJoinAndSelect("item.tags", "tags")
+      .leftJoin("item.parent", "parent")
+      .addSelect([
+        "parent.id",
+        "parent.de_no",
+        "parent.name_de",
+        "parent.name_en",
+        "parent.name_cn",
+      ])
+      .leftJoin("item.category", "category")
+      .addSelect(["category.id", "category.name"])
+      .leftJoin("item.customer", "customer")
+      .addSelect(["customer.id", "customer.companyName"])
+      .where("item.id IN (:...targetIds)", { targetIds })
+      .orderBy("item.created_at", "DESC")
+      .getMany();
+
+    // STEP 3: Load required Warehouse tracking metrics separately to prevent cross-join blocks
+    const targetItemIDsDE = items
+      .map((i) => i.ItemID_DE)
+      .filter(Boolean) as number[];
+
+    const warehouseItems = await warehouseRepository
+      .createQueryBuilder("wi")
+      .select([
+        "wi.id",
+        "wi.item_id",
+        "wi.ItemID_DE",
+        "wi.item_no_de",
+        "wi.item_name_de",
+        "wi.ean",
+        "wi.is_active",
+      ])
+      .where("wi.item_id IN (:...targetIds)", { targetIds })
+      .orWhere(
+        targetItemIDsDE.length > 0
+          ? "wi.ItemID_DE IN (:...targetItemIDsDE)"
+          : "1=0",
+        { targetItemIDsDE },
+      )
+      .getMany();
+
+    // STEP 4: Format payload map structures
     const formattedItems = items.map((item: any) => {
-      const customerData = item.customer;
+      const parentData = item.parent || null;
+      const customerData = item.customer || null;
+
+      const warehouseData =
+        warehouseItems.find(
+          (wi: any) =>
+            wi.item_id === item.id ||
+            (item.ItemID_DE && wi.ItemID_DE === item.ItemID_DE),
+        ) || null;
 
       return {
         id: item.id,
-        de_no: item.de_no || null,
-        name_de: item.name_de || null,
-        name_en: item.name_en || null,
-        name_cn: item.name_cn || null,
+        de_no: warehouseData?.item_no_de || parentData?.de_no || null,
+        name_de: parentData?.name_de || null,
+        name_en: parentData?.name_en || null,
+        name_cn: parentData?.name_cn || null,
         item_name: item.item_name,
         item_name_cn: item.item_name_cn,
-        ean: item.ean || null,
+        ean: item.ean || warehouseData?.ean || null,
         ItemID_DE: item.ItemID_DE || null,
-        is_active: item.isActive || "N",
+        is_active: warehouseData
+          ? warehouseData.is_active
+          : item.isActive || "N",
         parent_id: item.parent_id || null,
         taric_id: item.taric_id || null,
         category_id: item.cat_id || null,
-        category: item.supp_cat || null,
+        category: item.category?.name || item.supp_cat || null,
         supplier_id: item.supplier_id || null,
         customer_id: item.customer_id || null,
-        customer_name: customerData?.companyName || null, // Populated from relation join
+        customer_name: customerData?.companyName || null,
         isLabelPrint: item.isLabelPrint || false,
-        item_name_de: item.name_de || null,
+        item_name_de:
+          warehouseData?.item_name_de || parentData?.name_de || null,
         photo: item.photo || null,
         pix_path: item.pix_path || null,
         pix_path_eBay: item.pix_path_eBay || null,
@@ -220,15 +319,20 @@ export const getItems = async (
         transfer_price_EUR: item.transfer_price_EUR,
         created_at: item.created_at,
         updated_at: item.updated_at,
-        tags: item.tags || [], // Populated from relation join
+        tags: item.tags || [],
         tagOrder: item.tagOrder,
       };
     });
 
-    // 4. Send back structured response
+    const user = (req as any).user;
+    const filteredData = filterDataByRole(
+      formattedItems,
+      user?.role || "STAFF",
+    );
+
     return res.status(200).json({
       success: true,
-      data: formattedItems,
+      data: filteredData,
       pagination: {
         page: pageNum,
         limit: limitNum,
@@ -572,6 +676,7 @@ export const getItemById = async (
       })(),
 
       nprRemarks: item.npr_remark || "",
+      // remark_cn: item. || "",
     };
 
     const user = (req as AuthorizedRequest).user;
@@ -880,6 +985,7 @@ export const updateItem = async (
       "width",
       "height",
       "remark",
+      "remark_cn",
       "model",
       "isActive",
       "is_qty_dividable",
