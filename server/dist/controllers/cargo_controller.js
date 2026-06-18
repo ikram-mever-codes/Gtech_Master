@@ -29,6 +29,7 @@ const order_items_1 = require("../models/order_items");
 const invoice_1 = require("../models/invoice");
 const customers_1 = require("../models/customers");
 const tarics_1 = require("../models/tarics");
+const cargo_types_1 = require("../models/cargo_types");
 const typeorm_1 = require("typeorm");
 const generateInvoicesForOrders = (orderIds_1, ...args_1) => __awaiter(void 0, [orderIds_1, ...args_1], void 0, function* (orderIds, cargoIds = []) {
     var _a;
@@ -39,6 +40,7 @@ const generateInvoicesForOrders = (orderIds_1, ...args_1) => __awaiter(void 0, [
         const invoiceItemRepo = database_1.AppDataSource.getRepository(invoice_1.InvoiceItem);
         const customerRepo = database_1.AppDataSource.getRepository(customers_1.Customer);
         const cargoRepo = database_1.AppDataSource.getRepository(cargos_1.Cargo);
+        const cargoTypeRepo = database_1.AppDataSource.getRepository(cargo_types_1.CargoType);
         const cargoNumbers = new Set();
         const orderNumbers = new Set();
         if (cargoIds.length > 0) {
@@ -68,6 +70,17 @@ const generateInvoicesForOrders = (orderIds_1, ...args_1) => __awaiter(void 0, [
             });
             if (!cargo)
                 continue;
+            if (cargo.cargo_type_id) {
+                const cargoType = yield cargoTypeRepo.findOne({ where: { id: cargo.cargo_type_id } });
+                if (cargoType && cargoType.has_pl === false) {
+                    const existingInvoice = yield invoiceRepo.findOne({ where: { orderNumber: cargoNo } });
+                    if (existingInvoice) {
+                        yield invoiceItemRepo.delete({ invoice: { id: existingInvoice.id } });
+                        yield invoiceRepo.delete(existingInvoice.id);
+                    }
+                    continue;
+                }
+            }
             const items = yield orderItemRepo.find({
                 where: { cargo_id: cargo.id },
                 relations: ["item", "item.taric", "order"],

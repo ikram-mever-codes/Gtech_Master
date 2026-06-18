@@ -17,6 +17,7 @@ const items_controller_1 = require("../controllers/items_controller");
 const database_1 = require("../config/database");
 const parents_1 = require("../models/parents");
 const items_1 = require("../models/items");
+const typeorm_1 = require("typeorm");
 const router = express_1.default.Router();
 router.get("/pricing/transfer-prices", items_controller_1.feedTransferPrices);
 router.get("/cat/fix", items_controller_1.syncSuppCatWithCategoryName);
@@ -28,7 +29,7 @@ router.get("/new-items", items_controller_1.getNewItems);
 router.get("/new-items/count", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const itemRepository = database_1.AppDataSource.getRepository(items_1.Item);
-        const count = yield itemRepository.count({ where: { is_new: "Y" } });
+        const count = yield itemRepository.count({ where: { is_new: (0, typeorm_1.In)(["Y", "y"]) } });
         res.json({ success: true, data: { count } });
     }
     catch (error) {
