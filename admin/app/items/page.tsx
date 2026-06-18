@@ -103,6 +103,20 @@ interface FilterState {
 const PAGE_LIMIT = 30;
 const FETCH_ALL_LIMIT = 100000;
 
+const Field = ({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) => (
+  <div>
+    <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-0.5">
+      {label}
+    </p>
+    <div className="text-sm text-gray-900 break-words">{children}</div>
+  </div>
+);
 const ItemsManagementPage: React.FC = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -780,19 +794,13 @@ const ItemsManagementPage: React.FC = () => {
       return;
     }
     setPreviewSaving(true);
-    const tid = toast.loading("Saving item...", loadingStyles);
     try {
       await updateItem(previewItem.id, buildItemUpdatePayload(previewItem));
-      toast.success("Item updated", { id: tid, ...successStyles });
       setPreviewEdit(false);
       const fresh: any = await getItemById(previewItem.id);
       setPreviewItem(transformDetail(fresh?.data || {}));
       reloadItems();
     } catch (e: any) {
-      toast.error(e.message || "Failed to update item", {
-        id: tid,
-        ...errorStyles,
-      });
     } finally {
       setPreviewSaving(false);
     }
@@ -803,7 +811,6 @@ const ItemsManagementPage: React.FC = () => {
     if (!confirm("Are you sure you want to delete this item?")) return;
     try {
       await deleteItem(previewItem.id);
-      toast.success("Item deleted", successStyles);
       closePreview();
       reloadItems();
     } catch (e: any) {
@@ -1753,21 +1760,6 @@ const ItemsManagementPage: React.FC = () => {
     }
   };
 
-  const Field = ({
-    label,
-    children,
-  }: {
-    label: string;
-    children: React.ReactNode;
-  }) => (
-    <div>
-      <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-0.5">
-        {label}
-      </p>
-      <div className="text-sm text-gray-900 break-words">{children}</div>
-    </div>
-  );
-
   const inputCls =
     "w-full px-2.5 py-1.5 text-sm border border-gray-300/80 bg-white/70 rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all";
 
@@ -2394,7 +2386,7 @@ const ItemsManagementPage: React.FC = () => {
                 <Field label="Item No">{previewItemNo}</Field>
                 <Field label="Company">
                   {previewEdit && previewItem ? (
-                    <div className="relative">
+                    <div className="relative z-30">
                       <div className="relative">
                         <MagnifyingGlassIcon className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400 pointer-events-none" />
                         <input
@@ -2412,19 +2404,26 @@ const ItemsManagementPage: React.FC = () => {
                           <button
                             type="button"
                             onClick={handleClearPreviewCustomer}
-                            className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500"
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500 z-10"
                             title="Clear customer"
                           >
                             <XCircleIcon className="h-4 w-4" />
                           </button>
                         )}
                       </div>
+
                       {showCustomerDropdown && (
                         <>
+                          {/* Backdrop overlay shifted to z-10 so it sits behind the input container but above the rest of the page */}
                           <div
-                            className="fixed inset-0 z-10"
-                            onClick={() => setShowCustomerDropdown(false)}
+                            className="fixed inset-0 z-10 cursor-default"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setShowCustomerDropdown(false);
+                            }}
                           />
+
+                          {/* Dropdown container given z-20 so it remains interactive and floats above the backdrop */}
                           <div className="absolute z-20 mt-1 w-full max-h-56 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg">
                             {previewFilteredCustomers.length > 0 ? (
                               previewFilteredCustomers.map((customer: any) => {
@@ -2434,9 +2433,10 @@ const ItemsManagementPage: React.FC = () => {
                                 return (
                                   <div
                                     key={customer.id}
-                                    onClick={() =>
-                                      handleSelectPreviewCustomer(customer)
-                                    }
+                                    onClick={(e) => {
+                                      e.stopPropagation(); // Prevents backdrop click interference
+                                      handleSelectPreviewCustomer(customer);
+                                    }}
                                     className={`px-3 py-2 text-sm cursor-pointer flex items-center justify-between ${
                                       isSelected
                                         ? "bg-[#8CC21B]/10 text-[#5f8512] font-semibold"
@@ -2467,7 +2467,7 @@ const ItemsManagementPage: React.FC = () => {
                   ) : (
                     getCompany(previewItem) || getCompany(previewRow) || "—"
                   )}
-                </Field>{" "}
+                </Field>
                 <Field label="IsLabel">
                   {previewEdit && previewItem ? (
                     <select
