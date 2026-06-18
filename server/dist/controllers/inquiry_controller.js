@@ -226,6 +226,38 @@ class InquiryController {
         this.customerRepository = database_1.AppDataSource.getRepository(customers_1.Customer);
         this.contactPersonRepository = database_1.AppDataSource.getRepository(contact_person_1.ContactPerson);
     }
+    getLetterSuffix(index) {
+        let suffix = "";
+        let temp = index;
+        while (temp >= 0) {
+            suffix = String.fromCharCode((temp % 26) + 97) + suffix;
+            temp = Math.floor(temp / 26) - 1;
+        }
+        return suffix;
+    }
+    getNextInquiryNo() {
+        return __awaiter(this, void 0, void 0, function* () {
+            const currentYear = new Date().getFullYear();
+            const yearSuffix = currentYear.toString().slice(-2);
+            const prefix = `AF${yearSuffix}-`;
+            const lastInquiry = yield this.inquiryRepository
+                .createQueryBuilder("inquiry")
+                .where("inquiry.inquiryNo LIKE :prefix", { prefix: `${prefix}%` })
+                .orderBy("inquiry.inquiryNo", "DESC")
+                .getOne();
+            let nextCounter = 1;
+            if (lastInquiry && lastInquiry.inquiryNo) {
+                const parts = lastInquiry.inquiryNo.split("-");
+                if (parts.length === 2) {
+                    const lastCounter = parseInt(parts[1], 10);
+                    if (!isNaN(lastCounter)) {
+                        nextCounter = lastCounter + 1;
+                    }
+                }
+            }
+            return `${prefix}${String(nextCounter).padStart(3, "0")}`;
+        });
+    }
     getAllInquiries(request, response) {
         return __awaiter(this, void 0, void 0, function* () {
             try {
@@ -372,7 +404,7 @@ class InquiryController {
     createInquiry(request, response) {
         return __awaiter(this, void 0, void 0, function* () {
             try {
-                const { name, description, image, isAssembly, customerId, isEstimated, contactPersonId, status, priority, referenceNumber, requiredByDate, internalNotes, termsConditions, projectLink, asanaLink, assemblyInstructions, weight, width, height, length, itemNo, urgency1, urgency2, painPoints, isFragile, requiresSpecialHandling, handlingInstructions, numberOfPackages, packageType, purchasePrice, purchasePriceCurrency, requests, } = request.body;
+                const { name, description, image, isAssembly, customerId, isEstimated, contactPersonId, status, priority, referenceNumber, requiredByDate, internalNotes, termsConditions, projectLink, asanaLink, assemblyInstructions, weight, width, height, length, itemNo, urgency1, urgency2, painPoints, isFragile, requiresSpecialHandling, handlingInstructions, numberOfPackages, packageType, purchasePrice, purchasePriceCurrency, requests, total_potential_k_eur, next_followup_at, owner_user_id, next_action, } = request.body;
                 if (!name || !customerId) {
                     return response.status(400).json({
                         success: false,
@@ -401,11 +433,13 @@ class InquiryController {
                         });
                     }
                 }
+                const inquiryNo = yield this.getNextInquiryNo();
                 const inquiry = this.inquiryRepository.create({
                     name,
                     description,
                     image,
                     isAssembly: isAssembly || false,
+                    inquiryNo,
                     customer,
                     contactPerson,
                     status: status || "Draft",
@@ -433,6 +467,10 @@ class InquiryController {
                     packageType,
                     purchasePrice,
                     purchasePriceCurrency,
+                    total_potential_k_eur,
+                    next_followup_at: next_followup_at || null,
+                    owner_user_id,
+                    next_action,
                 });
                 const savedInquiry = yield this.inquiryRepository.save(inquiry);
                 if (requests && Array.isArray(requests) && requests.length > 0) {
@@ -444,7 +482,8 @@ class InquiryController {
                         });
                         yield starBusinessDetailsRepository.save(starBusinessDetails);
                     }
-                    const requestEntities = requests.map((reqData) => {
+                    let total_potential_k_eur = 0;
+                    const requestEntities = requests.map((reqData, index) => {
                         let totalWeight = null;
                         const currentQty = reqData.qty || reqData.quantity;
                         if (reqData.unitWeight && currentQty) {
@@ -452,10 +491,36 @@ class InquiryController {
                                 parseFloat(reqData.unitWeight) * parseFloat(currentQty);
                         }
                         const { id: _ignored } = reqData, reqDataWithoutId = __rest(reqData, ["id"]);
-                        const requestItem = this.requestRepository.create(Object.assign(Object.assign({}, reqDataWithoutId), { businessId: starBusinessDetails.id, business: starBusinessDetails, inquiry: savedInquiry, qty: currentQty, totalWeight: totalWeight || reqData.totalWeight }));
+                        const qtyVal = parseInt(currentQty || "0", 10) || 0;
+                        const targetPriceVal = parseFloat(reqData.targetPrice) || 0;
+                        let factor = 12;
+                        if (reqData.interval) {
+                            const normalized = reqData.interval.toLowerCase().trim();
+                            if (normalized === "jährlich" || normalized === "jaehrlich" || normalized === "yearly") {
+                                factor = 1;
+                            }
+                            else if (normalized === "halbjährlich" || normalized === "halbjaehrlich" || normalized === "half-yearly" || normalized === "half yearly" || normalized === "biannually") {
+                                factor = 2;
+                            }
+                            else if (normalized === "quartal" || normalized === "quarterly") {
+                                factor = 4;
+                            }
+                            else if (normalized === "2 monatlich" || normalized === "bimonthly") {
+                                factor = 6;
+                            }
+                            else if (normalized === "monatlich" || normalized === "monthly") {
+                                factor = 12;
+                            }
+                        }
+                        const annualPotential = qtyVal * targetPriceVal * factor;
+                        const annualPotentialKEur = annualPotential / 1000;
+                        total_potential_k_eur += annualPotentialKEur;
+                        const requestItem = this.requestRepository.create(Object.assign(Object.assign({}, reqDataWithoutId), { itemNo: `${inquiryNo}${this.getLetterSuffix(index)}`, businessId: starBusinessDetails.id, business: starBusinessDetails, inquiry: savedInquiry, qty: currentQty, totalWeight: totalWeight || reqData.totalWeight, targetPrice: reqData.targetPrice || null, annualPotential: annualPotential, annualPotentialKEur: annualPotentialKEur }));
                         return requestItem;
                     });
                     yield this.requestRepository.save(requestEntities);
+                    savedInquiry.total_potential_k_eur = total_potential_k_eur;
+                    yield this.inquiryRepository.save(savedInquiry);
                 }
                 const completeInquiry = yield this.inquiryRepository.findOne({
                     where: { id: savedInquiry.id },
@@ -487,7 +552,8 @@ class InquiryController {
             var _a;
             try {
                 const { id } = request.params;
-                const { name, description, image, isAssembly, contactPersonId, status, priority, referenceNumber, isEstimated, requiredByDate, internalNotes, termsConditions, projectLink, asanaLink, assemblyInstructions, weight, width, height, length, itemNo, urgency1, urgency2, painPoints, isFragile, requiresSpecialHandling, handlingInstructions, numberOfPackages, packageType, purchasePrice, purchasePriceCurrency, requests, } = request.body;
+                console.log("DEBUG: updateInquiry called with id:", id, "body requests:", JSON.stringify(request.body.requests));
+                const { name, description, image, isAssembly, contactPersonId, status, priority, referenceNumber, isEstimated, requiredByDate, internalNotes, termsConditions, projectLink, asanaLink, assemblyInstructions, weight, width, height, length, itemNo, urgency1, urgency2, painPoints, isFragile, requiresSpecialHandling, handlingInstructions, numberOfPackages, packageType, purchasePrice, purchasePriceCurrency, requests, total_potential_k_eur, next_followup_at, owner_user_id, next_action, } = request.body;
                 const existingInquiry = yield this.inquiryRepository.findOne({
                     where: { id },
                     relations: [
@@ -503,6 +569,12 @@ class InquiryController {
                         message: "Inquiry not found",
                     });
                 }
+                let inquiryNo = existingInquiry.inquiryNo;
+                if (!inquiryNo) {
+                    inquiryNo = yield this.getNextInquiryNo();
+                    existingInquiry.inquiryNo = inquiryNo;
+                    yield this.inquiryRepository.update(id, { inquiryNo });
+                }
                 let contactPerson = null;
                 if (contactPersonId) {
                     contactPerson = yield this.contactPersonRepository.findOne({
@@ -515,9 +587,9 @@ class InquiryController {
                         });
                     }
                 }
-                const updateData = Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign({}, (name && { name })), (description !== undefined && { description })), (image !== undefined && { image })), (isAssembly !== undefined && { isAssembly })), (status !== undefined && { status })), (priority !== undefined && { priority })), (referenceNumber !== undefined && { referenceNumber })), (requiredByDate !== undefined && { requiredByDate })), (internalNotes !== undefined && { internalNotes })), (termsConditions !== undefined && { termsConditions })), (projectLink !== undefined && { projectLink })), (asanaLink !== undefined && { asanaLink })), (assemblyInstructions !== undefined && { assemblyInstructions })), (isEstimated !== undefined && { isEstimated })), (weight !== undefined && { weight })), (width !== undefined && { width })), (height !== undefined && { height })), (length !== undefined && { length })), (itemNo !== undefined && { itemNo })), (urgency1 !== undefined && { urgency1 })), (urgency2 !== undefined && { urgency2 })), (painPoints !== undefined && { painPoints })), (isFragile !== undefined && { isFragile })), (requiresSpecialHandling !== undefined && {
+                const updateData = Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign({}, (name && { name })), (description !== undefined && { description })), (image !== undefined && { image })), (isAssembly !== undefined && { isAssembly })), (status !== undefined && { status })), (priority !== undefined && { priority })), (referenceNumber !== undefined && { referenceNumber })), (requiredByDate !== undefined && { requiredByDate })), (internalNotes !== undefined && { internalNotes })), (termsConditions !== undefined && { termsConditions })), (projectLink !== undefined && { projectLink })), (asanaLink !== undefined && { asanaLink })), (assemblyInstructions !== undefined && { assemblyInstructions })), (isEstimated !== undefined && { isEstimated })), (weight !== undefined && { weight })), (width !== undefined && { width })), (height !== undefined && { height })), (length !== undefined && { length })), (itemNo !== undefined && { itemNo })), (urgency1 !== undefined && { urgency1 })), (urgency2 !== undefined && { urgency2 })), (painPoints !== undefined && { painPoints })), (isFragile !== undefined && { isFragile })), (requiresSpecialHandling !== undefined && {
                     requiresSpecialHandling,
-                })), (handlingInstructions !== undefined && { handlingInstructions })), (numberOfPackages !== undefined && { numberOfPackages })), (packageType !== undefined && { packageType })), (purchasePrice !== undefined && { purchasePrice })), (purchasePriceCurrency !== undefined && { purchasePriceCurrency }));
+                })), (handlingInstructions !== undefined && { handlingInstructions })), (numberOfPackages !== undefined && { numberOfPackages })), (packageType !== undefined && { packageType })), (purchasePrice !== undefined && { purchasePrice })), (purchasePriceCurrency !== undefined && { purchasePriceCurrency })), (total_potential_k_eur !== undefined && { total_potential_k_eur })), (next_followup_at !== undefined && { next_followup_at: next_followup_at || null })), (owner_user_id !== undefined && { owner_user_id })), (next_action !== undefined && { next_action }));
                 if (contactPerson !== undefined) {
                     updateData.contactPerson = contactPerson;
                 }
@@ -526,6 +598,7 @@ class InquiryController {
                     if (existingInquiry.requests && existingInquiry.requests.length > 0) {
                         yield this.requestRepository.remove(existingInquiry.requests);
                     }
+                    let total_potential_k_eur = 0;
                     if (requests.length > 0) {
                         let starBusinessDetails = (_a = existingInquiry.customer) === null || _a === void 0 ? void 0 : _a.starBusinessDetails;
                         if (!starBusinessDetails && existingInquiry.customer) {
@@ -536,7 +609,7 @@ class InquiryController {
                             yield starBusinessDetailsRepository.save(starBusinessDetails);
                         }
                         if (starBusinessDetails) {
-                            const requestEntities = requests.map((reqData) => {
+                            const requestEntities = requests.map((reqData, index) => {
                                 let totalWeight = null;
                                 const currentQty = reqData.qty || reqData.quantity;
                                 if (reqData.unitWeight && currentQty) {
@@ -544,12 +617,38 @@ class InquiryController {
                                         parseFloat(reqData.unitWeight) * parseFloat(currentQty);
                                 }
                                 const { id: _ignored } = reqData, reqDataWithoutId = __rest(reqData, ["id"]);
-                                const requestItem = this.requestRepository.create(Object.assign(Object.assign({}, reqDataWithoutId), { businessId: starBusinessDetails.id, business: starBusinessDetails, inquiry: existingInquiry, qty: currentQty, totalWeight: totalWeight || reqData.totalWeight }));
+                                const qtyVal = parseInt(currentQty || "0", 10) || 0;
+                                const targetPriceVal = parseFloat(reqData.targetPrice) || 0;
+                                let factor = 12;
+                                if (reqData.interval) {
+                                    const normalized = reqData.interval.toLowerCase().trim();
+                                    if (normalized === "jährlich" || normalized === "jaehrlich" || normalized === "yearly") {
+                                        factor = 1;
+                                    }
+                                    else if (normalized === "halbjährlich" || normalized === "halbjaehrlich" || normalized === "half-yearly" || normalized === "half yearly" || normalized === "biannually") {
+                                        factor = 2;
+                                    }
+                                    else if (normalized === "quartal" || normalized === "quarterly") {
+                                        factor = 4;
+                                    }
+                                    else if (normalized === "2 monatlich" || normalized === "bimonthly") {
+                                        factor = 6;
+                                    }
+                                    else if (normalized === "monatlich" || normalized === "monthly") {
+                                        factor = 12;
+                                    }
+                                }
+                                const annualPotential = qtyVal * targetPriceVal * factor;
+                                const annualPotentialKEur = annualPotential / 1000;
+                                total_potential_k_eur += annualPotentialKEur;
+                                const requestItem = this.requestRepository.create(Object.assign(Object.assign({}, reqDataWithoutId), { itemNo: `${inquiryNo}${this.getLetterSuffix(index)}`, businessId: starBusinessDetails.id, business: starBusinessDetails, inquiry: existingInquiry, qty: currentQty, totalWeight: totalWeight || reqData.totalWeight, targetPrice: reqData.targetPrice || null, annualPotential: annualPotential, annualPotentialKEur: annualPotentialKEur }));
                                 return requestItem;
                             });
                             yield this.requestRepository.save(requestEntities);
                         }
                     }
+                    existingInquiry.total_potential_k_eur = total_potential_k_eur;
+                    yield this.inquiryRepository.update(id, { total_potential_k_eur });
                 }
                 if (status && status !== existingInquiry.status) {
                     const updatedInquiry = yield this.inquiryRepository.findOne({
@@ -858,7 +957,7 @@ class InquiryController {
                 }
                 const item = itemRepository.create(itemData);
                 const savedItem = yield itemRepository.save(item);
-                inquiry.status = "Quoted";
+                inquiry.status = "completed";
                 yield inquiryRepository.save(inquiry);
                 return response.status(201).json({
                     success: true,
@@ -986,7 +1085,7 @@ class InquiryController {
                     if (inquiry) {
                         const allConverted = inquiry.requests.every((req) => req.requestStatus === "Converted to Item");
                         if (allConverted) {
-                            inquiry.status = "Quoted";
+                            inquiry.status = "completed";
                             yield inquiryRepository.save(inquiry);
                         }
                     }

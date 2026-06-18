@@ -1553,7 +1553,7 @@ export const getItemStatistics = async (
     });
 
     const itemsPendingNew = await itemRepository.count({
-      where: { is_new: "Y" },
+      where: { is_new: In(["Y", "y"]) },
     });
 
     let itemsWithStock: any = { count: 0 };
@@ -3090,7 +3090,7 @@ export const exportItemsToCSV = async (
 
     let whereClause: any = { is_updated: true };
     if (type === "new") {
-      whereClause = { is_new: "Y" };
+      whereClause = { is_new: In(["Y", "y"]) };
     }
 
     const items = await itemRepository.find({
@@ -3402,7 +3402,7 @@ export const getNewItems = async (
 
     const queryBuilder = itemRepository
       .createQueryBuilder("item")
-      .where("item.is_new = :isNew", { isNew: "Y" })
+      .where("item.is_new IN ('Y', 'y')")
       .skip(skip)
       .take(limitNum)
       .orderBy("item.created_at", "DESC");
@@ -3505,7 +3505,7 @@ export const exportNewItemsToCSV = async (
     const supplierItemRepository = AppDataSource.getRepository(SupplierItem);
 
     const items = await itemRepository.find({
-      where: { is_new: "Y" },
+      where: { is_new: In(["Y", "y"]) },
       relations: ["parent", "taric", "category"],
       order: { id: "ASC" },
     });

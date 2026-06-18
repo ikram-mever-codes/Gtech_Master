@@ -44,6 +44,7 @@ import { AppDataSource } from "../config/database";
 import { Parent } from "../models/parents";
 import { UserRole } from "../models/users";
 import { Item } from "../models/items";
+import { In } from "typeorm";
 
 const router: any = express.Router();
 
@@ -58,7 +59,7 @@ router.get("/new-items", getNewItems);
 router.get("/new-items/count", async (req: Request, res: Response) => {
   try {
     const itemRepository = AppDataSource.getRepository(Item);
-    const count = await itemRepository.count({ where: { is_new: "Y" } });
+    const count = await itemRepository.count({ where: { is_new: In(["Y", "y"]) } });
     res.json({ success: true, data: { count } });
   } catch (error) {
     res

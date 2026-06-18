@@ -27,6 +27,10 @@ __decorate([
     __metadata("design:type", Number)
 ], CargoType.prototype, "duration", void 0);
 __decorate([
+    (0, typeorm_1.Column)({ type: "boolean", default: true }),
+    __metadata("design:type", Boolean)
+], CargoType.prototype, "has_pl", void 0);
+__decorate([
     (0, typeorm_1.CreateDateColumn)(),
     __metadata("design:type", Date)
 ], CargoType.prototype, "created_at", void 0);

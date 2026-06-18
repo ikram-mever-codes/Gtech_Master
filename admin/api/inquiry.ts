@@ -47,6 +47,9 @@ export interface Request {
   priceRMB?: number;
   priority?: string;
   interval?: string;
+  targetPrice?: number;
+  annualPotential?: number;
+  annualPotentialKEur?: number;
 }
 
 export interface Inquiry {
@@ -74,14 +77,13 @@ export interface Inquiry {
   deliveryAddress?: DeliveryAddress;
   requests: Request[];
   status:
-    | "Draft"
-    | "Submitted"
-    | "In Review"
-    | "Quoted"
-    | "Negotiation"
-    | "Accepted"
-    | "Rejected"
-    | "Cancelled";
+    | "draft"
+    | "active"
+    | "waiting_customer"
+    | "blocked"
+    | "completed"
+    | "lost"
+    | "paused";
   totalEstimatedCost?: number;
   priority: "Low" | "Medium" | "High" | "Urgent";
   referenceNumber?: string;
@@ -192,34 +194,21 @@ export const getAvailableCurrencies = () => [
   { value: "HKD", label: "HKD" },
 ];
 export const getInquiryStatuses = () => [
-  { value: "Draft", label: "Draft", color: "bg-gray-100 text-gray-800" },
+  { value: "draft", label: "Draft", color: "bg-gray-100 text-gray-800" },
+  { value: "active", label: "Active", color: "bg-blue-100 text-blue-800" },
   {
-    value: "Submitted",
-    label: "Submitted",
-    color: "bg-blue-100 text-blue-800",
-  },
-  {
-    value: "In Review",
-    label: "In Review",
+    value: "waiting_customer",
+    label: "Waiting Customer",
     color: "bg-yellow-100 text-yellow-800",
   },
-  { value: "Quoted", label: "Quoted", color: "bg-purple-100 text-purple-800" },
+  { value: "blocked", label: "Blocked", color: "bg-red-100 text-red-800" },
   {
-    value: "Negotiation",
-    label: "Negotiation",
-    color: "bg-orange-100 text-orange-800",
-  },
-  {
-    value: "Accepted",
-    label: "Accepted",
+    value: "completed",
+    label: "Completed",
     color: "bg-green-100 text-green-800",
   },
-  { value: "Rejected", label: "Rejected", color: "bg-red-100 text-red-800" },
-  {
-    value: "Cancelled",
-    label: "Cancelled",
-    color: "bg-gray-300 text-gray-800",
-  },
+  { value: "lost", label: "Lost", color: "bg-gray-500 text-white" },
+  { value: "paused", label: "Paused", color: "bg-purple-100 text-purple-800" },
 ];
 
 export const getRequestStatuses = () => [

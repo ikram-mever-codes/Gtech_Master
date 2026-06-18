@@ -151,6 +151,34 @@ __decorate([
 ], RequestedItem.prototype, "purchasePrice", void 0);
 __decorate([
     (0, typeorm_1.Column)({
+        type: "decimal",
+        precision: 12,
+        scale: 2,
+        nullable: true,
+        comment: "Target price for this requested item in EUR",
+    }),
+    __metadata("design:type", Number)
+], RequestedItem.prototype, "targetPrice", void 0);
+__decorate([
+    (0, typeorm_1.Column)({
+        type: "decimal",
+        precision: 12,
+        scale: 2,
+        nullable: true,
+    }),
+    __metadata("design:type", Number)
+], RequestedItem.prototype, "annualPotential", void 0);
+__decorate([
+    (0, typeorm_1.Column)({
+        type: "decimal",
+        precision: 12,
+        scale: 2,
+        nullable: true,
+    }),
+    __metadata("design:type", Number)
+], RequestedItem.prototype, "annualPotentialKEur", void 0);
+__decorate([
+    (0, typeorm_1.Column)({
         type: "enum",
         enum: ["RMB", "HKD", "EUR", "USD"],
         default: "RMB",

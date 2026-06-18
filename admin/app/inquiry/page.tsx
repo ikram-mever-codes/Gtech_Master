@@ -300,7 +300,7 @@ const CombinedInquiriesPageContent = () => {
     isAssembly: false,
     customerId: "",
     contactPersonId: "",
-    status: "Draft",
+    status: "draft",
     priority: "Medium",
     referenceNumber: "",
     requiredByDate: undefined,
@@ -546,17 +546,9 @@ const CombinedInquiriesPageContent = () => {
       if (response?.data) {
         const customers = Array.isArray(response.data)
           ? response.data
-          : response.data.businesses || [];
-        const filteredCustomers = customers.filter((customer: Customer) => {
-          return (
-            customer.stage === "star_business" ||
-            customer.stage === "star_customer"
-          );
-        });
-        setCustomers(filteredCustomers);
-        console.log(
-          `Found ${filteredCustomers.length} star customers/businesses`,
-        );
+          : response.data.customers || response.data.businesses || [];
+        setCustomers(customers);
+        console.log(`Loaded ${customers.length} customers/businesses`);
       }
     } catch (error) {
       console.error("Error fetching customers:", error);
@@ -621,11 +613,8 @@ const CombinedInquiriesPageContent = () => {
         const endIndex = startIndex + itemsPerPage;
         const paginatedItems = inquiryData.slice(startIndex, endIndex);
         setInquiries(paginatedItems);
-        const withRequests = inquiryData.filter(
-          (i: any) => i.requests?.length > 0,
-        );
-        setExpandedInquiryIds(new Set(withRequests.map((i: any) => i.id)));
-        setAllRequestsExpanded(true);
+        setExpandedInquiryIds(new Set());
+        setAllRequestsExpanded(false);
       }
     } catch (error) {
       console.error("Error fetching inquiries:", error);
@@ -747,6 +736,9 @@ const CombinedInquiriesPageContent = () => {
           priceRMB: req.priceRMB || req.purchasePrice || 0,
           priority: req.priority || "Normal",
           interval: req.interval || "Monatlich",
+          targetPrice: req.targetPrice || 0,
+          annualPotential: req.annualPotential || 0,
+          annualPotentialKEur: req.annualPotentialKEur || 0,
         })),
       );
     }
@@ -825,6 +817,9 @@ const CombinedInquiriesPageContent = () => {
         priceRMB: 0,
         priority: "Normal",
         interval: "Monatlich",
+        targetPrice: 0,
+        annualPotential: 0,
+        annualPotentialKEur: 0,
       },
     ]);
     setExpandedRequestIndex(inquiryRequests.length);
@@ -868,7 +863,7 @@ const CombinedInquiriesPageContent = () => {
       isAssembly: false,
       customerId: "",
       contactPersonId: "",
-      status: "Draft",
+      status: "draft",
       priority: "Medium",
       referenceNumber: "",
       requiredByDate: undefined,
@@ -929,6 +924,9 @@ const CombinedInquiriesPageContent = () => {
         priceRMB: 0,
         priority: "Normal",
         interval: "Monatlich",
+        targetPrice: 0,
+        annualPotential: 0,
+        annualPotentialKEur: 0,
       },
     ]);
     setInquiryImageFile(null);
@@ -1110,7 +1108,7 @@ const CombinedInquiriesPageContent = () => {
     );
   };
   const getInquiryStatusColor = (status: string) => {
-    const statusObj = getInquiryStatuses().find((s) => s.value === status);
+    const statusObj = getInquiryStatuses().find((s) => s.value.toLowerCase() === status?.toLowerCase());
     return statusObj?.color || "bg-gray-100 text-gray-800";
   };
   const getInquiryPriorityColor = (priority: string) => {
@@ -1232,22 +1230,7 @@ const CombinedInquiriesPageContent = () => {
                   </option>
                 ))}
               </select>
-              <button
-                onClick={() => toggleAllInquiryRequests(allInquiries)}
-                className="px-3 py-2 text-sm text-gray-700 bg-white/80 backdrop-blur-sm border border-gray-300/80 rounded-lg hover:bg-white/60 transition-all flex items-center gap-2"
-                title={
-                  allRequestsExpanded
-                    ? "Fold all requests"
-                    : "Unfold all requests"
-                }
-              >
-                {allRequestsExpanded ? (
-                  <EyeSlashIcon className="h-4 w-4" />
-                ) : (
-                  <EyeIcon className="h-4 w-4" />
-                )}
-                {allRequestsExpanded ? "Fold All" : "Unfold All"}
-              </button>
+
               <button
                 onClick={fetchInquiries}
                 disabled={inquiryLoading}
@@ -1429,7 +1412,7 @@ const CombinedInquiriesPageContent = () => {
                         <td className="px-4 py-3">
                           <div className="flex justify-center">
                             <select
-                              value={inquiry.status}
+                              value={inquiry.status?.toLowerCase()}
                               onChange={async (e: any) => {
                                 await handleInquiryStatusChange(
                                   inquiry.id,
@@ -1478,21 +1461,32 @@ const CombinedInquiriesPageContent = () => {
                       {expandedInquiryIds.has(inquiry.id) &&
                         inquiry.requests &&
                         inquiry.requests.length > 0 && (
-                          <tr className="bg-gray-50/30">
-                            <td colSpan={9} className="px-4 py-3">
-                              <div className="overflow-x-auto">
-                                <table className="w-full text-sm border border-gray-200 rounded-lg">
-                                  <thead className="bg-gray-200/50 border-b border-gray-200/50">
-                                    <tr>
-                                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Item Name
-                                      </th>
-                                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Dimensions
-                                      </th>
-                                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Quantity & Interval
-                                      </th>
+                          <tr className="bg-gray-50/50 border-t border-b border-gray-100">
+                            <td colSpan={9} className="px-6 py-4">
+                              <div>
+                                <div className="text-xs font-semibold text-gray-500 mb-2.5 uppercase tracking-wider flex items-center gap-1.5 select-none">
+                                  <ClipboardList className="h-4 w-4 text-blue-500" />
+                                  <span>Request Items for: <strong className="text-gray-800">{inquiry.name}</strong></span>
+                                </div>
+                                <div className="overflow-x-auto shadow-sm rounded-lg border border-gray-200 bg-white">
+                                  <table className="w-full text-sm">
+                                    <thead className="bg-gray-200/50 border-b border-gray-200/50">
+                                      <tr>
+                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                          Item Name
+                                        </th>
+                                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                          Dimensions
+                                        </th>
+                                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                          Quantity & Interval
+                                        </th>
+                                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                          Target Price
+                                        </th>
+                                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                          Potential (k €)
+                                        </th>
                                       <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                                         Status
                                       </th>
@@ -1544,6 +1538,20 @@ const CombinedInquiriesPageContent = () => {
                                         <td className="px-4 py-3 text-center">
                                           <div className="text-sm font-medium text-gray-900">
                                             {request.qty} / {request.interval}
+                                          </div>
+                                        </td>
+                                        <td className="px-4 py-3 text-center">
+                                          <div className="text-sm font-medium text-gray-900">
+                                            {request.targetPrice !== undefined && request.targetPrice !== null
+                                              ? `${request.targetPrice} €`
+                                              : "-"}
+                                          </div>
+                                        </td>
+                                        <td className="px-4 py-3 text-center">
+                                          <div className="text-sm font-bold text-blue-600">
+                                            {request.annualPotentialKEur !== undefined && request.annualPotentialKEur !== null
+                                              ? `${request.annualPotentialKEur} k €`
+                                              : "-"}
                                           </div>
                                         </td>
                                         <td className="px-4 py-3 text-center">
@@ -1696,8 +1704,9 @@ const CombinedInquiriesPageContent = () => {
                                   </tbody>
                                 </table>
                               </div>
-                            </td>
-                          </tr>
+                            </div>
+                          </td>
+                        </tr>
                         )}
                     </React.Fragment>
                   ))}
@@ -1779,11 +1788,41 @@ const CombinedInquiriesPageContent = () => {
           <div className="backdrop-blur-md rounded-2xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto bg-white/95">
             <div className="p-6">
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-bold text-gray-900">
-                  {inquiryModalMode === "edit"
-                    ? "Inquiry Details"
-                    : "Create New Inquiry"}
-                </h2>
+                <div className="flex items-center gap-4">
+                  <h2 className="text-xl font-bold text-gray-900">
+                    {inquiryModalMode === "edit"
+                      ? "Inquiry Details"
+                      : "Create New Inquiry"}
+                  </h2>
+                  {(() => {
+                    let total = 0;
+                    inquiryRequests.forEach((req: any) => {
+                      const qty = parseInt(req.qty) || 0;
+                      const targetPrice = parseFloat(req.targetPrice) || 0;
+                      let factor = 12;
+                      const interval = req.interval || "Monatlich";
+                      const normalized = interval.toLowerCase().trim();
+                      if (normalized === "jährlich" || normalized === "jaehrlich" || normalized === "yearly") {
+                        factor = 1;
+                      } else if (normalized === "halbjährlich" || normalized === "halbjaehrlich" || normalized === "half-yearly" || normalized === "half yearly" || normalized === "biannually") {
+                        factor = 2;
+                      } else if (normalized === "quartal" || normalized === "quarterly") {
+                        factor = 4;
+                      } else if (normalized === "2 monatlich" || normalized === "bimonthly") {
+                        factor = 6;
+                      } else if (normalized === "monatlich" || normalized === "monthly") {
+                        factor = 12;
+                      }
+                      const annual = qty * targetPrice * factor;
+                      total += (annual / 1000);
+                    });
+                    return (
+                      <span className="bg-blue-50 border border-blue-200 text-blue-800 text-xs px-2.5 py-1 rounded-full font-bold">
+                        Potential: {total.toFixed(2)} k €
+                      </span>
+                    );
+                  })()}
+                </div>
                 <button
                   onClick={() => {
                     setShowCreateModal(false);
@@ -1989,27 +2028,7 @@ const CombinedInquiriesPageContent = () => {
                           />
                         )}
                       </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                          VP (k EUR)
-                        </label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={inquiryFormData.total_potential_k_eur ?? 0}
-                          onChange={(e) =>
-                            setInquiryFormData({
-                              ...inquiryFormData,
-                              total_potential_k_eur: parseFloat(e.target.value) || 0,
-                            })
-                          }
-                          disabled={
-                            inquiryModalMode === "edit" && !editModeEnabled
-                          }
-                          className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                          placeholder="0.00"
-                        />
-                      </div>
+
                       <div>
                         <label className="block text-xs font-medium text-gray-700 mb-1">
                           Owner
@@ -2105,7 +2124,7 @@ const CombinedInquiriesPageContent = () => {
                           </label>
                         </div>
                       </div>
-                      {inquiryFormData.isAssembly && (
+                      {false && inquiryFormData.isAssembly && (
                         <div className="col-span-2 bg-orange-100/50 border border-orange-200 rounded-xl p-4 mt-2 space-y-4">
                           <div className="grid grid-cols-3 gap-3">
                             <div>
@@ -2835,7 +2854,31 @@ const CombinedInquiriesPageContent = () => {
                                     </select>
                                   </div>
                                 </div>
-                                <div className="grid grid-cols-3 gap-3">
+                                <div className="grid grid-cols-4 gap-3">
+                                  <div>
+                                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                                      Target Price (EUR)
+                                    </label>
+                                    <input
+                                      type="number"
+                                      value={request.targetPrice || ""}
+                                      onChange={(e) =>
+                                        updateRequest(
+                                          index,
+                                          "targetPrice",
+                                          e.target.value === "" ? "" : parseFloat(e.target.value) || 0,
+                                        )
+                                      }
+                                      disabled={
+                                        inquiryModalMode === "edit" &&
+                                        !editModeEnabled
+                                      }
+                                      className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                                      step="0.01"
+                                      min="0"
+                                      placeholder="0.00"
+                                    />
+                                  </div>
                                   <div>
                                     <label className="block text-xs font-medium text-gray-700 mb-1">
                                       Purchase Price
@@ -2920,6 +2963,63 @@ const CombinedInquiriesPageContent = () => {
                                         </option>
                                       ))}
                                     </select>
+                                  </div>
+                                </div>
+                                <div className="bg-blue-50/50 rounded-lg p-3 border border-blue-100/60 flex items-center justify-between text-xs text-blue-800">
+                                  <div>
+                                    <strong>Value Potential:</strong>
+                                  </div>
+                                  <div className="flex gap-4">
+                                    <span>
+                                      Annual Potential:{" "}
+                                      <strong className="text-sm font-semibold">
+                                        {(() => {
+                                          const qty = parseInt(request.qty) || 0;
+                                          const targetPrice = parseFloat(request.targetPrice) || 0;
+                                          let factor = 12;
+                                          const interval = request.interval || "Monatlich";
+                                          const normalized = interval.toLowerCase().trim();
+                                          if (normalized === "jährlich" || normalized === "jaehrlich" || normalized === "yearly") {
+                                            factor = 1;
+                                          } else if (normalized === "halbjährlich" || normalized === "halbjaehrlich" || normalized === "half-yearly" || normalized === "half yearly" || normalized === "biannually") {
+                                            factor = 2;
+                                          } else if (normalized === "quartal" || normalized === "quarterly") {
+                                            factor = 4;
+                                          } else if (normalized === "2 monatlich" || normalized === "bimonthly") {
+                                            factor = 6;
+                                          } else if (normalized === "monatlich" || normalized === "monthly") {
+                                            factor = 12;
+                                          }
+                                          const annual = qty * targetPrice * factor;
+                                          return `${annual.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
+                                        })()}
+                                      </strong>
+                                    </span>
+                                    <span>
+                                      Annual Potential (k €):{" "}
+                                      <strong className="text-sm font-semibold">
+                                        {(() => {
+                                          const qty = parseInt(request.qty) || 0;
+                                          const targetPrice = parseFloat(request.targetPrice) || 0;
+                                          let factor = 12;
+                                          const interval = request.interval || "Monatlich";
+                                          const normalized = interval.toLowerCase().trim();
+                                          if (normalized === "jährlich" || normalized === "jaehrlich" || normalized === "yearly") {
+                                            factor = 1;
+                                          } else if (normalized === "halbjährlich" || normalized === "halbjaehrlich" || normalized === "half-yearly" || normalized === "half yearly" || normalized === "biannually") {
+                                            factor = 2;
+                                          } else if (normalized === "quartal" || normalized === "quarterly") {
+                                            factor = 4;
+                                          } else if (normalized === "2 monatlich" || normalized === "bimonthly") {
+                                            factor = 6;
+                                          } else if (normalized === "monatlich" || normalized === "monthly") {
+                                            factor = 12;
+                                          }
+                                          const annual = qty * targetPrice * factor;
+                                          return `${(annual / 1000).toFixed(2)} k €`;
+                                        })()}
+                                      </strong>
+                                    </span>
                                   </div>
                                 </div>
                                 <div className="grid grid-cols-4 gap-3 border-t border-gray-200/50 pt-3">
@@ -3701,28 +3801,44 @@ const CombinedInquiriesPageContent = () => {
                   <div className="bg-gray-50/50 rounded-xl p-4 border border-gray-100 space-y-3">
                     <div className="grid grid-cols-2 gap-4 text-sm">
                       <div>
-                        <span className="text-gray-500 block">Quantity / Interval</span>
+                        <span className="text-gray-500 block font-medium">Quantity / Interval</span>
                         <span className="font-semibold text-gray-900 text-base">
                           {selectedRequestForDetail.qty} / {selectedRequestForDetail.interval || "Monthly"}
                         </span>
                       </div>
                       <div>
-                        <span className="text-gray-500 block">Purchase Price</span>
+                        <span className="text-gray-500 block font-medium">Purchase Price</span>
                         <span className="font-semibold text-gray-900 text-base">
                           {selectedRequestForDetail.purchasePrice} {selectedRequestForDetail.currency || "RMB"}
                         </span>
                       </div>
+                      <div>
+                        <span className="text-gray-500 block font-medium">Target Price (EUR)</span>
+                        <span className="font-semibold text-gray-900 text-base">
+                          {selectedRequestForDetail.targetPrice !== undefined && selectedRequestForDetail.targetPrice !== null
+                            ? `${selectedRequestForDetail.targetPrice} €`
+                            : "-"}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500 block font-medium text-blue-600">Potential (k €)</span>
+                        <span className="font-semibold text-blue-600 text-base">
+                          {selectedRequestForDetail.annualPotentialKEur !== undefined && selectedRequestForDetail.annualPotentialKEur !== null
+                            ? `${selectedRequestForDetail.annualPotentialKEur} k €`
+                            : "-"}
+                        </span>
+                      </div>
                       {selectedRequestForDetail.priceRMB && (
                         <div>
-                          <span className="text-gray-500 block">Price in RMB</span>
+                          <span className="text-gray-500 block font-medium">Price in RMB</span>
                           <span className="font-semibold text-gray-800">
                             ¥{selectedRequestForDetail.priceRMB}
                           </span>
                         </div>
                       )}
                       <div>
-                        <span className="text-gray-500 block">Delivery Date</span>
-                        <span className="font-semibold text-gray-800">
+                        <span className="text-gray-500 block font-medium">Delivery Date</span>
+                        <span className="font-semibold text-gray-800 font-medium">
                           {selectedRequestForDetail.expectedDeliveryDate
                             ? new Date(selectedRequestForDetail.expectedDeliveryDate).toLocaleDateString()
                             : "Not specified"}

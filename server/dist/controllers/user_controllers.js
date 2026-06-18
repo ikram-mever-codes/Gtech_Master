@@ -48,7 +48,8 @@ const createUser = (req, res, next) => __awaiter(void 0, void 0, void 0, functio
         const emailVerificationCode = Math.floor(100000 + Math.random() * 900000).toString();
         const emailVerificationExp = new Date(Date.now() + 24 * 60 * 60 * 1000);
         let finalAssignedResources = assignedResources || [];
-        if (role === users_1.UserRole.PURCHASING && !finalAssignedResources.includes("Orders")) {
+        if (role === users_1.UserRole.PURCHASING &&
+            !finalAssignedResources.includes("Orders")) {
             finalAssignedResources.push("Orders");
         }
         const user = userRepository.create({
@@ -72,10 +73,11 @@ const createUser = (req, res, next) => __awaiter(void 0, void 0, void 0, functio
         });
         yield userRepository.save(user);
         const finalPermissions = permissions || [];
-        if (role === users_1.UserRole.PURCHASING && !finalPermissions.find((p) => p.resource === "Orders")) {
+        if (role === users_1.UserRole.PURCHASING &&
+            !finalPermissions.find((p) => p.resource === "Orders")) {
             finalPermissions.push({
                 resource: "Orders",
-                actions: ["create", "read", "update", "delete"]
+                actions: ["create", "read", "update", "delete"],
             });
         }
         if (finalPermissions.length > 0) {
@@ -87,8 +89,8 @@ const createUser = (req, res, next) => __awaiter(void 0, void 0, void 0, functio
             }));
             yield permissionRepository.save(permissionEntities);
         }
-        const verificationLink = `https://master.gtech.de/verify?email=${encodeURIComponent(email)}&verificationCode=${emailVerificationCode}`;
-        const loginLink = `https://master.gtech.de/login`;
+        const verificationLink = `https://system.gtech.de/verify?email=${encodeURIComponent(email)}&verificationCode=${emailVerificationCode}`;
+        const loginLink = `https://system.gtech.de/login`;
         const message = `
         <h2>Welcome to Our Platform</h2>
         <p>Your admin account has been created with the following credentials:</p>
@@ -184,10 +186,13 @@ const login = (req, res, next) => __awaiter(void 0, void 0, void 0, function* ()
             return next(new errorHandler_1.default("Your account has been disabled. Please contact support.", 403));
         }
         const token = jsonwebtoken_1.default.sign({ id: user.id, role: user.role }, process.env.JWT_SECRET);
-        const cleanRes = (user.assignedResources || []).map(r => r.trim()).filter(r => r.length > 0);
-        const derivedRes = ((_a = user.permissions) === null || _a === void 0 ? void 0 : _a.map(p => p.resource.trim())) || [];
+        const cleanRes = (user.assignedResources || [])
+            .map((r) => r.trim())
+            .filter((r) => r.length > 0);
+        const derivedRes = ((_a = user.permissions) === null || _a === void 0 ? void 0 : _a.map((p) => p.resource.trim())) || [];
         let finalResources = Array.from(new Set([...cleanRes, ...derivedRes]));
-        if (user.role === users_1.UserRole.PURCHASING && !finalResources.includes("Orders")) {
+        if (user.role === users_1.UserRole.PURCHASING &&
+            !finalResources.includes("Orders")) {
             finalResources.push("Orders");
         }
         const userData = {
@@ -204,10 +209,7 @@ const login = (req, res, next) => __awaiter(void 0, void 0, void 0, function* ()
             phoneNumber: user.phoneNumber,
             isLoginEnabled: user.isLoginEnabled,
         };
-        return res
-            .status(200)
-            .cookie("token", token, cookieOptions_1.cookieOptions)
-            .json({
+        return res.status(200).cookie("token", token, cookieOptions_1.cookieOptions).json({
             success: true,
             message: "Logged in successfully",
             data: userData,
@@ -220,10 +222,7 @@ const login = (req, res, next) => __awaiter(void 0, void 0, void 0, function* ()
 exports.login = login;
 const logout = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        return res
-            .clearCookie("token", cookieOptions_1.cookieOptions)
-            .status(200)
-            .json({
+        return res.clearCookie("token", cookieOptions_1.cookieOptions).status(200).json({
             success: true,
             message: "Logged out successfully",
         });
@@ -245,10 +244,13 @@ const getMe = (req, res, next) => __awaiter(void 0, void 0, void 0, function* ()
         if (!user) {
             return next(new errorHandler_1.default("User not found", 404));
         }
-        const cleanResources = (user.assignedResources || []).map(r => r.trim()).filter(r => r.length > 0);
-        const derivedResources = ((_a = user.permissions) === null || _a === void 0 ? void 0 : _a.map(p => p.resource.trim())) || [];
+        const cleanResources = (user.assignedResources || [])
+            .map((r) => r.trim())
+            .filter((r) => r.length > 0);
+        const derivedResources = ((_a = user.permissions) === null || _a === void 0 ? void 0 : _a.map((p) => p.resource.trim())) || [];
         let finalResources = Array.from(new Set([...cleanResources, ...derivedResources]));
-        if (user.role === users_1.UserRole.PURCHASING && !finalResources.includes("Orders")) {
+        if (user.role === users_1.UserRole.PURCHASING &&
+            !finalResources.includes("Orders")) {
             finalResources.push("Orders");
         }
         const userData = {
@@ -311,10 +313,7 @@ const refresh = (req, res, next) => __awaiter(void 0, void 0, void 0, function* 
             phoneNumber: user.phoneNumber,
             isLoginEnabled: user.isLoginEnabled,
         };
-        return res
-            .status(200)
-            .cookie("token", newToken, cookieOptions_1.cookieOptions)
-            .json({
+        return res.status(200).cookie("token", newToken, cookieOptions_1.cookieOptions).json({
             success: true,
             data: userData,
         });
@@ -370,7 +369,7 @@ const editProfile = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
     var _a, _b;
     try {
         const userId = req.user.id;
-        const { name, phoneNumber, gender, dateOfBirth, address, partnerName, emergencyContact, country } = req.body;
+        const { name, phoneNumber, gender, dateOfBirth, address, partnerName, emergencyContact, country, } = req.body;
         const userRepository = database_1.AppDataSource.getRepository(users_1.User);
         const user = yield userRepository.findOne({ where: { id: userId } });
         if (!user) {
@@ -430,9 +429,13 @@ const editProfile = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
         if (!updatedUser) {
             return next(new errorHandler_1.default("User not found after update", 404));
         }
-        const cleanResources = (updatedUser.assignedResources || []).map(r => r.trim()).filter(r => r.length > 0);
-        const derivedResources = ((_b = updatedUser.permissions) === null || _b === void 0 ? void 0 : _b.map(p => p.resource)) || [];
-        const finalResources = cleanResources.length > 0 ? cleanResources : Array.from(new Set(derivedResources));
+        const cleanResources = (updatedUser.assignedResources || [])
+            .map((r) => r.trim())
+            .filter((r) => r.length > 0);
+        const derivedResources = ((_b = updatedUser.permissions) === null || _b === void 0 ? void 0 : _b.map((p) => p.resource)) || [];
+        const finalResources = cleanResources.length > 0
+            ? cleanResources
+            : Array.from(new Set(derivedResources));
         const userData = {
             id: updatedUser.id,
             name: updatedUser.name,
@@ -489,10 +492,15 @@ const getUserById = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
         if (!user) {
             return next(new errorHandler_1.default("User not found", 404));
         }
-        const cleanResources = (user.assignedResources || []).map(r => r.trim()).filter(r => r.length > 0);
-        const derivedResources = ((_a = user.permissions) === null || _a === void 0 ? void 0 : _a.map(p => p.resource.trim())) || [];
-        let finalResources = cleanResources.length > 0 ? cleanResources : Array.from(new Set(derivedResources));
-        if (user.role === users_1.UserRole.PURCHASING && !finalResources.includes("Orders")) {
+        const cleanResources = (user.assignedResources || [])
+            .map((r) => r.trim())
+            .filter((r) => r.length > 0);
+        const derivedResources = ((_a = user.permissions) === null || _a === void 0 ? void 0 : _a.map((p) => p.resource.trim())) || [];
+        let finalResources = cleanResources.length > 0
+            ? cleanResources
+            : Array.from(new Set(derivedResources));
+        if (user.role === users_1.UserRole.PURCHASING &&
+            !finalResources.includes("Orders")) {
             finalResources.push("Orders");
         }
         const userData = {
@@ -885,11 +893,15 @@ const updateUser = (req, res, next) => __awaiter(void 0, void 0, void 0, functio
             user.name = name;
             user.email = email;
             user.role = role;
-            let rawResources = Array.isArray(assignedResources) ? assignedResources : [];
-            if (role === users_1.UserRole.PURCHASING && !rawResources.includes('Orders')) {
-                rawResources.push('Orders');
+            let rawResources = Array.isArray(assignedResources)
+                ? assignedResources
+                : [];
+            if (role === users_1.UserRole.PURCHASING && !rawResources.includes("Orders")) {
+                rawResources.push("Orders");
             }
-            user.assignedResources = rawResources.map((r) => r.trim()).filter((r) => r.length > 0);
+            user.assignedResources = rawResources
+                .map((r) => r.trim())
+                .filter((r) => r.length > 0);
             user.phoneNumber = phoneNumber || null;
             user.gender = gender || null;
             user.dateOfBirth = dateOfBirth || null;
@@ -911,10 +923,11 @@ const updateUser = (req, res, next) => __awaiter(void 0, void 0, void 0, functio
             if (permissions) {
                 yield tPermRepo.delete({ user: { id: user.id } });
                 const finalPermissions = Array.isArray(permissions) ? permissions : [];
-                if (role === users_1.UserRole.PURCHASING && !finalPermissions.find((p) => p.resource === "Orders")) {
+                if (role === users_1.UserRole.PURCHASING &&
+                    !finalPermissions.find((p) => p.resource === "Orders")) {
                     finalPermissions.push({
                         resource: "Orders",
-                        actions: ["create", "read", "update", "delete"]
+                        actions: ["create", "read", "update", "delete"],
                     });
                 }
                 if (finalPermissions.length > 0) {
@@ -936,8 +949,10 @@ const updateUser = (req, res, next) => __awaiter(void 0, void 0, void 0, functio
         if (!updatedUser) {
             return next(new errorHandler_1.default("Failed to fetch updated user", 500));
         }
-        const cleanResources = (updatedUser.assignedResources || []).map(r => r.trim()).filter(r => r.length > 0);
-        const derivedResources = ((_a = updatedUser.permissions) === null || _a === void 0 ? void 0 : _a.map(p => p.resource.trim())) || [];
+        const cleanResources = (updatedUser.assignedResources || [])
+            .map((r) => r.trim())
+            .filter((r) => r.length > 0);
+        const derivedResources = ((_a = updatedUser.permissions) === null || _a === void 0 ? void 0 : _a.map((p) => p.resource.trim())) || [];
         const finalResources = Array.from(new Set([...cleanResources, ...derivedResources]));
         const userData = {
             id: updatedUser.id,
@@ -1105,7 +1120,7 @@ const resendVerificationEmail = (req, res, next) => __awaiter(void 0, void 0, vo
         user.emailVerificationCode = emailVerificationCode;
         user.emailVerificationExp = emailVerificationExp;
         yield userRepository.save(user);
-        const verificationLink = `https://master.gtech.de/verify?email=${encodeURIComponent(email)}&verificationCode=${emailVerificationCode}`;
+        const verificationLink = `https://system.gtech.de/verify?email=${encodeURIComponent(email)}&verificationCode=${emailVerificationCode}`;
         const message = `
         <h2>Email Verification</h2>
         <p>You requested a new verification email for your account.</p>

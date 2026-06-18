@@ -132,6 +132,31 @@ export class RequestedItem {
   purchasePrice!: number;
 
   @Column({
+    type: "decimal",
+    precision: 12,
+    scale: 2,
+    nullable: true,
+    comment: "Target price for this requested item in EUR",
+  })
+  targetPrice!: number;
+
+  @Column({
+    type: "decimal",
+    precision: 12,
+    scale: 2,
+    nullable: true,
+  })
+  annualPotential!: number;
+
+  @Column({
+    type: "decimal",
+    precision: 12,
+    scale: 2,
+    nullable: true,
+  })
+  annualPotentialKEur!: number;
+
+  @Column({
     type: "enum",
     enum: ["RMB", "HKD", "EUR", "USD"],
     default: "RMB",

@@ -91,6 +91,10 @@ __decorate([
 __decorate([
     (0, typeorm_1.Column)({ type: "varchar", length: 255, nullable: true }),
     __metadata("design:type", String)
+], Inquiry.prototype, "inquiryNo", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "varchar", length: 255, nullable: true }),
+    __metadata("design:type", String)
 ], Inquiry.prototype, "itemNo", void 0);
 __decorate([
     (0, typeorm_1.Column)({ type: "text", nullable: true }),
@@ -199,20 +203,7 @@ __decorate([
     __metadata("design:type", String)
 ], Inquiry.prototype, "description", void 0);
 __decorate([
-    (0, typeorm_1.Column)({
-        type: "enum",
-        enum: [
-            "Draft",
-            "Submitted",
-            "In Review",
-            "Quoted",
-            "Negotiation",
-            "Accepted",
-            "Rejected",
-            "Cancelled",
-        ],
-        default: "Draft",
-    }),
+    (0, typeorm_1.Column)({ type: "varchar", length: 100, default: "draft" }),
     __metadata("design:type", String)
 ], Inquiry.prototype, "status", void 0);
 __decorate([
@@ -297,6 +288,28 @@ __decorate([
     (0, typeorm_1.UpdateDateColumn)(),
     __metadata("design:type", Date)
 ], Inquiry.prototype, "updatedAt", void 0);
+__decorate([
+    (0, typeorm_1.Column)({
+        type: "decimal",
+        precision: 12,
+        scale: 2,
+        nullable: true,
+        default: 0,
+    }),
+    __metadata("design:type", Number)
+], Inquiry.prototype, "total_potential_k_eur", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "date", nullable: true }),
+    __metadata("design:type", Date)
+], Inquiry.prototype, "next_followup_at", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "varchar", length: 255, nullable: true }),
+    __metadata("design:type", String)
+], Inquiry.prototype, "owner_user_id", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "text", nullable: true }),
+    __metadata("design:type", String)
+], Inquiry.prototype, "next_action", void 0);
 __decorate([
     (0, typeorm_1.ManyToMany)(() => tags_1.Tag, (tag) => tag.inquiries),
     (0, typeorm_1.JoinTable)({ name: "inquiry_tags" }),
