@@ -453,14 +453,23 @@ const ItemsManagementPage: React.FC = () => {
 
   const refreshCounts = useCallback(async () => {
     try {
-      const [stats, pending, newCount]: any = await Promise.all([
+      const [statsRes, pendingRes, newCountRes] = await Promise.allSettled([
         getItemStatistics(),
         getPendingSyncCount(),
         getNewItemsCount(),
       ]);
-      setStatistics(stats.data);
-      setPendingSyncCount(pending.data?.pendingCount || 0);
-      setNewItemsCount(newCount.data?.count || 0);
+      if (statsRes.status === "fulfilled") {
+        const stats: any = statsRes.value;
+        setStatistics(stats.data);
+      }
+      if (pendingRes.status === "fulfilled") {
+        const pending: any = pendingRes.value;
+        setPendingSyncCount(pending.data?.pendingCount || 0);
+      }
+      if (newCountRes.status === "fulfilled") {
+        const newCount: any = newCountRes.value;
+        setNewItemsCount(newCount.data?.count || 0);
+      }
     } catch (e) {
       console.error("Error fetching counts:", e);
     }
@@ -1763,7 +1772,7 @@ const ItemsManagementPage: React.FC = () => {
               Filters
             </button>
             <button
-              onClick={() => fetchTab(activeTab, true)}
+              onClick={() => { fetchTab(activeTab, true); if (activeTab === "items") refreshCounts(); }}
               className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-md text-xs font-medium hover:bg-gray-200 flex items-center gap-1.5"
             >
               <ArrowPathIcon className="w-4 h-4" />

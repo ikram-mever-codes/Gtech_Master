@@ -86,6 +86,7 @@ interface ContactPerson {
     id: string;
     companyName: string;
   };
+  businessId?: string;
 }
 interface QualityCriterion {
   description: string;
@@ -1791,7 +1792,7 @@ const CombinedInquiriesPageContent = () => {
                 <div className="flex items-center gap-4">
                   <h2 className="text-xl font-bold text-gray-900">
                     {inquiryModalMode === "edit"
-                      ? "Inquiry Details"
+                      ? `Inquiry Details ${inquiryFormData.inquiryNo ? `- ${inquiryFormData.inquiryNo}` : ""}`
                       : "Create New Inquiry"}
                   </h2>
                   {(() => {
@@ -1864,9 +1865,6 @@ const CombinedInquiriesPageContent = () => {
                     }`}
                 >
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-3">
-                      Inquiry Information
-                    </h3>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="block text-xs font-medium text-gray-700 mb-1">
@@ -1914,7 +1912,7 @@ const CombinedInquiriesPageContent = () => {
                           {contactPersons
                             .filter(
                               (person) =>
-                                person.starBusinessDetailsId ===
+                                person.businessId ===
                                 inquiryFormData.customerId,
                             )
                             .map((person) => (
