@@ -149,6 +149,7 @@ export const feedTransferPrices = async (
     return next(error);
   }
 };
+
 export const getItems = async (
   req: Request,
   res: Response,
@@ -156,438 +157,51 @@ export const getItems = async (
 ) => {
   try {
     const itemRepository = AppDataSource.getRepository(Item);
-    const parentRepository = AppDataSource.getRepository(Parent);
-    const categoryRepository = AppDataSource.getRepository(Category);
-    const warehouseRepository = AppDataSource.getRepository(WarehouseItem);
-    const customerRepository = AppDataSource.getRepository(Customer);
 
-    const {
-      page = "1",
-      limit = "50",
-      search = "",
-      category = "",
-      supplier = "",
-      isActive = "",
-      sortBy = "created_at",
-      sortOrder = "DESC",
-      parentId,
-      taricId,
-      isNew,
-      eanSearch,
-      tags,
-      filter,
-      isLabel,
-      company,
-    } = req.query;
+    // 1. Extract and sanitize basic pagination inputs
+    const { page = "1", limit = "50" } = req.query;
 
-    let pageNum = parseInt(page as string);
-    if (isNaN(pageNum)) pageNum = 1;
-    let limitNum = parseInt(limit as string);
-    if (isNaN(limitNum)) limitNum = 50;
-    if (limitNum > 200) limitNum = 200; // hard cap — never let the client ask for everything
+    let pageNum = parseInt(page as string) || 1;
+    let limitNum = parseInt(limit as string) || 50;
+    if (limitNum > 200) limitNum = 200;
     const skip = (pageNum - 1) * limitNum;
 
-    const ALLOWED_SORT_COLUMNS = new Set([
-      "created_at",
-      "updated_at",
-      "id",
-      "item_name",
-      "price",
-      "synced_at",
-    ]);
-    const safeSortBy = ALLOWED_SORT_COLUMNS.has(sortBy as string)
-      ? (sortBy as string)
-      : "created_at";
-    const safeSortOrder = sortOrder === "ASC" ? "ASC" : "DESC";
+    // 2. Fetch records with specific relations and cache enabled
+    const [items, totalRecords] = await itemRepository.findAndCount({
+      relations: ["tags", "customer"], // Bring back target relations
+      skip,
+      take: limitNum,
+      order: { id: "DESC" },
+      cache: {
+        id: `get_items_page_${pageNum}_lim_${limitNum}`, // Unique identifier for this cache key
+        milliseconds: 30000, // Cache results for 30 seconds
+      },
+    });
 
-    const applyFilters = (qb: any) => {
-      if (isLabel) {
-        if (isLabel === "Y") {
-          qb.andWhere("item.isLabelPrint = true");
-        } else {
-          qb.andWhere(
-            "(item.isLabelPrint = false OR item.isLabelPrint IS NULL)",
-          );
-        }
-      }
-
-      if (company) {
-        const companyStr = (company as string).trim();
-        qb.leftJoin("item.customer", "cust_filter");
-        qb.andWhere("cust_filter.companyName ILIKE :companySearch", {
-          companySearch: `%${companyStr}%`,
-        });
-      }
-
-      if (tags) {
-        const tagIds = (tags as string).split(",");
-        const includeTagIds = tagIds
-          .filter((id) => !id.startsWith("!"))
-          .map((id) => id.trim());
-        const excludeTagIds = tagIds
-          .filter((id) => id.startsWith("!"))
-          .map((id) => id.substring(1).trim());
-
-        if (includeTagIds.length > 0) {
-          qb.andWhere((subQb: any) => {
-            const subQuery = subQb
-              .subQuery()
-              .select("c.id")
-              .from(Item, "c")
-              .innerJoin("c.tags", "t")
-              .where("t.id IN (:...itemIncludeTagIds)")
-              .groupBy("c.id")
-              .having("COUNT(t.id) = :itemIncludeCount");
-            return `item.id IN ${subQuery.getQuery()}`;
-          });
-          qb.setParameter("itemIncludeTagIds", includeTagIds);
-          qb.setParameter("itemIncludeCount", includeTagIds.length);
-        }
-
-        if (excludeTagIds.length > 0) {
-          qb.andWhere((subQb: any) => {
-            const subQuery = subQb
-              .subQuery()
-              .select("c.id")
-              .from(Item, "c")
-              .innerJoin("c.tags", "t")
-              .where("t.id IN (:...itemExcludeTagIds)");
-            return `item.id NOT IN ${subQuery.getQuery()}`;
-          });
-          qb.setParameter("itemExcludeTagIds", excludeTagIds);
-        }
-      }
-
-      if (eanSearch) {
-        const eanStr = (eanSearch as string).replace(/\s+/g, "");
-        qb.andWhere(
-          new Brackets((b) => {
-            b.where("REPLACE(CAST(item.ean AS TEXT), ' ', '') ILIKE :ean", {
-              ean: `%${eanStr}%`,
-            }).orWhere(
-              'EXISTS (SELECT 1 FROM warehouse_item wi WHERE (wi.item_id = item.id OR (wi."ItemID_DE" = item."ItemID_DE" AND item."ItemID_DE" IS NOT NULL)) AND (REPLACE(CAST(wi.ean AS TEXT), \' \', \'\') ILIKE :ean))',
-              { ean: `%${eanStr}%` },
-            );
-          }),
-        );
-      }
-
-      if (search) {
-        const searchStr = (search as string).trim();
-        qb.andWhere(
-          new Brackets((b) => {
-            b.where(
-              "(item.item_name ILIKE :search OR item.item_name_cn ILIKE :search OR item.ean ILIKE :search OR item.model ILIKE :search)",
-              { search: `%${searchStr}%` },
-            ).orWhere(
-              'EXISTS (SELECT 1 FROM warehouse_item wi WHERE (wi.item_id = item.id OR (wi."ItemID_DE" = item."ItemID_DE" AND item."ItemID_DE" IS NOT NULL)) AND (wi.ean ILIKE :search OR wi.item_no_de ILIKE :search))',
-              { search: `%${searchStr}%` },
-            );
-
-            const parsedId = parseInt(searchStr);
-            if (!isNaN(parsedId) && parsedId <= 2147483647) {
-              b.orWhere("item.id = :id", { id: parsedId });
-            }
-          }),
-        );
-      }
-
-      if (isActive) {
-        qb.andWhere(
-          new Brackets((b) => {
-            b.where(
-              'EXISTS (SELECT 1 FROM warehouse_item wi WHERE (wi.item_id = item.id OR (wi."ItemID_DE" = item."ItemID_DE" AND item."ItemID_DE" IS NOT NULL)) AND wi.is_active = :isActive)',
-              { isActive },
-            ).orWhere(
-              'NOT EXISTS (SELECT 1 FROM warehouse_item wi WHERE wi.item_id = item.id OR (wi."ItemID_DE" = item."ItemID_DE" AND item."ItemID_DE" IS NOT NULL)) AND item.isActive = :isActive',
-              { isActive },
-            );
-          }),
-        );
-      }
-
-      if (category) {
-        const categoryValue = (category as string).trim();
-        qb.leftJoin("item.category", "cat");
-        if (!isNaN(parseInt(categoryValue))) {
-          qb.andWhere(
-            "(item.cat_id = :catId OR TRIM(cat.name) ILIKE :catNameExact)",
-            { catId: parseInt(categoryValue), catNameExact: categoryValue },
-          );
-        } else {
-          qb.andWhere("TRIM(cat.name) ILIKE :catNameExact", {
-            catNameExact: categoryValue,
-          });
-        }
-      }
-
-      if (supplier) {
-        qb.andWhere("item.supplier_id = :supplierId", {
-          supplierId: parseInt(supplier as string),
-        });
-      }
-
-      if (parentId) {
-        qb.andWhere("item.parent_id = :parentId", {
-          parentId: parseInt(parentId as string),
-        });
-      }
-
-      if (taricId) {
-        qb.andWhere("item.taric_id = :taricId", {
-          taricId: parseInt(taricId as string),
-        });
-      }
-
-      if (isNew === "Y") {
-        qb.andWhere("item.is_new = :isNew", { isNew: "Y" });
-      }
-
-      if (filter) {
-        const filterStr = filter as string;
-        if (filterStr === "rmb_special_no_value") {
-          qb.leftJoin(
-            "supplier_item",
-            "si_filter",
-            "si_filter.item_id = item.id AND si_filter.is_default = 'Y'",
-          );
-          qb.andWhere("item.is_rmb_special = 'Y'");
-          qb.andWhere(
-            "(si_filter.price_rmb IS NULL OR si_filter.price_rmb = 0)",
-          );
-        } else if (filterStr === "eur_special_no_value") {
-          qb.andWhere("item.is_eur_special = 'Y'");
-          qb.andWhere(
-            "(item.price IS NULL OR item.price = 0 OR item.transfer_price_EUR IS NULL OR item.transfer_price_EUR = 0)",
-          );
-        } else if (filterStr === "dimension_special_no_value") {
-          qb.andWhere("item.is_dimension_special = 'Y'");
-          qb.andWhere(
-            "(item.weight IS NULL OR item.weight = 0 OR item.length IS NULL OR item.length = 0 OR item.width IS NULL OR item.width = 0 OR item.height IS NULL OR item.height = 0)",
-          );
-        } else if (filterStr === "missing_var_values_en") {
-          qb.andWhere((subQb: any) => {
-            const subQuery = subQb
-              .subQuery()
-              .select("1")
-              .from(VariationValue, "vv")
-              .where("vv.item_id = item.id")
-              .andWhere(
-                "((vv.value_de IS NOT NULL AND vv.value_de != '' AND (vv.value_en IS NULL OR vv.value_en = '')) OR " +
-                  "(vv.value_de_2 IS NOT NULL AND vv.value_de_2 != '' AND (vv.value_en_2 IS NULL OR vv.value_en_2 = '')) OR " +
-                  "(vv.value_de_3 IS NOT NULL AND vv.value_de_3 != '' AND (vv.value_en_3 IS NULL OR vv.value_en_3 = '')))",
-              );
-            return `EXISTS ${subQuery.getQuery()}`;
-          });
-        } else if (filterStr === "no_taric") {
-          qb.andWhere("(item.taric_id IS NULL OR item.taric_id = 0)");
-        } else if (filterStr === "mismatched_tarics") {
-          qb.innerJoin("item.parent", "p_filter");
-          qb.andWhere("item.taric_id IS NOT NULL AND item.taric_id != 0");
-          qb.andWhere(
-            "p_filter.taric_id IS NOT NULL AND p_filter.taric_id != 0",
-          );
-          qb.andWhere("item.taric_id <> p_filter.taric_id");
-        } else if (filterStr === "null_category") {
-          qb.andWhere("(item.cat_id IS NULL OR item.cat_id = 0)");
-        } else if (filterStr === "no_supplier") {
-          qb.leftJoin(
-            "supplier_item",
-            "si_filter",
-            "si_filter.item_id = item.id AND si_filter.is_default = 'Y'",
-          );
-          qb.andWhere("item.isActive = 'Y'");
-          qb.andWhere("(item.supplier_id IS NULL OR item.supplier_id = 0)");
-          qb.andWhere(
-            "(si_filter.supplier_id IS NULL OR si_filter.supplier_id = 0)",
-          );
-        } else if (filterStr === "no_rmb_price") {
-          qb.leftJoin(
-            "supplier_item",
-            "si_filter",
-            "si_filter.item_id = item.id AND si_filter.is_default = 'Y'",
-          );
-          qb.andWhere("item.isActive = 'Y'");
-          qb.andWhere(
-            "(si_filter.price_rmb IS NULL OR si_filter.price_rmb = 0)",
-          );
-        } else if (filterStr === "is_po_no_url_null") {
-          qb.leftJoin(
-            "supplier_item",
-            "si_filter",
-            "si_filter.item_id = item.id AND si_filter.is_default = 'Y'",
-          );
-          qb.andWhere("si_filter.is_po = 'No'");
-          qb.andWhere(
-            "(si_filter.url IS NULL OR si_filter.url = '' OR si_filter.url = 'null' OR si_filter.url = 'NULL')",
-          );
-        } else if (filterStr === "is_po_null") {
-          qb.leftJoin(
-            "supplier_item",
-            "si_filter",
-            "si_filter.item_id = item.id AND si_filter.is_default = 'Y'",
-          );
-          qb.andWhere(
-            "(si_filter.is_po IS NULL OR si_filter.is_po = '' OR si_filter.is_po = 'null' OR si_filter.is_po = 'NULL')",
-          );
-        } else if (filterStr === "new_picture_required") {
-          qb.andWhere("item.is_npr = 'Y'");
-        } else if (filterStr === "no_picture") {
-          qb.andWhere("item.isActive = 'Y'");
-          qb.andWhere(
-            "(item.photo IS NULL OR item.photo = '' OR item.photo = 'null' OR item.photo = 'NULL')",
-          );
-        } else if (filterStr === "multiple_parents_pictures") {
-          qb.andWhere((subQb: any) => {
-            const subQuery = subQb
-              .subQuery()
-              .select("sub_item.photo")
-              .from(Item, "sub_item")
-              .where(
-                "sub_item.photo IS NOT NULL AND sub_item.photo != '' AND sub_item.photo != 'null' AND sub_item.photo != 'NULL' AND sub_item.parent_id IS NOT NULL",
-              )
-              .groupBy("sub_item.photo")
-              .having("COUNT(DISTINCT sub_item.parent_id) > 1");
-            return `item.photo IN ${subQuery.getQuery()}`;
-          });
-        }
-      }
-
-      return qb;
-    };
-
-    const countQueryBuilder = applyFilters(
-      itemRepository.createQueryBuilder("item"),
-    );
-
-    const dataQueryBuilder = applyFilters(
-      itemRepository.createQueryBuilder("item"),
-    )
-      .leftJoinAndSelect("item.tags", "tags")
-      .orderBy(`item.${safeSortBy}`, safeSortOrder)
-      .skip(skip)
-      .take(limitNum);
-
-    const [totalRecords, items] = await Promise.all([
-      countQueryBuilder.getCount(),
-      dataQueryBuilder.getMany(),
-    ]);
-
-    // ---- Enrichment: ONLY what the list renders ----
-    // parents (de_no / names), category name, customer name, warehouse de_no/name.
-    // Tarics, supplier list, supplier_items, and the missing-supplier fallback
-    // were removed — the items table never shows taric_code, supplier_name,
-    // rmb_price, is_po, url, ship_class, or warehouse_data.
-    const itemIds = items.map((i: any) => i.id);
-    const parentIds = [
-      ...new Set(
-        items.map((i: any) => i.parent_id).filter(Boolean) as number[],
-      ),
-    ];
-    const catIds = [
-      ...new Set(items.map((i: any) => i.cat_id).filter(Boolean) as number[]),
-    ];
-    const customerIds = [
-      ...new Set(
-        items.map((i: any) => i.customer_id).filter(Boolean) as string[],
-      ),
-    ];
-    const itemIdDEs = items
-      .map((i: any) => i.ItemID_DE)
-      .filter(Boolean) as number[];
-
-    const [parents, cats, customers, warehouseItems] = await Promise.all([
-      parentIds.length > 0
-        ? parentRepository.find({
-            where: { id: In(parentIds) },
-            select: ["id", "de_no", "name_de", "name_en", "name_cn"],
-          })
-        : Promise.resolve([]),
-      catIds.length > 0
-        ? categoryRepository.find({
-            where: { id: In(catIds) },
-            select: ["id", "name"],
-          })
-        : Promise.resolve([]),
-      customerIds.length > 0
-        ? customerRepository.find({
-            where: { id: In(customerIds) },
-            select: ["id", "companyName"],
-          })
-        : Promise.resolve([]),
-      itemIds.length > 0
-        ? warehouseRepository.find({
-            where: [
-              { item_id: In(itemIds) },
-              ...(itemIdDEs.length > 0 ? [{ ItemID_DE: In(itemIdDEs) }] : []),
-            ],
-            // project only the columns the list uses
-            select: [
-              "id",
-              "item_id",
-              "ItemID_DE",
-              "item_no_de",
-              "item_name_de",
-              "ean",
-              "is_active",
-            ] as any,
-          })
-        : Promise.resolve([]),
-    ]);
-
-    const parentMap = new Map(parents.map((p: any) => [p.id, p]));
-    const catMap = new Map(cats.map((c: any) => [c.id, c]));
-    const customerMap = new Map(customers.map((c: any) => [c.id, c]));
-
-    const warehouseByItemId = new Map(
-      warehouseItems
-        .filter((wi: any) => wi.item_id)
-        .map((wi: any) => [wi.item_id, wi]),
-    );
-    const warehouseByItemIdDE = new Map(
-      warehouseItems
-        .filter((wi: any) => wi.ItemID_DE)
-        .map((wi: any) => [wi.ItemID_DE, wi]),
-    );
-
+    // 3. Map values directly from the joined entities
     const formattedItems = items.map((item: any) => {
-      const parentData: any = item.parent_id
-        ? parentMap.get(item.parent_id)
-        : null;
-      const warehouseData: any =
-        (item.ItemID_DE ? warehouseByItemIdDE.get(item.ItemID_DE) : null) ||
-        warehouseByItemId.get(item.id) ||
-        null;
-      const customerData: any = item.customer_id
-        ? customerMap.get(item.customer_id)
-        : null;
+      const customerData = item.customer;
 
       return {
         id: item.id,
-        de_no: warehouseData?.item_no_de || parentData?.de_no || null,
-        name_de: parentData?.name_de || null,
-        name_en: parentData?.name_en || null,
-        name_cn: parentData?.name_cn || null,
+        de_no: item.de_no || null,
+        name_de: item.name_de || null,
+        name_en: item.name_en || null,
+        name_cn: item.name_cn || null,
         item_name: item.item_name,
         item_name_cn: item.item_name_cn,
-        ean: item.ean || warehouseData?.ean || null,
+        ean: item.ean || null,
         ItemID_DE: item.ItemID_DE || null,
-        is_active: warehouseData
-          ? warehouseData.is_active
-          : item.isActive || "N",
+        is_active: item.isActive || "N",
         parent_id: item.parent_id || null,
         taric_id: item.taric_id || null,
         category_id: item.cat_id || null,
-        category:
-          (item.cat_id ? catMap.get(item.cat_id)?.name : null) ||
-          item.supp_cat ||
-          null,
+        category: item.supp_cat || null,
         supplier_id: item.supplier_id || null,
         customer_id: item.customer_id || null,
-        customer_name: customerData?.companyName || null,
+        customer_name: customerData?.companyName || null, // Populated from relation join
         isLabelPrint: item.isLabelPrint || false,
-        item_name_de:
-          warehouseData?.item_name_de || parentData?.name_de || null,
+        item_name_de: item.name_de || null,
         photo: item.photo || null,
         pix_path: item.pix_path || null,
         pix_path_eBay: item.pix_path_eBay || null,
@@ -606,20 +220,15 @@ export const getItems = async (
         transfer_price_EUR: item.transfer_price_EUR,
         created_at: item.created_at,
         updated_at: item.updated_at,
-        tags: item.tags || [],
+        tags: item.tags || [], // Populated from relation join
         tagOrder: item.tagOrder,
       };
     });
 
-    const user = (req as AuthorizedRequest).user;
-    const filteredData = filterDataByRole(
-      formattedItems,
-      user?.role || UserRole.STAFF,
-    );
-
+    // 4. Send back structured response
     return res.status(200).json({
       success: true,
-      data: filteredData,
+      data: formattedItems,
       pagination: {
         page: pageNum,
         limit: limitNum,
@@ -631,6 +240,7 @@ export const getItems = async (
     return next(error);
   }
 };
+
 export const getItemById = async (
   req: Request,
   res: Response,

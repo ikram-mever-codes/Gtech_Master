@@ -105,6 +105,7 @@ export const AppDataSource = new DataSource({
         : false,
   },
   poolSize: 10,
+  cache: true,
 });
 
 const bootstrapAdminUser = async () => {
