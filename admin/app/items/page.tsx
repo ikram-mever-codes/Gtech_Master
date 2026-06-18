@@ -1992,10 +1992,11 @@ const ItemsManagementPage: React.FC = () => {
                       onChange={(e) =>
                         setFilters({ ...filters, search: e.target.value })
                       }
-                      className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${filters.search
-                        ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
-                        : "text-gray-900 border-gray-300 bg-white"
-                        }`}
+                      className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${
+                        filters.search
+                          ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+                          : "text-gray-900 border-gray-300 bg-white"
+                      }`}
                     />
                     {filters.search && (
                       <button
@@ -2016,10 +2017,11 @@ const ItemsManagementPage: React.FC = () => {
                       onChange={(e) =>
                         setFilters({ ...filters, eanSearch: e.target.value })
                       }
-                      className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${filters.eanSearch
-                        ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
-                        : "text-gray-900 border-gray-300 bg-white"
-                        }`}
+                      className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${
+                        filters.eanSearch
+                          ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+                          : "text-gray-900 border-gray-300 bg-white"
+                      }`}
                     />
                     {filters.eanSearch && (
                       <button
@@ -2115,10 +2117,11 @@ const ItemsManagementPage: React.FC = () => {
                     onChange={(e) =>
                       setFilters({ ...filters, category: e.target.value })
                     }
-                    className={`w-full px-2 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${filters.category
-                      ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
-                      : "text-gray-400 border-gray-300 bg-white"
-                      }`}
+                    className={`w-full px-2 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${
+                      filters.category
+                        ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+                        : "text-gray-400 border-gray-300 bg-white"
+                    }`}
                   >
                     <option value="">Category</option>
                     {Array.from(
@@ -2516,10 +2519,11 @@ const ItemsManagementPage: React.FC = () => {
                 </Field>
                 <Field label="ID (system)">{previewRow.id}</Field>
               </div>
-              <div className="mt-5 grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-4">
+              <div className="mt-5 grid grid-cols-1 md:grid-cols-3 gap-x-4 gap-y-4">
                 <Field label="Item Name">
                   {previewEdit && previewItem ? (
-                    <input
+                    <textarea
+                      rows={5}
                       className={inputCls}
                       value={previewItem.name ?? previewItem.item_name ?? ""}
                       onChange={(e) =>
@@ -2535,7 +2539,8 @@ const ItemsManagementPage: React.FC = () => {
                 </Field>
                 <Field label="Item Name DE">
                   {previewEdit && previewItem ? (
-                    <input
+                    <textarea
+                      rows={5}
                       className={inputCls}
                       value={previewItem.others?.nameDE ?? ""}
                       onChange={(e) =>
@@ -2554,7 +2559,8 @@ const ItemsManagementPage: React.FC = () => {
                 </Field>
                 <Field label="Item Name CN">
                   {previewEdit && previewItem ? (
-                    <input
+                    <textarea
+                      rows={5}
                       className={inputCls}
                       value={
                         previewItem.nameCN ?? previewItem.item_name_cn ?? ""
