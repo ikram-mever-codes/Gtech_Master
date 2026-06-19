@@ -149,6 +149,7 @@ export const feedTransferPrices = async (
     return next(error);
   }
 };
+
 export const getItems = async (
   req: Request,
   res: Response,
@@ -158,15 +159,126 @@ export const getItems = async (
     const itemRepository = AppDataSource.getRepository(Item);
     const warehouseRepository = AppDataSource.getRepository(WarehouseItem);
 
-    // Dynamic pagination configuration with safe fallbacks
+    // ---- Pagination ----
     const pageNum = parseInt(req.query.page as string, 10) || 1;
     const limitNum = parseInt(req.query.limit as string, 10) || 50;
     const skip = (pageNum - 1) * limitNum;
 
-    // STEP 1: Get total record count and paginated IDs via a lightweight index lookup
-    const [idObjects, totalRecords] = await itemRepository
+    // ---- Read filters (basic, fast) ----
+    const search = ((req.query.search as string) || "").trim();
+    const eanSearch = ((req.query.eanSearch as string) || "").trim();
+    const isActive = ((req.query.isActive as string) || "").trim();
+    const category = ((req.query.category as string) || "").trim();
+    const supplier = ((req.query.supplier as string) || "").trim();
+    const company = ((req.query.company as string) || "").trim(); // customer_id
+    const isLabel = ((req.query.isLabel as string) || "").trim();
+    const tagStr = ((req.query.tags as string) || "").trim();
+    // NOTE: audit `filter` param is accepted but not implemented here.
+    // const auditFilter = (req.query.filter as string) || "";
+
+    const tagIds = tagStr
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const incTags = tagIds
+      .filter((t) => !t.startsWith("!"))
+      .map((t) => parseInt(t, 10))
+      .filter((n) => !isNaN(n));
+    const excTags = tagIds
+      .filter((t) => t.startsWith("!"))
+      .map((t) => parseInt(t.slice(1), 10))
+      .filter((n) => !isNaN(n));
+
+    const idQb = itemRepository
       .createQueryBuilder("item")
       .select("item.id")
+      .addSelect("item.created_at")
+      .leftJoin("item.parent", "parent")
+      .leftJoin("item.category", "category");
+
+    // Name search
+    if (search) {
+      idQb.andWhere(
+        "(item.item_name LIKE :search OR item.item_name_cn LIKE :search OR item.model LIKE :search)",
+        { search: `%${search}%` },
+      );
+    }
+
+    // Item No / EAN (searches item EAN + parent DE number)
+    if (eanSearch) {
+      idQb.andWhere("(item.ean LIKE :ean OR parent.de_no LIKE :ean)", {
+        ean: `%${eanSearch}%`,
+      });
+    }
+
+    // Active status (filters on item.isActive — fast, indexed)
+    if (isActive) {
+      idQb.andWhere("item.isActive = :isActive", { isActive });
+    }
+
+    // Category by name (or supplier category fallback)
+    if (category) {
+      idQb.andWhere(
+        "(category.name = :category OR item.supp_cat = :category)",
+        {
+          category,
+        },
+      );
+    }
+
+    // Supplier
+    if (supplier) {
+      idQb.andWhere("item.supplier_id = :supplier", { supplier });
+    }
+
+    // Company (customer)
+    if (company) {
+      idQb.andWhere("item.customer_id = :company", { company });
+    }
+
+    // isLabel — tolerant of boolean / tinyint / 'Y'/'N' storage
+    if (isLabel === "Y") {
+      idQb.andWhere("item.isLabelPrint IN (:...labelTrue)", {
+        labelTrue: [1, "1", "Y", true],
+      });
+    } else if (isLabel === "N") {
+      idQb.andWhere(
+        "(item.isLabelPrint IS NULL OR item.isLabelPrint IN (:...labelFalse))",
+        { labelFalse: [0, "0", "N", false, ""] },
+      );
+    }
+
+    // Tags — include (must have ALL) via one correlated subquery per tag
+    incTags.forEach((tid, i) => {
+      idQb.andWhere((qb2) => {
+        const sub = qb2
+          .subQuery()
+          .select("it_inc.id")
+          .from(Item, "it_inc")
+          .leftJoin("it_inc.tags", `t_inc_${i}`)
+          .where(`t_inc_${i}.id = :incTag${i}`)
+          .getQuery();
+        return `item.id IN ${sub}`;
+      });
+      idQb.setParameter(`incTag${i}`, tid);
+    });
+
+    // Tags — exclude (must have NONE)
+    if (excTags.length) {
+      idQb.andWhere((qb2) => {
+        const sub = qb2
+          .subQuery()
+          .select("it_exc.id")
+          .from(Item, "it_exc")
+          .leftJoin("it_exc.tags", "t_exc")
+          .where("t_exc.id IN (:...excTags)")
+          .getQuery();
+        return `item.id NOT IN ${sub}`;
+      });
+      idQb.setParameter("excTags", excTags);
+    }
+
+    const [idObjects, totalRecords] = await idQb
       .orderBy("item.created_at", "DESC")
       .skip(skip)
       .take(limitNum)
@@ -181,13 +293,13 @@ export const getItems = async (
         pagination: {
           page: pageNum,
           limit: limitNum,
-          totalRecords: 0,
-          totalPages: 0,
+          totalRecords,
+          totalPages: Math.ceil(totalRecords / limitNum),
         },
       });
     }
 
-    // STEP 2: Pull exact data records for the matched IDs (Disables TypeORM subquery wrapper)
+    // STEP 2: Pull full records for the matched IDs
     const items = await itemRepository
       .createQueryBuilder("item")
       .select([
@@ -241,7 +353,7 @@ export const getItems = async (
       .orderBy("item.created_at", "DESC")
       .getMany();
 
-    // STEP 3: Load required Warehouse tracking metrics separately to prevent cross-join blocks
+    // STEP 3: Warehouse metrics
     const targetItemIDsDE = items
       .map((i) => i.ItemID_DE)
       .filter(Boolean) as number[];
@@ -266,7 +378,7 @@ export const getItems = async (
       )
       .getMany();
 
-    // STEP 4: Format payload map structures
+    // STEP 4: Format
     const formattedItems = items.map((item: any) => {
       const parentData = item.parent || null;
       const customerData = item.customer || null;

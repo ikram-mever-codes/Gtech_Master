@@ -1,4 +1,5 @@
 master_id,ItemID_DE,order_no,qty,remark_de,qty_delivered
+27999,11061,DE3209,2,"d1: 10mm d2: 22mm B99059",0
 27994,4175,DE3207,2,B99100,0
 27995,11063,DE3207,1,B99100,0
 27997,11098,DE3208,1,"B99100 SFU2505 according to drawing",0
@@ -26,7 +27,7 @@ master_id,ItemID_DE,order_no,qty,remark_de,qty_delivered
 27971,12363,DE3194,3000,"Auftrag B99084",0
 27970,12363,DE3193,3000,"Auftrag B99084",0
 27969,12363,DE3192,3000,"Auftrag B99084",0
-27968,12363,DE3191,3000,"Auftrag B99084",0
+27968,12363,DE3191,3000,"Auftrag B99084",100
 27966,12341,DE3190,4000,"4000 Einheiten für Auftrag B99083",0
 27965,12341,DE3189,4000,"4000 Einheiten für Auftrag B99082",0
 27964,12341,DE3188,4000,"4000 Einheiten für Auftrag B99081",0
@@ -37,7 +38,6 @@ master_id,ItemID_DE,order_no,qty,remark_de,qty_delivered
 27957,12367,DE3184,10,"must be according to DIN 380 / ISO 2901",0
 27954,12346,DE3183,20,,0
 27955,12347,DE3183,20,,0
-27946,12362,DE3181,500,,0
 27945,6321,DE3180,10,"1000pcs total",0
 27940,4071,DE3178,20,"push-in spring pin ",0
 27933,4071,DE3176,4,"PG9 supplier FBE",0

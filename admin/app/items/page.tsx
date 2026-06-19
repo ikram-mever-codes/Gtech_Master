@@ -156,7 +156,22 @@ const ItemsManagementPage: React.FC = () => {
   const [pendingSyncCount, setPendingSyncCount] = useState(0);
   const [newItemsCount, setNewItemsCount] = useState(0);
 
-  const [page, setPage] = useState(1);
+  const [showItemPreview, setShowItemPreview] = useState(false);
+  const [previewRow, setPreviewRow] = useState<any>(null);
+  const [previewItem, setPreviewItem] = useState<any>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewEdit, setPreviewEdit] = useState(false);
+  const [previewSaving, setPreviewSaving] = useState(false);
+  const [previewQuality, setPreviewQuality] = useState<any[]>([]);
+  const [customerSearch, setCustomerSearch] = useState("");
+  const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
+  const pictureInputRef = useRef<HTMLInputElement>(null);
+  const [uploadingPictures, setUploadingPictures] = useState(false);
+  const [page, setPage] = useState(() => {
+    const p = parseInt(searchParams.get("page") || "1", 10);
+    return isNaN(p) || p < 1 ? 1 : p;
+  });
+  const didMountRef = useRef(false);
   const [showFilters, setShowFilters] = useState(true);
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [selectedTarics, setSelectedTarics] = useState<Set<string>>(new Set());
@@ -341,6 +356,7 @@ const ItemsManagementPage: React.FC = () => {
               { refresh: force },
             );
             data = res.data || [];
+            setItemsFirstLoaded(true);
             if (res.pagination) {
               setItemsTotalRecords(res.pagination.totalRecords || 0);
               setItemsTotalPages(res.pagination.totalPages || 1);
@@ -523,6 +539,26 @@ const ItemsManagementPage: React.FC = () => {
     setPage(1);
   }, [filters, taricSearch, activeTab]);
 
+  // Reset to page 1 when filters change — but not on first mount (preserve ?page=N)
+  useEffect(() => {
+    if (!didMountRef.current) {
+      didMountRef.current = true;
+      return;
+    }
+    setPage(1);
+  }, [filters, taricSearch, activeTab]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (page > 1) params.set("page", String(page));
+    else params.delete("page");
+    const qs = params.toString();
+    router.replace(`${window.location.pathname}${qs ? `?${qs}` : ""}`, {
+      scroll: false,
+    });
+  }, [page, router]);
+
   const reloadItems = useCallback(async () => {
     await fetchTab("items", true);
     if (activeTab === "items") refreshCounts();
@@ -579,17 +615,10 @@ const ItemsManagementPage: React.FC = () => {
         : filteredAll.slice((safePage - 1) * PAGE_LIMIT, safePage * PAGE_LIMIT),
     [filteredAll, safePage, activeTab],
   );
-  const [showItemPreview, setShowItemPreview] = useState(false);
-  const [previewRow, setPreviewRow] = useState<any>(null);
-  const [previewItem, setPreviewItem] = useState<any>(null);
-  const [previewLoading, setPreviewLoading] = useState(false);
-  const [previewEdit, setPreviewEdit] = useState(false);
-  const [previewSaving, setPreviewSaving] = useState(false);
-  const [previewQuality, setPreviewQuality] = useState<any[]>([]);
-  const [customerSearch, setCustomerSearch] = useState("");
-  const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
-  const pictureInputRef = useRef<HTMLInputElement>(null);
-  const [uploadingPictures, setUploadingPictures] = useState(false);
+
+  useEffect(() => {
+    setPage(1);
+  }, [filters, taricSearch, activeTab]);
 
   const toBool = (v: any) =>
     v === "Y" || v === "Yes" || v === true || v === 1 || v === "1";
@@ -2022,30 +2051,35 @@ const ItemsManagementPage: React.FC = () => {
                   onReset={() => setFilters((prev) => ({ ...prev, tags: "" }))}
                 />
               </div>
-              <div className="relative flex-grow flex-shrink flex-1 min-w-[120px]">
-                <div className="relative">
-                  <input
-                    type="text"
-                    placeholder="Company..."
-                    value={filters.company || ""}
-                    onChange={(e) =>
-                      setFilters({ ...filters, company: e.target.value })
-                    }
-                    className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${
-                      filters.company
-                        ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
-                        : "text-gray-900 border-gray-300 bg-white"
-                    }`}
-                  />
-                  {filters.company && (
-                    <button
-                      onClick={() => setFilters({ ...filters, company: "" })}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500"
-                    >
-                      <XMarkIcon className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                </div>
+              <div className="flex-grow flex-shrink flex-1 min-w-[150px]">
+                <select
+                  value={filters.company || ""}
+                  onChange={(e) =>
+                    setFilters({ ...filters, company: e.target.value })
+                  }
+                  className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${
+                    filters.company
+                      ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+                      : "text-gray-400 border-gray-300 bg-white"
+                  }`}
+                >
+                  <option value="">Company...</option>
+                  {Array.from(
+                    new Map(
+                      allCustomers
+                        .filter((c) => c.companyName)
+                        .map((c) => [String(c.id), c]),
+                    ).values(),
+                  )
+                    .sort((a: any, b: any) =>
+                      (a.companyName || "").localeCompare(b.companyName || ""),
+                    )
+                    .map((c: any) => (
+                      <option key={c.id} value={String(c.id)}>
+                        {c.companyName}
+                      </option>
+                    ))}
+                </select>
               </div>
 
               <div className="w-[90px] flex-shrink-0">
