@@ -28,6 +28,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { useRouter, useSearchParams } from "next/navigation";
 import PageHeader from "@/components/UI/PageHeader";
+import CustomButton from "@/components/UI/CustomButton";
 import { EditIcon, EyeIcon, Package, Hash } from "lucide-react";
 import { Delete, Sync } from "@mui/icons-material";
 import { toast } from "react-hot-toast";
@@ -474,14 +475,23 @@ const ItemsManagementPage: React.FC = () => {
 
   const refreshCounts = useCallback(async () => {
     try {
-      const [stats, pending, newCount]: any = await Promise.all([
+      const [statsRes, pendingRes, newCountRes] = await Promise.allSettled([
         getItemStatistics(),
         getPendingSyncCount(),
         getNewItemsCount(),
       ]);
-      setStatistics(stats.data);
-      setPendingSyncCount(pending.data?.pendingCount || 0);
-      setNewItemsCount(newCount.data?.count || 0);
+      if (statsRes.status === "fulfilled") {
+        const stats: any = statsRes.value;
+        setStatistics(stats.data);
+      }
+      if (pendingRes.status === "fulfilled") {
+        const pending: any = pendingRes.value;
+        setPendingSyncCount(pending.data?.pendingCount || 0);
+      }
+      if (newCountRes.status === "fulfilled") {
+        const newCount: any = newCountRes.value;
+        setNewItemsCount(newCount.data?.count || 0);
+      }
     } catch (e) {
       console.error("Error fetching counts:", e);
     }
@@ -1782,7 +1792,7 @@ const ItemsManagementPage: React.FC = () => {
       >
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
           <div>
-            <PageHeader title="Items Management" icon={Package} />
+            <PageHeader title="Items" icon={Package} />
             {activeTab === "items" && pendingSyncCount > 0 && (
               <div className="mt-2 text-sm text-yellow-600 flex items-center gap-2">
                 <Sync className="w-4 h-4" />
@@ -1793,124 +1803,108 @@ const ItemsManagementPage: React.FC = () => {
 
           <div className="flex gap-1.5 items-center flex-wrap justify-end">
             {activeTab === "items" && (
-              <button
+              <CustomButton
                 onClick={handleExportNewCSV}
                 disabled={exportingNew || newItemsCount === 0}
-                className={`px-3 py-1.5 rounded-md text-xs font-medium flex items-center gap-1.5 ${exportingNew || newItemsCount === 0 ? "bg-gray-300 text-gray-500 cursor-not-allowed" : "bg-emerald-600 text-white hover:bg-emerald-700"}`}
+                loading={exportingNew}
+                gradient={true}
+                size="small"
+                startIcon={<ArrowDownTrayIcon className="w-4 h-4" />}
               >
-                {exportingNew ? (
-                  <>
-                    <ArrowPathIcon className="w-4 h-4 animate-spin" />
-                    Exporting...
-                  </>
-                ) : (
-                  <>
-                    <ArrowDownTrayIcon className="w-4 h-4" />
-                    Export to WaWi CSV ({newItemsCount})
-                  </>
-                )}
-              </button>
+                Export to WaWi CSV ({newItemsCount})
+              </CustomButton>
             )}
             {activeTab === "items" && (
               <>
-                <button
+                <CustomButton
                   onClick={() => handleExportCSV()}
                   disabled={exporting || pendingSyncCount === 0}
-                  className={`px-3 py-1.5 rounded-md text-xs font-medium flex items-center gap-1.5 ${exporting || pendingSyncCount === 0 ? "bg-gray-300 text-gray-500 cursor-not-allowed" : "bg-blue-600 text-white hover:bg-blue-700"}`}
+                  loading={exporting}
+                  gradient={true}
+                  size="small"
+                  startIcon={<ArrowDownTrayIcon className="w-4 h-4" />}
                 >
-                  {exporting ? (
-                    <>
-                      <ArrowPathIcon className="w-4 h-4 animate-spin" />
-                      Exporting...
-                    </>
-                  ) : (
-                    <>
-                      <ArrowDownTrayIcon className="w-4 h-4" />
-                      Sync to WaWi ({pendingSyncCount})
-                    </>
-                  )}
-                </button>
+                  Sync to WaWi ({pendingSyncCount})
+                </CustomButton>
                 {process.env.NODE_ENV === "development" && (
-                  <button
+                  <CustomButton
                     onClick={handleResetSyncFlags}
-                    className="px-3 py-1.5 bg-orange-600 text-white rounded-md text-xs font-medium hover:bg-orange-700 flex items-center gap-1.5"
+                    gradient={true}
+                    size="small"
+                    startIcon={<ArrowPathIcon className="w-4 h-4" />}
                   >
-                    <ArrowPathIcon className="w-4 h-4" />
                     Reset Sync Flags
-                  </button>
+                  </CustomButton>
                 )}
               </>
             )}
             {getSelectedCount() > 0 &&
               (isTaricTab ? (
-                <button
+                <CustomButton
                   onClick={handleBulkDeleteTarics}
-                  className="px-3 py-1.5 bg-red-600 text-white rounded-md text-xs font-medium hover:bg-red-700"
+                  gradient={true}
+                  size="small"
+                  color="error"
                 >
                   Delete ({selectedTarics.size})
-                </button>
+                </CustomButton>
               ) : (
                 <>
-                  <button
+                  <CustomButton
                     onClick={() => handleBulk("activate")}
-                    className="px-3 py-1.5 bg-green-600 text-white rounded-md text-xs font-medium hover:bg-green-700"
+                    gradient={true}
+                    size="small"
+                    color="success"
                   >
                     Activate
-                  </button>
-                  <button
+                  </CustomButton>
+                  <CustomButton
                     onClick={() => handleBulk("deactivate")}
-                    className="px-3 py-1.5 bg-yellow-600 text-white rounded-md text-xs font-medium hover:bg-yellow-700"
+                    gradient={true}
+                    size="small"
+                    color="warning"
                   >
                     Deactivate
-                  </button>
-                  <button
+                  </CustomButton>
+                  <CustomButton
                     onClick={() => handleBulk("delete")}
-                    className="px-3 py-1.5 bg-red-600 text-white rounded-md text-xs font-medium hover:bg-red-700"
+                    gradient={true}
+                    size="small"
+                    color="error"
                   >
                     Delete
-                  </button>
+                  </CustomButton>
                 </>
               ))}
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium flex items-center gap-1.5 ${showFilters ? "bg-[#8CC21B] text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
-            >
-              <FunnelIcon className="w-4 h-4" />
-              Filters
-            </button>
-            <button
-              onClick={() => fetchTab(activeTab, true)}
-              className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-md text-xs font-medium hover:bg-gray-200 flex items-center gap-1.5"
-            >
-              <ArrowPathIcon className="w-4 h-4" />
-              Refresh
-            </button>
             {activeTab === "items" && (
-              <button
+              <CustomButton
                 onClick={openCreateItemModal}
-                className="px-3 py-1.5 bg-[#8CC21B] text-white rounded-md text-xs font-medium hover:bg-[#7ab318] flex items-center gap-1.5"
+                gradient={true}
+                size="small"
+                startIcon={<PlusIcon className="w-5 h-5" />}
               >
-                <PlusIcon className="w-4 h-4" />
                 New Item
-              </button>
+              </CustomButton>
             )}
             {activeTab === "tarics" && (
-              <button
+              <CustomButton
                 onClick={openCreateTaric}
-                className="px-3 py-1.5 bg-[#8CC21B] text-white rounded-md text-xs font-medium hover:bg-[#7ab318] flex items-center gap-1.5"
+                gradient={true}
+                size="small"
+                startIcon={<PlusIcon className="w-5 h-5" />}
               >
-                <PlusIcon className="w-4 h-4" />
                 New TARIC
-              </button>
+              </CustomButton>
             )}
             {activeTab === "suppliers" && (
-              <button
+              <CustomButton
                 onClick={() => router.push("/suppliers")}
-                className="px-3 py-1.5 bg-[#8CC21B] text-white rounded-md text-xs font-medium hover:bg-[#7ab318] flex items-center gap-1.5"
+                gradient={true}
+                size="small"
+                startIcon={<PlusIcon className="w-5 h-5" />}
               >
-                <PlusIcon className="w-4 h-4" />
                 Manage Suppliers
-              </button>
+              </CustomButton>
             )}
           </div>
         </div>
@@ -1952,24 +1946,14 @@ const ItemsManagementPage: React.FC = () => {
                 >
                   <tab.icon className="w-5 h-5" />
                   {tab.label}
-                  {tab.key === "items" && pendingSyncCount > 0 && (
-                    <span className="ml-1 text-xs bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded-full">
-                      {pendingSyncCount}
-                    </span>
-                  )}
-                  {tab.key === "items" && newItemsCount > 0 && (
-                    <span className="ml-1 text-xs bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full font-bold">
-                      {newItemsCount} new
-                    </span>
-                  )}
+
                 </button>
               ))}
             </nav>
           </div>
         </div>
 
-        {showFilters && (
-          <div className="mb-6 p-3 bg-white border border-gray-200 rounded-md shadow-sm">
+        <div className="mb-6 p-3 bg-white border border-gray-200 rounded-md shadow-sm">
             {activeTab === "items" ? (
               <div className="flex flex-wrap lg:flex-nowrap items-center gap-2 w-full">
                 <div className="flex items-center gap-1.5 text-gray-400 shrink-0 select-none px-1">
@@ -2174,7 +2158,7 @@ const ItemsManagementPage: React.FC = () => {
               </div>
             )}
           </div>
-        )}
+        
         {activeTab !== "tarics" && activeTab !== "items" && (
           <div className="mb-6">
             <div className="relative">
