@@ -453,50 +453,31 @@ const ItemsManagementPage: React.FC = () => {
   }, []);
 
   const refreshCounts = useCallback(async () => {
-    console.log("[refreshCounts] Called at:", new Date().toISOString());
     try {
       const [statsRes, pendingRes, newCountRes] = await Promise.allSettled([
         getItemStatistics(),
         getPendingSyncCount(),
         getNewItemsCount(),
       ]);
-
-      console.log("[refreshCounts] statsRes:", statsRes);
-      console.log("[refreshCounts] pendingRes:", pendingRes);
-      console.log("[refreshCounts] newCountRes:", newCountRes);
-
       if (statsRes.status === "fulfilled") {
         const stats: any = statsRes.value;
-        console.log("[refreshCounts] Setting statistics:", stats);
         setStatistics(stats.data);
-      } else {
-        console.error("[refreshCounts] statsRes FAILED:", statsRes.reason);
       }
       if (pendingRes.status === "fulfilled") {
         const pending: any = pendingRes.value;
-        console.log("[refreshCounts] Raw pending value:", pending, "=> pendingCount:", pending.data?.pendingCount);
         setPendingSyncCount(pending.data?.pendingCount || 0);
-      } else {
-        console.error("[refreshCounts] pendingRes FAILED:", pendingRes.reason);
       }
       if (newCountRes.status === "fulfilled") {
         const newCount: any = newCountRes.value;
-        console.log("[refreshCounts] Raw newCount value:", newCount, "=> count:", newCount.data?.count);
         setNewItemsCount(newCount.data?.count || 0);
-      } else {
-        console.error("[refreshCounts] newCountRes FAILED:", newCountRes.reason);
       }
     } catch (e) {
-      console.error("[refreshCounts] Unexpected error:", e);
+      console.error("[refreshCounts] error:", e);
     }
   }, []);
 
   useEffect(() => {
-    console.log("[useEffect] activeTab changed to:", activeTab);
-    if (activeTab === "items") {
-      console.log("[useEffect] Calling refreshCounts because activeTab === 'items'");
-      refreshCounts();
-    }
+    if (activeTab === "items") refreshCounts();
   }, [activeTab, refreshCounts]);
 
   useEffect(() => {
