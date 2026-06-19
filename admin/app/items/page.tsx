@@ -292,6 +292,7 @@ const ItemsManagementPage: React.FC = () => {
     for (let i = 0; i < 12; i++) ean12 += Math.floor(Math.random() * 10);
     return `${ean12}${calculateEAN13Checksum(ean12)}`;
   };
+  const refreshCountsRef = useRef<() => Promise<void>>(async () => { });
 
   const fetchTab = useCallback(
     async (tab: TabType, force = false) => {
@@ -329,6 +330,7 @@ const ItemsManagementPage: React.FC = () => {
               setItemsTotalRecords(data.length);
               setItemsTotalPages(Math.ceil(data.length / PAGE_LIMIT));
             }
+            refreshCountsRef.current();
             break;
           }
           case "parents": {
@@ -475,6 +477,8 @@ const ItemsManagementPage: React.FC = () => {
       console.error("[refreshCounts] error:", e);
     }
   }, []);
+
+  refreshCountsRef.current = refreshCounts;
 
   useEffect(() => {
     if (activeTab === "items") refreshCounts();
