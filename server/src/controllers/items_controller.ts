@@ -204,11 +204,23 @@ export const getItems = async (
       );
     }
 
-    // Item No / EAN (searches item EAN + parent DE number)
+    // Item No / EAN — searches item EAN, parent DE number, AND the warehouse
+    // item_no_de (the value that actually shows in the "Item No" column when a
+    // warehouse record exists). EXISTS keeps the row count / pagination correct.
     if (eanSearch) {
-      idQb.andWhere("(item.ean LIKE :ean OR parent.de_no LIKE :ean)", {
-        ean: `%${eanSearch}%`,
+      idQb.andWhere((qb2) => {
+        const whSub = qb2
+          .subQuery()
+          .select("wi_ean.id")
+          .from(WarehouseItem, "wi_ean")
+          .where(
+            "(wi_ean.item_id = item.id OR wi_ean.ItemID_DE = item.ItemID_DE)",
+          )
+          .andWhere("wi_ean.item_no_de LIKE :ean")
+          .getQuery();
+        return `(item.ean LIKE :ean OR parent.de_no LIKE :ean OR EXISTS ${whSub})`;
       });
+      idQb.setParameter("ean", `%${eanSearch}%`);
     }
 
     // Active status (filters on item.isActive — fast, indexed)
@@ -456,7 +468,6 @@ export const getItems = async (
     return next(error);
   }
 };
-
 export const getItemById = async (
   req: Request,
   res: Response,
