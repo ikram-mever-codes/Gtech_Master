@@ -58,9 +58,8 @@ const StatusIndicator = ({
   label?: string;
 }) => (
   <span
-    className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
-      value ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
-    }`}
+    className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${value ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+      }`}
   >
     {value ? (
       <CheckCircleIcon className="h-3 w-3" />
@@ -408,23 +407,23 @@ const ItemDetailsPage = () => {
         rawItem.supplierItem ||
         (defaultSupplierItem
           ? {
-              priceRMB: defaultSupplierItem.priceRMB || "0",
-              isPO: defaultSupplierItem.isPO || "No",
-              moq: defaultSupplierItem.moq || "0",
-              interval: defaultSupplierItem.interval || "0",
-              leadTime: defaultSupplierItem.leadTime || "",
-              noteCN: defaultSupplierItem.noteCN || "",
-              url: defaultSupplierItem.url || "",
-            }
+            priceRMB: defaultSupplierItem.priceRMB || "0",
+            isPO: defaultSupplierItem.isPO || "No",
+            moq: defaultSupplierItem.moq || "0",
+            interval: defaultSupplierItem.interval || "0",
+            leadTime: defaultSupplierItem.leadTime || "",
+            noteCN: defaultSupplierItem.noteCN || "",
+            url: defaultSupplierItem.url || "",
+          }
           : {
-              priceRMB: "0",
-              isPO: "No",
-              moq: "0",
-              interval: "0",
-              leadTime: "",
-              noteCN: "",
-              url: "",
-            }),
+            priceRMB: "0",
+            isPO: "No",
+            moq: "0",
+            interval: "0",
+            leadTime: "",
+            noteCN: "",
+            url: "",
+          }),
       isLabelPrint:
         rawItem.isLabelPrint !== undefined
           ? toBool(rawItem.isLabelPrint)
@@ -509,8 +508,8 @@ const ItemDetailsPage = () => {
     const term = customerSearch.trim().toLowerCase();
     const list = term
       ? allCustomers.filter((c) =>
-          (c.companyName || "").toLowerCase().includes(term),
-        )
+        (c.companyName || "").toLowerCase().includes(term),
+      )
       : allCustomers;
     return list.slice(0, 50);
   })();
@@ -1140,11 +1139,10 @@ const ItemDetailsPage = () => {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`px-4 py-2 text-sm font-medium whitespace-nowrap transition-colors ${
-                  activeTab === tab.id
+                className={`px-4 py-2 text-sm font-medium whitespace-nowrap transition-colors ${activeTab === tab.id
                     ? "text-gray-900 border-b-2 border-gray-600"
                     : "text-gray-500 hover:text-gray-700"
-                }`}
+                  }`}
               >
                 {tab.label}
               </button>
@@ -1223,10 +1221,10 @@ const ItemDetailsPage = () => {
                           );
                           const supplierName = supplierDetail
                             ? String(
-                                !hasChinese(supplierDetail.name || "")
-                                  ? supplierDetail.name
-                                  : supplierDetail.company_name || "Unknown",
-                              )
+                              !hasChinese(supplierDetail.name || "")
+                                ? supplierDetail.name
+                                : supplierDetail.company_name || "Unknown",
+                            )
                             : "Unknown";
                           let existingItem = updated.supplierItems?.find(
                             (si: any) =>
@@ -1338,15 +1336,15 @@ const ItemDetailsPage = () => {
                           />
                           {(customerSearch ||
                             (itemData as any).customer_id) && (
-                            <button
-                              type="button"
-                              onClick={handleClearCustomer}
-                              className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500 transition-colors"
-                              title="Clear customer"
-                            >
-                              <XCircleIcon className="h-4 w-4" />
-                            </button>
-                          )}
+                              <button
+                                type="button"
+                                onClick={handleClearCustomer}
+                                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500 transition-colors"
+                                title="Clear customer"
+                              >
+                                <XCircleIcon className="h-4 w-4" />
+                              </button>
+                            )}
                         </div>
 
                         {showCustomerDropdown && (
@@ -1368,11 +1366,10 @@ const ItemDetailsPage = () => {
                                       onClick={() =>
                                         handleSelectCustomer(customer)
                                       }
-                                      className={`px-3.5 py-2.5 text-sm cursor-pointer flex items-center justify-between transition-colors ${
-                                        isSelected
+                                      className={`px-3.5 py-2.5 text-sm cursor-pointer flex items-center justify-between transition-colors ${isSelected
                                           ? "bg-[#8CC21B]/10 text-[#5f8512] font-semibold"
                                           : "hover:bg-gray-50 text-gray-700"
-                                      }`}
+                                        }`}
                                     >
                                       <div className="flex flex-col min-w-0 pr-3">
                                         <span className="font-medium line-clamp-1">
@@ -1381,12 +1378,12 @@ const ItemDetailsPage = () => {
                                         </span>
                                         {(customer.customerNumber ||
                                           customer.email) && (
-                                          <span className="text-[11px] text-gray-400 line-clamp-1">
-                                            {customer.customerNumber
-                                              ? `No: ${customer.customerNumber}`
-                                              : customer.email}
-                                          </span>
-                                        )}
+                                            <span className="text-[11px] text-gray-400 line-clamp-1">
+                                              {customer.customerNumber
+                                                ? `No: ${customer.customerNumber}`
+                                                : customer.email}
+                                            </span>
+                                          )}
                                       </div>
                                       {isSelected && (
                                         <CheckCircleIcon className="h-4 w-4 text-[#8CC21B] shrink-0" />
@@ -2009,20 +2006,18 @@ const ItemDetailsPage = () => {
                   itemData.supplierItems.map((si: any) => (
                     <div
                       key={si.id}
-                      className={`p-5 rounded-xl border transition-all flex flex-col gap-4 ${
-                        si.isDefault
+                      className={`p-5 rounded-xl border transition-all flex flex-col gap-4 ${si.isDefault
                           ? "bg-blue-50/20 border-blue-200 shadow-sm"
                           : "bg-white border-gray-100 hover:border-gray-200"
-                      }`}
+                        }`}
                     >
                       <div className="flex items-center justify-between flex-wrap gap-3">
                         <div className="flex items-center gap-4">
                           <div
-                            className={`p-2 rounded-lg ${
-                              si.isDefault
+                            className={`p-2 rounded-lg ${si.isDefault
                                 ? "bg-blue-100 text-blue-600"
                                 : "bg-gray-100 text-gray-400"
-                            }`}
+                              }`}
                           >
                             <Package className="h-5 w-5" />
                           </div>
@@ -2064,11 +2059,10 @@ const ItemDetailsPage = () => {
                           <button
                             onClick={() => window.open(si.url, "_blank")}
                             disabled={!si.url}
-                            className={`p-2 rounded-lg transition-all ${
-                              si.url
+                            className={`p-2 rounded-lg transition-all ${si.url
                                 ? "text-blue-500 hover:bg-blue-50"
                                 : "text-gray-300 cursor-not-allowed"
-                            }`}
+                              }`}
                           >
                             <LinkIcon className="h-5 w-5" />
                           </button>
@@ -2104,11 +2098,10 @@ const ItemDetailsPage = () => {
                                     successStyles,
                                   );
                                 }}
-                                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                                  si.isDefault
+                                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${si.isDefault
                                     ? "bg-blue-600 text-white"
                                     : "bg-white border border-blue-200 text-blue-600 hover:bg-blue-50"
-                                }`}
+                                  }`}
                               >
                                 {si.isDefault ? "Default" : "Set Default"}
                               </button>
@@ -2414,11 +2407,10 @@ const ItemDetailsPage = () => {
                                       onClick={() =>
                                         router.push(`/items/${item.id}`)
                                       }
-                                      className={`w-full text-left px-3.5 py-2.5 text-xs rounded-xl transition-all flex items-center justify-between cursor-pointer group/item border ${
-                                        isCurrent
+                                      className={`w-full text-left px-3.5 py-2.5 text-xs rounded-xl transition-all flex items-center justify-between cursor-pointer group/item border ${isCurrent
                                           ? "bg-blue-50 border-blue-200 text-blue-700 font-semibold"
                                           : "bg-white border-gray-100 hover:border-[#8CC21B]/30 hover:bg-[#8CC21B]/5 text-gray-700"
-                                      }`}
+                                        }`}
                                     >
                                       <div className="flex flex-col gap-0.5 flex-1 min-w-0 pr-4">
                                         <span className="font-semibold line-clamp-1 group-hover/item:text-[#8CC21B] transition-colors">
@@ -2704,11 +2696,11 @@ const ItemDetailsPage = () => {
                                   <a
                                     href={
                                       finalUrl.includes("cloudinary") &&
-                                      !finalUrl.includes("/raw/")
+                                        !finalUrl.includes("/raw/")
                                         ? finalUrl.replace(
-                                            "/upload/",
-                                            "/upload/fl_attachment/",
-                                          )
+                                          "/upload/",
+                                          "/upload/fl_attachment/",
+                                        )
                                         : finalUrl
                                     }
                                     download={
@@ -2766,11 +2758,11 @@ const ItemDetailsPage = () => {
               </div>
 
               {itemData.pictures &&
-              [
-                itemData.pictures.shopPicture,
-                itemData.pictures.ebayPictures,
-                ...(itemData.pictures.pixPath || "").split(",").filter(Boolean),
-              ].filter(Boolean).length > 0 ? (
+                [
+                  itemData.pictures.shopPicture,
+                  itemData.pictures.ebayPictures,
+                  ...(itemData.pictures.pixPath || "").split(",").filter(Boolean),
+                ].filter(Boolean).length > 0 ? (
                 <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
                   {[
                     {
@@ -2916,9 +2908,8 @@ const ItemDetailsPage = () => {
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={uploadingPictures}
-              className={`px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 text-gray-700 ${
-                uploadingPictures ? "opacity-50 cursor-not-allowed" : ""
-              }`}
+              className={`px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 text-gray-700 ${uploadingPictures ? "opacity-50 cursor-not-allowed" : ""
+                }`}
             >
               <PhotoIcon className="h-4 w-4" />
               {uploadingPictures ? "Uploading..." : "Add Pictures"}

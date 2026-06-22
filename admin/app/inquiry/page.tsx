@@ -57,6 +57,7 @@ import { getAllContactPersons } from "@/api/contacts";
 import { getAllUsers } from "@/api/user";
 import CustomButton from "@/components/UI/CustomButton";
 import CustomModal from "@/components/UI/CustomModal";
+import ItemPreviewModal from "@/components/Item/ItemPreviewModal";
 import { useSelector } from "react-redux";
 import { RootState } from "@/app/Redux/store";
 import { MessagesSquare, ClipboardList } from "lucide-react";
@@ -431,6 +432,31 @@ const CombinedInquiriesPageContent = () => {
       console.error("Error fetching tarics:", error);
     }
   };
+  const handleSort = (field: string) => {
+    setInquiryFilters((prev: any) => {
+      const isSameField = prev.sortBy === field;
+      if (isSameField) {
+        if (prev.sortOrder === "ASC") {
+          return {
+            ...prev,
+            sortOrder: "DESC",
+          };
+        } else {
+          return {
+            ...prev,
+            sortBy: "createdAt",
+            sortOrder: "DESC",
+          };
+        }
+      } else {
+        return {
+          ...prev,
+          sortBy: field,
+          sortOrder: "ASC",
+        };
+      }
+    });
+  };
   useEffect(() => {
     fetchInquiries();
   }, [inquiryFilters, selectedCustomerId]);
@@ -602,6 +628,21 @@ const CombinedInquiriesPageContent = () => {
               const hasNoExcludes = excludeTagIds.every((id: string) => !reqTagIds.includes(id));
               return hasAllIncludes && hasNoExcludes;
             });
+          });
+        }
+
+        // Apply frontend sorting
+        if (inquiryFilters.sortBy === "total_potential_k_eur") {
+          inquiryData = [...inquiryData].sort((a: any, b: any) => {
+            const valA = a.total_potential_k_eur !== undefined && a.total_potential_k_eur !== null ? Number(a.total_potential_k_eur) : 0;
+            const valB = b.total_potential_k_eur !== undefined && b.total_potential_k_eur !== null ? Number(b.total_potential_k_eur) : 0;
+            return inquiryFilters.sortOrder === "ASC" ? valA - valB : valB - valA;
+          });
+        } else if (inquiryFilters.sortBy === "createdAt") {
+          inquiryData = [...inquiryData].sort((a: any, b: any) => {
+            const timeA = new Date(a.createdAt || 0).getTime();
+            const timeB = new Date(b.createdAt || 0).getTime();
+            return inquiryFilters.sortOrder === "ASC" ? timeA - timeB : timeB - timeA;
           });
         }
 
@@ -1207,6 +1248,9 @@ const CombinedInquiriesPageContent = () => {
     });
   };
 
+  const showPicColumn = allInquiries.some((inq) => inq.isAssembly);
+  const totalCols = showPicColumn ? 10 : 9;
+
   return (
     <div className="min-h-screen bg-white shadow-xl rounded-lg p-6">
       <div className="max-w-7xl mx-auto">
@@ -1309,11 +1353,34 @@ const CombinedInquiriesPageContent = () => {
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Company / Contacts
                     </th>
+                    {showPicColumn && (
+                      <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-16">
+                        Pic
+                      </th>
+                    )}
                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Request Items
                     </th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      VP
+                    <th
+                      className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:text-gray-900 transition-colors group"
+                      onClick={() => handleSort("total_potential_k_eur")}
+                    >
+                      <div className="flex items-center justify-center gap-1">
+                        <span>VP</span>
+                        {inquiryFilters.sortBy === "total_potential_k_eur" ? (
+                          inquiryFilters.sortOrder === "ASC" ? (
+                            <ChevronUpIcon className="h-4 w-4 text-blue-600 stroke-[3px]" />
+                          ) : (
+                            <ChevronDownIcon className="h-4 w-4 text-blue-600 stroke-[3px]" />
+                          )
+                        ) : (
+                          <span className="text-gray-400 opacity-40 group-hover:opacity-100 transition-opacity">
+                            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 10l5-5 5 5M7 14l5 5 5-5" />
+                            </svg>
+                          </span>
+                        )}
+                      </div>
                     </th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Status
@@ -1362,20 +1429,22 @@ const CombinedInquiriesPageContent = () => {
                               />
                             </button>
                             <div
-                              className="cursor-pointer font-medium text-gray-900 flex items-center gap-1.5"
+                              className="cursor-pointer flex flex-col"
                               onClick={() => handleInquiryClick(inquiry)}
                             >
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-sm font-medium text-gray-900">{inquiry.name}</span>
+                                {inquiry.isAssembly && (
+                                  <CubeIcon
+                                    className="h-3.5 w-3.5 text-blue-500"
+                                    title="Assembly Item"
+                                  />
+                                )}
+                              </div>
                               {inquiry.inquiryNo && (
-                                <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded font-mono font-semibold">
+                                <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded font-mono font-semibold mt-0.5 w-fit">
                                   {inquiry.inquiryNo}
                                 </span>
-                              )}
-                              <span>{inquiry.name}</span>
-                              {inquiry.isAssembly && (
-                                <CubeIcon
-                                  className="h-4 w-4 text-blue-500"
-                                  title="Assembly Item"
-                                />
                               )}
                             </div>
                           </div>
@@ -1392,20 +1461,44 @@ const CombinedInquiriesPageContent = () => {
                             >
                               {inquiry.customer?.companyName || "-"}
                             </a>
-                            {inquiry.contactPerson && (
-                              <div className="text-xs text-gray-600 truncate mt-0.5">
-                                {inquiry.contactPerson?.name}{" "}
-                                {inquiry.contactPerson?.familyName}
-                              </div>
-                            )}
+                            <div className="text-xs text-gray-600 truncate mt-0.5">
+                              {inquiry.contactPerson ? (
+                                `${inquiry.contactPerson.name || ""} ${inquiry.contactPerson.familyName || ""}`.trim() || "-"
+                              ) : (
+                                "-"
+                              )}
+                            </div>
                           </div>
                         </td>
-                        <td className="px-4 py-3 text-center text-sm font-medium text-gray-900">
-                          {inquiry.requests?.length || 0}
+                        {showPicColumn && (
+                          <td className="px-3 py-3 text-center">
+                            {inquiry.isAssembly ? (
+                              <div className="w-10 h-10 rounded border border-gray-200 bg-gray-50 flex items-center justify-center mx-auto flex-shrink-0">
+                                {inquiry.image ? (
+                                  <img
+                                    src={inquiry.image}
+                                    alt="Assembly"
+                                    className="w-full h-full object-cover rounded cursor-pointer hover:scale-105 transition-transform"
+                                    onClick={(e) => { e.stopPropagation(); window.open(inquiry.image!, "_blank"); }}
+                                    title="Assembly item image"
+                                  />
+                                ) : (
+                                  <PhotoIcon className="w-5 h-5 text-gray-300" title="No image available" />
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-gray-300 text-xs">—</span>
+                            )}
+                          </td>
+                        )}
+                        <td className="px-4 py-3 text-center">
+                          <span className="text-sm font-medium text-gray-900">
+                            {inquiry.requests?.length || 0}
+                          </span>
                         </td>
                         <td className="px-4 py-3 text-center text-sm text-gray-900 font-medium">
                           {inquiry.total_potential_k_eur !== undefined && inquiry.total_potential_k_eur !== null
-                            ? `${inquiry.total_potential_k_eur} k €`
+                            ? Math.round(inquiry.total_potential_k_eur)
                             : "-"}
                         </td>
                         <td className="px-4 py-3">
@@ -1451,16 +1544,35 @@ const CombinedInquiriesPageContent = () => {
                           {inquiry.next_followup_at ? formatDate(inquiry.next_followup_at) : <span className="text-gray-400">-</span>}
                         </td>
                         <td className="px-4 py-3 text-left text-sm text-gray-900 font-medium">
-                          {(() => {
-                            const ownerUser = users.find((u) => u.id === inquiry.owner_user_id);
-                            return ownerUser ? ownerUser.name : <span className="text-gray-400">-</span>;
-                          })()}
+                          <div className="flex items-center gap-2">
+                            {(() => {
+                              const ownerUser = users.find((u) => u.id === inquiry.owner_user_id);
+                              return ownerUser ? ownerUser.name : <span className="text-gray-400">-</span>;
+                            })()}
+                            {(inquiry.asanaLink || inquiry.requests?.some((r: any) => r.asanaLink)) && (
+                              <a
+                                href={inquiry.asanaLink || inquiry.requests?.find((r: any) => r.asanaLink)?.asanaLink}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                className="text-purple-500 hover:text-purple-700 transition-colors shrink-0"
+                                title="Open Asana task"
+                              >
+                                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
+                                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z" />
+                                  <circle cx="12" cy="8.5" r="1.5" />
+                                  <circle cx="8.5" cy="14.5" r="1.5" />
+                                  <circle cx="15.5" cy="14.5" r="1.5" />
+                                </svg>
+                              </a>
+                            )}
+                          </div>
                         </td>
                       </tr>
                       {expandedInquiryIds.has(inquiry.id) && (
                         inquiry.requests && inquiry.requests.length > 0 ? (
                           <tr className="bg-gray-50/50 border-t border-b border-gray-100">
-                            <td colSpan={9} className="px-6 py-4">
+                            <td colSpan={totalCols} className="px-6 py-4">
                               <div>
                                 <div className="text-xs font-semibold text-gray-500 mb-2.5 uppercase tracking-wider flex items-center gap-1.5 select-none">
                                   <ClipboardList className="h-4 w-4 text-blue-500" />
@@ -1471,19 +1583,21 @@ const CombinedInquiriesPageContent = () => {
                                     <thead className="bg-gray-200/50 border-b border-gray-200/50">
                                       <tr>
                                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                          Item Name
+                                          Request Item
                                         </th>
+                                        {inquiry.isAssembly && (
+                                          <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-16">
+                                            Pic
+                                          </th>
+                                        )}
                                         <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                          Dimensions
-                                        </th>
-                                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                          Quantity & Interval
+                                          Qty &amp; Interval
                                         </th>
                                         <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                                           Target Price
                                         </th>
                                         <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                          Potential (k €)
+                                          VP
                                         </th>
                                       <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                                         Status
@@ -1515,24 +1629,33 @@ const CombinedInquiriesPageContent = () => {
                                       >
                                         <td className="px-4 py-3">
                                           <div className="w-[8rem]">
-                                             <div className="text-sm font-medium text-gray-900 flex items-center gap-1.5 flex-wrap">
-                                               {request.itemNo && (
-                                                 <span className="text-[10px] font-mono text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded font-semibold">
-                                                   {request.itemNo}
-                                                 </span>
-                                               )}
-                                               <span>{request.itemName}</span>
-                                             </div>
-                                            {request.material && (
-                                              <div className="text-xs text-gray-500">
-                                                {request.material}
+                                            <div className="text-sm font-medium text-gray-900">
+                                              {request.itemName}
+                                            </div>
+                                            {request.itemNo && (
+                                              <div className="text-[10px] font-mono text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded font-semibold inline-block mt-0.5">
+                                                {request.itemNo}
                                               </div>
                                             )}
                                           </div>
                                         </td>
-                                        <td className="px-4 py-3 text-center">
-                                          {renderDimensionInfo(request)}
-                                        </td>
+                                        {inquiry.isAssembly && (
+                                          <td className="px-3 py-3 text-center">
+                                            <div className="w-10 h-10 rounded border border-gray-200 bg-gray-50 flex items-center justify-center mx-auto">
+                                              {request.images && request.images.length > 0 ? (
+                                                <img
+                                                  src={request.images[0]}
+                                                  alt="Item"
+                                                  className="w-full h-full object-cover rounded cursor-pointer hover:scale-105 transition-transform"
+                                                  onClick={(e) => { e.stopPropagation(); window.open(request.images![0], "_blank"); }}
+                                                  title="View image"
+                                                />
+                                              ) : (
+                                                <PhotoIcon className="w-5 h-5 text-gray-300" title="No image available" />
+                                              )}
+                                            </div>
+                                          </td>
+                                        )}
                                         <td className="px-4 py-3 text-center">
                                           <div className="text-sm font-medium text-gray-900">
                                             {request.qty} / {request.interval}
@@ -1548,7 +1671,7 @@ const CombinedInquiriesPageContent = () => {
                                         <td className="px-4 py-3 text-center">
                                           <div className="text-sm font-bold text-blue-600">
                                             {request.annualPotentialKEur !== undefined && request.annualPotentialKEur !== null
-                                              ? `${request.annualPotentialKEur} k €`
+                                              ? Math.round(request.annualPotentialKEur)
                                               : "-"}
                                           </div>
                                         </td>
@@ -1707,7 +1830,7 @@ const CombinedInquiriesPageContent = () => {
                         </tr>
                         ) : (
                           <tr className="bg-gray-50/30">
-                            <td colSpan={9} className="px-6 py-5 text-center">
+                            <td colSpan={totalCols} className="px-6 py-5 text-center">
                               <div className="flex flex-col items-center justify-center gap-2 text-gray-400">
                                 <ClipboardDocumentListIcon className="h-8 w-8 text-gray-300" />
                                 <p className="text-sm font-medium text-gray-500">No request items yet</p>
@@ -3692,257 +3815,23 @@ const CombinedInquiriesPageContent = () => {
           </div>
         </div>
       )}
-      {showRequestDetailModal && selectedRequestForDetail && (
-        <CustomModal
-          isOpen={showRequestDetailModal}
-          onClose={() => setShowRequestDetailModal(false)}
-          title={selectedRequestForDetail.itemName}
-          width="max-w-4xl"
-          footer={
-            <div className="flex justify-between items-center w-full">
-              <button
-                onClick={async () => {
-                  if (
-                    window.confirm(
-                      "Are you sure you want to delete this request from the inquiry? This action cannot be undone."
-                    )
-                  ) {
-                    try {
-                      await removeRequestFromInquiry(
-                        selectedRequestInquiryId,
-                        selectedRequestForDetail.id
-                      );
-                      setShowRequestDetailModal(false);
-                      fetchInquiries();
-                    } catch (err) {
-                      console.error("Failed to delete request:", err);
-                    }
-                  }
-                }}
-                className="px-4 py-2 bg-rose-600 text-white rounded-xl hover:bg-rose-700 transition-all text-sm font-semibold flex items-center gap-1.5 shadow-sm hover:shadow"
-              >
-                <TrashIcon className="h-4 w-4" />
-                Delete Request
-              </button>
-
-              <div className="flex gap-2">
-                <button
-                  onClick={() => {
-                    setShowRequestDetailModal(false);
-                    handleConvertRequestClick(
-                      selectedRequestForDetail,
-                      selectedRequestInquiryId
-                    );
-                  }}
-                  className="px-4 py-2 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-all text-sm font-semibold flex items-center gap-1.5 shadow-sm hover:shadow"
-                >
-                  <ArrowRightIcon className="h-4 w-4" />
-                  Convert to Item
-                </button>
-                <button
-                  onClick={() => setShowRequestDetailModal(false)}
-                  className="px-4 py-2 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-all text-sm font-semibold"
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-          }
-        >
-          <div className="space-y-6">
-            <div className="-mt-2 pb-4 border-b border-gray-100 flex items-center gap-3 flex-wrap text-sm">
-              {selectedRequestForDetail.itemNo && (
-                <span className="font-mono text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
-                  #{selectedRequestForDetail.itemNo}
-                </span>
-              )}
-              <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${getRequestPriorityColor(selectedRequestForDetail.priority)}`}>
-                {selectedRequestForDetail.priority || "Normal"}
-              </span>
-              <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${getRequestStatusColor(selectedRequestForDetail.requestStatus || selectedRequestForDetail.status)}`}>
-                {selectedRequestForDetail.requestStatus || selectedRequestForDetail.status || "Draft"}
-              </span>
-              <span className="text-gray-500">
-                &bull; Request Item Details &bull; Inquiry ID: {selectedRequestInquiryId}
-              </span>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-6">
-                <div>
-                  <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-2">Description</h3>
-                  <div className="bg-gray-50/50 rounded-xl p-4 border border-gray-100">
-                    <p className="text-sm text-gray-800 whitespace-pre-line">
-                      {selectedRequestForDetail.description || "No description provided."}
-                    </p>
-                  </div>
-                </div>
-                {((selectedRequestForDetail.painPoints && selectedRequestForDetail.painPoints.length > 0) || (selectedRequestForDetail.tags && selectedRequestForDetail.tags.length > 0)) && (
-                  <div>
-                    <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-2">Tags & Pain Points</h3>
-                    <div className="flex flex-wrap gap-1.5">
-                      {selectedRequestForDetail.tags?.map((tag: any) => (
-                        <span
-                          key={tag.id}
-                          className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200/60"
-                        >
-                          {tag.name}
-                        </span>
-                      ))}
-                      {selectedRequestForDetail.painPoints?.map((painPoint: string, i: number) => (
-                        <span
-                          key={i}
-                          className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200/60"
-                        >
-                          {painPoint}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-              <div className="space-y-6">
-                <div>
-                  <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-2">Pricing & Logistics</h3>
-                  <div className="bg-gray-50/50 rounded-xl p-4 border border-gray-100 space-y-3">
-                    <div className="grid grid-cols-2 gap-4 text-sm">
-                      <div>
-                        <span className="text-gray-500 block font-medium">Quantity / Interval</span>
-                        <span className="font-semibold text-gray-900 text-base">
-                          {selectedRequestForDetail.qty} / {selectedRequestForDetail.interval || "Monthly"}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-gray-500 block font-medium">Purchase Price</span>
-                        <span className="font-semibold text-gray-900 text-base">
-                          {selectedRequestForDetail.purchasePrice} {selectedRequestForDetail.currency || "RMB"}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-gray-500 block font-medium">Target Price (EUR)</span>
-                        <span className="font-semibold text-gray-900 text-base">
-                          {selectedRequestForDetail.targetPrice !== undefined && selectedRequestForDetail.targetPrice !== null
-                            ? `${selectedRequestForDetail.targetPrice} €`
-                            : "-"}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-gray-500 block font-medium text-blue-600">Potential (k €)</span>
-                        <span className="font-semibold text-blue-600 text-base">
-                          {selectedRequestForDetail.annualPotentialKEur !== undefined && selectedRequestForDetail.annualPotentialKEur !== null
-                            ? `${selectedRequestForDetail.annualPotentialKEur} k €`
-                            : "-"}
-                        </span>
-                      </div>
-                      {selectedRequestForDetail.priceRMB && (
-                        <div>
-                          <span className="text-gray-500 block font-medium">Price in RMB</span>
-                          <span className="font-semibold text-gray-800">
-                            ¥{selectedRequestForDetail.priceRMB}
-                          </span>
-                        </div>
-                      )}
-                      <div>
-                        <span className="text-gray-500 block font-medium">Delivery Date</span>
-                        <span className="font-semibold text-gray-800 font-medium">
-                          {selectedRequestForDetail.expectedDeliveryDate
-                            ? new Date(selectedRequestForDetail.expectedDeliveryDate).toLocaleDateString()
-                            : "Not specified"}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                {(selectedRequestForDetail.urgency1 || selectedRequestForDetail.urgency2) && (
-                  <div>
-                    <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-2">Urgency & Quality Criteria</h3>
-                    <div className="bg-gray-50/50 rounded-xl p-4 border border-gray-100 space-y-3 text-sm">
-                      {selectedRequestForDetail.urgency1 && (
-                        <div>
-                          <span className="text-gray-500 block font-medium">Urgency 1</span>
-                          <p className="text-gray-800">{selectedRequestForDetail.urgency1}</p>
-                        </div>
-                      )}
-                      {selectedRequestForDetail.urgency2 && (
-                        <div className="pt-2 border-t border-gray-200/50">
-                          <span className="text-gray-500 block font-medium">Quality Criteria / Urgency 2</span>
-                          <p className="text-gray-800 whitespace-pre-line">{selectedRequestForDetail.urgency2}</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-            </div>
-            {selectedRequestForDetail.images && selectedRequestForDetail.images.length > 0 && (
-              <div className="border-t border-gray-100 pt-4">
-                <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-3">Images</h3>
-                <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3">
-                  {selectedRequestForDetail.images.map((image: string, idx: number) => (
-                    <a
-                      key={idx}
-                      href={image}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="group relative aspect-square rounded-xl overflow-hidden bg-gray-100 border border-gray-200 hover:shadow-md transition-all"
-                    >
-                      <img
-                        src={image}
-                        alt={`Preview ${idx + 1}`}
-                        className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-200"
-                      />
-                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
-                        <PhotoIcon className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
-                      </div>
-                    </a>
-                  ))}
-                </div>
-              </div>
-            )}
-            {selectedRequestForDetail.attachments && selectedRequestForDetail.attachments.length > 0 && (
-              <div className="border-t border-gray-100 pt-4">
-                <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-2">Attachments</h3>
-                <div className="flex flex-wrap gap-2">
-                  {selectedRequestForDetail.attachments.map((attachment: any, idx: number) => (
-                    <a
-                      key={idx}
-                      href={attachment.fileUrl || attachment.url || attachment}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-xs font-semibold transition-colors border border-gray-200"
-                    >
-                      <PaperClipIcon className="w-3.5 h-3.5" />
-                      <span className="truncate max-w-[200px]">
-                        {attachment.fileName || attachment.name || `Attachment ${idx + 1}`}
-                      </span>
-                    </a>
-                  ))}
-                </div>
-              </div>
-            )}
-            {selectedRequestForDetail.asanaLink && (
-              <div className="border-t border-gray-100 pt-4 flex items-center gap-2">
-                <span className="text-sm font-medium text-gray-600">Asana Task:</span>
-                <a
-                  href={selectedRequestForDetail.asanaLink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 px-3 py-1 text-purple-600 hover:text-purple-800 hover:bg-purple-50 rounded-lg text-sm font-semibold transition-all border border-purple-200"
-                >
-                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z" />
-                    <circle cx="12" cy="8.5" r="1.5" />
-                    <circle cx="8.5" cy="14.5" r="1.5" />
-                    <circle cx="15.5" cy="14.5" r="1.5" />
-                  </svg>
-                  Open in Asana
-                </a>
-              </div>
-            )}
-          </div>
-        </CustomModal>
-      )}
+      <ItemPreviewModal
+        isOpen={showRequestDetailModal}
+        onClose={() => setShowRequestDetailModal(false)}
+        itemId={selectedRequestForDetail?.id}
+        isRequest={true}
+        onSaved={fetchInquiries}
+        onDeleted={() => {
+          setShowRequestDetailModal(false);
+          fetchInquiries();
+        }}
+        onConvert={(itemData) => {
+          handleConvertRequestClick(
+            itemData,
+            selectedRequestInquiryId
+          );
+        }}
+      />
     </div>
   );
 };

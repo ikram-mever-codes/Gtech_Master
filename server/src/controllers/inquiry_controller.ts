@@ -723,8 +723,8 @@ export class InquiryController {
         ...(next_action !== undefined && { next_action }),
       };
 
-      if (contactPerson !== undefined) {
-        updateData.contactPerson = contactPerson;
+      if (contactPersonId !== undefined) {
+        updateData.contactPersonId = contactPersonId || null;
       }
 
       await this.inquiryRepository.update(id, updateData);

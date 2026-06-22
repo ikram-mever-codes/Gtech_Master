@@ -106,9 +106,9 @@ export interface RequestedItemCreatePayload {
   contactPersonId?: string;
   itemName: string;
   itemNo?: string;
-  qualityCriteria: any;
-  attachments: any;
-  taric: any;
+  qualityCriteria?: any;
+  attachments?: any;
+  taric?: any;
   extraNote?: string;
   material?: string;
   asanaLink?: string;
@@ -127,11 +127,26 @@ export interface RequestedItemCreatePayload {
   sampleQty?: string;
   purchasePrice: any;
   currency: any;
-  inquiryId: any;
+  inquiryId?: any;
   expectedDelivery?: string;
   priority?: Priority;
   requestStatus?: RequestStatus;
   comment?: string;
+  parent_id?: number;
+  model?: string;
+  ean?: string;
+  taric_id?: number;
+  item_name_cn?: string;
+  cat_id?: number;
+  remark?: string;
+  photo?: string;
+  pix_path?: string;
+  pix_path_eBay?: string;
+  is_rmb_special?: "Y" | "N";
+  is_eur_special?: "Y" | "N";
+  isActive?: "Y" | "N";
+  supplier_id?: number;
+  item_name_de?: string;
 }
 
 export interface RequestedItemUpdatePayload extends Partial<RequestedItemCreatePayload> {
