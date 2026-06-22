@@ -75,18 +75,14 @@ import {
   loadingStyles,
   BASE_URL,
 } from "@/utils/constants";
-import CustomModal from "@/components/UI/CustomModal";
 import { TagFilterSelector } from "@/components/Tags/TagFilterSelector";
 import ItemCreateModal from "@/components/Item/ItemCreateModal";
 import ItemPreviewModal from "@/components/Item/ItemPreviewModal";
 import {
   TagBadge,
-  TagPickerInput,
-  EntityTagSelector,
   sortTags,
   type Tag,
 } from "@/components/Tags/TagManager";
-import { syncEntityTags } from "@/api/tags";
 
 type TabType = "items" | "parents" | "warehouse" | "tarics" | "suppliers";
 

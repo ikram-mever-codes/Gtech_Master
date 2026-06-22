@@ -163,6 +163,7 @@ export const ItemCreateModal: React.FC<ItemCreateModalProps> = ({
           width: itemFormData.width || undefined,
           height: itemFormData.height || undefined,
           remark: itemFormData.remark,
+          extraNote: itemFormData.remark,
           model: itemFormData.model,
           purchasePrice: Number(itemFormData.price) || 0,
           currency: itemFormData.currency || "EUR",

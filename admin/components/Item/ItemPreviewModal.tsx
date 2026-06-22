@@ -8,7 +8,6 @@ import {
   DocumentIcon,
   CheckCircleIcon,
   XCircleIcon,
-  PaperClipIcon,
   ArrowDownTrayIcon,
   PlusIcon,
   PencilIcon,
@@ -19,8 +18,6 @@ import ReactSelect from "react-select";
 import CustomModal from "@/components/UI/CustomModal";
 import {
   EntityTagSelector,
-  TagBadge,
-  sortTags,
   type Tag,
 } from "@/components/Tags/TagManager";
 import {
@@ -305,6 +302,7 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
           ean: (previewItem.ean || "").toString(),
           model: previewItem.model,
           extraNote: previewItem.remark,
+          remark: previewItem.remark,
           cat_id: previewItem.category_id ? parseInt(previewItem.category_id) : undefined,
           isActive: previewItem.isActive ? "Y" : "N",
           weight: parseFloat(previewItem.dimensions?.weight) || 0,
