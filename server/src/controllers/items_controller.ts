@@ -173,8 +173,6 @@ export const getItems = async (
     const company = ((req.query.company as string) || "").trim(); // customer_id
     const isLabel = ((req.query.isLabel as string) || "").trim();
     const tagStr = ((req.query.tags as string) || "").trim();
-    // NOTE: audit `filter` param is accepted but not implemented here.
-    // const auditFilter = (req.query.filter as string) || "";
 
     const tagIds = tagStr
       .split(",")
@@ -205,8 +203,6 @@ export const getItems = async (
     }
 
     // Item No / EAN — searches item EAN, parent DE number, AND the warehouse
-    // item_no_de (the value that actually shows in the "Item No" column when a
-    // warehouse record exists). EXISTS keeps the row count / pagination correct.
     if (eanSearch) {
       idQb.andWhere((qb2) => {
         const whSub = qb2
@@ -223,18 +219,16 @@ export const getItems = async (
       idQb.setParameter("ean", `%${eanSearch}%`);
     }
 
-    // Active status (filters on item.isActive — fast, indexed)
+    // Active status
     if (isActive) {
       idQb.andWhere("item.isActive = :isActive", { isActive });
     }
 
-    // Category by name (or supplier category fallback)
+    // Category by name
     if (category) {
       idQb.andWhere(
         "(category.name = :category OR item.supp_cat = :category)",
-        {
-          category,
-        },
+        { category },
       );
     }
 
@@ -256,11 +250,11 @@ export const getItems = async (
     } else if (isLabel === "N") {
       idQb.andWhere(
         "(item.isLabelPrint IS NULL OR item.isLabelPrint IN (:...labelFalse))",
-        { labelFalse: [0, "0", "N", false, ""] },
+        { labelFalse: [0, "0", "N", false] }, // FIX: Removed empty string "" causing conversion errors
       );
     }
 
-    // Tags — include (must have ALL) via one correlated subquery per tag
+    // Tags — include
     incTags.forEach((tid, i) => {
       idQb.andWhere((qb2) => {
         const sub = qb2
@@ -275,7 +269,7 @@ export const getItems = async (
       idQb.setParameter(`incTag${i}`, tid);
     });
 
-    // Tags — exclude (must have NONE)
+    // Tags — exclude
     if (excTags.length) {
       idQb.andWhere((qb2) => {
         const sub = qb2
@@ -468,6 +462,7 @@ export const getItems = async (
     return next(error);
   }
 };
+
 export const getItemById = async (
   req: Request,
   res: Response,
