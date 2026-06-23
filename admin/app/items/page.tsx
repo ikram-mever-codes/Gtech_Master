@@ -76,16 +76,11 @@ import {
   loadingStyles,
   BASE_URL,
 } from "@/utils/constants";
-import CustomModal from "@/components/UI/CustomModal";
 import { TagFilterSelector } from "@/components/Tags/TagFilterSelector";
-import {
-  TagBadge,
-  TagPickerInput,
-  EntityTagSelector,
-  sortTags,
-  type Tag,
-} from "@/components/Tags/TagManager";
-import { syncEntityTags } from "@/api/tags";
+import ItemCreateModal from "@/components/Item/ItemCreateModal";
+import ItemPreviewModal from "@/components/Item/ItemPreviewModal";
+import ParentModal from "@/components/Item/ParentModal";
+import { TagBadge, sortTags, type Tag } from "@/components/Tags/TagManager";
 
 type TabType = "items" | "parents" | "warehouse" | "tarics" | "suppliers";
 
@@ -104,20 +99,16 @@ interface FilterState {
 const PAGE_LIMIT = 30;
 const FETCH_ALL_LIMIT = 100000;
 
-const Field = ({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) => (
-  <div>
-    <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-0.5">
-      {label}
-    </p>
-    <div className="text-sm text-gray-900 break-words">{children}</div>
-  </div>
-);
+const getInputClass = (hasValue: boolean, isEmptySelect: boolean = false) => {
+  return `w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${
+    hasValue
+      ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+      : isEmptySelect
+        ? "text-gray-400 border-gray-300 bg-white"
+        : "text-gray-900 border-gray-300 bg-white"
+  }`;
+};
+
 const ItemsManagementPage: React.FC = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -175,6 +166,8 @@ const ItemsManagementPage: React.FC = () => {
   const [showFilters, setShowFilters] = useState(true);
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [selectedTarics, setSelectedTarics] = useState<Set<string>>(new Set());
+  const [showParentModal, setShowParentModal] = useState(false);
+  const [selectedParentId, setSelectedParentId] = useState<number | null>(null);
 
   const [statistics, setStatistics] = useState<any>({
     totalItems: 0,
@@ -616,509 +609,16 @@ const ItemsManagementPage: React.FC = () => {
     [filteredAll, safePage, activeTab],
   );
 
-  useEffect(() => {
-    setPage(1);
-  }, [filters, taricSearch, activeTab]);
+  const [showItemModal, setShowItemModal] = useState(false);
 
-  const toBool = (v: any) =>
-    v === "Y" || v === "Yes" || v === true || v === 1 || v === "1";
-
-  const transformDetail = (raw: any) => {
-    const activeSupplierId =
-      raw.supplier_id ||
-      raw.supplierItems?.find((si: any) => si.isDefault)?.supplierId ||
-      null;
-    const def = raw.supplierItems?.find(
-      (si: any) =>
-        si.isDefault || Number(si.supplierId) === Number(activeSupplierId),
-    );
-    return {
-      ...raw,
-      id: raw.id,
-      supplier_id: activeSupplierId,
-      customer_id: raw.customer_id ?? raw.customer?.id ?? null,
-      isActive: toBool(raw.isActive),
-      isLabelPrint:
-        raw.isLabelPrint !== undefined ? toBool(raw.isLabelPrint) : false,
-      supplierItems: raw.supplierItems || [],
-      supplierItem:
-        raw.supplierItem ||
-        (def
-          ? {
-              priceRMB: def.priceRMB || "0",
-              isPO: def.isPO || "No",
-              moq: def.moq || "0",
-              interval: def.interval || "0",
-              leadTime: def.leadTime || "",
-              noteCN: def.noteCN || "",
-              url: def.url || "",
-            }
-          : {
-              priceRMB: "0",
-              isPO: "No",
-              moq: "0",
-              interval: "0",
-              leadTime: "",
-              noteCN: "",
-              url: "",
-            }),
-      parent: {
-        ...raw.parent,
-        isActive: toBool(raw.parent?.isActive),
-        isSpecialItem: toBool(raw.parent?.isSpecialItem),
-        isEURSpecial: toBool(raw.parent?.isEURSpecial),
-        isRMBSpecial: toBool(raw.parent?.isRMBSpecial),
-        isDimensionSpecial: toBool(raw.parent?.isDimensionSpecial),
-      },
-      others: {
-        ...raw.others,
-        isQTYdiv: toBool(raw.others?.isQTYdiv),
-        isStock: toBool(raw.others?.isStock),
-        isActive: toBool(raw.others?.isActive),
-        isNew: toBool(raw.others?.isNew),
-        isNPR: toBool(raw.others?.isNPR),
-        isDimensionSpecial: toBool(raw.others?.isDimensionSpecial),
-      },
-      dimensions: raw.dimensions || {},
-      pictures: {
-        shopPicture: raw.pictures?.shopPicture || "",
-        ebayPictures: raw.pictures?.ebayPictures || "",
-        pixPath: raw.pictures?.pixPath || "",
-      },
-      attachments: raw.attachments || [],
-    };
-  };
-
-  const openItemPreview = async (row: any) => {
-    loadReferenceData();
+  const openItemPreview = (row: any) => {
     setPreviewRow(row);
-    setPreviewItem(null);
-    setPreviewQuality([]);
-    setPreviewEdit(false);
     setShowItemPreview(true);
-    setPreviewLoading(true);
-    try {
-      const [detailRes, qualityRes]: any = await Promise.all([
-        getItemById(row.id),
-        getItemQualityCriteria(row.id),
-      ]);
-      setPreviewItem(transformDetail(detailRes?.data || {}));
-      setPreviewQuality(qualityRes?.data || []);
-    } catch (e) {
-      console.error("Failed to load item detail:", e);
-    } finally {
-      setPreviewLoading(false);
-    }
   };
 
   const closePreview = () => {
     setShowItemPreview(false);
     setPreviewRow(null);
-    setPreviewItem(null);
-    setPreviewEdit(false);
-    setShowCustomerDropdown(false);
-    setCustomerSearch("");
-  };
-
-  const patchPreview = (patch: any) =>
-    setPreviewItem((p: any) => ({ ...p, ...patch }));
-  const patchPreviewDim = (key: string, val: any) =>
-    setPreviewItem((p: any) => ({
-      ...p,
-      dimensions: { ...p.dimensions, [key]: val },
-    }));
-  const patchPreviewSupplierItem = (patch: any) =>
-    setPreviewItem((p: any) => ({
-      ...p,
-      supplierItem: { ...p.supplierItem, ...patch },
-    }));
-  // Sync the company search box when entering edit mode.
-  useEffect(() => {
-    if (previewEdit && previewItem) {
-      const cust = allCustomers.find(
-        (c) => String(c.id) === String(previewItem?.customer_id),
-      );
-      setCustomerSearch(
-        cust?.companyName ||
-          (previewItem as any)?.customer_name ||
-          getCompany(previewItem) ||
-          "",
-      );
-    } else {
-      setShowCustomerDropdown(false);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [previewEdit]);
-
-  const previewFilteredCustomers = (() => {
-    const term = customerSearch.trim().toLowerCase();
-    const list = term
-      ? allCustomers.filter((c) =>
-          (c.companyName || "").toLowerCase().includes(term),
-        )
-      : allCustomers;
-    return list.slice(0, 50);
-  })();
-
-  const handleSelectPreviewCustomer = (customer: any) => {
-    patchPreview({ customer_id: customer.id });
-    setCustomerSearch(customer.companyName || "");
-    setShowCustomerDropdown(false);
-  };
-
-  const handleClearPreviewCustomer = () => {
-    patchPreview({ customer_id: null });
-    setCustomerSearch("");
-    setShowCustomerDropdown(false);
-  };
-  const buildItemUpdatePayload = (d: any) => {
-    const toNum = (v: any) => {
-      if (v === null || v === undefined || v === "") return null;
-      const n = parseFloat(v);
-      return isNaN(n) ? null : n;
-    };
-    const toInt = (v: any) => {
-      if (v === null || v === undefined || v === "") return null;
-      const n = parseInt(v);
-      return isNaN(n) ? null : n;
-    };
-    return {
-      item_name: d.name ?? d.item_name,
-      item_name_cn: d.nameCN ?? d.item_name_cn,
-      ean: (d.ean || "").toString(),
-      model: d.model,
-      remark: d.remark,
-      remark_cn: d.remarkCN ?? d.remark_cn,
-      cat_id: toInt(d.category_id),
-      isActive: d.isActive ? "Y" : "N",
-      weight: toNum(d.dimensions?.weight),
-      length: toNum(d.dimensions?.length),
-      width: toNum(d.dimensions?.width),
-      height: toNum(d.dimensions?.height),
-      is_qty_dividable: d.others?.isQTYdiv ? "Y" : "N",
-      is_dimension_special: d.others?.isDimensionSpecial ? "Y" : "N",
-      is_eur_special: d.parent?.isEURSpecial ? "Y" : "N",
-      is_rmb_special: d.parent?.isRMBSpecial ? "Y" : "N",
-      is_new: d.others?.isNew ? "Y" : "N",
-      is_npr: d.others?.isNPR ? "Y" : "N",
-      isLabelPrint: !!d.isLabelPrint,
-      supplier_id: toInt(d.supplier_id),
-      customer_id: d.customer_id ?? null,
-      supplierItems: d.supplierItems,
-      supplierItem: {
-        price_rmb: toNum(d.supplierItem?.priceRMB),
-        is_po: d.supplierItem?.isPO,
-        moq: toInt(d.supplierItem?.moq),
-        oi: toInt(d.supplierItem?.interval),
-        lead_time: d.supplierItem?.leadTime,
-        note_cn: d.supplierItem?.noteCN,
-        url: d.supplierItem?.url,
-      },
-      price: toNum(d.price ?? d.transfer_price),
-      transfer_price_EUR: toNum(d.price ?? d.transfer_price),
-      warehouseItemData: {
-        is_stock_item: d.others?.isStock ? "Y" : "N",
-        is_active: d.others?.isActive ? "Y" : "N",
-        msq: toNum(d.others?.msq),
-        buffer: toInt(d.others?.buffer),
-        item_no_de: d.others?.noDE,
-        item_name_de: d.others?.nameDE,
-      },
-      photo: d.pictures?.shopPicture,
-      pix_path: d.pictures?.pixPath,
-      pix_path_eBay: d.pictures?.ebayPictures,
-    };
-  };
-
-  const handleSavePreview = async () => {
-    if (!previewItem) return;
-    if (!previewItem.supplier_id) {
-      toast.error("Supplier is required", errorStyles);
-      return;
-    }
-    setPreviewSaving(true);
-    try {
-      await updateItem(previewItem.id, buildItemUpdatePayload(previewItem));
-      setPreviewEdit(false);
-      const fresh: any = await getItemById(previewItem.id);
-      setPreviewItem(transformDetail(fresh?.data || {}));
-      reloadItems();
-    } catch (e: any) {
-    } finally {
-      setPreviewSaving(false);
-    }
-  };
-
-  const handleDeletePreviewItem = async () => {
-    if (!previewItem) return;
-    if (!confirm("Are you sure you want to delete this item?")) return;
-    try {
-      await deleteItem(previewItem.id);
-      closePreview();
-      reloadItems();
-    } catch (e: any) {
-      toast.error(e.message || "Failed to delete item", errorStyles);
-    }
-  };
-  const uploadPreviewPictures = async (
-    e: React.ChangeEvent<HTMLInputElement>,
-  ) => {
-    const files = e.target.files;
-    if (!files || files.length === 0 || !previewItem) return;
-    const tid = toast.loading("Uploading pictures...", loadingStyles);
-    setUploadingPictures(true);
-    try {
-      const newUrls: string[] = [];
-      for (let i = 0; i < files.length; i++) {
-        const fd = new FormData();
-        fd.append("file", files[i]);
-        const res: any = await uploadFile(fd, false);
-        if (res.data?.url) newUrls.push(res.data.url);
-      }
-      if (newUrls.length > 0) {
-        const pics = {
-          shopPicture: previewItem.pictures?.shopPicture || "",
-          ebayPictures: previewItem.pictures?.ebayPictures || "",
-          pixPath: previewItem.pictures?.pixPath || "",
-        };
-        const gallery = pics.pixPath
-          ? pics.pixPath.split(",").filter(Boolean)
-          : [];
-        newUrls.forEach((url) => {
-          if (!pics.shopPicture) pics.shopPicture = url;
-          else if (!pics.ebayPictures) pics.ebayPictures = url;
-          else gallery.push(url);
-        });
-        pics.pixPath = gallery.join(",");
-
-        const merged = { ...previewItem, pictures: pics };
-        setPreviewItem(merged);
-        await updateItem(merged.id, buildItemUpdatePayload(merged));
-        const fresh: any = await getItemById(merged.id);
-        setPreviewItem(transformDetail(fresh?.data || {}));
-        toast.success("Pictures uploaded", { id: tid, ...successStyles });
-        reloadItems();
-      } else {
-        toast.dismiss(tid);
-      }
-    } catch (err) {
-      console.error(err);
-      toast.error("Failed to upload pictures", { id: tid, ...errorStyles });
-    } finally {
-      setUploadingPictures(false);
-      if (pictureInputRef.current) pictureInputRef.current.value = "";
-    }
-  };
-  const [qualityModalOpen, setQualityModalOpen] = useState(false);
-  const [editingQuality, setEditingQuality] = useState<any>(null);
-  const [qualityForm, setQualityForm] = useState<any>({
-    name: "",
-    description: "",
-    descriptionCN: "",
-    picture: null as File | null,
-    pictureUrl: "",
-  });
-
-  const openQualityModal = (q: any = null) => {
-    if (q) {
-      setEditingQuality(q);
-      setQualityForm({
-        name: q.name || "",
-        description: q.description || "",
-        descriptionCN: q.descriptionCN || "",
-        picture: null,
-        pictureUrl: q.picture || "",
-      });
-    } else {
-      setEditingQuality(null);
-      setQualityForm({
-        name: "",
-        description: "",
-        descriptionCN: "",
-        picture: null,
-        pictureUrl: "",
-      });
-    }
-    setQualityModalOpen(true);
-  };
-
-  const saveQuality = async () => {
-    if (!previewItem) return;
-    try {
-      let pictureUrl = qualityForm.pictureUrl;
-      if (qualityForm.picture) {
-        const fd = new FormData();
-        fd.append("file", qualityForm.picture);
-        const up = await uploadFile(fd);
-        pictureUrl = up.data.url;
-      }
-      const payload = {
-        name: qualityForm.name,
-        description: qualityForm.description,
-        description_cn: qualityForm.descriptionCN,
-        picture: pictureUrl,
-      };
-      if (editingQuality)
-        await updateQualityCriterion(editingQuality.id, payload);
-      else await createQualityCriterion(previewItem.id, payload);
-      const fresh = await getItemQualityCriteria(previewItem.id);
-      setPreviewQuality(fresh.data || []);
-      setQualityModalOpen(false);
-      toast.success("Quality criterion saved", successStyles);
-    } catch (e) {
-      console.error(e);
-      toast.error("Failed to save quality criterion", errorStyles);
-    }
-  };
-
-  const removeQuality = async (qid: number) => {
-    if (!confirm("Delete this quality criterion?")) return;
-    try {
-      await deleteQualityCriterion(qid);
-      setPreviewQuality((prev) => prev.filter((q) => q.id !== qid));
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const attachmentInputRef = useRef<HTMLInputElement>(null);
-  const [uploadingAttachments, setUploadingAttachments] = useState(false);
-
-  const uploadPreviewAttachments = async (
-    e: React.ChangeEvent<HTMLInputElement>,
-  ) => {
-    const files = e.target.files;
-    if (!files || files.length === 0 || !previewItem) return;
-    const tid = toast.loading("Uploading attachments...", loadingStyles);
-    setUploadingAttachments(true);
-    try {
-      for (let i = 0; i < files.length; i++) {
-        const fd = new FormData();
-        fd.append("file", files[i]);
-        fd.append("itemId", String(previewItem.id));
-        fd.append("isPublic", "true");
-        await uploadFile(fd, false);
-      }
-      const fresh: any = await getItemById(previewItem.id);
-      setPreviewItem(transformDetail(fresh?.data || {}));
-      toast.success("Attachments uploaded", { id: tid, ...successStyles });
-    } catch (e) {
-      console.error(e);
-      toast.error("Failed to upload attachments", { id: tid, ...errorStyles });
-    } finally {
-      setUploadingAttachments(false);
-      if (attachmentInputRef.current) attachmentInputRef.current.value = "";
-    }
-  };
-
-  const deletePreviewAttachment = async (fileId: string) => {
-    if (!confirm("Delete this attachment?")) return;
-    try {
-      await deleteFile(fileId);
-      setPreviewItem((p: any) => ({
-        ...p,
-        attachments: (p.attachments || []).filter((a: any) => a.id !== fileId),
-      }));
-      toast.success("Attachment deleted", successStyles);
-    } catch (e) {
-      toast.error("Failed to delete attachment", errorStyles);
-    }
-  };
-
-  const [showItemModal, setShowItemModal] = useState(false);
-  const [newItemTags, setNewItemTags] = useState<Tag[]>([]);
-  const [itemFormData, setItemFormData] = useState<any>({
-    item_name: "",
-    item_name_cn: "",
-    ean: "",
-    parent_id: 0,
-    taric_id: 0,
-    cat_id: 0,
-    supplier_id: 0,
-    weight: 0,
-    length: 0,
-    width: 0,
-    height: 0,
-    remark: "",
-    model: "",
-    price: 0,
-    currency: "CNY",
-    isActive: true,
-    is_eur_special: false,
-    is_rmb_special: false,
-    item_no_de: "",
-    item_name_de: "",
-  });
-
-  const openCreateItemModal = () => {
-    loadReferenceData();
-    setItemFormData({
-      item_name: "",
-      item_name_cn: "",
-      ean: "",
-      parent_id: 0,
-      taric_id: 0,
-      cat_id: 0,
-      supplier_id: 0,
-      weight: 0,
-      length: 0,
-      width: 0,
-      height: 0,
-      remark: "",
-      model: "",
-      price: 0,
-      currency: "CNY",
-      isActive: true,
-      is_eur_special: false,
-      is_rmb_special: false,
-      item_no_de: "",
-      item_name_de: "",
-    });
-    setNewItemTags([]);
-    setShowItemModal(true);
-  };
-
-  const handleCreateItemSubmit = async () => {
-    if (!itemFormData.item_name?.trim())
-      return toast.error("Item name is required");
-    if (!itemFormData.parent_id) return toast.error("Parent is required");
-    if (!itemFormData.supplier_id) return toast.error("Supplier is required");
-    try {
-      const result = await createItem({
-        item_name: itemFormData.item_name,
-        item_name_cn: itemFormData.item_name_cn,
-        ean: itemFormData.ean,
-        parent_id: itemFormData.parent_id,
-        taric_id: itemFormData.taric_id || undefined,
-        cat_id: itemFormData.cat_id || undefined,
-        supplier_id: itemFormData.supplier_id || undefined,
-        weight: itemFormData.weight || undefined,
-        length: itemFormData.length || undefined,
-        width: itemFormData.width || undefined,
-        height: itemFormData.height || undefined,
-        remark: itemFormData.remark,
-        model: itemFormData.model,
-        price: Number(itemFormData.price) || 0,
-        currency: itemFormData.currency || "CNY",
-        isActive: itemFormData.isActive ? "Y" : "N",
-        item_no_de: itemFormData.item_no_de || undefined,
-        item_name_de: itemFormData.item_name_de || undefined,
-        is_eur_special: itemFormData.is_eur_special ? "Y" : "N",
-        is_rmb_special: itemFormData.is_rmb_special ? "Y" : "N",
-      });
-      const createdId =
-        (result as any)?.data?.id || (result as any)?.data?.data?.id;
-      if (createdId && newItemTags.length > 0)
-        await syncEntityTags(
-          createdId,
-          "item",
-          newItemTags.map((t) => t.id),
-        );
-      setShowItemModal(false);
-      reloadItems();
-    } catch (e: any) {
-      toast.error(e.message || "Failed to create item", errorStyles);
-    }
   };
 
   const [showTaricModal, setShowTaricModal] = useState(false);
@@ -1356,9 +856,6 @@ const ItemsManagementPage: React.FC = () => {
             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
               Created
             </th>
-            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-              Actions
-            </th>
           </>
         );
       case "warehouse":
@@ -1414,9 +911,6 @@ const ItemsManagementPage: React.FC = () => {
             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
               Created
             </th>
-            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-              Actions
-            </th>
           </>
         );
       case "suppliers":
@@ -1433,9 +927,6 @@ const ItemsManagementPage: React.FC = () => {
             </th>
             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
               Tags
-            </th>
-            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-              Actions
             </th>
           </>
         );
@@ -1540,8 +1031,15 @@ const ItemsManagementPage: React.FC = () => {
 
       case "parents":
         return pageData.map((parent: any) => (
-          <tr key={parent.id} className="hover:bg-gray-50 transition-colors">
-            <td className="p-4">
+          <tr
+            key={parent.id}
+            className="hover:bg-gray-50 transition-colors cursor-pointer"
+            onClick={() => {
+              setSelectedParentId(parent.id);
+              setShowParentModal(true);
+            }}
+          >
+            <td className="p-4" onClick={(e) => e.stopPropagation()}>
               <input
                 type="checkbox"
                 checked={selectedItems.has(parent.id.toString())}
@@ -1583,31 +1081,6 @@ const ItemsManagementPage: React.FC = () => {
             <td className="px-4 py-3">
               <div className="text-sm text-gray-600">
                 {formatDate(parent.created_at || parent.updated_at)}
-              </div>
-            </td>
-            <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => router.push(`/parents/${parent.id}`)}
-                  className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg"
-                  title="View"
-                >
-                  <EyeIcon className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => router.push(`/parents/${parent.id}/edit`)}
-                  className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg"
-                  title="Edit"
-                >
-                  <EditIcon className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => handleDeleteParent(parent.id)}
-                  className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg"
-                  title="Delete"
-                >
-                  <Delete className="w-4 h-4" />
-                </button>
               </div>
             </td>
           </tr>
@@ -1684,8 +1157,12 @@ const ItemsManagementPage: React.FC = () => {
 
       case "tarics":
         return pageData.map((taric: any) => (
-          <tr key={taric.id} className="hover:bg-gray-50 transition-colors">
-            <td className="p-4">
+          <tr
+            key={taric.id}
+            className="hover:bg-gray-50 transition-colors cursor-pointer"
+            onClick={() => openEditTaric(taric)}
+          >
+            <td className="p-4" onClick={(e) => e.stopPropagation()}>
               <input
                 type="checkbox"
                 checked={selectedTarics.has(taric.id.toString())}
@@ -1728,31 +1205,6 @@ const ItemsManagementPage: React.FC = () => {
                 {formatDate(taric.created_at || taric.updated_at)}
               </div>
             </td>
-            <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => router.push(`/tarics/${taric.id}`)}
-                  className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg"
-                  title="View"
-                >
-                  <EyeIconOutline className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => openEditTaric(taric)}
-                  className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg"
-                  title="Edit"
-                >
-                  <PencilIcon className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => removeTaric(taric.id)}
-                  className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg"
-                  title="Delete"
-                >
-                  <TrashIcon className="w-4 h-4" />
-                </button>
-              </div>
-            </td>
           </tr>
         ));
 
@@ -1761,15 +1213,14 @@ const ItemsManagementPage: React.FC = () => {
           <tr
             key={s.id}
             className="hover:bg-gray-50 cursor-pointer transition-colors"
-            onClick={() => router.push("/suppliers")}
+            onClick={() => router.push(`/suppliers?supplierId=${s.id}`)}
           >
-            <td className="p-4">
+            <td className="p-4" onClick={(e) => e.stopPropagation()}>
               <input
                 type="checkbox"
                 checked={selectedItems.has(s.id.toString())}
                 onChange={() => toggleSelect(s.id.toString())}
                 className="w-4 h-4 text-primary focus:ring-primary border-gray-300 rounded"
-                onClick={(e) => e.stopPropagation()}
               />
             </td>
             <td className="px-4 py-3 font-medium">{s.name || `ID: ${s.id}`}</td>
@@ -1785,35 +1236,12 @@ const ItemsManagementPage: React.FC = () => {
                 )}
               </div>
             </td>
-            <td className="px-4 py-3 text-right">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  router.push("/suppliers");
-                }}
-                className="text-primary hover:underline"
-              >
-                Manage
-              </button>
-            </td>
           </tr>
         ));
       default:
         return null;
     }
   };
-
-  const inputCls =
-    "w-full px-2.5 py-1.5 text-sm border border-gray-300/80 bg-white/70 rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all";
-
-  const previewCompanyOrCat =
-    getCompany(previewRow) || previewRow?.category || "—";
-  const previewItemNo =
-    previewItem?.others?.noDE ||
-    previewRow?.de_no ||
-    previewRow?.warehouse_data?.item_no_de ||
-    "-";
-
   return (
     <div className="w-full mx-auto">
       <div
@@ -1825,7 +1253,30 @@ const ItemsManagementPage: React.FC = () => {
       >
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
           <div>
-            <PageHeader title="Items" icon={Package} />
+            <PageHeader
+              title={
+                activeTab === "items"
+                  ? "Items"
+                  : activeTab === "parents"
+                    ? "Parents"
+                    : activeTab === "tarics"
+                      ? "TARICs"
+                      : activeTab === "suppliers"
+                        ? "Suppliers"
+                        : "Warehouse"
+              }
+              icon={
+                activeTab === "items"
+                  ? Package
+                  : activeTab === "parents"
+                    ? BuildingOfficeIcon
+                    : activeTab === "tarics"
+                      ? DocumentTextIcon
+                      : activeTab === "suppliers"
+                        ? TruckIcon
+                        : ArchiveBoxIcon
+              }
+            />
             {activeTab === "items" && pendingSyncCount > 0 && (
               <div className="mt-2 text-sm text-yellow-600 flex items-center gap-2">
                 <Sync className="w-4 h-4" />
@@ -1911,12 +1362,25 @@ const ItemsManagementPage: React.FC = () => {
               ))}
             {activeTab === "items" && (
               <CustomButton
-                onClick={openCreateItemModal}
+                onClick={() => setShowItemModal(true)}
                 gradient={true}
                 size="small"
                 startIcon={<PlusIcon className="w-5 h-5" />}
               >
                 New Item
+              </CustomButton>
+            )}
+            {activeTab === "parents" && (
+              <CustomButton
+                onClick={() => {
+                  setSelectedParentId(null);
+                  setShowParentModal(true);
+                }}
+                gradient={true}
+                size="small"
+                startIcon={<PlusIcon className="w-5 h-5" />}
+              >
+                Add Parent
               </CustomButton>
             )}
             {activeTab === "tarics" && (
@@ -2155,29 +1619,75 @@ const ItemsManagementPage: React.FC = () => {
                 </button>
               </div>
             </div>
-          ) : activeTab === "tarics" ? (
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="md:col-span-3">
-                <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">
-                  Search
-                </label>
+          ) : activeTab === "parents" ? (
+            <div className="flex flex-wrap lg:flex-nowrap items-center gap-2 w-full">
+              <div className="flex items-center gap-1.5 text-gray-400 shrink-0 select-none px-1">
+                <FunnelIcon className="w-5 h-5 text-primary" />
+              </div>
+              <div className="w-64 shrink-0">
                 <input
                   type="text"
-                  placeholder="Search code or name..."
-                  value={taricSearch}
-                  onChange={(e) => setTaricSearch(e.target.value)}
-                  className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                  placeholder="Search Parents..."
+                  value={filters.search}
+                  onChange={(e) =>
+                    setFilters({ ...filters, search: e.target.value })
+                  }
+                  className={getInputClass(!!filters.search)}
                 />
               </div>
-              <div className="flex items-end justify-end">
-                <button
-                  onClick={() => setTaricSearch("")}
-                  className="px-4 py-2 text-xs font-semibold text-rose-600 hover:text-rose-800 flex items-center gap-1.5 border border-rose-200 rounded-lg bg-rose-50/50 hover:bg-rose-50"
-                >
-                  <ArrowPathIcon className="w-3.5 h-3.5" />
-                  Reset
-                </button>
+              <button
+                onClick={resetFilters}
+                className="px-3 py-2 text-sm font-semibold text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 rounded-md transition-colors flex items-center gap-1 whitespace-nowrap shrink-0"
+              >
+                <ArrowPathIcon className="w-4 h-4" />
+                Reset
+              </button>
+            </div>
+          ) : activeTab === "tarics" ? (
+            <div className="flex flex-wrap lg:flex-nowrap items-center gap-2 w-full">
+              <div className="flex items-center gap-1.5 text-gray-400 shrink-0 select-none px-1">
+                <FunnelIcon className="w-5 h-5 text-primary" />
               </div>
+              <div className="w-64 shrink-0">
+                <input
+                  type="text"
+                  placeholder="Search TARICs..."
+                  value={taricSearch}
+                  onChange={(e) => setTaricSearch(e.target.value)}
+                  className={getInputClass(!!taricSearch)}
+                />
+              </div>
+              <button
+                onClick={() => setTaricSearch("")}
+                className="px-3 py-2 text-sm font-semibold text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 rounded-md transition-colors flex items-center gap-1 whitespace-nowrap shrink-0"
+              >
+                <ArrowPathIcon className="w-4 h-4" />
+                Reset
+              </button>
+            </div>
+          ) : activeTab === "suppliers" ? (
+            <div className="flex flex-wrap lg:flex-nowrap items-center gap-2 w-full">
+              <div className="flex items-center gap-1.5 text-gray-400 shrink-0 select-none px-1">
+                <FunnelIcon className="w-5 h-5 text-primary" />
+              </div>
+              <div className="w-64 shrink-0">
+                <input
+                  type="text"
+                  placeholder="Search Suppliers..."
+                  value={filters.search}
+                  onChange={(e) =>
+                    setFilters({ ...filters, search: e.target.value })
+                  }
+                  className={getInputClass(!!filters.search)}
+                />
+              </div>
+              <button
+                onClick={resetFilters}
+                className="px-3 py-2 text-sm font-semibold text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 rounded-md transition-colors flex items-center gap-1 whitespace-nowrap shrink-0"
+              >
+                <ArrowPathIcon className="w-4 h-4" />
+                Reset
+              </button>
             </div>
           ) : (
             <div className="flex items-end justify-end">
@@ -2192,30 +1702,6 @@ const ItemsManagementPage: React.FC = () => {
           )}
         </div>
 
-        {activeTab !== "tarics" && activeTab !== "items" && (
-          <div className="mb-6">
-            <div className="relative">
-              <MagnifyingGlassIcon className="w-6 h-6 absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input
-                type="text"
-                placeholder={`Search ${activeTab}... (EAN, name, DE number, etc.)`}
-                value={filters.search}
-                onChange={(e) =>
-                  setFilters({ ...filters, search: e.target.value })
-                }
-                className="w-full pr-4 py-3.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary text-gray-700 placeholder-gray-400 pl-12"
-              />
-              {filters.search && (
-                <button
-                  onClick={() => setFilters({ ...filters, search: "" })}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                >
-                  <XMarkIcon className="w-5 h-5" />
-                </button>
-              )}
-            </div>
-          </div>
-        )}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
           {loading ? (
             <div className="p-20 flex justify-center items-center">
@@ -2303,846 +1789,14 @@ const ItemsManagementPage: React.FC = () => {
           )}
         </div>
       </div>
-      {showItemPreview && previewRow && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6">
-              <div className="flex items-start justify-between mb-4 gap-3">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-12 h-12 rounded-lg overflow-hidden bg-gray-100 border border-gray-200 flex items-center justify-center flex-shrink-0">
-                    {getThumb(previewItem || previewRow) ? (
-                      <img
-                        src={getThumb(previewItem || previewRow)!}
-                        alt="thumb"
-                        className="w-full h-full object-cover"
-                        onError={(e) =>
-                          ((e.target as HTMLImageElement).style.display =
-                            "none")
-                        }
-                      />
-                    ) : (
-                      <Package className="w-5 h-5 text-gray-300" />
-                    )}
-                  </div>
-                  <div className="min-w-0">
-                    <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2 truncate">
-                      {previewRow.item_name || "Item"}
-                    </h2>
-                    <p className="text-xs text-gray-500 truncate">
-                      {previewCompanyOrCat} · ItemNo {previewItemNo} · ID{" "}
-                      {previewRow.id}
-                    </p>
-                  </div>
-                </div>
-                <button
-                  onClick={closePreview}
-                  className="text-gray-400 hover:text-gray-600 mt-1"
-                >
-                  <XMarkIcon className="h-5 w-5" />
-                </button>
-              </div>
-              <div className="mb-4 flex items-center justify-between bg-gray-50 rounded-lg p-3">
-                <span className="text-sm font-medium text-gray-700">
-                  Edit Mode
-                </span>
-                <div className="flex items-center">
-                  <span className="text-xs text-gray-500 mr-2">
-                    {previewEdit ? "Enabled" : "Disabled"}
-                  </span>
-                  <button
-                    type="button"
-                    disabled={previewLoading}
-                    className={`${previewEdit ? "bg-gray-600" : "bg-gray-200"} relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 disabled:opacity-50`}
-                    onClick={() => setPreviewEdit(!previewEdit)}
-                  >
-                    <span
-                      className={`${previewEdit ? "translate-x-4" : "translate-x-0"} pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition`}
-                    />
-                  </button>
-                </div>
-              </div>
-              <div className="mb-5">
-                <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
-                  Tags
-                </p>
-                {previewEdit ? (
-                  <EntityTagSelector
-                    entityId={previewRow.id}
-                    entityType="item"
-                    initialTags={(previewItem || previewRow)?.tags || []}
-                    tagOrder={(previewItem || previewRow)?.tagOrder}
-                    onTagsUpdated={(newTags: any[]) =>
-                      setPreviewItem((p: any) =>
-                        p
-                          ? {
-                              ...p,
-                              tags: newTags,
-                              tagOrder: newTags.map((t) => t.id).join(","),
-                            }
-                          : p,
-                      )
-                    }
-                  />
-                ) : (
-                  <div className="flex flex-wrap gap-1">
-                    {sortTags(
-                      (previewItem || previewRow)?.tags || [],
-                      (previewItem || previewRow)?.tagOrder,
-                    ).map((tag: Tag) => (
-                      <TagBadge key={tag.id} tag={tag} size="sm" />
-                    ))}
-                    {(!(previewItem || previewRow)?.tags ||
-                      (previewItem || previewRow)?.tags.length === 0) && (
-                      <span className="text-sm text-gray-400">—</span>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-4">
-                <Field label="Item No">{previewItemNo}</Field>
-                <Field label="Company">
-                  {previewEdit && previewItem ? (
-                    <div className="relative z-30">
-                      <div className="relative">
-                        <MagnifyingGlassIcon className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400 pointer-events-none" />
-                        <input
-                          type="text"
-                          placeholder="Search customer..."
-                          value={customerSearch}
-                          onChange={(e) => {
-                            setCustomerSearch(e.target.value);
-                            setShowCustomerDropdown(true);
-                          }}
-                          onFocus={() => setShowCustomerDropdown(true)}
-                          className="w-full pl-7 pr-7 py-1.5 text-sm border border-gray-300/80 bg-white/70 rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all"
-                        />
-                        {(customerSearch || previewItem.customer_id) && (
-                          <button
-                            type="button"
-                            onClick={handleClearPreviewCustomer}
-                            className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500 z-10"
-                            title="Clear customer"
-                          >
-                            <XCircleIcon className="h-4 w-4" />
-                          </button>
-                        )}
-                      </div>
-
-                      {showCustomerDropdown && (
-                        <>
-                          {/* Backdrop overlay shifted to z-10 so it sits behind the input container but above the rest of the page */}
-                          <div
-                            className="fixed inset-0 z-10 cursor-default"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setShowCustomerDropdown(false);
-                            }}
-                          />
-
-                          {/* Dropdown container given z-20 so it remains interactive and floats above the backdrop */}
-                          <div className="absolute z-20 mt-1 w-full max-h-56 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg">
-                            {previewFilteredCustomers.length > 0 ? (
-                              previewFilteredCustomers.map((customer: any) => {
-                                const isSelected =
-                                  String(customer.id) ===
-                                  String(previewItem.customer_id);
-                                return (
-                                  <div
-                                    key={customer.id}
-                                    onClick={(e) => {
-                                      e.stopPropagation(); // Prevents backdrop click interference
-                                      handleSelectPreviewCustomer(customer);
-                                    }}
-                                    className={`px-3 py-2 text-sm cursor-pointer flex items-center justify-between ${
-                                      isSelected
-                                        ? "bg-[#8CC21B]/10 text-[#5f8512] font-semibold"
-                                        : "hover:bg-gray-50 text-gray-700"
-                                    }`}
-                                  >
-                                    <span className="font-medium line-clamp-1 pr-2">
-                                      {customer.companyName ||
-                                        "Unnamed Customer"}
-                                    </span>
-                                    {isSelected && (
-                                      <CheckCircleIcon className="h-4 w-4 text-[#8CC21B] shrink-0" />
-                                    )}
-                                  </div>
-                                );
-                              })
-                            ) : (
-                              <div className="px-3 py-3 text-center text-xs text-gray-400">
-                                {allCustomers.length === 0
-                                  ? "Loading customers…"
-                                  : "No customers found."}
-                              </div>
-                            )}
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  ) : (
-                    getCompany(previewItem) || getCompany(previewRow) || "—"
-                  )}
-                </Field>
-                <Field label="IsLabel">
-                  {previewEdit && previewItem ? (
-                    <select
-                      className={inputCls}
-                      value={previewItem.isLabelPrint ? "Y" : "N"}
-                      onChange={(e) =>
-                        patchPreview({ isLabelPrint: e.target.value === "Y" })
-                      }
-                    >
-                      <option value="Y">Yes</option>
-                      <option value="N">No</option>
-                    </select>
-                  ) : (
-                    <span
-                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${(previewItem?.isLabelPrint ?? previewRow.isLabelPrint) ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}`}
-                    >
-                      {(previewItem?.isLabelPrint ?? previewRow.isLabelPrint)
-                        ? "Yes"
-                        : "No"}
-                    </span>
-                  )}
-                </Field>
-                <Field label="CAT">
-                  {previewEdit && previewItem ? (
-                    <select
-                      className={inputCls}
-                      value={previewItem.category_id?.toString() ?? ""}
-                      onChange={(e) =>
-                        patchPreview({
-                          category_id: e.target.value
-                            ? parseInt(e.target.value)
-                            : null,
-                        })
-                      }
-                    >
-                      <option value="">—</option>
-                      {categories.map((c) => (
-                        <option key={c.id} value={c.id.toString()}>
-                          {c.name}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    previewRow.category || previewItem?.category || "—"
-                  )}
-                </Field>
-                <Field label="EAN">
-                  {previewItem?.ean || previewRow.ean || "—"}
-                </Field>
-                <Field label="ID (system)">{previewRow.id}</Field>
-              </div>
-              <div className="mt-5 grid grid-cols-1 md:grid-cols-3 gap-x-4 gap-y-4">
-                <Field label="Item Name">
-                  {previewEdit && previewItem ? (
-                    <textarea
-                      rows={5}
-                      className={inputCls}
-                      value={previewItem.name ?? previewItem.item_name ?? ""}
-                      onChange={(e) =>
-                        patchPreview({
-                          name: e.target.value,
-                          item_name: e.target.value,
-                        })
-                      }
-                    />
-                  ) : (
-                    previewRow.item_name || "—"
-                  )}
-                </Field>
-                <Field label="Item Name DE">
-                  {previewEdit && previewItem ? (
-                    <textarea
-                      rows={5}
-                      className={inputCls}
-                      value={previewItem.others?.nameDE ?? ""}
-                      onChange={(e) =>
-                        setPreviewItem((p: any) => ({
-                          ...p,
-                          others: { ...p.others, nameDE: e.target.value },
-                        }))
-                      }
-                    />
-                  ) : (
-                    previewItem?.others?.nameDE ||
-                    previewRow.item_name_de ||
-                    previewRow.name_de ||
-                    "—"
-                  )}
-                </Field>
-                <Field label="Item Name CN">
-                  {previewEdit && previewItem ? (
-                    <textarea
-                      rows={5}
-                      className={inputCls}
-                      value={
-                        previewItem.nameCN ?? previewItem.item_name_cn ?? ""
-                      }
-                      onChange={(e) =>
-                        patchPreview({
-                          nameCN: e.target.value,
-                          item_name_cn: e.target.value,
-                        })
-                      }
-                    />
-                  ) : (
-                    previewItem?.nameCN || previewRow.item_name_cn || "—"
-                  )}
-                </Field>
-              </div>
-              <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
-                <Field label="Remark (EN/DE)">
-                  {previewEdit && previewItem ? (
-                    <textarea
-                      rows={2}
-                      className={inputCls}
-                      value={previewItem.remark ?? ""}
-                      onChange={(e) => patchPreview({ remark: e.target.value })}
-                    />
-                  ) : (
-                    previewItem?.remark || previewRow.remark || "—"
-                  )}
-                </Field>
-                <Field label="Remark CN">
-                  {previewItem?.remarkCN ||
-                    previewItem?.remark_cn ||
-                    previewRow.remark_cn ||
-                    "—"}
-                </Field>
-              </div>
-              <div className="mt-5 grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-4">
-                {(["length", "width", "height", "weight"] as const).map(
-                  (dim) => (
-                    <Field
-                      key={dim}
-                      label={dim[0].toUpperCase() + dim.slice(1)}
-                    >
-                      {previewEdit && previewItem ? (
-                        <input
-                          type="number"
-                          step="0.01"
-                          className={inputCls}
-                          value={previewItem.dimensions?.[dim] ?? ""}
-                          onChange={(e) => patchPreviewDim(dim, e.target.value)}
-                        />
-                      ) : (
-                        (previewItem?.dimensions?.[dim] ??
-                        previewRow[dim] ??
-                        "—")
-                      )}
-                    </Field>
-                  ),
-                )}
-              </div>
-              <div className="mt-5 grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-4">
-                <Field label="Default Supplier">
-                  {previewEdit && previewItem ? (
-                    <select
-                      className={inputCls}
-                      value={previewItem.supplier_id?.toString() ?? ""}
-                      onChange={(e) => {
-                        const sid = parseInt(e.target.value);
-                        const sDetail = refSuppliers.find(
-                          (s: any) => s.id === sid,
-                        );
-                        const sName = sDetail
-                          ? !hasChinese(sDetail.name || "")
-                            ? sDetail.name
-                            : (sDetail as any).company_name || "Unknown"
-                          : "Unknown";
-                        setPreviewItem((p: any) => {
-                          let items = (p.supplierItems || []).map(
-                            (si: any) => ({
-                              ...si,
-                              isDefault: Number(si.supplierId) === sid,
-                            }),
-                          );
-                          if (
-                            !items.some(
-                              (si: any) => Number(si.supplierId) === sid,
-                            )
-                          ) {
-                            items = [
-                              ...items.map((si: any) => ({
-                                ...si,
-                                isDefault: false,
-                              })),
-                              {
-                                id: -Date.now(),
-                                supplierId: sid,
-                                supplierName: sName,
-                                priceRMB: "0",
-                                isPO: "No",
-                                moq: "0",
-                                interval: "0",
-                                leadTime: "",
-                                noteCN: "",
-                                url: "",
-                                isDefault: true,
-                              },
-                            ];
-                          }
-                          const def = items.find((si: any) => si.isDefault);
-                          return {
-                            ...p,
-                            supplier_id: sid,
-                            supplierItems: items,
-                            supplierItem: {
-                              priceRMB: def?.priceRMB || "0",
-                              isPO: def?.isPO || "No",
-                              moq: def?.moq || "0",
-                              interval: def?.interval || "0",
-                              leadTime: def?.leadTime || "",
-                              noteCN: def?.noteCN || "",
-                              url: def?.url || "",
-                            },
-                          };
-                        });
-                      }}
-                    >
-                      <option value="">Select a Supplier</option>
-                      {refSuppliers.map((s: any) => (
-                        <option
-                          key={s.id}
-                          value={s.id.toString()}
-                        >{`[ID: ${s.id}] ${!hasChinese(s.name) ? s.name : s.company_name || ""}`}</option>
-                      ))}
-                    </select>
-                  ) : (
-                    (() => {
-                      const sid =
-                        previewItem?.supplier_id || previewRow.supplier_id;
-                      const matched = refSuppliers.find(
-                        (s: any) => s.id === sid,
-                      );
-                      const name = matched
-                        ? !hasChinese(matched.name || "")
-                          ? matched.name
-                          : (matched as any).company_name
-                        : previewRow.supplier_name;
-                      return sid ? `[ID: ${sid}] ${name || ""}` : "—";
-                    })()
-                  )}
-                </Field>
-                <Field label="Price (RMB) ¥">
-                  {previewEdit && previewItem ? (
-                    <input
-                      type="number"
-                      step="0.01"
-                      className={inputCls}
-                      value={previewItem.supplierItem?.priceRMB ?? ""}
-                      onChange={(e) =>
-                        patchPreviewSupplierItem({ priceRMB: e.target.value })
-                      }
-                    />
-                  ) : (
-                    (previewItem?.supplierItem?.priceRMB ??
-                    previewRow.rmb_price ??
-                    "—")
-                  )}
-                </Field>
-                <Field label="Transfer Price (EUR)">
-                  {previewEdit && previewItem ? (
-                    <input
-                      type="number"
-                      step="0.01"
-                      className={inputCls}
-                      value={
-                        previewItem.price ?? previewItem.transfer_price ?? ""
-                      }
-                      onChange={(e) => patchPreview({ price: e.target.value })}
-                    />
-                  ) : (
-                    (previewItem?.price ??
-                    previewItem?.transfer_price ??
-                    previewRow.transfer_price_EUR ??
-                    "—")
-                  )}
-                </Field>
-                <Field label="Status">
-                  {previewEdit && previewItem ? (
-                    <select
-                      className={inputCls}
-                      value={previewItem.isActive ? "Y" : "N"}
-                      onChange={(e) =>
-                        patchPreview({ isActive: e.target.value === "Y" })
-                      }
-                    >
-                      <option value="Y">Active</option>
-                      <option value="N">Inactive</option>
-                    </select>
-                  ) : (
-                    <span
-                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusBadgeColor(previewRow.is_active)}`}
-                    >
-                      {(previewItem?.isActive ?? previewRow.is_active === "Y")
-                        ? "Active"
-                        : "Inactive"}
-                    </span>
-                  )}
-                </Field>
-              </div>
-              <div className="mt-5">
-                <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
-                  Sales Price per Qty (Bulk Prices)
-                </p>
-                {(() => {
-                  const bulk =
-                    previewItem?.bulkPrices ||
-                    previewItem?.salesPrices ||
-                    previewItem?.quantityPrices ||
-                    [];
-                  if (!bulk || bulk.length === 0)
-                    return <p className="text-sm text-gray-400">—</p>;
-                  return (
-                    <div className="flex flex-wrap gap-2">
-                      {bulk.map((bp: any, i: number) => (
-                        <span
-                          key={i}
-                          className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded-md"
-                        >
-                          {bp.qty ?? bp.quantity ?? bp.minQty}+ :{" "}
-                          {bp.price ?? bp.value}
-                        </span>
-                      ))}
-                    </div>
-                  );
-                })()}
-              </div>
-              <div className="mt-6 pt-5 border-t border-gray-200">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-bold text-gray-900">
-                    Quality Criteria ({previewQuality.length})
-                  </h3>
-                  <button
-                    onClick={() => openQualityModal()}
-                    className="px-2.5 py-1 text-xs bg-[#8CC21B] text-white rounded-md hover:bg-[#7ab318] flex items-center gap-1"
-                  >
-                    <PlusIcon className="w-3.5 h-3.5" />
-                    Add
-                  </button>
-                </div>
-                {previewLoading ? (
-                  <p className="text-xs text-gray-400">Loading…</p>
-                ) : previewQuality.length === 0 ? (
-                  <p className="text-xs text-gray-400">
-                    No quality criteria for this item.
-                  </p>
-                ) : (
-                  <div className="space-y-2">
-                    {previewQuality.map((q: any) => (
-                      <div
-                        key={q.id}
-                        className="flex items-center justify-between bg-gray-50 border border-gray-100 rounded-lg px-3 py-2"
-                      >
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium text-gray-900 truncate">
-                            {q.name}
-                          </p>
-                          <p className="text-xs text-gray-500 truncate">
-                            {q.description}
-                            {q.descriptionCN ? ` · ${q.descriptionCN}` : ""}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          {q.picture && (
-                            <button
-                              onClick={() =>
-                                window.open(
-                                  resolveUrl(q.picture)!.replace(
-                                    "/upload/fl_attachment/",
-                                    "/upload/",
-                                  ),
-                                  "_blank",
-                                )
-                              }
-                              className="text-blue-600 hover:text-blue-800"
-                              title="View"
-                            >
-                              <EyeIconOutline className="w-4 h-4" />
-                            </button>
-                          )}
-                          <button
-                            onClick={() => openQualityModal(q)}
-                            className="text-emerald-600 hover:text-emerald-800"
-                            title="Edit"
-                          >
-                            <PencilIcon className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => removeQuality(q.id)}
-                            className="text-rose-600 hover:text-rose-800"
-                            title="Delete"
-                          >
-                            <TrashIcon className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <div className="mt-6 pt-5 border-t border-gray-200">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-bold text-gray-900">
-                    Attachments ({previewItem?.attachments?.length || 0})
-                  </h3>
-                  <button
-                    onClick={() => attachmentInputRef.current?.click()}
-                    disabled={uploadingAttachments || !previewItem}
-                    className="px-2.5 py-1 text-xs bg-[#8CC21B] text-white rounded-md hover:bg-[#7ab318] flex items-center gap-1 disabled:opacity-50"
-                  >
-                    <DocumentIcon className="w-3.5 h-3.5" />
-                    {uploadingAttachments ? "Uploading..." : "Upload"}
-                  </button>
-                  <input
-                    ref={attachmentInputRef}
-                    type="file"
-                    multiple
-                    className="hidden"
-                    onChange={uploadPreviewAttachments}
-                  />
-                </div>
-                {previewLoading ? (
-                  <p className="text-xs text-gray-400">Loading…</p>
-                ) : !previewItem?.attachments ||
-                  previewItem.attachments.length === 0 ? (
-                  <p className="text-xs text-gray-400">
-                    No attachments for this item.
-                  </p>
-                ) : (
-                  <div className="space-y-2">
-                    {previewItem.attachments.map((att: any, i: number) => {
-                      const url = resolveUrl(att.url) || "";
-                      return (
-                        <div
-                          key={att.id || i}
-                          className="flex items-center justify-between bg-gray-50 border border-gray-100 rounded-lg px-3 py-2"
-                        >
-                          <span
-                            className="text-sm text-gray-900 break-all min-w-0 pr-3"
-                            title={att.originalName || att.filename}
-                          >
-                            {att.originalName || att.filename || "Attachment"}
-                          </span>
-                          <div className="flex items-center gap-3 flex-shrink-0">
-                            <button
-                              onClick={() =>
-                                window.open(
-                                  url.replace(
-                                    "/upload/fl_attachment/",
-                                    "/upload/",
-                                  ),
-                                  "_blank",
-                                )
-                              }
-                              className="text-blue-600 hover:text-blue-800"
-                              title="View"
-                            >
-                              <EyeIconOutline className="w-4 h-4" />
-                            </button>
-                            <a
-                              href={
-                                url.includes("cloudinary") &&
-                                !url.includes("/raw/")
-                                  ? url.replace(
-                                      "/upload/",
-                                      "/upload/fl_attachment/",
-                                    )
-                                  : url
-                              }
-                              download={att.originalName || att.filename}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="text-[#8CC21B] hover:text-[#7ab318]"
-                              title="Download"
-                            >
-                              <ArrowDownTrayIcon className="w-4 h-4" />
-                            </a>
-                            <button
-                              onClick={() => deletePreviewAttachment(att.id)}
-                              className="text-rose-600 hover:text-rose-800"
-                              title="Delete"
-                            >
-                              <TrashIcon className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
-                  <PhotoIcon className="w-4 h-4 text-blue-500" />
-                  Pictures
-                </h3>
-                <button
-                  onClick={() => pictureInputRef.current?.click()}
-                  disabled={uploadingPictures || !previewItem}
-                  className="px-2.5 py-1 text-xs bg-[#8CC21B] text-white rounded-md hover:bg-[#7ab318] flex items-center gap-1 disabled:opacity-50"
-                >
-                  <PhotoIcon className="w-3.5 h-3.5" />
-                  {uploadingPictures ? "Uploading..." : "Add Pictures"}
-                </button>
-                <input
-                  ref={pictureInputRef}
-                  type="file"
-                  multiple
-                  accept="image/*"
-                  className="hidden"
-                  onChange={uploadPreviewPictures}
-                />
-              </div>
-              <div className="flex justify-between gap-2 pt-6 mt-6 border-t">
-                <button
-                  onClick={handleDeletePreviewItem}
-                  className="px-4 py-2 text-xs text-red-700 bg-white border border-red-300/80 rounded-lg hover:bg-red-50 flex items-center gap-1"
-                >
-                  <TrashIcon className="w-4 h-4" />
-                  Delete
-                </button>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => router.push(`/items/${previewRow.id}`)}
-                    className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2"
-                  >
-                    <EyeIconOutline className="w-4 h-4" />
-                    Full Details
-                  </button>
-                  <button
-                    onClick={closePreview}
-                    className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-                  >
-                    Close
-                  </button>
-                  {previewEdit && (
-                    <button
-                      onClick={handleSavePreview}
-                      disabled={previewSaving || previewLoading}
-                      className="px-4 py-2 bg-[#8CC21B] text-white rounded-lg hover:bg-[#7ab318] disabled:opacity-50"
-                    >
-                      {previewSaving ? "Saving..." : "Save Changes"}
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-      <CustomModal
-        isOpen={qualityModalOpen}
-        onClose={() => setQualityModalOpen(false)}
-        title={
-          editingQuality ? "Update Quality Criterion" : "Add Quality Criterion"
-        }
-        width="max-w-md"
-        footer={
-          <div className="flex gap-2 w-full justify-end">
-            <button
-              onClick={() => setQualityModalOpen(false)}
-              className="px-4 py-2 flex items-center gap-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
-            >
-              <XCircleIcon className="h-4 w-4" />
-              Cancel
-            </button>
-            <button
-              onClick={saveQuality}
-              className="px-4 py-2 flex items-center gap-2 text-white bg-[#00A651] rounded-lg hover:bg-[#008c44]"
-            >
-              <CheckCircleIcon className="h-4 w-4" />
-              {editingQuality ? "Update" : "Add"}
-            </button>
-          </div>
-        }
-      >
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Name
-            </label>
-            <input
-              value={qualityForm.name}
-              onChange={(e) =>
-                setQualityForm((p: any) => ({ ...p, name: e.target.value }))
-              }
-              placeholder="Quality name"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Photo
-            </label>
-            <div className="flex items-center gap-3">
-              <input
-                type="file"
-                id="popup-quality-photo"
-                className="hidden"
-                accept="image/*"
-                onChange={(e) =>
-                  e.target.files?.[0] &&
-                  setQualityForm((p: any) => ({
-                    ...p,
-                    picture: e.target.files![0],
-                  }))
-                }
-              />
-              <label
-                htmlFor="popup-quality-photo"
-                className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-50"
-              >
-                Choose file
-              </label>
-              <span className="text-sm text-gray-500">
-                {qualityForm.picture
-                  ? qualityForm.picture.name
-                  : qualityForm.pictureUrl
-                    ? "Existing photo"
-                    : "No file chosen"}
-              </span>
-            </div>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Description
-            </label>
-            <textarea
-              value={qualityForm.description}
-              onChange={(e) =>
-                setQualityForm((p: any) => ({
-                  ...p,
-                  description: e.target.value,
-                }))
-              }
-              rows={3}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Description CN
-            </label>
-            <textarea
-              value={qualityForm.descriptionCN}
-              onChange={(e) =>
-                setQualityForm((p: any) => ({
-                  ...p,
-                  descriptionCN: e.target.value,
-                }))
-              }
-              rows={3}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary"
-            />
-          </div>
-        </div>
-      </CustomModal>
+      <ItemPreviewModal
+        isOpen={showItemPreview}
+        onClose={closePreview}
+        itemId={previewRow?.id}
+        isRequest={false}
+        onSaved={reloadItems}
+        onDeleted={reloadItems}
+      />
 
       {showTaricModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
@@ -3222,426 +1876,20 @@ const ItemsManagementPage: React.FC = () => {
           </div>
         </div>
       )}
-      {showItemModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-bold text-gray-900">
-                  Create New Item
-                </h2>
-                <button
-                  onClick={() => setShowItemModal(false)}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  <XMarkIcon className="h-5 w-5" />
-                </button>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Item Name *
-                  </label>
-                  <input
-                    value={itemFormData.item_name}
-                    onChange={(e) =>
-                      setItemFormData({
-                        ...itemFormData,
-                        item_name: e.target.value,
-                      })
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                    placeholder="Enter item name"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Chinese Name
-                  </label>
-                  <input
-                    value={itemFormData.item_name_cn}
-                    onChange={(e) =>
-                      setItemFormData({
-                        ...itemFormData,
-                        item_name_cn: e.target.value,
-                      })
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    EAN
-                  </label>
-                  <div className="flex gap-2">
-                    <input
-                      value={itemFormData.ean}
-                      onChange={(e) =>
-                        setItemFormData({
-                          ...itemFormData,
-                          ean: e.target.value,
-                        })
-                      }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                      placeholder="Leave empty to auto-generate"
-                    />
-                    <button
-                      onClick={() =>
-                        setItemFormData((p: any) => ({
-                          ...p,
-                          ean: generateEAN13(),
-                        }))
-                      }
-                      className="px-2 text-xs bg-gray-100 rounded-md hover:bg-gray-200"
-                    >
-                      Gen
-                    </button>
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    DE Number
-                  </label>
-                  <input
-                    value={itemFormData.item_no_de}
-                    onChange={(e) =>
-                      setItemFormData({
-                        ...itemFormData,
-                        item_no_de: e.target.value,
-                      })
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                    placeholder="e.g. DE1024"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    DE Item Name
-                  </label>
-                  <input
-                    value={itemFormData.item_name_de}
-                    onChange={(e) =>
-                      setItemFormData({
-                        ...itemFormData,
-                        item_name_de: e.target.value,
-                      })
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Parent *
-                  </label>
-                  <ReactSelect
-                    options={
-                      refParents?.map((p) => ({
-                        value: p.id,
-                        label: `${p.name_de} (${p.de_no})`,
-                      })) || []
-                    }
-                    value={
-                      itemFormData.parent_id
-                        ? {
-                            value: itemFormData.parent_id,
-                            label: (() => {
-                              const p = refParents?.find(
-                                (x) => x.id === itemFormData.parent_id,
-                              );
-                              return p
-                                ? `${p.name_de} (${p.de_no})`
-                                : "Unknown";
-                            })(),
-                          }
-                        : null
-                    }
-                    onChange={(opt: any) =>
-                      setItemFormData({
-                        ...itemFormData,
-                        parent_id: opt ? opt.value : 0,
-                      })
-                    }
-                    isClearable
-                    isSearchable
-                    placeholder="Select Parent..."
-                    className="text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    TARIC
-                  </label>
-                  <ReactSelect
-                    options={
-                      refTarics?.map((t) => ({
-                        value: t.id,
-                        label: `${t.code} - ${t.name_de}`,
-                      })) || []
-                    }
-                    value={
-                      itemFormData.taric_id
-                        ? {
-                            value: itemFormData.taric_id,
-                            label: (() => {
-                              const t = refTarics?.find(
-                                (x) => x.id === itemFormData.taric_id,
-                              );
-                              return t ? `${t.code} - ${t.name_de}` : "Unknown";
-                            })(),
-                          }
-                        : null
-                    }
-                    onChange={(opt: any) =>
-                      setItemFormData({
-                        ...itemFormData,
-                        taric_id: opt ? opt.value : 0,
-                      })
-                    }
-                    isClearable
-                    isSearchable
-                    placeholder="Select a Taric..."
-                    className="text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Category
-                  </label>
-                  <ReactSelect
-                    options={
-                      categories?.map((c) => ({
-                        value: c.id,
-                        label: c.name,
-                      })) || []
-                    }
-                    value={
-                      itemFormData.cat_id
-                        ? {
-                            value: itemFormData.cat_id,
-                            label:
-                              categories?.find(
-                                (x) => x.id === itemFormData.cat_id,
-                              )?.name || "Unknown",
-                          }
-                        : null
-                    }
-                    onChange={(opt: any) =>
-                      setItemFormData({
-                        ...itemFormData,
-                        cat_id: opt ? opt.value : 0,
-                      })
-                    }
-                    isClearable
-                    isSearchable
-                    placeholder="Select Category..."
-                    className="text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Supplier *
-                  </label>
-                  <ReactSelect
-                    options={
-                      refSuppliers?.map((s) => ({
-                        value: s.id,
-                        label: getSupplierLabel(s),
-                      })) || []
-                    }
-                    value={
-                      itemFormData.supplier_id
-                        ? {
-                            value: itemFormData.supplier_id,
-                            label: (() => {
-                              const s = refSuppliers?.find(
-                                (x) => x.id === itemFormData.supplier_id,
-                              );
-                              return s ? getSupplierLabel(s) : "Unknown";
-                            })(),
-                          }
-                        : null
-                    }
-                    onChange={(opt: any) =>
-                      setItemFormData({
-                        ...itemFormData,
-                        supplier_id: opt ? opt.value : 0,
-                      })
-                    }
-                    isClearable
-                    isSearchable
-                    placeholder="Select Supplier..."
-                    className="text-sm"
-                  />
-                </div>
-                {(["weight", "length", "width", "height"] as const).map(
-                  (dim) => (
-                    <div key={dim}>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        {dim[0].toUpperCase() + dim.slice(1)} (
-                        {dim === "weight" ? "kg" : "cm"})
-                      </label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={(itemFormData as any)[dim]}
-                        onChange={(e) =>
-                          setItemFormData({
-                            ...itemFormData,
-                            [dim]: Number(e.target.value),
-                          })
-                        }
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                      />
-                    </div>
-                  ),
-                )}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Model
-                  </label>
-                  <input
-                    value={itemFormData.model}
-                    onChange={(e) =>
-                      setItemFormData({
-                        ...itemFormData,
-                        model: e.target.value,
-                      })
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Price
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={itemFormData.price}
-                    onChange={(e) =>
-                      setItemFormData({
-                        ...itemFormData,
-                        price:
-                          e.target.value === ""
-                            ? 0
-                            : parseFloat(e.target.value),
-                      })
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                    placeholder="0.00"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Currency
-                  </label>
-                  <ReactSelect
-                    options={[
-                      { value: "CNY", label: "CNY (¥)" },
-                      { value: "EUR", label: "EUR (€)" },
-                      { value: "USD", label: "USD ($)" },
-                      { value: "GBP", label: "GBP (£)" },
-                    ]}
-                    value={{
-                      value: itemFormData.currency,
-                      label: itemFormData.currency,
-                    }}
-                    onChange={(opt: any) =>
-                      setItemFormData({
-                        ...itemFormData,
-                        currency: opt ? opt.value : "CNY",
-                      })
-                    }
-                    className="text-sm"
-                  />
-                </div>
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Remarks
-                  </label>
-                  <textarea
-                    value={itemFormData.remark}
-                    onChange={(e) =>
-                      setItemFormData({
-                        ...itemFormData,
-                        remark: e.target.value,
-                      })
-                    }
-                    rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Status
-                  </label>
-                  <select
-                    value={itemFormData.isActive ? "Y" : "N"}
-                    onChange={(e) =>
-                      setItemFormData({
-                        ...itemFormData,
-                        isActive: e.target.value === "Y",
-                      })
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                  >
-                    <option value="Y">Active</option>
-                    <option value="N">Inactive</option>
-                  </select>
-                </div>
-                <div className="flex items-center gap-2 pt-6">
-                  <input
-                    type="checkbox"
-                    id="is_special"
-                    checked={itemFormData.is_eur_special}
-                    onChange={(e) =>
-                      setItemFormData({
-                        ...itemFormData,
-                        is_eur_special: e.target.checked,
-                        is_rmb_special: e.target.checked,
-                      })
-                    }
-                    className="w-4 h-4 text-green-600 border-gray-300 rounded"
-                  />
-                  <label
-                    htmlFor="is_special"
-                    className="text-sm font-medium text-gray-700"
-                  >
-                    Special Item
-                  </label>
-                </div>
-                <div className="col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Tags
-                  </label>
-                  <TagPickerInput
-                    category="item"
-                    selectedTags={newItemTags}
-                    onChange={setNewItemTags}
-                  />
-                </div>
-              </div>
-              <div className="flex gap-2 pt-6 mt-6 border-t">
-                <button
-                  onClick={() => setShowItemModal(false)}
-                  className="flex-1 px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleCreateItemSubmit}
-                  disabled={
-                    !itemFormData.item_name?.trim() || !itemFormData.parent_id
-                  }
-                  className="flex-1 px-4 py-2 bg-[#8CC21B] text-white rounded-lg hover:bg-[#7ab318] disabled:opacity-50"
-                >
-                  Create Item
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <ItemCreateModal
+        isOpen={showItemModal}
+        onClose={() => setShowItemModal(false)}
+        isRequest={false}
+        onCreated={reloadItems}
+      />
+      <ParentModal
+        isOpen={showParentModal}
+        onClose={() => setShowParentModal(false)}
+        parentId={selectedParentId}
+        onSaved={() => fetchTab("parents", true)}
+        tarics={refTarics}
+        suppliers={refSuppliers}
+      />
     </div>
   );
 };

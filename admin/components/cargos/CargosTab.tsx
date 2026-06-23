@@ -4,15 +4,14 @@ import Select from "react-select";
 import {
     ArrowPathIcon,
     PlusIcon,
-    PencilIcon,
     TrashIcon,
-    EyeIcon,
     XMarkIcon,
-    TruckIcon,
     ChevronLeftIcon,
     ChevronRightIcon,
     MagnifyingGlassIcon,
 } from "@heroicons/react/24/outline";
+import { Truck } from "lucide-react";
+import PageHeader from "@/components/UI/PageHeader";
 import { toast } from "react-hot-toast";
 import {
     getAllCargos,
@@ -88,7 +87,7 @@ const formatCargoDateShort = (dateString: string | Date | undefined | null) => {
     return `${day}.${month}`;
 };
 
-const CargosTab: React.FC<CargosTabProps> = ({ customers: externalCustomers }) => {
+const CargosTab = React.forwardRef<any, CargosTabProps>(({ customers: externalCustomers }, ref) => {
     const [cargos, setCargos] = useState<CargoType[]>([]);
     const [loading, setLoading] = useState(false);
     const [search, setSearch] = useState("");
@@ -455,204 +454,172 @@ const CargosTab: React.FC<CargosTabProps> = ({ customers: externalCustomers }) =
         setFormData(prev => ({ ...prev, ...updates }));
     };
 
+    React.useImperativeHandle(ref, () => ({
+        handleOpenCreate,
+        fetchCargos,
+    }));
+
     return (
         <div>
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-3">
-                <div className="flex flex-wrap items-center gap-3 flex-1 w-full md:w-auto">
-                    <div className="relative w-full max-w-xs">
+            <div className="mb-6 mx-6 p-3 bg-white border border-gray-200 rounded-lg shadow-sm">
+                <div className="flex flex-col sm:flex-row items-center gap-3 w-full">
+                    <div className="flex-1 w-full relative">
                         <MagnifyingGlassIcon className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
                         <input
                             type="text"
                             placeholder="Search cargos..."
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-[4px] focus:ring-2 focus:ring-gray-500 focus:border-gray-500 transition-all text-sm"
+                            className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8CC21B]/40 focus:border-transparent outline-none text-black transition-all"
                         />
-                        {search && (
-                            <button
-                                onClick={() => setSearch("")}
-                                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                            >
-                                <XMarkIcon className="w-4 h-4" />
-                            </button>
-                        )}
                     </div>
-                    <SegmentedControl
-                        options={[
-                            { value: "Open", label: "Open" },
-                            { value: "Shipped", label: "Shipped" },
-                            { value: "Delivered", label: "Delivered" },
-                        ]}
-                        value={statusFilter}
-                        onChange={handleStatusFilterChange}
-                    />
-                </div>
-                <div className="flex gap-2">
-                    <button
-                        onClick={fetchCargos}
-                        disabled={loading}
-                        className="px-3 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-[4px] hover:bg-gray-50 transition-all flex items-center gap-2 disabled:opacity-50"
-                    >
-                        <ArrowPathIcon className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-                        Refresh
-                    </button>
-                    <button
-                        onClick={handleOpenCreate}
-                        className="px-3 py-2 text-sm bg-gray-600 text-white rounded-[4px] hover:bg-gray-700 transition-all flex items-center gap-2"
-                    >
-                        <PlusIcon className="h-4 w-4" />
-                        New Cargo
-                    </button>
+                    <div className="shrink-0">
+                        <SegmentedControl
+                            options={[
+                                { value: "Open", label: "Open" },
+                                { value: "Shipped", label: "Shipped" },
+                                { value: "Delivered", label: "Delivered" },
+                            ]}
+                            value={statusFilter}
+                            onChange={handleStatusFilterChange}
+                        />
+                    </div>
+                    {(search || statusFilter !== "Open") && (
+                        <button
+                            onClick={() => {
+                                setSearch("");
+                                handleStatusFilterChange("Open");
+                            }}
+                            className="px-3.5 py-2 text-sm font-semibold text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 rounded-lg transition-colors flex items-center gap-1 shrink-0 shadow-sm w-full sm:w-auto justify-center"
+                        >
+                            <ArrowPathIcon className="w-4 h-4" />
+                            Reset
+                        </button>
+                    )}
                 </div>
             </div>
-
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto px-6 pb-6">
                 {loading && cargos.length === 0 ? (
-                    <div className="p-8 text-center">
+                    <div className="p-8 text-center text-gray-500">
                         <div className="inline-flex items-center gap-3">
                             <ArrowPathIcon className="h-5 w-5 animate-spin text-gray-500" />
                             <span className="text-gray-600">Loading Cargos...</span>
                         </div>
                     </div>
                 ) : cargos.length === 0 ? (
-                    <div className="p-8 text-center">
-                        <TruckIcon className="h-10 w-10 text-gray-400 mx-auto mb-4" />
+                    <div className="p-8 text-center text-gray-500 overflow-hidden">
+                        <Truck className="h-10 w-10 text-gray-400 mx-auto mb-4" />
                         <p className="text-gray-600">No Cargos Found</p>
                         <p className="text-sm text-gray-400 mt-1">Click &quot;New Cargo&quot; to create one.</p>
                     </div>
                 ) : (
-                    <table className="w-full">
-                        <thead className="bg-[#F8F9FA] border-b border-[#E9ECEF]">
-                            <tr>
-                                <th className="px-3 py-3.5 text-left text-[11px] font-semibold text-[#495057] uppercase tracking-wider">
-                                    ID
-                                </th>
-                                <th className="px-3 py-3.5 text-left text-[11px] font-semibold text-[#495057] uppercase tracking-wider">
-                                    CARGO NO
-                                </th>
-                                <th className="px-3 py-3.5 text-left text-[11px] font-semibold text-[#495057] uppercase tracking-wider">
-                                    STATUS
-                                </th>
-                                <th className="px-3 py-3.5 text-left text-[11px] font-semibold text-[#495057] uppercase tracking-wider">
-                                    CARGO TYPE
-                                </th>
-                                <th className="px-3 py-3.5 text-left text-[11px] font-semibold text-[#495057] uppercase tracking-wider">
-                                    BILL TO
-                                </th>
-                                <th className="px-3 py-3.5 text-left text-[11px] font-semibold text-[#495057] uppercase tracking-wider">
-                                    SHIP TO
-                                </th>
-                                <th className="px-3 py-3.5 text-left text-[11px] font-semibold text-[#495057] uppercase tracking-wider">
-                                    EST. DEPARTURE
-                                </th>
-                                <th className="px-3 py-3.5 text-left text-[11px] font-semibold text-[#495057] uppercase tracking-wider">
-                                    SHIPPED
-                                </th>
-                                <th className="px-3 py-3.5 text-left text-[11px] font-semibold text-[#495057] uppercase tracking-wider">
-                                    EST. ARRIVAL
-                                </th>
-                                <th className="px-3 py-3.5 text-left text-[11px] font-semibold text-[#495057] uppercase tracking-wider">
-                                    ARRIVED (DAYS)
-                                </th>
-                                <th className="px-3 py-3.5 text-left text-[11px] font-semibold text-[#495057] uppercase tracking-wider">
-                                    ONLINE TRACK
-                                </th>
-                                <th className="px-3 py-3.5 text-left text-[11px] font-semibold text-[#495057] uppercase tracking-wider">
-                                    REMARKS
-                                </th>
-                                <th className="px-3 py-3.5 text-center text-[11px] font-semibold text-[#495057] uppercase tracking-wider">
-                                    Actions
-                                </th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-200">
-                            {cargos.map((cargo) => (
-                                <tr
-                                    key={cargo.id}
-                                    className="hover:bg-gray-50 border-b border-[#F1F3F5] transition-colors cursor-pointer group"
-                                    onClick={() => handleOpenEdit(cargo.id)}
-                                >
-                                    <td className="px-3 py-3 text-xs text-[#6C757D]">
-                                        {cargo.id}
-                                    </td>
-                                    <td className="px-3 py-3 text-xs font-medium text-[#212529]">
-                                        {cargo.cargo_no || "-"}
-                                    </td>
-                                    <td className="px-3 py-3">
-                                        <span className="text-[10px] font-bold text-[#495057]">
-                                            {cargo.cargo_status || "Open"}
-                                        </span>
-                                    </td>
-                                    <td className="px-3 py-3 text-xs text-[#495057]">
-                                        {cargo.cargo_type_id ? getCargoTypeName(cargo.cargo_type_id) : "-"}
-                                    </td>
-                                    <td className="px-3 py-3 text-xs text-[#212529]">
-                                        {cargo.bill_to_company_name || "GTech"}
-                                    </td>
-                                    <td className="px-3 py-3 text-xs text-[#6C757D]">
-                                        {cargo.ship_to_company_name || (cargo.customer_id ? getCustomerName(cargo.customer_id) : "-")}
-                                    </td>
-                                    <td className="px-3 py-3 text-xs text-[#212529]">
-                                        {formatCargoDateShort(cargo.dep_date)}
-                                    </td>
-                                    <td className="px-3 py-3 text-xs text-[#212529]">
-                                        {formatCargoDateShort(cargo.shipped_at)}
-                                    </td>
-                                    <td className="px-3 py-3 text-xs text-[#212529]">
-                                        {formatCargoDateShort(cargo.eta)}
-                                    </td>
-                                    <td className="px-3 py-3 text-xs text-[#6C757D]">
-                                        -
-                                    </td>
-                                    <td className="px-3 py-3 text-xs max-w-[120px] truncate">
-                                        {cargo.online_track ? (
-                                            <a
-                                                href={cargo.online_track}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="text-blue-500 hover:underline"
-                                                onClick={(e) => e.stopPropagation()}
-                                            >
-                                                {cargo.online_track}
-                                            </a>
-                                        ) : "-"}
-                                    </td>
-                                    <td className="px-3 py-3 text-xs text-[#6C757D] max-w-[150px] truncate">
-                                        {cargo.remark || cargo.note || "-"}
-                                    </td>
-                                    <td className="px-3 py-3">
-                                        <div className="flex items-center justify-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    handleOpenEdit(cargo.id);
-                                                }}
-                                                className="text-gray-400 hover:text-gray-600 transition-colors p-1"
-                                                title="Edit"
-                                            >
-                                                <PencilIcon className="h-3.5 w-3.5" />
-                                            </button>
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    handleDelete(cargo.id);
-                                                }}
-                                                className="text-red-300 hover:text-red-500 transition-colors p-1"
-                                                title="Delete"
-                                            >
-                                                <TrashIcon className="h-3.5 w-3.5" />
-                                            </button>
-                                        </div>
-                                    </td>
+                    <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+                        <table className="w-full text-left">
+                            <thead className="bg-gray-50 border-b border-gray-200">
+                                <tr>
+                                    <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">
+                                        ID
+                                    </th>
+                                    <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">
+                                        CARGO NO
+                                    </th>
+                                    <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">
+                                        STATUS
+                                    </th>
+                                    <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">
+                                        CARGO TYPE
+                                    </th>
+                                    <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">
+                                        BILL TO
+                                    </th>
+                                    <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">
+                                        SHIP TO
+                                    </th>
+                                    <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">
+                                        EST. DEPARTURE
+                                    </th>
+                                    <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">
+                                        SHIPPED
+                                    </th>
+                                    <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">
+                                        EST. ARRIVAL
+                                    </th>
+                                    <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">
+                                        ARRIVED (DAYS)
+                                    </th>
+                                    <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">
+                                        ONLINE TRACK
+                                    </th>
+                                    <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase">
+                                        REMARKS
+                                    </th>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                                {cargos.map((cargo) => (
+                                    <tr
+                                        key={cargo.id}
+                                        className="hover:bg-gray-50 cursor-pointer transition-colors"
+                                        onClick={() => handleOpenEdit(cargo.id)}
+                                    >
+                                        <td className="px-4 py-3 text-sm text-gray-800 font-bold">
+                                            {cargo.id}
+                                        </td>
+                                        <td className="px-4 py-3 text-sm text-gray-800 font-semibold">
+                                            {cargo.cargo_no || "-"}
+                                        </td>
+                                        <td className="px-4 py-3 text-sm">
+                                            <span className="text-[10px] font-bold text-[#495057]">
+                                                {cargo.cargo_status || "Open"}
+                                            </span>
+                                        </td>
+                                        <td className="px-4 py-3 text-sm text-gray-800">
+                                            {cargo.cargo_type_id ? getCargoTypeName(cargo.cargo_type_id) : "-"}
+                                        </td>
+                                        <td className="px-4 py-3 text-sm text-gray-800">
+                                            {cargo.bill_to_company_name || "GTech"}
+                                        </td>
+                                        <td className="px-4 py-3 text-sm text-gray-800">
+                                            {cargo.ship_to_company_name || (cargo.customer_id ? getCustomerName(cargo.customer_id) : "-")}
+                                        </td>
+                                        <td className="px-4 py-3 text-sm text-gray-800">
+                                            {formatCargoDateShort(cargo.dep_date)}
+                                        </td>
+                                        <td className="px-4 py-3 text-sm text-gray-800">
+                                            {formatCargoDateShort(cargo.shipped_at)}
+                                        </td>
+                                        <td className="px-4 py-3 text-sm text-gray-800">
+                                            {formatCargoDateShort(cargo.eta)}
+                                        </td>
+                                        <td className="px-4 py-3 text-sm text-gray-800">
+                                            -
+                                        </td>
+                                        <td className="px-4 py-3 text-sm max-w-[120px] truncate">
+                                            {cargo.online_track ? (
+                                                <a
+                                                    href={cargo.online_track}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-blue-500 hover:underline"
+                                                    onClick={(e) => e.stopPropagation()}
+                                                >
+                                                    {cargo.online_track}
+                                                </a>
+                                            ) : "-"}
+                                        </td>
+                                        <td className="px-4 py-3 text-sm text-gray-800 max-w-[150px] truncate">
+                                            {cargo.remark || cargo.note || "-"}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
                 )}
             </div>
 
             {pagination.totalPages > 1 && (
-                <div className="p-4 border-t border-gray-100 bg-gray-50 flex items-center justify-between">
+                <div className="mx-6 mb-6 p-4 border border-gray-200 rounded-lg bg-gray-50 flex items-center justify-between shadow-sm">
                     <p className="text-sm text-gray-600">
                         Showing{" "}
                         {Math.min((pagination.page - 1) * pagination.limit + 1, pagination.totalRecords)} to{" "}
@@ -663,7 +630,7 @@ const CargosTab: React.FC<CargosTabProps> = ({ customers: externalCustomers }) =
                         <button
                             onClick={() => handlePageChange(pagination.page - 1)}
                             disabled={pagination.page === 1}
-                            className="px-3 py-1.5 text-sm border border-gray-300 rounded-[4px] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 transition-all flex items-center gap-1"
+                            className="px-3 py-1.5 text-sm border border-gray-300 rounded-[4px] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 transition-all flex items-center gap-1 text-black font-semibold bg-white"
                         >
                             <ChevronLeftIcon className="w-4 h-4" />
                             Previous
@@ -674,7 +641,7 @@ const CargosTab: React.FC<CargosTabProps> = ({ customers: externalCustomers }) =
                         <button
                             onClick={() => handlePageChange(pagination.page + 1)}
                             disabled={pagination.page === pagination.totalPages}
-                            className="px-3 py-1.5 text-sm border border-gray-300 rounded-[4px] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 transition-all flex items-center gap-1"
+                            className="px-3 py-1.5 text-sm border border-gray-300 rounded-[4px] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 transition-all flex items-center gap-1 text-black font-semibold bg-white"
                         >
                             Next
                             <ChevronRightIcon className="w-4 h-4" />
@@ -689,7 +656,7 @@ const CargosTab: React.FC<CargosTabProps> = ({ customers: externalCustomers }) =
                         <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white flex items-center justify-between flex-shrink-0">
                             <div className="flex items-center gap-3">
                                 <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center">
-                                    <TruckIcon className="w-5 h-5 text-gray-600" />
+                                    <Truck className="w-5 h-5 text-gray-600" />
                                 </div>
                                 <div>
                                     <h2 className="text-xl font-bold text-gray-900">
@@ -1070,7 +1037,7 @@ const CargosTab: React.FC<CargosTabProps> = ({ customers: externalCustomers }) =
                             <div className="flex gap-3 justify-end">
                                 <button
                                     onClick={() => setShowModal(false)}
-                                    className="px-5 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-[4px] hover:bg-gray-50 transition-all"
+                                    className="px-4 py-2 text-sm font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
                                 >
                                     {isEditEnabled ? "Cancel" : "Close"}
                                 </button>
@@ -1078,7 +1045,7 @@ const CargosTab: React.FC<CargosTabProps> = ({ customers: externalCustomers }) =
                                     <button
                                         onClick={handleSubmit}
                                         disabled={loading}
-                                        className="px-5 py-2.5 text-sm font-medium bg-gray-600 text-white rounded-[4px] hover:bg-gray-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm flex items-center gap-2"
+                                        className="px-4 py-2 text-sm font-bold text-white bg-gradient-to-r from-[#8CC21B] to-[#7ab318] hover:from-[#7ab318] hover:to-[#6ba114] rounded-lg transition-all shadow-md disabled:opacity-50 flex items-center gap-2"
                                     >
                                         {loading && (
                                             <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -1089,7 +1056,7 @@ const CargosTab: React.FC<CargosTabProps> = ({ customers: externalCustomers }) =
                                 {modalMode === "edit" && !isEditEnabled && (
                                     <button
                                         onClick={() => handleDelete(editingId!)}
-                                        className="px-5 py-2.5 text-sm font-medium bg-red-600 text-white rounded-[4px] hover:bg-red-700 transition-all flex items-center gap-2"
+                                        className="px-4 py-2 text-sm font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-50 shadow-sm"
                                     >
                                         <TrashIcon className="w-4 h-4" />
                                         Delete Cargo
@@ -1102,6 +1069,6 @@ const CargosTab: React.FC<CargosTabProps> = ({ customers: externalCustomers }) =
             )}
         </div>
     );
-};
+});
 
 export default CargosTab;

@@ -14,6 +14,10 @@ import { StarBusinessDetails } from "./star_business_details";
 import { ContactPerson } from "./contact_person";
 import { Inquiry } from "./inquiry";
 import { Tag } from "./tags";
+import { Parent } from "./parents";
+import { Taric } from "./tarics";
+import { Category } from "./categories";
+import { Supplier } from "./suppliers";
 
 export type Interval =
   | "Monatlich"
@@ -204,6 +208,67 @@ export class RequestedItem {
 
   @Column({ type: "text", nullable: true })
   tagOrder?: string;
+
+  @Column({ name: "parent_id", nullable: true })
+  parent_id?: number;
+
+  @Column({ type: "varchar", length: 100, nullable: true })
+  model?: string;
+
+  @Column({ type: "varchar", length: 50, nullable: true })
+  ean?: string;
+
+  @Column({ name: "taric_id", nullable: true })
+  taric_id?: number;
+
+  @Column({ type: "text", nullable: true })
+  item_name_cn?: string;
+
+  @Column({ name: "cat_id", nullable: true })
+  cat_id?: number;
+
+  @Column({ type: "text", nullable: true })
+  remark?: string;
+
+  @Column({ type: "varchar", length: 255, nullable: true })
+  photo?: string;
+
+  @Column({ type: "text", nullable: true })
+  pix_path?: string;
+
+  @Column({ type: "text", nullable: true })
+  pix_path_eBay?: string;
+
+  @Column({ type: "char", length: 1, default: "N" })
+  is_rmb_special!: string;
+
+  @Column({ type: "char", length: 1, default: "N" })
+  is_eur_special!: string;
+
+  @Column({ type: "char", length: 1, default: "Y" })
+  isActive!: string;
+
+  @Column({ name: "supplier_id", nullable: true })
+  supplier_id?: number;
+
+  @Column({ type: "text", nullable: true })
+  item_name_de?: string;
+
+  @ManyToOne(() => Parent, { nullable: true })
+  @JoinColumn({ name: "parent_id" })
+  parent!: Parent | null;
+
+  @ManyToOne(() => Taric, { nullable: true })
+  @JoinColumn({ name: "taric_id" })
+  taricRel!: Taric | null;
+
+  @ManyToOne(() => Category, { nullable: true })
+  @JoinColumn({ name: "cat_id" })
+  category!: Category | null;
+
+  @ManyToOne(() => Supplier, { nullable: true })
+  @JoinColumn({ name: "supplier_id" })
+  supplier!: Supplier | null;
 
   constructor(partial?: Partial<RequestedItem>) {
     if (partial) {

@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, Suspense } from "react";
 import {
     MagnifyingGlassIcon,
     FunnelIcon,
@@ -12,7 +12,7 @@ import {
     ChevronLeftIcon,
     ChevronRightIcon,
 } from "@heroicons/react/24/outline";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import PageHeader from "@/components/UI/PageHeader";
 import { Truck } from "lucide-react";
 import { toast } from "react-hot-toast";
@@ -67,6 +67,7 @@ const initialFormData: Partial<Supplier> = {
 
 const SuppliersPage: React.FC = () => {
     const router = useRouter();
+    const searchParams = useSearchParams();
     const [suppliers, setSuppliers] = useState<Supplier[]>([]);
     const [loading, setLoading] = useState(false);
     const [search, setSearch] = useState("");
@@ -152,6 +153,13 @@ const SuppliersPage: React.FC = () => {
         }
     };
 
+    useEffect(() => {
+        const supplierId = searchParams.get("supplierId");
+        if (supplierId) {
+            handleOpenEdit(Number(supplierId));
+        }
+    }, [searchParams]);
+
     const handleSubmit = async () => {
         if (!formData.name?.trim()) {
             toast.error("Supplier name is required", errorStyles);
@@ -212,7 +220,6 @@ const SuppliersPage: React.FC = () => {
                     background: "linear-gradient(to bottom, #ffffff, #f9f9f9)",
                 }}
             >
-                {/* Header */}
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                     <div className="flex items-center gap-3">
                         <button
@@ -1001,4 +1008,17 @@ const SuppliersPage: React.FC = () => {
     );
 };
 
-export default SuppliersPage;
+export default function SuppliersPageWithSuspense() {
+    return (
+        <Suspense fallback={
+            <div className="p-20 flex justify-center items-center">
+                <div className="text-center">
+                    <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-gray-200 border-t-[#8CC21B]" />
+                    <p className="mt-4 text-gray-600">Loading...</p>
+                </div>
+            </div>
+        }>
+            <SuppliersPage />
+        </Suspense>
+    );
+}

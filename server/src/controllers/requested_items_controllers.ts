@@ -36,6 +36,10 @@ export class RequestedItemController {
         .leftJoinAndSelect("requestedItem.contactPerson", "contactPerson")
         .leftJoinAndSelect("requestedItem.inquiry", "inquiry")
         .leftJoinAndSelect("requestedItem.tags", "tags")
+        .leftJoinAndSelect("requestedItem.parent", "parent")
+        .leftJoinAndSelect("requestedItem.taricRel", "taricRel")
+        .leftJoinAndSelect("requestedItem.category", "category")
+        .leftJoinAndSelect("requestedItem.supplier", "supplier")
         .orderBy("requestedItem.createdAt", "DESC");
 
       if (tags) {
@@ -139,17 +143,17 @@ export class RequestedItemController {
               ...item.business,
               customer: customer
                 ? {
-                    id: customer.id,
-                    companyName: customer.companyName,
-                    legalName: customer.legalName,
-                    email: customer.email,
-                    contactEmail: customer.contactEmail,
-                    contactPhoneNumber: customer.contactPhoneNumber,
-                    stage: customer.stage,
-                    avatar: customer.avatar,
-                    createdAt: customer.createdAt,
-                    updatedAt: customer.updatedAt,
-                  }
+                  id: customer.id,
+                  companyName: customer.companyName,
+                  legalName: customer.legalName,
+                  email: customer.email,
+                  contactEmail: customer.contactEmail,
+                  contactPhoneNumber: customer.contactPhoneNumber,
+                  stage: customer.stage,
+                  avatar: customer.avatar,
+                  createdAt: customer.createdAt,
+                  updatedAt: customer.updatedAt,
+                }
                 : null,
             },
           };
@@ -187,7 +191,7 @@ export class RequestedItemController {
 
       const item = await this.requestedItemRepository.findOne({
         where: { id },
-        relations: ["business", "contactPerson", "inquiry", "tags"],
+        relations: ["business", "contactPerson", "inquiry", "tags", "parent", "taricRel", "category", "supplier"],
       });
 
       if (!item) {
@@ -208,17 +212,17 @@ export class RequestedItemController {
           ...item.business,
           customer: customer
             ? {
-                id: customer.id,
-                companyName: customer.companyName,
-                legalName: customer.legalName,
-                email: customer.email,
-                contactEmail: customer.contactEmail,
-                contactPhoneNumber: customer.contactPhoneNumber,
-                stage: customer.stage,
-                avatar: customer.avatar,
-                createdAt: customer.createdAt,
-                updatedAt: customer.updatedAt,
-              }
+              id: customer.id,
+              companyName: customer.companyName,
+              legalName: customer.legalName,
+              email: customer.email,
+              contactEmail: customer.contactEmail,
+              contactPhoneNumber: customer.contactPhoneNumber,
+              stage: customer.stage,
+              avatar: customer.avatar,
+              createdAt: customer.createdAt,
+              updatedAt: customer.updatedAt,
+            }
             : null,
         },
       };
@@ -275,6 +279,21 @@ export class RequestedItemController {
         urgency1,
         urgency2,
         painPoints,
+        parent_id,
+        model,
+        ean,
+        taric_id,
+        item_name_cn,
+        cat_id,
+        remark,
+        photo,
+        pix_path,
+        pix_path_eBay,
+        is_rmb_special,
+        is_eur_special,
+        isActive,
+        supplier_id,
+        item_name_de,
       } = request.body;
 
       console.log("Received contactPersonId:", contactPersonId);
@@ -358,6 +377,21 @@ export class RequestedItemController {
         urgency1,
         urgency2,
         painPoints,
+        parent_id,
+        model,
+        ean,
+        taric_id,
+        item_name_cn,
+        cat_id,
+        remark,
+        photo,
+        pix_path,
+        pix_path_eBay,
+        is_rmb_special,
+        is_eur_special,
+        isActive,
+        supplier_id,
+        item_name_de,
       });
 
       const savedItem: any =
@@ -365,7 +399,7 @@ export class RequestedItemController {
 
       const itemWithRelations = await this.requestedItemRepository.findOne({
         where: { id: savedItem.id },
-        relations: ["business", "contactPerson", "inquiry", "tags"],
+        relations: ["business", "contactPerson", "inquiry", "tags", "parent", "taricRel", "category", "supplier"],
       });
 
       return response.status(201).json({
@@ -415,6 +449,21 @@ export class RequestedItemController {
         urgency1,
         urgency2,
         painPoints,
+        parent_id,
+        model,
+        ean,
+        taric_id,
+        item_name_cn,
+        cat_id,
+        remark,
+        photo,
+        pix_path,
+        pix_path_eBay,
+        is_rmb_special,
+        is_eur_special,
+        isActive,
+        supplier_id,
+        item_name_de,
       } = request.body;
 
       const existingItem = await this.requestedItemRepository.findOne({
@@ -493,9 +542,23 @@ export class RequestedItemController {
         ...(urgency1 !== undefined && { urgency1 }),
         ...(urgency2 !== undefined && { urgency2 }),
         ...(painPoints !== undefined && { painPoints }),
+        ...(parent_id !== undefined && { parent_id }),
+        ...(model !== undefined && { model }),
+        ...(ean !== undefined && { ean }),
+        ...(taric_id !== undefined && { taric_id }),
+        ...(item_name_cn !== undefined && { item_name_cn }),
+        ...(cat_id !== undefined && { cat_id }),
+        ...(remark !== undefined && { remark }),
+        ...(photo !== undefined && { photo }),
+        ...(pix_path !== undefined && { pix_path }),
+        ...(pix_path_eBay !== undefined && { pix_path_eBay }),
+        ...(is_rmb_special !== undefined && { is_rmb_special }),
+        ...(is_eur_special !== undefined && { is_eur_special }),
+        ...(isActive !== undefined && { isActive }),
+        ...(supplier_id !== undefined && { supplier_id }),
+        ...(item_name_de !== undefined && { item_name_de }),
       };
 
-      // Safely update relation keys only if they are present in the request body
       if (request.body.hasOwnProperty("contactPersonId")) {
         updateData.contactPerson = contactPerson;
         updateData.contactPersonId = contactPerson ? contactPerson.id : null;
@@ -509,7 +572,7 @@ export class RequestedItemController {
 
       const updatedItem = await this.requestedItemRepository.findOne({
         where: { id },
-        relations: ["business", "contactPerson", "inquiry", "tags"],
+        relations: ["business", "contactPerson", "inquiry", "tags", "parent", "taricRel", "category", "supplier"],
       });
 
       return response.status(200).json({
