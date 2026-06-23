@@ -132,7 +132,6 @@ const CargoTypesTab = React.forwardRef<any, {}>((props, ref) => {
 
     return (
         <div>
-            {/* ONE-LINE-Filter */}
             <div className="mb-6 mx-6 p-3 bg-white border border-gray-200 rounded-lg shadow-sm">
                 <div className="flex items-center gap-2 w-full">
                     <div className="flex-1">
@@ -155,8 +154,6 @@ const CargoTypesTab = React.forwardRef<any, {}>((props, ref) => {
                     )}
                 </div>
             </div>
-
-            {/* Content Table */}
             <div className="overflow-x-auto px-6 pb-6">
                 {loading && cargoTypes.length === 0 ? (
                     <div className="p-8 text-center text-gray-500">Loading...</div>
@@ -198,8 +195,6 @@ const CargoTypesTab = React.forwardRef<any, {}>((props, ref) => {
                     </div>
                 )}
             </div>
-
-            {/* Modal */}
             {showModal && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
                     <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden">

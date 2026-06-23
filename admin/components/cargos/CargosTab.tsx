@@ -461,7 +461,6 @@ const CargosTab = React.forwardRef<any, CargosTabProps>(({ customers: externalCu
 
     return (
         <div>
-            {/* ONE-LINE-Filter */}
             <div className="mb-6 mx-6 p-3 bg-white border border-gray-200 rounded-lg shadow-sm">
                 <div className="flex flex-col sm:flex-row items-center gap-3 w-full">
                     <div className="flex-1 w-full relative">
@@ -499,8 +498,6 @@ const CargosTab = React.forwardRef<any, CargosTabProps>(({ customers: externalCu
                     )}
                 </div>
             </div>
-
-            {/* Content Table */}
             <div className="overflow-x-auto px-6 pb-6">
                 {loading && cargos.length === 0 ? (
                     <div className="p-8 text-center text-gray-500">
