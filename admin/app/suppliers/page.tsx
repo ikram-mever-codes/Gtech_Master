@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, Suspense } from "react";
 import {
     MagnifyingGlassIcon,
     FunnelIcon,
@@ -12,7 +12,7 @@ import {
     ChevronLeftIcon,
     ChevronRightIcon,
 } from "@heroicons/react/24/outline";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import PageHeader from "@/components/UI/PageHeader";
 import { Truck } from "lucide-react";
 import { toast } from "react-hot-toast";
@@ -67,6 +67,7 @@ const initialFormData: Partial<Supplier> = {
 
 const SuppliersPage: React.FC = () => {
     const router = useRouter();
+    const searchParams = useSearchParams();
     const [suppliers, setSuppliers] = useState<Supplier[]>([]);
     const [loading, setLoading] = useState(false);
     const [search, setSearch] = useState("");
@@ -151,6 +152,13 @@ const SuppliersPage: React.FC = () => {
             setLoading(false);
         }
     };
+
+    useEffect(() => {
+        const supplierId = searchParams.get("supplierId");
+        if (supplierId) {
+            handleOpenEdit(Number(supplierId));
+        }
+    }, [searchParams]);
 
     const handleSubmit = async () => {
         if (!formData.name?.trim()) {
@@ -1001,4 +1009,17 @@ const SuppliersPage: React.FC = () => {
     );
 };
 
-export default SuppliersPage;
+export default function SuppliersPageWithSuspense() {
+    return (
+        <Suspense fallback={
+            <div className="p-20 flex justify-center items-center">
+                <div className="text-center">
+                    <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-gray-200 border-t-[#8CC21B]" />
+                    <p className="mt-4 text-gray-600">Loading...</p>
+                </div>
+            </div>
+        }>
+            <SuppliersPage />
+        </Suspense>
+    );
+}

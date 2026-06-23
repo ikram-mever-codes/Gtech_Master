@@ -69,7 +69,7 @@ import { getCategories } from "@/api/categories";
 import { useSelector } from "react-redux";
 import { RootState } from "@/app/Redux/store";
 import { DataTable, ColumnDef } from "@/components/UI/DataTable";
-import { ShoppingCart } from "lucide-react";
+import { ShoppingCart, Truck } from "lucide-react";
 import BillToShipToForm, {
   BillToShipToData,
   WAREHOUSE_BILL_TO,
@@ -82,6 +82,16 @@ import OrdersTable from "@/components/orders/OrdersTable";
 import OrderDetailsModal from "@/components/orders/OrderDetailsModal";
 
 const hasChinese = (str: string) => /[\u4e00-\u9fa5]/.test(str || "");
+
+const getInputClass = (hasValue: boolean, isEmptySelect: boolean = false) => {
+  return `w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${
+    hasValue
+      ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+      : isEmptySelect
+        ? "text-gray-400 border-gray-300 bg-white"
+        : "text-gray-900 border-gray-300 bg-white"
+  }`;
+};
 
 interface Invoice {
   id: string;
@@ -184,6 +194,8 @@ const InvoiceListPage: React.FC = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user } = useSelector((state: RootState) => state.user);
+  const cargosTabRef = useRef<any>(null);
+  const cargoTypesTabRef = useRef<any>(null);
 
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [filteredInvoices, setFilteredInvoices] = useState<Invoice[]>([]);
@@ -218,6 +230,44 @@ const InvoiceListPage: React.FC = () => {
       { taric?: boolean; items?: boolean; data?: any; loading?: boolean }
     >
   >({});
+
+  const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+  const [showInvoiceDetailsModal, setShowInvoiceDetailsModal] = useState(false);
+  const [modalActiveTab, setModalActiveTab] = useState<"taric" | "items">("taric");
+
+  const handleOpenInvoiceDetails = async (invoice: Invoice) => {
+    setSelectedInvoice(invoice);
+    setShowInvoiceDetailsModal(true);
+    setModalActiveTab("taric");
+    setInvoiceEditForm({
+      description: invoice.description || "",
+      freightCost: invoice.freightCost?.toString() || "",
+      remark: invoice.remark || "",
+    });
+    
+    const currentState = expandedStates[invoice.id] || {};
+    if (!currentState.data) {
+      setExpandedStates((prev) => ({
+        ...prev,
+        [invoice.id]: { ...currentState, loading: true },
+      }));
+      try {
+        const response = await getExpandedInvoiceDetails(invoice.id);
+        if (response.success) {
+          setExpandedStates((prev) => ({
+            ...prev,
+            [invoice.id]: { taric: true, items: true, data: response.data, loading: false },
+          }));
+        }
+      } catch (error) {
+        console.error(error);
+        setExpandedStates((prev) => ({
+          ...prev,
+          [invoice.id]: { ...currentState, loading: false },
+        }));
+      }
+    }
+  };
 
   const [showREModal, setShowREModal] = useState(false);
   const [showSPModal, setShowSPModal] = useState(false);
@@ -1344,6 +1394,8 @@ const InvoiceListPage: React.FC = () => {
       setActionLoading((prev) => ({ ...prev, [`paid-${invoiceId}`]: true }));
       await markInvoiceAsPaid(invoiceId);
       await loadInvoices();
+      setSelectedInvoice((prev) => prev ? { ...prev, status: "paid" } : null);
+      toast.success("Invoice verified successfully");
     } catch (error) {
       console.error("Failed to mark as paid:", error);
     } finally {
@@ -1371,6 +1423,13 @@ const InvoiceListPage: React.FC = () => {
       });
       setEditingInvoiceId(null);
       await loadInvoices();
+      setSelectedInvoice((prev) => prev ? {
+        ...prev,
+        description: invoiceEditForm.description,
+        freightCost: invoiceEditForm.freightCost,
+        remark: invoiceEditForm.remark,
+      } : null);
+      toast.success("Invoice changes saved successfully");
     } catch (error) {
       console.error("Failed to save invoice edits:", error);
     } finally {
@@ -1504,12 +1563,18 @@ const InvoiceListPage: React.FC = () => {
                   ? "Orders"
                   : activeInvTab === "order_items"
                     ? "Order Items"
-                    : "Delivery"
+                    : activeInvTab === "cargos"
+                      ? "Cargos"
+                      : activeInvTab === "cargo_type"
+                        ? "Cargo Types"
+                        : "Delivery"
               }
               icon={
                 activeInvTab === "orders" || activeInvTab === "order_items"
                   ? ShoppingCart
-                  : FileText
+                  : activeInvTab === "cargos" || activeInvTab === "cargo_type"
+                    ? Truck
+                    : FileText
               }
             />
           </div>
@@ -1536,37 +1601,74 @@ const InvoiceListPage: React.FC = () => {
                 )}
               </div>
             )}
-            <button
-              onClick={() => {
-                if (activeInvTab === "orders" || activeInvTab === "order_items") {
-                  fetchOrders();
-                } else {
-                  setLoading(true);
-                  loadInvoices();
-                  if (activeInvTab === "billto_shipto") fetchCustomers();
-                }
-              }}
-              disabled={loading || loadingOrders}
-              className="px-4 py-2.5 bg-gray-100 text-gray-700 rounded-[4px] font-medium hover:bg-gray-200 transition-all flex items-center gap-2 disabled:opacity-50"
-            >
-              <RefreshCw
-                className={`w-4 h-4 ${loading || loadingOrders ? "animate-spin" : ""
-                  }`}
-              />
-              {loading || loadingOrders ? "Loading..." : "Refresh"}
-            </button>
-            {(activeInvTab === "orders" || activeInvTab === "order_items") && (
-              <button
-                onClick={() => {
-                  resetForm();
-                  setMode("create");
-                  setShowModal(true);
-                }}
-                className="px-4 py-2.5 bg-[#059669] text-white rounded-[4px] font-bold hover:bg-green-700 transition-all flex items-center gap-2 shadow-md"
-              >
-                <Plus className="w-4 h-4" />
-                New Order
-              </button>
+            {activeInvTab === "cargos" ? (
+              <>
+                <button
+                  onClick={() => cargosTabRef.current?.fetchCargos?.()}
+                  className="px-3.5 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2 font-semibold shadow-sm transition-all"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  Refresh
+                </button>
+                <button
+                  onClick={() => cargosTabRef.current?.handleOpenCreate?.()}
+                  className="px-4 py-2 text-sm bg-gradient-to-r from-[#8CC21B] to-[#7ab318] hover:from-[#7ab318] hover:to-[#6ba114] text-white rounded-lg flex items-center gap-2 font-bold shadow-md hover:shadow-lg transition-all"
+                >
+                  <Plus className="h-4 w-4" />
+                  New Cargo
+                </button>
+              </>
+            ) : activeInvTab === "cargo_type" ? (
+              <>
+                <button
+                  onClick={() => cargoTypesTabRef.current?.fetchCargoTypes?.()}
+                  className="px-3.5 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2 font-semibold shadow-sm transition-all"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  Refresh
+                </button>
+                <button
+                  onClick={() => cargoTypesTabRef.current?.handleOpenCreate?.()}
+                  className="px-4 py-2 text-sm bg-gradient-to-r from-[#8CC21B] to-[#7ab318] hover:from-[#7ab318] hover:to-[#6ba114] text-white rounded-lg flex items-center gap-2 font-bold shadow-md hover:shadow-lg transition-all"
+                >
+                  <Plus className="h-4 w-4" />
+                  New Cargo Type
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={() => {
+                    if (activeInvTab === "orders" || activeInvTab === "order_items") {
+                      fetchOrders();
+                    } else {
+                      setLoading(true);
+                      loadInvoices();
+                      if (activeInvTab === "billto_shipto") fetchCustomers();
+                    }
+                  }}
+                  disabled={loading || loadingOrders}
+                  className="px-3.5 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2 disabled:opacity-50 font-semibold shadow-sm transition-all"
+                >
+                  <RefreshCw
+                    className={`w-4 h-4 ${loading || loadingOrders ? "animate-spin" : ""}`}
+                  />
+                  {loading || loadingOrders ? "Loading..." : "Refresh"}
+                </button>
+                {(activeInvTab === "orders" || activeInvTab === "order_items") && (
+                  <button
+                    onClick={() => {
+                      resetForm();
+                      setMode("create");
+                      setShowModal(true);
+                    }}
+                    className="px-4 py-2 text-sm bg-gradient-to-r from-[#8CC21B] to-[#7ab318] hover:from-[#7ab318] hover:to-[#6ba114] text-white rounded-lg flex items-center gap-2 font-bold shadow-md hover:shadow-lg transition-all"
+                  >
+                    <Plus className="w-4 h-4" />
+                    New Order
+                  </button>
+                )}
+              </>
             )}
           </div>
         </div>
@@ -1761,187 +1863,39 @@ const InvoiceListPage: React.FC = () => {
                 </div>
               </div>
 
-              <div
-                className="bg-white rounded-[4px] border border-[#E9ECEF] mb-6"
-                style={{ boxShadow: "0 2px 8px rgba(0, 0, 0, 0.05)" }}
-              >
-                <div className="p-4 lg:p-6">
-                  <div className="flex flex-col lg:flex-row gap-4">
-                    <div className="flex-1 relative">
-                      <Search
-                        className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4"
-                        style={{ color: "#ADB5BD" }}
-                      />
-                      <input
-                        type="text"
-                        placeholder="Search invoices, customers, or order numbers..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2 border rounded-[4px] transition-all duration-200 text-sm"
-                        style={{ borderColor: "#E9ECEF", color: "#212529" }}
-                      />
-                    </div>
-
-                    <button
-                      onClick={() => setShowFilters(!showFilters)}
-                      className="flex items-center gap-2 px-4 py-2 border rounded-[4px] transition-colors text-sm font-medium"
-                      style={{ borderColor: "#E9ECEF", color: "#495057" }}
-                    >
-                      <Filter className="w-4 h-4" />
-                      Filters
-                      <ChevronDown
-                        className={`w-4 h-4 transition-transform ${showFilters ? "rotate-180" : ""
-                          }`}
-                      />
-                    </button>
+              {/* ONE-LINE-Filter */}
+              <div className="mb-6 p-3 bg-white border border-gray-200 rounded-md shadow-sm">
+                <div className="flex flex-wrap lg:flex-nowrap items-center gap-2 w-full">
+                  <div className="flex items-center gap-1.5 text-gray-400 shrink-0 select-none px-1">
+                    <Filter className="w-5 h-5 text-[#8CC21B]" />
                   </div>
-
-                  {showFilters && (
-                    <div className="mt-4 pt-4 border-t border-[#E9ECEF]">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-                        <div>
-                          <label
-                            className="block text-sm font-medium mb-1"
-                            style={{ color: "#212529" }}
-                          >
-                            Status
-                          </label>
-                          <select
-                            value={filters.status}
-                            onChange={(e) =>
-                              setFilters({ ...filters, status: e.target.value })
-                            }
-                            className="w-full px-3 py-2 border rounded-[4px] text-sm"
-                            style={{ borderColor: "#E9ECEF", color: "#212529" }}
-                          >
-                            <option value="">All Status</option>
-                            <option value="draft">Draft</option>
-                            <option value="sent">Sent</option>
-                            <option value="paid">Paid</option>
-                            <option value="overdue">Overdue</option>
-                            <option value="cancelled">Cancelled</option>
-                          </select>
-                        </div>
-
-                        <div>
-                          <label
-                            className="block text-sm font-medium mb-1"
-                            style={{ color: "#212529" }}
-                          >
-                            From Date
-                          </label>
-                          <input
-                            type="date"
-                            value={filters.dateFrom}
-                            onChange={(e) =>
-                              setFilters({ ...filters, dateFrom: e.target.value })
-                            }
-                            className="w-full px-3 py-2 border rounded-[4px] text-sm"
-                            style={{ borderColor: "#E9ECEF", color: "#212529" }}
-                          />
-                        </div>
-
-                        <div>
-                          <label
-                            className="block text-sm font-medium mb-1"
-                            style={{ color: "#212529" }}
-                          >
-                            To Date
-                          </label>
-                          <input
-                            type="date"
-                            value={filters.dateTo}
-                            onChange={(e) =>
-                              setFilters({ ...filters, dateTo: e.target.value })
-                            }
-                            className="w-full px-3 py-2 border rounded-[4px] text-sm"
-                            style={{ borderColor: "#E9ECEF", color: "#212529" }}
-                          />
-                        </div>
-
-                        <div>
-                          <label
-                            className="block text-sm font-medium mb-1"
-                            style={{ color: "#212529" }}
-                          >
-                            Customer
-                          </label>
-                          <input
-                            type="text"
-                            placeholder="Customer name"
-                            value={filters.customer}
-                            onChange={(e) =>
-                              setFilters({ ...filters, customer: e.target.value })
-                            }
-                            className="w-full px-3 py-2 border rounded-[4px] text-sm"
-                            style={{ borderColor: "#E9ECEF", color: "#212529" }}
-                          />
-                        </div>
-
-                        <div>
-                          <label
-                            className="block text-sm font-medium mb-1"
-                            style={{ color: "#212529" }}
-                          >
-                            Min Amount
-                          </label>
-                          <input
-                            type="number"
-                            placeholder="0.00"
-                            value={filters.minAmount}
-                            onChange={(e) =>
-                              setFilters({
-                                ...filters,
-                                minAmount: e.target.value,
-                              })
-                            }
-                            className="w-full px-3 py-2 border rounded-[4px] text-sm"
-                            style={{ borderColor: "#E9ECEF", color: "#212529" }}
-                          />
-                        </div>
-
-                        <div>
-                          <label
-                            className="block text-sm font-medium mb-1"
-                            style={{ color: "#212529" }}
-                          >
-                            Max Amount
-                          </label>
-                          <input
-                            type="number"
-                            placeholder="0.00"
-                            value={filters.maxAmount}
-                            onChange={(e) =>
-                              setFilters({
-                                ...filters,
-                                maxAmount: e.target.value,
-                              })
-                            }
-                            className="w-full px-3 py-2 border rounded-[4px] text-sm"
-                            style={{ borderColor: "#E9ECEF", color: "#212529" }}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="flex flex-wrap gap-2 mt-4">
-                        <button
-                          onClick={() =>
-                            setFilters({
-                              status: "",
-                              dateFrom: "",
-                              dateTo: "",
-                              customer: "",
-                              minAmount: "",
-                              maxAmount: "",
-                            })
-                          }
-                          className="px-3 py-1 text-sm border rounded-[4px] transition-colors"
-                          style={{ borderColor: "#E9ECEF", color: "#495057" }}
-                        >
-                          Clear Filters
-                        </button>
-                      </div>
-                    </div>
+                  <div className="flex-1 min-w-[200px]">
+                    <input
+                      type="text"
+                      placeholder="Search invoices, customers, or order numbers..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className={getInputClass(!!searchTerm)}
+                    />
+                  </div>
+                  {searchTerm && (
+                    <button
+                      onClick={() => {
+                        setSearchTerm("");
+                        setFilters({
+                          status: "",
+                          dateFrom: "",
+                          dateTo: "",
+                          customer: "",
+                          minAmount: "",
+                          maxAmount: "",
+                        });
+                      }}
+                      className="px-3 py-2 text-sm font-semibold text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 rounded-md transition-colors flex items-center gap-1 whitespace-nowrap shrink-0"
+                    >
+                      <RefreshCw className="w-4 h-4" />
+                      Reset
+                    </button>
                   )}
                 </div>
               </div>
@@ -2019,38 +1973,23 @@ const InvoiceListPage: React.FC = () => {
                                 Total Price
                               </th>
                             )}
-                            <th className="text-center py-3.5 px-4 font-semibold text-[11px] uppercase tracking-wider text-[#495057]">
-                              Actions
-                            </th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-[#F1F3F5]">
                           {currentInvoices.map((invoice, index) => {
-                            const expState = expandedStates[invoice.id] || {};
-                            const showExpanded = expState.taric || expState.items;
-
                             return (
                               <React.Fragment key={invoice.id}>
-                                <tr className="hover:bg-[#F8F9FA] transition-colors group">
+                                <tr
+                                  onClick={() => handleOpenInvoiceDetails(invoice)}
+                                  className="hover:bg-[#F8F9FA] transition-colors group cursor-pointer font-medium"
+                                >
                                   {activeInvTab === "closed_invoices" && (
                                     <td className="py-4 px-4 text-xs text-[#212529]">
                                       {startIndex + index + 1}
                                     </td>
                                   )}
-                                  <td className="py-4 px-4">
-                                    <button
-                                      onClick={() =>
-                                        toggleExpansion(invoice.id, "taric")
-                                      }
-                                      className="flex items-center gap-1.5 px-2.5 py-1 bg-[#495057] text-white text-[10px] font-bold rounded-[4px] hover:bg-[#343A40] transition-colors whitespace-nowrap"
-                                    >
-                                      {invoice.cargo?.cargo_no || "No Cargo"}{" "}
-                                      {expState.taric ? (
-                                        <ChevronDown className="w-3 h-3" />
-                                      ) : (
-                                        <ChevronRight className="w-3 h-3" />
-                                      )}
-                                    </button>
+                                  <td className="py-4 px-4 text-xs text-[#212529] font-bold">
+                                    {invoice.id.slice(-5).toUpperCase()}
                                   </td>
                                   {activeInvTab === "closed_invoices" && (
                                     <td className="py-4 px-4 text-xs font-semibold text-[#212529]">
@@ -2075,29 +2014,7 @@ const InvoiceListPage: React.FC = () => {
                                     })()}
                                   </td>
                                   <td className="py-4 px-4 text-xs text-[#212529]">
-                                    {activeInvTab === "open_invoices" ? (
-                                      (() => {
-                                        const cargoData =
-                                          invoice.cargo ||
-                                          expandedStates[invoice.id]?.data?.cargo;
-                                        if (cargoData) {
-                                          return (
-                                            <span className="font-medium">
-                                              {cargoData.cargo_no || "No Cargo"}
-                                            </span>
-                                          );
-                                        }
-                                        return (
-                                          <span className="font-medium text-[#ADB5BD]">
-                                            No Cargo
-                                          </span>
-                                        );
-                                      })()
-                                    ) : (
-                                      <span className="font-medium">
-                                        {invoice.cargo?.cargo_no || "No Cargo"}
-                                      </span>
-                                    )}
+                                    {invoice.cargo?.cargo_no || "No Cargo"}
                                   </td>
                                   <td className="py-4 px-4 text-xs text-[#495057]">
                                     {new Date(
@@ -2107,17 +2024,10 @@ const InvoiceListPage: React.FC = () => {
                                       month: "2-digit",
                                     })}
                                   </td>
-                                  <td className="py-4 px-4 text-xs">
-                                    <span
-                                      onClick={() =>
-                                        toggleExpansion(invoice.id, "items")
-                                      }
-                                      className="text-[#059669] font-bold hover:underline cursor-pointer"
-                                    >
-                                      {invoice.customItemCount ??
-                                        invoice.items?.length ??
-                                        0}
-                                    </span>
+                                  <td className="py-4 px-4 text-xs text-[#212529]">
+                                    {invoice.customItemCount ??
+                                      invoice.items?.length ??
+                                      0}
                                   </td>
                                   <td className="py-4 px-4 text-xs text-[#212529] font-medium">
                                     {invoice.customTotalQty ??
@@ -2139,889 +2049,7 @@ const InvoiceListPage: React.FC = () => {
                                       )}
                                     </td>
                                   )}
-                                  <td className="py-4 px-4">
-                                    <div className="flex items-center justify-center gap-2">
-                                      {activeInvTab === "open_invoices" ? (
-                                        <div className="flex items-center gap-2">
-                                          <button
-                                            onClick={() =>
-                                              handleMarkAsPaid(invoice.id)
-                                            }
-                                            className="flex items-center gap-1.5 px-4 py-1.5 bg-[#059669] text-white text-[10px] font-bold rounded-[4px] hover:bg-green-700 transition-all shadow-md"
-                                          >
-                                            <CheckCircle className="w-3.5 h-3.5" />{" "}
-                                            VERIFY
-                                          </button>
-                                          <button
-                                            onClick={() => {
-                                              if (editingInvoiceId === invoice.id)
-                                                setEditingInvoiceId(null);
-                                              else {
-                                                setEditingInvoiceId(invoice.id);
-                                                setInvoiceEditForm({
-                                                  description:
-                                                    invoice.description || "",
-                                                  freightCost:
-                                                    invoice.freightCost?.toString() ||
-                                                    "",
-                                                  remark: invoice.remark || "",
-                                                });
-                                              }
-                                            }}
-                                            className="px-3.5 py-1 bg-[#28A745] text-white text-[10px] font-bold rounded-[4px] hover:bg-green-600 transition-colors"
-                                          >
-                                            Edit
-                                          </button>
-                                        </div>
-                                      ) : (
-                                        <>
-                                          <button
-                                            className="text-[#DC3545] hover:text-red-700 transition-colors disabled:opacity-50"
-                                            title="Download PDF"
-                                            disabled={
-                                              actionLoading[`pdf-${invoice.id}`]
-                                            }
-                                            onClick={async () => {
-                                              try {
-                                                setActionLoading((prev) => ({
-                                                  ...prev,
-                                                  [`pdf-${invoice.id}`]: true,
-                                                }));
-                                                await downloadCommercialInvoice(
-                                                  invoice.id,
-                                                );
-                                              } catch (error) {
-                                                console.error(
-                                                  "PDF Generation failed",
-                                                  error,
-                                                );
-                                              } finally {
-                                                setActionLoading((prev) => ({
-                                                  ...prev,
-                                                  [`pdf-${invoice.id}`]: false,
-                                                }));
-                                              }
-                                            }}
-                                          >
-                                            {actionLoading[
-                                              `pdf-${invoice.id}`
-                                            ] ? (
-                                              <Loader2 className="w-5 h-5 animate-spin" />
-                                            ) : (
-                                              <FileText className="w-5 h-5" />
-                                            )}
-                                          </button>
-                                          <button className="px-3.5 py-1 bg-[#F15A24] text-white text-[10px] font-bold rounded-[4px] flex items-center gap-1 hover:bg-[#D9481B] transition-colors">
-                                            <RefreshCw className="w-3 h-3" /> Ship
-                                          </button>
-                                        </>
-                                      )}
-                                    </div>
-                                  </td>
                                 </tr>
-                                {showExpanded && (
-                                  <tr>
-                                    <td
-                                      colSpan={
-                                        activeInvTab === "closed_invoices"
-                                          ? 11
-                                          : 8
-                                      }
-                                      className="p-0 bg-[#F8F9FA]"
-                                    >
-                                      <div className="p-4 space-y-4">
-                                        {expState.data?.cargo && (
-                                          <div className="flex items-center gap-4 px-4 py-2 bg-[#EFF6FF] border border-[#BFDBFE] rounded-[4px] text-xs">
-                                            <span className="font-bold text-[#1D4ED8]">
-                                              Cargo: {expState.data.cargo.cargo_no}
-                                            </span>
-                                            {expState.data.orderNosInCargo
-                                              ?.length > 0 && (
-                                                <span className="text-[#374151]">
-                                                  Orders:{" "}
-                                                  <span className="font-semibold">
-                                                    {expState.data.orderNosInCargo.join(
-                                                      ", ",
-                                                    )}
-                                                  </span>
-                                                </span>
-                                              )}
-                                            {expState.data.cargo.ship_to && (
-                                              <span className="text-[#374151]">
-                                                Ship To:{" "}
-                                                <span className="font-semibold">
-                                                  {expState.data.cargo.ship_to}
-                                                </span>
-                                              </span>
-                                            )}
-                                          </div>
-                                        )}
-                                        {expState.taric && (
-                                          <div className="space-y-2">
-                                            <h4 className="text-[11px] font-bold text-[#495057] uppercase tracking-wider mb-2">
-                                              Items to be shown in invoice based
-                                              on Taric
-                                            </h4>
-                                            <SpreadSheet
-                                              data={
-                                                expState.data?.taricGroups || []
-                                              }
-                                              loading={expState.loading}
-                                              showTotals={true}
-                                              columns={
-                                                activeInvTab === "closed_invoices"
-                                                  ? [
-                                                    {
-                                                      header: "Position",
-                                                      render: (
-                                                        _: any,
-                                                        idx: number,
-                                                      ) => idx + 1,
-                                                      width: "70px",
-                                                    },
-                                                    {
-                                                      header: "Taric Name EN",
-                                                      render: (it: any) =>
-                                                        it.taricNameEn,
-                                                      width: "350px",
-                                                    },
-                                                    {
-                                                      header: "Taric Code",
-                                                      render: (it: any) => (
-                                                        <span
-                                                          style={
-                                                            it.isProjectItem
-                                                              ? {
-                                                                color:
-                                                                  "#F59E0B",
-                                                                fontWeight: 600,
-                                                              }
-                                                              : undefined
-                                                          }
-                                                        >
-                                                          {it.taricCode}
-                                                        </span>
-                                                      ),
-                                                      width: "140px",
-                                                    },
-                                                    {
-                                                      header: "Duty rate",
-                                                      render: (it: any) =>
-                                                        it.dutyRate
-                                                          ? `${Number(it.dutyRate).toFixed(2)}`
-                                                          : "-",
-                                                      width: "80px",
-                                                    },
-                                                    {
-                                                      header: "Total Qty",
-                                                      render: (it: any) =>
-                                                        it.totalQty,
-                                                      align: "center",
-                                                      width: "100px",
-                                                    },
-                                                    {
-                                                      header: "Unit Price",
-                                                      render: (it: any) =>
-                                                        it.unitPrice || "0.00",
-                                                      width: "100px",
-                                                    },
-                                                    {
-                                                      header: "Total Price",
-                                                      render: (it: any) =>
-                                                        (
-                                                          Number(
-                                                            it.totalPrice,
-                                                          ) || 0
-                                                        ).toLocaleString(
-                                                          undefined,
-                                                          {
-                                                            minimumFractionDigits: 2,
-                                                          },
-                                                        ),
-                                                      width: "120px",
-                                                    },
-                                                  ]
-                                                  : [
-                                                    {
-                                                      header: "Position",
-                                                      render: (
-                                                        _: any,
-                                                        idx: number,
-                                                      ) => idx + 1,
-                                                      width: "70px",
-                                                    },
-                                                    {
-                                                      header: "Taric Name EN",
-                                                      render: (it: any) =>
-                                                        it.taricNameEn,
-                                                      width: "350px",
-                                                    },
-                                                    {
-                                                      header: "Taric Code",
-                                                      render: (it: any) => (
-                                                        <span
-                                                          style={
-                                                            it.isProjectItem
-                                                              ? {
-                                                                color:
-                                                                  "#F59E0B",
-                                                                fontWeight: 600,
-                                                              }
-                                                              : undefined
-                                                          }
-                                                        >
-                                                          {it.taricCode}
-                                                        </span>
-                                                      ),
-                                                      width: "140px",
-                                                    },
-                                                    {
-                                                      header: "Duty rate",
-                                                      render: (it: any) =>
-                                                        it.dutyRate
-                                                          ? `${Number(it.dutyRate).toFixed(2)}`
-                                                          : "-",
-                                                      width: "80px",
-                                                    },
-                                                    {
-                                                      header: "Total Qty",
-                                                      render: (it: any) =>
-                                                        it.totalQty,
-                                                      align: "center",
-                                                      width: "100px",
-                                                    },
-                                                    {
-                                                      header: "Unit Price",
-                                                      render: (it: any) =>
-                                                        it.unitPrice || "0.00",
-                                                      width: "100px",
-                                                    },
-                                                    {
-                                                      header: "Total Price",
-                                                      render: (it: any) =>
-                                                        (
-                                                          Number(
-                                                            it.totalPrice,
-                                                          ) || 0
-                                                        ).toLocaleString(
-                                                          undefined,
-                                                          {
-                                                            minimumFractionDigits: 2,
-                                                          },
-                                                        ),
-                                                      width: "120px",
-                                                    },
-                                                    {
-                                                      header: "Operation",
-                                                      render: (group: any) => (
-                                                        <button
-                                                          onClick={() => {
-                                                            setSelectedTaricGroup(
-                                                              group,
-                                                            );
-                                                            setSelectedTaricCode(
-                                                              "",
-                                                            );
-                                                            setShowTaricModal(
-                                                              true,
-                                                            );
-                                                          }}
-                                                          className="flex items-center gap-1 px-3 py-1 bg-[#1A73E8] text-white text-[10px] font-bold rounded hover:bg-[#1557B0]"
-                                                        >
-                                                          <RefreshCw className="w-3 h-3" />{" "}
-                                                          Set taric
-                                                        </button>
-                                                      ),
-                                                      width: "120px",
-                                                    },
-                                                  ]
-                                              }
-                                              expandedRowId={null}
-                                              totalCols={
-                                                activeInvTab === "closed_invoices"
-                                                  ? [
-                                                    {
-                                                      label: "Grand Total",
-                                                      value: "",
-                                                      width: "740px",
-                                                      align: "left",
-                                                    },
-                                                    {
-                                                      value:
-                                                        expState.data?.taricGroups?.reduce(
-                                                          (s: number, g: any) =>
-                                                            s +
-                                                            (g.totalQty || 0),
-                                                          0,
-                                                        ) || 0,
-                                                      width: "100px",
-                                                      align: "center",
-                                                    },
-                                                    {
-                                                      value: "",
-                                                      width: "100px",
-                                                    },
-                                                    {
-                                                      value: (
-                                                        expState.data?.taricGroups?.reduce(
-                                                          (s: number, g: any) =>
-                                                            s +
-                                                            (g.totalPrice || 0),
-                                                          0,
-                                                        ) || 0
-                                                      ).toLocaleString(
-                                                        undefined,
-                                                        {
-                                                          minimumFractionDigits: 2,
-                                                        },
-                                                      ),
-                                                      width: "120px",
-                                                      align: "left",
-                                                    },
-                                                  ]
-                                                  : [
-                                                    {
-                                                      label: "Grand Total",
-                                                      value: "",
-                                                      width: "620px",
-                                                      align: "left",
-                                                    },
-                                                    {
-                                                      value:
-                                                        expState.data?.taricGroups?.reduce(
-                                                          (s: number, g: any) =>
-                                                            s +
-                                                            (g.totalQty || 0),
-                                                          0,
-                                                        ) || 0,
-                                                      width: "100px",
-                                                      align: "center",
-                                                    },
-                                                    {
-                                                      value: "",
-                                                      width: "100px",
-                                                    },
-                                                    {
-                                                      value: (
-                                                        expState.data?.taricGroups?.reduce(
-                                                          (s: number, g: any) =>
-                                                            s +
-                                                            (g.totalPrice || 0),
-                                                          0,
-                                                        ) || 0
-                                                      ).toLocaleString(
-                                                        undefined,
-                                                        {
-                                                          minimumFractionDigits: 2,
-                                                        },
-                                                      ),
-                                                      width: "120px",
-                                                      align: "left",
-                                                    },
-                                                    {
-                                                      value: "",
-                                                      width: "120px",
-                                                    },
-                                                  ]
-                                              }
-                                            />
-                                          </div>
-                                        )}
-                                        {expState.items && (
-                                          <SpreadSheet
-                                            data={
-                                              expState.data?.detailedItems || []
-                                            }
-                                            loading={expState.loading}
-                                            columns={
-                                              activeInvTab === "closed_invoices"
-                                                ? [
-                                                  {
-                                                    header: "#",
-                                                    render: (
-                                                      _: any,
-                                                      idx: number,
-                                                    ) => idx + 1,
-                                                    width: "40px",
-                                                  },
-                                                  {
-                                                    header: "EAN",
-                                                    render: (it: any) =>
-                                                      it._fallbackEan ||
-                                                      it.item?.ean ||
-                                                      "-",
-                                                    width: "110px",
-                                                  },
-                                                  {
-                                                    header: "Item Name",
-                                                    render: (it: any) => (
-                                                      <div
-                                                        className="line-clamp-2 leading-tight py-1"
-                                                        title={
-                                                          it.item?.item_name
-                                                        }
-                                                      >
-                                                        {it.item?.item_name}
-                                                      </div>
-                                                    ),
-                                                    width: "350px",
-                                                  },
-                                                  {
-                                                    header: "Taric code",
-                                                    render: (it: any) =>
-                                                      it.set_taric_code ||
-                                                      it.item?.taric?.code ||
-                                                      "-",
-                                                    width: "100px",
-                                                  },
-                                                  {
-                                                    header: "QTY",
-                                                    render: (it: any) => (
-                                                      <span className="font-bold">
-                                                        {it.qty}
-                                                      </span>
-                                                    ),
-                                                    width: "60px",
-                                                    align: "center",
-                                                  },
-                                                  {
-                                                    header: "EUR",
-                                                    render: (it: any) =>
-                                                      it.eur_special_price ||
-                                                      it._fallbackEk ||
-                                                      "0",
-                                                    width: "60px",
-                                                    align: "center",
-                                                  },
-                                                  {
-                                                    header: "EK",
-                                                    render: (it: any) => {
-                                                      const unitPrice =
-                                                        Number(
-                                                          it.eur_special_price ||
-                                                          it._fallbackEk,
-                                                        ) || 0;
-                                                      const totalPrice =
-                                                        (it.qty || 0) *
-                                                        unitPrice;
-                                                      return (
-                                                        <span className="font-bold text-[#10B981]">
-                                                          {totalPrice.toFixed(
-                                                            2,
-                                                          )}
-                                                        </span>
-                                                      );
-                                                    },
-                                                    width: "80px",
-                                                    align: "center",
-                                                  },
-                                                ]
-                                                : [
-                                                  {
-                                                    header: "ID",
-                                                    render: (it: any) => (
-                                                      <div className="flex flex-col gap-1.5 p-1">
-                                                        <div className="px-2 py-1 bg-[#495057] text-white text-[10px] font-bold rounded-[4px] text-center mb-1 flex items-center justify-center gap-1.5">
-                                                          <FileText className="w-3 h-3" />{" "}
-                                                          {it.id}
-                                                        </div>
-                                                        <div className="flex flex-col gap-1">
-                                                          <button
-                                                            onClick={() => {
-                                                              setSelectedItem(
-                                                                it,
-                                                              );
-                                                              setNewQty(
-                                                                it.qty_label ||
-                                                                it.qty,
-                                                              );
-                                                              setQtyRemarks(
-                                                                it.remarks_cn ||
-                                                                "",
-                                                              );
-                                                              setShowQTYModal(
-                                                                true,
-                                                              );
-                                                            }}
-                                                            className="flex items-center gap-1.5 px-2 py-1.5 text-[9px] font-bold bg-[#495057] text-white rounded-[4px] hover:bg-[#343A40] transition shadow-sm uppercase"
-                                                          >
-                                                            <div className="bg-white/20 p-0.5 rounded">
-                                                              <Package className="w-2.5 h-2.5" />
-                                                            </div>{" "}
-                                                            QtyLabel
-                                                          </button>
-                                                          <button
-                                                            onClick={() => {
-                                                              setSelectedItem(
-                                                                it,
-                                                              );
-                                                              setSplitQty(
-                                                                Math.floor(
-                                                                  it.qty * 0.5,
-                                                                ),
-                                                              );
-                                                              setTargetCargoId(
-                                                                "",
-                                                              );
-                                                              setSplitRemarks(
-                                                                it.remarks_cn ||
-                                                                "",
-                                                              );
-                                                              setShowSPModal(
-                                                                true,
-                                                              );
-                                                            }}
-                                                            className="flex items-center gap-1.5 px-2 py-1.5 text-[9px] font-bold bg-[#F15A24] text-white rounded-[4px] hover:bg-[#D9481B] transition shadow-sm uppercase"
-                                                          >
-                                                            <div className="bg-white/20 p-0.5 rounded">
-                                                              <Scissors className="w-2.5 h-2.5" />
-                                                            </div>{" "}
-                                                            Split
-                                                          </button>
-                                                          <button
-                                                            onClick={() => {
-                                                              setSelectedItem(
-                                                                it,
-                                                              );
-                                                              setTargetCargoId(
-                                                                it.cargo_id ||
-                                                                "",
-                                                              );
-                                                              setShowREModal(
-                                                                true,
-                                                              );
-                                                            }}
-                                                            className="flex items-center gap-1.5 px-2 py-1.5 text-[9px] font-bold bg-[#4F46E5] text-white rounded-[4px] hover:bg-[#4338CA] transition shadow-sm uppercase"
-                                                          >
-                                                            <div className="bg-white/20 p-0.5 rounded">
-                                                              <RefreshCw className="w-2.5 h-2.5" />
-                                                            </div>{" "}
-                                                            ReAssign
-                                                          </button>
-                                                        </div>
-                                                      </div>
-                                                    ),
-                                                    width: "100px",
-                                                  },
-                                                  {
-                                                    header: "EAN",
-                                                    render: (it: any) =>
-                                                      it._fallbackEan ||
-                                                      it.item?.ean ||
-                                                      "-",
-                                                    width: "110px",
-                                                  },
-                                                  {
-                                                    header: "Item Name",
-                                                    render: (it: any) => (
-                                                      <div
-                                                        className="line-clamp-3 leading-tight break-words"
-                                                        title={
-                                                          it.item?.item_name
-                                                        }
-                                                      >
-                                                        {it.item?.item_name}
-                                                      </div>
-                                                    ),
-                                                    width: "250px",
-                                                  },
-                                                  {
-                                                    header: "Taric code",
-                                                    render: (it: any) =>
-                                                      it.set_taric_code ||
-                                                      it.item?.taric?.code,
-                                                    width: "90px",
-                                                  },
-                                                  {
-                                                    header: "Remark",
-                                                    render: (it: any) =>
-                                                      `// ${it.remark_de || ""}`,
-                                                    width: "80px",
-                                                  },
-                                                  {
-                                                    header: "Order_no",
-                                                    render: (it: any) =>
-                                                      it.order?.order_no || "-",
-                                                    width: "80px",
-                                                  },
-                                                  {
-                                                    header: "SOID",
-                                                    render: (it: any) =>
-                                                      it.supplier_order_id ||
-                                                      "-",
-                                                    width: "50px",
-                                                  },
-                                                  {
-                                                    header: "Status",
-                                                    render: (it: any) =>
-                                                      it.status,
-                                                    width: "60px",
-                                                  },
-                                                  {
-                                                    header: "V(dm³)",
-                                                    render: (it: any) =>
-                                                      it.v?.toFixed(2),
-                                                    width: "60px",
-                                                    align: "center",
-                                                  },
-                                                  {
-                                                    header: "W(kg)",
-                                                    render: (it: any) =>
-                                                      it.w?.toFixed(2),
-                                                    width: "60px",
-                                                    align: "center",
-                                                  },
-                                                  {
-                                                    header: "QTY",
-                                                    render: (it: any) => (
-                                                      <div className="flex flex-col items-center">
-                                                        <span className="font-bold">
-                                                          {it.qty_label
-                                                            ? `${it.qty_label}/${it.qty}`
-                                                            : it.qty}
-                                                        </span>
-                                                      </div>
-                                                    ),
-                                                    width: "60px",
-                                                    align: "center",
-                                                  },
-                                                  {
-                                                    header: "EUR",
-                                                    render: (it: any) =>
-                                                      it.eur_special_price ||
-                                                      it._fallbackEk ||
-                                                      "0",
-                                                    width: "45px",
-                                                    align: "center",
-                                                  },
-                                                  {
-                                                    header: "EK",
-                                                    render: (it: any) => {
-                                                      const unitPrice =
-                                                        Number(
-                                                          it.eur_special_price ||
-                                                          it._fallbackEk,
-                                                        ) || 0;
-                                                      const totalPrice =
-                                                        (it.qty || 0) *
-                                                        unitPrice;
-                                                      return (
-                                                        <span className="font-bold text-[#10B981]">
-                                                          {totalPrice.toFixed(
-                                                            2,
-                                                          )}
-                                                        </span>
-                                                      );
-                                                    },
-                                                    width: "65px",
-                                                    align: "center",
-                                                  },
-                                                  {
-                                                    header: "Action",
-                                                    render: (it: any) =>
-                                                      it.item
-                                                        ?.is_eur_special ===
-                                                        "Y" &&
-                                                        (!it.eur_special_price ||
-                                                          Number(
-                                                            it.eur_special_price,
-                                                          ) === 0) ? (
-                                                        <button
-                                                          onClick={() => {
-                                                            setExpandedPriceItemId(
-                                                              expandedPriceItemId ===
-                                                                it.id
-                                                                ? null
-                                                                : it.id,
-                                                            );
-                                                            setEditingPrice(
-                                                              it.eur_special_price ||
-                                                              0,
-                                                            );
-                                                          }}
-                                                          className="flex items-center gap-1.5 px-3 py-1.5 bg-[#EF4444] text-white text-[10px] font-bold rounded-[4px] hover:bg-red-600 transition-all shadow-md whitespace-nowrap"
-                                                        >
-                                                          <DollarSign className="w-3.5 h-3.5" />{" "}
-                                                          SET EUR PRICE
-                                                        </button>
-                                                      ) : null,
-                                                    width: "120px",
-                                                  },
-                                                ]
-                                            }
-                                            expandedRowId={expandedPriceItemId}
-                                            renderRowDetails={(it: any) => (
-                                              <div className="bg-[#F8F9FA] p-4 rounded-md border border-gray-200 mt-2 shadow-inner">
-                                                <h4 className="text-[11px] font-bold text-[#495057] uppercase mb-3 tracking-wider flex items-center gap-2">
-                                                  <div className="w-1.5 h-1.5 bg-[#EF4444] rounded-full"></div>
-                                                  Set EUR Price for Item {it.id}
-                                                </h4>
-                                                <div className="space-y-3">
-                                                  <div>
-                                                    <label className="block text-[10px] font-bold text-[#6C757D] uppercase mb-1.5">
-                                                      EUR Special Price
-                                                    </label>
-                                                    <div className="relative">
-                                                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                                        <span className="text-gray-500 text-xs text-black"></span>
-                                                      </div>
-                                                      <input
-                                                        type="number"
-                                                        step="0.01"
-                                                        value={editingPrice}
-                                                        onChange={(e) =>
-                                                          setEditingPrice(
-                                                            Number(
-                                                              e.target.value,
-                                                            ),
-                                                          )
-                                                        }
-                                                        className="w-full pl-7 pr-3 py-2 bg-white border border-gray-300 rounded-[4px] text-sm focus:ring-2 focus:ring-[#EF4444] focus:border-transparent outline-none transition-all shadow-sm font-medium text-black"
-                                                        placeholder="0.00"
-                                                      />
-                                                    </div>
-                                                  </div>
-                                                  <div className="flex gap-2 pt-1">
-                                                    <button
-                                                      onClick={() =>
-                                                        setExpandedPriceItemId(
-                                                          null,
-                                                        )
-                                                      }
-                                                      className="px-4 py-2 text-[11px] font-bold text-[#495057] bg-white border border-[#DEE2E6] rounded-[4px] hover:bg-gray-50 transition-all uppercase shadow-sm"
-                                                    >
-                                                      Cancel
-                                                    </button>
-                                                    <button
-                                                      onClick={() =>
-                                                        handleSetPrice(it.id)
-                                                      }
-                                                      className="px-5 py-2 text-[11px] font-bold text-white bg-[#10B981] rounded-[4px] hover:bg-[#059669] transition-all uppercase shadow-md flex items-center gap-2"
-                                                    >
-                                                      <Check className="w-3.5 h-3.5" />{" "}
-                                                      Set Price
-                                                    </button>
-                                                  </div>
-                                                </div>
-                                              </div>
-                                            )}
-                                            showTotals={false}
-                                          />
-                                        )}
-                                      </div>
-                                    </td>
-                                  </tr>
-                                )}
-                                {editingInvoiceId === invoice.id && (
-                                  <tr>
-                                    <td
-                                      colSpan={
-                                        activeInvTab === "closed_invoices"
-                                          ? 11
-                                          : 9
-                                      }
-                                      className="p-0 border-b border-[#E9ECEF] bg-[#F8F9FA]"
-                                    >
-                                      <div className="p-6 flex justify-center w-full">
-                                        <div className="bg-white p-6 rounded-[8px] border border-[#E9ECEF] shadow-sm w-full max-w-2xl">
-                                          <div className="space-y-4">
-                                            <div className="grid grid-cols-1 gap-4">
-                                              <div>
-                                                <label className="block text-[11px] font-bold text-[#495057] mb-1.5">
-                                                  Description *
-                                                </label>
-                                                <input
-                                                  type="text"
-                                                  value={
-                                                    invoiceEditForm.description
-                                                  }
-                                                  onChange={(e) =>
-                                                    setInvoiceEditForm({
-                                                      ...invoiceEditForm,
-                                                      description: e.target.value,
-                                                    })
-                                                  }
-                                                  className="w-full px-3 py-2 border border-[#DEE2E6] rounded-[4px] text-sm focus:outline-none focus:border-[#8CC21B]"
-                                                  placeholder="Freight cost"
-                                                />
-                                              </div>
-                                              <div>
-                                                <label className="block text-[11px] font-bold text-[#495057] mb-1.5">
-                                                  Freight Cost *
-                                                </label>
-                                                <input
-                                                  type="number"
-                                                  step="0.01"
-                                                  value={
-                                                    invoiceEditForm.freightCost
-                                                  }
-                                                  onChange={(e) =>
-                                                    setInvoiceEditForm({
-                                                      ...invoiceEditForm,
-                                                      freightCost: e.target.value,
-                                                    })
-                                                  }
-                                                  className="w-full px-3 py-2 border border-[#DEE2E6] rounded-[4px] text-sm focus:outline-none focus:border-[#8CC21B]"
-                                                  placeholder="Enter Freight Cost"
-                                                />
-                                              </div>
-                                              <div>
-                                                <label className="block text-[11px] font-bold text-[#495057] mb-1.5">
-                                                  Remark
-                                                </label>
-                                                <textarea
-                                                  value={invoiceEditForm.remark}
-                                                  onChange={(e) =>
-                                                    setInvoiceEditForm({
-                                                      ...invoiceEditForm,
-                                                      remark: e.target.value,
-                                                    })
-                                                  }
-                                                  rows={3}
-                                                  className="w-full px-3 py-2 border border-[#DEE2E6] rounded-[4px] text-sm focus:outline-none focus:border-[#8CC21B]"
-                                                  placeholder="Enter extra info"
-                                                />
-                                              </div>
-                                            </div>
-                                            <div className="flex justify-center gap-3 pt-4">
-                                              <button
-                                                onClick={() =>
-                                                  setEditingInvoiceId(null)
-                                                }
-                                                className="px-6 py-2 text-[11px] font-bold text-[#495057] bg-white border border-[#DEE2E6] rounded-[20px] hover:bg-gray-50 flex items-center gap-1.5 shadow-sm transition-all"
-                                              >
-                                                <XCircle className="w-3.5 h-3.5" />{" "}
-                                                Cancel
-                                              </button>
-                                              <button
-                                                onClick={() =>
-                                                  handleSaveInvoiceEdit(
-                                                    invoice.id,
-                                                  )
-                                                }
-                                                disabled={
-                                                  actionLoading[
-                                                  `save-${invoice.id}`
-                                                  ]
-                                                }
-                                                className="px-6 py-2 text-[11px] font-bold text-white bg-[#059669] rounded-[20px] hover:bg-green-700 flex items-center gap-1.5 shadow-md transition-all disabled:opacity-50"
-                                              >
-                                                {actionLoading[
-                                                  `save-${invoice.id}`
-                                                ] ? (
-                                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                                ) : (
-                                                  <PlusCircle className="w-3.5 h-3.5" />
-                                                )}
-                                                Save
-                                              </button>
-                                            </div>
-                                          </div>
-                                        </div>
-                                      </div>
-                                    </td>
-                                  </tr>
-                                )}
                               </React.Fragment>
                             );
                           })}
@@ -3031,11 +2059,15 @@ const InvoiceListPage: React.FC = () => {
 
                     <div className="lg:hidden divide-y divide-[#F1F3F5]">
                       {currentInvoices.map((invoice) => (
-                        <div key={invoice.id} className="p-4">
+                        <div
+                          key={invoice.id}
+                          onClick={() => handleOpenInvoiceDetails(invoice)}
+                          className="p-4 cursor-pointer hover:bg-gray-50 transition-colors"
+                        >
                           <div className="flex items-center justify-between mb-3">
                             <div className="flex items-center gap-2">
                               <div className="px-2 py-1 bg-[#495057] text-white text-[10px] font-bold rounded-[4px]">
-                                {invoice.id.slice(-2)}
+                                {invoice.id.slice(-5).toUpperCase()}
                               </div>
                               <div className="font-bold text-sm text-[#212529]">
                                 {activeInvTab === "closed_invoices"
@@ -3051,7 +2083,7 @@ const InvoiceListPage: React.FC = () => {
                             </span>
                           </div>
 
-                          <div className="space-y-2 mb-4">
+                          <div className="space-y-2">
                             <div className="flex justify-between text-xs">
                               <span className="text-[#6C757D]">Customer</span>
                               <span className="font-medium text-[#212529]">
@@ -3065,17 +2097,17 @@ const InvoiceListPage: React.FC = () => {
                                   : "Cargo No."}
                               </span>
                               <span className="font-medium text-[#212529]">
-                                {invoice.cargoNo || "-"}
+                                {invoice.cargo?.cargo_no || "-"}
                               </span>
                             </div>
                             <div className="flex justify-between text-xs">
                               <span className="text-[#6C757D]">Items / Qty</span>
                               <span className="font-medium text-[#212529]">
-                                {invoice.items?.length || 0} /{" "}
-                                {invoice.items?.reduce(
+                                {invoice.customItemCount ?? invoice.items?.length ?? 0} /{" "}
+                                {invoice.customTotalQty ?? (invoice.items?.reduce(
                                   (sum, item) => sum + item.quantity,
                                   0,
-                                ) || 0}
+                                ) ?? 0)}
                               </span>
                             </div>
                             {activeInvTab === "closed_invoices" && (
@@ -3089,157 +2121,6 @@ const InvoiceListPage: React.FC = () => {
                               </div>
                             )}
                           </div>
-
-                          <div className="flex gap-2">
-                            {activeInvTab === "open_invoices" ? (
-                              <>
-                                <button
-                                  onClick={() => handleMarkAsPaid(invoice.id)}
-                                  disabled={actionLoading[`paid-${invoice.id}`]}
-                                  className="flex-1 flex items-center justify-center gap-2 py-2 bg-[#059669] text-white text-[11px] font-bold rounded-[4px] shadow-md disabled:opacity-50"
-                                >
-                                  {actionLoading[`paid-${invoice.id}`] ? (
-                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                  ) : (
-                                    <CheckCircle className="w-4 h-4" />
-                                  )}
-                                  VERIFY
-                                </button>
-                                <button
-                                  onClick={() => {
-                                    if (editingInvoiceId === invoice.id)
-                                      setEditingInvoiceId(null);
-                                    else {
-                                      setEditingInvoiceId(invoice.id);
-                                      setInvoiceEditForm({
-                                        description: invoice.description || "",
-                                        freightCost:
-                                          invoice.freightCost?.toString() || "",
-                                        remark: invoice.remark || "",
-                                      });
-                                    }
-                                  }}
-                                  className="flex-1 py-2 bg-[#28A745] text-white text-[11px] font-bold rounded-[4px]"
-                                >
-                                  Edit
-                                </button>
-                              </>
-                            ) : (
-                              <>
-                                <button
-                                  disabled={actionLoading[`pdf-${invoice.id}`]}
-                                  onClick={async () => {
-                                    try {
-                                      setActionLoading((prev) => ({
-                                        ...prev,
-                                        [`pdf-${invoice.id}`]: true,
-                                      }));
-                                      await downloadCommercialInvoice(invoice.id);
-                                    } catch (error) {
-                                      console.error(
-                                        "PDF Generation failed",
-                                        error,
-                                      );
-                                    } finally {
-                                      setActionLoading((prev) => ({
-                                        ...prev,
-                                        [`pdf-${invoice.id}`]: false,
-                                      }));
-                                    }
-                                  }}
-                                  className="flex-1 py-2 border border-[#DC3545] text-[#DC3545] text-[11px] font-bold rounded-[4px] flex items-center justify-center gap-1.5 disabled:opacity-50"
-                                >
-                                  {actionLoading[`pdf-${invoice.id}`] ? (
-                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                  ) : (
-                                    <FileText className="w-4 h-4" />
-                                  )}
-                                  PDF
-                                </button>
-                                <button className="flex-1 py-2 bg-[#F15A24] text-white text-[11px] font-bold rounded-[4px] flex items-center justify-center gap-1 hover:bg-[#D9481B]">
-                                  <RefreshCw className="w-3.5 h-3.5" /> Ship
-                                </button>
-                              </>
-                            )}
-                          </div>
-                          {editingInvoiceId === invoice.id && (
-                            <div className="mt-4 p-4 bg-[#F8F9FA] border border-[#E9ECEF] rounded-[4px] space-y-4">
-                              <div>
-                                <label className="block text-[11px] font-bold text-[#495057] mb-1.5">
-                                  Description *
-                                </label>
-                                <input
-                                  type="text"
-                                  value={invoiceEditForm.description}
-                                  onChange={(e) =>
-                                    setInvoiceEditForm({
-                                      ...invoiceEditForm,
-                                      description: e.target.value,
-                                    })
-                                  }
-                                  className="w-full px-3 py-2 bg-white border border-[#DEE2E6] rounded-[4px] text-sm focus:outline-none focus:border-[#8CC21B] text-black font-medium"
-                                  placeholder="Freight cost"
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-[11px] font-bold text-[#495057] mb-1.5">
-                                  Freight Cost *
-                                </label>
-                                <input
-                                  type="number"
-                                  step="0.01"
-                                  value={invoiceEditForm.freightCost}
-                                  onChange={(e) =>
-                                    setInvoiceEditForm({
-                                      ...invoiceEditForm,
-                                      freightCost: e.target.value,
-                                    })
-                                  }
-                                  className="w-full px-3 py-2 bg-white border border-[#DEE2E6] rounded-[4px] text-sm focus:outline-none focus:border-[#8CC21B] text-black font-medium"
-                                  placeholder="Enter Freight Cost"
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-[11px] font-bold text-[#495057] mb-1.5">
-                                  Remark
-                                </label>
-                                <textarea
-                                  value={invoiceEditForm.remark}
-                                  onChange={(e) =>
-                                    setInvoiceEditForm({
-                                      ...invoiceEditForm,
-                                      remark: e.target.value,
-                                    })
-                                  }
-                                  rows={3}
-                                  className="w-full px-3 py-2 bg-white border border-[#DEE2E6] rounded-[4px] text-sm focus:outline-none focus:border-[#8CC21B] text-black font-medium"
-                                  placeholder="Enter extra info"
-                                />
-                              </div>
-                              <div className="flex gap-2 pt-2">
-                                <button
-                                  onClick={() => setEditingInvoiceId(null)}
-                                  className="flex-1 py-2 text-[11px] font-bold text-[#495057] bg-white border border-[#DEE2E6] rounded-[20px] hover:bg-gray-50 flex items-center justify-center gap-1.5 shadow-sm transition-all"
-                                >
-                                  <XCircle className="w-3.5 h-3.5" /> Cancel
-                                </button>
-                                <button
-                                  onClick={() =>
-                                    handleSaveInvoiceEdit(invoice.id)
-                                  }
-                                  disabled={actionLoading[`save-${invoice.id}`]}
-                                  className="flex-1 py-2 text-[11px] font-bold text-white bg-[#059669] rounded-[20px] hover:bg-green-700 flex items-center justify-center gap-1.5 shadow-md transition-all disabled:opacity-50"
-                                >
-                                  {actionLoading[`save-${invoice.id}`] ? (
-                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                  ) : (
-                                    <PlusCircle className="w-3.5 h-3.5" />
-                                  )}
-                                  Save
-                                </button>
-                              </div>
-                            </div>
-                          )}
                         </div>
                       ))}
                     </div>
@@ -3298,7 +2179,7 @@ const InvoiceListPage: React.FC = () => {
             className="bg-white rounded-[4px] border border-[#E9ECEF] p-4"
             style={{ boxShadow: "0 2px 8px rgba(0, 0, 0, 0.05)" }}
           >
-            <CargosTab />
+            <CargosTab ref={cargosTabRef} />
           </div>
         )}
 
@@ -3307,7 +2188,7 @@ const InvoiceListPage: React.FC = () => {
             className="bg-white rounded-[4px] border border-[#E9ECEF] p-4"
             style={{ boxShadow: "0 2px 8px rgba(0, 0, 0, 0.05)" }}
           >
-            <CargoTypesTab />
+            <CargoTypesTab ref={cargoTypesTabRef} />
           </div>
         )}
 
@@ -3426,6 +2307,659 @@ const InvoiceListPage: React.FC = () => {
             <PackingListTab />
           </div>
         )}
+        {showInvoiceDetailsModal && selectedInvoice && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-2xl shadow-xl max-w-5xl w-full max-h-[90vh] overflow-y-auto flex flex-col">
+              {/* Modal Header */}
+              <div className="p-6 border-b border-gray-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                    <FileText className="w-5 h-5 text-[#8CC21B]" />
+                    Invoice Details
+                  </h2>
+                  <p className="text-xs text-gray-500 mt-1">
+                    ID: {selectedInvoice.id} {selectedInvoice.invoiceNumber ? `| Invoice No: ${selectedInvoice.invoiceNumber}` : ""}
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span
+                    className="text-xs font-bold px-2.5 py-1 rounded-[4px] uppercase"
+                    style={getStatusColor(selectedInvoice.status)}
+                  >
+                    {selectedInvoice.status}
+                  </span>
+
+                  {activeInvTab === "open_invoices" ? (
+                    <button
+                      onClick={() => handleMarkAsPaid(selectedInvoice.id)}
+                      disabled={actionLoading[`paid-${selectedInvoice.id}`]}
+                      className="px-4 py-2 bg-[#059669] text-white text-xs font-bold rounded-lg hover:bg-green-700 transition-all flex items-center gap-1.5 shadow-md disabled:opacity-50"
+                    >
+                      {actionLoading[`paid-${selectedInvoice.id}`] ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <CheckCircle className="w-3.5 h-3.5" />
+                      )}
+                      VERIFY
+                    </button>
+                  ) : (
+                    <>
+                      <button
+                        className="px-4 py-2 border border-[#DC3545] text-[#DC3545] text-xs font-bold rounded-lg flex items-center gap-1.5 hover:bg-[#DC3545]/10 transition-colors disabled:opacity-50"
+                        title="Download PDF"
+                        disabled={actionLoading[`pdf-${selectedInvoice.id}`]}
+                        onClick={async () => {
+                          try {
+                            setActionLoading((prev) => ({
+                              ...prev,
+                              [`pdf-${selectedInvoice.id}`]: true,
+                            }));
+                            await downloadCommercialInvoice(selectedInvoice.id);
+                          } catch (error) {
+                            console.error("PDF Generation failed", error);
+                          } finally {
+                            setActionLoading((prev) => ({
+                              ...prev,
+                              [`pdf-${selectedInvoice.id}`]: false,
+                            }));
+                          }
+                        }}
+                      >
+                        {actionLoading[`pdf-${selectedInvoice.id}`] ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <FileText className="w-3.5 h-3.5" />
+                        )}
+                        Download PDF
+                      </button>
+                      <button className="px-4 py-2 bg-[#F15A24] text-white text-xs font-bold rounded-lg flex items-center gap-1 hover:bg-[#D9481B] transition-colors">
+                        <RefreshCw className="w-3 h-3" /> Ship
+                      </button>
+                    </>
+                  )}
+
+                  <button
+                    onClick={() => setShowInvoiceDetailsModal(false)}
+                    className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors ml-2"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Modal Body */}
+              <div className="p-6 space-y-6 flex-1 text-black">
+                {/* Meta details cards */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                    <span className="block text-[10px] font-bold text-gray-400 uppercase tracking-wide">Customer</span>
+                    <span className="text-sm font-semibold text-gray-800 block mt-1">{selectedInvoice.customer?.companyName || "N/A"}</span>
+                    {selectedInvoice.customer?.email && (
+                      <span className="text-xs text-gray-500 block mt-0.5">{selectedInvoice.customer.email}</span>
+                    )}
+                  </div>
+                  <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                    <span className="block text-[10px] font-bold text-gray-400 uppercase tracking-wide">Bill To / Ship To</span>
+                    <span className="text-sm font-semibold text-gray-800 block mt-1">
+                      Bill To: {typeof selectedInvoice.bill_to === "string" ? selectedInvoice.bill_to : "N/A"}
+                    </span>
+                    <span className="text-xs text-gray-500 block mt-0.5">
+                      Ship To: {typeof selectedInvoice.ship_to === "string" ? selectedInvoice.ship_to : "N/A"}
+                    </span>
+                  </div>
+                  <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                    <span className="block text-[10px] font-bold text-gray-400 uppercase tracking-wide">Cargo No / Dates</span>
+                    <span className="text-sm font-semibold text-gray-800 block mt-1">Cargo: {selectedInvoice.cargo?.cargo_no || "No Cargo"}</span>
+                    <span className="text-xs text-gray-500 block mt-0.5">
+                      Date: {new Date(selectedInvoice.invoiceDate).toLocaleDateString("de-DE")}
+                    </span>
+                  </div>
+                  <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                    <span className="block text-[10px] font-bold text-gray-400 uppercase tracking-wide">Items / Totals</span>
+                    <span className="text-sm font-semibold text-gray-800 block mt-1">
+                      {selectedInvoice.customItemCount ?? selectedInvoice.items?.length ?? 0} Items | {selectedInvoice.customTotalQty ?? 0} Qty
+                    </span>
+                    {activeInvTab === "closed_invoices" && (
+                      <span className="text-sm font-bold text-emerald-600 block mt-0.5">
+                        Total: ${Number(selectedInvoice.grossTotal).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Edit Form for Open Invoices */}
+                {activeInvTab === "open_invoices" && (
+                  <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm space-y-4">
+                    <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider">Edit Invoice Details</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-[11px] font-bold text-[#495057] mb-1.5">Description *</label>
+                        <input
+                          type="text"
+                          value={invoiceEditForm.description}
+                          onChange={(e) => setInvoiceEditForm({ ...invoiceEditForm, description: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-[4px] text-sm focus:outline-none focus:border-[#8CC21B] text-black"
+                          placeholder="Description (e.g. Freight cost)"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-bold text-[#495057] mb-1.5">Freight Cost *</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={invoiceEditForm.freightCost}
+                          onChange={(e) => setInvoiceEditForm({ ...invoiceEditForm, freightCost: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-[4px] text-sm focus:outline-none focus:border-[#8CC21B] text-black"
+                          placeholder="Freight Cost"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-[#495057] mb-1.5">Remark</label>
+                      <textarea
+                        value={invoiceEditForm.remark}
+                        onChange={(e) => setInvoiceEditForm({ ...invoiceEditForm, remark: e.target.value })}
+                        rows={2}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-[4px] text-sm focus:outline-none focus:border-[#8CC21B] text-black"
+                        placeholder="Remark"
+                      />
+                    </div>
+                    <div className="flex justify-end pt-2">
+                      <button
+                        onClick={() => handleSaveInvoiceEdit(selectedInvoice.id)}
+                        disabled={actionLoading[`save-${selectedInvoice.id}`]}
+                        className="px-4 py-2 text-xs font-bold text-white bg-[#059669] rounded-lg hover:bg-green-700 flex items-center gap-1.5 shadow-md disabled:opacity-50"
+                      >
+                        {actionLoading[`save-${selectedInvoice.id}`] ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Check className="w-3.5 h-3.5" />
+                        )}
+                        Save Changes
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Spreadsheet Section (Tabs) */}
+                <div className="space-y-4">
+                  <div className="flex border-b border-gray-200">
+                    <button
+                      onClick={() => setModalActiveTab("taric")}
+                      className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-all relative ${
+                        modalActiveTab === "taric"
+                          ? "border-[#8CC21B] text-gray-900"
+                          : "border-transparent text-gray-500 hover:text-gray-700"
+                      }`}
+                    >
+                      Taric Summary
+                    </button>
+                    <button
+                      onClick={() => setModalActiveTab("items")}
+                      className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-all relative ${
+                        modalActiveTab === "items"
+                          ? "border-[#8CC21B] text-gray-900"
+                          : "border-transparent text-gray-500 hover:text-gray-700"
+                      }`}
+                    >
+                      Items List
+                    </button>
+                  </div>
+
+                  <div className="min-h-[300px]">
+                    {expandedStates[selectedInvoice.id]?.loading ? (
+                      <div className="flex items-center justify-center py-12">
+                        <div className="text-center">
+                          <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-[#8CC21B]" />
+                          <p className="text-xs text-[#6C757D]">Loading data details...</p>
+                        </div>
+                      </div>
+                    ) : modalActiveTab === "taric" ? (
+                      <div className="space-y-2">
+                        <h4 className="text-[11px] font-bold text-[#495057] uppercase tracking-wider mb-2">
+                          Items shown in invoice based on Taric
+                        </h4>
+                        <SpreadSheet
+                          data={expandedStates[selectedInvoice.id]?.data?.taricGroups || []}
+                          loading={expandedStates[selectedInvoice.id]?.loading}
+                          showTotals={true}
+                          columns={
+                            activeInvTab === "closed_invoices"
+                              ? [
+                                  {
+                                    header: "Position",
+                                    render: (_: any, idx: number) => idx + 1,
+                                    width: "70px",
+                                  },
+                                  {
+                                    header: "Taric Name EN",
+                                    render: (it: any) => it.taricNameEn,
+                                    width: "350px",
+                                  },
+                                  {
+                                    header: "Taric Code",
+                                    render: (it: any) => (
+                                      <span style={it.isProjectItem ? { color: "#F59E0B", fontWeight: 600 } : undefined}>
+                                        {it.taricCode}
+                                      </span>
+                                    ),
+                                    width: "140px",
+                                  },
+                                  {
+                                    header: "Duty rate",
+                                    render: (it: any) => (it.dutyRate ? `${Number(it.dutyRate).toFixed(2)}` : "-"),
+                                    width: "80px",
+                                  },
+                                  {
+                                    header: "Total Qty",
+                                    render: (it: any) => it.totalQty,
+                                    align: "center",
+                                    width: "100px",
+                                  },
+                                  {
+                                    header: "Unit Price",
+                                    render: (it: any) => it.unitPrice || "0.00",
+                                    width: "100px",
+                                  },
+                                  {
+                                    header: "Total Price",
+                                    render: (it: any) =>
+                                      (Number(it.totalPrice) || 0).toLocaleString(undefined, { minimumFractionDigits: 2 }),
+                                    width: "120px",
+                                  },
+                                ]
+                              : [
+                                  {
+                                    header: "Position",
+                                    render: (_: any, idx: number) => idx + 1,
+                                    width: "70px",
+                                  },
+                                  {
+                                    header: "Taric Name EN",
+                                    render: (it: any) => it.taricNameEn,
+                                    width: "350px",
+                                  },
+                                  {
+                                    header: "Taric Code",
+                                    render: (it: any) => (
+                                      <span style={it.isProjectItem ? { color: "#F59E0B", fontWeight: 600 } : undefined}>
+                                        {it.taricCode}
+                                      </span>
+                                    ),
+                                    width: "140px",
+                                  },
+                                  {
+                                    header: "Duty rate",
+                                    render: (it: any) => (it.dutyRate ? `${Number(it.dutyRate).toFixed(2)}` : "-"),
+                                    width: "80px",
+                                  },
+                                  {
+                                    header: "Total Qty",
+                                    render: (it: any) => it.totalQty,
+                                    align: "center",
+                                    width: "100px",
+                                  },
+                                  {
+                                    header: "Unit Price",
+                                    render: (it: any) => it.unitPrice || "0.00",
+                                    width: "100px",
+                                  },
+                                  {
+                                    header: "Total Price",
+                                    render: (it: any) =>
+                                      (Number(it.totalPrice) || 0).toLocaleString(undefined, { minimumFractionDigits: 2 }),
+                                    width: "120px",
+                                  },
+                                  {
+                                    header: "Operation",
+                                    render: (group: any) => (
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setSelectedTaricGroup(group);
+                                          setSelectedTaricCode("");
+                                          setShowTaricModal(true);
+                                        }}
+                                        className="flex items-center gap-1 px-3 py-1 bg-[#1A73E8] text-white text-[10px] font-bold rounded hover:bg-[#1557B0]"
+                                      >
+                                        <RefreshCw className="w-3 h-3" /> Set taric
+                                      </button>
+                                    ),
+                                    width: "120px",
+                                  },
+                                ]
+                          }
+                          expandedRowId={null}
+                          totalCols={
+                            activeInvTab === "closed_invoices"
+                              ? [
+                                  {
+                                    label: "Grand Total",
+                                    value: "",
+                                    width: "740px",
+                                    align: "left",
+                                  },
+                                  {
+                                    value:
+                                      expandedStates[selectedInvoice.id]?.data?.taricGroups?.reduce(
+                                        (s: number, g: any) => s + (g.totalQty || 0),
+                                        0,
+                                      ) || 0,
+                                    width: "100px",
+                                    align: "center",
+                                  },
+                                  {
+                                    value: "",
+                                    width: "100px",
+                                  },
+                                  {
+                                    value: (
+                                      expandedStates[selectedInvoice.id]?.data?.taricGroups?.reduce(
+                                        (s: number, g: any) => s + (g.totalPrice || 0),
+                                        0,
+                                      ) || 0
+                                    ).toLocaleString(undefined, { minimumFractionDigits: 2 }),
+                                    width: "120px",
+                                    align: "left",
+                                  },
+                                ]
+                              : [
+                                  {
+                                    label: "Grand Total",
+                                    value: "",
+                                    width: "620px",
+                                    align: "left",
+                                  },
+                                  {
+                                    value:
+                                      expandedStates[selectedInvoice.id]?.data?.taricGroups?.reduce(
+                                        (s: number, g: any) => s + (g.totalQty || 0),
+                                        0,
+                                      ) || 0,
+                                    width: "100px",
+                                    align: "center",
+                                  },
+                                  {
+                                    value: "",
+                                    width: "100px",
+                                  },
+                                  {
+                                    value: (
+                                      expandedStates[selectedInvoice.id]?.data?.taricGroups?.reduce(
+                                        (s: number, g: any) => s + (g.totalPrice || 0),
+                                        0,
+                                      ) || 0
+                                    ).toLocaleString(undefined, { minimumFractionDigits: 2 }),
+                                    width: "120px",
+                                    align: "left",
+                                  },
+                                  {
+                                    value: "",
+                                    width: "120px",
+                                  },
+                                ]
+                          }
+                        />
+                      </div>
+                    ) : (
+                      <SpreadSheet
+                        data={expandedStates[selectedInvoice.id]?.data?.detailedItems || []}
+                        loading={expandedStates[selectedInvoice.id]?.loading}
+                        columns={
+                          activeInvTab === "closed_invoices"
+                            ? [
+                                {
+                                  header: "#",
+                                  render: (_: any, idx: number) => idx + 1,
+                                  width: "40px",
+                                },
+                                {
+                                  header: "EAN",
+                                  render: (it: any) => it._fallbackEan || it.item?.ean || "-",
+                                  width: "110px",
+                                },
+                                {
+                                  header: "Item Name",
+                                  render: (it: any) => (
+                                    <div className="line-clamp-2 leading-tight py-1" title={it.item?.item_name}>
+                                      {it.item?.item_name}
+                                    </div>
+                                  ),
+                                  width: "350px",
+                                },
+                                {
+                                  header: "Taric code",
+                                  render: (it: any) => it.set_taric_code || it.item?.taric?.code || "-",
+                                  width: "100px",
+                                },
+                                {
+                                  header: "QTY",
+                                  render: (it: any) => <span className="font-bold">{it.qty}</span>,
+                                  width: "60px",
+                                  align: "center",
+                                },
+                                {
+                                  header: "EUR",
+                                  render: (it: any) => it.eur_special_price || it._fallbackEk || "0",
+                                  width: "60px",
+                                  align: "center",
+                                },
+                                {
+                                  header: "EK",
+                                  render: (it: any) => {
+                                    const unitPrice = Number(it.eur_special_price || it._fallbackEk) || 0;
+                                    const totalPrice = (it.qty || 0) * unitPrice;
+                                    return <span className="font-bold text-[#10B981]">{totalPrice.toFixed(2)}</span>;
+                                  },
+                                  width: "80px",
+                                  align: "center",
+                                },
+                              ]
+                            : [
+                                {
+                                  header: "ID",
+                                  render: (it: any) => (
+                                    <div className="flex flex-col gap-1.5 p-1">
+                                      <div className="px-2 py-1 bg-[#495057] text-white text-[10px] font-bold rounded-[4px] text-center mb-1 flex items-center justify-center gap-1.5 font-sans">
+                                        <FileText className="w-3 h-3" /> {it.id}
+                                      </div>
+                                      <div className="flex flex-col gap-1">
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setSelectedItem(it);
+                                            setNewQty(it.qty_label || it.qty);
+                                            setQtyRemarks(it.remarks_cn || "");
+                                            setShowQTYModal(true);
+                                          }}
+                                          className="flex items-center justify-center gap-1.5 px-2 py-1.5 text-[9px] font-bold bg-[#495057] text-white rounded-[4px] hover:bg-[#343A40] transition shadow-sm uppercase"
+                                        >
+                                          <Package className="w-2.5 h-2.5" /> QtyLabel
+                                        </button>
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setSelectedItem(it);
+                                            setSplitQty(Math.floor(it.qty * 0.5));
+                                            setTargetCargoId("");
+                                            setSplitRemarks(it.remarks_cn || "");
+                                            setShowSPModal(true);
+                                          }}
+                                          className="flex items-center justify-center gap-1.5 px-2 py-1.5 text-[9px] font-bold bg-[#F15A24] text-white rounded-[4px] hover:bg-[#D9481B] transition shadow-sm uppercase"
+                                        >
+                                          <Scissors className="w-2.5 h-2.5" /> Split
+                                        </button>
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setSelectedItem(it);
+                                            setTargetCargoId(it.cargo_id || "");
+                                            setShowREModal(true);
+                                          }}
+                                          className="flex items-center justify-center gap-1.5 px-2 py-1.5 text-[9px] font-bold bg-[#4F46E5] text-white rounded-[4px] hover:bg-[#4338CA] transition shadow-sm uppercase"
+                                        >
+                                          <RefreshCw className="w-2.5 h-2.5" /> ReAssign
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ),
+                                  width: "100px",
+                                },
+                                {
+                                  header: "EAN",
+                                  render: (it: any) => it._fallbackEan || it.item?.ean || "-",
+                                  width: "110px",
+                                },
+                                {
+                                  header: "Item Name",
+                                  render: (it: any) => (
+                                    <div className="line-clamp-3 leading-tight break-words" title={it.item?.item_name}>
+                                      {it.item?.item_name}
+                                    </div>
+                                  ),
+                                  width: "250px",
+                                },
+                                {
+                                  header: "Taric code",
+                                  render: (it: any) => it.set_taric_code || it.item?.taric?.code,
+                                  width: "90px",
+                                },
+                                {
+                                  header: "Remark",
+                                  render: (it: any) => `// ${it.remark_de || ""}`,
+                                  width: "80px",
+                                },
+                                {
+                                  header: "Order_no",
+                                  render: (it: any) => it.order?.order_no || "-",
+                                  width: "80px",
+                                },
+                                {
+                                  header: "SOID",
+                                  render: (it: any) => it.supplier_order_id || "-",
+                                  width: "50px",
+                                },
+                                {
+                                  header: "Status",
+                                  render: (it: any) => it.status,
+                                  width: "60px",
+                                },
+                                {
+                                  header: "V(dm³)",
+                                  render: (it: any) => it.v?.toFixed(2),
+                                  width: "60px",
+                                  align: "center",
+                                },
+                                {
+                                  header: "W(kg)",
+                                  render: (it: any) => it.w?.toFixed(2),
+                                  width: "60px",
+                                  align: "center",
+                                },
+                                {
+                                  header: "QTY",
+                                  render: (it: any) => (
+                                    <div className="flex flex-col items-center">
+                                      <span className="font-bold">
+                                        {it.qty_label ? `${it.qty_label}/${it.qty}` : it.qty}
+                                      </span>
+                                    </div>
+                                  ),
+                                  width: "60px",
+                                  align: "center",
+                                },
+                                {
+                                  header: "EUR",
+                                  render: (it: any) => it.eur_special_price || it._fallbackEk || "0",
+                                  width: "45px",
+                                  align: "center",
+                                },
+                                {
+                                  header: "EK",
+                                  render: (it: any) => {
+                                    const unitPrice = Number(it.eur_special_price || it._fallbackEk) || 0;
+                                    const totalPrice = (it.qty || 0) * unitPrice;
+                                    return <span className="font-bold text-[#10B981]">{totalPrice.toFixed(2)}</span>;
+                                  },
+                                  width: "65px",
+                                  align: "center",
+                                },
+                                {
+                                  header: "Action",
+                                  render: (it: any) =>
+                                    it.item?.is_eur_special === "Y" &&
+                                    (!it.eur_special_price || Number(it.eur_special_price) === 0) ? (
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setExpandedPriceItemId(expandedPriceItemId === it.id ? null : it.id);
+                                          setEditingPrice(it.eur_special_price || 0);
+                                        }}
+                                        className="flex items-center gap-1.5 px-3 py-1.5 bg-[#EF4444] text-white text-[10px] font-bold rounded-[4px] hover:bg-red-600 transition-all shadow-md whitespace-nowrap"
+                                      >
+                                        <DollarSign className="w-3.5 h-3.5" /> SET EUR PRICE
+                                      </button>
+                                    ) : null,
+                                  width: "120px",
+                                },
+                              ]
+                        }
+                        expandedRowId={expandedPriceItemId}
+                        renderRowDetails={(it: any) => (
+                          <div className="bg-[#F8F9FA] p-4 rounded-md border border-gray-200 mt-2 shadow-inner">
+                            <h4 className="text-[11px] font-bold text-[#495057] uppercase mb-3 tracking-wider flex items-center gap-2">
+                              <div className="w-1.5 h-1.5 bg-[#EF4444] rounded-full"></div>
+                              Set EUR Price for Item {it.id}
+                            </h4>
+                            <div className="space-y-3">
+                              <div>
+                                <label className="block text-[10px] font-bold text-[#6C757D] uppercase mb-1.5">
+                                  EUR Special Price
+                                </label>
+                                <div className="relative">
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    value={editingPrice}
+                                    onChange={(e) => setEditingPrice(Number(e.target.value))}
+                                    className="w-full px-3 py-2 bg-white border border-gray-300 rounded-[4px] text-sm focus:ring-2 focus:ring-[#EF4444] focus:border-transparent outline-none transition-all shadow-sm font-medium text-black"
+                                    placeholder="0.00"
+                                  />
+                                </div>
+                              </div>
+                              <div className="flex gap-2 pt-1">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setExpandedPriceItemId(null);
+                                  }}
+                                  className="px-4 py-2 text-[11px] font-bold text-[#495057] bg-white border border-[#DEE2E6] rounded-[4px] hover:bg-gray-50 transition-all uppercase shadow-sm"
+                                >
+                                  Cancel
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleSetPrice(it.id);
+                                  }}
+                                  className="px-5 py-2 text-[11px] font-bold text-white bg-[#10B981] rounded-[4px] hover:bg-[#059669] transition-all uppercase shadow-md flex items-center gap-2"
+                                >
+                                  <Check className="w-3.5 h-3.5" /> Set Price
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                        showTotals={false}
+                      />
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {showREModal && selectedItem && (
           <CustomModal
             isOpen={showREModal}

@@ -78,6 +78,7 @@ import {
 import { TagFilterSelector } from "@/components/Tags/TagFilterSelector";
 import ItemCreateModal from "@/components/Item/ItemCreateModal";
 import ItemPreviewModal from "@/components/Item/ItemPreviewModal";
+import ParentModal from "@/components/Item/ParentModal";
 import {
   TagBadge,
   sortTags,
@@ -100,6 +101,16 @@ interface FilterState {
 
 const PAGE_LIMIT = 30;
 const FETCH_ALL_LIMIT = 100000;
+
+const getInputClass = (hasValue: boolean, isEmptySelect: boolean = false) => {
+  return `w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${
+    hasValue
+      ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+      : isEmptySelect
+        ? "text-gray-400 border-gray-300 bg-white"
+        : "text-gray-900 border-gray-300 bg-white"
+  }`;
+};
 
 const ItemsManagementPage: React.FC = () => {
   const router = useRouter();
@@ -140,6 +151,8 @@ const ItemsManagementPage: React.FC = () => {
   const [showFilters, setShowFilters] = useState(true);
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [selectedTarics, setSelectedTarics] = useState<Set<string>>(new Set());
+  const [showParentModal, setShowParentModal] = useState(false);
+  const [selectedParentId, setSelectedParentId] = useState<number | null>(null);
 
   const [statistics, setStatistics] = useState<any>({
     totalItems: 0,
@@ -789,9 +802,6 @@ const ItemsManagementPage: React.FC = () => {
             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
               Created
             </th>
-            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-              Actions
-            </th>
           </>
         );
       case "warehouse":
@@ -847,9 +857,6 @@ const ItemsManagementPage: React.FC = () => {
             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
               Created
             </th>
-            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-              Actions
-            </th>
           </>
         );
       case "suppliers":
@@ -866,9 +873,6 @@ const ItemsManagementPage: React.FC = () => {
             </th>
             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
               Tags
-            </th>
-            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-              Actions
             </th>
           </>
         );
@@ -968,8 +972,15 @@ const ItemsManagementPage: React.FC = () => {
 
       case "parents":
         return pageData.map((parent: any) => (
-          <tr key={parent.id} className="hover:bg-gray-50 transition-colors">
-            <td className="p-4">
+          <tr
+            key={parent.id}
+            className="hover:bg-gray-50 transition-colors cursor-pointer"
+            onClick={() => {
+              setSelectedParentId(parent.id);
+              setShowParentModal(true);
+            }}
+          >
+            <td className="p-4" onClick={(e) => e.stopPropagation()}>
               <input
                 type="checkbox"
                 checked={selectedItems.has(parent.id.toString())}
@@ -1010,31 +1021,6 @@ const ItemsManagementPage: React.FC = () => {
             <td className="px-4 py-3">
               <div className="text-sm text-gray-600">
                 {formatDate(parent.created_at || parent.updated_at)}
-              </div>
-            </td>
-            <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => router.push(`/parents/${parent.id}`)}
-                  className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg"
-                  title="View"
-                >
-                  <EyeIcon className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => router.push(`/parents/${parent.id}/edit`)}
-                  className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg"
-                  title="Edit"
-                >
-                  <EditIcon className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => handleDeleteParent(parent.id)}
-                  className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg"
-                  title="Delete"
-                >
-                  <Delete className="w-4 h-4" />
-                </button>
               </div>
             </td>
           </tr>
@@ -1111,8 +1097,12 @@ const ItemsManagementPage: React.FC = () => {
 
       case "tarics":
         return pageData.map((taric: any) => (
-          <tr key={taric.id} className="hover:bg-gray-50 transition-colors">
-            <td className="p-4">
+          <tr
+            key={taric.id}
+            className="hover:bg-gray-50 transition-colors cursor-pointer"
+            onClick={() => openEditTaric(taric)}
+          >
+            <td className="p-4" onClick={(e) => e.stopPropagation()}>
               <input
                 type="checkbox"
                 checked={selectedTarics.has(taric.id.toString())}
@@ -1155,31 +1145,6 @@ const ItemsManagementPage: React.FC = () => {
                 {formatDate(taric.created_at || taric.updated_at)}
               </div>
             </td>
-            <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => router.push(`/tarics/${taric.id}`)}
-                  className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg"
-                  title="View"
-                >
-                  <EyeIconOutline className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => openEditTaric(taric)}
-                  className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg"
-                  title="Edit"
-                >
-                  <PencilIcon className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => removeTaric(taric.id)}
-                  className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg"
-                  title="Delete"
-                >
-                  <TrashIcon className="w-4 h-4" />
-                </button>
-              </div>
-            </td>
           </tr>
         ));
 
@@ -1188,15 +1153,14 @@ const ItemsManagementPage: React.FC = () => {
           <tr
             key={s.id}
             className="hover:bg-gray-50 cursor-pointer transition-colors"
-            onClick={() => router.push("/suppliers")}
+            onClick={() => router.push(`/suppliers?supplierId=${s.id}`)}
           >
-            <td className="p-4">
+            <td className="p-4" onClick={(e) => e.stopPropagation()}>
               <input
                 type="checkbox"
                 checked={selectedItems.has(s.id.toString())}
                 onChange={() => toggleSelect(s.id.toString())}
                 className="w-4 h-4 text-primary focus:ring-primary border-gray-300 rounded"
-                onClick={(e) => e.stopPropagation()}
               />
             </td>
             <td className="px-4 py-3 font-medium">{s.name || `ID: ${s.id}`}</td>
@@ -1211,17 +1175,6 @@ const ItemsManagementPage: React.FC = () => {
                   <span className="text-xs text-gray-400">—</span>
                 )}
               </div>
-            </td>
-            <td className="px-4 py-3 text-right">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  router.push("/suppliers");
-                }}
-                className="text-primary hover:underline"
-              >
-                Manage
-              </button>
             </td>
           </tr>
         ));
@@ -1240,7 +1193,30 @@ const ItemsManagementPage: React.FC = () => {
       >
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
           <div>
-            <PageHeader title="Items" icon={Package} />
+            <PageHeader
+              title={
+                activeTab === "items"
+                  ? "Items"
+                  : activeTab === "parents"
+                    ? "Parents"
+                    : activeTab === "tarics"
+                      ? "TARICs"
+                      : activeTab === "suppliers"
+                        ? "Suppliers"
+                        : "Warehouse"
+              }
+              icon={
+                activeTab === "items"
+                  ? Package
+                  : activeTab === "parents"
+                    ? BuildingOfficeIcon
+                    : activeTab === "tarics"
+                      ? DocumentTextIcon
+                      : activeTab === "suppliers"
+                        ? TruckIcon
+                        : ArchiveBoxIcon
+              }
+            />
             {activeTab === "items" && pendingSyncCount > 0 && (
               <div className="mt-2 text-sm text-yellow-600 flex items-center gap-2">
                 <Sync className="w-4 h-4" />
@@ -1332,6 +1308,19 @@ const ItemsManagementPage: React.FC = () => {
                 startIcon={<PlusIcon className="w-5 h-5" />}
               >
                 New Item
+              </CustomButton>
+            )}
+            {activeTab === "parents" && (
+              <CustomButton
+                onClick={() => {
+                  setSelectedParentId(null);
+                  setShowParentModal(true);
+                }}
+                gradient={true}
+                size="small"
+                startIcon={<PlusIcon className="w-5 h-5" />}
+              >
+                Add Parent
               </CustomButton>
             )}
             {activeTab === "tarics" && (
@@ -1562,29 +1551,71 @@ const ItemsManagementPage: React.FC = () => {
                 </button>
               </div>
             </div>
-          ) : activeTab === "tarics" ? (
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="md:col-span-3">
-                <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">
-                  Search
-                </label>
+          ) : activeTab === "parents" ? (
+            <div className="flex flex-wrap lg:flex-nowrap items-center gap-2 w-full">
+              <div className="flex items-center gap-1.5 text-gray-400 shrink-0 select-none px-1">
+                <FunnelIcon className="w-5 h-5 text-primary" />
+              </div>
+              <div className="w-64 shrink-0">
                 <input
                   type="text"
-                  placeholder="Search code or name..."
-                  value={taricSearch}
-                  onChange={(e) => setTaricSearch(e.target.value)}
-                  className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                  placeholder="Search Parents..."
+                  value={filters.search}
+                  onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+                  className={getInputClass(!!filters.search)}
                 />
               </div>
-              <div className="flex items-end justify-end">
-                <button
-                  onClick={() => setTaricSearch("")}
-                  className="px-4 py-2 text-xs font-semibold text-rose-600 hover:text-rose-800 flex items-center gap-1.5 border border-rose-200 rounded-lg bg-rose-50/50 hover:bg-rose-50"
-                >
-                  <ArrowPathIcon className="w-3.5 h-3.5" />
-                  Reset
-                </button>
+              <button
+                onClick={resetFilters}
+                className="px-3 py-2 text-sm font-semibold text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 rounded-md transition-colors flex items-center gap-1 whitespace-nowrap shrink-0"
+              >
+                <ArrowPathIcon className="w-4 h-4" />
+                Reset
+              </button>
+            </div>
+          ) : activeTab === "tarics" ? (
+            <div className="flex flex-wrap lg:flex-nowrap items-center gap-2 w-full">
+              <div className="flex items-center gap-1.5 text-gray-400 shrink-0 select-none px-1">
+                <FunnelIcon className="w-5 h-5 text-primary" />
               </div>
+              <div className="w-64 shrink-0">
+                <input
+                  type="text"
+                  placeholder="Search TARICs..."
+                  value={taricSearch}
+                  onChange={(e) => setTaricSearch(e.target.value)}
+                  className={getInputClass(!!taricSearch)}
+                />
+              </div>
+              <button
+                onClick={() => setTaricSearch("")}
+                className="px-3 py-2 text-sm font-semibold text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 rounded-md transition-colors flex items-center gap-1 whitespace-nowrap shrink-0"
+              >
+                <ArrowPathIcon className="w-4 h-4" />
+                Reset
+              </button>
+            </div>
+          ) : activeTab === "suppliers" ? (
+            <div className="flex flex-wrap lg:flex-nowrap items-center gap-2 w-full">
+              <div className="flex items-center gap-1.5 text-gray-400 shrink-0 select-none px-1">
+                <FunnelIcon className="w-5 h-5 text-primary" />
+              </div>
+              <div className="w-64 shrink-0">
+                <input
+                  type="text"
+                  placeholder="Search Suppliers..."
+                  value={filters.search}
+                  onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+                  className={getInputClass(!!filters.search)}
+                />
+              </div>
+              <button
+                onClick={resetFilters}
+                className="px-3 py-2 text-sm font-semibold text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 rounded-md transition-colors flex items-center gap-1 whitespace-nowrap shrink-0"
+              >
+                <ArrowPathIcon className="w-4 h-4" />
+                Reset
+              </button>
             </div>
           ) : (
             <div className="flex items-end justify-end">
@@ -1599,30 +1630,7 @@ const ItemsManagementPage: React.FC = () => {
           )}
         </div>
 
-        {activeTab !== "tarics" && activeTab !== "items" && (
-          <div className="mb-6">
-            <div className="relative">
-              <MagnifyingGlassIcon className="w-6 h-6 absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input
-                type="text"
-                placeholder={`Search ${activeTab}... (EAN, name, DE number, etc.)`}
-                value={filters.search}
-                onChange={(e) =>
-                  setFilters({ ...filters, search: e.target.value })
-                }
-                className="w-full pr-4 py-3.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary text-gray-700 placeholder-gray-400 pl-12"
-              />
-              {filters.search && (
-                <button
-                  onClick={() => setFilters({ ...filters, search: "" })}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                >
-                  <XMarkIcon className="w-5 h-5" />
-                </button>
-              )}
-            </div>
-          </div>
-        )}
+
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
           {loading ? (
             <div className="p-20 flex justify-center items-center">
@@ -1802,6 +1810,14 @@ const ItemsManagementPage: React.FC = () => {
         onClose={() => setShowItemModal(false)}
         isRequest={false}
         onCreated={reloadItems}
+      />
+      <ParentModal
+        isOpen={showParentModal}
+        onClose={() => setShowParentModal(false)}
+        parentId={selectedParentId}
+        onSaved={() => fetchTab("parents", true)}
+        tarics={refTarics}
+        suppliers={refSuppliers}
       />
     </div>
   );

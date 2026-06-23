@@ -84,6 +84,17 @@ import { DownloadCloudIcon, ToggleLeft, ToggleRight } from "lucide-react";
 import { formatDate, openOutlookWithOffer } from "@/utils/offers";
 import { Customer } from "../inquiry/page";
 import { errorStyles } from "@/utils/constants";
+import { FunnelIcon } from "@heroicons/react/24/outline";
+
+const getInputClass = (hasValue: boolean, isEmptySelect: boolean = false) => {
+  return `w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${
+    hasValue
+      ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+      : isEmptySelect
+        ? "text-gray-400 border-gray-300 bg-white"
+        : "text-gray-900 border-gray-300 bg-white"
+  }`;
+};
 
 const OffersPage: React.FC = () => {
   // State management
@@ -779,53 +790,68 @@ const OffersPage: React.FC = () => {
               <PageHeader title="Offers" icon={BadgePercent} />
             </div>
             <div className="flex gap-2">
-              {/* Filters */}
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  placeholder="Search offers..."
-                  value={filters.search || ""}
-                  onChange={(e) =>
-                    setFilters({ ...filters, search: e.target.value, page: 1 })
-                  }
-                  className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent"
-                />
-                <select
-                  value={filters.status || ""}
-                  onChange={(e) =>
-                    setFilters({ ...filters, status: e.target.value, page: 1 })
-                  }
-                  className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent"
-                >
-                  <option value="">All Status</option>
-                  {getOfferStatuses().map((status) => (
-                    <option key={status.value} value={status.value}>
-                      {status.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <button
+              <CustomButton
                 onClick={fetchOffers}
                 disabled={loading}
-                className="px-3 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-all flex items-center gap-2 disabled:opacity-50"
+                gradient={true}
+                size="small"
+                startIcon={<ArrowPathIcon className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />}
               >
-                <ArrowPathIcon
-                  className={`h-4 w-4 ${loading ? "animate-spin" : ""}`}
-                />
                 Refresh
-              </button>
+              </CustomButton>
 
               <CustomButton
                 gradient={true}
                 onClick={handleOpenCreateModal}
-                className="px-3 py-2 text-sm bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-all flex items-center gap-2"
+                size="small"
+                startIcon={<PlusIcon className="h-4 w-4" />}
               >
-                <PlusIcon className="h-4 w-4" />
                 New Offer
               </CustomButton>
             </div>
+          </div>
+        </div>
+
+        {/* ONE-LINE-Filter */}
+        <div className="mb-6 p-3 bg-white border border-gray-200 rounded-md shadow-sm">
+          <div className="flex flex-wrap lg:flex-nowrap items-center gap-2 w-full">
+            <div className="flex items-center gap-1.5 text-gray-400 shrink-0 select-none px-1">
+              <FunnelIcon className="w-5 h-5 text-primary" />
+            </div>
+            <div className="w-64 shrink-0">
+              <input
+                type="text"
+                placeholder="Search offers..."
+                value={filters.search || ""}
+                onChange={(e) =>
+                  setFilters({ ...filters, search: e.target.value, page: 1 })
+                }
+                className={getInputClass(!!filters.search)}
+              />
+            </div>
+            <div className="w-48 shrink-0">
+              <select
+                value={filters.status || ""}
+                onChange={(e) =>
+                  setFilters({ ...filters, status: e.target.value, page: 1 })
+                }
+                className={getInputClass(!!filters.status, !filters.status)}
+              >
+                <option value="">All Status</option>
+                {getOfferStatuses().map((status) => (
+                  <option key={status.value} value={status.value}>
+                    {status.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button
+              onClick={() => setFilters({ ...filters, search: "", status: "", page: 1 })}
+              className="px-3 py-2 text-sm font-semibold text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 rounded-md transition-colors flex items-center gap-1 whitespace-nowrap shrink-0"
+            >
+              <ArrowPathIcon className="w-4 h-4" />
+              Reset
+            </button>
           </div>
         </div>
 
@@ -863,21 +889,25 @@ const OffersPage: React.FC = () => {
                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Status & Expiry
                     </th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Actions
-                    </th>
+
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {offers.map((offer: any) => (
                     <React.Fragment key={offer.id}>
                       {/* Main offer row */}
-                      <tr className="hover:bg-gray-50 transition-colors">
+                      <tr
+                        className="hover:bg-gray-50 transition-colors cursor-pointer"
+                        onClick={() => handleViewOffer(offer)}
+                      >
                         <td className="px-4 py-3">
                           <div className="w-[12rem]">
                             <div className="flex items-center gap-2">
                               <button
-                                onClick={() => toggleOfferExpansion(offer.id)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleOfferExpansion(offer.id);
+                                }}
                                 className="text-gray-500 hover:text-gray-700"
                               >
                                 {expandedOfferId === offer.id ? (
@@ -947,72 +977,13 @@ const OffersPage: React.FC = () => {
                             )}
                           </div>
                         </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center justify-center gap-2">
-                            {/* Existing buttons */}
-                            <button
-                              onClick={() => handleViewOffer(offer)}
-                              className="text-blue-600 hover:text-blue-800 transition-colors p-1"
-                              title="View details"
-                            >
-                              <EyeIcon className="h-4 w-4" />
-                            </button>
 
-                            <button
-                              onClick={() => handleEditOffer(offer)}
-                              className="text-gray-600 hover:text-gray-800 transition-colors p-1"
-                              title="Edit offer"
-                            >
-                              <PencilIcon className="h-4 w-4" />
-                            </button>
-
-                            {/* NEW: Mail button */}
-                            <button
-                              onClick={() => openOutlookWithOffer(offer)}
-                              className="text-green-600 hover:text-green-800 transition-colors p-1"
-                              title="Send offer via email"
-                            >
-                              <svg
-                                className="h-4 w-4"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-                                />
-                              </svg>
-                            </button>
-
-                            {/* Existing PDF button */}
-                            {offer.pdfGenerated ? (
-                              <button
-                                onClick={() => downloadOfferPdf(offer.id)}
-                                className="text-purple-600 hover:text-purple-800 transition-colors p-1"
-                                title="Download PDF"
-                              >
-                                <DownloadCloudIcon className="h-4 w-4" />
-                              </button>
-                            ) : (
-                              <button
-                                onClick={() => handleGeneratePdf(offer.id)}
-                                className="text-purple-600 hover:text-purple-800 transition-colors p-1"
-                                title="Generate PDF"
-                              >
-                                <PrinterIcon className="h-4 w-4" />
-                              </button>
-                            )}
-                          </div>
-                        </td>
                       </tr>
 
                       {/* Expanded details row */}
                       {expandedOfferId === offer.id && (
                         <tr className="bg-gray-50/50">
-                          <td colSpan={5} className="px-4 py-3">
+                          <td colSpan={4} className="px-4 py-3">
                             <div className="pl-8">
                               {/* Unit pricing status for offer */}
                               <div className="mb-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
@@ -1565,19 +1536,58 @@ const OffersPage: React.FC = () => {
                     </div>
                   )}
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 items-center">
                   <button
-                    onClick={() => handleGeneratePdf(selectedOffer.id)}
-                    className="px-3 py-2 text-sm text-purple-700 bg-white border border-purple-300 rounded-lg hover:bg-purple-50 transition-all flex items-center gap-2"
+                    onClick={() => {
+                      setShowViewModal(false);
+                      handleEditOffer(selectedOffer);
+                    }}
+                    className="px-3 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-all flex items-center gap-1.5"
                   >
-                    <PrinterIcon className="h-4 w-4" />
-                    {selectedOffer.pdfGenerated
-                      ? "Regenerate PDF"
-                      : "Generate PDF"}
+                    <PencilIcon className="h-4 w-4 text-gray-500" />
+                    Edit
                   </button>
+
+                  <button
+                    onClick={() => openOutlookWithOffer(selectedOffer)}
+                    className="px-3 py-2 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition-all flex items-center gap-1.5"
+                  >
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                    Send Email
+                  </button>
+
+                  {selectedOffer.pdfGenerated ? (
+                    <button
+                      onClick={() => downloadOfferPdf(selectedOffer.id)}
+                      className="px-3 py-2 text-sm text-purple-700 bg-purple-50 border border-purple-200 rounded-lg hover:bg-purple-100 transition-all flex items-center gap-1.5"
+                    >
+                      <DownloadCloudIcon className="h-4 w-4" />
+                      Download PDF
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => handleGeneratePdf(selectedOffer.id)}
+                      className="px-3 py-2 text-sm text-purple-700 bg-purple-50 border border-purple-200 rounded-lg hover:bg-purple-100 transition-all flex items-center gap-1.5"
+                    >
+                      <PrinterIcon className="h-4 w-4" />
+                      Generate PDF
+                    </button>
+                  )}
+
+                  {selectedOffer.pdfGenerated && (
+                    <button
+                      onClick={() => handleGeneratePdf(selectedOffer.id)}
+                      className="px-3 py-2 text-xs text-gray-500 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-all"
+                    >
+                      Regenerate PDF
+                    </button>
+                  )}
+
                   <button
                     onClick={() => setShowViewModal(false)}
-                    className="text-gray-400 hover:text-gray-600 transition-colors"
+                    className="text-gray-400 hover:text-gray-600 transition-colors p-1.5 ml-2 hover:bg-gray-100 rounded-lg"
                   >
                     <XMarkIcon className="h-5 w-5" />
                   </button>
