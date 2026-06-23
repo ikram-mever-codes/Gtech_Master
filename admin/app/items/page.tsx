@@ -164,7 +164,7 @@ const ItemsManagementPage: React.FC = () => {
     search: "",
     eanSearch: "",
     status: "",
-    category: "",
+    category: "PRO",
     supplier: "",
     isActive: "Y",
     tags: "",
@@ -750,7 +750,7 @@ const ItemsManagementPage: React.FC = () => {
     setFilters({
       search: "",
       status: "",
-      category: "",
+      category: "PRO",
       eanSearch: "",
       supplier: "",
       isActive: "",

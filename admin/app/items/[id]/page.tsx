@@ -1140,8 +1140,8 @@ const ItemDetailsPage = () => {
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 className={`px-4 py-2 text-sm font-medium whitespace-nowrap transition-colors ${activeTab === tab.id
-                    ? "text-gray-900 border-b-2 border-gray-600"
-                    : "text-gray-500 hover:text-gray-700"
+                  ? "text-gray-900 border-b-2 border-gray-600"
+                  : "text-gray-500 hover:text-gray-700"
                   }`}
               >
                 {tab.label}
@@ -1367,8 +1367,8 @@ const ItemDetailsPage = () => {
                                         handleSelectCustomer(customer)
                                       }
                                       className={`px-3.5 py-2.5 text-sm cursor-pointer flex items-center justify-between transition-colors ${isSelected
-                                          ? "bg-[#8CC21B]/10 text-[#5f8512] font-semibold"
-                                          : "hover:bg-gray-50 text-gray-700"
+                                        ? "bg-[#8CC21B]/10 text-[#5f8512] font-semibold"
+                                        : "hover:bg-gray-50 text-gray-700"
                                         }`}
                                     >
                                       <div className="flex flex-col min-w-0 pr-3">
@@ -2007,16 +2007,16 @@ const ItemDetailsPage = () => {
                     <div
                       key={si.id}
                       className={`p-5 rounded-xl border transition-all flex flex-col gap-4 ${si.isDefault
-                          ? "bg-blue-50/20 border-blue-200 shadow-sm"
-                          : "bg-white border-gray-100 hover:border-gray-200"
+                        ? "bg-blue-50/20 border-blue-200 shadow-sm"
+                        : "bg-white border-gray-100 hover:border-gray-200"
                         }`}
                     >
                       <div className="flex items-center justify-between flex-wrap gap-3">
                         <div className="flex items-center gap-4">
                           <div
                             className={`p-2 rounded-lg ${si.isDefault
-                                ? "bg-blue-100 text-blue-600"
-                                : "bg-gray-100 text-gray-400"
+                              ? "bg-blue-100 text-blue-600"
+                              : "bg-gray-100 text-gray-400"
                               }`}
                           >
                             <Package className="h-5 w-5" />
@@ -2060,8 +2060,8 @@ const ItemDetailsPage = () => {
                             onClick={() => window.open(si.url, "_blank")}
                             disabled={!si.url}
                             className={`p-2 rounded-lg transition-all ${si.url
-                                ? "text-blue-500 hover:bg-blue-50"
-                                : "text-gray-300 cursor-not-allowed"
+                              ? "text-blue-500 hover:bg-blue-50"
+                              : "text-gray-300 cursor-not-allowed"
                               }`}
                           >
                             <LinkIcon className="h-5 w-5" />
@@ -2099,8 +2099,8 @@ const ItemDetailsPage = () => {
                                   );
                                 }}
                                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${si.isDefault
-                                    ? "bg-blue-600 text-white"
-                                    : "bg-white border border-blue-200 text-blue-600 hover:bg-blue-50"
+                                  ? "bg-blue-600 text-white"
+                                  : "bg-white border border-blue-200 text-blue-600 hover:bg-blue-50"
                                   }`}
                               >
                                 {si.isDefault ? "Default" : "Set Default"}
@@ -2408,8 +2408,8 @@ const ItemDetailsPage = () => {
                                         router.push(`/items/${item.id}`)
                                       }
                                       className={`w-full text-left px-3.5 py-2.5 text-xs rounded-xl transition-all flex items-center justify-between cursor-pointer group/item border ${isCurrent
-                                          ? "bg-blue-50 border-blue-200 text-blue-700 font-semibold"
-                                          : "bg-white border-gray-100 hover:border-[#8CC21B]/30 hover:bg-[#8CC21B]/5 text-gray-700"
+                                        ? "bg-blue-50 border-blue-200 text-blue-700 font-semibold"
+                                        : "bg-white border-gray-100 hover:border-[#8CC21B]/30 hover:bg-[#8CC21B]/5 text-gray-700"
                                         }`}
                                     >
                                       <div className="flex flex-col gap-0.5 flex-1 min-w-0 pr-4">
@@ -3089,5 +3089,4 @@ const ItemDetailsPage = () => {
     </div>
   );
 };
-
 export default ItemDetailsPage;
