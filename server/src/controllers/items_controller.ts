@@ -164,7 +164,7 @@ export const getItems = async (
     const limitNum = parseInt(req.query.limit as string, 10) || 50;
     const skip = (pageNum - 1) * limitNum;
 
-    // ---- Read filters (basic, fast) ----
+    // ---- Read filters ----
     const search = ((req.query.search as string) || "").trim();
     const eanSearch = ((req.query.eanSearch as string) || "").trim();
     const isActive = ((req.query.isActive as string) || "").trim();
@@ -194,15 +194,16 @@ export const getItems = async (
       .leftJoin("item.parent", "parent")
       .leftJoin("item.category", "category");
 
-    // Name search
+    // Name search — case-insensitive
     if (search) {
       idQb.andWhere(
-        "(item.item_name LIKE :search OR item.item_name_cn LIKE :search OR item.model LIKE :search)",
-        { search: `%${search}%` },
+        "(LOWER(item.item_name) LIKE :search OR LOWER(item.item_name_cn) LIKE :search OR LOWER(item.model) LIKE :search)",
+        { search: `%${search.toLowerCase()}%` },
       );
     }
 
-    // Item No / EAN — searches item EAN, parent DE number, AND the warehouse
+    // Item No / EAN — case-insensitive; checks item EAN, parent DE number,
+    // item name (EN/CN, where numbers like 0013-1080 may live), and the warehouse
     if (eanSearch) {
       idQb.andWhere((qb2) => {
         const whSub = qb2
@@ -212,15 +213,16 @@ export const getItems = async (
           .where(
             "(wi_ean.item_id = item.id OR wi_ean.ItemID_DE = item.ItemID_DE)",
           )
-          .andWhere("wi_ean.item_no_de LIKE :ean")
+          .andWhere("LOWER(wi_ean.item_no_de) LIKE :ean")
           .getQuery();
-        return `(item.ean LIKE :ean OR parent.de_no LIKE :ean OR EXISTS ${whSub})`;
+        return `(LOWER(item.ean) LIKE :ean OR LOWER(parent.de_no) LIKE :ean OR LOWER(item.item_name) LIKE :ean OR LOWER(item.item_name_cn) LIKE :ean OR EXISTS ${whSub})`;
       });
-      idQb.setParameter("ean", `%${eanSearch}%`);
+      idQb.setParameter("ean", `%${eanSearch.toLowerCase()}%`);
     }
 
-    // Active status
-    if (isActive) {
+    // Active status — skipped when searching by Item No, so inactive items
+    // (e.g. a deactivated 0013-1080) still surface on an exact-number lookup
+    if (isActive && !eanSearch) {
       idQb.andWhere("item.isActive = :isActive", { isActive });
     }
 
@@ -250,7 +252,7 @@ export const getItems = async (
     } else if (isLabel === "N") {
       idQb.andWhere(
         "(item.isLabelPrint IS NULL OR item.isLabelPrint IN (:...labelFalse))",
-        { labelFalse: [0, "0", "N", false] }, // FIX: Removed empty string "" causing conversion errors
+        { labelFalse: [0, "0", "N", false] },
       );
     }
 
