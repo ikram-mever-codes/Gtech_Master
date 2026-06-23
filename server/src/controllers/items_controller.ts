@@ -29,19 +29,6 @@ import { filterDataByRole } from "../utils/dataFilter";
 import { AuthorizedRequest } from "../middlewares/authorized";
 import { Customer } from "../models/customers";
 
-// --- Simple in-memory TTL cache for the items list ---
-type ItemsCacheEntry = { expires: number; payload: any };
-const itemsListCache = new Map<string, ItemsCacheEntry>();
-const ITEMS_CACHE_TTL = 30_000; // 30s
-const ITEMS_CACHE_MAX = 500;
-
-export const invalidateItemsCache = () => itemsListCache.clear();
-
-const setItemsCache = (key: string, payload: any) => {
-  if (itemsListCache.size >= ITEMS_CACHE_MAX) itemsListCache.clear();
-  itemsListCache.set(key, { expires: Date.now() + ITEMS_CACHE_TTL, payload });
-};
-
 export const getRMBPriceFromSupplier = async (
   itemId: number,
   supplierId?: number,
@@ -162,6 +149,7 @@ export const feedTransferPrices = async (
     return next(error);
   }
 };
+
 export const getItems = async (
   req: Request,
   res: Response,
@@ -176,13 +164,13 @@ export const getItems = async (
     const limitNum = parseInt(req.query.limit as string, 10) || 50;
     const skip = (pageNum - 1) * limitNum;
 
-    // ---- Read filters ----
+    // ---- Read filters (basic, fast) ----
     const search = ((req.query.search as string) || "").trim();
     const eanSearch = ((req.query.eanSearch as string) || "").trim();
     const isActive = ((req.query.isActive as string) || "").trim();
     const category = ((req.query.category as string) || "").trim();
     const supplier = ((req.query.supplier as string) || "").trim();
-    const company = ((req.query.company as string) || "").trim();
+    const company = ((req.query.company as string) || "").trim(); // customer_id
     const isLabel = ((req.query.isLabel as string) || "").trim();
     const tagStr = ((req.query.tags as string) || "").trim();
 
@@ -199,30 +187,6 @@ export const getItems = async (
       .map((t) => parseInt(t.slice(1), 10))
       .filter((n) => !isNaN(n));
 
-    // Read user early so role is part of the cache key
-    const user = (req as any).user;
-    const role = user?.role || "STAFF";
-
-    // ---- Cache lookup ----
-    const cacheKey = JSON.stringify({
-      pageNum,
-      limitNum,
-      search,
-      eanSearch,
-      isActive,
-      category,
-      supplier,
-      company,
-      isLabel,
-      incTags,
-      excTags,
-      role,
-    });
-    const cached = itemsListCache.get(cacheKey);
-    if (cached && cached.expires > Date.now()) {
-      return res.status(200).json(cached.payload);
-    }
-
     const idQb = itemRepository
       .createQueryBuilder("item")
       .select("item.id")
@@ -230,48 +194,37 @@ export const getItems = async (
       .leftJoin("item.parent", "parent")
       .leftJoin("item.category", "category");
 
-    // Name search — case-insensitive
+    // Name search
     if (search) {
       idQb.andWhere(
-        "(LOWER(item.item_name) LIKE :search OR LOWER(item.item_name_cn) LIKE :search OR LOWER(item.model) LIKE :search)",
-        { search: `%${search.toLowerCase()}%` },
+        "(item.item_name LIKE :search OR item.item_name_cn LIKE :search OR item.model LIKE :search)",
+        { search: `%${search}%` },
       );
     }
 
-    // Item No / EAN — case-insensitive, single warehouse scan (no correlated subquery)
+    // Item No / EAN — searches item EAN, parent DE number, AND the warehouse
     if (eanSearch) {
-      const eanLike = `%${eanSearch.toLowerCase()}%`;
-
-      // ONE scan of the warehouse table instead of per-row EXISTS
-      const whMatches = await warehouseRepository
-        .createQueryBuilder("wi")
-        .select(["wi.id", "wi.item_id", "wi.ItemID_DE"])
-        .where("LOWER(wi.item_no_de) LIKE :ean", { ean: eanLike })
-        .getMany();
-
-      const whItemIds = [
-        ...new Set(whMatches.map((w: any) => w.item_id).filter(Boolean)),
-      ];
-      const whItemIDsDE = [
-        ...new Set(whMatches.map((w: any) => w.ItemID_DE).filter(Boolean)),
-      ];
-
-      idQb.andWhere(
-        new Brackets((qb) => {
-          qb.where("LOWER(item.ean) LIKE :ean", { ean: eanLike }).orWhere(
-            "LOWER(parent.de_no) LIKE :ean",
-            { ean: eanLike },
-          );
-          if (whItemIds.length)
-            qb.orWhere("item.id IN (:...whItemIds)", { whItemIds });
-          if (whItemIDsDE.length)
-            qb.orWhere("item.ItemID_DE IN (:...whItemIDsDE)", { whItemIDsDE });
-        }),
-      );
+      idQb.andWhere((qb2) => {
+        const whSub = qb2
+          .subQuery()
+          .select("wi_ean.id")
+          .from(WarehouseItem, "wi_ean")
+          .where(
+            "(wi_ean.item_id = item.id OR wi_ean.ItemID_DE = item.ItemID_DE)",
+          )
+          .andWhere("wi_ean.item_no_de LIKE :ean")
+          .getQuery();
+        return `(item.ean LIKE :ean OR parent.de_no LIKE :ean OR EXISTS ${whSub})`;
+      });
+      idQb.setParameter("ean", `%${eanSearch}%`);
     }
 
-    if (isActive) idQb.andWhere("item.isActive = :isActive", { isActive });
+    // Active status
+    if (isActive) {
+      idQb.andWhere("item.isActive = :isActive", { isActive });
+    }
 
+    // Category by name
     if (category) {
       idQb.andWhere(
         "(category.name = :category OR item.supp_cat = :category)",
@@ -279,9 +232,17 @@ export const getItems = async (
       );
     }
 
-    if (supplier) idQb.andWhere("item.supplier_id = :supplier", { supplier });
-    if (company) idQb.andWhere("item.customer_id = :company", { company });
+    // Supplier
+    if (supplier) {
+      idQb.andWhere("item.supplier_id = :supplier", { supplier });
+    }
 
+    // Company (customer)
+    if (company) {
+      idQb.andWhere("item.customer_id = :company", { company });
+    }
+
+    // isLabel — tolerant of boolean / tinyint / 'Y'/'N' storage
     if (isLabel === "Y") {
       idQb.andWhere("item.isLabelPrint IN (:...labelTrue)", {
         labelTrue: [1, "1", "Y", true],
@@ -289,10 +250,11 @@ export const getItems = async (
     } else if (isLabel === "N") {
       idQb.andWhere(
         "(item.isLabelPrint IS NULL OR item.isLabelPrint IN (:...labelFalse))",
-        { labelFalse: [0, "0", "N", false] },
+        { labelFalse: [0, "0", "N", false] }, // FIX: Removed empty string "" causing conversion errors
       );
     }
 
+    // Tags — include
     incTags.forEach((tid, i) => {
       idQb.andWhere((qb2) => {
         const sub = qb2
@@ -307,6 +269,7 @@ export const getItems = async (
       idQb.setParameter(`incTag${i}`, tid);
     });
 
+    // Tags — exclude
     if (excTags.length) {
       idQb.andWhere((qb2) => {
         const sub = qb2
@@ -330,7 +293,7 @@ export const getItems = async (
     const targetIds = idObjects.map((io) => io.id);
 
     if (targetIds.length === 0) {
-      const payload = {
+      return res.status(200).json({
         success: true,
         data: [],
         pagination: {
@@ -339,12 +302,10 @@ export const getItems = async (
           totalRecords,
           totalPages: Math.ceil(totalRecords / limitNum),
         },
-      };
-      setItemsCache(cacheKey, payload);
-      return res.status(200).json(payload);
+      });
     }
 
-    // STEP 2: full records — (unchanged from your version)
+    // STEP 2: Pull full records for the matched IDs
     const items = await itemRepository
       .createQueryBuilder("item")
       .select([
@@ -398,7 +359,7 @@ export const getItems = async (
       .orderBy("item.created_at", "DESC")
       .getMany();
 
-    // STEP 3: warehouse metrics (unchanged)
+    // STEP 3: Warehouse metrics
     const targetItemIDsDE = items
       .map((i) => i.ItemID_DE)
       .filter(Boolean) as number[];
@@ -423,28 +384,71 @@ export const getItems = async (
       )
       .getMany();
 
-    // STEP 4: format (unchanged — your existing .map block goes here)
+    // STEP 4: Format
     const formattedItems = items.map((item: any) => {
       const parentData = item.parent || null;
       const customerData = item.customer || null;
+
       const warehouseData =
         warehouseItems.find(
           (wi: any) =>
             wi.item_id === item.id ||
             (item.ItemID_DE && wi.ItemID_DE === item.ItemID_DE),
         ) || null;
+
       return {
-        /* ... keep your exact existing object mapping ... */
         id: item.id,
         de_no: warehouseData?.item_no_de || parentData?.de_no || null,
-        // (rest unchanged)
-        ...item, // placeholder — keep your real mapping, not this spread
+        name_de: parentData?.name_de || null,
+        name_en: parentData?.name_en || null,
+        name_cn: parentData?.name_cn || null,
+        item_name: item.item_name,
+        item_name_cn: item.item_name_cn,
+        ean: item.ean || warehouseData?.ean || null,
+        ItemID_DE: item.ItemID_DE || null,
+        is_active: warehouseData
+          ? warehouseData.is_active
+          : item.isActive || "N",
+        parent_id: item.parent_id || null,
+        taric_id: item.taric_id || null,
+        category_id: item.cat_id || null,
+        category: item.category?.name || item.supp_cat || null,
+        supplier_id: item.supplier_id || null,
+        customer_id: item.customer_id || null,
+        customer_name: customerData?.companyName || null,
+        isLabelPrint: item.isLabelPrint || false,
+        item_name_de:
+          warehouseData?.item_name_de || parentData?.name_de || null,
+        photo: item.photo || null,
+        pix_path: item.pix_path || null,
+        pix_path_eBay: item.pix_path_eBay || null,
+        weight: item.weight,
+        length: item.length,
+        width: item.width,
+        height: item.height,
+        remark: item.remark,
+        model: item.model,
+        is_rmb_special: item.is_rmb_special,
+        is_eur_special: item.is_eur_special,
+        is_dimension_special: item.is_dimension_special,
+        is_npr: item.is_npr,
+        is_new: item.is_new,
+        price: item.price,
+        transfer_price_EUR: item.transfer_price_EUR,
+        created_at: item.created_at,
+        updated_at: item.updated_at,
+        tags: item.tags || [],
+        tagOrder: item.tagOrder,
       };
     });
 
-    const filteredData = filterDataByRole(formattedItems, role);
+    const user = (req as any).user;
+    const filteredData = filterDataByRole(
+      formattedItems,
+      user?.role || "STAFF",
+    );
 
-    const payload = {
+    return res.status(200).json({
       success: true,
       data: filteredData,
       pagination: {
@@ -453,9 +457,7 @@ export const getItems = async (
         totalRecords,
         totalPages: Math.ceil(totalRecords / limitNum),
       },
-    };
-    setItemsCache(cacheKey, payload);
-    return res.status(200).json(payload);
+    });
   } catch (error) {
     return next(error);
   }
