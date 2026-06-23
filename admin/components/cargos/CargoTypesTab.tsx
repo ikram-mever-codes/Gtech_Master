@@ -3,12 +3,12 @@ import React, { useState, useEffect, useCallback } from "react";
 import {
     ArrowPathIcon,
     PlusIcon,
-    XMarkIcon,
-    TrashIcon,
 } from "@heroicons/react/24/outline";
 import { Truck } from "lucide-react";
 import { toast } from "react-hot-toast";
 import PageHeader from "@/components/UI/PageHeader";
+import ModalHeader from "@/components/UI/ModalHeader";
+import ModalFooter from "@/components/UI/ModalFooter";
 import {
     getAllCargoTypes,
     getCargoTypeById,
@@ -26,6 +26,7 @@ const CargoTypesTab = React.forwardRef<any, {}>((props, ref) => {
     const [showModal, setShowModal] = useState(false);
     const [modalMode, setModalMode] = useState<"create" | "edit">("create");
     const [editingId, setEditingId] = useState<number | null>(null);
+    const [isEditEnabled, setIsEditEnabled] = useState(false);
 
     const [formData, setFormData] = useState<Partial<CargoTypeObj>>({
         type: "",
@@ -54,6 +55,7 @@ const CargoTypesTab = React.forwardRef<any, {}>((props, ref) => {
         setFormData({ type: "", duration: undefined, has_pl: true });
         setModalMode("create");
         setEditingId(null);
+        setIsEditEnabled(true);
         setShowModal(true);
     };
 
@@ -70,6 +72,7 @@ const CargoTypesTab = React.forwardRef<any, {}>((props, ref) => {
                 });
                 setModalMode("edit");
                 setEditingId(id);
+                setIsEditEnabled(false);
                 setShowModal(true);
             }
         } catch (error) {
@@ -197,24 +200,25 @@ const CargoTypesTab = React.forwardRef<any, {}>((props, ref) => {
             </div>
             {showModal && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-                    <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden">
-                        <div className="px-6 py-4 border-b flex justify-between items-center bg-gray-50">
-                            <h2 className="text-xl font-bold text-gray-900">
-                                {modalMode === "create" ? "New Cargo Type" : "Edit Cargo Type"}
-                            </h2>
-                            <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100 transition-colors">
-                                <XMarkIcon className="h-5 w-5" />
-                            </button>
-                        </div>
+                    <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden flex flex-col">
+                        <ModalHeader
+                            entityName="Cargo Type"
+                            icon={Truck}
+                            isEditMode={modalMode !== "create"}
+                            isEditEnabled={isEditEnabled}
+                            onToggleEdit={() => setIsEditEnabled(!isEditEnabled)}
+                            onClose={() => setShowModal(false)}
+                        />
 
-                        <div className="p-6 space-y-4 text-black">
+                        <div className="p-6 space-y-4 text-black overflow-y-auto">
                             <div>
                                 <label className="block text-sm font-semibold text-gray-700 mb-1">Type *</label>
                                 <input
                                     type="text"
                                     value={formData.type || ""}
                                     onChange={(e) => updateField("type", e.target.value)}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8CC21B]/40 focus:border-transparent outline-none text-sm text-black"
+                                    disabled={!isEditEnabled}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8CC21B]/40 focus:border-transparent outline-none text-sm text-black disabled:bg-gray-100 disabled:cursor-not-allowed"
                                     placeholder="e.g. DHL Express"
                                 />
                             </div>
@@ -224,7 +228,8 @@ const CargoTypesTab = React.forwardRef<any, {}>((props, ref) => {
                                     type="number"
                                     value={formData.duration || ""}
                                     onChange={(e) => updateField("duration", e.target.value)}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8CC21B]/40 focus:border-transparent outline-none text-sm text-black"
+                                    disabled={!isEditEnabled}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8CC21B]/40 focus:border-transparent outline-none text-sm text-black disabled:bg-gray-100 disabled:cursor-not-allowed"
                                     placeholder="e.g. 5"
                                     min={0}
                                 />
@@ -236,43 +241,25 @@ const CargoTypesTab = React.forwardRef<any, {}>((props, ref) => {
                                     id="has_pl"
                                     checked={formData.has_pl !== false}
                                     onChange={(e) => updateField("has_pl", e.target.checked)}
-                                    className="h-4 w-4 text-[#8CC21B] border-gray-300 rounded focus:ring-[#8CC21B] cursor-pointer"
+                                    disabled={!isEditEnabled}
+                                    className="h-4 w-4 text-[#8CC21B] border-gray-300 rounded focus:ring-[#8CC21B] cursor-pointer disabled:cursor-not-allowed"
                                 />
                                 <label htmlFor="has_pl" className="text-sm font-medium text-gray-700 cursor-pointer select-none">
                                     Create PL (Packing List)
                                 </label>
                             </div>
-
-                            <div className="flex justify-between items-center pt-4 border-t border-gray-100">
-                                <div>
-                                    {modalMode === "edit" && editingId && (
-                                        <button
-                                            onClick={() => handleDelete(editingId)}
-                                            disabled={loading}
-                                            className="px-4 py-2 text-sm font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-50 shadow-sm"
-                                        >
-                                            <TrashIcon className="h-4 w-4" />
-                                            Delete
-                                        </button>
-                                    )}
-                                </div>
-                                <div className="flex gap-2">
-                                    <button
-                                        onClick={() => setShowModal(false)}
-                                        className="px-4 py-2 text-sm font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
-                                    >
-                                        Cancel
-                                    </button>
-                                    <button
-                                        onClick={handleSubmit}
-                                        disabled={loading || !formData.type?.trim()}
-                                        className="px-4 py-2 text-sm font-bold text-white bg-gradient-to-r from-[#8CC21B] to-[#7ab318] hover:from-[#7ab318] hover:to-[#6ba114] rounded-lg transition-all shadow-md disabled:opacity-50"
-                                    >
-                                        {modalMode === "create" ? "Create" : "Update"}
-                                    </button>
-                                </div>
-                            </div>
                         </div>
+
+                        <ModalFooter
+                            isEditMode={modalMode !== "create"}
+                            isEditEnabled={isEditEnabled}
+                            onDelete={modalMode === "edit" && editingId ? () => handleDelete(editingId) : undefined}
+                            onCancel={() => setShowModal(false)}
+                            onSave={handleSubmit}
+                            saveLabel={modalMode === "create" ? "Create" : "Update"}
+                            loading={loading}
+                            saveDisabled={!formData.type?.trim()}
+                        />
                     </div>
                 </div>
             )}
