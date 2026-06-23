@@ -14,6 +14,8 @@ import {
 } from "@heroicons/react/24/outline";
 import { useRouter, useSearchParams } from "next/navigation";
 import PageHeader from "@/components/UI/PageHeader";
+import ModalHeader from "@/components/UI/ModalHeader";
+import ModalFooter from "@/components/UI/ModalFooter";
 import { Truck } from "lucide-react";
 import { toast } from "react-hot-toast";
 import {
@@ -478,48 +480,15 @@ const SuppliersPage: React.FC = () => {
             {showModal && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
                     <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[92vh] flex flex-col overflow-hidden">
-                        <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white flex items-center justify-between flex-shrink-0">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-xl bg-[#8CC21B]/10 flex items-center justify-center">
-                                    <TruckIcon className="w-5 h-5 text-[#8CC21B]" />
-                                </div>
-                                <div>
-                                    <h2 className="text-xl font-bold text-gray-900">
-                                        {modalMode === "edit" ? "Edit Supplier" : "Create New Supplier"}
-                                    </h2>
-                                    <p className="text-sm text-gray-500">
-                                        {modalMode === "edit"
-                                            ? "Toggle edit mode to modify supplier details"
-                                            : "Fill in the details to create a new supplier"}
-                                    </p>
-                                </div>
-                            </div>
-                            <div className="flex items-center gap-3">
-                                {modalMode === "edit" && (
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-sm font-medium text-gray-600">
-                                            {isEditEnabled ? "Editing" : "View Only"}
-                                        </span>
-                                        <button
-                                            onClick={() => setIsEditEnabled(!isEditEnabled)}
-                                            className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${isEditEnabled ? "bg-[#8CC21B]" : "bg-gray-300"
-                                                }`}
-                                        >
-                                            <span
-                                                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${isEditEnabled ? "translate-x-5" : "translate-x-0"
-                                                    }`}
-                                            />
-                                        </button>
-                                    </div>
-                                )}
-                                <button
-                                    onClick={() => setShowModal(false)}
-                                    className="text-gray-400 hover:text-gray-600 transition-colors p-1.5 rounded-lg hover:bg-gray-100"
-                                >
-                                    <XMarkIcon className="h-5 w-5" />
-                                </button>
-                            </div>
-                        </div>
+                        <ModalHeader
+                            entityName="Supplier"
+                            entityNo={modalMode === "edit" ? editingId : null}
+                            icon={TruckIcon}
+                            isEditMode={modalMode === "edit"}
+                            isEditEnabled={isEditEnabled}
+                            onToggleEdit={() => setIsEditEnabled(!isEditEnabled)}
+                            onClose={() => setShowModal(false)}
+                        />
 
                         <div className="px-6 py-2 border-b border-gray-200 bg-gray-50/50 flex-shrink-0">
                             <nav className="flex space-x-1">
@@ -970,37 +939,16 @@ const SuppliersPage: React.FC = () => {
                             )}
                         </div>
 
-                        <div className="px-6 py-4 border-t border-gray-200 bg-gray-50/80 flex-shrink-0">
-                            <div className="flex gap-3 justify-end">
-                                <button
-                                    onClick={() => setShowModal(false)}
-                                    className="px-5 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-all"
-                                >
-                                    {isEditEnabled ? "Cancel" : "Close"}
-                                </button>
-                                {isEditEnabled && (
-                                    <button
-                                        onClick={handleSubmit}
-                                        disabled={!formData.name?.trim() || loading}
-                                        className="px-5 py-2.5 text-sm font-medium bg-[#8CC21B] text-white rounded-lg hover:bg-[#7ab318] transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm flex items-center gap-2"
-                                    >
-                                        {loading && (
-                                            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                        )}
-                                        {modalMode === "edit" ? "Update Supplier" : "Create Supplier"}
-                                    </button>
-                                )}
-                                {modalMode === "edit" && !isEditEnabled && (
-                                    <button
-                                        onClick={() => handleDelete(editingId!)}
-                                        className="px-5 py-2.5 text-sm font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all flex items-center gap-2"
-                                    >
-                                        <TrashIcon className="w-4 h-4" />
-                                        Delete Supplier
-                                    </button>
-                                )}
-                            </div>
-                        </div>
+                        <ModalFooter
+                            isEditMode={modalMode === "edit"}
+                            isEditEnabled={isEditEnabled}
+                            onDelete={() => handleDelete(editingId!)}
+                            onCancel={() => setShowModal(false)}
+                            onSave={handleSubmit}
+                            saveLabel={modalMode === "edit" ? "Update Supplier" : "Create Supplier"}
+                            loading={loading}
+                            saveDisabled={!formData.name?.trim() || loading}
+                        />
                     </div>
                 </div>
             )}

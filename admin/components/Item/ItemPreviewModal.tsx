@@ -16,6 +16,7 @@ import { Package } from "lucide-react";
 import { toast } from "react-hot-toast";
 import ReactSelect from "react-select";
 import CustomModal from "@/components/UI/CustomModal";
+import ViewEditToggle from "@/components/UI/ViewEditToggle";
 import {
   EntityTagSelector,
   type Tag,
@@ -563,16 +564,16 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-      <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="p-6">
+      <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl max-w-4xl w-full max-h-[90vh] flex flex-col">
           {previewLoading || !previewItem ? (
-            <div className="py-20 text-center">
+            <div className="p-6 py-20 text-center">
               <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-gray-200 border-t-primary" />
               <p className="mt-2 text-sm text-gray-500">Loading details...</p>
             </div>
           ) : (
-            <div>
-              <div className="flex items-start justify-between mb-4 gap-3">
+            <>
+              {/* Header with thumbnail, title, toggle, and close */}
+              <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white flex items-center justify-between flex-shrink-0 select-none">
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="w-12 h-12 rounded-lg overflow-hidden bg-gray-100 border border-gray-200 flex items-center justify-center flex-shrink-0">
                     {getThumb(previewItem) ? (
@@ -598,35 +599,24 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                     </p>
                   </div>
                 </div>
-                <button
-                  onClick={onClose}
-                  className="text-gray-400 hover:text-gray-600 mt-1"
-                >
-                  <XMarkIcon className="h-5 w-5" />
-                </button>
-              </div>
-
-              <div className="mb-4 flex items-center justify-between bg-gray-50 rounded-lg p-3">
-                <span className="text-sm font-medium text-gray-700">
-                  Edit Mode
-                </span>
-                <div className="flex items-center">
-                  <span className="text-xs text-gray-500 mr-2">
-                    {previewEdit ? "Enabled" : "Disabled"}
-                  </span>
+                <div className="flex items-center gap-4 flex-shrink-0">
+                  <ViewEditToggle
+                    isEditEnabled={previewEdit}
+                    onToggle={() => setPreviewEdit(!previewEdit)}
+                    disabled={previewSaving}
+                  />
                   <button
                     type="button"
-                    disabled={previewSaving}
-                    className={`${previewEdit ? "bg-gray-600" : "bg-gray-200"} relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 disabled:opacity-50`}
-                    onClick={() => setPreviewEdit(!previewEdit)}
+                    onClick={onClose}
+                    className="text-gray-400 hover:text-gray-600 transition-colors p-1.5 rounded-lg hover:bg-gray-100"
                   >
-                    <span
-                      className={`${previewEdit ? "translate-x-4" : "translate-x-0"} pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition`}
-                    />
+                    <XMarkIcon className="h-5 w-5" />
                   </button>
                 </div>
               </div>
 
+              {/* Scrollable content */}
+              <div className="flex-1 overflow-y-auto p-6">
               <div className="mb-5">
                 <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
                   Tags
@@ -1106,14 +1096,19 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                   );
                 })()}
               </div>
+              {/* Footer */}
               <div className="flex justify-between gap-2 pt-6 mt-6 border-t">
-                <button
-                  onClick={handleDeletePreviewItem}
-                  className="px-4 py-2 text-xs text-red-700 bg-white border border-red-300/80 rounded-lg hover:bg-red-50 flex items-center gap-1 font-semibold"
-                >
-                  <TrashIcon className="w-4 h-4" />
-                  Delete
-                </button>
+                <div>
+                  {previewEdit && (
+                    <button
+                      onClick={handleDeletePreviewItem}
+                      className="px-4 py-2 text-xs text-red-700 bg-white border border-red-300/80 rounded-lg hover:bg-red-50 flex items-center gap-1 font-semibold"
+                    >
+                      <TrashIcon className="w-4 h-4" />
+                      Delete
+                    </button>
+                  )}
+                </div>
                 <div className="flex gap-2">
                   {!isRequest && (
                     <button
@@ -1139,7 +1134,7 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                     onClick={onClose}
                     className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 text-xs font-semibold"
                   >
-                    Close
+                    {previewEdit ? "Cancel" : "Close"}
                   </button>
                   {previewEdit && (
                     <button
@@ -1152,9 +1147,9 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                   )}
                 </div>
               </div>
-            </div>
+              </div>
+            </>
           )}
-        </div>
       </div>
       <CustomModal
         isOpen={qualityModalOpen}

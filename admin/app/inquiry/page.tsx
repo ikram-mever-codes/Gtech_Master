@@ -62,6 +62,8 @@ import { useSelector } from "react-redux";
 import { RootState } from "@/app/Redux/store";
 import { MessagesSquare, ClipboardList } from "lucide-react";
 import PageHeader from "@/components/UI/PageHeader";
+import ModalHeader from "@/components/UI/ModalHeader";
+import ModalFooter from "@/components/UI/ModalFooter";
 import { UserRole } from "@/utils/interfaces";
 import { getAllTarics } from "@/api/items";
 import { TagFilterSelector } from "@/components/Tags/TagFilterSelector";
@@ -1917,77 +1919,48 @@ const CombinedInquiriesPageContent = () => {
       </div>
       {showCreateModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="backdrop-blur-md rounded-2xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto bg-white/95">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-4">
-                  <h2 className="text-xl font-bold text-gray-900">
-                    {inquiryModalMode === "edit"
-                      ? `Inquiry Details ${inquiryFormData.inquiryNo ? `- ${inquiryFormData.inquiryNo}` : ""}`
-                      : "Create New Inquiry"}
-                  </h2>
-                  {(() => {
-                    let total = 0;
-                    inquiryRequests.forEach((req: any) => {
-                      const qty = parseInt(req.qty) || 0;
-                      const targetPrice = parseFloat(req.targetPrice) || 0;
-                      let factor = 12;
-                      const interval = req.interval || "Monatlich";
-                      const normalized = interval.toLowerCase().trim();
-                      if (normalized === "jährlich" || normalized === "jaehrlich" || normalized === "yearly") {
-                        factor = 1;
-                      } else if (normalized === "halbjährlich" || normalized === "halbjaehrlich" || normalized === "half-yearly" || normalized === "half yearly" || normalized === "biannually") {
-                        factor = 2;
-                      } else if (normalized === "quartal" || normalized === "quarterly") {
-                        factor = 4;
-                      } else if (normalized === "2 monatlich" || normalized === "bimonthly") {
-                        factor = 6;
-                      } else if (normalized === "monatlich" || normalized === "monthly") {
-                        factor = 12;
-                      }
-                      const annual = qty * targetPrice * factor;
-                      total += (annual / 1000);
-                    });
-                    return (
-                      <span className="bg-blue-50 border border-blue-200 text-blue-800 text-xs px-2.5 py-1 rounded-full font-bold">
-                        Potential: {total.toFixed(2)} k €
-                      </span>
-                    );
-                  })()}
-                </div>
-                <button
-                  onClick={() => {
-                    setShowCreateModal(false);
-                    resetInquiryForm();
-                  }}
-                  className="text-gray-400 hover:text-gray-600 transition-colors"
-                >
-                  <XMarkIcon className="h-5 w-5" />
-                </button>
-              </div>
-              {inquiryModalMode === "edit" && (
-                <div className="mb-4 flex items-center justify-between bg-gray-50 rounded-lg p-3">
-                  <span className="text-sm font-medium text-gray-700">
-                    Edit Mode
+          <div className="backdrop-blur-md rounded-2xl shadow-xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden bg-white/95">
+            <ModalHeader
+              entityName="Inquiry"
+              entityNo={inquiryModalMode === "edit" ? inquiryFormData.inquiryNo : null}
+              icon={ClipboardDocumentListIcon}
+              isEditMode={inquiryModalMode === "edit"}
+              isEditEnabled={editModeEnabled}
+              onToggleEdit={() => setEditModeEnabled(!editModeEnabled)}
+              onClose={() => {
+                setShowCreateModal(false);
+                resetInquiryForm();
+              }}
+              extraHeaderElements={(() => {
+                let total = 0;
+                inquiryRequests.forEach((req: any) => {
+                  const qty = parseInt(req.qty) || 0;
+                  const targetPrice = parseFloat(req.targetPrice) || 0;
+                  let factor = 12;
+                  const interval = req.interval || "Monatlich";
+                  const normalized = interval.toLowerCase().trim();
+                  if (normalized === "jährlich" || normalized === "jaehrlich" || normalized === "yearly") {
+                    factor = 1;
+                  } else if (normalized === "halbjährlich" || normalized === "halbjaehrlich" || normalized === "half-yearly" || normalized === "half yearly" || normalized === "biannually") {
+                    factor = 2;
+                  } else if (normalized === "quartal" || normalized === "quarterly") {
+                    factor = 4;
+                  } else if (normalized === "2 monatlich" || normalized === "bimonthly") {
+                    factor = 6;
+                  } else if (normalized === "monatlich" || normalized === "monthly") {
+                    factor = 12;
+                  }
+                  const annual = qty * targetPrice * factor;
+                  total += (annual / 1000);
+                });
+                return (
+                  <span className="bg-blue-50 border border-blue-200 text-blue-800 text-xs px-2.5 py-1 rounded-full font-bold">
+                    Potential: {total.toFixed(2)} k €
                   </span>
-                  <div className="flex items-center">
-                    <span className="text-xs text-gray-500 mr-2">
-                      {editModeEnabled ? "Enabled" : "Disabled"}
-                    </span>
-                    <button
-                      type="button"
-                      className={`${editModeEnabled ? "bg-gray-600" : "bg-gray-200"
-                        } relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2`}
-                      onClick={() => setEditModeEnabled(!editModeEnabled)}
-                    >
-                      <span
-                        className={`${editModeEnabled ? "translate-x-4" : "translate-x-0"
-                          } pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out`}
-                      />
-                    </button>
-                  </div>
-                </div>
-              )}
+                );
+              })()}
+            />
+            <div className="p-6 flex-1 overflow-y-auto">
               <div className="space-y-6">
                 <div
                   className={`rounded-xl p-4 -mx-4 transition-colors duration-300 ${inquiryFormData.isAssembly
@@ -3432,58 +3405,31 @@ const CombinedInquiriesPageContent = () => {
                   </div>
                 </div>
               </div>
-              <div className="mt-4 flex justify-between gap-2">
-                <div>
-                  {inquiryModalMode === "edit" &&
-                    user?.role === UserRole.ADMIN && (
-                      <button
-                        onClick={async () => {
-                          if (editingInquiryId) {
-                            await handleDeleteInquiry(editingInquiryId);
-                            setShowCreateModal(false);
-                          }
-                        }}
-                        className="px-4 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-lg transition-all flex items-center gap-1.5"
-                      >
-                        <TrashIcon className="h-4 w-4" />
-                        Delete Inquiry
-                      </button>
-                    )}
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => {
-                      setShowCreateModal(false);
-                      resetInquiryForm();
-                    }}
-                    className="px-3 py-2 text-xs text-gray-700 bg-white/80 backdrop-blur-sm border border-gray-300/80 rounded hover:bg-white/60 transition-all"
-                  >
-                    {inquiryModalMode === "edit" && !editModeEnabled
-                      ? "Close"
-                      : "Cancel"}
-                  </button>
-                  {(inquiryModalMode === "create" ||
-                    (inquiryModalMode === "edit" && editModeEnabled)) && (
-                      <CustomButton
-                        gradient={true}
-                        onClick={handleInquirySubmit}
-                        disabled={
-                          !inquiryFormData.name ||
-                          !inquiryFormData.customerId ||
-                          !inquiryRequests.some(
-                            (req) => req.itemName && req.qty >= 1,
-                          )
-                        }
-                        className="px-3 py-2 text-xs bg-gray-600/90 backdrop-blur-sm text-white rounded hover:bg-gray-700/90 transition-all disabled:opacity-50"
-                      >
-                        {inquiryModalMode === "edit"
-                          ? "Update Inquiry"
-                          : "Create Inquiry"}
-                      </CustomButton>
-                    )}
-                </div>
-              </div>
             </div>
+            <ModalFooter
+              isEditMode={inquiryModalMode === "edit"}
+              isEditEnabled={editModeEnabled}
+              onDelete={async () => {
+                if (editingInquiryId) {
+                  await handleDeleteInquiry(editingInquiryId);
+                  setShowCreateModal(false);
+                }
+              }}
+              onCancel={() => {
+                setShowCreateModal(false);
+                resetInquiryForm();
+              }}
+              onSave={handleInquirySubmit}
+              saveLabel={inquiryModalMode === "edit" ? "Update Inquiry" : "Create Inquiry"}
+              loading={inquiryLoading}
+              saveDisabled={
+                !inquiryFormData.name ||
+                !inquiryFormData.customerId ||
+                !inquiryRequests.some((req) => req.itemName && req.qty >= 1) ||
+                inquiryLoading
+              }
+              showDelete={user?.role === UserRole.ADMIN}
+            />
           </div>
         </div>
       )}

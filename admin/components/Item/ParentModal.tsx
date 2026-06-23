@@ -10,6 +10,8 @@ import {
   Taric,
 } from "@/api/items";
 import { Supplier } from "@/api/suppliers";
+import ModalHeader from "../UI/ModalHeader";
+import ModalFooter from "../UI/ModalFooter";
 
 interface ParentModalProps {
   isOpen: boolean;
@@ -179,46 +181,15 @@ export const ParentModal: React.FC<ParentModalProps> = ({
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[92vh] flex flex-col overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white flex items-center justify-between flex-shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-[#8CC21B]/10 flex items-center justify-center">
-              <BuildingOfficeIcon className="w-5 h-5 text-[#8CC21B]" />
-            </div>
-            <div>
-              <h2 className="text-xl font-bold text-gray-900">
-                {isEditMode ? "Edit Parent" : "Create New Parent"}
-              </h2>
-              <p className="text-sm text-gray-500">
-                {isEditMode ? "View or modify parent details" : "Fill in the details to create a new parent"}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            {isEditMode && (
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-medium text-gray-600">
-                  {isEditEnabled ? "Editing" : "View Only"}
-                </span>
-                <button
-                  onClick={() => setIsEditEnabled(!isEditEnabled)}
-                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${isEditEnabled ? "bg-[#8CC21B]" : "bg-gray-300"
-                    }`}
-                >
-                  <span
-                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${isEditEnabled ? "translate-x-5" : "translate-x-0"
-                      }`}
-                  />
-                </button>
-              </div>
-            )}
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 transition-colors p-1.5 rounded-lg hover:bg-gray-100"
-            >
-              <XMarkIcon className="h-5 w-5" />
-            </button>
-          </div>
-        </div>
+        <ModalHeader
+          entityName="Parent"
+          entityNo={isEditMode ? formData.de_no : null}
+          icon={BuildingOfficeIcon}
+          isEditMode={isEditMode}
+          isEditEnabled={isEditEnabled}
+          onToggleEdit={() => setIsEditEnabled(!isEditEnabled)}
+          onClose={onClose}
+        />
         <div className="px-6 py-2 border-b border-gray-200 bg-gray-50/50 flex-shrink-0">
           <nav className="flex space-x-2">
             {[
@@ -399,37 +370,16 @@ export const ParentModal: React.FC<ParentModalProps> = ({
             </div>
           )}
         </div>
-        <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex items-center justify-between flex-shrink-0">
-          <div>
-            {isEditMode && isEditEnabled && (
-              <button
-                onClick={handleDeleteParent}
-                disabled={loading}
-                className="px-4 py-2 text-sm font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-50"
-              >
-                <TrashIcon className="h-4 w-4" />
-                Delete Parent
-              </button>
-            )}
-          </div>
-          <div className="flex gap-3">
-            <button
-              onClick={onClose}
-              className="px-5 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-all"
-            >
-              Cancel
-            </button>
-            {isEditEnabled && (
-              <button
-                onClick={handleSave}
-                disabled={loading}
-                className="px-5 py-2.5 text-sm font-medium bg-[#8CC21B] text-white rounded-lg hover:bg-[#7ab318] transition-all disabled:opacity-50 shadow-sm"
-              >
-                {loading ? "Saving..." : isEditMode ? "Save Changes" : "Create Parent"}
-              </button>
-            )}
-          </div>
-        </div>
+        <ModalFooter
+          isEditMode={isEditMode}
+          isEditEnabled={isEditEnabled}
+          onDelete={handleDeleteParent}
+          onCancel={onClose}
+          onSave={handleSave}
+          saveLabel={isEditMode ? "Save Changes" : "Create Parent"}
+          loading={loading}
+          saveDisabled={loading || !formData.de_no.trim() || !formData.name_de.trim()}
+        />
 
       </div>
     </div>

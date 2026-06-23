@@ -5,13 +5,14 @@ import {
     ArrowPathIcon,
     PlusIcon,
     TrashIcon,
-    XMarkIcon,
     ChevronLeftIcon,
     ChevronRightIcon,
     MagnifyingGlassIcon,
 } from "@heroicons/react/24/outline";
 import { Truck } from "lucide-react";
 import PageHeader from "@/components/UI/PageHeader";
+import ModalHeader from "@/components/UI/ModalHeader";
+import ModalFooter from "@/components/UI/ModalFooter";
 import { toast } from "react-hot-toast";
 import {
     getAllCargos,
@@ -653,47 +654,15 @@ const CargosTab = React.forwardRef<any, CargosTabProps>(({ customers: externalCu
             {showModal && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
                     <div className="bg-white rounded-[4px] shadow-2xl max-w-4xl w-full max-h-[92vh] flex flex-col">
-                        <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white flex items-center justify-between flex-shrink-0">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center">
-                                    <Truck className="w-5 h-5 text-gray-600" />
-                                </div>
-                                <div>
-                                    <h2 className="text-xl font-bold text-gray-900">
-                                        {modalMode === "view"
-                                            ? "View Cargo"
-                                            : modalMode === "edit"
-                                                ? "Edit Cargo"
-                                                : "Create New Cargo"}
-                                    </h2>
-                                </div>
-                            </div>
-                            <div className="flex items-center gap-3">
-                                {modalMode === "edit" && (
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-sm font-medium text-gray-600">
-                                            {isEditEnabled ? "Editing" : "View Only"}
-                                        </span>
-                                        <button
-                                            onClick={() => setIsEditEnabled(!isEditEnabled)}
-                                            className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-[4px] border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${isEditEnabled ? "bg-gray-600" : "bg-gray-300"
-                                                }`}
-                                        >
-                                            <span
-                                                className={`pointer-events-none inline-block h-5 w-5 transform rounded-[4px] bg-white shadow ring-0 transition duration-200 ease-in-out ${isEditEnabled ? "translate-x-5" : "translate-x-0"
-                                                    }`}
-                                            />
-                                        </button>
-                                    </div>
-                                )}
-                                <button
-                                    onClick={() => setShowModal(false)}
-                                    className="text-gray-400 hover:text-gray-600 transition-colors p-1.5 rounded-[4px] hover:bg-gray-100"
-                                >
-                                    <XMarkIcon className="h-5 w-5" />
-                                </button>
-                            </div>
-                        </div>
+                        <ModalHeader
+                            entityName="Cargo"
+                            entityNo={modalMode !== "create" ? formData.cargo_no : undefined}
+                            icon={Truck}
+                            isEditMode={modalMode !== "create"}
+                            isEditEnabled={isEditEnabled}
+                            onToggleEdit={() => setIsEditEnabled(!isEditEnabled)}
+                            onClose={() => setShowModal(false)}
+                        />
 
                         <div className="px-6 py-2 border-b border-gray-200 bg-gray-50/50 flex-shrink-0">
                             <nav className="flex space-x-1">
@@ -1033,37 +1002,15 @@ const CargosTab = React.forwardRef<any, CargosTabProps>(({ customers: externalCu
                             )}
                         </div>
 
-                        <div className="px-6 py-4 border-t border-gray-200 bg-gray-50/80 flex-shrink-0">
-                            <div className="flex gap-3 justify-end">
-                                <button
-                                    onClick={() => setShowModal(false)}
-                                    className="px-4 py-2 text-sm font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
-                                >
-                                    {isEditEnabled ? "Cancel" : "Close"}
-                                </button>
-                                {isEditEnabled && modalMode !== "view" && (
-                                    <button
-                                        onClick={handleSubmit}
-                                        disabled={loading}
-                                        className="px-4 py-2 text-sm font-bold text-white bg-gradient-to-r from-[#8CC21B] to-[#7ab318] hover:from-[#7ab318] hover:to-[#6ba114] rounded-lg transition-all shadow-md disabled:opacity-50 flex items-center gap-2"
-                                    >
-                                        {loading && (
-                                            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                        )}
-                                        {modalMode === "edit" ? "Update Cargo" : "Create Cargo"}
-                                    </button>
-                                )}
-                                {modalMode === "edit" && !isEditEnabled && (
-                                    <button
-                                        onClick={() => handleDelete(editingId!)}
-                                        className="px-4 py-2 text-sm font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-50 shadow-sm"
-                                    >
-                                        <TrashIcon className="w-4 h-4" />
-                                        Delete Cargo
-                                    </button>
-                                )}
-                            </div>
-                        </div>
+                        <ModalFooter
+                            isEditMode={modalMode !== "create"}
+                            isEditEnabled={isEditEnabled}
+                            onDelete={modalMode === "edit" ? () => handleDelete(editingId!) : undefined}
+                            onCancel={() => setShowModal(false)}
+                            onSave={handleSubmit}
+                            saveLabel={modalMode === "edit" ? "Update Cargo" : "Create Cargo"}
+                            loading={loading}
+                        />
                     </div>
                 </div>
             )}

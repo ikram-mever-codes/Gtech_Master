@@ -46,6 +46,8 @@ import { useSelector } from "react-redux";
 import { UserRole } from "@/utils/interfaces";
 import { ClipboardList } from "lucide-react";
 import PageHeader from "@/components/UI/PageHeader";
+import ModalHeader from "@/components/UI/ModalHeader";
+import ModalFooter from "@/components/UI/ModalFooter";
 import { TagFilterSelector } from "@/components/Tags/TagFilterSelector";
 import { TagPickerInput, EntityTagSelector, type Tag } from "@/components/Tags/TagManager";
 import { syncEntityTags } from "@/api/tags";
@@ -890,48 +892,20 @@ const RequestedItemsPage: React.FC = () => {
 
         {showCreateModal && (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-              <div className="p-6">
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-2xl font-bold text-gray-900">
-                    {modalMode === "edit"
-                      ? "Request Details"
-                      : "Add New Requested Item"}
-                  </h2>
-                  <button
-                    onClick={() => {
-                      setShowCreateModal(false);
-                      resetForm();
-                    }}
-                    className="text-gray-400 hover:text-gray-600 transition-colors"
-                  >
-                    <XMarkIcon className="h-6 w-6" />
-                  </button>
-                </div>
-
-                {modalMode === "edit" && (
-                  <div className="mb-6 flex items-center justify-between bg-gray-50 rounded-lg p-4">
-                    <span className="text-sm font-medium text-gray-700">
-                      Edit Mode
-                    </span>
-                    <div className="flex items-center">
-                      <span className="text-sm text-gray-500 mr-3">
-                        {editModeEnabled ? "Enabled" : "Disabled"}
-                      </span>
-                      <button
-                        type="button"
-                        className={`${editModeEnabled ? "bg-gray-600" : "bg-gray-200"
-                          } relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2`}
-                        onClick={() => setEditModeEnabled(!editModeEnabled)}
-                      >
-                        <span
-                          className={`${editModeEnabled ? "translate-x-5" : "translate-x-0"
-                            } pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out`}
-                        />
-                      </button>
-                    </div>
-                  </div>
-                )}
+          <div className="backdrop-blur-md rounded-2xl shadow-xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden bg-white/95">
+            <ModalHeader
+              entityName="Request"
+              entityNo={modalMode === "edit" ? editingItemId : null}
+              icon={DocumentTextIcon}
+              isEditMode={modalMode === "edit"}
+              isEditEnabled={editModeEnabled}
+              onToggleEdit={() => setEditModeEnabled(!editModeEnabled)}
+              onClose={() => {
+                setShowCreateModal(false);
+                resetForm();
+              }}
+            />
+            <div className="p-6 flex-1 overflow-y-auto">
 
                 <div className="space-y-6">
                   <div className="grid grid-cols-2 gap-4">
@@ -1279,55 +1253,30 @@ const RequestedItemsPage: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="mt-6 flex justify-between gap-3">
-                    <div>
-                      {modalMode === "edit" &&
-                        editModeEnabled &&
-                        user?.role === UserRole.ADMIN && (
-                          <button
-                            onClick={() => {
-                              if (editingItemId) {
-                                handleDeleteItem(editingItemId);
-                                setShowCreateModal(false);
-                              }
-                            }}
-                            className="px-4 py-2 text-red-700 bg-white/80 backdrop-blur-sm border border-red-300/80 rounded-lg hover:bg-red-50/60 transition-all"
-                          >
-                            Delete
-                          </button>
-                        )}
-                    </div>
-                    <div className="flex gap-3">
-                      <button
-                        onClick={() => {
-                          setShowCreateModal(false);
-                          resetForm();
-                        }}
-                        className="px-4 py-2 text-gray-700 bg-white/80 backdrop-blur-sm border border-gray-300/80 rounded-lg hover:bg-white/60 transition-all"
-                      >
-                        {modalMode === "edit" && !editModeEnabled
-                          ? "Close"
-                          : "Cancel"}
-                      </button>
-                      {(modalMode === "create" ||
-                        (modalMode === "edit" && editModeEnabled)) && (
-                          <CustomButton
-                            gradient={true}
-                            onClick={handleSubmit}
-                            className="px-4 py-2 bg-gray-600/90 backdrop-blur-sm text-white rounded-lg hover:bg-gray-700/90 transition-all"
-                          >
-                            {modalMode === "edit"
-                              ? "Update Request"
-                              : "Add Request"}
-                          </CustomButton>
-                        )}
-                    </div>
                   </div>
-                </div>
-              </div>
             </div>
+            <ModalFooter
+              isEditMode={modalMode === "edit"}
+              isEditEnabled={editModeEnabled}
+              onDelete={() => {
+                if (editingItemId) {
+                  handleDeleteItem(editingItemId);
+                  setShowCreateModal(false);
+                }
+              }}
+              onCancel={() => {
+                setShowCreateModal(false);
+                resetForm();
+              }}
+              onSave={handleSubmit}
+              saveLabel={modalMode === "edit" ? "Update Request" : "Add Request"}
+              loading={loading}
+              saveDisabled={loading}
+              showDelete={user?.role === UserRole.ADMIN}
+            />
           </div>
-        )}
+        </div>
+      )}
       </div>
     </div>
   );
