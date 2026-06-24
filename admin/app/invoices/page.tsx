@@ -2515,12 +2515,12 @@ const InvoiceListPage: React.FC = () => {
                                 {
                                   header: "Position",
                                   render: (_: any, idx: number) => idx + 1,
-                                  width: "70px",
+                                  width: "50px",
                                 },
                                 {
                                   header: "Taric Name EN",
                                   render: (it: any) => it.taricNameEn,
-                                  width: "350px",
+                                  width: "250px",
                                 },
                                 {
                                   header: "Taric Code",
@@ -2529,7 +2529,7 @@ const InvoiceListPage: React.FC = () => {
                                       {it.taricCode}
                                     </span>
                                   ),
-                                  width: "140px",
+                                  width: "110px",
                                 },
                                 {
                                   header: "Duty rate",
@@ -2540,30 +2540,30 @@ const InvoiceListPage: React.FC = () => {
                                   header: "Total Qty",
                                   render: (it: any) => it.totalQty,
                                   align: "center",
-                                  width: "100px",
+                                  width: "80px",
                                 },
                                 {
                                   header: "Unit Price",
                                   render: (it: any) => it.unitPrice || "0.00",
-                                  width: "100px",
+                                  width: "80px",
                                 },
                                 {
                                   header: "Total Price",
                                   render: (it: any) =>
                                     (Number(it.totalPrice) || 0).toLocaleString(undefined, { minimumFractionDigits: 2 }),
-                                  width: "120px",
+                                  width: "100px",
                                 },
                               ]
                               : [
                                 {
                                   header: "Position",
                                   render: (_: any, idx: number) => idx + 1,
-                                  width: "70px",
+                                  width: "50px",
                                 },
                                 {
                                   header: "Taric Name EN",
                                   render: (it: any) => it.taricNameEn,
-                                  width: "350px",
+                                  width: "250px",
                                 },
                                 {
                                   header: "Taric Code",
@@ -2572,7 +2572,7 @@ const InvoiceListPage: React.FC = () => {
                                       {it.taricCode}
                                     </span>
                                   ),
-                                  width: "140px",
+                                  width: "110px",
                                 },
                                 {
                                   header: "Duty rate",
@@ -2583,18 +2583,18 @@ const InvoiceListPage: React.FC = () => {
                                   header: "Total Qty",
                                   render: (it: any) => it.totalQty,
                                   align: "center",
-                                  width: "100px",
+                                  width: "80px",
                                 },
                                 {
                                   header: "Unit Price",
                                   render: (it: any) => it.unitPrice || "0.00",
-                                  width: "100px",
+                                  width: "80px",
                                 },
                                 {
                                   header: "Total Price",
                                   render: (it: any) =>
                                     (Number(it.totalPrice) || 0).toLocaleString(undefined, { minimumFractionDigits: 2 }),
-                                  width: "120px",
+                                  width: "100px",
                                 },
                                 {
                                   header: "Operation",
@@ -2611,7 +2611,7 @@ const InvoiceListPage: React.FC = () => {
                                       <RefreshCw className="w-3 h-3" /> Set taric
                                     </button>
                                   ),
-                                  width: "120px",
+                                  width: "110px",
                                 },
                               ]
                           }
@@ -2622,7 +2622,7 @@ const InvoiceListPage: React.FC = () => {
                                 {
                                   label: "Grand Total",
                                   value: "",
-                                  width: "740px",
+                                  colSpan: 4,
                                   align: "left",
                                 },
                                 {
@@ -2631,12 +2631,12 @@ const InvoiceListPage: React.FC = () => {
                                       (s: number, g: any) => s + (g.totalQty || 0),
                                       0,
                                     ) || 0,
-                                  width: "100px",
+                                  width: "80px",
                                   align: "center",
                                 },
                                 {
                                   value: "",
-                                  width: "100px",
+                                  width: "80px",
                                 },
                                 {
                                   value: (
@@ -2645,7 +2645,7 @@ const InvoiceListPage: React.FC = () => {
                                       0,
                                     ) || 0
                                   ).toLocaleString(undefined, { minimumFractionDigits: 2 }),
-                                  width: "120px",
+                                  width: "100px",
                                   align: "left",
                                 },
                               ]
@@ -2653,7 +2653,7 @@ const InvoiceListPage: React.FC = () => {
                                 {
                                   label: "Grand Total",
                                   value: "",
-                                  width: "620px",
+                                  colSpan: 4,
                                   align: "left",
                                 },
                                 {
@@ -2662,12 +2662,12 @@ const InvoiceListPage: React.FC = () => {
                                       (s: number, g: any) => s + (g.totalQty || 0),
                                       0,
                                     ) || 0,
-                                  width: "100px",
+                                  width: "80px",
                                   align: "center",
                                 },
                                 {
                                   value: "",
-                                  width: "100px",
+                                  width: "80px",
                                 },
                                 {
                                   value: (
@@ -2676,12 +2676,12 @@ const InvoiceListPage: React.FC = () => {
                                       0,
                                     ) || 0
                                   ).toLocaleString(undefined, { minimumFractionDigits: 2 }),
-                                  width: "120px",
+                                  width: "100px",
                                   align: "left",
                                 },
                                 {
                                   value: "",
-                                  width: "120px",
+                                  width: "110px",
                                 },
                               ]
                           }

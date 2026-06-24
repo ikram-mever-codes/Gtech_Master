@@ -15,6 +15,10 @@ const star_business_details_1 = require("./star_business_details");
 const contact_person_1 = require("./contact_person");
 const inquiry_1 = require("./inquiry");
 const tags_1 = require("./tags");
+const parents_1 = require("./parents");
+const tarics_1 = require("./tarics");
+const categories_1 = require("./categories");
+const suppliers_1 = require("./suppliers");
 let RequestedItem = class RequestedItem {
     constructor(partial) {
         if (partial) {
@@ -239,6 +243,86 @@ __decorate([
     (0, typeorm_1.Column)({ type: "text", nullable: true }),
     __metadata("design:type", String)
 ], RequestedItem.prototype, "tagOrder", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: "parent_id", nullable: true }),
+    __metadata("design:type", Number)
+], RequestedItem.prototype, "parent_id", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "varchar", length: 100, nullable: true }),
+    __metadata("design:type", String)
+], RequestedItem.prototype, "model", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "varchar", length: 50, nullable: true }),
+    __metadata("design:type", String)
+], RequestedItem.prototype, "ean", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: "taric_id", nullable: true }),
+    __metadata("design:type", Number)
+], RequestedItem.prototype, "taric_id", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "text", nullable: true }),
+    __metadata("design:type", String)
+], RequestedItem.prototype, "item_name_cn", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: "cat_id", nullable: true }),
+    __metadata("design:type", Number)
+], RequestedItem.prototype, "cat_id", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "text", nullable: true }),
+    __metadata("design:type", String)
+], RequestedItem.prototype, "remark", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "varchar", length: 255, nullable: true }),
+    __metadata("design:type", String)
+], RequestedItem.prototype, "photo", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "text", nullable: true }),
+    __metadata("design:type", String)
+], RequestedItem.prototype, "pix_path", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "text", nullable: true }),
+    __metadata("design:type", String)
+], RequestedItem.prototype, "pix_path_eBay", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "char", length: 1, default: "N" }),
+    __metadata("design:type", String)
+], RequestedItem.prototype, "is_rmb_special", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "char", length: 1, default: "N" }),
+    __metadata("design:type", String)
+], RequestedItem.prototype, "is_eur_special", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "char", length: 1, default: "Y" }),
+    __metadata("design:type", String)
+], RequestedItem.prototype, "isActive", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: "supplier_id", nullable: true }),
+    __metadata("design:type", Number)
+], RequestedItem.prototype, "supplier_id", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: "text", nullable: true }),
+    __metadata("design:type", String)
+], RequestedItem.prototype, "item_name_de", void 0);
+__decorate([
+    (0, typeorm_1.ManyToOne)(() => parents_1.Parent, { nullable: true }),
+    (0, typeorm_1.JoinColumn)({ name: "parent_id" }),
+    __metadata("design:type", Object)
+], RequestedItem.prototype, "parent", void 0);
+__decorate([
+    (0, typeorm_1.ManyToOne)(() => tarics_1.Taric, { nullable: true }),
+    (0, typeorm_1.JoinColumn)({ name: "taric_id" }),
+    __metadata("design:type", Object)
+], RequestedItem.prototype, "taricRel", void 0);
+__decorate([
+    (0, typeorm_1.ManyToOne)(() => categories_1.Category, { nullable: true }),
+    (0, typeorm_1.JoinColumn)({ name: "cat_id" }),
+    __metadata("design:type", Object)
+], RequestedItem.prototype, "category", void 0);
+__decorate([
+    (0, typeorm_1.ManyToOne)(() => suppliers_1.Supplier, { nullable: true }),
+    (0, typeorm_1.JoinColumn)({ name: "supplier_id" }),
+    __metadata("design:type", Object)
+], RequestedItem.prototype, "supplier", void 0);
 exports.RequestedItem = RequestedItem = __decorate([
     (0, typeorm_1.Entity)(),
     __metadata("design:paramtypes", [Object])

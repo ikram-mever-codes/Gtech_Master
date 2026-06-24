@@ -25,6 +25,7 @@ interface TagFilterSelectorProps {
   onChange: (filterString: string) => void;
   onReset?: () => void;
   compact?: boolean;
+  placeholder?: string;
 }
 
 export const TagFilterSelector: React.FC<TagFilterSelectorProps> = ({
@@ -32,6 +33,7 @@ export const TagFilterSelector: React.FC<TagFilterSelectorProps> = ({
   onChange,
   onReset,
   compact = false,
+  placeholder,
 }) => {
   const [availableTags, setAvailableTags] = useState<Tag[]>([]);
   const [selectedFilters, setSelectedFilters] = useState<TagFilter[]>([]);
@@ -154,7 +156,7 @@ export const TagFilterSelector: React.FC<TagFilterSelectorProps> = ({
         >
           {selectedFilters.length === 0 && (
             <span className="text-gray-400 text-sm">
-              Tags...
+              {placeholder || "Tags..."}
             </span>
           )}
 

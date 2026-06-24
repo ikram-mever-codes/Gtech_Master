@@ -1392,7 +1392,7 @@ const ItemsManagementPage: React.FC = () => {
 
         <div className="mb-6 p-3 bg-white border border-gray-200 rounded-md shadow-sm">
           {activeTab === "items" ? (
-            <div className="flex flex-wrap lg:flex-nowrap items-center gap-2 w-full">
+            <div className="flex flex-wrap items-center gap-2 w-full">
               <div className="flex items-center gap-1.5 text-gray-400 shrink-0 select-none px-1">
                 <FunnelIcon className="w-5 h-5 text-primary" />
               </div>
@@ -1552,7 +1552,7 @@ const ItemsManagementPage: React.FC = () => {
               </div>
             </div>
           ) : activeTab === "parents" ? (
-            <div className="flex flex-wrap lg:flex-nowrap items-center gap-2 w-full">
+            <div className="flex flex-wrap items-center gap-2 w-full">
               <div className="flex items-center gap-1.5 text-gray-400 shrink-0 select-none px-1">
                 <FunnelIcon className="w-5 h-5 text-primary" />
               </div>
@@ -1574,7 +1574,7 @@ const ItemsManagementPage: React.FC = () => {
               </button>
             </div>
           ) : activeTab === "tarics" ? (
-            <div className="flex flex-wrap lg:flex-nowrap items-center gap-2 w-full">
+            <div className="flex flex-wrap items-center gap-2 w-full">
               <div className="flex items-center gap-1.5 text-gray-400 shrink-0 select-none px-1">
                 <FunnelIcon className="w-5 h-5 text-primary" />
               </div>
@@ -1596,7 +1596,7 @@ const ItemsManagementPage: React.FC = () => {
               </button>
             </div>
           ) : activeTab === "suppliers" ? (
-            <div className="flex flex-wrap lg:flex-nowrap items-center gap-2 w-full">
+            <div className="flex flex-wrap items-center gap-2 w-full">
               <div className="flex items-center gap-1.5 text-gray-400 shrink-0 select-none px-1">
                 <FunnelIcon className="w-5 h-5 text-primary" />
               </div>

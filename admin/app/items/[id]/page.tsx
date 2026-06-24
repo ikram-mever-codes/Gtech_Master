@@ -493,8 +493,6 @@ const ItemDetailsPage = () => {
       year: "numeric",
     }).format(date);
   };
-
-  // Currently selected customer derived from itemData.customer_id
   const selectedCustomer = allCustomers.find(
     (c) => String(c.id) === String((itemData as any)?.customer_id),
   );
@@ -530,8 +528,6 @@ const ItemDetailsPage = () => {
     setShowCustomerDropdown(false);
   };
 
-  // Keep the customer search input in sync with the current selection when
-  // entering/leaving edit mode.
   useEffect(() => {
     if (editMode) {
       const cust = allCustomers.find(
@@ -541,7 +537,6 @@ const ItemDetailsPage = () => {
     } else {
       setShowCustomerDropdown(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editMode]);
 
   const getCorrectUrl = (url: string) => {
@@ -1313,7 +1308,6 @@ const ItemDetailsPage = () => {
                     )}
                   </div>
                 </div>
-                {/* Customer (searchable autocomplete) */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 py-3 border-b border-gray-100">
                   <div className="text-sm font-medium text-gray-700">
                     Customer
@@ -1349,7 +1343,6 @@ const ItemDetailsPage = () => {
 
                         {showCustomerDropdown && (
                           <>
-                            {/* click-away overlay */}
                             <div
                               className="fixed inset-0 z-10"
                               onClick={() => setShowCustomerDropdown(false)}

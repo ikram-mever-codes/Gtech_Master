@@ -130,10 +130,10 @@ export class InvoiceController {
 
         const companyInfo = {
           name: "GTech Industries GmbH",
-          address: "Reichshofstr. 137",
-          city: "58239 Schwerte",
+          address: "Antonio-Segni-Str. 4",
+          city: "44263 Dortmund",
           country: "Deutschland",
-          phone: "+49 2304 3389510",
+          phone: "+4923158697565",
           email: "info@gtech-industries.de",
           website: "www.gtech-shop.de",
           registrationNumber: "Amtsgericht Hagen HRB 12496",
@@ -1249,7 +1249,7 @@ export class InvoiceController {
       doc.font("Helvetica").fontSize(7.5).text(cargoNo, RX + RL + 3, 101, { width: RV - 5 });
 
       doc.rect(30, 115, LW, 15).stroke();
-      doc.fontSize(8).text("Reichshofstr. 137 58239 Schwerte Germany, Tel: +4923043389510", 35, 119);
+      doc.fontSize(8).text("Antonio-Segni-Str. 4 44263 Dortmund Germany, Tel: +4923158697565", 35, 119);
 
       doc.rect(RX, 115, RW, 15).stroke();
       doc.font("Helvetica-Bold").fontSize(8).text("Date:", RX + 3, 119, { width: RL - 3 });
