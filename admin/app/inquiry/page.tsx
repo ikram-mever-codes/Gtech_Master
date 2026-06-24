@@ -26,6 +26,7 @@ import {
   TrashIcon,
   PhotoIcon,
   PaperClipIcon,
+  FunnelIcon,
 } from "@heroicons/react/24/outline";
 import { toast } from "react-hot-toast";
 import {
@@ -1254,58 +1255,70 @@ const CombinedInquiriesPageContent = () => {
   const totalCols = showPicColumn ? 10 : 9;
 
   return (
-    <div className="min-h-screen bg-white shadow-xl rounded-lg p-6">
-      <div className="max-w-7xl mx-auto">
-        <div className="mb-6">
-          <div className="flex justify-between items-center mb-4">
-            <div>
-              <PageHeader title="Inquiries" icon={MessagesSquare} />
-            </div>
-            <div className="flex gap-2">
-              <select
-                value={selectedCustomerId}
-                onChange={(e) => {
-                  setSelectedCustomerId(e.target.value);
-                  setInquiryCurrentPage(1);
-                }}
-                className="px-3 py-2 text-sm text-gray-700 bg-white/80 backdrop-blur-sm border border-gray-300/80 rounded-lg hover:bg-white/60 transition-all"
-              >
-                <option value="">All Customers</option>
-                {customers.map((customer) => (
-                  <option key={customer.id} value={customer.id}>
-                    {customer.companyName || customer.legalName}
-                  </option>
-                ))}
-              </select>
-
-              <button
-                onClick={fetchInquiries}
-                disabled={inquiryLoading}
-                className="px-3 py-2 text-sm text-gray-700 bg-white/80 backdrop-blur-sm border border-gray-300/80 rounded-lg hover:bg-white/60 transition-all flex items-center gap-2 disabled:opacity-50"
-              >
-                <ArrowPathIcon
-                  className={`h-4 w-4 ${inquiryLoading ? "animate-spin" : ""}`}
-                />
-                Refresh
-              </button>
-              <CustomButton
-                gradient={true}
-                onClick={() => {
-                  resetInquiryForm();
-                  setShowCreateModal(true);
-                }}
-                className="px-3 py-2 text-sm bg-gray-600/90 backdrop-blur-sm text-white rounded-lg hover:bg-gray-700/90 transition-all flex items-center gap-2"
-              >
-                <PlusIcon className="h-4 w-4" />
-                New Inquiry
-              </CustomButton>
-            </div>
+    <div className="w-full max-w-full mx-auto overflow-hidden">
+      <div
+        className="bg-white rounded-lg shadow-sm pb-8 p-6"
+        style={{
+          border: "1px solid #e0e0e0",
+          background: "linear-gradient(to bottom, #ffffff, #f9f9f9)",
+        }}
+      >
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+          <div>
+            <PageHeader title="Inquiries" icon={MessagesSquare} />
           </div>
-          <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-white/50 backdrop-blur-sm p-4 rounded-xl border border-gray-100 shadow-sm flex flex-col gap-2">
-              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Filter by Inquiry Tags</span>
+          <div className="flex flex-wrap gap-3">
+            <select
+              value={selectedCustomerId}
+              onChange={(e) => {
+                setSelectedCustomerId(e.target.value);
+                setInquiryCurrentPage(1);
+              }}
+              className="px-3 py-2 text-sm text-gray-700 bg-white/80 backdrop-blur-sm border border-gray-300/80 rounded-lg hover:bg-white/60 transition-all cursor-pointer"
+            >
+              <option value="">All Customers</option>
+              {customers.map((customer) => (
+                <option key={customer.id} value={customer.id}>
+                  {customer.companyName || customer.legalName}
+                </option>
+              ))}
+            </select>
+
+            <button
+              onClick={fetchInquiries}
+              disabled={inquiryLoading}
+              className="px-3 py-2 text-sm text-gray-700 bg-white/80 backdrop-blur-sm border border-gray-300/80 rounded-lg hover:bg-white/60 transition-all flex items-center gap-2 disabled:opacity-50"
+            >
+              <ArrowPathIcon
+                className={`h-4 w-4 ${inquiryLoading ? "animate-spin" : ""}`}
+              />
+              Refresh
+            </button>
+            <CustomButton
+              gradient={true}
+              onClick={() => {
+                resetInquiryForm();
+                setShowCreateModal(true);
+              }}
+              className="px-3 py-2 text-sm bg-gray-600/90 backdrop-blur-sm text-white rounded-lg hover:bg-gray-700/90 transition-all flex items-center gap-2"
+            >
+              <PlusIcon className="h-4 w-4" />
+              New Inquiry
+            </CustomButton>
+          </div>
+        </div>
+
+        <div className="mb-6 p-3 bg-white border border-gray-200 rounded-md shadow-sm">
+          <div className="flex flex-wrap items-center gap-2 w-full">
+            <div className="flex items-center gap-1.5 text-gray-400 shrink-0 select-none px-1">
+              <FunnelIcon className="w-5 h-5 text-primary" />
+            </div>
+
+            <div className="flex-grow flex-shrink flex-1 min-w-[200px]">
               <TagFilterSelector
                 category="inquiry"
+                compact={true}
+                placeholder="Filter by Inquiry Tags..."
                 onChange={(tagString) =>
                   setInquiryFilters((prev: any) => ({ ...prev, tags: tagString }))
                 }
@@ -1314,10 +1327,12 @@ const CombinedInquiriesPageContent = () => {
                 }
               />
             </div>
-            <div className="bg-white/50 backdrop-blur-sm p-4 rounded-xl border border-gray-100 shadow-sm flex flex-col gap-2">
-              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Filter by Request Item Tags</span>
+
+            <div className="flex-grow flex-shrink flex-1 min-w-[200px]">
               <TagFilterSelector
                 category="request_item"
+                compact={true}
+                placeholder="Filter by Request Item Tags..."
                 onChange={(tagString) =>
                   setInquiryFilters((prev: any) => ({ ...prev, requestItemTags: tagString }))
                 }
@@ -1325,6 +1340,22 @@ const CombinedInquiriesPageContent = () => {
                   setInquiryFilters((prev: any) => ({ ...prev, requestItemTags: "" }))
                 }
               />
+            </div>
+
+            <div className="shrink-0">
+              <button
+                onClick={() => {
+                  setInquiryFilters((prev: any) => ({
+                    ...prev,
+                    tags: "",
+                    requestItemTags: "",
+                  }));
+                }}
+                className="w-full lg:w-auto px-2.5 py-2 text-xs font-semibold text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 rounded-md transition-colors flex items-center justify-center gap-1.5 whitespace-nowrap"
+              >
+                <ArrowPathIcon className="w-3.5 h-3.5" />
+                Reset
+              </button>
             </div>
           </div>
         </div>

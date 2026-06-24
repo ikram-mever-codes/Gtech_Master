@@ -30,29 +30,29 @@ export interface BillToShipToData {
 export const WAREHOUSE_BILL_TO: Partial<BillToShipToData> = {
     bill_to_company_name: "GTech Industries GmbH",
     bill_to_display_name: "GTech",
-    bill_to_phone_no: "+4923043389510",
+    bill_to_phone_no: "+4923158697565",
     bill_to_tax_no: "DE977540238364617",
     bill_to_email: "info@gtech.de",
     bill_to_website: "www.gtech.de",
     bill_to_contact_person: "Markus",
-    bill_to_contact_phone: "+4923043389510",
+    bill_to_contact_phone: "+4923158697565",
     bill_to_contact_mobile: "+4915121856340",
     bill_to_contact_email: "info@gtech.de",
     bill_to_country: "Germany",
-    bill_to_city: "Schwerte",
-    bill_to_postal_code: "58239",
-    bill_to_full_address: "Reichshofstr. 137",
+    bill_to_city: "Dortmund",
+    bill_to_postal_code: "44263",
+    bill_to_full_address: "Antonio-Segni-Str. 4",
 };
 
 export const WAREHOUSE_SHIP_TO: Partial<BillToShipToData> = {
     ship_to_company_name: "GTech Industries GmbH",
     ship_to_display_name: "GTech",
     ship_to_contact_person: "Markus",
-    ship_to_contact_phone: "+4923043389510",
+    ship_to_contact_phone: "+4923158697565",
     ship_to_country: "Germany",
-    ship_to_city: "Schwerte",
-    ship_to_postal_code: "58239",
-    ship_to_full_address: "Reichshofstr. 137",
+    ship_to_city: "Dortmund",
+    ship_to_postal_code: "44263",
+    ship_to_full_address: "Antonio-Segni-Str. 4",
 };
 
 interface BillToShipToFormProps {

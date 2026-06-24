@@ -35,6 +35,10 @@ class RequestedItemController {
                     .leftJoinAndSelect("requestedItem.contactPerson", "contactPerson")
                     .leftJoinAndSelect("requestedItem.inquiry", "inquiry")
                     .leftJoinAndSelect("requestedItem.tags", "tags")
+                    .leftJoinAndSelect("requestedItem.parent", "parent")
+                    .leftJoinAndSelect("requestedItem.taricRel", "taricRel")
+                    .leftJoinAndSelect("requestedItem.category", "category")
+                    .leftJoinAndSelect("requestedItem.supplier", "supplier")
                     .orderBy("requestedItem.createdAt", "DESC");
                 if (tags) {
                     const tagIds = tags.split(",");
@@ -157,7 +161,7 @@ class RequestedItemController {
                 const { id } = request.params;
                 const item = yield this.requestedItemRepository.findOne({
                     where: { id },
-                    relations: ["business", "contactPerson", "inquiry", "tags"],
+                    relations: ["business", "contactPerson", "inquiry", "tags", "parent", "taricRel", "category", "supplier"],
                 });
                 if (!item) {
                     return response.status(404).json({
@@ -202,7 +206,7 @@ class RequestedItemController {
     createRequestedItem(request, response) {
         return __awaiter(this, void 0, void 0, function* () {
             try {
-                const { businessId, contactPersonId, extraNote, itemName, material, specification, extraItems, extraItemsDescriptions, qty, asanaLink, interval, sampleQty, expectedDelivery, priority, requestStatus, comment, weight, width, height, length, purchasePrice, currency, inquiryId, qualityCriteria, attachments, taric, itemNo, urgency1, urgency2, painPoints, } = request.body;
+                const { businessId, contactPersonId, extraNote, itemName, material, specification, extraItems, extraItemsDescriptions, qty, asanaLink, interval, sampleQty, expectedDelivery, priority, requestStatus, comment, weight, width, height, length, purchasePrice, currency, inquiryId, qualityCriteria, attachments, taric, itemNo, urgency1, urgency2, painPoints, parent_id, model, ean, taric_id, item_name_cn, cat_id, remark, photo, pix_path, pix_path_eBay, is_rmb_special, is_eur_special, isActive, supplier_id, item_name_de, } = request.body;
                 console.log("Received contactPersonId:", contactPersonId);
                 if (!businessId || !itemName || !qty) {
                     return response.status(400).json({
@@ -275,11 +279,26 @@ class RequestedItemController {
                     urgency1,
                     urgency2,
                     painPoints,
+                    parent_id,
+                    model,
+                    ean,
+                    taric_id,
+                    item_name_cn,
+                    cat_id,
+                    remark,
+                    photo,
+                    pix_path,
+                    pix_path_eBay,
+                    is_rmb_special,
+                    is_eur_special,
+                    isActive,
+                    supplier_id,
+                    item_name_de,
                 });
                 const savedItem = yield this.requestedItemRepository.save(requestedItem);
                 const itemWithRelations = yield this.requestedItemRepository.findOne({
                     where: { id: savedItem.id },
-                    relations: ["business", "contactPerson", "inquiry", "tags"],
+                    relations: ["business", "contactPerson", "inquiry", "tags", "parent", "taricRel", "category", "supplier"],
                 });
                 return response.status(201).json({
                     success: true,
@@ -300,7 +319,7 @@ class RequestedItemController {
         return __awaiter(this, void 0, void 0, function* () {
             try {
                 const { id } = request.params;
-                const { contactPersonId, itemName, material, specification, extraItems, extraNote, extraItemsDescriptions, qty, asanaLink, interval, sampleQty, expectedDelivery, priority, requestStatus, comment, weight, width, height, length, purchasePrice, currency, inquiryId, qualityCriteria, attachments, taric, itemNo, urgency1, urgency2, painPoints, } = request.body;
+                const { contactPersonId, itemName, material, specification, extraItems, extraNote, extraItemsDescriptions, qty, asanaLink, interval, sampleQty, expectedDelivery, priority, requestStatus, comment, weight, width, height, length, purchasePrice, currency, inquiryId, qualityCriteria, attachments, taric, itemNo, urgency1, urgency2, painPoints, parent_id, model, ean, taric_id, item_name_cn, cat_id, remark, photo, pix_path, pix_path_eBay, is_rmb_special, is_eur_special, isActive, supplier_id, item_name_de, } = request.body;
                 const existingItem = yield this.requestedItemRepository.findOne({
                     where: { id },
                     relations: ["business", "contactPerson", "inquiry", "tags"],
@@ -345,8 +364,7 @@ class RequestedItemController {
                         inquiry = null;
                     }
                 }
-                const updateData = Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign({}, (itemName && { itemName })), (extraNote !== undefined && { extraNote })), (asanaLink !== undefined && { asanaLink })), (material !== undefined && { material })), (specification !== undefined && { specification })), (extraItems && { extraItems })), (extraItemsDescriptions !== undefined && { extraItemsDescriptions })), (qty && { qty })), (interval && { interval })), (sampleQty !== undefined && { sampleQty })), (expectedDelivery !== undefined && { expectedDelivery })), (priority && { priority })), (requestStatus && { requestStatus })), (comment !== undefined && { comment })), (weight !== undefined && { weight })), (width !== undefined && { width })), (height !== undefined && { height })), (length !== undefined && { length })), (purchasePrice !== undefined && { purchasePrice })), (currency && { currency })), (qualityCriteria !== undefined && { qualityCriteria })), (attachments !== undefined && { attachments })), (taric !== undefined && { taric })), (itemNo !== undefined && { itemNo })), (urgency1 !== undefined && { urgency1 })), (urgency2 !== undefined && { urgency2 })), (painPoints !== undefined && { painPoints }));
-                // Safely update relation keys only if they are present in the request body
+                const updateData = Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign({}, (itemName && { itemName })), (extraNote !== undefined && { extraNote })), (asanaLink !== undefined && { asanaLink })), (material !== undefined && { material })), (specification !== undefined && { specification })), (extraItems && { extraItems })), (extraItemsDescriptions !== undefined && { extraItemsDescriptions })), (qty && { qty })), (interval && { interval })), (sampleQty !== undefined && { sampleQty })), (expectedDelivery !== undefined && { expectedDelivery })), (priority && { priority })), (requestStatus && { requestStatus })), (comment !== undefined && { comment })), (weight !== undefined && { weight })), (width !== undefined && { width })), (height !== undefined && { height })), (length !== undefined && { length })), (purchasePrice !== undefined && { purchasePrice })), (currency && { currency })), (qualityCriteria !== undefined && { qualityCriteria })), (attachments !== undefined && { attachments })), (taric !== undefined && { taric })), (itemNo !== undefined && { itemNo })), (urgency1 !== undefined && { urgency1 })), (urgency2 !== undefined && { urgency2 })), (painPoints !== undefined && { painPoints })), (parent_id !== undefined && { parent_id })), (model !== undefined && { model })), (ean !== undefined && { ean })), (taric_id !== undefined && { taric_id })), (item_name_cn !== undefined && { item_name_cn })), (cat_id !== undefined && { cat_id })), (remark !== undefined && { remark })), (photo !== undefined && { photo })), (pix_path !== undefined && { pix_path })), (pix_path_eBay !== undefined && { pix_path_eBay })), (is_rmb_special !== undefined && { is_rmb_special })), (is_eur_special !== undefined && { is_eur_special })), (isActive !== undefined && { isActive })), (supplier_id !== undefined && { supplier_id })), (item_name_de !== undefined && { item_name_de }));
                 if (request.body.hasOwnProperty("contactPersonId")) {
                     updateData.contactPerson = contactPerson;
                     updateData.contactPersonId = contactPerson ? contactPerson.id : null;
@@ -357,7 +375,7 @@ class RequestedItemController {
                 yield this.requestedItemRepository.update(id, updateData);
                 const updatedItem = yield this.requestedItemRepository.findOne({
                     where: { id },
-                    relations: ["business", "contactPerson", "inquiry", "tags"],
+                    relations: ["business", "contactPerson", "inquiry", "tags", "parent", "taricRel", "category", "supplier"],
                 });
                 return response.status(200).json({
                     success: true,

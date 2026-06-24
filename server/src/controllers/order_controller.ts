@@ -1433,6 +1433,15 @@ const formatPostalCity = (
     .trim();
 };
 
+const formatCountry = (country?: string | null): string => {
+  if (!country) return "";
+  const code = country.trim().toUpperCase();
+  if (code === "DE") return "Germany";
+  if (code === "AT") return "Austria";
+  if (code === "CH") return "Switzerland";
+  return country.trim();
+};
+
 const resolveCustomerAddress = (
   customer: Customer | null | undefined,
 ): ResolvedCustomerAddress => {
@@ -1470,11 +1479,12 @@ const resolveCustomerAddress = (
       starCustomerDetails?.deliveryPostalCode ||
       businessDetails?.postalCode ||
       "",
-    country:
+    country: formatCountry(
       customer.country ||
       starCustomerDetails?.deliveryCountry ||
       businessDetails?.country ||
-      "",
+      ""
+    ),
     phone:
       customer.contactPhoneNumber ||
       starCustomerDetails?.deliveryContactPhone ||
@@ -1675,9 +1685,11 @@ export const generateCommercialInvoicePDF = async (
       : cargo?.ship_to_city
         ? formatPostalCity(cargo.ship_to_postal_code, cargo.ship_to_city)
         : formatPostalCity(customerAddress.postalCode, customerAddress.city);
-    const billToCountry = hasCargoBillTo
-      ? cargo?.bill_to_country || customerAddress.country || "Germany"
-      : cargo?.ship_to_country || customerAddress.country || "Germany";
+    const billToCountry = formatCountry(
+      hasCargoBillTo
+        ? cargo?.bill_to_country || customerAddress.country || "Germany"
+        : cargo?.ship_to_country || customerAddress.country || "Germany"
+    );
     const billToPhone = hasCargoBillTo
       ? cargo?.bill_to_phone_no || customerAddress.phone
       : cargo?.ship_to_contact_phone || customerAddress.phone;
@@ -1694,8 +1706,9 @@ export const generateCommercialInvoicePDF = async (
     const shipToCity = cargo?.ship_to_city
       ? formatPostalCity(cargo.ship_to_postal_code, cargo.ship_to_city)
       : formatPostalCity(customerAddress.postalCode, customerAddress.city);
-    const shipToCountry =
-      cargo?.ship_to_country || customerAddress.country || "";
+    const shipToCountry = formatCountry(
+      cargo?.ship_to_country || customerAddress.country || ""
+    );
     const shipToContact =
       cargo?.ship_to_contact_person || customerAddress.contact || "";
     const shipToPhone =
@@ -1832,17 +1845,15 @@ export const generateCommercialInvoicePDF = async (
         doc.font("Helvetica").fillColor("#000000");
       }
     }
-
     const GTECH_GMBH = {
       name: "GTech Industries GmbH",
-      street: "Reichshofstr. 137",
-      city: "58239 Schwerte",
+      street: "Antonio-Segni-Str. 4",
+      city: "44263 Dortmund",
       country: "Germany",
-      phone: "+4923043389510",
+      phone: "+4923158697565",
       eori: "DE977540238364617",
     };
     const isGTechBillTo = data.billTo.name === "GTech Industries GmbH";
-
     const isSameAddr =
       !hasCargoBillTo ||
       (data.billTo.name === data.shipTo.company &&

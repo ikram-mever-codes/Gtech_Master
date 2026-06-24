@@ -1173,6 +1173,18 @@ const formatPostalCity = (postalCode, city) => {
         .join(" ")
         .trim();
 };
+const formatCountry = (country) => {
+    if (!country)
+        return "";
+    const code = country.trim().toUpperCase();
+    if (code === "DE")
+        return "Germany";
+    if (code === "AT")
+        return "Austria";
+    if (code === "CH")
+        return "Switzerland";
+    return country.trim();
+};
 const resolveCustomerAddress = (customer) => {
     if (!customer) {
         return {
@@ -1203,10 +1215,10 @@ const resolveCustomerAddress = (customer) => {
             (starCustomerDetails === null || starCustomerDetails === void 0 ? void 0 : starCustomerDetails.deliveryPostalCode) ||
             (businessDetails === null || businessDetails === void 0 ? void 0 : businessDetails.postalCode) ||
             "",
-        country: customer.country ||
+        country: formatCountry(customer.country ||
             (starCustomerDetails === null || starCustomerDetails === void 0 ? void 0 : starCustomerDetails.deliveryCountry) ||
             (businessDetails === null || businessDetails === void 0 ? void 0 : businessDetails.country) ||
-            "",
+            ""),
         phone: customer.contactPhoneNumber ||
             (starCustomerDetails === null || starCustomerDetails === void 0 ? void 0 : starCustomerDetails.deliveryContactPhone) ||
             (businessDetails === null || businessDetails === void 0 ? void 0 : businessDetails.contactPhone) ||
@@ -1376,9 +1388,9 @@ const generateCommercialInvoicePDF = (req, res, next) => __awaiter(void 0, void 
             : (cargo === null || cargo === void 0 ? void 0 : cargo.ship_to_city)
                 ? formatPostalCity(cargo.ship_to_postal_code, cargo.ship_to_city)
                 : formatPostalCity(customerAddress.postalCode, customerAddress.city);
-        const billToCountry = hasCargoBillTo
+        const billToCountry = formatCountry(hasCargoBillTo
             ? (cargo === null || cargo === void 0 ? void 0 : cargo.bill_to_country) || customerAddress.country || "Germany"
-            : (cargo === null || cargo === void 0 ? void 0 : cargo.ship_to_country) || customerAddress.country || "Germany";
+            : (cargo === null || cargo === void 0 ? void 0 : cargo.ship_to_country) || customerAddress.country || "Germany");
         const billToPhone = hasCargoBillTo
             ? (cargo === null || cargo === void 0 ? void 0 : cargo.bill_to_phone_no) || customerAddress.phone
             : (cargo === null || cargo === void 0 ? void 0 : cargo.ship_to_contact_phone) || customerAddress.phone;
@@ -1393,7 +1405,7 @@ const generateCommercialInvoicePDF = (req, res, next) => __awaiter(void 0, void 
         const shipToCity = (cargo === null || cargo === void 0 ? void 0 : cargo.ship_to_city)
             ? formatPostalCity(cargo.ship_to_postal_code, cargo.ship_to_city)
             : formatPostalCity(customerAddress.postalCode, customerAddress.city);
-        const shipToCountry = (cargo === null || cargo === void 0 ? void 0 : cargo.ship_to_country) || customerAddress.country || "";
+        const shipToCountry = formatCountry((cargo === null || cargo === void 0 ? void 0 : cargo.ship_to_country) || customerAddress.country || "");
         const shipToContact = (cargo === null || cargo === void 0 ? void 0 : cargo.ship_to_contact_person) || customerAddress.contact || "";
         const shipToPhone = (cargo === null || cargo === void 0 ? void 0 : cargo.ship_to_contact_phone) || customerAddress.phone || "";
         const customerID = (() => {
@@ -1513,10 +1525,10 @@ const generateCommercialInvoicePDF = (req, res, next) => __awaiter(void 0, void 
         }
         const GTECH_GMBH = {
             name: "GTech Industries GmbH",
-            street: "Reichshofstr. 137",
-            city: "58239 Schwerte",
+            street: "Antonio-Segni-Str. 4",
+            city: "44263 Dortmund",
             country: "Germany",
-            phone: "+4923043389510",
+            phone: "+4923158697565",
             eori: "DE977540238364617",
         };
         const isGTechBillTo = data.billTo.name === "GTech Industries GmbH";

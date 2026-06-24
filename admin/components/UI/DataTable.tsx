@@ -22,6 +22,7 @@ export type DataTableProps<T> = {
     headerClassName?: string;
     thClassName?: string;
     tdClassName?: string;
+    tfoot?: React.ReactNode;
 };
 
 export function DataTable<T>({
@@ -36,7 +37,8 @@ export function DataTable<T>({
     onRowClick,
     headerClassName,
     thClassName,
-    tdClassName
+    tdClassName,
+    tfoot
 }: DataTableProps<T>) {
 
     return (
@@ -122,6 +124,7 @@ export function DataTable<T>({
                         })
                     )}
                 </tbody>
+                {tfoot}
             </table>
         </div>
     );
