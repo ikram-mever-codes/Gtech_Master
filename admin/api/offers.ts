@@ -88,13 +88,13 @@ export interface Offer {
   customerSnapshot: CustomerSnapshot;
   deliveryAddress: DeliveryAddress;
   status:
-    | "Draft"
-    | "Submitted"
-    | "Negotiation"
-    | "Accepted"
-    | "Rejected"
-    | "Expired"
-    | "Cancelled";
+  | "Draft"
+  | "Submitted"
+  | "Negotiation"
+  | "Accepted"
+  | "Rejected"
+  | "Expired"
+  | "Cancelled";
   validUntil: Date;
   termsConditions?: string;
   deliveryTerms?: string;
@@ -114,7 +114,6 @@ export interface Offer {
   assemblyDescription?: string;
   assemblyNotes?: string;
 
-  // Unit pricing configuration at offer level
   useUnitPrices: boolean;
   unitPriceDecimalPlaces: number;
   totalPriceDecimalPlaces: number;
@@ -153,8 +152,6 @@ export interface CreateOfferPayload {
   assemblyName?: string;
   assemblyDescription?: string;
   assemblyNotes?: string;
-
-  // Unit pricing settings for offer
   useUnitPrices?: boolean;
   unitPriceDecimalPlaces?: number;
   totalPriceDecimalPlaces?: number;
@@ -364,8 +361,7 @@ export const toggleOfferUnitPrices = async (
     );
     toast.dismiss();
     toast.success(
-      `Unit prices ${
-        useUnitPrices ? "enabled" : "disabled"
+      `Unit prices ${useUnitPrices ? "enabled" : "disabled"
       } successfully for all line items`,
       successStyles,
     );
@@ -537,7 +533,7 @@ export const generateOfferPdf = async (id: string) => {
     const response: any = await api.post(`/offers/${id}/generate-pdf`);
     toast.dismiss();
     toast.success("PDF generated successfully", successStyles);
-    return response.data; // Return the data property, not the full response
+    return response;
   } catch (error) {
     handleApiError(error, "Failed to generate PDF");
     throw error;
@@ -547,44 +543,24 @@ export const generateOfferPdf = async (id: string) => {
 export const downloadOfferPdf = async (id: string, offerNumber?: string) => {
   try {
     toast.loading("Preparing download...", loadingStyles);
-
-    // 1. Verify generation status
     const offerResponse: any = await getOfferById(id);
     const offer = offerResponse.data || offerResponse;
-
     if (!offer.pdfGenerated) {
       await generateOfferPdf(id);
     }
-
-    // 2. Fetch binary data
-    // Note: 'api' must be your axios instance
     const response: any = await api.get(`/offers/${id}/download-pdf`, {
       responseType: "blob",
     });
-
-    // 3. Trigger Browser Download
-    // CRITICAL FIX: Use response.data, not the whole response object
     const blob = new Blob([response.data], { type: "application/pdf" });
-
-    // Safety check: ensure blob has content
     if (blob.size === 0) {
       throw new Error("The downloaded PDF is empty.");
     }
-
     const url = window.URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `Offer-${offerNumber || id}.pdf`;
-
-    document.body.appendChild(link);
-    link.click();
-
-    // Cleanup
+    window.open(url, "_blank");
     setTimeout(() => {
       window.URL.revokeObjectURL(url);
-      document.body.removeChild(link);
       toast.dismiss();
-    }, 100);
+    }, 1000);
 
     return true;
   } catch (error) {
@@ -609,8 +585,6 @@ export const getOffersByInquiry = async (
     throw error;
   }
 };
-
-// Statistics
 export const getOfferStatistics = async () => {
   try {
     const response: any = await api.get("/offers/statistics");
@@ -730,10 +704,8 @@ export const calculateLineItemTotal = (
   const activePrice = getActivePrice(lineItem, offerUsesUnitPrices);
   if (activePrice) {
     if ("totalPrice" in activePrice) {
-      // Unit price
       return activePrice.totalPrice;
     } else {
-      // Quantity price
       return activePrice.total;
     }
   } else if (lineItem.basePrice && lineItem.baseQuantity) {
@@ -819,7 +791,6 @@ export const migrateOfferToUnitPrices = async (offerId: string) => {
   }
 };
 
-// Check if offer uses unit prices
 export const offerUsesUnitPrices = (offer: Offer): boolean => {
   return offer.useUnitPrices || false;
 };

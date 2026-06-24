@@ -63,7 +63,6 @@ import {
   getActivePrice,
   getActivePriceType,
   prepareLineItemForUnitPricesLegacy,
-  // New offer-level unit pricing functions
   toggleOfferUnitPrices,
   bulkUpdateOfferUnitPrices,
   syncUnitPricesAcrossOffer,
@@ -130,15 +129,12 @@ const OffersPage: React.FC = () => {
 
   const [editFormData, setEditFormData] = useState<any>({});
   const [copyPasteData, setCopyPasteData] = useState("");
-
-  // Unit price form states (for line items)
   const [unitPriceFormData, setUnitPriceFormData] = useState({
     quantity: "",
     unitPrice: "",
     isActive: false,
   });
 
-  // Unit price settings at offer level
   const [offerUnitPriceSettings, setOfferUnitPriceSettings] = useState({
     useUnitPrices: false,
     unitPriceDecimalPlaces: 3,
@@ -146,7 +142,6 @@ const OffersPage: React.FC = () => {
     maxUnitPriceColumns: 3,
   });
 
-  // Filters
   const [filters, setFilters] = useState<OfferSearchFilters>({
     search: "",
     status: "",
@@ -157,18 +152,12 @@ const OffersPage: React.FC = () => {
 
   const { user } = useSelector((state: RootState) => state.user);
   const itemsPerPage = 20;
-
-  // Expanded offers for details view
   const [expandedOfferId, setExpandedOfferId] = useState<string | null>(null);
   const [filteredInquiries, setFilteredInquiries] = useState<Inquiry[]>([]);
-
-  // Editing state for inline editing
   const [editingLineItemId, setEditingLineItemId] = useState<string | null>(
     null,
   );
   const [editingLineItemData, setEditingLineItemData] = useState<any>({});
-
-  // Fetch data on mount
   useEffect(() => {
     fetchOffers();
     fetchInquiries();
@@ -199,7 +188,7 @@ const OffersPage: React.FC = () => {
           ? response.data
           : response.data.inquiries || [];
         setInquiries(inquiryData);
-        setFilteredInquiries(inquiryData); // Initialize filtered inquiries
+        setFilteredInquiries(inquiryData);
       }
     } catch (error) {
       console.error("Error fetching inquiries:", error);
@@ -225,15 +214,12 @@ const OffersPage: React.FC = () => {
     setSelectedCustomerId(customerId);
 
     if (customerId) {
-      // Filter inquiries for the selected customer
       const filtered = inquiries.filter(
         (inquiry) => inquiry.customer?.id === customerId,
       );
       setFilteredInquiries(filtered);
-      // Reset selected inquiry when customer changes
       setSelectedInquiry(null);
     } else {
-      // Show all inquiries if no customer is selected
       setFilteredInquiries(inquiries);
       setSelectedInquiry(null);
     }
@@ -262,11 +248,7 @@ const OffersPage: React.FC = () => {
         toast.success("Offer created successfully");
         setShowCreateModal(false);
         resetCreateForm();
-
-        // Fix: Move to page 1 so the new offer (prepended by backend) is visible
         setFilters((prev) => ({ ...prev, page: 1 }));
-
-        // Refresh the list to ensure all calculated totals are correct
         fetchOffers();
       }
     } catch (error) {
@@ -275,7 +257,6 @@ const OffersPage: React.FC = () => {
     }
   };
 
-  // Handle offer update
   const handleUpdateOffer = async () => {
     if (!selectedOffer) return;
 
@@ -291,7 +272,6 @@ const OffersPage: React.FC = () => {
     }
   };
 
-  // Handle offer deletion
   const handleDeleteOffer = async (offerId: string) => {
     if (window.confirm("Are you sure you want to delete this offer?")) {
       try {
@@ -303,21 +283,21 @@ const OffersPage: React.FC = () => {
       }
     }
   };
-
-  // Handle PDF generation
-  const handleGeneratePdf = async (offer: Offer) => {
+  const handleGeneratePdf = async (offerOrId: Offer | string) => {
     try {
-      const response = await generateOfferPdf(offer.id);
-      // Many APIs return { data: { success: true } }, check your structure
+      const offerId = typeof offerOrId === "string" ? offerOrId : offerOrId.id;
+      const offerNumber = typeof offerOrId === "string"
+        ? (selectedOffer?.id === offerOrId ? selectedOffer.offerNumber : "")
+        : offerOrId.offerNumber;
+
+      const response = await generateOfferPdf(offerId);
       if (response || response.success) {
-        await downloadOfferPdf(offer.id, offer.offerNumber);
+        await downloadOfferPdf(offerId, offerNumber);
       }
     } catch (error) {
       console.error("Error in PDF workflow:", error);
     }
   };
-
-  // Handle copy/paste prices
   const handleCopyPastePrices = async () => {
     if (!selectedOffer || !copyPasteData.trim()) {
       toast.error("Please paste data from spreadsheet");
@@ -331,8 +311,6 @@ const OffersPage: React.FC = () => {
       if (response.success) {
         setShowCopyPasteModal(false);
         setCopyPasteData("");
-
-        // Refresh offer data
         const updated = await getOfferById(selectedOffer.id);
         if (updated.success) {
           setSelectedOffer(updated.data);
@@ -344,8 +322,6 @@ const OffersPage: React.FC = () => {
       console.error("Error processing copied data:", error);
     }
   };
-
-  // Handle viewing offer details
   const handleViewOffer = async (offer: Offer) => {
     try {
       const response = await getOfferById(offer.id);
@@ -357,8 +333,6 @@ const OffersPage: React.FC = () => {
       console.error("Error fetching offer details:", error);
     }
   };
-
-  // Handle editing offer
   const handleEditOffer = (offer: Offer) => {
     setSelectedOffer(offer);
     setEditFormData({
@@ -375,7 +349,6 @@ const OffersPage: React.FC = () => {
       shippingCost: offer.shippingCost,
       currency: offer.currency,
       deliveryAddress: offer.deliveryAddress,
-      // Unit pricing settings at offer level
       useUnitPrices: offer.useUnitPrices,
       unitPriceDecimalPlaces: offer.unitPriceDecimalPlaces,
       totalPriceDecimalPlaces: offer.totalPriceDecimalPlaces,
@@ -383,14 +356,10 @@ const OffersPage: React.FC = () => {
     });
     setShowEditModal(true);
   };
-
-  // Handle editing pricing
   const handleEditPricing = (offer: Offer) => {
     setSelectedOffer(offer);
     setShowPricingModal(true);
   };
-
-  // Handle inline line item edit
   const handleEditLineItem = (lineItem: any) => {
     setEditingLineItemId(lineItem.id);
     setEditingLineItemData({
@@ -415,7 +384,6 @@ const OffersPage: React.FC = () => {
         const updatedOffer = await getOfferById(offerId);
 
         if (updatedOffer.success) {
-          // Fix: Update both the selected modal view and the background list
           setSelectedOffer(updatedOffer.data);
           setOffers((prev) =>
             prev.map((o) => (o.id === offerId ? updatedOffer.data : o)),
@@ -436,15 +404,12 @@ const OffersPage: React.FC = () => {
     setEditingLineItemData({});
   };
 
-  // Handle toggle unit prices for entire offer
   const handleToggleOfferUnitPrices = async (
     offerId: string,
     useUnitPrices: boolean,
   ) => {
     try {
       await toggleOfferUnitPrices(offerId, useUnitPrices);
-
-      // Refresh offer data
       if (selectedOffer) {
         const updatedOffer = await getOfferById(selectedOffer.id);
         if (updatedOffer.success) {
@@ -458,7 +423,6 @@ const OffersPage: React.FC = () => {
     }
   };
 
-  // Handle adding unit price to line item
   const handleAddUnitPrice = async (lineItemId: string) => {
     if (!unitPriceFormData.quantity || !unitPriceFormData.unitPrice) {
       toast.error("Please enter quantity and unit price");
@@ -472,14 +436,11 @@ const OffersPage: React.FC = () => {
         isActive: unitPriceFormData.isActive,
       });
 
-      // Reset form
       setUnitPriceFormData({
         quantity: "",
         unitPrice: "",
         isActive: false,
       });
-
-      // Refresh offer data
       if (selectedOffer) {
         const updatedOffer = await getOfferById(selectedOffer.id);
         if (updatedOffer.success) {
@@ -491,8 +452,6 @@ const OffersPage: React.FC = () => {
       toast.error("Failed to add unit price");
     }
   };
-
-  // Handle updating unit price settings at offer level
   const handleUpdateOfferUnitPriceSettings = async () => {
     if (!selectedOffer) return;
 
@@ -502,10 +461,7 @@ const OffersPage: React.FC = () => {
         totalPriceDecimalPlaces: offerUnitPriceSettings.totalPriceDecimalPlaces,
         maxUnitPriceColumns: offerUnitPriceSettings.maxUnitPriceColumns,
       };
-
       await updateOffer(selectedOffer.id, updateData);
-
-      // Refresh offer data
       const updatedOffer = await getOfferById(selectedOffer.id);
       if (updatedOffer.success) {
         setSelectedOffer(updatedOffer.data);
@@ -519,7 +475,6 @@ const OffersPage: React.FC = () => {
     }
   };
 
-  // Handle setting active price (for both unit prices and quantity prices)
   const handleSetActivePrice = async (
     lineItemId: string,
     priceType: "quantity" | "unit",
@@ -527,8 +482,6 @@ const OffersPage: React.FC = () => {
   ) => {
     try {
       await setActivePrice(lineItemId, priceType, priceIndex);
-
-      // Refresh offer data
       if (selectedOffer) {
         const updatedOffer = await getOfferById(selectedOffer.id);
         if (updatedOffer.success) {
@@ -541,7 +494,6 @@ const OffersPage: React.FC = () => {
     }
   };
 
-  // Handle updating unit price
   const handleUpdateUnitPrice = async (
     lineItemId: string,
     unitPriceId: string,
@@ -560,8 +512,6 @@ const OffersPage: React.FC = () => {
       await updateLineItem(selectedOffer.id, lineItemId, {
         unitPrices: updatedUnitPrices,
       });
-
-      // Refresh offer data
       const updatedOffer = await getOfferById(selectedOffer.id);
       if (updatedOffer.success) {
         setSelectedOffer(updatedOffer.data);
@@ -572,7 +522,6 @@ const OffersPage: React.FC = () => {
     }
   };
 
-  // Handle deleting unit price
   const handleDeleteUnitPrice = async (
     lineItemId: string,
     unitPriceId: string,
@@ -595,7 +544,6 @@ const OffersPage: React.FC = () => {
         unitPrices: updatedUnitPrices,
       });
 
-      // Refresh offer data
       const updatedOffer = await getOfferById(selectedOffer.id);
       if (updatedOffer.success) {
         setSelectedOffer(updatedOffer.data);
@@ -606,12 +554,9 @@ const OffersPage: React.FC = () => {
     }
   };
 
-  // Sync unit prices across all line items
   const handleSyncUnitPricesAcrossOffer = async (offerId: string) => {
     try {
       await syncUnitPricesAcrossOffer(offerId);
-
-      // Refresh offer data
       const updatedOffer = await getOfferById(offerId);
       if (updatedOffer.success) {
         setSelectedOffer(updatedOffer.data);
@@ -627,7 +572,6 @@ const OffersPage: React.FC = () => {
     setOfferFormData({
       title: "",
       currency: "EUR",
-      // Fix: Maintain YYYY-MM-DD format on reset
       validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
         .toISOString()
         .split("T")[0] as any,
@@ -640,8 +584,6 @@ const OffersPage: React.FC = () => {
     setSelectedCustomerId("");
     setFilteredInquiries(inquiries);
   };
-
-  // Toggle offer expansion
   const toggleOfferExpansion = (offerId: string) => {
     if (expandedOfferId === offerId) {
       setExpandedOfferId(null);
@@ -650,10 +592,8 @@ const OffersPage: React.FC = () => {
     }
   };
 
-  // Helper function to determine what to display in the amount column
   const getOfferAmountDisplay = (offer: any) => {
     if (offer.useUnitPrices) {
-      // For unit price offers, count unit price sets across all line items
       const unitPriceSets =
         offer.lineItems
           ?.filter((item: any) => !item.isComponent)
@@ -672,7 +612,6 @@ const OffersPage: React.FC = () => {
         </div>
       );
     } else {
-      // For normal offers, show the total amount
       return (
         <div className="space-y-1 text-center">
           <div className="text-sm font-bold text-gray-900">
@@ -686,13 +625,11 @@ const OffersPage: React.FC = () => {
       );
     }
   };
-  // Open unit price settings modal for line item (deprecated but kept for migration)
   const openUnitPriceSettings = (lineItem: any) => {
     console.warn(
       "Line item unit price settings are deprecated. Use offer-level settings instead.",
     );
     setSelectedLineItem(lineItem);
-    // Set to offer's settings instead of line item's
     setOfferUnitPriceSettings({
       useUnitPrices: selectedOffer?.useUnitPrices || false,
       unitPriceDecimalPlaces: selectedOffer?.unitPriceDecimalPlaces || 3,
@@ -702,7 +639,6 @@ const OffersPage: React.FC = () => {
     setShowOfferUnitPriceSettingsModal(true);
   };
 
-  // Open offer-level unit price settings modal
   const openOfferUnitPriceSettings = (offer: any) => {
     setSelectedOffer(offer);
     setOfferUnitPriceSettings({
@@ -713,8 +649,6 @@ const OffersPage: React.FC = () => {
     });
     setShowOfferUnitPriceSettingsModal(true);
   };
-
-  // Render price display based on type
   const renderPriceDisplay = (item: any, offer: any) => {
     const usesUnitPrices = offerUsesUnitPrices(offer);
 
@@ -1105,7 +1039,6 @@ const OffersPage: React.FC = () => {
                                         className="p-3 bg-white rounded border border-gray-200 hover:border-gray-300 transition-colors"
                                       >
                                         {editingLineItemId === item.id ? (
-                                          // Edit mode
                                           <div className="space-y-2">
                                             <div className="flex justify-between items-start">
                                               <input
@@ -1201,7 +1134,6 @@ const OffersPage: React.FC = () => {
                                             </div>
                                           </div>
                                         ) : (
-                                          // View mode
                                           <>
                                             <div className="flex justify-between items-start">
                                               <div className="flex-1">
@@ -1522,7 +1454,7 @@ const OffersPage: React.FC = () => {
 
                   {selectedOffer.pdfGenerated ? (
                     <button
-                      onClick={() => downloadOfferPdf(selectedOffer.id)}
+                      onClick={() => downloadOfferPdf(selectedOffer.id, selectedOffer.offerNumber)}
                       className="px-3 py-2 text-sm text-purple-700 bg-purple-50 border border-purple-200 rounded-lg hover:bg-purple-100 transition-all flex items-center gap-1.5"
                     >
                       <DownloadCloudIcon className="h-4 w-4" />
@@ -1530,7 +1462,7 @@ const OffersPage: React.FC = () => {
                     </button>
                   ) : (
                     <button
-                      onClick={() => handleGeneratePdf(selectedOffer.id)}
+                      onClick={() => handleGeneratePdf(selectedOffer)}
                       className="px-3 py-2 text-sm text-purple-700 bg-purple-50 border border-purple-200 rounded-lg hover:bg-purple-100 transition-all flex items-center gap-1.5"
                     >
                       <PrinterIcon className="h-4 w-4" />
@@ -1540,7 +1472,7 @@ const OffersPage: React.FC = () => {
 
                   {selectedOffer.pdfGenerated && (
                     <button
-                      onClick={() => handleGeneratePdf(selectedOffer.id)}
+                      onClick={() => handleGeneratePdf(selectedOffer)}
                       className="px-3 py-2 text-xs text-gray-500 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-all"
                     >
                       Regenerate PDF
@@ -1930,10 +1862,7 @@ const OffersPage: React.FC = () => {
                         <div
                           key={inquiry.id}
                           onClick={() => {
-                            // 1. Select the inquiry as usual
                             setSelectedInquiry(inquiry);
-
-                            // 2. Default the offer title to the inquiry name
                             setOfferFormData((prev) => ({
                               ...prev,
                               title: inquiry.name,
@@ -2476,12 +2405,9 @@ const OffersPage: React.FC = () => {
                         </label>
                         <input
                           type="text"
-                          // If the value is 0 or NaN, show empty so the user can type
                           value={editFormData.maxUnitPriceColumns || ""}
                           onChange={(e) => {
                             const val = e.target.value;
-
-                            // 1. Allow empty string for easy editing/backspacing
                             if (val === "") {
                               setEditFormData({
                                 ...editFormData,
@@ -2489,13 +2415,9 @@ const OffersPage: React.FC = () => {
                               });
                               return;
                             }
-
-                            // 2. Strict digit-only check (prevents e, ., -, etc.)
                             if (!/^\d+$/.test(val)) return;
 
                             const numValue = parseInt(val, 10);
-
-                            // 3. Enforce Range (1 to 10)
                             if (numValue > 10) {
                               toast.error(
                                 "Max unit price columns is 10",
@@ -2504,9 +2426,7 @@ const OffersPage: React.FC = () => {
                               return;
                             }
 
-                            // If you want to prevent '0' as a valid entry:
                             if (numValue < 1 && val !== "0") {
-                              // Optional: toast error or reset to 1
                               return;
                             }
 
@@ -2944,7 +2864,6 @@ const OffersPage: React.FC = () => {
                             )}
                           </div>
                         ) : (
-                          // Legacy Quantity Prices Table
                           <div className="space-y-3">
                             <div className="flex items-center justify-between">
                               <h4 className="font-medium text-gray-900">
