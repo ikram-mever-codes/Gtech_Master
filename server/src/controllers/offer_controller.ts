@@ -27,16 +27,16 @@ const getValidator = (): ValidatorModule => {
     return require("class-validator");
   } catch {
     return {
-      IsDate: () => () => {},
-      IsEnum: () => () => {},
-      IsNumber: () => () => {},
-      IsObject: () => () => {},
-      IsOptional: () => () => {},
-      IsString: () => () => {},
-      Max: () => () => {},
-      Min: () => () => {},
-      IsBoolean: () => () => {},
-      IsArray: () => () => {},
+      IsDate: () => () => { },
+      IsEnum: () => () => { },
+      IsNumber: () => () => { },
+      IsObject: () => () => { },
+      IsOptional: () => () => { },
+      IsString: () => () => { },
+      Max: () => () => { },
+      Min: () => () => { },
+      IsBoolean: () => () => { },
+      IsArray: () => () => { },
       validate: async () => [],
     };
   }
@@ -47,7 +47,7 @@ const getTransformer = (): TransformerModule => {
     return require("class-transformer");
   } catch {
     return {
-      Type: () => () => {},
+      Type: () => () => { },
       plainToInstance: <T>(cls: ClassConstructor<T>, plain: any): T =>
         plain as T,
     };
@@ -88,6 +88,16 @@ import { v4 as uuidv4 } from "uuid";
 import { ConvertInquiryToItemDto, ItemGenerator } from "./inquiry_controller";
 import { Item } from "../models/items";
 import { Taric } from "../models/tarics";
+import { _cachedCjkFontPath, _cachedCjkFontBuffer } from "./order_controller";
+
+const formatCountry = (country?: string | null): string => {
+  if (!country) return "";
+  const code = country.trim().toUpperCase();
+  if (code === "DE") return "Germany";
+  if (code === "AT") return "Austria";
+  if (code === "CH") return "Switzerland";
+  return country.trim();
+};
 
 export class CreateOfferDto {
   @IsOptional()
@@ -515,14 +525,14 @@ export class OfferController {
         email: customer.email,
         contactEmail: customer.contactEmail,
         contactPhoneNumber: customer.contactPhoneNumber,
-        vatId: "",
-        address: customer.businessDetails?.address,
-        city: customer.businessDetails?.city,
-        postalCode: customer.businessDetails?.postalCode,
-        country: customer.businessDetails?.country,
-        state: customer.businessDetails?.state,
-        street: "Street Address",
-        additionalInfo: "Additional Info",
+        vatId: customer.vatTaxId || customer.taxNumber || "",
+        address: customer.addressLine1 || customer.businessDetails?.address || "",
+        city: customer.city || customer.businessDetails?.city || "",
+        postalCode: customer.postalCode || customer.businessDetails?.postalCode || "",
+        country: customer.country || customer.businessDetails?.country || "",
+        state: customer.businessDetails?.state || "",
+        street: customer.addressLine1 || "Street Address",
+        additionalInfo: customer.addressLine2 || "Additional Info",
       };
 
       const defaultUnitPrices = createOfferDto.useUnitPrices
@@ -2191,9 +2201,8 @@ export class OfferController {
 
       return response.status(200).json({
         success: true,
-        message: `Unit prices ${
-          useUnitPrices ? "enabled" : "disabled"
-        } successfully for entire offer`,
+        message: `Unit prices ${useUnitPrices ? "enabled" : "disabled"
+          } successfully for entire offer`,
         data: updatedOffer,
       });
     } catch (error) {
@@ -2522,7 +2531,7 @@ export class OfferController {
 
       const offer = await this.offerRepository.findOne({
         where: { id },
-        relations: ["lineItems"],
+        relations: ["lineItems", "inquiry", "inquiry.contactPerson"],
       });
 
       if (!offer) {
@@ -2537,7 +2546,7 @@ export class OfferController {
         const date =
           typeof dateValue === "string" ? new Date(dateValue) : dateValue;
         if (!(date instanceof Date) || isNaN(date.getTime())) return "N/A";
-        return date.toLocaleDateString();
+        return date.toLocaleDateString("de-DE");
       };
 
       const getSafeNumber = (numValue: any): number => {
@@ -2628,266 +2637,34 @@ export class OfferController {
 
       const totals = calculateTotals(offer);
 
-      const doc = new PDFDocument({ margin: 50, size: "A4" });
+      const doc = new PDFDocument({ margin: 50, size: "A4", bufferPages: true });
 
-      doc
-        .fontSize(20)
-        .text(`OFFER ${offer.offerNumber || "N/A"}`, { align: "center" });
-      doc.moveDown();
+      const pageWidth = 595.28;
+      const pageHeight = 841.89;
+      const margin = 50;
 
-      doc.fontSize(12);
-      doc.text(`Date: ${formatDate(offer.createdAt)}`);
-      doc.text(`Valid Until: ${formatDate(offer.validUntil)}`);
+      const leftAlignX = margin;
+      const rightAlignX = 350;
+      const centerColumnX = 200;
+      const rightColumnX = 420;
 
-      if (offer.useUnitPrices) {
-        doc.text(
-          `Pricing Mode: Unit Pricing (${
-            offer.maxUnitPriceColumns || 3
-          } columns)`,
-        );
-      }
-      doc.moveDown();
-
-      doc.fontSize(14).text("Customer Information:", { underline: true });
-      doc.fontSize(11);
-      if (offer.customerSnapshot) {
-        let customer;
-        try {
-          customer =
-            typeof offer.customerSnapshot === "string"
-              ? JSON.parse(offer.customerSnapshot)
-              : offer.customerSnapshot;
-        } catch (e) {
-          customer = offer.customerSnapshot;
-        }
-
-        if (customer && typeof customer === "object") {
-          doc.text(`${customer.companyName || customer.name || ""}`);
-          if (
-            customer.legalName &&
-            customer.legalName !== customer.companyName
-          ) {
-            doc.text(`${customer.legalName}`);
-          }
-          if (customer.address) doc.text(`${customer.address}`);
-          if (customer.postalCode && customer.city)
-            doc.text(`${customer.postalCode} ${customer.city}`);
-          if (customer.country) doc.text(`${customer.country}`);
-          if (customer.vatId) doc.text(`VAT ID: ${customer.vatId}`);
-        }
-      }
-      doc.moveDown();
-
-      if (offer.deliveryAddress) {
-        try {
-          let deliveryAddress;
-          if (typeof offer.deliveryAddress === "string") {
-            deliveryAddress = JSON.parse(offer.deliveryAddress);
-          } else {
-            deliveryAddress = offer.deliveryAddress;
-          }
-
-          if (deliveryAddress && typeof deliveryAddress === "object") {
-            doc.fontSize(14).text("Delivery Address:", { underline: true });
-            doc.fontSize(11);
-
-            if (deliveryAddress.contactName)
-              doc.text(`${deliveryAddress.contactName}`);
-            if (deliveryAddress.street) doc.text(`${deliveryAddress.street}`);
-            if (deliveryAddress.postalCode && deliveryAddress.city)
-              doc.text(`${deliveryAddress.postalCode} ${deliveryAddress.city}`);
-            if (deliveryAddress.state) doc.text(`${deliveryAddress.state}`);
-            if (deliveryAddress.country) doc.text(`${deliveryAddress.country}`);
-            if (deliveryAddress.contactPhone)
-              doc.text(`Phone: ${deliveryAddress.contactPhone}`);
-            doc.moveDown();
-          }
-        } catch (e) {
-          console.warn("Failed to parse delivery address:", e);
-        }
-      }
-
-      doc.fontSize(14).text("Offer Positions:", { underline: true });
-      doc.moveDown();
-
-      const tableTop = doc.y;
-      const itemX = 50;
-      const descX = 150;
-      const qtyX = 350;
-      const priceX = 400;
-      const totalX = 500;
-
-      doc.fontSize(10);
-      doc.text("Pos.", itemX, tableTop);
-      doc.text("Description", descX, tableTop);
-      doc.text("Qty", qtyX, tableTop);
-      doc.text("Price", priceX, tableTop);
-      doc.text("Total", totalX, tableTop);
-
-      doc
-        .moveTo(50, tableTop + 20)
-        .lineTo(550, tableTop + 20)
-        .stroke();
-
-      let y = tableTop + 30;
-
-      if (offer.lineItems && Array.isArray(offer.lineItems)) {
-        const customerItems = offer.lineItems.filter(
-          (item: any) => !item.isComponent,
-        );
-
-        if (customerItems.length === 0) {
-          doc.text("No items in this offer", itemX, y);
-          y += 30;
-        } else {
-          customerItems.forEach((item: any, index: number) => {
-            const itemNumber = `${index + 1}.`;
-            const itemName =
-              item.itemName || item.description || "Unnamed Item";
-
-            doc.text(itemNumber, itemX, y);
-            doc.text(itemName, descX, y, { width: 180 });
-
-            if (
-              offer.useUnitPrices &&
-              item.unitPrices &&
-              Array.isArray(item.unitPrices)
-            ) {
-              const maxColumns = offer.maxUnitPriceColumns || 3;
-              const displayedPrices = item.unitPrices.slice(0, maxColumns);
-              let itemY = y;
-
-              displayedPrices.forEach((up: any, upIndex: number) => {
-                const qty = getSafeNumber(up.quantity);
-                const unitPrice = getSafeNumber(up.unitPrice);
-                const unitPriceDecimalPlaces =
-                  offer.unitPriceDecimalPlaces || 3;
-                const priceText = `${qty} pcs: €${formatNumber(unitPrice, unitPriceDecimalPlaces)} (unit)`;
-                const highlight = up.isActive ? { color: "red" } : {};
-                doc.text(priceText, qtyX, itemY + upIndex * 15, {
-                  ...highlight,
-                  width: 150,
-                });
-              });
-
-              const activeUnitPrice = item.unitPrices.find(
-                (up: any) => up.isActive,
-              );
-              if (activeUnitPrice) {
-                const totalPriceDecimalPlaces =
-                  offer.totalPriceDecimalPlaces || 2;
-                doc.text(
-                  `€${formatNumber(activeUnitPrice.totalPrice, totalPriceDecimalPlaces)}`,
-                  totalX,
-                  y,
-                );
-              }
-            } else if (
-              item.quantityPrices &&
-              Array.isArray(item.quantityPrices)
-            ) {
-              let itemY = y;
-              item.quantityPrices.forEach((qp: any, qpIndex: number) => {
-                const qpQuantity = getSafeNumber(qp.quantity);
-                const qpPrice = getSafeNumber(qp.price);
-                const priceText = `${qpQuantity} pcs: €${formatNumber(qpPrice, 3)}`;
-                const highlight = qp.isActive ? { color: "red" } : {};
-                doc.text(priceText, qtyX, itemY + qpIndex * 15, {
-                  ...highlight,
-                  width: 150,
-                });
-              });
-
-              const activePrice = item.quantityPrices.find(
-                (qp: any) => qp.isActive,
-              );
-              if (activePrice) {
-                doc.text(`€${formatNumber(activePrice.total, 2)}`, totalX, y);
-              }
-            } else if (item.baseQuantity || item.basePrice) {
-              const quantity = getSafeNumber(item.baseQuantity);
-              const price = getSafeNumber(item.basePrice);
-
-              doc.text(quantity.toString(), qtyX, y);
-              doc.text(`€${formatNumber(price, 3)}`, priceX, y);
-              const total = quantity * price;
-              doc.text(`€${formatNumber(total, 2)}`, totalX, y);
-            } else {
-              doc.text("N/A", qtyX, y);
-              doc.text("N/A", priceX, y);
-              doc.text("N/A", totalX, y);
-            }
-
-            const numPrices = Math.max(
-              offer.useUnitPrices && item.unitPrices
-                ? item.unitPrices.length
-                : 0,
-              item.quantityPrices ? item.quantityPrices.length : 0,
-              1,
-            );
-            y += Math.max(30, numPrices * 20);
-          });
-        }
-      }
-
-      const displaySubtotal = getSafeNumber(totals.subtotal);
-      const displayTaxAmount = getSafeNumber(totals.taxAmount);
-      const displayTotalAmount = getSafeNumber(totals.totalAmount);
-      const displayShippingCost = getSafeNumber(totals.shippingCost);
-      const displayDiscountAmount = getSafeNumber(totals.discountAmount);
-
-      y += 20;
-      doc.moveTo(400, y).lineTo(550, y).stroke();
-      y += 10;
-
-      doc.fontSize(10);
-      doc.text("Subtotal:", 400, y);
-      doc.text(`€${formatNumber(displaySubtotal, 2)}`, 500, y);
-      y += 20;
-
-      if (displayDiscountAmount > 0) {
-        doc.text("Discount:", 400, y);
-        doc.text(`-€${formatNumber(displayDiscountAmount, 2)}`, 500, y);
-        y += 20;
-      }
-
-      if (displayShippingCost > 0) {
-        doc.text("Shipping:", 400, y);
-        doc.text(`€${formatNumber(displayShippingCost, 2)}`, 500, y);
-        y += 20;
-      }
-
-      const taxRate = offer.taxRate ? getSafeNumber(offer.taxRate) : 19;
-      doc.text(`VAT (${taxRate}%):`, 400, y);
-      doc.text(`€${formatNumber(displayTaxAmount, 2)}`, 500, y);
-      y += 20;
-
-      doc.fontSize(12).font("Helvetica-Bold");
-      doc.text("TOTAL:", 400, y);
-      doc.text(`€${formatNumber(displayTotalAmount, 2)}`, 500, y);
-
-      y += 40;
-      doc.fontSize(10).font("Helvetica");
-      doc.text("All prices are net prices.", 50, y);
-      y += 15;
-
-      if (offer.deliveryTime) {
-        doc.text(`Delivery Time: ${offer.deliveryTime}`, 50, y);
-        y += 15;
-      }
-
-      if (offer.paymentTerms) {
-        doc.text(`Payment Terms: ${offer.paymentTerms}`, 50, y);
-        y += 15;
-      }
-
-      if (offer.notes) {
-        const notes =
-          offer.notes.length > 200
-            ? offer.notes.substring(0, 200) + "..."
-            : offer.notes;
-        doc.text(`Notes: ${notes}`, 50, y, { width: 500 });
-      }
+      const companyInfo = {
+        name: "GTech Industries GmbH",
+        address: "Antonio-Segni-Str. 4",
+        city: "44263 Dortmund",
+        country: "Deutschland",
+        phone: "+49 231 58697565",
+        email: "info@gtech.de",
+        website: "www.gtech.de",
+        registrationNumber: "Amtsgericht Hagen HRB 12496",
+        ceo: "Geschäftsführer Joschua Grenzheuser",
+        vatId: "DE291514916",
+        taxNumber: "316/5733/1295",
+        weeeNumber: "DE 66370256",
+        iban: "DE16 4404 0037 0210 9288 00",
+        bic: "COBADEFFXXX",
+        bank: "Commerzbank Dortmund",
+      };
 
       const uploadsDir = path.join(__dirname, "../../uploads/offers");
       if (!fs.existsSync(uploadsDir)) {
@@ -2898,15 +2675,462 @@ export class OfferController {
       const pdfPath = path.join(uploadsDir, pdfFileName);
 
       const writeStream = fs.createWriteStream(pdfPath);
+      doc.pipe(writeStream);
 
       const pdfWritePromise = new Promise<void>((resolve, reject) => {
         writeStream.on("finish", resolve);
         writeStream.on("error", reject);
-
-        doc.pipe(writeStream);
-        doc.end();
       });
+
+      let yPos = 50;
+      const logoPath = path.join(process.cwd(), "assets", "logo.png");
+      if (fs.existsSync(logoPath)) {
+        doc.image(logoPath, leftAlignX, yPos, { width: 100, height: 50 });
+      }
+      const fontSource = _cachedCjkFontBuffer || _cachedCjkFontPath;
+
+      doc.fontSize(12).font("Helvetica-Bold");
+      doc.text(companyInfo.name, rightAlignX, yPos);
+
+      yPos += 15;
+      doc.fontSize(10).font("Helvetica");
+      doc.text(companyInfo.address, rightAlignX, yPos);
+      yPos += 12;
+      doc.text(companyInfo.city, rightAlignX, yPos);
+      yPos += 12;
+      doc.text(companyInfo.country, rightAlignX, yPos);
+
+      yPos += 15;
+      doc.text(companyInfo.phone, rightAlignX, yPos);
+      yPos += 12;
+      doc.text(companyInfo.email, rightAlignX, yPos);
+      yPos += 12;
+      doc.text(companyInfo.website, rightAlignX, yPos);
+      yPos = 180;
+      doc.fontSize(8).font("Helvetica");
+      doc.fillColor("#666666");
+      doc.text(
+        `${companyInfo.name} - ${companyInfo.address} - ${companyInfo.city}`,
+        leftAlignX,
+        yPos
+      );
+
+      let customer: any = {};
+      if (offer.customerSnapshot) {
+        try {
+          customer = typeof offer.customerSnapshot === "string"
+            ? JSON.parse(offer.customerSnapshot)
+            : offer.customerSnapshot;
+        } catch (e) {
+          customer = offer.customerSnapshot;
+        }
+      }
+      yPos += 20;
+      doc.fontSize(12).font("Helvetica-Bold");
+      doc.fillColor("#000000");
+      doc.text(customer.companyName || "", leftAlignX, yPos);
+
+      yPos += 15;
+      doc.fontSize(10).font("Helvetica");
+      if (customer.legalName && customer.legalName !== customer.companyName) {
+        doc.text(customer.legalName, leftAlignX, yPos);
+        yPos += 12;
+      } else if (customer.additionalInfo && customer.additionalInfo !== "Additional Info") {
+        doc.text(customer.additionalInfo, leftAlignX, yPos);
+        yPos += 12;
+      }
+
+      doc.text(customer.address || customer.street || "", leftAlignX, yPos);
+      yPos += 12;
+
+      doc.text(
+        `${customer.postalCode || ""} ${customer.city || ""}`.trim(),
+        leftAlignX,
+        yPos
+      );
+      yPos += 12;
+
+      const displayCountry = formatCountry(customer.country);
+      if (displayCountry && displayCountry.toUpperCase() !== "DE" && displayCountry.toUpperCase() !== "GERMANY" && displayCountry.toUpperCase() !== "DEUTSCHLAND") {
+        doc.text(displayCountry, leftAlignX, yPos);
+        yPos += 12;
+      }
+
+      const customerVatId = customer.vatId || customer.vatTaxId || customer.taxNumber || "";
+      if (customerVatId && displayCountry && displayCountry.toUpperCase() !== "DE" && displayCountry.toUpperCase() !== "GERMANY" && displayCountry.toUpperCase() !== "DEUTSCHLAND") {
+        doc.text(`VAT ID: ${customerVatId}`, leftAlignX, yPos);
+        yPos += 12;
+      }
+
+      const boxY = 180;
+      const boxWidth = 180;
+      const boxHeight = 120;
+
+      doc.lineWidth(0.3);
+      doc.rect(rightAlignX, boxY, boxWidth, boxHeight).stroke("#CCCCCC");
+      doc
+        .rect(rightAlignX, boxY, boxWidth, 30)
+        .fillAndStroke("#CCCCCC", "#CCCCCC");
+      doc.fontSize(15).font("Helvetica-Bold");
+      doc.fillColor("#000000");
+      doc.text("Angebot", rightAlignX + 5, boxY + 8);
+
+      const detailsStartY = boxY + 40;
+      doc.fontSize(10).font("Helvetica");
+
+      const contactName = offer.inquiry?.contactPerson
+        ? `${offer.inquiry.contactPerson.name} ${offer.inquiry.contactPerson.familyName}`
+        : "Alexander";
+
+      const offerDetails = [
+        ["Angebotsnr.", offer.offerNumber || ""],
+        ["Datum", formatDate(offer.createdAt)],
+        ["Gültig bis", formatDate(offer.validUntil)],
+        ["Ansprechpartner", contactName],
+        ["Kundennr.", customer.id ? customer.id.substring(0, 8) : "N/A"],
+      ];
+
+      offerDetails.forEach((detail, index) => {
+        const detailY = detailsStartY + index * 15;
+        doc.text(detail[0], rightAlignX + 10, detailY);
+        doc.font("Helvetica-Bold");
+        doc.text(detail[1], rightAlignX + 90, detailY);
+        doc.font("Helvetica");
+      });
+
+      yPos = 320;
+      doc.fontSize(10).font("Helvetica");
+      if (offer.deliveryTime) {
+        doc.text(`Lieferzeit: ${offer.deliveryTime}`, leftAlignX, yPos);
+      }
+      if (offer.deliveryTerms) {
+        doc.text(`Lieferbedingungen: ${offer.deliveryTerms}`, leftAlignX + 250, yPos);
+      }
+
+      yPos += 20;
+      const tableY = yPos;
+
+      const columns = [
+        { header: "Pos", width: 25, align: "left" },
+        { header: "Art. Nr.", width: 60, align: "left" },
+        { header: "Menge", width: 40, align: "left" },
+        { header: "Bezeichnung", width: 155, align: "left" },
+        { header: "Gesamt\n(Netto)", width: 55, align: "left" },
+        { header: "MwSt", width: 45, align: "left" },
+        { header: "E-Preis", width: 55, align: "left" },
+        { header: "Gesamt\n(Brutto)", width: 60, align: "left" },
+      ];
+
+      const tableWidth = columns.reduce((sum, col) => sum + col.width, 0);
+      const rowHeight = 40;
+      const headerHeight = 35;
+
+      doc.lineWidth(0.3);
+      doc
+        .rect(leftAlignX, tableY, tableWidth, headerHeight)
+        .fillAndStroke("#E8E8E8", "#333333");
+      doc.fontSize(9).font("Helvetica-Bold");
+      doc.fillColor("#000000");
+
+      let currentX = leftAlignX;
+      columns.forEach((col) => {
+        doc.text(col.header, currentX + 3, tableY + 8, {
+          width: col.width - 6,
+          align: col.align as "center" | "left" | "right" | "justify",
+        });
+        currentX += col.width;
+      });
+
+      doc.lineWidth(0.3);
+      doc
+        .moveTo(leftAlignX, tableY + headerHeight)
+        .lineTo(leftAlignX + tableWidth, tableY + headerHeight)
+        .stroke("#333333");
+
+      doc.fontSize(9).font("Helvetica");
+
+      const getActivePrice = (lineItem: any, offerUsesUnitPrices: boolean) => {
+        if (offerUsesUnitPrices && lineItem.unitPrices && lineItem.unitPrices.length > 0) {
+          return lineItem.unitPrices.find((up: any) => up.isActive) || null;
+        } else if (lineItem.quantityPrices && lineItem.quantityPrices.length > 0) {
+          return lineItem.quantityPrices.find((qp: any) => qp.isActive) || null;
+        }
+        return null;
+      };
+
+      let currentY = tableY + headerHeight;
+
+      if (offer.lineItems && Array.isArray(offer.lineItems)) {
+        const customerItems = offer.lineItems.filter(
+          (item: any) => !item.isComponent,
+        );
+
+        customerItems.forEach((item: any, rowIndex: number) => {
+          const activePrice = getActivePrice(item, offer.useUnitPrices);
+
+          let qtyStr = "1";
+          let unitPriceNum = 0;
+          let netTotalNum = 0;
+
+          if (activePrice) {
+            qtyStr = Number(activePrice.quantity).toString();
+            unitPriceNum = getSafeNumber("unitPrice" in activePrice ? activePrice.unitPrice : activePrice.price);
+            netTotalNum = getSafeNumber("totalPrice" in activePrice ? activePrice.totalPrice : activePrice.total);
+          } else {
+            qtyStr = Number(item.baseQuantity || 1).toString();
+            unitPriceNum = getSafeNumber(item.basePrice);
+            netTotalNum = qtyStr ? parseFloat(qtyStr) * unitPriceNum : unitPriceNum;
+          }
+
+          const vatRate = offer.taxRate ? getSafeNumber(offer.taxRate) : 19;
+          const grossTotalNum = netTotalNum * (1 + vatRate / 100);
+
+          let nameText = item.itemName || "Item";
+          if (item.description) {
+            nameText += `\n${item.description}`;
+          }
+
+          if (offer.useUnitPrices && item.unitPrices && item.unitPrices.length > 1) {
+            nameText += "\nStaffelpreise:";
+            item.unitPrices.slice(0, 3).forEach((up: any) => {
+              const activeMark = up.isActive ? " (*)" : "";
+              nameText += `\n  - ${up.quantity} Stk: € ${formatNumber(up.unitPrice, offer.unitPriceDecimalPlaces || 3)} / Stk${activeMark}`;
+            });
+          } else if (item.quantityPrices && item.quantityPrices.length > 1) {
+            nameText += "\nMengenstaffel:";
+            item.quantityPrices.slice(0, 3).forEach((qp: any) => {
+              const activeMark = qp.isActive ? " (*)" : "";
+              nameText += `\n  - ${qp.quantity} Stk: € ${formatNumber(qp.price, 3)} / Stk${activeMark}`;
+            });
+          }
+          const designationWidth = columns[3].width - 6;
+          doc.fontSize(9);
+          if (fontSource) {
+            try { doc.font(fontSource, 0); } catch (e) { doc.font("Helvetica"); }
+          } else {
+            doc.font("Helvetica");
+          }
+          const textHeight = doc.heightOfString(nameText, { width: designationWidth });
+          doc.font("Helvetica");
+          const computedRowHeight = Math.max(40, textHeight + 12);
+          if (currentY + computedRowHeight > pageHeight - 120) {
+            doc.lineWidth(0.3);
+            doc
+              .moveTo(leftAlignX, currentY)
+              .lineTo(leftAlignX + tableWidth, currentY)
+              .stroke("#333333");
+
+            doc.addPage();
+
+            const newTableY = 60;
+            doc.lineWidth(0.3);
+            doc
+              .rect(leftAlignX, newTableY, tableWidth, headerHeight)
+              .fillAndStroke("#E8E8E8", "#333333");
+            doc.fontSize(9).font("Helvetica-Bold");
+            doc.fillColor("#000000");
+
+            let tempX = leftAlignX;
+            columns.forEach((col) => {
+              doc.text(col.header, tempX + 3, newTableY + 8, {
+                width: col.width - 6,
+                align: col.align as "center" | "left" | "right" | "justify",
+              });
+              tempX += col.width;
+            });
+
+            doc.lineWidth(0.3);
+            doc
+              .moveTo(leftAlignX, newTableY + headerHeight)
+              .lineTo(leftAlignX + tableWidth, newTableY + headerHeight)
+              .stroke("#333333");
+
+            currentY = newTableY + headerHeight;
+          }
+
+          if (rowIndex % 2 === 1) {
+            doc.rect(leftAlignX, currentY, tableWidth, computedRowHeight).fill("#FAFAFA");
+          }
+
+          const rowData = [
+            (rowIndex + 1).toString(),
+            item.material || item.id.substring(0, 8),
+            qtyStr,
+            nameText,
+            `${formatNumber(netTotalNum, 2)} ${offer.currency || "EUR"}`,
+            `${vatRate}%`,
+            `${formatNumber(unitPriceNum, offer.unitPriceDecimalPlaces || 3)} ${offer.currency || "EUR"}`,
+            `${formatNumber(grossTotalNum, 2)} ${offer.currency || "EUR"}`,
+          ];
+
+          currentX = leftAlignX;
+          rowData.forEach((data, colIndex) => {
+            const align: any = columns[colIndex].align;
+            let textX = currentX + 3;
+
+            if (align === "right") {
+              textX = currentX + columns[colIndex].width - 3;
+            } else if (align === "center") {
+              textX = currentX + columns[colIndex].width / 2;
+            }
+
+            if (colIndex === 3 && fontSource) {
+              try { doc.font(fontSource, 0); } catch (e) { doc.font("Helvetica"); }
+            } else {
+              doc.font("Helvetica");
+            }
+
+            doc.fillColor("#000000");
+            doc.text(data, textX, currentY + 6, {
+              width: columns[colIndex].width - 6,
+              align: align,
+            });
+            currentX += columns[colIndex].width;
+          });
+
+          doc.font("Helvetica");
+
+          if (rowIndex < customerItems.length - 1) {
+            doc.lineWidth(0.5);
+            doc
+              .moveTo(leftAlignX, currentY + computedRowHeight)
+              .lineTo(leftAlignX + tableWidth, currentY + computedRowHeight)
+              .stroke("#E0E0E0");
+          }
+
+          currentY += computedRowHeight;
+        });
+      }
+
+      doc.lineWidth(0.3);
+      doc
+        .moveTo(leftAlignX, currentY)
+        .lineTo(leftAlignX + tableWidth, currentY)
+        .stroke("#333333");
+
+      yPos = currentY + 30;
+      if (yPos + 150 > pageHeight - 120) {
+        doc.addPage();
+        yPos = 60;
+      }
+
+      doc.fontSize(10).font("Helvetica");
+      doc.text("Gesamtpreis Netto", rightAlignX, yPos);
+      doc.text(
+        `${Number(totals.subtotal || 0).toFixed(2)} ${offer.currency || "EUR"}`,
+        rightAlignX + 120,
+        yPos,
+        { align: "right" }
+      );
+
+      if (Number(totals.discountAmount || 0) > 0) {
+        yPos += 18;
+        doc.text(`Rabatt (${offer.discountPercentage || 0}%)`, rightAlignX, yPos);
+        doc.text(
+          `-${Number(totals.discountAmount).toFixed(2)} ${offer.currency || "EUR"}`,
+          rightAlignX + 120,
+          yPos,
+          { align: "right" }
+        );
+      }
+
+      if (Number(totals.shippingCost || 0) > 0) {
+        yPos += 18;
+        doc.text("Versandkosten", rightAlignX, yPos);
+        doc.text(
+          `${Number(totals.shippingCost).toFixed(2)} ${offer.currency || "EUR"}`,
+          rightAlignX + 120,
+          yPos,
+          { align: "right" }
+        );
+      }
+
+      const taxRatePercent = offer.taxRate ? Number(offer.taxRate) : 19;
+      yPos += 18;
+      doc.text(`MwSt. ${taxRatePercent.toFixed(2)}%`, rightAlignX, yPos);
+      doc.text(
+        `${Number(totals.taxAmount || 0).toFixed(2)} ${offer.currency || "EUR"}`,
+        rightAlignX + 120,
+        yPos,
+        { align: "right" }
+      );
+
+      yPos += 20;
+      doc.lineWidth(0.3);
+      doc
+        .rect(rightAlignX - 5, yPos - 3, 200, 22)
+        .fillAndStroke("#F5F5F5", "#CCCCCC");
+      doc.fontSize(11).font("Helvetica-Bold");
+      doc.fillColor("#000000");
+      doc.text("Gesamtpreis Brutto", rightAlignX, yPos + 5);
+      doc.text(
+        `${Number(totals.totalAmount || 0).toFixed(2)} ${offer.currency || "EUR"}`,
+        rightAlignX + 120,
+        yPos + 5,
+        { align: "right" }
+      );
+      yPos += 35;
+      let notesHeight = 15;
+      if (offer.paymentTerms) notesHeight += 15;
+      if (offer.notes) notesHeight += doc.heightOfString(`Hinweise: ${offer.notes}`, { width: 500 }) + 5;
+
+      if (yPos + notesHeight > pageHeight - 120) {
+        doc.addPage();
+        yPos = 60;
+      }
+
+      doc.fontSize(10).font("Helvetica");
+      doc.fillColor("#000000");
+
+      doc.text("All prices are net prices.", leftAlignX, yPos);
+      yPos += 15;
+
+      if (offer.paymentTerms) {
+        doc.text(`Zahlungsbedingungen: ${offer.paymentTerms}`, leftAlignX, yPos);
+        yPos += 15;
+      }
+
+      if (offer.notes) {
+        doc.text(`Hinweise: ${offer.notes}`, leftAlignX, yPos, { width: 500 });
+      }
+
+      const pages = doc.bufferedPageRange();
+      for (let i = 0; i < pages.count; i++) {
+        doc.switchToPage(i);
+        const pNum = i + 1;
+
+        const footerY = pageHeight - 120;
+        doc.lineWidth(0.5);
+        doc
+          .moveTo(leftAlignX, footerY - 15)
+          .lineTo(pageWidth - margin, footerY - 15)
+          .stroke("#CCCCCC");
+
+        doc.fontSize(8).font("Helvetica").fillColor("#666666");
+
+        doc.font("Helvetica-Bold");
+        doc.text(companyInfo.name, leftAlignX, footerY);
+        doc.font("Helvetica");
+        doc.text(`IBAN: ${companyInfo.iban}`, leftAlignX, footerY + 12);
+        doc.text(`BIC: ${companyInfo.bic}`, leftAlignX, footerY + 24);
+        doc.text(companyInfo.bank, leftAlignX, footerY + 36);
+
+        doc.text(companyInfo.registrationNumber, centerColumnX, footerY);
+        doc.text(companyInfo.ceo, centerColumnX, footerY + 12);
+        doc.text(`Ust.-ID: ${companyInfo.vatId}`, centerColumnX, footerY + 24);
+        doc.text(`SteuerNR: ${companyInfo.taxNumber}`, centerColumnX, footerY + 36);
+        doc.text(`WEEE-Reg.-Nr. ${companyInfo.weeeNumber}`, centerColumnX, footerY + 48);
+
+        doc.text(`Angebotsnr:`, rightColumnX, footerY);
+        doc.font("Helvetica-Bold");
+        doc.text(`${offer.offerNumber || "N/A"}`, rightColumnX + 60, footerY);
+        doc.font("Helvetica");
+        doc.text(`Seite ${pNum} / ${pages.count}`, rightColumnX + 60, footerY + 48);
+      }
+
+      doc.end();
       await pdfWritePromise;
+
       try {
         offer.pdfPath = `/uploads/offers/${pdfFileName}`;
         offer.pdfGenerated = true;
@@ -2951,7 +3175,6 @@ export class OfferController {
         });
       }
 
-      // 2. FETCH DATA
       const offer = await this.offerRepository.findOne({
         where: { id: id },
         relations: ["lineItems"],
@@ -2964,59 +3187,32 @@ export class OfferController {
         });
       }
 
-      // 3. INITIALIZE PDF
-      const doc = new PDFDocument({ margin: 50, size: "A4" });
-      const filename = `Offer-${offer.offerNumber || "Document"}.pdf`;
+      const uploadsDir = path.join(__dirname, "../../uploads/offers");
+      const pdfFileName = `${offer.offerNumber || "offer"}.pdf`;
+      const pdfPath = path.join(uploadsDir, pdfFileName);
 
-      // 4. PREPARE RESPONSE HEADERS
-      response.setHeader("Content-Type", "application/pdf");
-      response.setHeader(
-        "Content-Disposition",
-        `attachment; filename="${filename}"`,
-      );
-      response.setHeader(
-        "Access-Control-Expose-Headers",
-        "Content-Disposition",
-      );
-
-      // 5. PIPE & GENERATE
-      doc.pipe(response);
-
-      // Header
-      doc
-        .fontSize(20)
-        .text(`OFFER ${offer.offerNumber || ""}`, { align: "center" });
-      doc.moveDown();
-      doc.fontSize(10).text(`Project: ${offer.title || "N/A"}`);
-      doc.moveDown();
-
-      // Line Items Table
-      doc.fontSize(10).text("Description", 50, 150);
-      doc.text("Qty", 350, 150);
-      doc.text("Total", 450, 150);
-      doc.moveTo(50, 165).lineTo(550, 165).stroke();
-
-      let y = 175;
-      (offer.lineItems || []).forEach((item: any) => {
-        doc.text(item.itemName || item.description || "Item", 50, y, {
-          width: 280,
+      if (fs.existsSync(pdfPath)) {
+        response.setHeader("Content-Type", "application/pdf");
+        response.setHeader(
+          "Content-Disposition",
+          `attachment; filename="${pdfFileName}"`,
+        );
+        response.setHeader(
+          "Access-Control-Expose-Headers",
+          "Content-Disposition",
+        );
+        const fileStream = fs.createReadStream(pdfPath);
+        fileStream.pipe(response);
+        return new Promise<void>((resolve, reject) => {
+          response.on("finish", resolve);
+          response.on("error", (err) => {
+            console.error("Streaming error:", err);
+            reject(err);
+          });
         });
-        doc.text((item.quantity || 0).toString(), 350, y);
-        doc.text((item.lineTotal || 0).toLocaleString(), 450, y);
-        y += 20;
-      });
-
-      // 6. END DOCUMENT
-      doc.end();
-
-      // 7. STREAM ERROR HANDLING
-      return new Promise<void>((resolve, reject) => {
-        response.on("finish", resolve);
-        response.on("error", (err) => {
-          console.error("Streaming error:", err);
-          reject(err);
-        });
-      });
+      } else {
+        return this.generatePdf(request, response);
+      }
     } catch (error: any) {
       console.error("Fatal Controller Error:", error);
       if (!response.headersSent) {
