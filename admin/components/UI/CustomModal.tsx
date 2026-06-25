@@ -9,6 +9,8 @@ const CustomModal: React.FC<CustomModalProps> = ({
     children,
     footer,
     width = "max-w-md",
+    showHeader = true,
+    noPadding = false,
 }) => {
     if (!isOpen) return null;
 
@@ -18,19 +20,21 @@ const CustomModal: React.FC<CustomModalProps> = ({
                 className={`bg-white rounded-2xl shadow-2xl w-full ${width} transform transition-all duration-300 scale-100 border border-gray-100 overflow-hidden`}
                 onClick={(e) => e.stopPropagation()}
             >
-                <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-white">
-                    <h3 className="text-lg font-bold text-gray-900 tracking-tight">
-                        {title}
-                    </h3>
-                    <button
-                        onClick={onClose}
-                        className="p-1 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
-                    >
-                        <XMarkIcon className="h-5 w-5" />
-                    </button>
-                </div>
+                {showHeader && (
+                    <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-white">
+                        <h3 className="text-lg font-bold text-gray-900 tracking-tight">
+                            {title}
+                        </h3>
+                        <button
+                            onClick={onClose}
+                            className="p-1 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
+                        >
+                            <XMarkIcon className="h-5 w-5" />
+                        </button>
+                    </div>
+                )}
 
-                <div className="px-6 py-6 max-h-[80vh] overflow-y-auto">
+                <div className={`${noPadding ? "" : "px-6 py-6"} max-h-[80vh] overflow-y-auto`}>
                     {children}
                 </div>
 

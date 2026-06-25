@@ -37,6 +37,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Linkedin, Building2, PlusIcon, HandshakeIcon } from "lucide-react";
 import PageHeader from "@/components/UI/PageHeader";
 import CustomButton from "@/components/UI/CustomButton";
+import CustomModal from "@/components/UI/CustomModal";
 import ModalHeader from "@/components/UI/ModalHeader";
 import ModalFooter from "@/components/UI/ModalFooter";
 import { Google, LinkedIn, Delete, Add } from "@mui/icons-material";
@@ -1587,9 +1588,18 @@ const CombinedBusinessContactsContent: React.FC = () => {
         </div>
       </div>
 
-      {showBusinessModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="backdrop-blur-md rounded-2xl shadow-xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden bg-white/95">
+      <CustomModal
+        isOpen={showBusinessModal}
+        onClose={() => {
+          setShowBusinessModal(false);
+          resetBusinessForm();
+          setBusinessModalMode("create");
+        }}
+        title=""
+        showHeader={false}
+        noPadding={true}
+        width="max-w-4xl"
+      >
             <ModalHeader
               entityName="Business"
               entityNo={businessModalMode === "edit" ? businessForm.customerNumber : null}
@@ -2119,32 +2129,19 @@ const CombinedBusinessContactsContent: React.FC = () => {
               saveDisabled={!businessForm.companyName?.trim() || loading}
               showDelete={user?.role === UserRole.ADMIN}
             />
-          </div>
-        </div>
-      )}
+      </CustomModal>
 
-      {showCreateModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-gray-900">
-                  {modalMode === "edit"
-                    ? "Edit Contact Person"
-                    : "Add New Contact Person"}
-                </h2>
-                <button
-                  onClick={() => {
-                    setShowCreateModal(false);
-                    resetCreateForm();
-                    setModalMode("create");
-                    setEditingContactId(null);
-                  }}
-                  className="text-gray-400 hover:text-gray-600 transition-colors"
-                >
-                  <XMarkIcon className="h-6 w-6" />
-                </button>
-              </div>
+      <CustomModal
+        isOpen={showCreateModal}
+        onClose={() => {
+          setShowCreateModal(false);
+          resetCreateForm();
+          setModalMode("create");
+          setEditingContactId(null);
+        }}
+        title={modalMode === "edit" ? "Edit Contact Person" : "Add New Contact Person"}
+        width="max-w-2xl"
+      >
 
               {modalMode === "edit" && (
                 <div className="mb-6 flex items-center justify-between bg-gray-50 rounded-lg p-4">
@@ -2542,151 +2539,136 @@ const CombinedBusinessContactsContent: React.FC = () => {
                     )}
                   </div>
                 </div>
-              </div>
-            </div>
-          </div>
         </div>
-      )}
+      </CustomModal>
 
-      {showNotesModal && notesModalData && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl max-w-2xl w-full max-h-[80vh] overflow-y-auto">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-bold text-gray-900">
-                  All Notes for {notesModalData.name}{" "}
-                  {notesModalData.familyName}
-                </h2>
-                <button
-                  onClick={() => {
-                    setShowNotesModal(false);
-                    setNotesModalData(null);
-                  }}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  <XMarkIcon className="h-6 w-6" />
-                </button>
-              </div>
-              <div className="space-y-6">
-                <div className="bg-blue-50 rounded-lg p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="text-blue-500 text-xl">📝</span>
-                    <h3 className="font-semibold text-gray-900">
-                      General Note
-                    </h3>
-                  </div>
-                  <p className="text-gray-700 whitespace-pre-wrap">
-                    {notesModalData.note || ""}
-                  </p>
-                </div>
-                <div className="bg-green-50 rounded-lg p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="text-green-500 text-xl">💬</span>
-                    <h3 className="font-semibold text-gray-900">
-                      Contact Preference
-                    </h3>
-                  </div>
-                  <p className="text-gray-700 whitespace-pre-wrap">
-                    {notesModalData.noteContactPreference || ""}
-                  </p>
-                </div>
-                <div className="bg-purple-50 rounded-lg p-4 border-l-4 border-purple-500">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="text-purple-500 text-xl">🤝</span>
-                    <h3 className="font-semibold text-purple-900">
-                      Decision Maker Note
-                    </h3>
-                  </div>
-                  <p className="text-gray-700 whitespace-pre-wrap font-medium">
-                    {notesModalData.decisionMakerNote || ""}
-                  </p>
-                </div>
-              </div>
-              <div className="mt-6 flex justify-end gap-3">
-                <button
-                  onClick={() => {
-                    const c = notesModalData;
-                    setShowNotesModal(false);
-                    setNotesModalData(null);
-                    openContactModal(c, true);
-                  }}
-                  className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2"
-                >
-                  <PencilIcon className="h-4 w-4" />
-                  Edit Contact
-                </button>
-                <button
-                  onClick={() => {
-                    setShowNotesModal(false);
-                    setNotesModalData(null);
-                  }}
-                  className="px-4 py-2 text-white bg-gray-600 rounded-lg hover:bg-gray-700"
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showBusinessNoteModal && businessNoteData && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl max-w-2xl w-full max-h-[80vh] overflow-y-auto">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-bold text-gray-900">
-                  Note ·{" "}
-                  {businessNoteData.displayName ||
-                    businessNoteData.companyName ||
-                    businessNoteData.name}
-                </h2>
-                <button
-                  onClick={() => {
-                    setShowBusinessNoteModal(false);
-                    setBusinessNoteData(null);
-                  }}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  <XMarkIcon className="h-6 w-6" />
-                </button>
-              </div>
-              <div className="bg-blue-50 rounded-lg p-4 max-w-full">
+      <CustomModal
+        isOpen={showNotesModal && !!notesModalData}
+        onClose={() => {
+          setShowNotesModal(false);
+          setNotesModalData(null);
+        }}
+        title={notesModalData ? `All Notes for ${notesModalData.name} ${notesModalData.familyName}` : "All Notes"}
+        width="max-w-2xl"
+      >
+        {notesModalData && (
+          <>
+            <div className="space-y-6">
+              <div className="bg-blue-50 rounded-lg p-4">
                 <div className="flex items-center gap-2 mb-2">
                   <span className="text-blue-500 text-xl">📝</span>
-                  <h3 className="font-semibold text-gray-900">Note</h3>
+                  <h3 className="font-semibold text-gray-900">
+                    General Note
+                  </h3>
                 </div>
-                <p className="text-gray-700 break-words line-clamp-4">
-                  {businessNoteData.note || ""}
+                <p className="text-gray-700 whitespace-pre-wrap">
+                  {notesModalData.note || ""}
                 </p>
               </div>
-              <div className="mt-6 flex justify-end gap-3">
-                <button
-                  onClick={() => {
-                    const b = businessNoteData;
-                    setShowBusinessNoteModal(false);
-                    setBusinessNoteData(null);
-                    openBusinessModal(b);
-                  }}
-                  className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2"
-                >
-                  <PencilIcon className="h-4 w-4" />
-                  Edit Business
-                </button>
-                <button
-                  onClick={() => {
-                    setShowBusinessNoteModal(false);
-                    setBusinessNoteData(null);
-                  }}
-                  className="px-4 py-2 text-white bg-gray-600 rounded-lg hover:bg-gray-700"
-                >
-                  Close
-                </button>
+              <div className="bg-green-50 rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-green-500 text-xl">💬</span>
+                  <h3 className="font-semibold text-gray-900">
+                    Contact Preference
+                  </h3>
+                </div>
+                <p className="text-gray-700 whitespace-pre-wrap">
+                  {notesModalData.noteContactPreference || ""}
+                </p>
+              </div>
+              <div className="bg-purple-50 rounded-lg p-4 border-l-4 border-purple-500">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-purple-500 text-xl">🤝</span>
+                  <h3 className="font-semibold text-purple-900">
+                    Decision Maker Note
+                  </h3>
+                </div>
+                <p className="text-gray-700 whitespace-pre-wrap font-medium">
+                  {notesModalData.decisionMakerNote || ""}
+                </p>
               </div>
             </div>
-          </div>
-        </div>
-      )}
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  const c = notesModalData;
+                  setShowNotesModal(false);
+                  setNotesModalData(null);
+                  openContactModal(c, true);
+                }}
+                className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2"
+              >
+                <PencilIcon className="h-4 w-4" />
+                Edit Contact
+              </button>
+              <button
+                onClick={() => {
+                  setShowNotesModal(false);
+                  setNotesModalData(null);
+                }}
+                className="px-4 py-2 text-white bg-gray-600 rounded-lg hover:bg-gray-700"
+              >
+                Close
+              </button>
+            </div>
+          </>
+        )}
+      </CustomModal>
+
+      <CustomModal
+        isOpen={showBusinessNoteModal && !!businessNoteData}
+        onClose={() => {
+          setShowBusinessNoteModal(false);
+          setBusinessNoteData(null);
+        }}
+        title={
+          businessNoteData
+            ? `Note · ${
+                businessNoteData.displayName ||
+                businessNoteData.companyName ||
+                businessNoteData.name
+              }`
+            : "Note"
+        }
+        width="max-w-2xl"
+      >
+        {businessNoteData && (
+          <>
+            <div className="bg-blue-50 rounded-lg p-4 max-w-full">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-blue-500 text-xl">📝</span>
+                <h3 className="font-semibold text-gray-900">Note</h3>
+              </div>
+              <p className="text-gray-700 break-words line-clamp-4">
+                {businessNoteData.note || ""}
+              </p>
+            </div>
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  const b = businessNoteData;
+                  setShowBusinessNoteModal(false);
+                  setBusinessNoteData(null);
+                  openBusinessModal(b);
+                }}
+                className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2"
+              >
+                <PencilIcon className="h-4 w-4" />
+                Edit Business
+              </button>
+              <button
+                onClick={() => {
+                  setShowBusinessNoteModal(false);
+                  setBusinessNoteData(null);
+                }}
+                className="px-4 py-2 text-white bg-gray-600 rounded-lg hover:bg-gray-700"
+              >
+                Close
+              </button>
+            </div>
+          </>
+        )}
+      </CustomModal>
     </div>
   );
 };

@@ -520,6 +520,7 @@ export class OfferController {
 
       const customerSnapshot: CustomerSnapshot = {
         id: customer.id,
+        customerNumber: customer.customerNumber,
         companyName: customer.companyName,
         legalName: customer.legalName,
         email: customer.email,
@@ -2531,7 +2532,7 @@ export class OfferController {
 
       const offer = await this.offerRepository.findOne({
         where: { id },
-        relations: ["lineItems", "inquiry", "inquiry.contactPerson"],
+        relations: ["lineItems", "inquiry", "inquiry.contactPerson", "inquiry.customer"],
       });
 
       if (!offer) {
@@ -2787,7 +2788,7 @@ export class OfferController {
         ["Datum", formatDate(offer.createdAt)],
         ["Gültig bis", formatDate(offer.validUntil)],
         ["Ansprechpartner", contactName],
-        ["Kundennr.", customer.id ? customer.id.substring(0, 8) : "N/A"],
+        ["Kundennr.", offer.inquiry?.customer?.customerNumber || customer.customerNumber || "-"],
       ];
 
       offerDetails.forEach((detail, index) => {
@@ -3106,7 +3107,12 @@ export class OfferController {
           .lineTo(pageWidth - margin, footerY - 15)
           .stroke("#CCCCCC");
 
-        doc.fontSize(8).font("Helvetica").fillColor("#666666");
+        doc.fontSize(8).fillColor("#666666");
+        if (fontSource) {
+          try { doc.font(fontSource); } catch (e) { doc.font("Helvetica"); }
+        } else {
+          doc.font("Helvetica");
+        }
 
         doc.font("Helvetica-Bold");
         doc.text(companyInfo.name, leftAlignX, footerY);

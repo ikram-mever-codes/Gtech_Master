@@ -1664,9 +1664,10 @@ export const generateCommercialInvoicePDF = async (
     );
 
     const rawBillName = hasCargoBillTo
-      ? cargo!.bill_to_display_name || cargo!.bill_to_company_name || ""
-      : cargo?.ship_to_display_name ||
-      cargo?.ship_to_company_name ||
+      ? cargo!.bill_to_company_name || cargo!.bill_to_display_name || ""
+      : cargo?.ship_to_company_name ||
+      cargo?.ship_to_display_name ||
+      customer?.legalName ||
       customer?.companyName ||
       "";
     const billToName =
@@ -1698,8 +1699,9 @@ export const generateCommercialInvoicePDF = async (
       : customer?.taxNumber || "";
 
     const shipToCompany =
-      cargo?.ship_to_display_name ||
       cargo?.ship_to_company_name ||
+      cargo?.ship_to_display_name ||
+      customer?.legalName ||
       customer?.companyName ||
       "";
     const shipToStreet = cargo?.ship_to_full_address || customerAddress.street;
@@ -1709,8 +1711,15 @@ export const generateCommercialInvoicePDF = async (
     const shipToCountry = formatCountry(
       cargo?.ship_to_country || customerAddress.country || ""
     );
+    const isContactSameAsLegalName = !!(
+      customerAddress.contact &&
+      customer?.legalName &&
+      customerAddress.contact.trim().toLowerCase() === customer.legalName.trim().toLowerCase()
+    );
     const shipToContact =
-      cargo?.ship_to_contact_person || customerAddress.contact || "";
+      cargo?.ship_to_contact_person ||
+      (!isContactSameAsLegalName ? customerAddress.contact : "") ||
+      "";
     const shipToPhone =
       cargo?.ship_to_contact_phone || customerAddress.phone || "";
 
@@ -1751,11 +1760,16 @@ export const generateCommercialInvoicePDF = async (
       },
     };
 
+    const safeInvoiceNo = (data.invoiceNo || "").trim() || "CI";
+    const safeCargoNo = (data.cargoNo || "").trim() || "NoCargo";
+    const filename = `${safeInvoiceNo}_${safeCargoNo}.pdf`
+      .replace(/[/\\?%*:|"<>\s]/g, "_");
+
     const doc = new PDFDocument({ size: "A4", margin: 40, bufferPages: true });
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader(
       "Content-Disposition",
-      `attachment; filename=Invoice_${data.invoiceNo}.pdf`,
+      `attachment; filename=${filename}`,
     );
     doc.pipe(res);
 

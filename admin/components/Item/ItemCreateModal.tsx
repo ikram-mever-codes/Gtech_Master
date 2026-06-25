@@ -219,19 +219,19 @@ export const ItemCreateModal: React.FC<ItemCreateModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-      <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-bold text-gray-900">
-              {isRequest ? "Create New Request Item" : "Create New Item"}
-            </h2>
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-gray-600"
-            >
-              <XMarkIcon className="h-5 w-5" />
-            </button>
-          </div>
+      <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white flex items-center justify-between flex-shrink-0 select-none">
+          <h2 className="text-lg font-bold text-gray-900">
+            {isRequest ? "Create New Request Item" : "Create New Item"}
+          </h2>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
+          >
+            <XMarkIcon className="h-5 w-5" />
+          </button>
+        </div>
+        <div className="flex-grow overflow-y-auto p-6">
           {loadingOptions ? (
             <div className="py-20 text-center">
               <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-gray-200 border-t-primary" />
@@ -704,27 +704,27 @@ export const ItemCreateModal: React.FC<ItemCreateModalProps> = ({
               </div>
             </div>
           )}
-          <div className="flex gap-2 pt-6 mt-6 border-t">
-            <button
-              onClick={onClose}
-              className="flex-1 px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 font-medium"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSubmit}
-              disabled={
-                loadingOptions ||
-                !itemFormData.item_name?.trim() ||
-                !itemFormData.parent_id ||
-                !itemFormData.supplier_id ||
-                (isRequest && (!businessId || !itemFormData.qty?.trim()))
-              }
-              className="flex-1 px-4 py-2 bg-[#8CC21B] text-white rounded-lg hover:bg-[#7ab318] disabled:opacity-50 font-medium"
-            >
-              {isRequest ? "Create Request Item" : "Create Item"}
-            </button>
-          </div>
+        </div>
+        <div className="px-6 py-4 border-t border-gray-100 bg-gray-50/50 flex justify-end gap-2 flex-shrink-0">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 font-medium text-sm transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={
+              loadingOptions ||
+              !itemFormData.item_name?.trim() ||
+              !itemFormData.parent_id ||
+              !itemFormData.supplier_id ||
+              (isRequest && (!businessId || !itemFormData.qty?.trim()))
+            }
+            className="px-4 py-2 bg-[#8CC21B] text-white rounded-lg hover:bg-[#7ab318] disabled:opacity-50 font-medium text-sm transition-colors"
+          >
+            {isRequest ? "Create Request Item" : "Create Item"}
+          </button>
         </div>
       </div>
     </div>

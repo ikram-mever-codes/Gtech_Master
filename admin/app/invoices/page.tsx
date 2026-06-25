@@ -2350,7 +2350,11 @@ const InvoiceListPage: React.FC = () => {
                               ...prev,
                               [`pdf-${selectedInvoice.id}`]: true,
                             }));
-                            await downloadCommercialInvoice(selectedInvoice.id);
+                            await downloadCommercialInvoice(
+                              selectedInvoice.id,
+                              selectedInvoice.invoiceNumber,
+                              selectedInvoice.cargo?.cargo_no || selectedInvoice.cargoNo
+                            );
                           } catch (error) {
                             console.error("PDF Generation failed", error);
                           } finally {
