@@ -43,6 +43,7 @@ export interface UnitPrice {
 
 export interface CustomerSnapshot {
   id: string;
+  customerNumber?: string;
   companyName: string;
   legalName?: string;
   email?: string;
@@ -343,7 +344,7 @@ export class Offer {
         (!lineItem.unitPrices || lineItem.unitPrices.length === 0)
       ) {
         lineItem.unitPrices = this.defaultUnitPrices
-          ? JSON.parse(JSON.stringify(this.defaultUnitPrices)) // Deep copy
+          ? JSON.parse(JSON.stringify(this.defaultUnitPrices))
           : [];
       }
 

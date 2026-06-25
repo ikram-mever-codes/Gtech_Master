@@ -279,7 +279,11 @@ export const downloadItemLabel = async (itemId: number | string) => {
   }
 };
 
-export const downloadCommercialInvoice = async (orderId: any) => {
+export const downloadCommercialInvoice = async (
+  orderId: any,
+  invoiceNo?: string,
+  cargoNo?: string
+) => {
   try {
     toast.loading("Generating Commercial Invoice...", loadingStyles);
 
@@ -291,7 +295,13 @@ export const downloadCommercialInvoice = async (orderId: any) => {
     const fileURL = URL.createObjectURL(file);
     const link = document.createElement("a");
     link.href = fileURL;
-    link.download = `Commercial_Invoice_${orderId}.pdf`;
+
+    const sanitizedInvoiceNo = (invoiceNo || "").trim() || "CI";
+    const sanitizedCargoNo = (cargoNo || "").trim() || "NoCargo";
+    const filename = `${sanitizedInvoiceNo}_${sanitizedCargoNo}.pdf`
+      .replace(/[/\\?%*:|"<>\s]/g, "_");
+
+    link.download = filename;
     document.body.appendChild(link);
     link.click();
 

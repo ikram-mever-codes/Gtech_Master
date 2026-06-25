@@ -1948,9 +1948,17 @@ const CombinedInquiriesPageContent = () => {
           )}
         </div>
       </div>
-      {showCreateModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="backdrop-blur-md rounded-2xl shadow-xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden bg-white/95">
+      <CustomModal
+        isOpen={showCreateModal}
+        onClose={() => {
+          setShowCreateModal(false);
+          resetInquiryForm();
+        }}
+        title=""
+        showHeader={false}
+        noPadding={true}
+        width="max-w-4xl"
+      >
             <ModalHeader
               entityName="Inquiry"
               entityNo={inquiryModalMode === "edit" ? inquiryFormData.inquiryNo : null}
@@ -3461,34 +3469,23 @@ const CombinedInquiriesPageContent = () => {
               }
               showDelete={user?.role === UserRole.ADMIN}
             />
-          </div>
-        </div>
-      )}
-      {showConversionModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-6">
-                <div>
-                  <h2 className="text-xl font-bold text-gray-900">
-                    {conversionType === "inquiry"
-                      ? "Convert Inquiry to Item"
-                      : "Convert Request to Item"}
-                  </h2>
-                  <p className="text-sm text-gray-600 mt-1">
-                    Fill in the required fields to create a new item
-                  </p>
-                </div>
-                <button
-                  onClick={() => {
-                    setShowConversionModal(false);
-                    resetConversionForm();
-                  }}
-                  className="text-gray-400 hover:text-gray-600 transition-colors"
-                >
-                  <XMarkIcon className="h-5 w-5" />
-                </button>
-              </div>
+      </CustomModal>
+      <CustomModal
+        isOpen={showConversionModal}
+        onClose={() => {
+          setShowConversionModal(false);
+          resetConversionForm();
+        }}
+        title={
+          conversionType === "inquiry"
+            ? "Convert Inquiry to Item"
+            : "Convert Request to Item"
+        }
+        width="max-w-2xl"
+      >
+        <p className="text-sm text-gray-600 mb-6">
+          Fill in the required fields to create a new item
+        </p>
               <div className="mb-6 p-3 bg-gray-50 rounded-lg">
                 <h3 className="font-medium text-gray-900 mb-2">
                   Source Information
@@ -3787,11 +3784,8 @@ const CombinedInquiriesPageContent = () => {
                     Convert to Item
                   </CustomButton>
                 </div>
-              </div>
-            </div>
-          </div>
         </div>
-      )}
+      </CustomModal>
       <ItemPreviewModal
         isOpen={showRequestDetailModal}
         onClose={() => setShowRequestDetailModal(false)}

@@ -15,4 +15,6 @@ export interface CustomModalProps {
   children: ReactNode;
   footer?: ReactNode;
   width?: string;
+  showHeader?: boolean;
+  noPadding?: boolean;
 }
