@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   XMarkIcon,
   TrashIcon,
@@ -17,10 +17,7 @@ import { toast } from "react-hot-toast";
 import ReactSelect from "react-select";
 import CustomModal from "@/components/UI/CustomModal";
 import ViewEditToggle from "@/components/UI/ViewEditToggle";
-import {
-  EntityTagSelector,
-  type Tag,
-} from "@/components/Tags/TagManager";
+import { EntityTagSelector, type Tag } from "@/components/Tags/TagManager";
 import {
   getItemById,
   updateItem,
@@ -41,6 +38,7 @@ import {
 } from "@/api/requested_items";
 import { getAllSuppliers, Supplier } from "@/api/suppliers";
 import { getCategories } from "@/api/categories";
+import { getAllCustomers } from "@/api/customers";
 import { uploadFile, deleteFile } from "@/api/library";
 import {
   successStyles,
@@ -83,6 +81,7 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
   const [refTarics, setRefTarics] = useState<Taric[]>([]);
   const [refSuppliers, setRefSuppliers] = useState<Supplier[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
+  const [customers, setCustomers] = useState<any[]>([]);
 
   const [qualityModalOpen, setQualityModalOpen] = useState(false);
   const [editingQuality, setEditingQuality] = useState<any>(null);
@@ -120,10 +119,10 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
   const getThumb = (item: any) =>
     resolveUrl(
       item?.photo ||
-      item?.pix_path_eBay ||
-      item?.pictures?.shopPicture ||
-      (item?.pix_path ? item.pix_path.split(",").filter(Boolean)[0] : null) ||
-      null,
+        item?.pix_path_eBay ||
+        item?.pictures?.shopPicture ||
+        (item?.pix_path ? item.pix_path.split(",").filter(Boolean)[0] : null) ||
+        null,
     );
 
   const getCompany = (item: any) =>
@@ -136,6 +135,23 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
     item?.company_name ||
     item?.company ||
     "";
+
+  // Searchable customer options for the Company dropdown (deduped + sorted).
+  const customerOptions = useMemo(() => {
+    const seen = new Map<string, { value: string; label: string }>();
+    customers
+      .filter((c) => c.companyName)
+      .forEach((c) => {
+        if (!seen.has(String(c.id)))
+          seen.set(String(c.id), {
+            value: String(c.id),
+            label: c.companyName,
+          });
+      });
+    return Array.from(seen.values()).sort((a, b) =>
+      a.label.localeCompare(b.label),
+    );
+  }, [customers]);
 
   const fetchItemDetails = async () => {
     setPreviewLoading(true);
@@ -153,9 +169,22 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
           category_id: raw.cat_id || null,
           category: raw.category?.name || "",
           supplier_id: raw.supplier_id || null,
-          supplier_name: raw.supplier ? (!hasChinese(raw.supplier.name || "") ? raw.supplier.name : raw.supplier.company_name) : "",
+          supplier_name: raw.supplier
+            ? !hasChinese(raw.supplier.name || "")
+              ? raw.supplier.name
+              : raw.supplier.company_name
+            : "",
+          customer_id: raw.customer_id ?? raw.customer?.id ?? null,
+          customer_name: getCompany(raw),
           parent_id: raw.parent_id || null,
-          parent: raw.parent ? { ...raw.parent, de_no: raw.parent.de_no, name_de: raw.parent.name_de } : null,
+          parent: raw.parent
+            ? {
+                ...raw.parent,
+                de_no: raw.parent.de_no,
+                name_de: raw.parent.name_de,
+              }
+            : null,
+          item_name_de: raw.item_name_de || raw.parent?.name_de || "",
           remark: raw.remark || raw.extraNote || "",
           price: raw.purchasePrice || 0,
           currency: raw.currency || "EUR",
@@ -191,43 +220,77 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
           (si: any) =>
             si.isDefault || Number(si.supplierId) === Number(activeSupplierId),
         );
+
+        // --- Defensive field mapping ---------------------------------------
+        // getItemById may not flatten these the way the list endpoint does,
+        // so pull each value from every plausible location with fallbacks.
+        const catName =
+          (typeof raw.category === "string"
+            ? raw.category
+            : raw.category?.name) ||
+          raw.supp_cat ||
+          "";
+        const companyName = getCompany(raw);
+        const supplierName =
+          raw.supplier_name ||
+          (raw.supplier
+            ? !hasChinese(raw.supplier.name || "")
+              ? raw.supplier.name
+              : raw.supplier.company_name
+            : "");
+
         const mapped = {
           ...raw,
           id: raw.id,
           name: raw.item_name || "",
+          item_name: raw.item_name || "",
           nameCN: raw.item_name_cn || "",
-          category_id: raw.cat_id || null,
-          category: raw.category?.name || "",
+          item_name_cn: raw.item_name_cn || "",
+          item_name_de: raw.item_name_de || raw.parent?.name_de || "",
+          ean: raw.ean || "",
+          de_no: raw.de_no || raw.parent?.de_no || raw.ItemID_DE || "",
+          category_id:
+            raw.cat_id ?? raw.category_id ?? raw.category?.id ?? null,
+          category: catName,
           supplier_id: activeSupplierId,
+          supplier_name: supplierName,
           customer_id: raw.customer_id ?? raw.customer?.id ?? null,
+          customer_name: companyName,
           isActive: toBool(raw.isActive),
-          isLabelPrint: raw.isLabelPrint !== undefined ? toBool(raw.isLabelPrint) : false,
+          isLabelPrint:
+            raw.isLabelPrint !== undefined ? toBool(raw.isLabelPrint) : false,
           supplierItems: raw.supplierItems || [],
           supplierItem:
             raw.supplierItem ||
             (def
               ? {
-                priceRMB: def.priceRMB || "0",
-                isPO: def.isPO || "No",
-                moq: def.moq || "0",
-                interval: def.interval || "0",
-                leadTime: def.leadTime || "",
-                noteCN: def.noteCN || "",
-                url: def.url || "",
-              }
+                  priceRMB: def.priceRMB || "0",
+                  isPO: def.isPO || "No",
+                  moq: def.moq || "0",
+                  interval: def.interval || "0",
+                  leadTime: def.leadTime || "",
+                  noteCN: def.noteCN || "",
+                  url: def.url || "",
+                }
               : {
-                priceRMB: "0",
-                isPO: "No",
-                moq: "0",
-                interval: "0",
-                leadTime: "",
-                noteCN: "",
-                url: "",
-              }),
-          parent: raw.parent ? { ...raw.parent, isActive: toBool(raw.parent?.isActive) } : null,
+                  priceRMB: "0",
+                  isPO: "No",
+                  moq: "0",
+                  interval: "0",
+                  leadTime: "",
+                  noteCN: "",
+                  url: "",
+                }),
+          parent: raw.parent
+            ? { ...raw.parent, isActive: toBool(raw.parent?.isActive) }
+            : null,
           parent_id: raw.parent_id || null,
-          de_no: raw.de_no || "",
-          dimensions: raw.dimensions || { weight: 0, length: 0, width: 0, height: 0 },
+          dimensions: raw.dimensions || {
+            weight: 0,
+            length: 0,
+            width: 0,
+            height: 0,
+          },
           pictures: {
             shopPicture: raw.photo || "",
             ebayPictures: raw.pix_path_eBay || "",
@@ -249,20 +312,34 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
   useEffect(() => {
     if (!isOpen) return;
 
+    // Always open in view mode — edit must be explicitly enabled each time.
+    setPreviewEdit(false);
+
     const loadOptions = async () => {
       try {
-        const [parentsRes, taricsRes, suppliersRes, categoriesRes] = await Promise.all([
+        const [
+          parentsRes,
+          taricsRes,
+          suppliersRes,
+          categoriesRes,
+          customersRes,
+        ]: any = await Promise.all([
           getParents({ page: 1, limit: 100000 }),
           getAllTarics({ page: 1, limit: 100000 }),
           getAllSuppliers({ page: 1, limit: 100000 }),
           getCategories(),
+          getAllCustomers({ page: 1, limit: 100000 }),
         ]);
         setRefParents(parentsRes.data || []);
         setRefTarics(taricsRes.data || []);
         setRefSuppliers(suppliersRes.data || []);
         setCategories(categoriesRes?.data || []);
+        setCustomers(customersRes?.data?.customers || customersRes?.data || []);
       } catch (err) {
-        console.error("Failed to load select options in ItemPreviewModal:", err);
+        console.error(
+          "Failed to load select options in ItemPreviewModal:",
+          err,
+        );
       }
     };
 
@@ -304,13 +381,17 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
           model: previewItem.model,
           extraNote: previewItem.remark,
           remark: previewItem.remark,
-          cat_id: previewItem.category_id ? parseInt(previewItem.category_id) : undefined,
+          cat_id: previewItem.category_id
+            ? parseInt(previewItem.category_id)
+            : undefined,
           isActive: previewItem.isActive ? "Y" : "N",
           weight: parseFloat(previewItem.dimensions?.weight) || 0,
           length: parseFloat(previewItem.dimensions?.length) || 0,
           width: parseFloat(previewItem.dimensions?.width) || 0,
           height: parseFloat(previewItem.dimensions?.height) || 0,
-          supplier_id: previewItem.supplier_id ? parseInt(previewItem.supplier_id) : undefined,
+          supplier_id: previewItem.supplier_id
+            ? parseInt(previewItem.supplier_id)
+            : undefined,
           purchasePrice: parseFloat(previewItem.price) || 0,
           currency: previewItem.currency || "EUR",
           itemNo: previewItem.de_no,
@@ -328,20 +409,26 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
           ean: (previewItem.ean || "").toString(),
           model: previewItem.model,
           remark: previewItem.remark,
-          cat_id: previewItem.category_id ? parseInt(previewItem.category_id) : null,
+          cat_id: previewItem.category_id
+            ? parseInt(previewItem.category_id)
+            : null,
           isActive: previewItem.isActive ? "Y" : "N",
           weight: parseFloat(previewItem.dimensions?.weight) || 0,
           length: parseFloat(previewItem.dimensions?.length) || 0,
           width: parseFloat(previewItem.dimensions?.width) || 0,
           height: parseFloat(previewItem.dimensions?.height) || 0,
           is_qty_dividable: previewItem.others?.isQTYdiv ? "Y" : "N",
-          is_dimension_special: previewItem.others?.isDimensionSpecial ? "Y" : "N",
+          is_dimension_special: previewItem.others?.isDimensionSpecial
+            ? "Y"
+            : "N",
           is_eur_special: previewItem.parent?.isEURSpecial ? "Y" : "N",
           is_rmb_special: previewItem.parent?.isRMBSpecial ? "Y" : "N",
           is_new: previewItem.others?.isNew ? "Y" : "N",
           is_npr: previewItem.others?.isNPR ? "Y" : "N",
           isLabelPrint: !!previewItem.isLabelPrint,
-          supplier_id: previewItem.supplier_id ? parseInt(previewItem.supplier_id) : null,
+          supplier_id: previewItem.supplier_id
+            ? parseInt(previewItem.supplier_id)
+            : null,
           customer_id: previewItem.customer_id ?? null,
           supplierItems: previewItem.supplierItems,
           supplierItem: {
@@ -366,7 +453,10 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
       fetchItemDetails();
       if (onSaved) onSaved();
     } catch (e: any) {
-      toast.error(e.message || "Failed to update item", { id: tid, ...errorStyles });
+      toast.error(e.message || "Failed to update item", {
+        id: tid,
+        ...errorStyles,
+      });
     } finally {
       setPreviewSaving(false);
     }
@@ -374,18 +464,29 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
 
   const handleDeletePreviewItem = async () => {
     if (!previewItem) return;
-    if (!confirm(`Are you sure you want to delete this ${isRequest ? "request item" : "item"}?`)) return;
+    if (
+      !confirm(
+        `Are you sure you want to delete this ${isRequest ? "request item" : "item"}?`,
+      )
+    )
+      return;
     try {
       if (isRequest) {
         await deleteRequestedItem(String(itemId));
       } else {
         await deleteItem(Number(itemId));
       }
-      toast.success(`${isRequest ? "Request item" : "Item"} deleted`, successStyles);
+      toast.success(
+        `${isRequest ? "Request item" : "Item"} deleted`,
+        successStyles,
+      );
       onClose();
       if (onDeleted) onDeleted();
     } catch (e: any) {
-      toast.error(e.message || `Failed to delete ${isRequest ? "request item" : "item"}`, errorStyles);
+      toast.error(
+        e.message || `Failed to delete ${isRequest ? "request item" : "item"}`,
+        errorStyles,
+      );
     }
   };
   const openQualityModal = (q: any = null) => {
@@ -432,7 +533,7 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
         let updatedQuality: any[];
         if (editingQuality) {
           updatedQuality = previewQuality.map((q) =>
-            q.id === editingQuality.id ? { ...q, ...payload } : q
+            q.id === editingQuality.id ? { ...q, ...payload } : q,
           );
         } else {
           updatedQuality = [
@@ -441,7 +542,9 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
           ];
         }
         setPreviewQuality(updatedQuality);
-        await updateRequestedItem(String(itemId), { qualityCriteria: updatedQuality });
+        await updateRequestedItem(String(itemId), {
+          qualityCriteria: updatedQuality,
+        });
         toast.success("Quality criterion saved", successStyles);
       } else {
         if (editingQuality) {
@@ -466,7 +569,9 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
       if (isRequest) {
         const updatedQuality = previewQuality.filter((q) => q.id !== qid);
         setPreviewQuality(updatedQuality);
-        await updateRequestedItem(String(itemId), { qualityCriteria: updatedQuality });
+        await updateRequestedItem(String(itemId), {
+          qualityCriteria: updatedQuality,
+        });
         toast.success("Quality criterion deleted", successStyles);
       } else {
         await deleteQualityCriterion(Number(qid));
@@ -500,7 +605,9 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
           });
         }
         setPreviewItem((p: any) => ({ ...p, attachments: updatedAttachments }));
-        await updateRequestedItem(String(itemId), { attachments: updatedAttachments });
+        await updateRequestedItem(String(itemId), {
+          attachments: updatedAttachments,
+        });
         toast.success("Attachments uploaded", { id: tid, ...successStyles });
       } else {
         for (let i = 0; i < files.length; i++) {
@@ -511,7 +618,10 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
           await uploadFile(fd, false);
         }
         const fresh: any = await getItemById(Number(itemId));
-        setPreviewItem((p: any) => ({ ...p, attachments: fresh?.data?.attachments || [] }));
+        setPreviewItem((p: any) => ({
+          ...p,
+          attachments: fresh?.data?.attachments || [],
+        }));
         toast.success("Attachments uploaded", { id: tid, ...successStyles });
       }
     } catch (e) {
@@ -527,15 +637,21 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
     if (!confirm("Delete this attachment?")) return;
     try {
       if (isRequest) {
-        const updatedAttachments = (previewItem.attachments || []).filter((a: any) => a.id !== fileId);
+        const updatedAttachments = (previewItem.attachments || []).filter(
+          (a: any) => a.id !== fileId,
+        );
         setPreviewItem((p: any) => ({ ...p, attachments: updatedAttachments }));
-        await updateRequestedItem(String(itemId), { attachments: updatedAttachments });
+        await updateRequestedItem(String(itemId), {
+          attachments: updatedAttachments,
+        });
         toast.success("Attachment deleted", successStyles);
       } else {
         await deleteFile(fileId);
         setPreviewItem((p: any) => ({
           ...p,
-          attachments: (p.attachments || []).filter((a: any) => a.id !== fileId),
+          attachments: (p.attachments || []).filter(
+            (a: any) => a.id !== fileId,
+          ),
         }));
         toast.success("Attachment deleted", successStyles);
       }
@@ -559,64 +675,65 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
     </div>
   );
 
-  const previewCompanyOrCat = getCompany(previewItem) || previewItem?.category || "—";
+  const previewCompanyOrCat =
+    getCompany(previewItem) || previewItem?.category || "—";
   const previewItemNo = previewItem?.de_no || "—";
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
       <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl max-w-4xl w-full max-h-[90vh] flex flex-col">
-          {previewLoading || !previewItem ? (
-            <div className="p-6 py-20 text-center">
-              <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-gray-200 border-t-primary" />
-              <p className="mt-2 text-sm text-gray-500">Loading details...</p>
-            </div>
-          ) : (
-            <>
-              {/* Header with thumbnail, title, toggle, and close */}
-              <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white flex items-center justify-between flex-shrink-0 select-none">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-12 h-12 rounded-lg overflow-hidden bg-gray-100 border border-gray-200 flex items-center justify-center flex-shrink-0">
-                    {getThumb(previewItem) ? (
-                      <img
-                        src={getThumb(previewItem)!}
-                        alt="thumb"
-                        className="w-full h-full object-cover"
-                        onError={(e) =>
-                          ((e.target as HTMLImageElement).style.display = "none")
-                        }
-                      />
-                    ) : (
-                      <Package className="w-5 h-5 text-gray-300" />
-                    )}
-                  </div>
-                  <div className="min-w-0">
-                    <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2 truncate">
-                      {previewItem.item_name || previewItem.name || "Item"}
-                    </h2>
-                    <p className="text-xs text-gray-500 truncate">
-                      {previewCompanyOrCat} · ItemNo {previewItemNo} · ID{" "}
-                      {previewItem.id}
-                    </p>
-                  </div>
+        {previewLoading || !previewItem ? (
+          <div className="p-6 py-20 text-center">
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-gray-200 border-t-primary" />
+            <p className="mt-2 text-sm text-gray-500">Loading details...</p>
+          </div>
+        ) : (
+          <>
+            {/* Header with thumbnail, title, toggle, and close */}
+            <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white flex items-center justify-between flex-shrink-0 select-none">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-12 h-12 rounded-lg overflow-hidden bg-gray-100 border border-gray-200 flex items-center justify-center flex-shrink-0">
+                  {getThumb(previewItem) ? (
+                    <img
+                      src={getThumb(previewItem)!}
+                      alt="thumb"
+                      className="w-full h-full object-cover"
+                      onError={(e) =>
+                        ((e.target as HTMLImageElement).style.display = "none")
+                      }
+                    />
+                  ) : (
+                    <Package className="w-5 h-5 text-gray-300" />
+                  )}
                 </div>
-                <div className="flex items-center gap-4 flex-shrink-0">
-                  <ViewEditToggle
-                    isEditEnabled={previewEdit}
-                    onToggle={() => setPreviewEdit(!previewEdit)}
-                    disabled={previewSaving}
-                  />
-                  <button
-                    type="button"
-                    onClick={onClose}
-                    className="text-gray-400 hover:text-gray-600 transition-colors p-1.5 rounded-lg hover:bg-gray-100"
-                  >
-                    <XMarkIcon className="h-5 w-5" />
-                  </button>
+                <div className="min-w-0">
+                  <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2 truncate">
+                    {previewItem.item_name || previewItem.name || "Item"}
+                  </h2>
+                  <p className="text-xs text-gray-500 truncate">
+                    {previewCompanyOrCat} · ItemNo {previewItemNo} · ID{" "}
+                    {previewItem.id}
+                  </p>
                 </div>
               </div>
+              <div className="flex items-center gap-4 flex-shrink-0">
+                <ViewEditToggle
+                  isEditEnabled={previewEdit}
+                  onToggle={() => setPreviewEdit(!previewEdit)}
+                  disabled={previewSaving}
+                />
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="text-gray-400 hover:text-gray-600 transition-colors p-1.5 rounded-lg hover:bg-gray-100"
+                >
+                  <XMarkIcon className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
 
-              {/* Scrollable content */}
-              <div className="flex-1 overflow-y-auto p-6">
+            {/* Scrollable content */}
+            <div className="flex-1 overflow-y-auto p-6">
               <div className="mb-5">
                 <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
                   Tags
@@ -631,11 +748,11 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                     setPreviewItem((p: any) =>
                       p
                         ? {
-                          ...p,
-                          tags: newTags,
-                          tagOrder: newTags.map((t) => t.id).join(","),
-                        }
-                        : p
+                            ...p,
+                            tags: newTags,
+                            tagOrder: newTags.map((t) => t.id).join(","),
+                          }
+                        : p,
                     )
                   }
                 />
@@ -653,17 +770,65 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                     previewItemNo
                   )}
                 </Field>
-                <Field label="Company">{getCompany(previewItem) || "—"}</Field>
+                <Field label="Company">
+                  {previewEdit ? (
+                    <ReactSelect
+                      isClearable
+                      placeholder="Search customer..."
+                      options={customerOptions}
+                      value={
+                        customerOptions.find(
+                          (o) =>
+                            String(o.value) === String(previewItem.customer_id),
+                        ) ||
+                        (previewItem.customer_id
+                          ? {
+                              value: String(previewItem.customer_id),
+                              label:
+                                previewItem.customer_name ||
+                                `#${previewItem.customer_id}`,
+                            }
+                          : null)
+                      }
+                      onChange={(opt: any) =>
+                        patchPreview({
+                          customer_id: opt?.value ?? null,
+                          customer_name: opt?.label ?? "",
+                        })
+                      }
+                      menuPortalTarget={
+                        typeof document !== "undefined"
+                          ? document.body
+                          : undefined
+                      }
+                      styles={{
+                        menuPortal: (base) => ({ ...base, zIndex: 9999 }),
+                        control: (base) => ({
+                          ...base,
+                          minHeight: "34px",
+                          fontSize: "0.875rem",
+                          borderRadius: "0.5rem",
+                        }),
+                      }}
+                    />
+                  ) : (
+                    getCompany(previewItem) || "—"
+                  )}
+                </Field>
                 <Field label="IsLabel">
                   {previewEdit ? (
                     <div className="flex items-center mt-1">
                       <input
                         type="checkbox"
                         checked={previewItem.isLabelPrint}
-                        onChange={(e) => patchPreview({ isLabelPrint: e.target.checked })}
+                        onChange={(e) =>
+                          patchPreview({ isLabelPrint: e.target.checked })
+                        }
                         className="w-4 h-4 text-green-600 border-gray-300 rounded"
                       />
-                      <span className="ml-2 text-sm text-gray-700">Label Print</span>
+                      <span className="ml-2 text-sm text-gray-700">
+                        Label Print
+                      </span>
                     </div>
                   ) : (
                     <span
@@ -733,7 +898,9 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                     <input
                       className={inputCls}
                       value={previewItem.item_name_de || ""}
-                      onChange={(e) => patchPreview({ item_name_de: e.target.value })}
+                      onChange={(e) =>
+                        patchPreview({ item_name_de: e.target.value })
+                      }
                     />
                   ) : (
                     previewItem.item_name_de || "—"
@@ -743,7 +910,9 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                   {previewEdit ? (
                     <input
                       className={inputCls}
-                      value={previewItem.nameCN ?? previewItem.item_name_cn ?? ""}
+                      value={
+                        previewItem.nameCN ?? previewItem.item_name_cn ?? ""
+                      }
                       onChange={(e) =>
                         patchPreview({
                           nameCN: e.target.value,
@@ -752,7 +921,7 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                       }
                     />
                   ) : (
-                    previewItem.nameCN || "—"
+                    previewItem.nameCN || previewItem.item_name_cn || "—"
                   )}
                 </Field>
               </div>
@@ -776,7 +945,9 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                       rows={2}
                       className={inputCls}
                       value={previewItem.remarkCN ?? ""}
-                      onChange={(e) => patchPreview({ remarkCN: e.target.value })}
+                      onChange={(e) =>
+                        patchPreview({ remarkCN: e.target.value })
+                      }
                     />
                   ) : (
                     previewItem.remarkCN || "—"
@@ -800,7 +971,7 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                           onChange={(e) => patchPreviewDim(dim, e.target.value)}
                         />
                       ) : (
-                        previewItem.dimensions?.[dim] ?? "—"
+                        (previewItem.dimensions?.[dim] ?? "—")
                       )}
                     </Field>
                   ),
@@ -813,7 +984,9 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                     <select
                       className={inputCls}
                       value={previewItem.supplier_id?.toString() ?? ""}
-                      onChange={(e) => patchPreview({ supplier_id: e.target.value })}
+                      onChange={(e) =>
+                        patchPreview({ supplier_id: e.target.value })
+                      }
                     >
                       <option value="">Select a Supplier</option>
                       {refSuppliers.map((s: any) => (
@@ -823,8 +996,10 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                         >{`[ID: ${s.id}] ${!hasChinese(s.name) ? s.name : s.company_name || ""}`}</option>
                       ))}
                     </select>
+                  ) : previewItem.supplier_name ? (
+                    `[ID: ${previewItem.supplier_id}] ${previewItem.supplier_name}`
                   ) : (
-                    previewItem.supplier_name ? `[ID: ${previewItem.supplier_id}] ${previewItem.supplier_name}` : "—"
+                    "—"
                   )}
                 </Field>
                 <Field label="Price">
@@ -845,7 +1020,9 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                     <select
                       className={inputCls}
                       value={previewItem.isActive ? "Y" : "N"}
-                      onChange={(e) => patchPreview({ isActive: e.target.value === "Y" })}
+                      onChange={(e) =>
+                        patchPreview({ isActive: e.target.value === "Y" })
+                      }
                     >
                       <option value="Y">Active</option>
                       <option value="N">Inactive</option>
@@ -878,7 +1055,9 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                       <select
                         className={inputCls}
                         value={previewItem.interval || "Monatlich"}
-                        onChange={(e) => patchPreview({ interval: e.target.value })}
+                        onChange={(e) =>
+                          patchPreview({ interval: e.target.value })
+                        }
                       >
                         <option value="Monatlich">Monatlich</option>
                         <option value="2 monatlich">2 monatlich</option>
@@ -895,7 +1074,9 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                       <select
                         className={inputCls}
                         value={previewItem.priority || "Normal"}
-                        onChange={(e) => patchPreview({ priority: e.target.value })}
+                        onChange={(e) =>
+                          patchPreview({ priority: e.target.value })
+                        }
                       >
                         <option value="Normal">Normal</option>
                         <option value="High">High</option>
@@ -909,13 +1090,17 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                       <select
                         className={inputCls}
                         value={previewItem.requestStatus || "Open"}
-                        onChange={(e) => patchPreview({ requestStatus: e.target.value })}
+                        onChange={(e) =>
+                          patchPreview({ requestStatus: e.target.value })
+                        }
                       >
                         <option value="Open">Open</option>
                         <option value="supplier search">Supplier search</option>
                         <option value="stopped">Stopped</option>
                         <option value="successful">Successful</option>
-                        <option value="Converted to Item">Converted to Item</option>
+                        <option value="Converted to Item">
+                          Converted to Item
+                        </option>
                       </select>
                     ) : (
                       previewItem.requestStatus || "—"
@@ -959,7 +1144,9 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                         <div className="flex items-center gap-2 flex-shrink-0">
                           {q.picture && (
                             <button
-                              onClick={() => window.open(resolveUrl(q.picture)!, "_blank")}
+                              onClick={() =>
+                                window.open(resolveUrl(q.picture)!, "_blank")
+                              }
                               className="text-blue-600 hover:text-blue-800"
                               title="View Image"
                             >
@@ -1007,7 +1194,8 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                     onChange={uploadPreviewAttachments}
                   />
                 </div>
-                {!previewItem?.attachments || previewItem.attachments.length === 0 ? (
+                {!previewItem?.attachments ||
+                previewItem.attachments.length === 0 ? (
                   <p className="text-xs text-gray-400">
                     No attachments for this item.
                   </p>
@@ -1072,7 +1260,9 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                       .filter(Boolean),
                   ].filter(Boolean);
                   if (pics.length === 0)
-                    return <p className="text-xs text-gray-400">No pictures.</p>;
+                    return (
+                      <p className="text-xs text-gray-400">No pictures.</p>
+                    );
                   return (
                     <div className="grid grid-cols-3 md:grid-cols-5 gap-3">
                       {pics.map((url: any, i: number) => (
@@ -1084,10 +1274,12 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                             src={resolveUrl(url)!}
                             alt={`pic-${i}`}
                             className="w-full h-full object-cover cursor-pointer"
-                            onClick={() => window.open(resolveUrl(url)!, "_blank")}
+                            onClick={() =>
+                              window.open(resolveUrl(url)!, "_blank")
+                            }
                             onError={(e) =>
-                            ((e.target as HTMLImageElement).src =
-                              "https://placehold.co/200x200?text=—")
+                              ((e.target as HTMLImageElement).src =
+                                "https://placehold.co/200x200?text=—")
                             }
                           />
                         </div>
@@ -1119,17 +1311,19 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                       Full Details
                     </button>
                   )}
-                  {isRequest && onConvert && previewItem.requestStatus !== "Converted to Item" && (
-                    <button
-                      onClick={() => {
-                        onClose();
-                        if (onConvert) onConvert(previewItem);
-                      }}
-                      className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 flex items-center gap-1.5 text-xs font-semibold shadow-sm"
-                    >
-                      Convert to Item
-                    </button>
-                  )}
+                  {isRequest &&
+                    onConvert &&
+                    previewItem.requestStatus !== "Converted to Item" && (
+                      <button
+                        onClick={() => {
+                          onClose();
+                          if (onConvert) onConvert(previewItem);
+                        }}
+                        className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 flex items-center gap-1.5 text-xs font-semibold shadow-sm"
+                      >
+                        Convert to Item
+                      </button>
+                    )}
                   <button
                     onClick={onClose}
                     className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 text-xs font-semibold"
@@ -1147,14 +1341,16 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                   )}
                 </div>
               </div>
-              </div>
-            </>
-          )}
+            </div>
+          </>
+        )}
       </div>
       <CustomModal
         isOpen={qualityModalOpen}
         onClose={() => setQualityModalOpen(false)}
-        title={editingQuality ? "Update Quality Criterion" : "Add Quality Criterion"}
+        title={
+          editingQuality ? "Update Quality Criterion" : "Add Quality Criterion"
+        }
         width="max-w-md"
         footer={
           <div className="flex gap-2 w-full justify-end">

@@ -500,7 +500,14 @@ export const getItemById = async (
 
     const item = await itemRepository.findOne({
       where: { id: parseInt(id) },
-      relations: ["parent", "taric", "category", "supplier", "tags"],
+      relations: [
+        "parent",
+        "taric",
+        "category",
+        "supplier",
+        "tags",
+        "customer",
+      ],
     });
 
     console.log(item);
@@ -626,16 +633,8 @@ export const getItemById = async (
       supplier_id: item.supplier_id,
       supplier_name: item.supplier?.company_name || item.supplier?.name || "",
       customer_id: item.customer_id || null,
-      customer_name: customer?.companyName || "",
-      customer: customer
-        ? {
-            id: customer.id,
-            companyName: customer.companyName,
-            legalName: customer.legalName || "",
-            customerNumber: customer.customerNumber || "",
-            email: customer.email || "",
-          }
-        : null,
+      customer_name: item.customer?.companyName || "",
+      customer: item.customer,
       painPoints: item.painPoints || [],
       isActive: primaryWarehouseItem
         ? primaryWarehouseItem.is_active === "Y"
