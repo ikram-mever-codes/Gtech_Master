@@ -1093,55 +1093,55 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                   );
                 })()}
               </div>
-              <div className="flex justify-between gap-2 pt-6 mt-6 border-t">
-                <div>
-                  {previewEdit && (
-                    <button
-                      onClick={handleDeletePreviewItem}
-                      className="px-4 py-2 text-xs text-red-700 bg-white border border-red-300/80 rounded-lg hover:bg-red-50 flex items-center gap-1 font-semibold"
-                    >
-                      <TrashIcon className="w-4 h-4" />
-                      Delete
-                    </button>
-                  )}
-                </div>
-                <div className="flex gap-2">
-                  {!isRequest && (
-                    <button
-                      onClick={() => router.push(`/items/${itemId}`)}
-                      className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2 text-xs font-semibold"
-                    >
-                      <EyeIconOutline className="w-4 h-4" />
-                      Full Details
-                    </button>
-                  )}
-                  {isRequest && onConvert && previewItem.requestStatus !== "Converted to Item" && (
-                    <button
-                      onClick={() => {
-                        onClose();
-                        if (onConvert) onConvert(previewItem);
-                      }}
-                      className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 flex items-center gap-1.5 text-xs font-semibold shadow-sm"
-                    >
-                      Convert to Item
-                    </button>
-                  )}
+            </div>
+            <div className="px-6 py-4 border-t border-gray-100 bg-gray-50/50 flex justify-between items-center gap-2 flex-shrink-0">
+              <div>
+                {previewEdit && (
                   <button
-                    onClick={onClose}
-                    className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 text-xs font-semibold"
+                    onClick={handleDeletePreviewItem}
+                    className="px-4 py-2 text-xs text-red-700 bg-white border border-red-300/80 rounded-lg hover:bg-red-50 flex items-center gap-1 font-semibold"
                   >
-                    {previewEdit ? "Cancel" : "Close"}
+                    <TrashIcon className="w-4 h-4" />
+                    Delete
                   </button>
-                  {previewEdit && (
-                    <button
-                      onClick={handleSavePreview}
-                      disabled={previewSaving}
-                      className="px-4 py-2 bg-[#8CC21B] text-white rounded-lg hover:bg-[#7ab318] disabled:opacity-50 text-xs font-semibold"
-                    >
-                      {previewSaving ? "Saving..." : "Save Changes"}
-                    </button>
-                  )}
-                </div>
+                )}
+              </div>
+              <div className="flex gap-2">
+                {!isRequest && (
+                  <button
+                    onClick={() => router.push(`/items/${itemId}`)}
+                    className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2 text-xs font-semibold"
+                  >
+                    <EyeIconOutline className="w-4 h-4" />
+                    Full Details
+                  </button>
+                )}
+                {isRequest && onConvert && previewItem.requestStatus !== "Converted to Item" && (
+                  <button
+                    onClick={() => {
+                      onClose();
+                      if (onConvert) onConvert(previewItem);
+                    }}
+                    className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 flex items-center gap-1.5 text-xs font-semibold shadow-sm"
+                  >
+                    Convert to Item
+                  </button>
+                )}
+                <button
+                  onClick={onClose}
+                  className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 text-xs font-semibold"
+                >
+                  {previewEdit ? "Cancel" : "Close"}
+                </button>
+                {previewEdit && (
+                  <button
+                    onClick={handleSavePreview}
+                    disabled={previewSaving}
+                    className="px-4 py-2 bg-[#8CC21B] text-white rounded-lg hover:bg-[#7ab318] disabled:opacity-50 text-xs font-semibold"
+                  >
+                    {previewSaving ? "Saving..." : "Save Changes"}
+                  </button>
+                )}
               </div>
             </div>
           </>

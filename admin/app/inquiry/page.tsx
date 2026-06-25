@@ -633,8 +633,6 @@ const CombinedInquiriesPageContent = () => {
             });
           });
         }
-
-        // Apply frontend sorting
         if (inquiryFilters.sortBy === "total_potential_k_eur") {
           inquiryData = [...inquiryData].sort((a: any, b: any) => {
             const valA = a.total_potential_k_eur !== undefined && a.total_potential_k_eur !== null ? Number(a.total_potential_k_eur) : 0;
@@ -1443,11 +1441,10 @@ const CombinedInquiriesPageContent = () => {
                                 e.stopPropagation();
                                 toggleInquiryRequests(inquiry.id);
                               }}
-                              className={`${
-                                !inquiry.requests || inquiry.requests.length === 0
-                                  ? "text-red-500 hover:text-red-700"
-                                  : "text-gray-400 hover:text-gray-700"
-                              } flex-shrink-0 mt-0.5`}
+                              className={`${!inquiry.requests || inquiry.requests.length === 0
+                                ? "text-red-500 hover:text-red-700"
+                                : "text-gray-400 hover:text-gray-700"
+                                } flex-shrink-0 mt-0.5`}
                               title={
                                 !inquiry.requests || inquiry.requests.length === 0
                                   ? "No request items yet"
@@ -1632,235 +1629,235 @@ const CombinedInquiriesPageContent = () => {
                                         <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                                           VP
                                         </th>
-                                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Status
-                                      </th>
-                                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Priority
-                                      </th>
-                                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Asana
-                                      </th>
-                                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Actions
-                                      </th>
-                                    </tr>
-                                  </thead>
-                                  <tbody className="divide-y divide-gray-200">
-                                    {inquiry.requests.map((request: any) => (
-                                      <tr
-                                        key={request.id}
-                                        onClick={() => {
-                                          setSelectedRequestForDetail(request);
-                                          setSelectedRequestInquiryId(inquiry.id);
-                                          setShowRequestDetailModal(true);
-                                        }}
-                                        className={`hover:bg-gray-50/50 transition-colors cursor-pointer ${request.priority === "High"
-                                          ? "bg-red-50/50"
-                                          : ""
-                                          }`}
-                                      >
-                                        <td className="px-4 py-3">
-                                          <div className="w-[8rem]">
-                                            <div className="text-sm font-medium text-gray-900">
-                                              {request.itemName}
-                                            </div>
-                                            {request.itemNo && (
-                                              <div className="text-[10px] font-mono text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded font-semibold inline-block mt-0.5">
-                                                {request.itemNo}
+                                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                          Status
+                                        </th>
+                                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                          Priority
+                                        </th>
+                                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                          Asana
+                                        </th>
+                                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                          Actions
+                                        </th>
+                                      </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-200">
+                                      {inquiry.requests.map((request: any) => (
+                                        <tr
+                                          key={request.id}
+                                          onClick={() => {
+                                            setSelectedRequestForDetail(request);
+                                            setSelectedRequestInquiryId(inquiry.id);
+                                            setShowRequestDetailModal(true);
+                                          }}
+                                          className={`hover:bg-gray-50/50 transition-colors cursor-pointer ${request.priority === "High"
+                                            ? "bg-red-50/50"
+                                            : ""
+                                            }`}
+                                        >
+                                          <td className="px-4 py-3">
+                                            <div className="w-[8rem]">
+                                              <div className="text-sm font-medium text-gray-900">
+                                                {request.itemName}
                                               </div>
-                                            )}
-                                          </div>
-                                        </td>
-                                        {inquiry.isAssembly && (
-                                          <td className="px-3 py-3 text-center">
-                                            <div className="w-10 h-10 rounded border border-gray-200 bg-gray-50 flex items-center justify-center mx-auto">
-                                              {request.images && request.images.length > 0 ? (
-                                                <img
-                                                  src={request.images[0]}
-                                                  alt="Item"
-                                                  className="w-full h-full object-cover rounded cursor-pointer hover:scale-105 transition-transform"
-                                                  onClick={(e) => { e.stopPropagation(); window.open(request.images![0], "_blank"); }}
-                                                  title="View image"
-                                                />
-                                              ) : (
-                                                <PhotoIcon className="w-5 h-5 text-gray-300" title="No image available" />
+                                              {request.itemNo && (
+                                                <div className="text-[10px] font-mono text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded font-semibold inline-block mt-0.5">
+                                                  {request.itemNo}
+                                                </div>
                                               )}
                                             </div>
                                           </td>
-                                        )}
-                                        <td className="px-4 py-3 text-center">
-                                          <div className="text-sm font-medium text-gray-900">
-                                            {request.qty} / {request.interval}
-                                          </div>
-                                        </td>
-                                        <td className="px-4 py-3 text-center">
-                                          <div className="text-sm font-medium text-gray-900">
-                                            {request.targetPrice !== undefined && request.targetPrice !== null
-                                              ? `${request.targetPrice} €`
-                                              : "-"}
-                                          </div>
-                                        </td>
-                                        <td className="px-4 py-3 text-center">
-                                          <div className="text-sm font-bold text-blue-600">
-                                            {request.annualPotentialKEur !== undefined && request.annualPotentialKEur !== null
-                                              ? Math.round(request.annualPotentialKEur)
-                                              : "-"}
-                                          </div>
-                                        </td>
-                                        <td className="px-4 py-3 text-center">
-                                          <select
-                                            value={request.requestStatus}
-                                            onClick={(e) => e.stopPropagation()}
-                                            onChange={async (e: any) => {
-                                              const nextStatus = e.target.value;
-
-                                              setInquiries((prevInquiries) =>
-                                                prevInquiries.map((inq) => ({
-                                                  ...inq,
-                                                  requests: inq.requests?.map(
-                                                    (req: any) =>
-                                                      req.id === request.id
-                                                        ? {
-                                                          ...req,
-                                                          requestStatus:
-                                                            nextStatus,
-                                                        }
-                                                        : req,
-                                                  ),
-                                                })),
-                                              );
-
-                                              setAllInquiries(
-                                                (prevAllInquiries) =>
-                                                  prevAllInquiries.map(
-                                                    (inq) => ({
-                                                      ...inq,
-                                                      requests:
-                                                        inq.requests?.map(
-                                                          (req: any) =>
-                                                            req.id ===
-                                                              request.id
-                                                              ? {
-                                                                ...req,
-                                                                requestStatus:
-                                                                  nextStatus,
-                                                              }
-                                                              : req,
-                                                        ),
-                                                    }),
-                                                  ),
-                                              );
-
-                                              try {
-                                                await updateRequestedItem(
-                                                  request.id,
-                                                  {
-                                                    requestStatus: nextStatus,
-                                                  },
-                                                );
-
-                                                fetchInquiries();
-                                              } catch (error) {
-                                                fetchInquiries();
-                                              }
-                                            }}
-                                            className={`text-xs px-2 py-1 rounded-full font-medium border-0 cursor-pointer ${getRequestStatusColor(
-                                              request.requestStatus,
-                                            )}`}
-                                          >
-                                            {getAvailableRequestStatuses().map(
-                                              (status) => (
-                                                <option
-                                                  key={status.value}
-                                                  value={status.value}
-                                                >
-                                                  {status.label}
-                                                </option>
-                                              ),
-                                            )}
-                                          </select>
-                                        </td>
-                                        <td className="px-4 py-3 text-center">
-                                          <span
-                                            className={`text-xs px-2 py-1 rounded-full font-medium ${getRequestPriorityColor(
-                                              request.priority,
-                                            )}`}
-                                          >
-                                            {request.priority}
-                                          </span>
-                                        </td>
-                                        <td className="px-4 py-3 text-center">
-                                          {request.asanaLink ? (
-                                            <button
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                window.open(
-                                                  request.asanaLink,
-                                                  "_blank",
-                                                );
-                                              }}
-                                              className="text-purple-500 hover:text-purple-700 transition-colors p-1"
-                                              title="Open Asana link"
-                                            >
-                                              <svg
-                                                className="h-4 w-4"
-                                                viewBox="0 0 24 24"
-                                                fill="currentColor"
-                                              >
-                                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z" />
-                                                <circle
-                                                  cx="12"
-                                                  cy="8.5"
-                                                  r="1.5"
-                                                />
-                                                <circle
-                                                  cx="8.5"
-                                                  cy="14.5"
-                                                  r="1.5"
-                                                />
-                                                <circle
-                                                  cx="15.5"
-                                                  cy="14.5"
-                                                  r="1.5"
-                                                />
-                                              </svg>
-                                            </button>
-                                          ) : (
-                                            <span
-                                              className="text-red-500 font-bold text-lg animate-pulse"
-                                              title="Missing Asana Link"
-                                            >
-                                              !
-                                            </span>
+                                          {inquiry.isAssembly && (
+                                            <td className="px-3 py-3 text-center">
+                                              <div className="w-10 h-10 rounded border border-gray-200 bg-gray-50 flex items-center justify-center mx-auto">
+                                                {request.images && request.images.length > 0 ? (
+                                                  <img
+                                                    src={request.images[0]}
+                                                    alt="Item"
+                                                    className="w-full h-full object-cover rounded cursor-pointer hover:scale-105 transition-transform"
+                                                    onClick={(e) => { e.stopPropagation(); window.open(request.images![0], "_blank"); }}
+                                                    title="View image"
+                                                  />
+                                                ) : (
+                                                  <PhotoIcon className="w-5 h-5 text-gray-300" title="No image available" />
+                                                )}
+                                              </div>
+                                            </td>
                                           )}
-                                        </td>
-                                        <td className="px-4 py-3">
-                                          <div className="flex items-center justify-center gap-2">
-                                            <button
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                handleConvertRequestClick(
-                                                  request,
-                                                  inquiry.id,
+                                          <td className="px-4 py-3 text-center">
+                                            <div className="text-sm font-medium text-gray-900">
+                                              {request.qty} / {request.interval}
+                                            </div>
+                                          </td>
+                                          <td className="px-4 py-3 text-center">
+                                            <div className="text-sm font-medium text-gray-900">
+                                              {request.targetPrice !== undefined && request.targetPrice !== null
+                                                ? `${request.targetPrice} €`
+                                                : "-"}
+                                            </div>
+                                          </td>
+                                          <td className="px-4 py-3 text-center">
+                                            <div className="text-sm font-bold text-blue-600">
+                                              {request.annualPotentialKEur !== undefined && request.annualPotentialKEur !== null
+                                                ? Math.round(request.annualPotentialKEur)
+                                                : "-"}
+                                            </div>
+                                          </td>
+                                          <td className="px-4 py-3 text-center">
+                                            <select
+                                              value={request.requestStatus}
+                                              onClick={(e) => e.stopPropagation()}
+                                              onChange={async (e: any) => {
+                                                const nextStatus = e.target.value;
+
+                                                setInquiries((prevInquiries) =>
+                                                  prevInquiries.map((inq) => ({
+                                                    ...inq,
+                                                    requests: inq.requests?.map(
+                                                      (req: any) =>
+                                                        req.id === request.id
+                                                          ? {
+                                                            ...req,
+                                                            requestStatus:
+                                                              nextStatus,
+                                                          }
+                                                          : req,
+                                                    ),
+                                                  })),
                                                 );
+
+                                                setAllInquiries(
+                                                  (prevAllInquiries) =>
+                                                    prevAllInquiries.map(
+                                                      (inq) => ({
+                                                        ...inq,
+                                                        requests:
+                                                          inq.requests?.map(
+                                                            (req: any) =>
+                                                              req.id ===
+                                                                request.id
+                                                                ? {
+                                                                  ...req,
+                                                                  requestStatus:
+                                                                    nextStatus,
+                                                                }
+                                                                : req,
+                                                          ),
+                                                      }),
+                                                    ),
+                                                );
+
+                                                try {
+                                                  await updateRequestedItem(
+                                                    request.id,
+                                                    {
+                                                      requestStatus: nextStatus,
+                                                    },
+                                                  );
+
+                                                  fetchInquiries();
+                                                } catch (error) {
+                                                  fetchInquiries();
+                                                }
                                               }}
-                                              className="px-2 py-1 text-xs bg-green-500 text-white rounded hover:bg-green-600 transition-all flex items-center gap-1"
-                                              title="Convert to item"
+                                              className={`text-xs px-2 py-1 rounded-full font-medium border-0 cursor-pointer ${getRequestStatusColor(
+                                                request.requestStatus,
+                                              )}`}
                                             >
-                                              <ArrowRightIcon className="h-3 w-3" />
-                                              Convert
-                                            </button>
-                                          </div>
-                                        </td>
-                                      </tr>
-                                    ))}
-                                  </tbody>
-                                </table>
+                                              {getAvailableRequestStatuses().map(
+                                                (status) => (
+                                                  <option
+                                                    key={status.value}
+                                                    value={status.value}
+                                                  >
+                                                    {status.label}
+                                                  </option>
+                                                ),
+                                              )}
+                                            </select>
+                                          </td>
+                                          <td className="px-4 py-3 text-center">
+                                            <span
+                                              className={`text-xs px-2 py-1 rounded-full font-medium ${getRequestPriorityColor(
+                                                request.priority,
+                                              )}`}
+                                            >
+                                              {request.priority}
+                                            </span>
+                                          </td>
+                                          <td className="px-4 py-3 text-center">
+                                            {request.asanaLink ? (
+                                              <button
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  window.open(
+                                                    request.asanaLink,
+                                                    "_blank",
+                                                  );
+                                                }}
+                                                className="text-purple-500 hover:text-purple-700 transition-colors p-1"
+                                                title="Open Asana link"
+                                              >
+                                                <svg
+                                                  className="h-4 w-4"
+                                                  viewBox="0 0 24 24"
+                                                  fill="currentColor"
+                                                >
+                                                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z" />
+                                                  <circle
+                                                    cx="12"
+                                                    cy="8.5"
+                                                    r="1.5"
+                                                  />
+                                                  <circle
+                                                    cx="8.5"
+                                                    cy="14.5"
+                                                    r="1.5"
+                                                  />
+                                                  <circle
+                                                    cx="15.5"
+                                                    cy="14.5"
+                                                    r="1.5"
+                                                  />
+                                                </svg>
+                                              </button>
+                                            ) : (
+                                              <span
+                                                className="text-red-500 font-bold text-lg animate-pulse"
+                                                title="Missing Asana Link"
+                                              >
+                                                !
+                                              </span>
+                                            )}
+                                          </td>
+                                          <td className="px-4 py-3">
+                                            <div className="flex items-center justify-center gap-2">
+                                              <button
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  handleConvertRequestClick(
+                                                    request,
+                                                    inquiry.id,
+                                                  );
+                                                }}
+                                                className="px-2 py-1 text-xs bg-green-500 text-white rounded hover:bg-green-600 transition-all flex items-center gap-1"
+                                                title="Convert to item"
+                                              >
+                                                <ArrowRightIcon className="h-3 w-3" />
+                                                Convert
+                                              </button>
+                                            </div>
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
                               </div>
-                            </div>
-                          </td>
-                        </tr>
+                            </td>
+                          </tr>
                         ) : (
                           <tr className="bg-gray-50/30">
                             <td colSpan={totalCols} className="px-6 py-5 text-center">
@@ -1872,7 +1869,7 @@ const CombinedInquiriesPageContent = () => {
                             </td>
                           </tr>
                         )
-                        )}
+                      )}
                     </React.Fragment>
                   ))}
                 </tbody>
@@ -1959,1516 +1956,1516 @@ const CombinedInquiriesPageContent = () => {
         noPadding={true}
         width="max-w-4xl"
       >
-            <ModalHeader
-              entityName="Inquiry"
-              entityNo={inquiryModalMode === "edit" ? inquiryFormData.inquiryNo : null}
-              icon={ClipboardDocumentListIcon}
-              isEditMode={inquiryModalMode === "edit"}
-              isEditEnabled={editModeEnabled}
-              onToggleEdit={() => setEditModeEnabled(!editModeEnabled)}
-              onClose={() => {
-                setShowCreateModal(false);
-                resetInquiryForm();
-              }}
-              extraHeaderElements={(() => {
-                let total = 0;
-                inquiryRequests.forEach((req: any) => {
-                  const qty = parseInt(req.qty) || 0;
-                  const targetPrice = parseFloat(req.targetPrice) || 0;
-                  let factor = 12;
-                  const interval = req.interval || "Monatlich";
-                  const normalized = interval.toLowerCase().trim();
-                  if (normalized === "jährlich" || normalized === "jaehrlich" || normalized === "yearly") {
-                    factor = 1;
-                  } else if (normalized === "halbjährlich" || normalized === "halbjaehrlich" || normalized === "half-yearly" || normalized === "half yearly" || normalized === "biannually") {
-                    factor = 2;
-                  } else if (normalized === "quartal" || normalized === "quarterly") {
-                    factor = 4;
-                  } else if (normalized === "2 monatlich" || normalized === "bimonthly") {
-                    factor = 6;
-                  } else if (normalized === "monatlich" || normalized === "monthly") {
-                    factor = 12;
-                  }
-                  const annual = qty * targetPrice * factor;
-                  total += (annual / 1000);
-                });
-                return (
-                  <span className="bg-blue-50 border border-blue-200 text-blue-800 text-xs px-2.5 py-1 rounded-full font-bold">
-                    Potential: {total.toFixed(2)} k €
-                  </span>
-                );
-              })()}
-            />
-            <div className="p-6 flex-1 overflow-y-auto">
-              <div className="space-y-6">
-                <div
-                  className={`rounded-xl p-4 -mx-4 transition-colors duration-300 ${inquiryFormData.isAssembly
-                    ? "bg-red-50 border border-red-200/70"
-                    : "bg-transparent"
-                    }`}
-                >
+        <ModalHeader
+          entityName="Inquiry"
+          entityNo={inquiryModalMode === "edit" ? inquiryFormData.inquiryNo : null}
+          icon={ClipboardDocumentListIcon}
+          isEditMode={inquiryModalMode === "edit"}
+          isEditEnabled={editModeEnabled}
+          onToggleEdit={() => setEditModeEnabled(!editModeEnabled)}
+          onClose={() => {
+            setShowCreateModal(false);
+            resetInquiryForm();
+          }}
+          extraHeaderElements={(() => {
+            let total = 0;
+            inquiryRequests.forEach((req: any) => {
+              const qty = parseInt(req.qty) || 0;
+              const targetPrice = parseFloat(req.targetPrice) || 0;
+              let factor = 12;
+              const interval = req.interval || "Monatlich";
+              const normalized = interval.toLowerCase().trim();
+              if (normalized === "jährlich" || normalized === "jaehrlich" || normalized === "yearly") {
+                factor = 1;
+              } else if (normalized === "halbjährlich" || normalized === "halbjaehrlich" || normalized === "half-yearly" || normalized === "half yearly" || normalized === "biannually") {
+                factor = 2;
+              } else if (normalized === "quartal" || normalized === "quarterly") {
+                factor = 4;
+              } else if (normalized === "2 monatlich" || normalized === "bimonthly") {
+                factor = 6;
+              } else if (normalized === "monatlich" || normalized === "monthly") {
+                factor = 12;
+              }
+              const annual = qty * targetPrice * factor;
+              total += (annual / 1000);
+            });
+            return (
+              <span className="bg-blue-50 border border-blue-200 text-blue-800 text-xs px-2.5 py-1 rounded-full font-bold">
+                Potential: {total.toFixed(2)} k €
+              </span>
+            );
+          })()}
+        />
+        <div className="p-6 flex-1 overflow-y-auto">
+          <div className="space-y-6">
+            <div
+              className={`rounded-xl p-4 -mx-4 transition-colors duration-300 ${inquiryFormData.isAssembly
+                ? "bg-red-50 border border-red-200/70"
+                : "bg-transparent"
+                }`}
+            >
+              <div>
+                <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                          Customer *
-                        </label>
-                        <select
-                          value={inquiryFormData.customerId}
-                          onChange={(e) =>
-                            setInquiryFormData({
-                              ...inquiryFormData,
-                              customerId: e.target.value,
-                            })
-                          }
-                          disabled={
-                            inquiryModalMode === "edit" && !editModeEnabled
-                          }
-                          className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                        >
-                          <option value="">Select Customer</option>
-                          {customers.map((customer) => (
-                            <option key={customer.id} value={customer.id}>
-                              {customer.companyName || customer.legalName}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                          Contact Person
-                        </label>
-                        <select
-                          value={inquiryFormData.contactPersonId}
-                          onChange={(e) =>
-                            setInquiryFormData({
-                              ...inquiryFormData,
-                              contactPersonId: e.target.value,
-                            })
-                          }
-                          disabled={
-                            inquiryModalMode === "edit" && !editModeEnabled
-                          }
-                          className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                        >
-                          <option value="">Select Contact Person</option>
-                          {contactPersons
-                            .filter(
-                              (person) =>
-                                person.businessId ===
-                                inquiryFormData.customerId,
-                            )
-                            .map((person) => (
-                              <option key={person.id} value={person.id}>
-                                {person.name} {person.familyName}
-                              </option>
-                            ))}
-                        </select>
-                      </div>
-                      <div className="col-span-2">
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                          Inquiry Name *
-                        </label>
-                        <input
-                          type="text"
-                          value={inquiryFormData.name}
-                          onChange={(e) =>
-                            setInquiryFormData({
-                              ...inquiryFormData,
-                              name: e.target.value,
-                            })
-                          }
-                          disabled={
-                            inquiryModalMode === "edit" && !editModeEnabled
-                          }
-                          className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed font-medium"
-                          placeholder="PT0171 - Untere Schiebemuffe"
-                        />
-                      </div>
-                      {inquiryFormData.inquiryNo && (
-                        <div className="col-span-1">
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Customer *
+                    </label>
+                    <select
+                      value={inquiryFormData.customerId}
+                      onChange={(e) =>
+                        setInquiryFormData({
+                          ...inquiryFormData,
+                          customerId: e.target.value,
+                        })
+                      }
+                      disabled={
+                        inquiryModalMode === "edit" && !editModeEnabled
+                      }
+                      className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    >
+                      <option value="">Select Customer</option>
+                      {customers.map((customer) => (
+                        <option key={customer.id} value={customer.id}>
+                          {customer.companyName || customer.legalName}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Contact Person
+                    </label>
+                    <select
+                      value={inquiryFormData.contactPersonId}
+                      onChange={(e) =>
+                        setInquiryFormData({
+                          ...inquiryFormData,
+                          contactPersonId: e.target.value,
+                        })
+                      }
+                      disabled={
+                        inquiryModalMode === "edit" && !editModeEnabled
+                      }
+                      className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    >
+                      <option value="">Select Contact Person</option>
+                      {contactPersons
+                        .filter(
+                          (person) =>
+                            person.businessId ===
+                            inquiryFormData.customerId,
+                        )
+                        .map((person) => (
+                          <option key={person.id} value={person.id}>
+                            {person.name} {person.familyName}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Inquiry Name *
+                    </label>
+                    <input
+                      type="text"
+                      value={inquiryFormData.name}
+                      onChange={(e) =>
+                        setInquiryFormData({
+                          ...inquiryFormData,
+                          name: e.target.value,
+                        })
+                      }
+                      disabled={
+                        inquiryModalMode === "edit" && !editModeEnabled
+                      }
+                      className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed font-medium"
+                      placeholder="PT0171 - Untere Schiebemuffe"
+                    />
+                  </div>
+                  {inquiryFormData.inquiryNo && (
+                    <div className="col-span-1">
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        Inquiry Number
+                      </label>
+                      <input
+                        type="text"
+                        value={inquiryFormData.inquiryNo}
+                        disabled
+                        className="w-full px-3 py-2 text-sm border border-gray-300 bg-gray-100 rounded-lg font-mono font-semibold text-gray-600 cursor-not-allowed"
+                      />
+                    </div>
+                  )}
+                  <div className={inquiryFormData.inquiryNo ? "col-span-1" : "col-span-2"}>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Status
+                    </label>
+                    <select
+                      value={inquiryFormData.status}
+                      onChange={(e) =>
+                        setInquiryFormData({
+                          ...inquiryFormData,
+                          status: e.target.value as any,
+                        })
+                      }
+                      disabled={
+                        inquiryModalMode === "edit" && !editModeEnabled
+                      }
+                      className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    >
+                      {getInquiryStatuses().map((status) => (
+                        <option key={status.value} value={status.value}>
+                          {status.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Description
+                    </label>
+                    <textarea
+                      value={inquiryFormData.description}
+                      onChange={(e) =>
+                        setInquiryFormData({
+                          ...inquiryFormData,
+                          description: e.target.value,
+                        })
+                      }
+                      disabled={
+                        inquiryModalMode === "edit" && !editModeEnabled
+                      }
+                      rows={2}
+                      className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                      placeholder="Enter inquiry description"
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Tags
+                    </label>
+                    {inquiryModalMode === "create" ? (
+                      <TagPickerInput
+                        category="inquiry"
+                        selectedTags={newInquiryTags}
+                        onChange={setNewInquiryTags}
+                      />
+                    ) : (
+                      <EntityTagSelector
+                        entityId={editingInquiryId!}
+                        entityType="inquiry"
+                        initialTags={(inquiryFormData as any).tags || []}
+                        tagOrder={(inquiryFormData as any).tagOrder}
+                        onTagsUpdated={(updatedTags) =>
+                          setInquiryFormData((prev: any) => ({
+                            ...prev,
+                            tags: updatedTags,
+                            tagOrder: updatedTags.map((t) => t.id).join(","),
+                          }))
+                        }
+                        disabled={!editModeEnabled}
+                      />
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Owner
+                    </label>
+                    <select
+                      value={inquiryFormData.owner_user_id || ""}
+                      onChange={(e) =>
+                        setInquiryFormData({
+                          ...inquiryFormData,
+                          owner_user_id: e.target.value,
+                        })
+                      }
+                      disabled={
+                        inquiryModalMode === "edit" && !editModeEnabled
+                      }
+                      className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    >
+                      <option value="">Select Owner</option>
+                      {users.map((u) => (
+                        <option key={u.id} value={u.id}>
+                          {u.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Next Action
+                    </label>
+                    <input
+                      type="text"
+                      value={inquiryFormData.next_action || ""}
+                      onChange={(e) =>
+                        setInquiryFormData({
+                          ...inquiryFormData,
+                          next_action: e.target.value,
+                        })
+                      }
+                      disabled={
+                        inquiryModalMode === "edit" && !editModeEnabled
+                      }
+                      className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                      placeholder="e.g. Call client"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Follow-up Date
+                    </label>
+                    <input
+                      type="date"
+                      value={
+                        inquiryFormData.next_followup_at
+                          ? new Date(inquiryFormData.next_followup_at).toISOString().split("T")[0]
+                          : ""
+                      }
+                      onChange={(e) =>
+                        setInquiryFormData({
+                          ...inquiryFormData,
+                          next_followup_at: e.target.value || undefined,
+                        })
+                      }
+                      disabled={
+                        inquiryModalMode === "edit" && !editModeEnabled
+                      }
+                      className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <div
+                      className={`flex items-center gap-2 p-2 border rounded-lg transition-colors duration-200 ${inquiryFormData.isAssembly ? "border-orange-300 bg-orange-100" : "border-gray-200 bg-gray-50"}`}
+                    >
+                      <input
+                        type="checkbox"
+                        id="isAssembly"
+                        checked={inquiryFormData.isAssembly}
+                        onChange={(e) =>
+                          setInquiryFormData({
+                            ...inquiryFormData,
+                            isAssembly: e.target.checked,
+                          })
+                        }
+                        disabled={
+                          inquiryModalMode === "edit" && !editModeEnabled
+                        }
+                        className="h-4 w-4 text-orange-600 rounded focus:ring-orange-500"
+                      />
+                      <label
+                        htmlFor="isAssembly"
+                        className="text-xs font-medium text-gray-700"
+                      >
+                        This is an assembly item
+                      </label>
+                    </div>
+                  </div>
+                  {false && inquiryFormData.isAssembly && (
+                    <div className="col-span-2 bg-orange-100/50 border border-orange-200 rounded-xl p-4 mt-2 space-y-4">
+                      <div className="grid grid-cols-3 gap-3">
+                        <div>
                           <label className="block text-xs font-medium text-gray-700 mb-1">
-                            Inquiry Number
+                            ItemName*
                           </label>
                           <input
                             type="text"
-                            value={inquiryFormData.inquiryNo}
-                            disabled
-                            className="w-full px-3 py-2 text-sm border border-gray-300 bg-gray-100 rounded-lg font-mono font-semibold text-gray-600 cursor-not-allowed"
+                            value={inquiryFormData.name}
+                            readOnly
+                            className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
                           />
                         </div>
-                      )}
-                      <div className={inquiryFormData.inquiryNo ? "col-span-1" : "col-span-2"}>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                          Status
-                        </label>
-                        <select
-                          value={inquiryFormData.status}
-                          onChange={(e) =>
-                            setInquiryFormData({
-                              ...inquiryFormData,
-                              status: e.target.value as any,
-                            })
-                          }
-                          disabled={
-                            inquiryModalMode === "edit" && !editModeEnabled
-                          }
-                          className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                        >
-                          {getInquiryStatuses().map((status) => (
-                            <option key={status.value} value={status.value}>
-                              {status.label}
-                            </option>
-                          ))}
-                        </select>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            ItemNo*
+                          </label>
+                          <input
+                            type="text"
+                            value={inquiryFormData.itemNo || ""}
+                            onChange={(e) =>
+                              setInquiryFormData({
+                                ...inquiryFormData,
+                                itemNo: e.target.value,
+                              })
+                            }
+                            disabled={
+                              inquiryModalMode === "edit" &&
+                              !editModeEnabled
+                            }
+                            className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-orange-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                            placeholder="Enter item number"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            Prio
+                          </label>
+                          <select
+                            value={inquiryFormData.priority}
+                            onChange={(e) =>
+                              setInquiryFormData({
+                                ...inquiryFormData,
+                                priority: e.target.value as any,
+                              })
+                            }
+                            disabled={
+                              inquiryModalMode === "edit" &&
+                              !editModeEnabled
+                            }
+                            className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-orange-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                          >
+                            {getPriorityOptions().map((priority) => (
+                              <option
+                                key={priority.value}
+                                value={priority.value}
+                              >
+                                {priority.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
                       </div>
-                      <div className="col-span-2">
+                      <div className="grid grid-cols-4 gap-3">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            Qty
+                          </label>
+                          <input
+                            type="number"
+                            value={inquiryFormData.qty || 1}
+                            onChange={(e) =>
+                              setInquiryFormData({
+                                ...inquiryFormData,
+                                qty: parseInt(e.target.value) || 1,
+                              })
+                            }
+                            disabled={
+                              inquiryModalMode === "edit" &&
+                              !editModeEnabled
+                            }
+                            className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-orange-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                            min="1"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            Interval
+                          </label>
+                          <select
+                            value={inquiryFormData.interval || "Monatlich"}
+                            onChange={(e) =>
+                              setInquiryFormData({
+                                ...inquiryFormData,
+                                interval: e.target.value,
+                              })
+                            }
+                            disabled={
+                              inquiryModalMode === "edit" &&
+                              !editModeEnabled
+                            }
+                            className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-orange-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                          >
+                            {getAvailableIntervals().map((interval) => (
+                              <option
+                                key={interval.value}
+                                value={interval.value}
+                              >
+                                {interval.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            Asana Link
+                          </label>
+                          <input
+                            type="text"
+                            value={inquiryFormData.asanaLink || ""}
+                            onChange={(e) =>
+                              setInquiryFormData({
+                                ...inquiryFormData,
+                                asanaLink: e.target.value,
+                              })
+                            }
+                            disabled={
+                              inquiryModalMode === "edit" &&
+                              !editModeEnabled
+                            }
+                            className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-orange-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                            placeholder="Link to Asana"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            Status
+                          </label>
+                          <select
+                            value={inquiryFormData.requestStatus || "Draft"}
+                            onChange={(e) =>
+                              setInquiryFormData({
+                                ...inquiryFormData,
+                                requestStatus: e.target.value,
+                              })
+                            }
+                            disabled={
+                              inquiryModalMode === "edit" &&
+                              !editModeEnabled
+                            }
+                            className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-orange-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                          >
+                            {getRequestStatuses().map((status) => (
+                              <option
+                                key={status.value}
+                                value={status.value}
+                              >
+                                {status.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-3 gap-3">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            Purchase Price
+                          </label>
+                          <input
+                            type="number"
+                            value={inquiryFormData.purchasePrice || ""}
+                            onChange={(e) =>
+                              setInquiryFormData({
+                                ...inquiryFormData,
+                                purchasePrice:
+                                  parseFloat(e.target.value) || undefined,
+                              })
+                            }
+                            disabled={
+                              inquiryModalMode === "edit" &&
+                              !editModeEnabled
+                            }
+                            className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-orange-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                            step="0.01"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            Currency Purchase
+                          </label>
+                          <select
+                            value={inquiryFormData.purchasePriceCurrency}
+                            onChange={(e) =>
+                              setInquiryFormData({
+                                ...inquiryFormData,
+                                purchasePriceCurrency: e.target
+                                  .value as any,
+                              })
+                            }
+                            disabled={
+                              inquiryModalMode === "edit" &&
+                              !editModeEnabled
+                            }
+                            className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-orange-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                          >
+                            {getAvailableCurrencies().map((currency) => (
+                              <option
+                                key={currency.value}
+                                value={currency.value}
+                              >
+                                {currency.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            TARIC
+                          </label>
+                          <select
+                            value={inquiryFormData.taric || ""}
+                            onChange={(e) =>
+                              setInquiryFormData({
+                                ...inquiryFormData,
+                                taric: e.target.value,
+                              })
+                            }
+                            disabled={
+                              inquiryModalMode === "edit" &&
+                              !editModeEnabled
+                            }
+                            className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-orange-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                          >
+                            <option value="">Select TARIC Code</option>
+                            {tarics.map((taric) => (
+                              <option key={taric.id} value={taric.code}>
+                                {formatTaricDisplay(taric)}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-4 gap-3 border-t border-orange-200/50 pt-3">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            Weight (kg)
+                          </label>
+                          <input
+                            type="number"
+                            value={inquiryFormData.weight || ""}
+                            onChange={(e) =>
+                              setInquiryFormData({
+                                ...inquiryFormData,
+                                weight:
+                                  parseFloat(e.target.value) || undefined,
+                              })
+                            }
+                            disabled={
+                              inquiryModalMode === "edit" &&
+                              !editModeEnabled
+                            }
+                            className="w-full px-2 py-1.5 text-sm border border-gray-300/80 bg-white rounded-lg transition-all"
+                            step="0.001"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            Length (cm)
+                          </label>
+                          <input
+                            type="number"
+                            value={inquiryFormData.length || ""}
+                            onChange={(e) =>
+                              setInquiryFormData({
+                                ...inquiryFormData,
+                                length:
+                                  parseFloat(e.target.value) || undefined,
+                              })
+                            }
+                            disabled={
+                              inquiryModalMode === "edit" &&
+                              !editModeEnabled
+                            }
+                            className="w-full px-2 py-1.5 text-sm border border-gray-300/80 bg-white rounded-lg transition-all"
+                            step="0.1"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            Width (cm)
+                          </label>
+                          <input
+                            type="number"
+                            value={inquiryFormData.width || ""}
+                            onChange={(e) =>
+                              setInquiryFormData({
+                                ...inquiryFormData,
+                                width:
+                                  parseFloat(e.target.value) || undefined,
+                              })
+                            }
+                            disabled={
+                              inquiryModalMode === "edit" &&
+                              !editModeEnabled
+                            }
+                            className="w-full px-2 py-1.5 text-sm border border-gray-300/80 bg-white rounded-lg transition-all"
+                            step="0.1"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            Height (cm)
+                          </label>
+                          <input
+                            type="number"
+                            value={inquiryFormData.height || ""}
+                            onChange={(e) =>
+                              setInquiryFormData({
+                                ...inquiryFormData,
+                                height:
+                                  parseFloat(e.target.value) || undefined,
+                              })
+                            }
+                            disabled={
+                              inquiryModalMode === "edit" &&
+                              !editModeEnabled
+                            }
+                            className="w-full px-2 py-1.5 text-sm border border-gray-300/80 bg-white rounded-lg transition-all"
+                            step="0.1"
+                          />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-3 gap-3 border-t border-orange-200/50 pt-3">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            Urgency (text field)
+                          </label>
+                          <textarea
+                            value={inquiryFormData.urgency1 || ""}
+                            onChange={(e) =>
+                              setInquiryFormData({
+                                ...inquiryFormData,
+                                urgency1: e.target.value,
+                              })
+                            }
+                            disabled={
+                              inquiryModalMode === "edit" &&
+                              !editModeEnabled
+                            }
+                            rows={3}
+                            className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white rounded-lg transition-all"
+                            placeholder="Enter urgency details..."
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            Urgency (text field)
+                          </label>
+                          <textarea
+                            value={inquiryFormData.urgency2 || ""}
+                            onChange={(e) =>
+                              setInquiryFormData({
+                                ...inquiryFormData,
+                                urgency2: e.target.value,
+                              })
+                            }
+                            disabled={
+                              inquiryModalMode === "edit" &&
+                              !editModeEnabled
+                            }
+                            rows={3}
+                            className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white rounded-lg transition-all"
+                            placeholder="Enter quality criteria / urgency..."
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            Pain Points (tags)
+                          </label>
+                          <div className="min-h-[80px] p-2 border border-gray-300/80 bg-white rounded-lg focus-within:ring-2 focus-within:ring-orange-500/50 transition-all">
+                            <div className="flex flex-wrap gap-1 mb-2">
+                              {inquiryFormData.painPoints?.map((tag, i) => (
+                                <span
+                                  key={i}
+                                  className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-50 text-orange-800 border border-orange-200"
+                                >
+                                  {tag}
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setInquiryFormData({
+                                        ...inquiryFormData,
+                                        painPoints:
+                                          inquiryFormData.painPoints?.filter(
+                                            (_, idx) => idx !== i,
+                                          ),
+                                      })
+                                    }
+                                    disabled={
+                                      inquiryModalMode === "edit" &&
+                                      !editModeEnabled
+                                    }
+                                    className="ml-1 text-orange-400 hover:text-orange-600 focus:outline-none"
+                                  >
+                                    <XMarkIcon className="h-3 w-3" />
+                                  </button>
+                                </span>
+                              ))}
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <input
+                                type="text"
+                                value={inquiryTagInput}
+                                onChange={(e) =>
+                                  setInquiryTagInput(e.target.value)
+                                }
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter" || e.key === ",") {
+                                    e.preventDefault();
+                                    handleAddInquiryPainPoint();
+                                  }
+                                }}
+                                disabled={
+                                  inquiryModalMode === "edit" &&
+                                  !editModeEnabled
+                                }
+                                placeholder="Type tag..."
+                                className="flex-1 text-sm bg-transparent outline-none border-none p-0 focus:ring-0"
+                              />
+                              <button
+                                type="button"
+                                onClick={handleAddInquiryPainPoint}
+                                disabled={
+                                  (inquiryModalMode === "edit" &&
+                                    !editModeEnabled) ||
+                                  !inquiryTagInput.trim()
+                                }
+                                className="p-1 text-orange-500 hover:text-orange-700 transition-colors disabled:text-gray-300"
+                              >
+                                <PlusIcon className="h-5 w-5" />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="pt-2">
                         <label className="block text-xs font-medium text-gray-700 mb-1">
-                          Description
+                          Assembly Instructions
                         </label>
                         <textarea
-                          value={inquiryFormData.description}
+                          value={inquiryFormData.assemblyInstructions}
                           onChange={(e) =>
                             setInquiryFormData({
                               ...inquiryFormData,
-                              description: e.target.value,
+                              assemblyInstructions: e.target.value,
                             })
                           }
                           disabled={
                             inquiryModalMode === "edit" && !editModeEnabled
                           }
                           rows={2}
-                          className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                          placeholder="Enter inquiry description"
+                          className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white rounded-lg transition-all"
+                          placeholder="Enter assembly instructions..."
                         />
                       </div>
-                      <div className="col-span-2">
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                          Tags
-                        </label>
-                        {inquiryModalMode === "create" ? (
-                          <TagPickerInput
-                            category="inquiry"
-                            selectedTags={newInquiryTags}
-                            onChange={setNewInquiryTags}
-                          />
-                        ) : (
-                          <EntityTagSelector
-                            entityId={editingInquiryId!}
-                            entityType="inquiry"
-                            initialTags={(inquiryFormData as any).tags || []}
-                            tagOrder={(inquiryFormData as any).tagOrder}
-                            onTagsUpdated={(updatedTags) =>
-                              setInquiryFormData((prev: any) => ({
-                                ...prev,
-                                tags: updatedTags,
-                                tagOrder: updatedTags.map((t) => t.id).join(","),
-                              }))
-                            }
-                            disabled={!editModeEnabled}
-                          />
-                        )}
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                          Owner
-                        </label>
-                        <select
-                          value={inquiryFormData.owner_user_id || ""}
-                          onChange={(e) =>
-                            setInquiryFormData({
-                              ...inquiryFormData,
-                              owner_user_id: e.target.value,
-                            })
-                          }
-                          disabled={
-                            inquiryModalMode === "edit" && !editModeEnabled
-                          }
-                          className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                        >
-                          <option value="">Select Owner</option>
-                          {users.map((u) => (
-                            <option key={u.id} value={u.id}>
-                              {u.name}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                          Next Action
-                        </label>
-                        <input
-                          type="text"
-                          value={inquiryFormData.next_action || ""}
-                          onChange={(e) =>
-                            setInquiryFormData({
-                              ...inquiryFormData,
-                              next_action: e.target.value,
-                            })
-                          }
-                          disabled={
-                            inquiryModalMode === "edit" && !editModeEnabled
-                          }
-                          className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                          placeholder="e.g. Call client"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                          Follow-up Date
-                        </label>
-                        <input
-                          type="date"
-                          value={
-                            inquiryFormData.next_followup_at
-                              ? new Date(inquiryFormData.next_followup_at).toISOString().split("T")[0]
-                              : ""
-                          }
-                          onChange={(e) =>
-                            setInquiryFormData({
-                              ...inquiryFormData,
-                              next_followup_at: e.target.value || undefined,
-                            })
-                          }
-                          disabled={
-                            inquiryModalMode === "edit" && !editModeEnabled
-                          }
-                          className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                        />
-                      </div>
-                      <div className="col-span-2">
-                        <div
-                          className={`flex items-center gap-2 p-2 border rounded-lg transition-colors duration-200 ${inquiryFormData.isAssembly ? "border-orange-300 bg-orange-100" : "border-gray-200 bg-gray-50"}`}
-                        >
-                          <input
-                            type="checkbox"
-                            id="isAssembly"
-                            checked={inquiryFormData.isAssembly}
-                            onChange={(e) =>
-                              setInquiryFormData({
-                                ...inquiryFormData,
-                                isAssembly: e.target.checked,
-                              })
-                            }
-                            disabled={
-                              inquiryModalMode === "edit" && !editModeEnabled
-                            }
-                            className="h-4 w-4 text-orange-600 rounded focus:ring-orange-500"
-                          />
-                          <label
-                            htmlFor="isAssembly"
-                            className="text-xs font-medium text-gray-700"
-                          >
-                            This is an assembly item
-                          </label>
-                        </div>
-                      </div>
-                      {false && inquiryFormData.isAssembly && (
-                        <div className="col-span-2 bg-orange-100/50 border border-orange-200 rounded-xl p-4 mt-2 space-y-4">
-                          <div className="grid grid-cols-3 gap-3">
-                            <div>
-                              <label className="block text-xs font-medium text-gray-700 mb-1">
-                                ItemName*
-                              </label>
-                              <input
-                                type="text"
-                                value={inquiryFormData.name}
-                                readOnly
-                                className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-xs font-medium text-gray-700 mb-1">
-                                ItemNo*
-                              </label>
-                              <input
-                                type="text"
-                                value={inquiryFormData.itemNo || ""}
-                                onChange={(e) =>
-                                  setInquiryFormData({
-                                    ...inquiryFormData,
-                                    itemNo: e.target.value,
-                                  })
-                                }
-                                disabled={
-                                  inquiryModalMode === "edit" &&
-                                  !editModeEnabled
-                                }
-                                className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-orange-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                                placeholder="Enter item number"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-xs font-medium text-gray-700 mb-1">
-                                Prio
-                              </label>
-                              <select
-                                value={inquiryFormData.priority}
-                                onChange={(e) =>
-                                  setInquiryFormData({
-                                    ...inquiryFormData,
-                                    priority: e.target.value as any,
-                                  })
-                                }
-                                disabled={
-                                  inquiryModalMode === "edit" &&
-                                  !editModeEnabled
-                                }
-                                className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-orange-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                              >
-                                {getPriorityOptions().map((priority) => (
-                                  <option
-                                    key={priority.value}
-                                    value={priority.value}
-                                  >
-                                    {priority.label}
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
-                          </div>
-                          <div className="grid grid-cols-4 gap-3">
-                            <div>
-                              <label className="block text-xs font-medium text-gray-700 mb-1">
-                                Qty
-                              </label>
-                              <input
-                                type="number"
-                                value={inquiryFormData.qty || 1}
-                                onChange={(e) =>
-                                  setInquiryFormData({
-                                    ...inquiryFormData,
-                                    qty: parseInt(e.target.value) || 1,
-                                  })
-                                }
-                                disabled={
-                                  inquiryModalMode === "edit" &&
-                                  !editModeEnabled
-                                }
-                                className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-orange-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                                min="1"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-xs font-medium text-gray-700 mb-1">
-                                Interval
-                              </label>
-                              <select
-                                value={inquiryFormData.interval || "Monatlich"}
-                                onChange={(e) =>
-                                  setInquiryFormData({
-                                    ...inquiryFormData,
-                                    interval: e.target.value,
-                                  })
-                                }
-                                disabled={
-                                  inquiryModalMode === "edit" &&
-                                  !editModeEnabled
-                                }
-                                className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-orange-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                              >
-                                {getAvailableIntervals().map((interval) => (
-                                  <option
-                                    key={interval.value}
-                                    value={interval.value}
-                                  >
-                                    {interval.label}
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
-                            <div>
-                              <label className="block text-xs font-medium text-gray-700 mb-1">
-                                Asana Link
-                              </label>
-                              <input
-                                type="text"
-                                value={inquiryFormData.asanaLink || ""}
-                                onChange={(e) =>
-                                  setInquiryFormData({
-                                    ...inquiryFormData,
-                                    asanaLink: e.target.value,
-                                  })
-                                }
-                                disabled={
-                                  inquiryModalMode === "edit" &&
-                                  !editModeEnabled
-                                }
-                                className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-orange-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                                placeholder="Link to Asana"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-xs font-medium text-gray-700 mb-1">
-                                Status
-                              </label>
-                              <select
-                                value={inquiryFormData.requestStatus || "Draft"}
-                                onChange={(e) =>
-                                  setInquiryFormData({
-                                    ...inquiryFormData,
-                                    requestStatus: e.target.value,
-                                  })
-                                }
-                                disabled={
-                                  inquiryModalMode === "edit" &&
-                                  !editModeEnabled
-                                }
-                                className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-orange-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                              >
-                                {getRequestStatuses().map((status) => (
-                                  <option
-                                    key={status.value}
-                                    value={status.value}
-                                  >
-                                    {status.label}
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
-                          </div>
-                          <div className="grid grid-cols-3 gap-3">
-                            <div>
-                              <label className="block text-xs font-medium text-gray-700 mb-1">
-                                Purchase Price
-                              </label>
-                              <input
-                                type="number"
-                                value={inquiryFormData.purchasePrice || ""}
-                                onChange={(e) =>
-                                  setInquiryFormData({
-                                    ...inquiryFormData,
-                                    purchasePrice:
-                                      parseFloat(e.target.value) || undefined,
-                                  })
-                                }
-                                disabled={
-                                  inquiryModalMode === "edit" &&
-                                  !editModeEnabled
-                                }
-                                className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-orange-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                                step="0.01"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-xs font-medium text-gray-700 mb-1">
-                                Currency Purchase
-                              </label>
-                              <select
-                                value={inquiryFormData.purchasePriceCurrency}
-                                onChange={(e) =>
-                                  setInquiryFormData({
-                                    ...inquiryFormData,
-                                    purchasePriceCurrency: e.target
-                                      .value as any,
-                                  })
-                                }
-                                disabled={
-                                  inquiryModalMode === "edit" &&
-                                  !editModeEnabled
-                                }
-                                className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-orange-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                              >
-                                {getAvailableCurrencies().map((currency) => (
-                                  <option
-                                    key={currency.value}
-                                    value={currency.value}
-                                  >
-                                    {currency.label}
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
-                            <div>
-                              <label className="block text-xs font-medium text-gray-700 mb-1">
-                                TARIC
-                              </label>
-                              <select
-                                value={inquiryFormData.taric || ""}
-                                onChange={(e) =>
-                                  setInquiryFormData({
-                                    ...inquiryFormData,
-                                    taric: e.target.value,
-                                  })
-                                }
-                                disabled={
-                                  inquiryModalMode === "edit" &&
-                                  !editModeEnabled
-                                }
-                                className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-orange-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                              >
-                                <option value="">Select TARIC Code</option>
-                                {tarics.map((taric) => (
-                                  <option key={taric.id} value={taric.code}>
-                                    {formatTaricDisplay(taric)}
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
-                          </div>
-                          <div className="grid grid-cols-4 gap-3 border-t border-orange-200/50 pt-3">
-                            <div>
-                              <label className="block text-xs font-medium text-gray-700 mb-1">
-                                Weight (kg)
-                              </label>
-                              <input
-                                type="number"
-                                value={inquiryFormData.weight || ""}
-                                onChange={(e) =>
-                                  setInquiryFormData({
-                                    ...inquiryFormData,
-                                    weight:
-                                      parseFloat(e.target.value) || undefined,
-                                  })
-                                }
-                                disabled={
-                                  inquiryModalMode === "edit" &&
-                                  !editModeEnabled
-                                }
-                                className="w-full px-2 py-1.5 text-sm border border-gray-300/80 bg-white rounded-lg transition-all"
-                                step="0.001"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-xs font-medium text-gray-700 mb-1">
-                                Length (cm)
-                              </label>
-                              <input
-                                type="number"
-                                value={inquiryFormData.length || ""}
-                                onChange={(e) =>
-                                  setInquiryFormData({
-                                    ...inquiryFormData,
-                                    length:
-                                      parseFloat(e.target.value) || undefined,
-                                  })
-                                }
-                                disabled={
-                                  inquiryModalMode === "edit" &&
-                                  !editModeEnabled
-                                }
-                                className="w-full px-2 py-1.5 text-sm border border-gray-300/80 bg-white rounded-lg transition-all"
-                                step="0.1"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-xs font-medium text-gray-700 mb-1">
-                                Width (cm)
-                              </label>
-                              <input
-                                type="number"
-                                value={inquiryFormData.width || ""}
-                                onChange={(e) =>
-                                  setInquiryFormData({
-                                    ...inquiryFormData,
-                                    width:
-                                      parseFloat(e.target.value) || undefined,
-                                  })
-                                }
-                                disabled={
-                                  inquiryModalMode === "edit" &&
-                                  !editModeEnabled
-                                }
-                                className="w-full px-2 py-1.5 text-sm border border-gray-300/80 bg-white rounded-lg transition-all"
-                                step="0.1"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-xs font-medium text-gray-700 mb-1">
-                                Height (cm)
-                              </label>
-                              <input
-                                type="number"
-                                value={inquiryFormData.height || ""}
-                                onChange={(e) =>
-                                  setInquiryFormData({
-                                    ...inquiryFormData,
-                                    height:
-                                      parseFloat(e.target.value) || undefined,
-                                  })
-                                }
-                                disabled={
-                                  inquiryModalMode === "edit" &&
-                                  !editModeEnabled
-                                }
-                                className="w-full px-2 py-1.5 text-sm border border-gray-300/80 bg-white rounded-lg transition-all"
-                                step="0.1"
-                              />
-                            </div>
-                          </div>
-                          <div className="grid grid-cols-3 gap-3 border-t border-orange-200/50 pt-3">
-                            <div>
-                              <label className="block text-xs font-medium text-gray-700 mb-1">
-                                Urgency (text field)
-                              </label>
-                              <textarea
-                                value={inquiryFormData.urgency1 || ""}
-                                onChange={(e) =>
-                                  setInquiryFormData({
-                                    ...inquiryFormData,
-                                    urgency1: e.target.value,
-                                  })
-                                }
-                                disabled={
-                                  inquiryModalMode === "edit" &&
-                                  !editModeEnabled
-                                }
-                                rows={3}
-                                className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white rounded-lg transition-all"
-                                placeholder="Enter urgency details..."
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-xs font-medium text-gray-700 mb-1">
-                                Urgency (text field)
-                              </label>
-                              <textarea
-                                value={inquiryFormData.urgency2 || ""}
-                                onChange={(e) =>
-                                  setInquiryFormData({
-                                    ...inquiryFormData,
-                                    urgency2: e.target.value,
-                                  })
-                                }
-                                disabled={
-                                  inquiryModalMode === "edit" &&
-                                  !editModeEnabled
-                                }
-                                rows={3}
-                                className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white rounded-lg transition-all"
-                                placeholder="Enter quality criteria / urgency..."
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-xs font-medium text-gray-700 mb-1">
-                                Pain Points (tags)
-                              </label>
-                              <div className="min-h-[80px] p-2 border border-gray-300/80 bg-white rounded-lg focus-within:ring-2 focus-within:ring-orange-500/50 transition-all">
-                                <div className="flex flex-wrap gap-1 mb-2">
-                                  {inquiryFormData.painPoints?.map((tag, i) => (
-                                    <span
-                                      key={i}
-                                      className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-50 text-orange-800 border border-orange-200"
-                                    >
-                                      {tag}
-                                      <button
-                                        type="button"
-                                        onClick={() =>
-                                          setInquiryFormData({
-                                            ...inquiryFormData,
-                                            painPoints:
-                                              inquiryFormData.painPoints?.filter(
-                                                (_, idx) => idx !== i,
-                                              ),
-                                          })
-                                        }
-                                        disabled={
-                                          inquiryModalMode === "edit" &&
-                                          !editModeEnabled
-                                        }
-                                        className="ml-1 text-orange-400 hover:text-orange-600 focus:outline-none"
-                                      >
-                                        <XMarkIcon className="h-3 w-3" />
-                                      </button>
-                                    </span>
-                                  ))}
-                                </div>
-                                <div className="flex items-center gap-1">
-                                  <input
-                                    type="text"
-                                    value={inquiryTagInput}
-                                    onChange={(e) =>
-                                      setInquiryTagInput(e.target.value)
-                                    }
-                                    onKeyDown={(e) => {
-                                      if (e.key === "Enter" || e.key === ",") {
-                                        e.preventDefault();
-                                        handleAddInquiryPainPoint();
-                                      }
-                                    }}
-                                    disabled={
-                                      inquiryModalMode === "edit" &&
-                                      !editModeEnabled
-                                    }
-                                    placeholder="Type tag..."
-                                    className="flex-1 text-sm bg-transparent outline-none border-none p-0 focus:ring-0"
-                                  />
-                                  <button
-                                    type="button"
-                                    onClick={handleAddInquiryPainPoint}
-                                    disabled={
-                                      (inquiryModalMode === "edit" &&
-                                        !editModeEnabled) ||
-                                      !inquiryTagInput.trim()
-                                    }
-                                    className="p-1 text-orange-500 hover:text-orange-700 transition-colors disabled:text-gray-300"
-                                  >
-                                    <PlusIcon className="h-5 w-5" />
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="pt-2">
-                            <label className="block text-xs font-medium text-gray-700 mb-1">
-                              Assembly Instructions
-                            </label>
-                            <textarea
-                              value={inquiryFormData.assemblyInstructions}
-                              onChange={(e) =>
-                                setInquiryFormData({
-                                  ...inquiryFormData,
-                                  assemblyInstructions: e.target.value,
-                                })
-                              }
-                              disabled={
-                                inquiryModalMode === "edit" && !editModeEnabled
-                              }
-                              rows={2}
-                              className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white rounded-lg transition-all"
-                              placeholder="Enter assembly instructions..."
-                            />
-                          </div>
-                        </div>
-                      )}
                     </div>
-                  </div>
+                  )}
                 </div>
-                <div
-                  className={`rounded-xl p-4 -mx-4 transition-colors duration-300 ${inquiryFormData.isAssembly
-                    ? "bg-green-50 border border-green-200/70 mt-2"
-                    : "bg-transparent"
-                    }`}
-                >
-                  <div>
-                    <div className="flex items-center justify-between mb-3">
-                      <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                        <span>Request Items *</span>
-                        <span className="text-xs font-normal text-gray-500">
-                          (At least one request item is required)
-                        </span>
-                      </h3>
+              </div>
+            </div>
+            <div
+              className={`rounded-xl p-4 -mx-4 transition-colors duration-300 ${inquiryFormData.isAssembly
+                ? "bg-green-50 border border-green-200/70 mt-2"
+                : "bg-transparent"
+                }`}
+            >
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                    <span>Request Items *</span>
+                    <span className="text-xs font-normal text-gray-500">
+                      (At least one request item is required)
+                    </span>
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={addNewRequest}
+                    disabled={
+                      inquiryModalMode === "edit" && !editModeEnabled
+                    }
+                    className="px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 transition-all flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <PlusIcon className="h-3 w-3" />
+                    Add Item
+                  </button>
+                </div>
+                <div className="space-y-2">
+                  {inquiryRequests.map((request: any, index: any) => (
+                    <div
+                      key={index}
+                      className={`border rounded-lg overflow-hidden transition-colors duration-300 ${inquiryFormData.isAssembly ? "border-green-200" : "border-gray-200"}`}
+                    >
                       <button
                         type="button"
-                        onClick={addNewRequest}
-                        disabled={
-                          inquiryModalMode === "edit" && !editModeEnabled
-                        }
-                        className="px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 transition-all flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                        onClick={() => toggleRequestExpansion(index)}
+                        className={`w-full px-3 py-2 flex items-center justify-between text-left transition-colors ${expandedRequestIndex === index
+                          ? inquiryFormData.isAssembly
+                            ? "bg-green-100"
+                            : "bg-gray-100"
+                          : inquiryFormData.isAssembly
+                            ? "bg-green-50 hover:bg-green-100"
+                            : "bg-gray-50 hover:bg-gray-100"
+                          }`}
                       >
-                        <PlusIcon className="h-3 w-3" />
-                        Add Item
+                        <div className="flex items-center gap-2">
+                          {expandedRequestIndex === index ? (
+                            <ChevronUpIcon className="h-4 w-4 text-gray-500" />
+                          ) : (
+                            <ChevronDownIcon className="h-4 w-4 text-gray-500" />
+                          )}
+                          <span className="text-sm font-medium text-gray-900">
+                            Request #{index + 1}:{" "}
+                            {request.itemName || "New Item"}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {inquiryRequests.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                removeRequest(index);
+                              }}
+                              disabled={
+                                inquiryModalMode === "edit" &&
+                                !editModeEnabled
+                              }
+                              className="px-2 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              Remove
+                            </button>
+                          )}
+                        </div>
                       </button>
-                    </div>
-                    <div className="space-y-2">
-                      {inquiryRequests.map((request: any, index: any) => (
+                      {expandedRequestIndex === index && (
                         <div
-                          key={index}
-                          className={`border rounded-lg overflow-hidden transition-colors duration-300 ${inquiryFormData.isAssembly ? "border-green-200" : "border-gray-200"}`}
+                          className={`p-4 transition-colors duration-300 ${inquiryFormData.isAssembly ? "bg-green-50/60" : "bg-white"}`}
                         >
-                          <button
-                            type="button"
-                            onClick={() => toggleRequestExpansion(index)}
-                            className={`w-full px-3 py-2 flex items-center justify-between text-left transition-colors ${expandedRequestIndex === index
-                              ? inquiryFormData.isAssembly
-                                ? "bg-green-100"
-                                : "bg-gray-100"
-                              : inquiryFormData.isAssembly
-                                ? "bg-green-50 hover:bg-green-100"
-                                : "bg-gray-50 hover:bg-gray-100"
-                              }`}
-                          >
-                            <div className="flex items-center gap-2">
-                              {expandedRequestIndex === index ? (
-                                <ChevronUpIcon className="h-4 w-4 text-gray-500" />
-                              ) : (
-                                <ChevronDownIcon className="h-4 w-4 text-gray-500" />
-                              )}
-                              <span className="text-sm font-medium text-gray-900">
-                                Request #{index + 1}:{" "}
-                                {request.itemName || "New Item"}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              {inquiryRequests.length > 1 && (
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    removeRequest(index);
-                                  }}
+                          <div className="space-y-4">
+                            <div className="grid grid-cols-3 gap-3">
+                              <div>
+                                <label className="block text-xs font-medium text-gray-700 mb-1">
+                                  ItemName*
+                                </label>
+                                <input
+                                  type="text"
+                                  value={request.itemName}
+                                  onChange={(e) =>
+                                    updateRequest(
+                                      index,
+                                      "itemName",
+                                      e.target.value,
+                                    )
+                                  }
                                   disabled={
                                     inquiryModalMode === "edit" &&
                                     !editModeEnabled
                                   }
-                                  className="px-2 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                  className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                                  placeholder="Enter item name"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-medium text-gray-700 mb-1">
+                                  ItemNo*
+                                </label>
+                                <input
+                                  type="text"
+                                  value={request.itemNo || ""}
+                                  onChange={(e) =>
+                                    updateRequest(
+                                      index,
+                                      "itemNo",
+                                      e.target.value,
+                                    )
+                                  }
+                                  disabled={
+                                    inquiryModalMode === "edit" &&
+                                    !editModeEnabled
+                                  }
+                                  className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                                  placeholder="Enter item number"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-medium text-gray-700 mb-1">
+                                  Prio
+                                </label>
+                                <select
+                                  value={request.priority || "Normal"}
+                                  onChange={(e) =>
+                                    updateRequest(
+                                      index,
+                                      "priority",
+                                      e.target.value,
+                                    )
+                                  }
+                                  disabled={
+                                    inquiryModalMode === "edit" &&
+                                    !editModeEnabled
+                                  }
+                                  className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
                                 >
-                                  Remove
-                                </button>
-                              )}
-                            </div>
-                          </button>
-                          {expandedRequestIndex === index && (
-                            <div
-                              className={`p-4 transition-colors duration-300 ${inquiryFormData.isAssembly ? "bg-green-50/60" : "bg-white"}`}
-                            >
-                              <div className="space-y-4">
-                                <div className="grid grid-cols-3 gap-3">
-                                  <div>
-                                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                                      ItemName*
-                                    </label>
-                                    <input
-                                      type="text"
-                                      value={request.itemName}
-                                      onChange={(e) =>
-                                        updateRequest(
-                                          index,
-                                          "itemName",
-                                          e.target.value,
-                                        )
-                                      }
-                                      disabled={
-                                        inquiryModalMode === "edit" &&
-                                        !editModeEnabled
-                                      }
-                                      className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                                      placeholder="Enter item name"
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                                      ItemNo*
-                                    </label>
-                                    <input
-                                      type="text"
-                                      value={request.itemNo || ""}
-                                      onChange={(e) =>
-                                        updateRequest(
-                                          index,
-                                          "itemNo",
-                                          e.target.value,
-                                        )
-                                      }
-                                      disabled={
-                                        inquiryModalMode === "edit" &&
-                                        !editModeEnabled
-                                      }
-                                      className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                                      placeholder="Enter item number"
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                                      Prio
-                                    </label>
-                                    <select
-                                      value={request.priority || "Normal"}
-                                      onChange={(e) =>
-                                        updateRequest(
-                                          index,
-                                          "priority",
-                                          e.target.value,
-                                        )
-                                      }
-                                      disabled={
-                                        inquiryModalMode === "edit" &&
-                                        !editModeEnabled
-                                      }
-                                      className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                                    >
-                                      {getAvailableRequestPriorities()?.map(
-                                        (p: any) => (
-                                          <option key={p.value} value={p.value}>
-                                            {p.label}
-                                          </option>
-                                        ),
-                                      )}
-                                    </select>
-                                  </div>
-                                </div>
-                                <div className="grid grid-cols-4 gap-3">
-                                  <div>
-                                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                                      Qty
-                                    </label>
-                                    <input
-                                      type="number"
-                                      value={request.qty}
-                                      onChange={(e) =>
-                                        updateRequest(
-                                          index,
-                                          "qty",
-                                          e.target.value,
-                                        )
-                                      }
-                                      disabled={
-                                        inquiryModalMode === "edit" &&
-                                        !editModeEnabled
-                                      }
-                                      className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                                      min="1"
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                                      Interval
-                                    </label>
-                                    <select
-                                      value={request.interval || "Monatlich"}
-                                      onChange={(e) =>
-                                        updateRequest(
-                                          index,
-                                          "interval",
-                                          e.target.value,
-                                        )
-                                      }
-                                      disabled={
-                                        inquiryModalMode === "edit" &&
-                                        !editModeEnabled
-                                      }
-                                      className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                                    >
-                                      {getAvailableIntervals().map(
-                                        (interval) => (
-                                          <option
-                                            key={interval.value}
-                                            value={interval.value}
-                                          >
-                                            {interval.label}
-                                          </option>
-                                        ),
-                                      )}
-                                    </select>
-                                  </div>
-                                  <div>
-                                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                                      Asana Link
-                                    </label>
-                                    <input
-                                      type="text"
-                                      value={request.asanaLink || ""}
-                                      onChange={(e) =>
-                                        updateRequest(
-                                          index,
-                                          "asanaLink",
-                                          e.target.value,
-                                        )
-                                      }
-                                      disabled={
-                                        inquiryModalMode === "edit" &&
-                                        !editModeEnabled
-                                      }
-                                      className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                                      placeholder="Link to Asana"
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                                      Status
-                                    </label>
-                                    <select
-                                      value={request.status || "Draft"}
-                                      onChange={(e) =>
-                                        updateRequest(
-                                          index,
-                                          "status",
-                                          e.target.value,
-                                        )
-                                      }
-                                      disabled={
-                                        inquiryModalMode === "edit" &&
-                                        !editModeEnabled
-                                      }
-                                      className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                                    >
-                                      {getRequestStatuses().map((status) => (
-                                        <option
-                                          key={status.value}
-                                          value={status.value}
-                                        >
-                                          {status.label}
-                                        </option>
-                                      ))}
-                                    </select>
-                                  </div>
-                                </div>
-                                <div className="grid grid-cols-4 gap-3">
-                                  <div>
-                                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                                      Target Price (EUR)
-                                    </label>
-                                    <input
-                                      type="number"
-                                      value={request.targetPrice || ""}
-                                      onChange={(e) =>
-                                        updateRequest(
-                                          index,
-                                          "targetPrice",
-                                          e.target.value === "" ? "" : parseFloat(e.target.value) || 0,
-                                        )
-                                      }
-                                      disabled={
-                                        inquiryModalMode === "edit" &&
-                                        !editModeEnabled
-                                      }
-                                      className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                                      step="0.01"
-                                      min="0"
-                                      placeholder="0.00"
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                                      Purchase Price
-                                    </label>
-                                    <input
-                                      type="number"
-                                      value={request.purchasePrice}
-                                      onChange={(e) =>
-                                        updateRequest(
-                                          index,
-                                          "purchasePrice",
-                                          parseFloat(e.target.value) || 0,
-                                        )
-                                      }
-                                      disabled={
-                                        inquiryModalMode === "edit" &&
-                                        !editModeEnabled
-                                      }
-                                      className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                                      step="0.01"
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                                      Currency Purchase
-                                    </label>
-                                    <select
-                                      value={request.currency}
-                                      onChange={(e) =>
-                                        updateRequest(
-                                          index,
-                                          "currency",
-                                          e.target.value,
-                                        )
-                                      }
-                                      disabled={
-                                        inquiryModalMode === "edit" &&
-                                        !editModeEnabled
-                                      }
-                                      className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                                    >
-                                      {getAvailableCurrencies().map(
-                                        (currency) => (
-                                          <option
-                                            key={currency.value}
-                                            value={currency.value}
-                                          >
-                                            {currency.label}
-                                          </option>
-                                        ),
-                                      )}
-                                    </select>
-                                  </div>
-                                  <div>
-                                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                                      TARIC
-                                    </label>
-                                    <select
-                                      value={request.taric || ""}
-                                      onChange={(e) =>
-                                        updateRequest(
-                                          index,
-                                          "taric",
-                                          e.target.value,
-                                        )
-                                      }
-                                      disabled={
-                                        inquiryModalMode === "edit" &&
-                                        !editModeEnabled
-                                      }
-                                      className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                                    >
-                                      <option value="">
-                                        Select TARIC Code
+                                  {getAvailableRequestPriorities()?.map(
+                                    (p: any) => (
+                                      <option key={p.value} value={p.value}>
+                                        {p.label}
                                       </option>
-                                      {tarics.map((taric) => (
-                                        <option
-                                          key={taric.id}
-                                          value={taric.code}
+                                    ),
+                                  )}
+                                </select>
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-4 gap-3">
+                              <div>
+                                <label className="block text-xs font-medium text-gray-700 mb-1">
+                                  Qty
+                                </label>
+                                <input
+                                  type="number"
+                                  value={request.qty}
+                                  onChange={(e) =>
+                                    updateRequest(
+                                      index,
+                                      "qty",
+                                      e.target.value,
+                                    )
+                                  }
+                                  disabled={
+                                    inquiryModalMode === "edit" &&
+                                    !editModeEnabled
+                                  }
+                                  className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                                  min="1"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-medium text-gray-700 mb-1">
+                                  Interval
+                                </label>
+                                <select
+                                  value={request.interval || "Monatlich"}
+                                  onChange={(e) =>
+                                    updateRequest(
+                                      index,
+                                      "interval",
+                                      e.target.value,
+                                    )
+                                  }
+                                  disabled={
+                                    inquiryModalMode === "edit" &&
+                                    !editModeEnabled
+                                  }
+                                  className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                                >
+                                  {getAvailableIntervals().map(
+                                    (interval) => (
+                                      <option
+                                        key={interval.value}
+                                        value={interval.value}
+                                      >
+                                        {interval.label}
+                                      </option>
+                                    ),
+                                  )}
+                                </select>
+                              </div>
+                              <div>
+                                <label className="block text-xs font-medium text-gray-700 mb-1">
+                                  Asana Link
+                                </label>
+                                <input
+                                  type="text"
+                                  value={request.asanaLink || ""}
+                                  onChange={(e) =>
+                                    updateRequest(
+                                      index,
+                                      "asanaLink",
+                                      e.target.value,
+                                    )
+                                  }
+                                  disabled={
+                                    inquiryModalMode === "edit" &&
+                                    !editModeEnabled
+                                  }
+                                  className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                                  placeholder="Link to Asana"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-medium text-gray-700 mb-1">
+                                  Status
+                                </label>
+                                <select
+                                  value={request.status || "Draft"}
+                                  onChange={(e) =>
+                                    updateRequest(
+                                      index,
+                                      "status",
+                                      e.target.value,
+                                    )
+                                  }
+                                  disabled={
+                                    inquiryModalMode === "edit" &&
+                                    !editModeEnabled
+                                  }
+                                  className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                                >
+                                  {getRequestStatuses().map((status) => (
+                                    <option
+                                      key={status.value}
+                                      value={status.value}
+                                    >
+                                      {status.label}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-4 gap-3">
+                              <div>
+                                <label className="block text-xs font-medium text-gray-700 mb-1">
+                                  Target Price (EUR)
+                                </label>
+                                <input
+                                  type="number"
+                                  value={request.targetPrice || ""}
+                                  onChange={(e) =>
+                                    updateRequest(
+                                      index,
+                                      "targetPrice",
+                                      e.target.value === "" ? "" : parseFloat(e.target.value) || 0,
+                                    )
+                                  }
+                                  disabled={
+                                    inquiryModalMode === "edit" &&
+                                    !editModeEnabled
+                                  }
+                                  className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                                  step="0.01"
+                                  min="0"
+                                  placeholder="0.00"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-medium text-gray-700 mb-1">
+                                  Purchase Price
+                                </label>
+                                <input
+                                  type="number"
+                                  value={request.purchasePrice}
+                                  onChange={(e) =>
+                                    updateRequest(
+                                      index,
+                                      "purchasePrice",
+                                      parseFloat(e.target.value) || 0,
+                                    )
+                                  }
+                                  disabled={
+                                    inquiryModalMode === "edit" &&
+                                    !editModeEnabled
+                                  }
+                                  className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                                  step="0.01"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-medium text-gray-700 mb-1">
+                                  Currency Purchase
+                                </label>
+                                <select
+                                  value={request.currency}
+                                  onChange={(e) =>
+                                    updateRequest(
+                                      index,
+                                      "currency",
+                                      e.target.value,
+                                    )
+                                  }
+                                  disabled={
+                                    inquiryModalMode === "edit" &&
+                                    !editModeEnabled
+                                  }
+                                  className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                                >
+                                  {getAvailableCurrencies().map(
+                                    (currency) => (
+                                      <option
+                                        key={currency.value}
+                                        value={currency.value}
+                                      >
+                                        {currency.label}
+                                      </option>
+                                    ),
+                                  )}
+                                </select>
+                              </div>
+                              <div>
+                                <label className="block text-xs font-medium text-gray-700 mb-1">
+                                  TARIC
+                                </label>
+                                <select
+                                  value={request.taric || ""}
+                                  onChange={(e) =>
+                                    updateRequest(
+                                      index,
+                                      "taric",
+                                      e.target.value,
+                                    )
+                                  }
+                                  disabled={
+                                    inquiryModalMode === "edit" &&
+                                    !editModeEnabled
+                                  }
+                                  className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                                >
+                                  <option value="">
+                                    Select TARIC Code
+                                  </option>
+                                  {tarics.map((taric) => (
+                                    <option
+                                      key={taric.id}
+                                      value={taric.code}
+                                    >
+                                      {formatTaricDisplay(taric)}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                            </div>
+                            <div className="bg-blue-50/50 rounded-lg p-3 border border-blue-100/60 flex items-center justify-between text-xs text-blue-800">
+                              <div>
+                                <strong>Value Potential:</strong>
+                              </div>
+                              <div className="flex gap-4">
+                                <span>
+                                  Annual Potential:{" "}
+                                  <strong className="text-sm font-semibold">
+                                    {(() => {
+                                      const qty = parseInt(request.qty) || 0;
+                                      const targetPrice = parseFloat(request.targetPrice) || 0;
+                                      let factor = 12;
+                                      const interval = request.interval || "Monatlich";
+                                      const normalized = interval.toLowerCase().trim();
+                                      if (normalized === "jährlich" || normalized === "jaehrlich" || normalized === "yearly") {
+                                        factor = 1;
+                                      } else if (normalized === "halbjährlich" || normalized === "halbjaehrlich" || normalized === "half-yearly" || normalized === "half yearly" || normalized === "biannually") {
+                                        factor = 2;
+                                      } else if (normalized === "quartal" || normalized === "quarterly") {
+                                        factor = 4;
+                                      } else if (normalized === "2 monatlich" || normalized === "bimonthly") {
+                                        factor = 6;
+                                      } else if (normalized === "monatlich" || normalized === "monthly") {
+                                        factor = 12;
+                                      }
+                                      const annual = qty * targetPrice * factor;
+                                      return `${annual.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
+                                    })()}
+                                  </strong>
+                                </span>
+                                <span>
+                                  Annual Potential (k €):{" "}
+                                  <strong className="text-sm font-semibold">
+                                    {(() => {
+                                      const qty = parseInt(request.qty) || 0;
+                                      const targetPrice = parseFloat(request.targetPrice) || 0;
+                                      let factor = 12;
+                                      const interval = request.interval || "Monatlich";
+                                      const normalized = interval.toLowerCase().trim();
+                                      if (normalized === "jährlich" || normalized === "jaehrlich" || normalized === "yearly") {
+                                        factor = 1;
+                                      } else if (normalized === "halbjährlich" || normalized === "halbjaehrlich" || normalized === "half-yearly" || normalized === "half yearly" || normalized === "biannually") {
+                                        factor = 2;
+                                      } else if (normalized === "quartal" || normalized === "quarterly") {
+                                        factor = 4;
+                                      } else if (normalized === "2 monatlich" || normalized === "bimonthly") {
+                                        factor = 6;
+                                      } else if (normalized === "monatlich" || normalized === "monthly") {
+                                        factor = 12;
+                                      }
+                                      const annual = qty * targetPrice * factor;
+                                      return `${(annual / 1000).toFixed(2)} k €`;
+                                    })()}
+                                  </strong>
+                                </span>
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-4 gap-3 border-t border-gray-200/50 pt-3">
+                              <div>
+                                <label className="block text-xs font-medium text-gray-700 mb-1">
+                                  Weight (kg)
+                                </label>
+                                <input
+                                  type="number"
+                                  value={request.weight || ""}
+                                  onChange={(e) =>
+                                    updateRequest(
+                                      index,
+                                      "weight",
+                                      parseFloat(e.target.value) ||
+                                      undefined,
+                                    )
+                                  }
+                                  disabled={
+                                    inquiryModalMode === "edit" &&
+                                    !editModeEnabled
+                                  }
+                                  className="w-full px-2 py-1.5 text-sm border border-gray-300/80 bg-white rounded-lg transition-all"
+                                  step="0.001"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-medium text-gray-700 mb-1">
+                                  Length (cm)
+                                </label>
+                                <input
+                                  type="number"
+                                  value={request.length || ""}
+                                  onChange={(e) =>
+                                    updateRequest(
+                                      index,
+                                      "length",
+                                      parseFloat(e.target.value) ||
+                                      undefined,
+                                    )
+                                  }
+                                  disabled={
+                                    inquiryModalMode === "edit" &&
+                                    !editModeEnabled
+                                  }
+                                  className="w-full px-2 py-1.5 text-sm border border-gray-300/80 bg-white rounded-lg transition-all"
+                                  step="0.1"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-medium text-gray-700 mb-1">
+                                  Width (cm)
+                                </label>
+                                <input
+                                  type="number"
+                                  value={request.width || ""}
+                                  onChange={(e) =>
+                                    updateRequest(
+                                      index,
+                                      "width",
+                                      parseFloat(e.target.value) ||
+                                      undefined,
+                                    )
+                                  }
+                                  disabled={
+                                    inquiryModalMode === "edit" &&
+                                    !editModeEnabled
+                                  }
+                                  className="w-full px-2 py-1.5 text-sm border border-gray-300/80 bg-white rounded-lg transition-all"
+                                  step="0.1"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-medium text-gray-700 mb-1">
+                                  Height (cm)
+                                </label>
+                                <input
+                                  type="number"
+                                  value={request.height || ""}
+                                  onChange={(e) =>
+                                    updateRequest(
+                                      index,
+                                      "height",
+                                      parseFloat(e.target.value) ||
+                                      undefined,
+                                    )
+                                  }
+                                  disabled={
+                                    inquiryModalMode === "edit" &&
+                                    !editModeEnabled
+                                  }
+                                  className="w-full px-2 py-1.5 text-sm border border-gray-300/80 bg-white rounded-lg transition-all"
+                                  step="0.1"
+                                />
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-3 gap-3 border-t border-gray-200/50 pt-3">
+                              <div>
+                                <label className="block text-xs font-medium text-gray-700 mb-1">
+                                  Urgency (text field)
+                                </label>
+                                <textarea
+                                  value={request.urgency1 || ""}
+                                  onChange={(e) =>
+                                    updateRequest(
+                                      index,
+                                      "urgency1",
+                                      e.target.value,
+                                    )
+                                  }
+                                  disabled={
+                                    inquiryModalMode === "edit" &&
+                                    !editModeEnabled
+                                  }
+                                  rows={3}
+                                  className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white rounded-lg transition-all"
+                                  placeholder="Enter urgency details..."
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-medium text-gray-700 mb-1">
+                                  Urgency (text field)
+                                </label>
+                                <textarea
+                                  value={request.urgency2 || ""}
+                                  onChange={(e) =>
+                                    updateRequest(
+                                      index,
+                                      "urgency2",
+                                      e.target.value,
+                                    )
+                                  }
+                                  disabled={
+                                    inquiryModalMode === "edit" &&
+                                    !editModeEnabled
+                                  }
+                                  rows={3}
+                                  className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white rounded-lg transition-all"
+                                  placeholder="Enter quality criteria / urgency..."
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-medium text-gray-700 mb-1">
+                                  Pain Points (tags)
+                                </label>
+                                <div className="min-h-[80px] p-2 border border-gray-300/80 bg-white rounded-lg focus-within:ring-2 focus-within:ring-gray-500/50 transition-all">
+                                  <div className="flex flex-wrap gap-1 mb-2">
+                                    {request.painPoints?.map(
+                                      (tag: any, i: any) => (
+                                        <span
+                                          key={i}
+                                          className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 border border-gray-200"
                                         >
-                                          {formatTaricDisplay(taric)}
-                                        </option>
-                                      ))}
-                                    </select>
-                                  </div>
-                                </div>
-                                <div className="bg-blue-50/50 rounded-lg p-3 border border-blue-100/60 flex items-center justify-between text-xs text-blue-800">
-                                  <div>
-                                    <strong>Value Potential:</strong>
-                                  </div>
-                                  <div className="flex gap-4">
-                                    <span>
-                                      Annual Potential:{" "}
-                                      <strong className="text-sm font-semibold">
-                                        {(() => {
-                                          const qty = parseInt(request.qty) || 0;
-                                          const targetPrice = parseFloat(request.targetPrice) || 0;
-                                          let factor = 12;
-                                          const interval = request.interval || "Monatlich";
-                                          const normalized = interval.toLowerCase().trim();
-                                          if (normalized === "jährlich" || normalized === "jaehrlich" || normalized === "yearly") {
-                                            factor = 1;
-                                          } else if (normalized === "halbjährlich" || normalized === "halbjaehrlich" || normalized === "half-yearly" || normalized === "half yearly" || normalized === "biannually") {
-                                            factor = 2;
-                                          } else if (normalized === "quartal" || normalized === "quarterly") {
-                                            factor = 4;
-                                          } else if (normalized === "2 monatlich" || normalized === "bimonthly") {
-                                            factor = 6;
-                                          } else if (normalized === "monatlich" || normalized === "monthly") {
-                                            factor = 12;
-                                          }
-                                          const annual = qty * targetPrice * factor;
-                                          return `${annual.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
-                                        })()}
-                                      </strong>
-                                    </span>
-                                    <span>
-                                      Annual Potential (k €):{" "}
-                                      <strong className="text-sm font-semibold">
-                                        {(() => {
-                                          const qty = parseInt(request.qty) || 0;
-                                          const targetPrice = parseFloat(request.targetPrice) || 0;
-                                          let factor = 12;
-                                          const interval = request.interval || "Monatlich";
-                                          const normalized = interval.toLowerCase().trim();
-                                          if (normalized === "jährlich" || normalized === "jaehrlich" || normalized === "yearly") {
-                                            factor = 1;
-                                          } else if (normalized === "halbjährlich" || normalized === "halbjaehrlich" || normalized === "half-yearly" || normalized === "half yearly" || normalized === "biannually") {
-                                            factor = 2;
-                                          } else if (normalized === "quartal" || normalized === "quarterly") {
-                                            factor = 4;
-                                          } else if (normalized === "2 monatlich" || normalized === "bimonthly") {
-                                            factor = 6;
-                                          } else if (normalized === "monatlich" || normalized === "monthly") {
-                                            factor = 12;
-                                          }
-                                          const annual = qty * targetPrice * factor;
-                                          return `${(annual / 1000).toFixed(2)} k €`;
-                                        })()}
-                                      </strong>
-                                    </span>
-                                  </div>
-                                </div>
-                                <div className="grid grid-cols-4 gap-3 border-t border-gray-200/50 pt-3">
-                                  <div>
-                                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                                      Weight (kg)
-                                    </label>
-                                    <input
-                                      type="number"
-                                      value={request.weight || ""}
-                                      onChange={(e) =>
-                                        updateRequest(
-                                          index,
-                                          "weight",
-                                          parseFloat(e.target.value) ||
-                                          undefined,
-                                        )
-                                      }
-                                      disabled={
-                                        inquiryModalMode === "edit" &&
-                                        !editModeEnabled
-                                      }
-                                      className="w-full px-2 py-1.5 text-sm border border-gray-300/80 bg-white rounded-lg transition-all"
-                                      step="0.001"
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                                      Length (cm)
-                                    </label>
-                                    <input
-                                      type="number"
-                                      value={request.length || ""}
-                                      onChange={(e) =>
-                                        updateRequest(
-                                          index,
-                                          "length",
-                                          parseFloat(e.target.value) ||
-                                          undefined,
-                                        )
-                                      }
-                                      disabled={
-                                        inquiryModalMode === "edit" &&
-                                        !editModeEnabled
-                                      }
-                                      className="w-full px-2 py-1.5 text-sm border border-gray-300/80 bg-white rounded-lg transition-all"
-                                      step="0.1"
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                                      Width (cm)
-                                    </label>
-                                    <input
-                                      type="number"
-                                      value={request.width || ""}
-                                      onChange={(e) =>
-                                        updateRequest(
-                                          index,
-                                          "width",
-                                          parseFloat(e.target.value) ||
-                                          undefined,
-                                        )
-                                      }
-                                      disabled={
-                                        inquiryModalMode === "edit" &&
-                                        !editModeEnabled
-                                      }
-                                      className="w-full px-2 py-1.5 text-sm border border-gray-300/80 bg-white rounded-lg transition-all"
-                                      step="0.1"
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                                      Height (cm)
-                                    </label>
-                                    <input
-                                      type="number"
-                                      value={request.height || ""}
-                                      onChange={(e) =>
-                                        updateRequest(
-                                          index,
-                                          "height",
-                                          parseFloat(e.target.value) ||
-                                          undefined,
-                                        )
-                                      }
-                                      disabled={
-                                        inquiryModalMode === "edit" &&
-                                        !editModeEnabled
-                                      }
-                                      className="w-full px-2 py-1.5 text-sm border border-gray-300/80 bg-white rounded-lg transition-all"
-                                      step="0.1"
-                                    />
-                                  </div>
-                                </div>
-                                <div className="grid grid-cols-3 gap-3 border-t border-gray-200/50 pt-3">
-                                  <div>
-                                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                                      Urgency (text field)
-                                    </label>
-                                    <textarea
-                                      value={request.urgency1 || ""}
-                                      onChange={(e) =>
-                                        updateRequest(
-                                          index,
-                                          "urgency1",
-                                          e.target.value,
-                                        )
-                                      }
-                                      disabled={
-                                        inquiryModalMode === "edit" &&
-                                        !editModeEnabled
-                                      }
-                                      rows={3}
-                                      className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white rounded-lg transition-all"
-                                      placeholder="Enter urgency details..."
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                                      Urgency (text field)
-                                    </label>
-                                    <textarea
-                                      value={request.urgency2 || ""}
-                                      onChange={(e) =>
-                                        updateRequest(
-                                          index,
-                                          "urgency2",
-                                          e.target.value,
-                                        )
-                                      }
-                                      disabled={
-                                        inquiryModalMode === "edit" &&
-                                        !editModeEnabled
-                                      }
-                                      rows={3}
-                                      className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white rounded-lg transition-all"
-                                      placeholder="Enter quality criteria / urgency..."
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                                      Pain Points (tags)
-                                    </label>
-                                    <div className="min-h-[80px] p-2 border border-gray-300/80 bg-white rounded-lg focus-within:ring-2 focus-within:ring-gray-500/50 transition-all">
-                                      <div className="flex flex-wrap gap-1 mb-2">
-                                        {request.painPoints?.map(
-                                          (tag: any, i: any) => (
-                                            <span
-                                              key={i}
-                                              className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 border border-gray-200"
-                                            >
-                                              {tag}
-                                              <button
-                                                type="button"
-                                                onClick={() =>
-                                                  updateRequest(
-                                                    index,
-                                                    "painPoints",
-                                                    request.painPoints?.filter(
-                                                      (_: any, idx: any) =>
-                                                        idx !== i,
-                                                    ),
-                                                  )
-                                                }
-                                                disabled={
-                                                  inquiryModalMode === "edit" &&
-                                                  !editModeEnabled
-                                                }
-                                                className="ml-1 text-gray-400 hover:text-gray-600 focus:outline-none"
-                                              >
-                                                <XMarkIcon className="h-3 w-3" />
-                                              </button>
-                                            </span>
-                                          ),
-                                        )}
-                                      </div>
-                                      <div className="flex items-center gap-1">
-                                        <input
-                                          type="text"
-                                          value={
-                                            requestLoopTagInputs[index] || ""
-                                          }
-                                          onChange={(e) =>
-                                            setRequestLoopTagInputs({
-                                              ...requestLoopTagInputs,
-                                              [index]: e.target.value,
-                                            })
-                                          }
-                                          onKeyDown={(e) => {
-                                            if (
-                                              e.key === "Enter" ||
-                                              e.key === ","
-                                            ) {
-                                              e.preventDefault();
-                                              handleAddRequestLoopPainPoint(
+                                          {tag}
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              updateRequest(
                                                 index,
-                                              );
+                                                "painPoints",
+                                                request.painPoints?.filter(
+                                                  (_: any, idx: any) =>
+                                                    idx !== i,
+                                                ),
+                                              )
                                             }
-                                          }}
-                                          disabled={
-                                            inquiryModalMode === "edit" &&
-                                            !editModeEnabled
-                                          }
-                                          placeholder="Type tag..."
-                                          className="flex-1 text-sm bg-transparent outline-none border-none p-0 focus:ring-0"
-                                        />
-                                        <button
-                                          type="button"
-                                          onClick={() =>
-                                            handleAddRequestLoopPainPoint(index)
-                                          }
-                                          disabled={
-                                            (inquiryModalMode === "edit" &&
-                                              !editModeEnabled) ||
-                                            !(
-                                              requestLoopTagInputs[index] || ""
-                                            ).trim()
-                                          }
-                                          className="p-1 text-blue-500 hover:text-blue-700 transition-colors disabled:text-gray-300"
-                                        >
-                                          <PlusIcon className="h-5 w-5" />
-                                        </button>
-                                      </div>
-                                    </div>
+                                            disabled={
+                                              inquiryModalMode === "edit" &&
+                                              !editModeEnabled
+                                            }
+                                            className="ml-1 text-gray-400 hover:text-gray-600 focus:outline-none"
+                                          >
+                                            <XMarkIcon className="h-3 w-3" />
+                                          </button>
+                                        </span>
+                                      ),
+                                    )}
                                   </div>
-                                </div>
-                                <div className="grid grid-cols-2 gap-3 border-t border-gray-200/50 pt-3">
-                                  <div>
-                                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                                      Description
-                                    </label>
-                                    <textarea
-                                      value={request.description}
-                                      onChange={(e) =>
-                                        updateRequest(
-                                          index,
-                                          "description",
-                                          e.target.value,
-                                        )
+                                  <div className="flex items-center gap-1">
+                                    <input
+                                      type="text"
+                                      value={
+                                        requestLoopTagInputs[index] || ""
                                       }
+                                      onChange={(e) =>
+                                        setRequestLoopTagInputs({
+                                          ...requestLoopTagInputs,
+                                          [index]: e.target.value,
+                                        })
+                                      }
+                                      onKeyDown={(e) => {
+                                        if (
+                                          e.key === "Enter" ||
+                                          e.key === ","
+                                        ) {
+                                          e.preventDefault();
+                                          handleAddRequestLoopPainPoint(
+                                            index,
+                                          );
+                                        }
+                                      }}
                                       disabled={
                                         inquiryModalMode === "edit" &&
                                         !editModeEnabled
                                       }
-                                      rows={2}
-                                      className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white rounded-lg transition-all"
-                                      placeholder="Enter item description"
+                                      placeholder="Type tag..."
+                                      className="flex-1 text-sm bg-transparent outline-none border-none p-0 focus:ring-0"
                                     />
-                                  </div>
-                                  <div>
-                                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                                      Specifications
-                                    </label>
-                                    <textarea
-                                      value={request.specification}
-                                      onChange={(e) =>
-                                        updateRequest(
-                                          index,
-                                          "specification",
-                                          e.target.value,
-                                        )
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        handleAddRequestLoopPainPoint(index)
                                       }
                                       disabled={
-                                        inquiryModalMode === "edit" &&
-                                        !editModeEnabled
+                                        (inquiryModalMode === "edit" &&
+                                          !editModeEnabled) ||
+                                        !(
+                                          requestLoopTagInputs[index] || ""
+                                        ).trim()
                                       }
-                                      rows={2}
-                                      className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white rounded-lg transition-all"
-                                      placeholder="Enter specifications"
-                                    />
+                                      className="p-1 text-blue-500 hover:text-blue-700 transition-colors disabled:text-gray-300"
+                                    >
+                                      <PlusIcon className="h-5 w-5" />
+                                    </button>
                                   </div>
                                 </div>
                               </div>
                             </div>
-                          )}
+                            <div className="grid grid-cols-2 gap-3 border-t border-gray-200/50 pt-3">
+                              <div>
+                                <label className="block text-xs font-medium text-gray-700 mb-1">
+                                  Description
+                                </label>
+                                <textarea
+                                  value={request.description}
+                                  onChange={(e) =>
+                                    updateRequest(
+                                      index,
+                                      "description",
+                                      e.target.value,
+                                    )
+                                  }
+                                  disabled={
+                                    inquiryModalMode === "edit" &&
+                                    !editModeEnabled
+                                  }
+                                  rows={2}
+                                  className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white rounded-lg transition-all"
+                                  placeholder="Enter item description"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-medium text-gray-700 mb-1">
+                                  Specifications
+                                </label>
+                                <textarea
+                                  value={request.specification}
+                                  onChange={(e) =>
+                                    updateRequest(
+                                      index,
+                                      "specification",
+                                      e.target.value,
+                                    )
+                                  }
+                                  disabled={
+                                    inquiryModalMode === "edit" &&
+                                    !editModeEnabled
+                                  }
+                                  rows={2}
+                                  className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white rounded-lg transition-all"
+                                  placeholder="Enter specifications"
+                                />
+                              </div>
+                            </div>
+                          </div>
                         </div>
-                      ))}
+                      )}
                     </div>
-                  </div>
+                  ))}
                 </div>
               </div>
             </div>
-            <ModalFooter
-              isEditMode={inquiryModalMode === "edit"}
-              isEditEnabled={editModeEnabled}
-              onDelete={async () => {
-                if (editingInquiryId) {
-                  await handleDeleteInquiry(editingInquiryId);
-                  setShowCreateModal(false);
-                }
-              }}
-              onCancel={() => {
-                setShowCreateModal(false);
-                resetInquiryForm();
-              }}
-              onSave={handleInquirySubmit}
-              saveLabel={inquiryModalMode === "edit" ? "Update Inquiry" : "Create Inquiry"}
-              loading={inquiryLoading}
-              saveDisabled={
-                !inquiryFormData.name ||
-                !inquiryFormData.customerId ||
-                !inquiryRequests.some((req) => req.itemName && req.qty >= 1) ||
-                inquiryLoading
-              }
-              showDelete={user?.role === UserRole.ADMIN}
-            />
+          </div>
+        </div>
+        <ModalFooter
+          isEditMode={inquiryModalMode === "edit"}
+          isEditEnabled={editModeEnabled}
+          onDelete={async () => {
+            if (editingInquiryId) {
+              await handleDeleteInquiry(editingInquiryId);
+              setShowCreateModal(false);
+            }
+          }}
+          onCancel={() => {
+            setShowCreateModal(false);
+            resetInquiryForm();
+          }}
+          onSave={handleInquirySubmit}
+          saveLabel={inquiryModalMode === "edit" ? "Update Inquiry" : "Create Inquiry"}
+          loading={inquiryLoading}
+          saveDisabled={
+            !inquiryFormData.name ||
+            !inquiryFormData.customerId ||
+            !inquiryRequests.some((req) => req.itemName && req.qty >= 1) ||
+            inquiryLoading
+          }
+          showDelete={user?.role === UserRole.ADMIN}
+        />
       </CustomModal>
       <CustomModal
         isOpen={showConversionModal}
@@ -3486,304 +3483,304 @@ const CombinedInquiriesPageContent = () => {
         <p className="text-sm text-gray-600 mb-6">
           Fill in the required fields to create a new item
         </p>
-              <div className="mb-6 p-3 bg-gray-50 rounded-lg">
-                <h3 className="font-medium text-gray-900 mb-2">
-                  Source Information
-                </h3>
-                {conversionType === "inquiry" && conversionInquiryData && (
-                  <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div>
-                      <span className="text-gray-600">Name:</span>
-                      <span className="ml-2 font-medium">
-                        {conversionInquiryData.name}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-gray-600">Customer:</span>
-                      <span className="ml-2 font-medium">
-                        {conversionInquiryData.customer?.companyName}
-                      </span>
-                    </div>
-                    <div className="col-span-2">
-                      <span className="text-gray-600">Type:</span>
-                      <span className="ml-2 font-medium">
-                        {conversionInquiryData.isAssembly
-                          ? "Assembly"
-                          : "Single Item"}
-                      </span>
-                    </div>
-                    {(conversionInquiryData.weight ||
-                      conversionInquiryData.width ||
-                      conversionInquiryData.height ||
-                      conversionInquiryData.length) && (
-                        <div className="col-span-2">
-                          <span className="text-gray-600">Dimensions:</span>
-                          <span className="ml-2">
-                            {conversionInquiryData.weight &&
-                              `${conversionInquiryData.weight}kg `}
-                            {conversionInquiryData.length &&
-                              `${conversionInquiryData.length}×`}
-                            {conversionInquiryData.width &&
-                              `${conversionInquiryData.width}×`}
-                            {conversionInquiryData.height &&
-                              `${conversionInquiryData.height}`}
-                            cm
-                          </span>
-                        </div>
-                      )}
-                  </div>
-                )}
-                {conversionType === "request" && conversionRequestData && (
-                  <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div>
-                      <span className="text-gray-600">Item Name:</span>
-                      <span className="ml-2 font-medium">
-                        {conversionRequestData.itemName}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-gray-600">Business:</span>
-                      <span className="ml-2 font-medium">
-                        {(conversionRequestData as any).business?.customer
-                          ?.companyName ||
-                          (conversionRequestData as any).business
-                            ?.companyName ||
-                          "N/A"}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-gray-600">Material:</span>
-                      <span className="ml-2">
-                        {conversionRequestData.material || "-"}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-gray-600">Quantity:</span>
-                      <span className="ml-2 font-medium">
-                        {conversionRequestData.qty}
-                      </span>
-                    </div>
-                    {(conversionRequestData.weight ||
-                      conversionRequestData.width ||
-                      conversionRequestData.height ||
-                      conversionRequestData.length) && (
-                        <div className="col-span-2">
-                          <span className="text-gray-600">Dimensions:</span>
-                          <span className="ml-2">
-                            {conversionRequestData.weight &&
-                              `${conversionRequestData.weight}kg `}
-                            {conversionRequestData.length &&
-                              `${conversionRequestData.length}×`}
-                            {conversionRequestData.width &&
-                              `${conversionRequestData.width}×`}
-                            {conversionRequestData.height &&
-                              `${conversionRequestData.height}`}
-                            cm
-                          </span>
-                        </div>
-                      )}
-                  </div>
-                )}
+        <div className="mb-6 p-3 bg-gray-50 rounded-lg">
+          <h3 className="font-medium text-gray-900 mb-2">
+            Source Information
+          </h3>
+          {conversionType === "inquiry" && conversionInquiryData && (
+            <div className="grid grid-cols-2 gap-2 text-sm">
+              <div>
+                <span className="text-gray-600">Name:</span>
+                <span className="ml-2 font-medium">
+                  {conversionInquiryData.name}
+                </span>
               </div>
-              {renderDimensionStatus()}
-              <div className="space-y-4">
-                <h3 className="font-medium text-gray-900">Item Details</h3>
-                <div className="grid grid-cols-2 gap-3">
-                  {getConversionFormFieldsWithOptions().map((field) => (
-                    <div
-                      key={field.name}
-                      className={field.type === "textarea" ? "col-span-2" : ""}
-                    >
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        {field.label}
-                        {field.required && (
-                          <span className="text-red-500 ml-1">*</span>
-                        )}
-                        {!field.required && (
-                          <span className="text-gray-500 ml-1"></span>
-                        )}
-                      </label>
-                      {field.type === "textarea" ? (
-                        <textarea
-                          value={conversionFormData[field.name] || ""}
-                          onChange={(e) =>
-                            setConversionFormData({
-                              ...conversionFormData,
-                              [field.name]: e.target.value,
-                            })
-                          }
-                          className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all"
-                          placeholder={field.placeholder}
-                          rows={3}
-                        />
-                      ) : field.type === "select" ? (
-                        <select
-                          value={conversionFormData[field.name] || ""}
-                          onChange={(e) =>
-                            setConversionFormData({
-                              ...conversionFormData,
-                              [field.name]: e.target.value
-                                ? parseInt(e.target.value)
-                                : "",
-                            })
-                          }
-                          className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all"
-                        >
-                          <option value="">Select {field.label}</option>
-                          {field.options?.map((option: any) => (
-                            <option
-                              className=""
-                              key={option.value}
-                              value={option.value}
-                            >
-                              {option.label}
-                            </option>
-                          ))}
-                        </select>
-                      ) : field.type === "tags" ? (
-                        <div className="min-h-[80px] p-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus-within:ring-2 focus-within:ring-gray-500/50 transition-all">
-                          <div className="flex flex-wrap gap-1 mb-2">
-                            {conversionFormData[field.name]?.map(
-                              (tag: string, i: number) => (
-                                <span
-                                  key={i}
-                                  className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 border border-gray-200"
-                                >
-                                  {tag}
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      setConversionFormData({
-                                        ...conversionFormData,
-                                        [field.name]: conversionFormData[
-                                          field.name
-                                        ].filter(
-                                          (_: any, idx: number) => idx !== i,
-                                        ),
-                                      })
-                                    }
-                                    className="ml-1 text-gray-400 hover:text-gray-600 focus:outline-none"
-                                  >
-                                    <XMarkIcon className="h-3 w-3" />
-                                  </button>
-                                </span>
-                              ),
-                            )}
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <input
-                              type="text"
-                              value={conversionTagInput}
-                              onChange={(e) =>
-                                setConversionTagInput(e.target.value)
-                              }
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter" || e.key === ",") {
-                                  e.preventDefault();
-                                  handleAddConversionPainPoint();
-                                }
-                              }}
-                              placeholder="Type tag..."
-                              className="flex-1 text-sm bg-transparent outline-none border-none p-0 focus:ring-0"
-                            />
+              <div>
+                <span className="text-gray-600">Customer:</span>
+                <span className="ml-2 font-medium">
+                  {conversionInquiryData.customer?.companyName}
+                </span>
+              </div>
+              <div className="col-span-2">
+                <span className="text-gray-600">Type:</span>
+                <span className="ml-2 font-medium">
+                  {conversionInquiryData.isAssembly
+                    ? "Assembly"
+                    : "Single Item"}
+                </span>
+              </div>
+              {(conversionInquiryData.weight ||
+                conversionInquiryData.width ||
+                conversionInquiryData.height ||
+                conversionInquiryData.length) && (
+                  <div className="col-span-2">
+                    <span className="text-gray-600">Dimensions:</span>
+                    <span className="ml-2">
+                      {conversionInquiryData.weight &&
+                        `${conversionInquiryData.weight}kg `}
+                      {conversionInquiryData.length &&
+                        `${conversionInquiryData.length}×`}
+                      {conversionInquiryData.width &&
+                        `${conversionInquiryData.width}×`}
+                      {conversionInquiryData.height &&
+                        `${conversionInquiryData.height}`}
+                      cm
+                    </span>
+                  </div>
+                )}
+            </div>
+          )}
+          {conversionType === "request" && conversionRequestData && (
+            <div className="grid grid-cols-2 gap-2 text-sm">
+              <div>
+                <span className="text-gray-600">Item Name:</span>
+                <span className="ml-2 font-medium">
+                  {conversionRequestData.itemName}
+                </span>
+              </div>
+              <div>
+                <span className="text-gray-600">Business:</span>
+                <span className="ml-2 font-medium">
+                  {(conversionRequestData as any).business?.customer
+                    ?.companyName ||
+                    (conversionRequestData as any).business
+                      ?.companyName ||
+                    "N/A"}
+                </span>
+              </div>
+              <div>
+                <span className="text-gray-600">Material:</span>
+                <span className="ml-2">
+                  {conversionRequestData.material || "-"}
+                </span>
+              </div>
+              <div>
+                <span className="text-gray-600">Quantity:</span>
+                <span className="ml-2 font-medium">
+                  {conversionRequestData.qty}
+                </span>
+              </div>
+              {(conversionRequestData.weight ||
+                conversionRequestData.width ||
+                conversionRequestData.height ||
+                conversionRequestData.length) && (
+                  <div className="col-span-2">
+                    <span className="text-gray-600">Dimensions:</span>
+                    <span className="ml-2">
+                      {conversionRequestData.weight &&
+                        `${conversionRequestData.weight}kg `}
+                      {conversionRequestData.length &&
+                        `${conversionRequestData.length}×`}
+                      {conversionRequestData.width &&
+                        `${conversionRequestData.width}×`}
+                      {conversionRequestData.height &&
+                        `${conversionRequestData.height}`}
+                      cm
+                    </span>
+                  </div>
+                )}
+            </div>
+          )}
+        </div>
+        {renderDimensionStatus()}
+        <div className="space-y-4">
+          <h3 className="font-medium text-gray-900">Item Details</h3>
+          <div className="grid grid-cols-2 gap-3">
+            {getConversionFormFieldsWithOptions().map((field) => (
+              <div
+                key={field.name}
+                className={field.type === "textarea" ? "col-span-2" : ""}
+              >
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  {field.label}
+                  {field.required && (
+                    <span className="text-red-500 ml-1">*</span>
+                  )}
+                  {!field.required && (
+                    <span className="text-gray-500 ml-1"></span>
+                  )}
+                </label>
+                {field.type === "textarea" ? (
+                  <textarea
+                    value={conversionFormData[field.name] || ""}
+                    onChange={(e) =>
+                      setConversionFormData({
+                        ...conversionFormData,
+                        [field.name]: e.target.value,
+                      })
+                    }
+                    className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all"
+                    placeholder={field.placeholder}
+                    rows={3}
+                  />
+                ) : field.type === "select" ? (
+                  <select
+                    value={conversionFormData[field.name] || ""}
+                    onChange={(e) =>
+                      setConversionFormData({
+                        ...conversionFormData,
+                        [field.name]: e.target.value
+                          ? parseInt(e.target.value)
+                          : "",
+                      })
+                    }
+                    className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all"
+                  >
+                    <option value="">Select {field.label}</option>
+                    {field.options?.map((option: any) => (
+                      <option
+                        className=""
+                        key={option.value}
+                        value={option.value}
+                      >
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                ) : field.type === "tags" ? (
+                  <div className="min-h-[80px] p-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus-within:ring-2 focus-within:ring-gray-500/50 transition-all">
+                    <div className="flex flex-wrap gap-1 mb-2">
+                      {conversionFormData[field.name]?.map(
+                        (tag: string, i: number) => (
+                          <span
+                            key={i}
+                            className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 border border-gray-200"
+                          >
+                            {tag}
                             <button
                               type="button"
-                              onClick={handleAddConversionPainPoint}
-                              disabled={!conversionTagInput.trim()}
-                              className="p-1 text-blue-500 hover:text-blue-700 transition-colors disabled:text-gray-300"
+                              onClick={() =>
+                                setConversionFormData({
+                                  ...conversionFormData,
+                                  [field.name]: conversionFormData[
+                                    field.name
+                                  ].filter(
+                                    (_: any, idx: number) => idx !== i,
+                                  ),
+                                })
+                              }
+                              className="ml-1 text-gray-400 hover:text-gray-600 focus:outline-none"
                             >
-                              <PlusIcon className="h-5 w-5" />
+                              <XMarkIcon className="h-3 w-3" />
                             </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <input
-                          type={field.type}
-                          value={conversionFormData[field.name] || ""}
-                          onChange={(e) =>
-                            setConversionFormData({
-                              ...conversionFormData,
-                              [field.name]:
-                                field.type === "number"
-                                  ? e.target.value === ""
-                                    ? ""
-                                    : parseFloat(e.target.value)
-                                  : e.target.value,
-                            })
-                          }
-                          className={`w-full px-3 py-2 text-sm border ${field.required && !conversionFormData[field.name]
-                            ? "border-red-300"
-                            : "border-gray-300/80"
-                            } bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all`}
-                          placeholder={field.placeholder}
-                          min={field.min}
-                          step={field.step}
-                          required={field.required}
-                        />
-                      )}
-                      {field.description && (
-                        <p
-                          className={`text-xs mt-1 ${field.required ? "text-red-600" : "text-gray-500"
-                            }`}
-                        >
-                          {field.description}
-                        </p>
+                          </span>
+                        ),
                       )}
                     </div>
-                  ))}
-                </div>
-                <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-                  <div className="flex items-start gap-2">
-                    <InformationCircleIcon className="h-5 w-5 text-blue-500 mt-0.5" />
-                    <div className="text-sm text-blue-700">
-                      <p className="font-medium">Note:</p>
-                      <ul className="mt-1 space-y-1 list-disc list-inside">
-                        <li>
-                          TARIC code and EAN will be automatically generated if
-                          not provided
-                        </li>
-                        <li>Parent and category fields will be left null</li>
-                        <li>
-                          For assembly inquiries, name, quantity, and image will
-                          be used directly from the inquiry
-                        </li>
-                        <li>
-                          Missing fields will be filled from the form above
-                        </li>
-                        <li>
-                          Dimension fields that exist in the source are
-                          pre-filled and optional
-                        </li>
-                        <li>
-                          Dimension fields missing in the source are required
-                        </li>
-                      </ul>
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="text"
+                        value={conversionTagInput}
+                        onChange={(e) =>
+                          setConversionTagInput(e.target.value)
+                        }
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === ",") {
+                            e.preventDefault();
+                            handleAddConversionPainPoint();
+                          }
+                        }}
+                        placeholder="Type tag..."
+                        className="flex-1 text-sm bg-transparent outline-none border-none p-0 focus:ring-0"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleAddConversionPainPoint}
+                        disabled={!conversionTagInput.trim()}
+                        className="p-1 text-blue-500 hover:text-blue-700 transition-colors disabled:text-gray-300"
+                      >
+                        <PlusIcon className="h-5 w-5" />
+                      </button>
                     </div>
                   </div>
-                </div>
-                <div className="mt-6 flex justify-end gap-2">
-                  <button
-                    onClick={() => {
-                      setShowConversionModal(false);
-                      resetConversionForm();
-                    }}
-                    className="px-4 py-2 text-sm text-gray-700 bg-white/80 backdrop-blur-sm border border-gray-300/80 rounded-lg hover:bg-white/60 transition-all"
-                  >
-                    Cancel
-                  </button>
-                  <CustomButton
-                    gradient={true}
-                    onClick={
-                      conversionType === "inquiry"
-                        ? handleConvertInquiryToItem
-                        : handleConvertRequestToItem
+                ) : (
+                  <input
+                    type={field.type}
+                    value={conversionFormData[field.name] || ""}
+                    onChange={(e) =>
+                      setConversionFormData({
+                        ...conversionFormData,
+                        [field.name]:
+                          field.type === "number"
+                            ? e.target.value === ""
+                              ? ""
+                              : parseFloat(e.target.value)
+                            : e.target.value,
+                      })
                     }
-                    className="px-4 py-2 text-sm bg-green-600/90 backdrop-blur-sm text-white rounded-lg hover:bg-green-700/90 transition-all flex items-center gap-2"
+                    className={`w-full px-3 py-2 text-sm border ${field.required && !conversionFormData[field.name]
+                      ? "border-red-300"
+                      : "border-gray-300/80"
+                      } bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all`}
+                    placeholder={field.placeholder}
+                    min={field.min}
+                    step={field.step}
+                    required={field.required}
+                  />
+                )}
+                {field.description && (
+                  <p
+                    className={`text-xs mt-1 ${field.required ? "text-red-600" : "text-gray-500"
+                      }`}
                   >
-                    <ArrowRightIcon className="h-4 w-4" />
-                    Convert to Item
-                  </CustomButton>
-                </div>
+                    {field.description}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+          <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+            <div className="flex items-start gap-2">
+              <InformationCircleIcon className="h-5 w-5 text-blue-500 mt-0.5" />
+              <div className="text-sm text-blue-700">
+                <p className="font-medium">Note:</p>
+                <ul className="mt-1 space-y-1 list-disc list-inside">
+                  <li>
+                    TARIC code and EAN will be automatically generated if
+                    not provided
+                  </li>
+                  <li>Parent and category fields will be left null</li>
+                  <li>
+                    For assembly inquiries, name, quantity, and image will
+                    be used directly from the inquiry
+                  </li>
+                  <li>
+                    Missing fields will be filled from the form above
+                  </li>
+                  <li>
+                    Dimension fields that exist in the source are
+                    pre-filled and optional
+                  </li>
+                  <li>
+                    Dimension fields missing in the source are required
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+          <div className="mt-6 flex justify-end gap-2">
+            <button
+              onClick={() => {
+                setShowConversionModal(false);
+                resetConversionForm();
+              }}
+              className="px-4 py-2 text-sm text-gray-700 bg-white/80 backdrop-blur-sm border border-gray-300/80 rounded-lg hover:bg-white/60 transition-all"
+            >
+              Cancel
+            </button>
+            <CustomButton
+              gradient={true}
+              onClick={
+                conversionType === "inquiry"
+                  ? handleConvertInquiryToItem
+                  : handleConvertRequestToItem
+              }
+              className="px-4 py-2 text-sm bg-green-600/90 backdrop-blur-sm text-white rounded-lg hover:bg-green-700/90 transition-all flex items-center gap-2"
+            >
+              <ArrowRightIcon className="h-4 w-4" />
+              Convert to Item
+            </CustomButton>
+          </div>
         </div>
       </CustomModal>
       <ItemPreviewModal
