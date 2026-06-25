@@ -229,9 +229,20 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
           de_no: raw.de_no || "",
           dimensions: raw.dimensions || { weight: 0, length: 0, width: 0, height: 0 },
           pictures: {
-            shopPicture: raw.pictures?.shopPicture || raw.photo || "",
-            ebayPictures: raw.pictures?.ebayPictures || raw.pix_path_eBay || "",
-            pixPath: raw.pictures?.pixPath || raw.pix_path || "",
+            shopPicture:
+              raw.pictures?.shopPicture ||
+              raw.photo ||
+              raw.pix_path_eBay ||
+              (raw.pix_path ? raw.pix_path.split(",").filter(Boolean)[0] : "") ||
+              "",
+            ebayPictures:
+              raw.pictures?.ebayPictures ||
+              raw.pix_path_eBay ||
+              "",
+            pixPath:
+              raw.pictures?.pixPath ||
+              raw.pix_path ||
+              "",
           },
           attachments: raw.attachments || [],
         };
