@@ -745,12 +745,6 @@ export class InvoiceController {
 
       const data = invoices.map((inv) => {
         const cargo = orderToCargoMap.get(inv.orderNumber);
-        if (!cargo) {
-          AppDataSource.getRepository(InvoiceItem).delete({ invoice: { id: inv.id } })
-            .then(() => invoiceRepository.delete(inv.id))
-            .catch(err => console.error("Error deleting cargo-less invoice:", err));
-          return null;
-        }
 
         let customItemCount = 0;
         let customTotalQty = 0;
@@ -770,12 +764,9 @@ export class InvoiceController {
             if (calculatedGrossTotal === 0) calculatedGrossTotal = stats.total_price;
           }
         }
-
-        if (customItemCount === 0) {
-          AppDataSource.getRepository(InvoiceItem).delete({ invoice: { id: inv.id } })
-            .then(() => invoiceRepository.delete(inv.id))
-            .catch(err => console.error("Error deleting empty invoice:", err));
-          return null;
+        if (customItemCount === 0 && inv.items) {
+          customItemCount = inv.items.length;
+          customTotalQty = inv.items.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
         }
 
         const cargoNo = cargo?.cargo_no || (inv.orderNumber && !orderIdMap.has(inv.orderNumber) ? inv.orderNumber : undefined);
