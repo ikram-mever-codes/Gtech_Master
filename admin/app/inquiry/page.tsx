@@ -46,6 +46,7 @@ import {
   convertInquiryToItem,
   convertRequestToItem,
   removeRequestFromInquiry,
+  getInquiryById,
 } from "@/api/inquiry";
 import {
   getAvailableIntervals,
@@ -253,6 +254,38 @@ const getConversionFormFields = (hasExistingDimensions?: any) => {
   return baseFields;
 };
 const CombinedInquiriesPageContent = () => {
+  const mapRequestsFromServer = (requests: any[]) => {
+    return (requests || []).map((req: any) => ({
+      id: req.id,
+      itemName: req.itemName,
+      description: req.description || "",
+      qty: req.qty || 1,
+      purchasePrice: req.purchasePrice || 0,
+      currency: req.currency || "RMB",
+      status: req.status || "Draft",
+      material: req.material || "",
+      specification: req.specification || "",
+      images: req.images || [],
+      weight: req.weight,
+      width: req.width,
+      height: req.height,
+      length: req.length,
+      qualityCriteria: req.qualityCriteria || [],
+      attachments: req.attachments || [],
+      taric: req.taric || "",
+      asanaLink: req.asanaLink || "",
+      itemNo: req.itemNo || "",
+      urgency1: req.urgency1 || "",
+      urgency2: req.urgency2 || "",
+      painPoints: req.painPoints || [],
+      priceRMB: req.priceRMB || req.purchasePrice || 0,
+      priority: req.priority || "Normal",
+      interval: req.interval || "Monatlich",
+      targetPrice: req.targetPrice || 0,
+      annualPotential: req.annualPotential || 0,
+      annualPotentialKEur: req.annualPotentialKEur || 0,
+    }));
+  };
   const [inquiries, setInquiries] = useState<Inquiry[]>([]);
   const [newInquiryTags, setNewInquiryTags] = useState<Tag[]>([]);
   const [allInquiries, setAllInquiries] = useState<Inquiry[]>([]);
@@ -666,6 +699,89 @@ const CombinedInquiriesPageContent = () => {
       setInquiryLoading(false);
     }
   }, [inquiryFilters, inquiryCurrentPage, itemsPerPage, selectedCustomerId]);
+  const refreshInquiryRequests = useCallback(async () => {
+    if (!editingInquiryId) return;
+    try {
+      const response = await getInquiryById(editingInquiryId);
+      const inquiry = (response as any)?.data;
+      if (inquiry && inquiry.requests) {
+        setInquiryRequests(mapRequestsFromServer(inquiry.requests));
+      }
+    } catch (error) {
+      console.error("Error refreshing inquiry requests:", error);
+    }
+  }, [editingInquiryId]);
+  const handleItemInfoClick = async (request: any, index: number) => {
+    if (request.id) {
+      setSelectedRequestForDetail(request);
+      setSelectedRequestInquiryId(editingInquiryId || "");
+      setShowRequestDetailModal(true);
+      return;
+    }
+
+    if (!inquiryFormData.name || !inquiryFormData.customerId) {
+      toast.error("Please fill in Inquiry Name and Customer first to save item info");
+      return;
+    }
+
+    if (!request.itemName || !request.qty || parseInt(request.qty) < 1) {
+      toast.error("Please fill in Request Name and Qty for this item first");
+      return;
+    }
+
+    try {
+      const requestsData = inquiryRequests.map((req) => ({
+        ...req,
+        qty: req.qty.toString(),
+      }));
+      const inquiryPayload = {
+        ...inquiryFormData,
+        requests: requestsData,
+      };
+
+      let savedInquiryId = editingInquiryId;
+      if (inquiryModalMode === "edit" && editingInquiryId) {
+        await updateInquiry({
+          id: editingInquiryId,
+          ...inquiryPayload,
+        } as UpdateInquiryPayload);
+      } else {
+        const result = await createInquiry(inquiryPayload as CreateInquiryPayload);
+        savedInquiryId = (result as any)?.data?.id || (result as any)?.id;
+        if (savedInquiryId) {
+          setEditingInquiryId(savedInquiryId);
+          setInquiryModalMode("edit");
+          setEditModeEnabled(true);
+          if (newInquiryTags.length > 0) {
+            await syncEntityTags(savedInquiryId, "inquiry", newInquiryTags.map((t) => t.id));
+          }
+        }
+      }
+
+      if (!savedInquiryId) {
+        toast.error("Failed to save inquiry");
+        return;
+      }
+
+      const response = await getInquiryById(savedInquiryId);
+      const updatedInquiry = (response as any)?.data;
+      if (updatedInquiry && updatedInquiry.requests) {
+        const mappedRequests = mapRequestsFromServer(updatedInquiry.requests);
+        setInquiryRequests(mappedRequests);
+        const savedRequest = mappedRequests[index];
+        if (savedRequest && savedRequest.id) {
+          setSelectedRequestForDetail(savedRequest);
+          setSelectedRequestInquiryId(savedInquiryId);
+          setShowRequestDetailModal(true);
+        } else {
+          toast.error("Could not find saved request");
+        }
+      }
+      fetchInquiries();
+    } catch (error) {
+      console.error("Error auto-saving inquiry for details:", error);
+    }
+  };
   const renderDimensionStatus = () => {
     if (!Object.values(existingDimensionFields).some((v) => v)) {
       return null;
@@ -754,37 +870,7 @@ const CombinedInquiriesPageContent = () => {
     setNewInquiryTags((inquiry as any).tags || []);
     setInquiryImagePreview(inquiry.image || "");
     if (inquiry.requests && inquiry.requests.length > 0) {
-      setInquiryRequests(
-        inquiry.requests.map((req: any) => ({
-          itemName: req.itemName,
-          description: req.description || "",
-          qty: req.qty || 1,
-          purchasePrice: req.purchasePrice || 0,
-          currency: req.currency || "RMB",
-          status: req.status || "Draft",
-          material: req.material || "",
-          specification: req.specification || "",
-          images: req.images || [],
-          weight: req.weight,
-          width: req.width,
-          height: req.height,
-          length: req.length,
-          qualityCriteria: req.qualityCriteria || [],
-          attachments: req.attachments || [],
-          taric: req.taric || "",
-          asanaLink: req.asanaLink || "",
-          itemNo: req.itemNo || "",
-          urgency1: req.urgency1 || "",
-          urgency2: req.urgency2 || "",
-          painPoints: req.painPoints || [],
-          priceRMB: req.priceRMB || req.purchasePrice || 0,
-          priority: req.priority || "Normal",
-          interval: req.interval || "Monatlich",
-          targetPrice: req.targetPrice || 0,
-          annualPotential: req.annualPotential || 0,
-          annualPotentialKEur: req.annualPotentialKEur || 0,
-        })),
-      );
+      setInquiryRequests(mapRequestsFromServer(inquiry.requests));
     }
     setExpandedRequestIndex(0);
     setShowCreateModal(true);
@@ -2779,10 +2865,20 @@ const CombinedInquiriesPageContent = () => {
                           )}
                           <span className="text-sm font-medium text-gray-900">
                             Request #{index + 1}:{" "}
-                            {request.itemName || "New Item"}
+                            {request.itemName || "New Request"}
                           </span>
                         </div>
                         <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleItemInfoClick(request, index);
+                            }}
+                            className="px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 transition-all font-semibold"
+                          >
+                            Item Info
+                          </button>
                           {inquiryRequests.length > 1 && (
                             <button
                               type="button"
@@ -2809,7 +2905,7 @@ const CombinedInquiriesPageContent = () => {
                             <div className="grid grid-cols-3 gap-3">
                               <div>
                                 <label className="block text-xs font-medium text-gray-700 mb-1">
-                                  ItemName*
+                                  Request Name*
                                 </label>
                                 <input
                                   type="text"
@@ -2826,7 +2922,7 @@ const CombinedInquiriesPageContent = () => {
                                     !editModeEnabled
                                   }
                                   className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                                  placeholder="Enter item name"
+                                  placeholder="Enter request name"
                                 />
                               </div>
                               <div>
@@ -3011,91 +3107,6 @@ const CombinedInquiriesPageContent = () => {
                                   placeholder="0.00"
                                 />
                               </div>
-                              <div>
-                                <label className="block text-xs font-medium text-gray-700 mb-1">
-                                  Purchase Price
-                                </label>
-                                <input
-                                  type="number"
-                                  value={request.purchasePrice}
-                                  onChange={(e) =>
-                                    updateRequest(
-                                      index,
-                                      "purchasePrice",
-                                      parseFloat(e.target.value) || 0,
-                                    )
-                                  }
-                                  disabled={
-                                    inquiryModalMode === "edit" &&
-                                    !editModeEnabled
-                                  }
-                                  className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                                  step="0.01"
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-xs font-medium text-gray-700 mb-1">
-                                  Currency Purchase
-                                </label>
-                                <select
-                                  value={request.currency}
-                                  onChange={(e) =>
-                                    updateRequest(
-                                      index,
-                                      "currency",
-                                      e.target.value,
-                                    )
-                                  }
-                                  disabled={
-                                    inquiryModalMode === "edit" &&
-                                    !editModeEnabled
-                                  }
-                                  className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                                >
-                                  {getAvailableCurrencies().map(
-                                    (currency) => (
-                                      <option
-                                        key={currency.value}
-                                        value={currency.value}
-                                      >
-                                        {currency.label}
-                                      </option>
-                                    ),
-                                  )}
-                                </select>
-                              </div>
-                              <div>
-                                <label className="block text-xs font-medium text-gray-700 mb-1">
-                                  TARIC
-                                </label>
-                                <select
-                                  value={request.taric || ""}
-                                  onChange={(e) =>
-                                    updateRequest(
-                                      index,
-                                      "taric",
-                                      e.target.value,
-                                    )
-                                  }
-                                  disabled={
-                                    inquiryModalMode === "edit" &&
-                                    !editModeEnabled
-                                  }
-                                  className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                                >
-                                  <option value="">
-                                    Select TARIC Code
-                                  </option>
-                                  {tarics.map((taric) => (
-                                    <option
-                                      key={taric.id}
-                                      value={taric.code}
-                                    >
-                                      {formatTaricDisplay(taric)}
-                                    </option>
-                                  ))}
-                                </select>
-                              </div>
                             </div>
                             <div className="bg-blue-50/50 rounded-lg p-3 border border-blue-100/60 flex items-center justify-between text-xs text-blue-800">
                               <div>
@@ -3154,100 +3165,7 @@ const CombinedInquiriesPageContent = () => {
                                 </span>
                               </div>
                             </div>
-                            <div className="grid grid-cols-4 gap-3 border-t border-gray-200/50 pt-3">
-                              <div>
-                                <label className="block text-xs font-medium text-gray-700 mb-1">
-                                  Weight (kg)
-                                </label>
-                                <input
-                                  type="number"
-                                  value={request.weight || ""}
-                                  onChange={(e) =>
-                                    updateRequest(
-                                      index,
-                                      "weight",
-                                      parseFloat(e.target.value) ||
-                                      undefined,
-                                    )
-                                  }
-                                  disabled={
-                                    inquiryModalMode === "edit" &&
-                                    !editModeEnabled
-                                  }
-                                  className="w-full px-2 py-1.5 text-sm border border-gray-300/80 bg-white rounded-lg transition-all"
-                                  step="0.001"
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-xs font-medium text-gray-700 mb-1">
-                                  Length (cm)
-                                </label>
-                                <input
-                                  type="number"
-                                  value={request.length || ""}
-                                  onChange={(e) =>
-                                    updateRequest(
-                                      index,
-                                      "length",
-                                      parseFloat(e.target.value) ||
-                                      undefined,
-                                    )
-                                  }
-                                  disabled={
-                                    inquiryModalMode === "edit" &&
-                                    !editModeEnabled
-                                  }
-                                  className="w-full px-2 py-1.5 text-sm border border-gray-300/80 bg-white rounded-lg transition-all"
-                                  step="0.1"
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-xs font-medium text-gray-700 mb-1">
-                                  Width (cm)
-                                </label>
-                                <input
-                                  type="number"
-                                  value={request.width || ""}
-                                  onChange={(e) =>
-                                    updateRequest(
-                                      index,
-                                      "width",
-                                      parseFloat(e.target.value) ||
-                                      undefined,
-                                    )
-                                  }
-                                  disabled={
-                                    inquiryModalMode === "edit" &&
-                                    !editModeEnabled
-                                  }
-                                  className="w-full px-2 py-1.5 text-sm border border-gray-300/80 bg-white rounded-lg transition-all"
-                                  step="0.1"
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-xs font-medium text-gray-700 mb-1">
-                                  Height (cm)
-                                </label>
-                                <input
-                                  type="number"
-                                  value={request.height || ""}
-                                  onChange={(e) =>
-                                    updateRequest(
-                                      index,
-                                      "height",
-                                      parseFloat(e.target.value) ||
-                                      undefined,
-                                    )
-                                  }
-                                  disabled={
-                                    inquiryModalMode === "edit" &&
-                                    !editModeEnabled
-                                  }
-                                  className="w-full px-2 py-1.5 text-sm border border-gray-300/80 bg-white rounded-lg transition-all"
-                                  step="0.1"
-                                />
-                              </div>
-                            </div>
+
                             <div className="grid grid-cols-3 gap-3 border-t border-gray-200/50 pt-3">
                               <div>
                                 <label className="block text-xs font-medium text-gray-700 mb-1">
@@ -3782,9 +3700,13 @@ const CombinedInquiriesPageContent = () => {
         onClose={() => setShowRequestDetailModal(false)}
         itemId={selectedRequestForDetail?.id}
         isRequest={true}
-        onSaved={fetchInquiries}
+        onSaved={() => {
+          refreshInquiryRequests();
+          fetchInquiries();
+        }}
         onDeleted={() => {
           setShowRequestDetailModal(false);
+          refreshInquiryRequests();
           fetchInquiries();
         }}
         onConvert={(itemData) => {

@@ -11,11 +11,12 @@ const CustomModal: React.FC<CustomModalProps> = ({
     width = "max-w-md",
     showHeader = true,
     noPadding = false,
+    zIndex = "z-[100]",
 }) => {
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-[100] transition-opacity duration-300">
+        <div className={`fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 transition-opacity duration-300 ${zIndex}`}>
             <div
                 className={`bg-white rounded-2xl shadow-2xl w-full ${width} transform transition-all duration-300 scale-100 border border-gray-100 overflow-hidden`}
                 onClick={(e) => e.stopPropagation()}

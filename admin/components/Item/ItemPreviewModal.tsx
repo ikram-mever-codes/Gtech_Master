@@ -575,7 +575,7 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
   const previewItemNo = previewItem?.de_no || "—";
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-[150]">
       <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden">
         {previewLoading || !previewItem ? (
           <div className="p-6 py-20 text-center">
@@ -1175,6 +1175,7 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
         onClose={() => setQualityModalOpen(false)}
         title={editingQuality ? "Update Quality Criterion" : "Add Quality Criterion"}
         width="max-w-md"
+        zIndex="z-[160]"
         footer={
           <div className="flex gap-2 w-full justify-end">
             <button

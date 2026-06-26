@@ -17,4 +17,5 @@ export interface CustomModalProps {
   width?: string;
   showHeader?: boolean;
   noPadding?: boolean;
+  zIndex?: string;
 }
