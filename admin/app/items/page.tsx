@@ -79,17 +79,9 @@ import {
 import { TagFilterSelector } from "@/components/Tags/TagFilterSelector";
 import ItemCreateModal from "@/components/Item/ItemCreateModal";
 import ParentModal from "@/components/Item/ParentModal";
-<<<<<<< HEAD
+import { CustomerSearchInput } from "@/components/UI/CustomerSearchInput";
 import { TagBadge, sortTags, type Tag } from "@/components/Tags/TagManager";
 import ItemPreviewModal from "@/components/Item/ItemPreviewModal";
-=======
-import { CustomerSearchInput } from "@/components/UI/CustomerSearchInput";
-import {
-  TagBadge,
-  sortTags,
-  type Tag,
-} from "@/components/Tags/TagManager";
->>>>>>> ca5b2fe3eadf32a930ee1b116b7f901c00b3f732
 
 type TabType = "items" | "parents" | "warehouse" | "tarics" | "suppliers";
 
@@ -1767,37 +1759,6 @@ const ItemsManagementPage: React.FC = () => {
                   onReset={() => setFilters((prev) => ({ ...prev, tags: "" }))}
                 />
               </div>
-<<<<<<< HEAD
-              <div className="flex-grow flex-shrink flex-1 min-w-[150px]">
-                <select
-                  value={filters.company || ""}
-                  onChange={(e) =>
-                    setFilters({ ...filters, company: e.target.value })
-                  }
-                  className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${
-                    filters.company
-                      ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
-                      : "text-gray-400 border-gray-300 bg-white"
-                  }`}
-                >
-                  <option value="">Company...</option>
-                  {Array.from(
-                    new Map(
-                      allCustomers
-                        .filter((c) => c.companyName)
-                        .map((c) => [String(c.id), c]),
-                    ).values(),
-                  )
-                    .sort((a: any, b: any) =>
-                      (a.companyName || "").localeCompare(b.companyName || ""),
-                    )
-                    .map((c: any) => (
-                      <option key={c.id} value={String(c.id)}>
-                        {c.companyName}
-                      </option>
-                    ))}
-                </select>
-=======
               <div className="relative flex-grow flex-shrink flex-1 min-w-[180px]">
                 <CustomerSearchInput
                   value={filters.company || ""}
@@ -1808,7 +1769,6 @@ const ItemsManagementPage: React.FC = () => {
                   mode="customers"
                   initialLabel={filters.company || ""}
                 />
->>>>>>> ca5b2fe3eadf32a930ee1b116b7f901c00b3f732
               </div>
 
               <div className="w-[90px] flex-shrink-0">
