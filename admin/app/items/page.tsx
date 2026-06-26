@@ -79,6 +79,7 @@ import { TagFilterSelector } from "@/components/Tags/TagFilterSelector";
 import ItemCreateModal from "@/components/Item/ItemCreateModal";
 import ItemPreviewModal from "@/components/Item/ItemPreviewModal";
 import ParentModal from "@/components/Item/ParentModal";
+import { CustomerSearchInput } from "@/components/UI/CustomerSearchInput";
 import {
   TagBadge,
   sortTags,
@@ -1456,29 +1457,16 @@ const ItemsManagementPage: React.FC = () => {
                   }
                 />
               </div>
-              <div className="relative flex-grow flex-shrink flex-1 min-w-[120px]">
-                <div className="relative">
-                  <input
-                    type="text"
-                    placeholder="Company..."
-                    value={filters.company || ""}
-                    onChange={(e) =>
-                      setFilters({ ...filters, company: e.target.value })
-                    }
-                    className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${filters.company
-                      ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
-                      : "text-gray-900 border-gray-300 bg-white"
-                      }`}
-                  />
-                  {filters.company && (
-                    <button
-                      onClick={() => setFilters({ ...filters, company: "" })}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500"
-                    >
-                      <XMarkIcon className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                </div>
+              <div className="relative flex-grow flex-shrink flex-1 min-w-[180px]">
+                <CustomerSearchInput
+                  value={filters.company || ""}
+                  onChange={(id, name) =>
+                    setFilters({ ...filters, company: name })
+                  }
+                  placeholder="Company..."
+                  mode="customers"
+                  initialLabel={filters.company || ""}
+                />
               </div>
 
               <div className="w-[90px] flex-shrink-0">

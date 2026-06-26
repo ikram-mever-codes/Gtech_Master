@@ -16,6 +16,7 @@ import { Package } from "lucide-react";
 import { toast } from "react-hot-toast";
 import ReactSelect from "react-select";
 import CustomModal from "@/components/UI/CustomModal";
+import { CustomerSearchInput } from "@/components/UI/CustomerSearchInput";
 import ViewEditToggle from "@/components/UI/ViewEditToggle";
 import {
   EntityTagSelector,
@@ -661,7 +662,18 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                     previewItemNo
                   )}
                 </Field>
-                <Field label="Company">{getCompany(previewItem) || "—"}</Field>
+                <Field label="Company">
+                  {previewEdit ? (
+                    <CustomerSearchInput
+                      value={previewItem.customer_id ?? ""}
+                      initialLabel={getCompany(previewItem)}
+                      onChange={(id) => patchPreview({ customer_id: id ? parseInt(id) : null })}
+                      placeholder="Search company..."
+                    />
+                  ) : (
+                    getCompany(previewItem) || "—"
+                  )}
+                </Field>
                 <Field label="IsLabel">
                   {previewEdit ? (
                     <div className="flex items-center mt-1">
