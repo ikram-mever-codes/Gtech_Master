@@ -136,7 +136,7 @@ export class InvoiceController {
           phone: "+4923158697565",
           email: "info@gtech-industries.de",
           website: "www.gtech-shop.de",
-          registrationNumber: "Amtsgericht Hagen HRB 12496",
+          registrationNumber: "Amtsgericht Dortmund HRB38470",
           ceo: "Geschäftsführer Joschua Grenzheuser",
           vatId: "DE291514916",
           taxNumber: "316/5733/1295",
@@ -150,7 +150,7 @@ export class InvoiceController {
 
         const logoPath = path.join(process.cwd(), "assets", "logo.png");
         if (fs.existsSync(logoPath)) {
-          doc.image(logoPath, leftAlignX, yPos, { width: 100, height: 50 });
+          doc.image(logoPath, leftAlignX, yPos, { fit: [100, 50] });
         }
 
         const fontSource = _cachedCjkFontBuffer || _cachedCjkFontPath;

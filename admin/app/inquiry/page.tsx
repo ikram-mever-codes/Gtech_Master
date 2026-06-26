@@ -719,23 +719,48 @@ const CombinedInquiriesPageContent = () => {
       return;
     }
 
-    if (!inquiryFormData.name || !inquiryFormData.customerId) {
-      toast.error("Please fill in Inquiry Name and Customer first to save item info");
-      return;
-    }
-
-    if (!request.itemName || !request.qty || parseInt(request.qty) < 1) {
-      toast.error("Please fill in Request Name and Qty for this item first");
-      return;
-    }
-
     try {
-      const requestsData = inquiryRequests.map((req) => ({
+      let updatedFormData = { ...inquiryFormData };
+      let updatedRequests = [...inquiryRequests];
+      let changedForm = false;
+      let changedRequests = false;
+
+      if (!updatedFormData.name) {
+        updatedFormData.name = "Draft Inquiry";
+        changedForm = true;
+      }
+      if (!updatedFormData.customerId && customers.length > 0) {
+        updatedFormData.customerId = customers[0].id;
+        changedForm = true;
+      }
+
+      if (!updatedRequests[index].itemName) {
+        updatedRequests[index].itemName = "Draft Request Item";
+        changedRequests = true;
+      }
+      if (!updatedRequests[index].qty || parseInt(updatedRequests[index].qty) < 1) {
+        updatedRequests[index].qty = 1;
+        changedRequests = true;
+      }
+
+      if (changedForm) {
+        setInquiryFormData(updatedFormData);
+      }
+      if (changedRequests) {
+        setInquiryRequests(updatedRequests);
+      }
+
+      if (!updatedFormData.customerId) {
+        toast.error("Please add/select a Customer before viewing item details");
+        return;
+      }
+
+      const requestsData = updatedRequests.map((req) => ({
         ...req,
         qty: req.qty.toString(),
       }));
       const inquiryPayload = {
-        ...inquiryFormData,
+        ...updatedFormData,
         requests: requestsData,
       };
 
