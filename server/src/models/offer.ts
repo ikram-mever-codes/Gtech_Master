@@ -24,6 +24,13 @@ export type OfferStatus =
 
 export type Currency = "RMB" | "HKD" | "EUR" | "USD";
 
+/**
+ * Where an offer originated. An offer can now be created from an inquiry
+ * (the original flow), directly from an existing catalogue item, or as a
+ * blank offer attached to a customer.
+ */
+export type OfferSourceType = "inquiry" | "item" | "customer";
+
 export interface QuantityPrice {
   quantity: string;
   price: number;
@@ -59,6 +66,38 @@ export interface CustomerSnapshot {
   additionalInfo?: string;
 }
 
+/**
+ * Frozen copy of the catalogue item an offer was generated from, so the
+ * offer stays meaningful even if the item later changes.
+ */
+export interface ItemSnapshot {
+  id: string;
+  itemName: string;
+  itemNameCn?: string;
+  ean?: string;
+  model?: string;
+  description?: string;
+  specification?: string;
+  weight?: number;
+  width?: number;
+  height?: number;
+  length?: number;
+  purchasePrice?: number;
+  purchaseCurrency?: string;
+  photo?: string;
+}
+
+export interface InquirySnapshot {
+  id: string;
+  name: string;
+  isAssembly: boolean;
+  description?: string;
+  createdAt: Date;
+  referenceNumber?: string;
+  status?: string;
+  requestsCount?: number;
+}
+
 @Entity()
 export class Offer {
   @PrimaryGeneratedColumn("uuid")
@@ -70,24 +109,40 @@ export class Offer {
   @Column({ type: "varchar", length: 255 })
   title!: string;
 
+  /**
+   * Discriminator for how the offer was created. Defaults to "inquiry"
+   * to keep existing rows valid after migration.
+   */
+  @Column({ type: "varchar", length: 20, default: "inquiry" })
+  sourceType!: OfferSourceType;
+
+  // --- Source: Inquiry (now optional) ------------------------------------
+  // Previously required + CASCADE delete. An offer can now exist without an
+  // inquiry (when created from an item or a customer), so this is nullable
+  // and deleting the inquiry only detaches it instead of removing the offer.
   @ManyToOne(() => Inquiry, (inquiry) => inquiry.offers, {
-    nullable: false,
-    onDelete: "CASCADE",
+    nullable: true,
+    onDelete: "SET NULL",
   })
   @JoinColumn({ name: "inquiry_id" })
-  inquiry!: Inquiry;
+  inquiry?: Inquiry | null;
 
-  @Column({ name: "inquiry_id" })
-  inquiryId!: string;
+  @Column({ name: "inquiry_id", nullable: true })
+  inquiryId?: string | null;
 
   @Column({ type: "json", nullable: true })
-  inquirySnapshot!: {
-    id: string;
-    name: string;
-    isAssembly: boolean;
-    description?: string;
-    createdAt: Date;
-  };
+  inquirySnapshot?: InquirySnapshot | null;
+
+  // --- Source: Item ------------------------------------------------------
+  @Column({ name: "item_id", type: "varchar", length: 100, nullable: true })
+  itemId?: string | null;
+
+  @Column({ type: "json", nullable: true })
+  itemSnapshot?: ItemSnapshot | null;
+
+  // --- Source: Customer (always captured as a snapshot) ------------------
+  @Column({ name: "customer_id", type: "varchar", length: 100, nullable: true })
+  customerId?: string | null;
 
   @Column({ type: "json", nullable: false })
   customerSnapshot!: CustomerSnapshot;
@@ -379,6 +434,15 @@ export class OfferLineItem {
 
   @Column({ name: "requested_item_id", nullable: true })
   requestedItemId?: string;
+
+  /** Set when this line was generated from a catalogue item. */
+  @Column({
+    name: "source_item_id",
+    type: "varchar",
+    length: 100,
+    nullable: true,
+  })
+  sourceItemId?: string;
 
   @Column({ type: "varchar", length: 255 })
   itemName!: string;

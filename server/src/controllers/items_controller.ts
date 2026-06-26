@@ -737,6 +737,9 @@ export const getItemById = async (
         uploadedAt: file.uploadedAt,
       })),
 
+      photo: item.photo || "",
+      pix_path: item.pix_path || "",
+      pix_path_eBay: item.pix_path_eBay || "",
       pictures: {
         shopPicture: item.photo || "",
         ebayPictures: item.pix_path_eBay || "",

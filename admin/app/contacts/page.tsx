@@ -49,6 +49,7 @@ import { useSelector } from "react-redux";
 import { UserRole } from "@/utils/interfaces";
 import Link from "next/link";
 import { TagFilterSelector } from "@/components/Tags/TagFilterSelector";
+import { CustomerSearchInput } from "@/components/UI/CustomerSearchInput";
 
 type TabType = "all" | "no-contacts" | "sales";
 type ModalMode = "create" | "edit";
@@ -1670,54 +1671,24 @@ const ContactPersonsPage: React.FC = () => {
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Select Business *
                       </label>
-                      <div className="relative">
-                        <input
-                          type="text"
-                          placeholder="Geschäft suchen..."
-                          value={businessSearchTerm}
-                          onChange={(e) => {
-                            setBusinessSearchTerm(e.target.value);
-                            fetchAllStarBusinesses(e.target.value);
-                          }}
-                          disabled={
-                            (modalMode === "edit" && !editModeEnabled) ||
-                            (activeTab === "sales" &&
-                              !isDecisionMakerContact(createForm.contact))
-                          }
-                          className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                        />
-                        {allStarBusinesses.length > 0 && (
-                          <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto z-10">
-                            {allStarBusinesses.map((business, index) => (
-                              <button
-                                key={business.value || business.id || `business-${index}`}
-                                onClick={() => {
-                                  console.log("[DEBUG] Selected business from dropdown:", business);
-                                  setSelectedBusiness(business);
-                                  setCreateForm({
-                                    ...createForm,
-                                    starBusinessDetailsId:
-                                      business.value || business.id,
-                                  });
-                                  setBusinessSearchTerm("");
-                                }}
-                                className="w-full px-4 py-2 text-left hover:bg-gray-50 border-b border-gray-100 last:border-b-0"
-                              >
-                                <div className="font-medium">
-                                  {business.name ||
-                                    business.label ||
-                                    business.companyName}
-                                </div>
-                                {business.city && (
-                                  <div className="text-sm text-gray-500">
-                                    {business.city}, {business.state}
-                                  </div>
-                                )}
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
+                      <CustomerSearchInput
+                        value={createForm.starBusinessDetailsId || ""}
+                        onChange={(id, name, fullObj) => {
+                          console.log("[DEBUG] Selected business from dropdown:", fullObj);
+                          setSelectedBusiness(fullObj);
+                          setCreateForm({
+                            ...createForm,
+                            starBusinessDetailsId: id,
+                          });
+                        }}
+                        placeholder="Geschäft suchen..."
+                        mode="businesses"
+                        disabled={
+                          (modalMode === "edit" && !editModeEnabled) ||
+                          (activeTab === "sales" &&
+                            !isDecisionMakerContact(createForm.contact))
+                        }
+                      />
                     </div>
                   )}
 
@@ -1754,10 +1725,7 @@ const ContactPersonsPage: React.FC = () => {
                       </div>
                     </div>
                   )}
-
-                  {/* Contact Form */}
                   <div className="grid grid-cols-2 gap-4">
-                    {/* Personal Information */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         First Name *

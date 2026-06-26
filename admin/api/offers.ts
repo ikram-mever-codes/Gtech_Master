@@ -80,6 +80,40 @@ export interface OfferLineItem {
   activePriceType?: "quantity" | "unit";
 }
 
+export interface CreateOfferFromItemPayload {
+  customerId?: string;
+  title?: string;
+  currency?: "EUR" | "USD" | "RMB" | "HKD";
+  validUntil?: Date | string;
+  notes?: string;
+  baseQuantity?: string;
+  useUnitPrices?: boolean;
+  unitPriceDecimalPlaces?: number;
+  totalPriceDecimalPlaces?: number;
+  maxUnitPriceColumns?: number;
+}
+
+export interface CreateOfferFromCustomerPayload {
+  title?: string;
+  currency?: "EUR" | "USD" | "RMB" | "HKD";
+  validUntil?: Date | string;
+  notes?: string;
+  useUnitPrices?: boolean;
+  unitPriceDecimalPlaces?: number;
+  totalPriceDecimalPlaces?: number;
+  maxUnitPriceColumns?: number;
+}
+
+export interface CreateLineItemPayload {
+  itemName: string;
+  material?: string;
+  specification?: string;
+  description?: string;
+  baseQuantity?: string;
+  basePrice?: number;
+  notes?: string;
+}
+
 export interface Offer {
   id: string;
   offerNumber: string;
@@ -88,13 +122,13 @@ export interface Offer {
   customerSnapshot: CustomerSnapshot;
   deliveryAddress: DeliveryAddress;
   status:
-  | "Draft"
-  | "Submitted"
-  | "Negotiation"
-  | "Accepted"
-  | "Rejected"
-  | "Expired"
-  | "Cancelled";
+    | "Draft"
+    | "Submitted"
+    | "Negotiation"
+    | "Accepted"
+    | "Rejected"
+    | "Expired"
+    | "Cancelled";
   validUntil: Date;
   termsConditions?: string;
   deliveryTerms?: string;
@@ -361,7 +395,8 @@ export const toggleOfferUnitPrices = async (
     );
     toast.dismiss();
     toast.success(
-      `Unit prices ${useUnitPrices ? "enabled" : "disabled"
+      `Unit prices ${
+        useUnitPrices ? "enabled" : "disabled"
       } successfully for all line items`,
       successStyles,
     );
@@ -905,4 +940,41 @@ export const prepareLineItemForUnitPricesLegacy = (
     unitPrices: lineItem.unitPrices || createDefaultUnitPrices(),
     quantityPrices: lineItem.quantityPrices || [],
   };
+};
+
+export const createOfferFromItem = async (
+  itemId: string,
+  payload: CreateOfferFromItemPayload,
+) => {
+  const { data } = await api.post(`/offers/from-item/${itemId}`, payload);
+  return data;
+};
+
+export const createOfferFromCustomer = async (
+  customerId: string,
+  payload: CreateOfferFromCustomerPayload,
+) => {
+  const { data } = await api.post(
+    `/offers/from-customer/${customerId}`,
+    payload,
+  );
+  return data;
+};
+
+export const createOfferLineItem = async (
+  offerId: string,
+  payload: CreateLineItemPayload,
+) => {
+  const { data } = await api.post(`/offers/${offerId}/line-items`, payload);
+  return data;
+};
+
+export const deleteOfferLineItem = async (
+  offerId: string,
+  lineItemId: string,
+) => {
+  const { data } = await api.delete(
+    `/offers/${offerId}/line-items/${lineItemId}`,
+  );
+  return data;
 };

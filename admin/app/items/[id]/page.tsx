@@ -48,6 +48,7 @@ import {
 import { Package } from "lucide-react";
 import PageHeader from "@/components/UI/PageHeader";
 import { EntityTagSelector } from "@/components/Tags/TagManager";
+import { CustomerSearchInput } from "@/components/UI/CustomerSearchInput";
 
 const hasChinese = (str: string) => /[\u4e00-\u9fa5]/.test(str || "");
 
@@ -1315,94 +1316,16 @@ const ItemDetailsPage = () => {
                   </div>
                   <div className="md:col-span-2">
                     {editMode ? (
-                      <div className="relative">
-                        <div className="relative">
-                          <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
-                          <input
-                            type="text"
-                            placeholder="Search customer by name..."
-                            value={customerSearch}
-                            onChange={(e) => {
-                              setCustomerSearch(e.target.value);
-                              setShowCustomerDropdown(true);
-                            }}
-                            onFocus={() => setShowCustomerDropdown(true)}
-                            className="w-full pl-9 pr-9 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary"
-                          />
-                          {(customerSearch ||
-                            (itemData as any).customer_id) && (
-                              <button
-                                type="button"
-                                onClick={handleClearCustomer}
-                                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500 transition-colors"
-                                title="Clear customer"
-                              >
-                                <XCircleIcon className="h-4 w-4" />
-                              </button>
-                            )}
-                        </div>
-
-                        {showCustomerDropdown && (
-                          <>
-                            <div
-                              className="fixed inset-0 z-10"
-                              onClick={() => setShowCustomerDropdown(false)}
-                            />
-                            <div className="absolute z-20 mt-1 w-full max-h-64 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg scrollbar-thin">
-                              {filteredCustomers.length > 0 ? (
-                                filteredCustomers.map((customer: any) => {
-                                  const isSelected =
-                                    String(customer.id) ===
-                                    String((itemData as any).customer_id);
-                                  return (
-                                    <div
-                                      key={customer.id}
-                                      onClick={() =>
-                                        handleSelectCustomer(customer)
-                                      }
-                                      className={`px-3.5 py-2.5 text-sm cursor-pointer flex items-center justify-between transition-colors ${isSelected
-                                        ? "bg-[#8CC21B]/10 text-[#5f8512] font-semibold"
-                                        : "hover:bg-gray-50 text-gray-700"
-                                        }`}
-                                    >
-                                      <div className="flex flex-col min-w-0 pr-3">
-                                        <span className="font-medium line-clamp-1">
-                                          {customer.companyName ||
-                                            "Unnamed Customer"}
-                                        </span>
-                                        {(customer.customerNumber ||
-                                          customer.email) && (
-                                            <span className="text-[11px] text-gray-400 line-clamp-1">
-                                              {customer.customerNumber
-                                                ? `No: ${customer.customerNumber}`
-                                                : customer.email}
-                                            </span>
-                                          )}
-                                      </div>
-                                      {isSelected && (
-                                        <CheckCircleIcon className="h-4 w-4 text-[#8CC21B] shrink-0" />
-                                      )}
-                                    </div>
-                                  );
-                                })
-                              ) : (
-                                <div className="px-3.5 py-4 text-center text-xs text-gray-400">
-                                  No customers found.
-                                </div>
-                              )}
-                            </div>
-                          </>
-                        )}
-
-                        {selectedCustomer && (
-                          <p className="mt-2 text-xs text-gray-500">
-                            Selected:{" "}
-                            <span className="font-semibold text-gray-700">
-                              {selectedCustomer.companyName}
-                            </span>
-                          </p>
-                        )}
-                      </div>
+                      <CustomerSearchInput
+                        value={(itemData as any).customer_id ?? ""}
+                        initialLabel={selectedCustomerName}
+                        onChange={(id) => {
+                          setItemData((prev) =>
+                            prev ? ({ ...prev, customer_id: id ? parseInt(id) : null } as any) : prev,
+                          );
+                        }}
+                        placeholder="Search customer by name or number..."
+                      />
                     ) : (
                       <span className="text-gray-900">
                         {selectedCustomerName || "—"}

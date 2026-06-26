@@ -16,6 +16,7 @@ import { Package } from "lucide-react";
 import { toast } from "react-hot-toast";
 import ReactSelect from "react-select";
 import CustomModal from "@/components/UI/CustomModal";
+import { CustomerSearchInput } from "@/components/UI/CustomerSearchInput";
 import ViewEditToggle from "@/components/UI/ViewEditToggle";
 import { EntityTagSelector, type Tag } from "@/components/Tags/TagManager";
 import {
@@ -292,9 +293,26 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
             height: 0,
           },
           pictures: {
+<<<<<<< HEAD
             shopPicture: raw.photo || "",
             ebayPictures: raw.pix_path_eBay || "",
             pixPath: raw.pix_path || "",
+=======
+            shopPicture:
+              raw.pictures?.shopPicture ||
+              raw.photo ||
+              raw.pix_path_eBay ||
+              (raw.pix_path ? raw.pix_path.split(",").filter(Boolean)[0] : "") ||
+              "",
+            ebayPictures:
+              raw.pictures?.ebayPictures ||
+              raw.pix_path_eBay ||
+              "",
+            pixPath:
+              raw.pictures?.pixPath ||
+              raw.pix_path ||
+              "",
+>>>>>>> ca5b2fe3eadf32a930ee1b116b7f901c00b3f732
           },
           attachments: raw.attachments || [],
         };
@@ -772,6 +790,7 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                 </Field>
                 <Field label="Company">
                   {previewEdit ? (
+<<<<<<< HEAD
                     <ReactSelect
                       isClearable
                       placeholder="Search customer..."
@@ -810,6 +829,13 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
                           borderRadius: "0.5rem",
                         }),
                       }}
+=======
+                    <CustomerSearchInput
+                      value={previewItem.customer_id ?? ""}
+                      initialLabel={getCompany(previewItem)}
+                      onChange={(id) => patchPreview({ customer_id: id ? parseInt(id) : null })}
+                      placeholder="Search company..."
+>>>>>>> ca5b2fe3eadf32a930ee1b116b7f901c00b3f732
                     />
                   ) : (
                     getCompany(previewItem) || "—"

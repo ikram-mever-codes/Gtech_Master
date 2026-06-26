@@ -6,6 +6,7 @@ import {
   QuantityPrice,
   UnitPrice,
   OfferLineItem,
+  ItemSnapshot,
 } from "../models/offer";
 import { Inquiry } from "../models/inquiry";
 import { RequestedItem } from "../models/requested_items";
@@ -27,16 +28,16 @@ const getValidator = (): ValidatorModule => {
     return require("class-validator");
   } catch {
     return {
-      IsDate: () => () => { },
-      IsEnum: () => () => { },
-      IsNumber: () => () => { },
-      IsObject: () => () => { },
-      IsOptional: () => () => { },
-      IsString: () => () => { },
-      Max: () => () => { },
-      Min: () => () => { },
-      IsBoolean: () => () => { },
-      IsArray: () => () => { },
+      IsDate: () => () => {},
+      IsEnum: () => () => {},
+      IsNumber: () => () => {},
+      IsObject: () => () => {},
+      IsOptional: () => () => {},
+      IsString: () => () => {},
+      Max: () => () => {},
+      Min: () => () => {},
+      IsBoolean: () => () => {},
+      IsArray: () => () => {},
       validate: async () => [],
     };
   }
@@ -47,7 +48,7 @@ const getTransformer = (): TransformerModule => {
     return require("class-transformer");
   } catch {
     return {
-      Type: () => () => { },
+      Type: () => () => {},
       plainToInstance: <T>(cls: ClassConstructor<T>, plain: any): T =>
         plain as T,
     };
@@ -425,6 +426,141 @@ export class CopyPastePricesDto {
   data!: string;
 }
 
+// ---------------------------------------------------------------------------
+// New DTOs: creating offers from an Item or a Customer, and adding line items
+// to an offer that did not originate from an inquiry.
+// ---------------------------------------------------------------------------
+
+export class CreateOfferFromItemDto {
+  // Item-sourced offers may target a customer that differs from the item's
+  // own customer; if omitted we fall back to the item's customer.
+  @IsOptional()
+  @IsString()
+  customerId?: string;
+
+  @IsOptional()
+  @IsString()
+  title?: string;
+
+  @IsOptional()
+  @IsEnum(["RMB", "HKD", "EUR", "USD"])
+  currency?: "RMB" | "HKD" | "EUR" | "USD";
+
+  @IsOptional()
+  @IsDate()
+  @Type(() => Date)
+  validUntil?: Date;
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
+
+  @IsOptional()
+  @IsString()
+  internalNotes?: string;
+
+  @IsOptional()
+  @IsString()
+  baseQuantity?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  useUnitPrices?: boolean;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(2)
+  @Max(4)
+  unitPriceDecimalPlaces?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(2)
+  @Max(4)
+  totalPriceDecimalPlaces?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(10)
+  maxUnitPriceColumns?: number;
+}
+
+export class CreateOfferFromCustomerDto {
+  @IsOptional()
+  @IsString()
+  title?: string;
+
+  @IsOptional()
+  @IsEnum(["RMB", "HKD", "EUR", "USD"])
+  currency?: "RMB" | "HKD" | "EUR" | "USD";
+
+  @IsOptional()
+  @IsDate()
+  @Type(() => Date)
+  validUntil?: Date;
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
+
+  @IsOptional()
+  @IsString()
+  internalNotes?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  useUnitPrices?: boolean;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(2)
+  @Max(4)
+  unitPriceDecimalPlaces?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(2)
+  @Max(4)
+  totalPriceDecimalPlaces?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(10)
+  maxUnitPriceColumns?: number;
+}
+
+export class CreateLineItemDto {
+  @IsString()
+  itemName!: string;
+
+  @IsOptional()
+  @IsString()
+  material?: string;
+
+  @IsOptional()
+  @IsString()
+  specification?: string;
+
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @IsOptional()
+  @IsString()
+  baseQuantity?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  basePrice?: number;
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
+}
+
 export class OfferController {
   private offerRepository: any = AppDataSource.getRepository(Offer);
   private lineItemRepository: any = AppDataSource.getRepository(OfferLineItem);
@@ -452,6 +588,43 @@ export class OfferController {
     }
 
     return `OFF-${year}${month}-${sequence.toString().padStart(4, "0")}`;
+  }
+
+  // -------------------------------------------------------------------------
+  // Shared helpers for building snapshots from a Customer entity. Used by the
+  // inquiry/item/customer create paths so the snapshot shape stays identical.
+  // -------------------------------------------------------------------------
+  private buildCustomerSnapshot(customer: Customer | any): CustomerSnapshot {
+    return {
+      id: customer.id,
+      customerNumber: customer.customerNumber,
+      companyName: customer.companyName,
+      legalName: customer.legalName,
+      email: customer.email,
+      contactEmail: customer.contactEmail,
+      contactPhoneNumber: customer.contactPhoneNumber,
+      vatId: customer.vatTaxId || customer.taxNumber || "",
+      address: customer.addressLine1 || customer.businessDetails?.address || "",
+      city: customer.city || customer.businessDetails?.city || "",
+      postalCode:
+        customer.postalCode || customer.businessDetails?.postalCode || "",
+      country: customer.country || customer.businessDetails?.country || "",
+      state: customer.businessDetails?.state || "",
+      street: customer.addressLine1 || "Street Address",
+      additionalInfo: customer.addressLine2 || "Additional Info",
+    };
+  }
+
+  private buildDeliveryAddress(customer: Customer | any) {
+    return {
+      street: customer.addressLine1 || "Street Address",
+      city: customer.city || customer.businessDetails?.city,
+      state: customer.businessDetails?.state,
+      postalCode: customer.postalCode || customer.businessDetails?.postalCode,
+      country: customer.country || customer.businessDetails?.country,
+      contactName: customer.legalName || customer.companyName,
+      contactPhone: customer.contactPhoneNumber,
+    };
   }
 
   async createOfferFromInquiry(request: Request, response: Response) {
@@ -518,23 +691,8 @@ export class OfferController {
         requestsCount: inquiry.requests?.length || 0,
       };
 
-      const customerSnapshot: CustomerSnapshot = {
-        id: customer.id,
-        customerNumber: customer.customerNumber,
-        companyName: customer.companyName,
-        legalName: customer.legalName,
-        email: customer.email,
-        contactEmail: customer.contactEmail,
-        contactPhoneNumber: customer.contactPhoneNumber,
-        vatId: customer.vatTaxId || customer.taxNumber || "",
-        address: customer.addressLine1 || customer.businessDetails?.address || "",
-        city: customer.city || customer.businessDetails?.city || "",
-        postalCode: customer.postalCode || customer.businessDetails?.postalCode || "",
-        country: customer.country || customer.businessDetails?.country || "",
-        state: customer.businessDetails?.state || "",
-        street: customer.addressLine1 || "Street Address",
-        additionalInfo: customer.addressLine2 || "Additional Info",
-      };
+      const customerSnapshot: CustomerSnapshot =
+        this.buildCustomerSnapshot(customer);
 
       const defaultUnitPrices = createOfferDto.useUnitPrices
         ? createOfferDto.defaultUnitPrices || this.createDefaultUnitPrices()
@@ -542,6 +700,10 @@ export class OfferController {
 
       const offer = this.offerRepository.create({
         offerNumber,
+        sourceType: "inquiry",
+        itemId: null,
+        itemSnapshot: null,
+        customerId: customer.id,
         title: createOfferDto.title || `Offer for ${inquiry.name}`,
         inquiry: inquiry,
         inquiryId: inquiry.id,
@@ -696,6 +858,330 @@ export class OfferController {
         success: false,
         message: "Internal server error",
         error: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  }
+
+  // ==========================================================================
+  // CREATE FROM ITEM
+  // POST /offers/from-item/:itemId
+  // Prefills the customer (from the item's linked customer, or an explicit
+  // body.customerId) and seeds a single line item from the item's data.
+  // ==========================================================================
+  async createOfferFromItem(request: Request, response: Response) {
+    try {
+      const { itemId } = request.params;
+      const body: CreateOfferFromItemDto = request.body || {};
+
+      const itemRepository = AppDataSource.getRepository(Item);
+      const item: any = await itemRepository.findOne({
+        where: { id: itemId as any },
+        relations: ["customer", "taric"],
+      });
+
+      if (!item) {
+        return response
+          .status(404)
+          .json({ success: false, message: "Item not found" });
+      }
+
+      // Resolve the customer: explicit body.customerId wins, else the item's
+      // own customer. An offer must always carry a customer snapshot.
+      let customer: any = null;
+      if (body.customerId) {
+        customer = await this.customerRepository.findOne({
+          where: { id: body.customerId },
+        });
+      }
+      if (!customer) {
+        customer = item.customer || null;
+      }
+      if (!customer) {
+        return response.status(400).json({
+          success: false,
+          message:
+            "This item has no linked customer. Pass a customerId to create the offer.",
+        });
+      }
+
+      const offerNumber = await this.generateOfferNumber();
+      const customerSnapshot = this.buildCustomerSnapshot(customer);
+
+      const itemSnapshot: ItemSnapshot = {
+        id: item.id,
+        itemName: item.item_name,
+        itemNameCn: item.item_name_cn,
+        ean: item.ean ? String(item.ean) : undefined,
+        model: item.model,
+        description: item.remark || item.note,
+        specification: item.model,
+        weight: item.weight,
+        width: item.width,
+        height: item.height,
+        length: item.length,
+        purchasePrice: item.RMB_Price || 0,
+        purchaseCurrency: "RMB",
+        photo: item.photo || "",
+      };
+
+      const useUnitPrices = body.useUnitPrices || false;
+      const defaultUnitPrices = useUnitPrices
+        ? this.createDefaultUnitPrices()
+        : [];
+
+      const offer = this.offerRepository.create({
+        offerNumber,
+        sourceType: "item",
+        title: body.title || `Offer for ${itemSnapshot.itemName}`,
+        inquiry: null,
+        inquiryId: null,
+        inquirySnapshot: null,
+        itemId: itemSnapshot.id,
+        itemSnapshot,
+        customerId: customer.id,
+        customerSnapshot,
+        deliveryAddress: this.buildDeliveryAddress(customer),
+        status: "Draft",
+        validUntil:
+          body.validUntil || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        currency: body.currency || "EUR",
+        notes: body.notes,
+        internalNotes: body.internalNotes,
+        isAssembly: false,
+        useUnitPrices,
+        unitPriceDecimalPlaces: body.unitPriceDecimalPlaces || 3,
+        totalPriceDecimalPlaces: body.totalPriceDecimalPlaces || 2,
+        maxUnitPriceColumns: body.maxUnitPriceColumns || 3,
+        defaultUnitPrices,
+        revision: 1,
+        subtotal: 0,
+        taxAmount: 0,
+        totalAmount: 0,
+      });
+
+      const savedOffer = await this.offerRepository.save(offer);
+
+      const lineItem = this.lineItemRepository.create({
+        offer: savedOffer,
+        offerId: savedOffer.id,
+        sourceItemId: itemSnapshot.id,
+        itemName: itemSnapshot.itemName,
+        specification: itemSnapshot.specification,
+        description: itemSnapshot.description,
+        weight: itemSnapshot.weight,
+        width: itemSnapshot.width,
+        height: itemSnapshot.height,
+        length: itemSnapshot.length,
+        purchasePrice: itemSnapshot.purchasePrice,
+        purchaseCurrency: itemSnapshot.purchaseCurrency,
+        baseQuantity: body.baseQuantity || "1",
+        position: 1,
+        quantityPrices: [],
+        unitPrices: useUnitPrices ? this.createDefaultUnitPrices() : [],
+        lineTotal: 0,
+      });
+      await this.lineItemRepository.save(lineItem);
+
+      await this.calculateOfferTotals(savedOffer.id);
+
+      const completeOffer = await this.offerRepository.findOne({
+        where: { id: savedOffer.id },
+        relations: ["lineItems"],
+      });
+
+      return response.status(201).json({
+        success: true,
+        message: "Offer created from item successfully",
+        data: completeOffer,
+      });
+    } catch (error) {
+      console.error("Error creating offer from item:", error);
+      return response.status(500).json({
+        success: false,
+        message: "Internal server error",
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  }
+
+  // ==========================================================================
+  // CREATE FROM CUSTOMER (blank offer, customer prefilled)
+  // POST /offers/from-customer/:customerId
+  // ==========================================================================
+  async createOfferFromCustomer(request: Request, response: Response) {
+    try {
+      const { customerId } = request.params;
+      const body: CreateOfferFromCustomerDto = request.body || {};
+
+      const customer = await this.customerRepository.findOne({
+        where: { id: customerId },
+      });
+
+      if (!customer) {
+        return response
+          .status(404)
+          .json({ success: false, message: "Customer not found" });
+      }
+
+      const offerNumber = await this.generateOfferNumber();
+      const customerSnapshot = this.buildCustomerSnapshot(customer);
+
+      const useUnitPrices = body.useUnitPrices || false;
+      const defaultUnitPrices = useUnitPrices
+        ? this.createDefaultUnitPrices()
+        : [];
+
+      const offer = this.offerRepository.create({
+        offerNumber,
+        sourceType: "customer",
+        title: body.title || `Offer for ${customer.companyName}`,
+        inquiry: null,
+        inquiryId: null,
+        inquirySnapshot: null,
+        itemId: null,
+        itemSnapshot: null,
+        customerId: customer.id,
+        customerSnapshot,
+        deliveryAddress: this.buildDeliveryAddress(customer),
+        status: "Draft",
+        validUntil:
+          body.validUntil || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        currency: body.currency || "EUR",
+        notes: body.notes,
+        internalNotes: body.internalNotes,
+        isAssembly: false,
+        useUnitPrices,
+        unitPriceDecimalPlaces: body.unitPriceDecimalPlaces || 3,
+        totalPriceDecimalPlaces: body.totalPriceDecimalPlaces || 2,
+        maxUnitPriceColumns: body.maxUnitPriceColumns || 3,
+        defaultUnitPrices,
+        revision: 1,
+        subtotal: 0,
+        taxAmount: 0,
+        totalAmount: 0,
+      });
+
+      const savedOffer = await this.offerRepository.save(offer);
+
+      // No line items yet — the user adds them via createLineItem.
+      const completeOffer = await this.offerRepository.findOne({
+        where: { id: savedOffer.id },
+        relations: ["lineItems"],
+      });
+
+      return response.status(201).json({
+        success: true,
+        message: "Blank offer created for customer successfully",
+        data: completeOffer,
+      });
+    } catch (error) {
+      console.error("Error creating offer from customer:", error);
+      return response.status(500).json({
+        success: false,
+        message: "Internal server error",
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  }
+
+  // ==========================================================================
+  // ADD A LINE ITEM TO AN EXISTING OFFER
+  // POST /offers/:offerId/line-items
+  // Needed for customer/blank offers (and ad-hoc additions to any offer).
+  // ==========================================================================
+  async createLineItem(request: Request, response: Response) {
+    try {
+      const { offerId } = request.params;
+      const body: CreateLineItemDto = request.body || {};
+
+      if (!body.itemName || !body.itemName.trim()) {
+        return response
+          .status(400)
+          .json({ success: false, message: "itemName is required" });
+      }
+
+      const offer = await this.offerRepository.findOne({
+        where: { id: offerId },
+        relations: ["lineItems"],
+      });
+      if (!offer) {
+        return response
+          .status(404)
+          .json({ success: false, message: "Offer not found" });
+      }
+
+      const existing = (offer.lineItems || []).filter(
+        (li: OfferLineItem) => !li.isComponent,
+      );
+      const nextPosition =
+        existing.reduce(
+          (max: number, li: OfferLineItem) => Math.max(max, li.position || 0),
+          0,
+        ) + 1;
+
+      const lineItem = this.lineItemRepository.create({
+        offer,
+        offerId: offer.id,
+        itemName: body.itemName.trim(),
+        material: body.material,
+        specification: body.specification,
+        description: body.description,
+        baseQuantity: body.baseQuantity || "1",
+        basePrice: body.basePrice ?? undefined,
+        notes: body.notes,
+        position: nextPosition,
+        quantityPrices: [],
+        unitPrices: offer.useUnitPrices ? this.createDefaultUnitPrices() : [],
+        lineTotal:
+          body.basePrice && body.baseQuantity
+            ? body.basePrice * (parseFloat(body.baseQuantity) || 1)
+            : 0,
+      });
+
+      const saved = await this.lineItemRepository.save(lineItem);
+      await this.calculateOfferTotals(offer.id);
+
+      return response.status(201).json({
+        success: true,
+        message: "Line item added successfully",
+        data: saved,
+      });
+    } catch (error) {
+      console.error("Error adding line item:", error);
+      return response.status(500).json({
+        success: false,
+        message: "Internal server error",
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  }
+
+  // ==========================================================================
+  // DELETE A LINE ITEM
+  // DELETE /offers/:offerId/line-items/:lineItemId
+  // ==========================================================================
+  async deleteLineItem(request: Request, response: Response) {
+    try {
+      const { offerId, lineItemId } = request.params;
+      const lineItem = await this.lineItemRepository.findOne({
+        where: { id: lineItemId, offerId },
+      });
+      if (!lineItem) {
+        return response
+          .status(404)
+          .json({ success: false, message: "Line item not found" });
+      }
+      await this.lineItemRepository.remove(lineItem);
+      await this.calculateOfferTotals(offerId);
+      return response.status(200).json({
+        success: true,
+        message: "Line item deleted successfully",
+      });
+    } catch (error) {
+      console.error("Error deleting line item:", error);
+      return response.status(500).json({
+        success: false,
+        message: "Internal server error",
       });
     }
   }
@@ -2202,8 +2688,9 @@ export class OfferController {
 
       return response.status(200).json({
         success: true,
-        message: `Unit prices ${useUnitPrices ? "enabled" : "disabled"
-          } successfully for entire offer`,
+        message: `Unit prices ${
+          useUnitPrices ? "enabled" : "disabled"
+        } successfully for entire offer`,
         data: updatedOffer,
       });
     } catch (error) {
@@ -2532,7 +3019,12 @@ export class OfferController {
 
       const offer = await this.offerRepository.findOne({
         where: { id },
-        relations: ["lineItems", "inquiry", "inquiry.contactPerson", "inquiry.customer"],
+        relations: [
+          "lineItems",
+          "inquiry",
+          "inquiry.contactPerson",
+          "inquiry.customer",
+        ],
       });
 
       if (!offer) {
@@ -2638,7 +3130,11 @@ export class OfferController {
 
       const totals = calculateTotals(offer);
 
-      const doc = new PDFDocument({ margin: 50, size: "A4", bufferPages: true });
+      const doc = new PDFDocument({
+        margin: 50,
+        size: "A4",
+        bufferPages: true,
+      });
 
       const pageWidth = 595.28;
       const pageHeight = 841.89;
@@ -2713,15 +3209,16 @@ export class OfferController {
       doc.text(
         `${companyInfo.name} - ${companyInfo.address} - ${companyInfo.city}`,
         leftAlignX,
-        yPos
+        yPos,
       );
 
       let customer: any = {};
       if (offer.customerSnapshot) {
         try {
-          customer = typeof offer.customerSnapshot === "string"
-            ? JSON.parse(offer.customerSnapshot)
-            : offer.customerSnapshot;
+          customer =
+            typeof offer.customerSnapshot === "string"
+              ? JSON.parse(offer.customerSnapshot)
+              : offer.customerSnapshot;
         } catch (e) {
           customer = offer.customerSnapshot;
         }
@@ -2736,7 +3233,10 @@ export class OfferController {
       if (customer.legalName && customer.legalName !== customer.companyName) {
         doc.text(customer.legalName, leftAlignX, yPos);
         yPos += 12;
-      } else if (customer.additionalInfo && customer.additionalInfo !== "Additional Info") {
+      } else if (
+        customer.additionalInfo &&
+        customer.additionalInfo !== "Additional Info"
+      ) {
         doc.text(customer.additionalInfo, leftAlignX, yPos);
         yPos += 12;
       }
@@ -2747,18 +3247,30 @@ export class OfferController {
       doc.text(
         `${customer.postalCode || ""} ${customer.city || ""}`.trim(),
         leftAlignX,
-        yPos
+        yPos,
       );
       yPos += 12;
 
       const displayCountry = formatCountry(customer.country);
-      if (displayCountry && displayCountry.toUpperCase() !== "DE" && displayCountry.toUpperCase() !== "GERMANY" && displayCountry.toUpperCase() !== "DEUTSCHLAND") {
+      if (
+        displayCountry &&
+        displayCountry.toUpperCase() !== "DE" &&
+        displayCountry.toUpperCase() !== "GERMANY" &&
+        displayCountry.toUpperCase() !== "DEUTSCHLAND"
+      ) {
         doc.text(displayCountry, leftAlignX, yPos);
         yPos += 12;
       }
 
-      const customerVatId = customer.vatId || customer.vatTaxId || customer.taxNumber || "";
-      if (customerVatId && displayCountry && displayCountry.toUpperCase() !== "DE" && displayCountry.toUpperCase() !== "GERMANY" && displayCountry.toUpperCase() !== "DEUTSCHLAND") {
+      const customerVatId =
+        customer.vatId || customer.vatTaxId || customer.taxNumber || "";
+      if (
+        customerVatId &&
+        displayCountry &&
+        displayCountry.toUpperCase() !== "DE" &&
+        displayCountry.toUpperCase() !== "GERMANY" &&
+        displayCountry.toUpperCase() !== "DEUTSCHLAND"
+      ) {
         doc.text(`VAT ID: ${customerVatId}`, leftAlignX, yPos);
         yPos += 12;
       }
@@ -2788,7 +3300,12 @@ export class OfferController {
         ["Datum", formatDate(offer.createdAt)],
         ["Gültig bis", formatDate(offer.validUntil)],
         ["Ansprechpartner", contactName],
-        ["Kundennr.", offer.inquiry?.customer?.customerNumber || customer.customerNumber || "-"],
+        [
+          "Kundennr.",
+          offer.inquiry?.customer?.customerNumber ||
+            customer.customerNumber ||
+            "-",
+        ],
       ];
 
       offerDetails.forEach((detail, index) => {
@@ -2805,7 +3322,11 @@ export class OfferController {
         doc.text(`Lieferzeit: ${offer.deliveryTime}`, leftAlignX, yPos);
       }
       if (offer.deliveryTerms) {
-        doc.text(`Lieferbedingungen: ${offer.deliveryTerms}`, leftAlignX + 250, yPos);
+        doc.text(
+          `Lieferbedingungen: ${offer.deliveryTerms}`,
+          leftAlignX + 250,
+          yPos,
+        );
       }
 
       yPos += 20;
@@ -2851,9 +3372,16 @@ export class OfferController {
       doc.fontSize(9).font("Helvetica");
 
       const getActivePrice = (lineItem: any, offerUsesUnitPrices: boolean) => {
-        if (offerUsesUnitPrices && lineItem.unitPrices && lineItem.unitPrices.length > 0) {
+        if (
+          offerUsesUnitPrices &&
+          lineItem.unitPrices &&
+          lineItem.unitPrices.length > 0
+        ) {
           return lineItem.unitPrices.find((up: any) => up.isActive) || null;
-        } else if (lineItem.quantityPrices && lineItem.quantityPrices.length > 0) {
+        } else if (
+          lineItem.quantityPrices &&
+          lineItem.quantityPrices.length > 0
+        ) {
           return lineItem.quantityPrices.find((qp: any) => qp.isActive) || null;
         }
         return null;
@@ -2875,12 +3403,22 @@ export class OfferController {
 
           if (activePrice) {
             qtyStr = Number(activePrice.quantity).toString();
-            unitPriceNum = getSafeNumber("unitPrice" in activePrice ? activePrice.unitPrice : activePrice.price);
-            netTotalNum = getSafeNumber("totalPrice" in activePrice ? activePrice.totalPrice : activePrice.total);
+            unitPriceNum = getSafeNumber(
+              "unitPrice" in activePrice
+                ? activePrice.unitPrice
+                : activePrice.price,
+            );
+            netTotalNum = getSafeNumber(
+              "totalPrice" in activePrice
+                ? activePrice.totalPrice
+                : activePrice.total,
+            );
           } else {
             qtyStr = Number(item.baseQuantity || 1).toString();
             unitPriceNum = getSafeNumber(item.basePrice);
-            netTotalNum = qtyStr ? parseFloat(qtyStr) * unitPriceNum : unitPriceNum;
+            netTotalNum = qtyStr
+              ? parseFloat(qtyStr) * unitPriceNum
+              : unitPriceNum;
           }
 
           const vatRate = offer.taxRate ? getSafeNumber(offer.taxRate) : 19;
@@ -2891,7 +3429,11 @@ export class OfferController {
             nameText += `\n${item.description}`;
           }
 
-          if (offer.useUnitPrices && item.unitPrices && item.unitPrices.length > 1) {
+          if (
+            offer.useUnitPrices &&
+            item.unitPrices &&
+            item.unitPrices.length > 1
+          ) {
             nameText += "\nStaffelpreise:";
             item.unitPrices.slice(0, 3).forEach((up: any) => {
               const activeMark = up.isActive ? " (*)" : "";
@@ -2907,11 +3449,17 @@ export class OfferController {
           const designationWidth = columns[3].width - 6;
           doc.fontSize(9);
           if (fontSource) {
-            try { doc.font(fontSource, 0); } catch (e) { doc.font("Helvetica"); }
+            try {
+              doc.font(fontSource, 0);
+            } catch (e) {
+              doc.font("Helvetica");
+            }
           } else {
             doc.font("Helvetica");
           }
-          const textHeight = doc.heightOfString(nameText, { width: designationWidth });
+          const textHeight = doc.heightOfString(nameText, {
+            width: designationWidth,
+          });
           doc.font("Helvetica");
           const computedRowHeight = Math.max(40, textHeight + 12);
           if (currentY + computedRowHeight > pageHeight - 120) {
@@ -2950,7 +3498,9 @@ export class OfferController {
           }
 
           if (rowIndex % 2 === 1) {
-            doc.rect(leftAlignX, currentY, tableWidth, computedRowHeight).fill("#FAFAFA");
+            doc
+              .rect(leftAlignX, currentY, tableWidth, computedRowHeight)
+              .fill("#FAFAFA");
           }
 
           const rowData = [
@@ -2976,7 +3526,11 @@ export class OfferController {
             }
 
             if (colIndex === 3 && fontSource) {
-              try { doc.font(fontSource, 0); } catch (e) { doc.font("Helvetica"); }
+              try {
+                doc.font(fontSource, 0);
+              } catch (e) {
+                doc.font("Helvetica");
+              }
             } else {
               doc.font("Helvetica");
             }
@@ -3021,17 +3575,21 @@ export class OfferController {
         `${Number(totals.subtotal || 0).toFixed(2)} ${offer.currency || "EUR"}`,
         rightAlignX + 120,
         yPos,
-        { align: "right" }
+        { align: "right" },
       );
 
       if (Number(totals.discountAmount || 0) > 0) {
         yPos += 18;
-        doc.text(`Rabatt (${offer.discountPercentage || 0}%)`, rightAlignX, yPos);
+        doc.text(
+          `Rabatt (${offer.discountPercentage || 0}%)`,
+          rightAlignX,
+          yPos,
+        );
         doc.text(
           `-${Number(totals.discountAmount).toFixed(2)} ${offer.currency || "EUR"}`,
           rightAlignX + 120,
           yPos,
-          { align: "right" }
+          { align: "right" },
         );
       }
 
@@ -3042,7 +3600,7 @@ export class OfferController {
           `${Number(totals.shippingCost).toFixed(2)} ${offer.currency || "EUR"}`,
           rightAlignX + 120,
           yPos,
-          { align: "right" }
+          { align: "right" },
         );
       }
 
@@ -3053,7 +3611,7 @@ export class OfferController {
         `${Number(totals.taxAmount || 0).toFixed(2)} ${offer.currency || "EUR"}`,
         rightAlignX + 120,
         yPos,
-        { align: "right" }
+        { align: "right" },
       );
 
       yPos += 20;
@@ -3068,12 +3626,14 @@ export class OfferController {
         `${Number(totals.totalAmount || 0).toFixed(2)} ${offer.currency || "EUR"}`,
         rightAlignX + 120,
         yPos + 5,
-        { align: "right" }
+        { align: "right" },
       );
       yPos += 35;
       let notesHeight = 15;
       if (offer.paymentTerms) notesHeight += 15;
-      if (offer.notes) notesHeight += doc.heightOfString(`Hinweise: ${offer.notes}`, { width: 500 }) + 5;
+      if (offer.notes)
+        notesHeight +=
+          doc.heightOfString(`Hinweise: ${offer.notes}`, { width: 500 }) + 5;
 
       if (yPos + notesHeight > pageHeight - 120) {
         doc.addPage();
@@ -3087,7 +3647,11 @@ export class OfferController {
       yPos += 15;
 
       if (offer.paymentTerms) {
-        doc.text(`Zahlungsbedingungen: ${offer.paymentTerms}`, leftAlignX, yPos);
+        doc.text(
+          `Zahlungsbedingungen: ${offer.paymentTerms}`,
+          leftAlignX,
+          yPos,
+        );
         yPos += 15;
       }
 
@@ -3109,7 +3673,11 @@ export class OfferController {
 
         doc.fontSize(8).fillColor("#666666");
         if (fontSource) {
-          try { doc.font(fontSource); } catch (e) { doc.font("Helvetica"); }
+          try {
+            doc.font(fontSource);
+          } catch (e) {
+            doc.font("Helvetica");
+          }
         } else {
           doc.font("Helvetica");
         }
@@ -3124,14 +3692,26 @@ export class OfferController {
         doc.text(companyInfo.registrationNumber, centerColumnX, footerY);
         doc.text(companyInfo.ceo, centerColumnX, footerY + 12);
         doc.text(`Ust.-ID: ${companyInfo.vatId}`, centerColumnX, footerY + 24);
-        doc.text(`SteuerNR: ${companyInfo.taxNumber}`, centerColumnX, footerY + 36);
-        doc.text(`WEEE-Reg.-Nr. ${companyInfo.weeeNumber}`, centerColumnX, footerY + 48);
+        doc.text(
+          `SteuerNR: ${companyInfo.taxNumber}`,
+          centerColumnX,
+          footerY + 36,
+        );
+        doc.text(
+          `WEEE-Reg.-Nr. ${companyInfo.weeeNumber}`,
+          centerColumnX,
+          footerY + 48,
+        );
 
         doc.text(`Angebotsnr:`, rightColumnX, footerY);
         doc.font("Helvetica-Bold");
         doc.text(`${offer.offerNumber || "N/A"}`, rightColumnX + 60, footerY);
         doc.font("Helvetica");
-        doc.text(`Seite ${pNum} / ${pages.count}`, rightColumnX + 60, footerY + 48);
+        doc.text(
+          `Seite ${pNum} / ${pages.count}`,
+          rightColumnX + 60,
+          footerY + 48,
+        );
       }
 
       doc.end();
