@@ -1353,6 +1353,7 @@ export const ItemPreviewModal: React.FC<ItemPreviewModalProps> = ({
           editingQuality ? "Update Quality Criterion" : "Add Quality Criterion"
         }
         width="max-w-md"
+        zIndex="z-[160]"
         footer={
           <div className="flex gap-2 w-full justify-end">
             <button
