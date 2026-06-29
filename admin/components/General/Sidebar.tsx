@@ -44,6 +44,7 @@ import {
   ShoppingCart,
   Timer,
   Globe as LucideGlobe,
+  Percent as LucidePercent,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -136,6 +137,12 @@ const allMenuItems: MenuEntry[] = [
         icon: LucideGlobe,
         text: "Countries",
         path: "/countries",
+        resource: "Settings",
+      },
+      {
+        icon: LucidePercent,
+        text: "Tax Profiles",
+        path: "/tax-profiles",
         resource: "Settings",
       },
     ],

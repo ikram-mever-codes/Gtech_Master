@@ -21,21 +21,6 @@ export const seedDatabase = async () => {
         const taxProfileRepository = AppDataSource.getRepository(TaxProfile);
         const countryRepository = AppDataSource.getRepository(Country);
 
-        const existingTaxProfiles = await taxProfileRepository.count();
-        if (existingTaxProfiles === 0) {
-            console.log("📦 Seeding tax profiles...");
-            const profiles = [
-                { name: "Standard VAT (19%)", rate: 19.00, description: "Standard German VAT rate" },
-                { name: "Reduced VAT (7%)", rate: 7.00, description: "Reduced German VAT rate" },
-                { name: "VAT Free (Inner-community supply / Reverse Charge)", rate: 0.00, description: "Intra-EU business transactions" },
-                { name: "VAT Free (Export to Third Countries)", rate: 0.00, description: "Export to non-EU countries" },
-            ];
-            for (const p of profiles) {
-                await taxProfileRepository.save(taxProfileRepository.create(p));
-            }
-            console.log("  ✓ Seeded default tax profiles");
-        }
-
         const existingCountries = await countryRepository.count();
         if (existingCountries === 0) {
             console.log("🌍 Seeding countries...");
@@ -60,6 +45,78 @@ export const seedDatabase = async () => {
                 await countryRepository.save(countryRepository.create(c));
             }
             console.log("  ✓ Seeded default countries");
+        }
+
+        const existingTaxProfiles = await taxProfileRepository.count();
+        if (existingTaxProfiles === 0) {
+            console.log("📦 Seeding tax profiles...");
+            const deCountry = await countryRepository.findOne({ where: { iso2: "DE" } });
+            const atCountry = await countryRepository.findOne({ where: { iso2: "AT" } });
+            const chCountry = await countryRepository.findOne({ where: { iso2: "CH" } });
+
+            const profiles = [
+                {
+                    name: "DE 19%",
+                    tax_rate: 19.00,
+                    country: deCountry,
+                    tax_case: "Standard",
+                    tax_code: "DE-VAT19",
+                    revenue_account_no: "8400",
+                    description: "Standard German VAT rate (19%)",
+                },
+                {
+                    name: "Reduced VAT (7%)",
+                    tax_rate: 7.00,
+                    country: deCountry,
+                    tax_case: "Standard",
+                    tax_code: "DE-VAT7",
+                    revenue_account_no: "8300",
+                    description: "Reduced German VAT rate (7%)",
+                },
+                {
+                    name: "AT IGL 0%",
+                    tax_rate: 0.00,
+                    country: atCountry,
+                    tax_case: "IGL",
+                    tax_code: "AT-IGL0",
+                    revenue_account_no: "8125",
+                    requires_vat_id: true,
+                    requires_confirmed_vat_id: true,
+                    description: "Intra-EU business transactions to Austria (0%)",
+                },
+                {
+                    name: "AT without valid VAT ID 19%",
+                    tax_rate: 19.00,
+                    country: atCountry,
+                    tax_case: "Standard",
+                    tax_code: "AT-VAT19",
+                    revenue_account_no: "8315",
+                    description: "Transactions to Austria without valid VAT ID (19%)",
+                },
+                {
+                    name: "CH Export 0%",
+                    tax_rate: 0.00,
+                    country: chCountry,
+                    tax_case: "Export",
+                    tax_code: "CH-EXP0",
+                    revenue_account_no: "8120",
+                    description: "Export to Switzerland (0%)",
+                },
+                {
+                    name: "VAT Free (Export to Third Countries)",
+                    tax_rate: 0.00,
+                    country: deCountry,
+                    tax_case: "Export",
+                    tax_code: "DE-EXP0",
+                    revenue_account_no: "8120",
+                    description: "Export to non-EU countries (0%)",
+                },
+            ];
+
+            for (const p of profiles) {
+                await taxProfileRepository.save(taxProfileRepository.create(p));
+            }
+            console.log("  ✓ Seeded default tax profiles");
         }
 
         const existingSuppliers = await supplierRepository.count();
