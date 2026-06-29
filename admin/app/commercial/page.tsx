@@ -2197,7 +2197,7 @@ const InvoiceListPage: React.FC = () => {
             </div>
           )}
 
-        {activeInvTab === "lieferschein" && (
+        {false && activeInvTab === "lieferschein" && (
           <div
             className="bg-white rounded-[4px] border border-[#E9ECEF] overflow-hidden"
             style={{ boxShadow: "0 2px 8px rgba(0, 0, 0, 0.05)" }}
