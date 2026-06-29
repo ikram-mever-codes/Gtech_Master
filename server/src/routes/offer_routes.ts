@@ -24,12 +24,6 @@ router.post(
   authorize(UserRole.SALES),
   offerController.createOfferFromItem.bind(offerController),
 );
-// NEW: create a blank offer for a customer
-router.post(
-  "/from-customer/:customerId",
-  authorize(UserRole.SALES),
-  offerController.createOfferFromCustomer.bind(offerController),
-);
 
 // ---------------------------------------------------------------------------
 // Offer CRUD operations - Restricted to Admin and Sales

@@ -81,16 +81,15 @@ export interface OfferLineItem {
 }
 
 export interface CreateOfferFromItemPayload {
-  customerId?: string;
   title?: string;
-  currency?: "EUR" | "USD" | "RMB" | "HKD";
-  validUntil?: Date | string;
-  notes?: string;
-  baseQuantity?: string;
+  currency?: string;
+  validUntil?: string;
   useUnitPrices?: boolean;
   unitPriceDecimalPlaces?: number;
   totalPriceDecimalPlaces?: number;
   maxUnitPriceColumns?: number;
+  customerId?: string;
+  itemIds?: string[];
 }
 
 export interface CreateOfferFromCustomerPayload {
@@ -947,17 +946,6 @@ export const createOfferFromItem = async (
   payload: CreateOfferFromItemPayload,
 ) => {
   const { data } = await api.post(`/offers/from-item/${itemId}`, payload);
-  return data;
-};
-
-export const createOfferFromCustomer = async (
-  customerId: string,
-  payload: CreateOfferFromCustomerPayload,
-) => {
-  const { data } = await api.post(
-    `/offers/from-customer/${customerId}`,
-    payload,
-  );
   return data;
 };
 

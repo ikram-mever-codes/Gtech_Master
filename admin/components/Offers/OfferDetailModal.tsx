@@ -32,6 +32,8 @@ import {
   setActivePrice,
   createOfferLineItem,
   deleteOfferLineItem,
+  createOfferFromInquiry,
+  createOfferFromItem,
   formatCurrency,
   formatUnitPrice,
   formatTotalPrice,
@@ -47,18 +49,24 @@ import {
   offerUsesUnitPrices,
   type UnitPrice,
 } from "@/api/offers";
+import { getAllInquiries } from "@/api/inquiry";
+import { getAllCustomers } from "@/api/customers";
+import { getItems } from "@/api/items";
 import { formatDate, openOutlookWithOffer } from "@/utils/offers";
 import { UserRole } from "@/utils/interfaces";
 import { errorStyles } from "@/utils/constants";
 
 interface OfferDetailModalProps {
   isOpen: boolean;
+  /** null => create mode (inline picker); string => view/edit an existing offer. */
   offerId: string | null;
   onClose: () => void;
   /** Called after any change that should refresh the list behind the modal. */
   onChanged?: () => void;
   userRole?: UserRole;
 }
+
+type SourceType = "inquiry" | "item";
 
 const inputCls =
   "w-full px-2.5 py-1.5 text-sm border border-gray-300/80 bg-white/70 rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default";
@@ -100,6 +108,36 @@ const Field: React.FC<{
   </div>
 );
 
+/** Small selectable row used by the inline create picker. */
+const PickerRow: React.FC<{
+  selected: boolean;
+  onClick: () => void;
+  title: string;
+  subtitle?: string;
+  meta?: string;
+}> = ({ selected, onClick, title, subtitle, meta }) => (
+  <div
+    onClick={onClick}
+    className={`p-3 border rounded-lg cursor-pointer transition-all ${
+      selected
+        ? "border-primary bg-primary/5"
+        : "border-gray-200 hover:bg-gray-50"
+    }`}
+  >
+    <div className="flex justify-between items-start">
+      <div className="min-w-0">
+        <div className="font-medium text-gray-900 truncate">{title}</div>
+        {subtitle && (
+          <div className="text-sm text-gray-600 truncate">{subtitle}</div>
+        )}
+      </div>
+      {meta && (
+        <div className="text-xs text-gray-500 shrink-0 ml-2">{meta}</div>
+      )}
+    </div>
+  </div>
+);
+
 export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
   isOpen,
   offerId,
@@ -112,6 +150,9 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
   const [saving, setSaving] = useState(false);
   const [edit, setEdit] = useState(false);
 
+  // create mode = the modal is open with no offer id yet.
+  const isCreate = !offerId && !offer;
+
   // Editable header/detail fields kept in a working copy; pricing persists live.
   const [form, setForm] = useState<any>({});
 
@@ -123,6 +164,28 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
     itemName: string;
     baseQuantity: string;
   }>({ itemName: "", baseQuantity: "1" });
+
+  // --- Create-picker state (only used while isCreate) ----------------------
+  const [creating, setCreating] = useState(false);
+  const [sourceType, setSourceType] = useState<SourceType>("inquiry");
+  const [inquiries, setInquiries] = useState<any[]>([]);
+  const [customers, setCustomers] = useState<any[]>([]);
+  const [items, setItems] = useState<any[]>([]);
+  const [filterCustomerId, setFilterCustomerId] = useState("");
+  const [selectedInquiry, setSelectedInquiry] = useState<any>(null);
+  const [selectedItems, setSelectedItems] = useState<any[]>([]);
+  const [sourceSearch, setSourceSearch] = useState("");
+  const [createForm, setCreateForm] = useState<any>({
+    title: "",
+    currency: "EUR",
+    validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .split("T")[0],
+    useUnitPrices: true,
+    unitPriceDecimalPlaces: 3,
+    totalPriceDecimalPlaces: 2,
+    maxUnitPriceColumns: 3,
+  });
 
   const fetchOffer = useCallback(async () => {
     if (!offerId) return;
@@ -141,16 +204,73 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
     }
   }, [offerId]);
 
+  // Load offer when an id is present; reset everything when the modal opens.
   useEffect(() => {
     if (!isOpen) return;
     setEdit(false);
     setShowSettings(false);
     setShowCopyPaste(false);
     setCopyPasteData("");
-    fetchOffer();
+    if (offerId) {
+      fetchOffer();
+    } else {
+      // entering create mode fresh
+      setOffer(null);
+      resetCreatePicker();
+    }
   }, [isOpen, offerId, fetchOffer]);
 
+  // Lazy-load source lists the first time we're in create mode.
+  useEffect(() => {
+    if (!isOpen || offerId) return;
+    (async () => {
+      try {
+        const [inqRes, custRes, itemRes]: any = await Promise.all([
+          getAllInquiries({ limit: 1000 }),
+          getAllCustomers({ limit: 1000 }),
+          getItems({ limit: 1000 }).catch(() => ({ data: [] })),
+        ]);
+        setInquiries(
+          Array.isArray(inqRes?.data)
+            ? inqRes.data
+            : inqRes?.data?.inquiries || [],
+        );
+        setCustomers(
+          Array.isArray(custRes?.data)
+            ? custRes.data
+            : custRes?.data?.customers || custRes?.data?.businesses || [],
+        );
+        setItems(
+          Array.isArray(itemRes?.data)
+            ? itemRes.data
+            : itemRes?.data?.items || [],
+        );
+      } catch (e) {
+        console.error("Error loading sources:", e);
+      }
+    })();
+  }, [isOpen, offerId]);
+
   if (!isOpen) return null;
+
+  function resetCreatePicker() {
+    setSourceType("inquiry");
+    setFilterCustomerId("");
+    setSourceSearch("");
+    setSelectedInquiry(null);
+    setSelectedItems([]);
+    setCreateForm({
+      title: "",
+      currency: "EUR",
+      validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+        .toISOString()
+        .split("T")[0],
+      useUnitPrices: true,
+      unitPriceDecimalPlaces: 3,
+      totalPriceDecimalPlaces: 2,
+      maxUnitPriceColumns: 3,
+    });
+  }
 
   function buildForm(o: any) {
     return {
@@ -183,6 +303,102 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
   const refreshLocal = async () => {
     const updated = await getOfferById(offer.id);
     if (updated.success) setOffer(updated.data);
+  };
+
+  // =========================================================================
+  // CREATE FLOW (inline picker) — runs only while offerId === null
+  // =========================================================================
+  const cPatch = (p: any) => setCreateForm((f: any) => ({ ...f, ...p }));
+
+  const visibleInquiries = inquiries.filter((i) => {
+    const matchCust = filterCustomerId
+      ? i.customer?.id === filterCustomerId
+      : true;
+    const matchSearch = sourceSearch
+      ? i.name?.toLowerCase().includes(sourceSearch.toLowerCase())
+      : true;
+    return matchCust && matchSearch;
+  });
+
+  const visibleItems = items.filter((it) => {
+    const matchCust = filterCustomerId
+      ? String(it.customer_id || it.customer?.id) === filterCustomerId
+      : true;
+    const name = it.item_name || it.itemName || "";
+    const matchSearch = sourceSearch
+      ? name.toLowerCase().includes(sourceSearch.toLowerCase()) ||
+        String(it.ean || "").includes(sourceSearch)
+      : true;
+    return matchCust && matchSearch;
+  });
+
+  const toggleItem = (it: any) => {
+    setSelectedItems((prev) => {
+      const exists = prev.some((p) => String(p.id) === String(it.id));
+      const next = exists
+        ? prev.filter((p) => String(p.id) !== String(it.id))
+        : [...prev, it];
+      setCreateForm((f: any) => {
+        if (f.title?.trim()) return f;
+        const first = next[0];
+        return first
+          ? { ...f, title: `Offer for ${first.item_name || first.itemName}` }
+          : f;
+      });
+      return next;
+    });
+  };
+
+  const canCreate = () => {
+    if (!createForm.title?.trim()) return false;
+    if (sourceType === "inquiry") return !!selectedInquiry;
+    if (sourceType === "item")
+      return !!filterCustomerId && selectedItems.length > 0;
+    return false;
+  };
+
+  // Creates the offer server-side, then flips THIS modal into edit view on it.
+  const handleCreate = async () => {
+    if (!canCreate()) return;
+    setCreating(true);
+    try {
+      const common = {
+        title: createForm.title,
+        currency: createForm.currency,
+        validUntil: createForm.validUntil,
+        useUnitPrices: createForm.useUnitPrices,
+        unitPriceDecimalPlaces: createForm.unitPriceDecimalPlaces,
+        totalPriceDecimalPlaces: createForm.totalPriceDecimalPlaces,
+        maxUnitPriceColumns: createForm.maxUnitPriceColumns,
+      };
+
+      let res: any;
+      if (sourceType === "inquiry") {
+        res = await createOfferFromInquiry(selectedInquiry.id, common);
+      } else {
+        res = await createOfferFromItem(String(selectedItems[0].id), {
+          ...common,
+          customerId: filterCustomerId,
+          itemIds: selectedItems.map((it) => String(it.id)),
+        });
+      }
+
+      if (res?.success && res.data?.id) {
+        toast.success("Offer created");
+        onChanged?.();
+        // Flip into the normal detail/edit view on the brand-new offer.
+        setOffer(res.data);
+        setForm(buildForm(res.data));
+        setEdit(true); // open straight into edit so pricing can be entered
+      } else {
+        toast.error("Couldn't create the offer.", errorStyles);
+      }
+    } catch (e) {
+      console.error("Error creating offer:", e);
+      toast.error("Couldn't create the offer.", errorStyles);
+    } finally {
+      setCreating(false);
+    }
   };
 
   // --- Save header/detail fields -------------------------------------------
@@ -483,10 +699,362 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
   const visibleLineItems =
     offer?.lineItems?.filter((li: any) => !li.isComponent) || [];
 
+  const sourceTabs: {
+    key: SourceType;
+    label: string;
+    icon: React.ReactNode;
+  }[] = [
+    {
+      key: "inquiry",
+      label: "From inquiry",
+      icon: <LinkIcon className="h-4 w-4" />,
+    },
+    {
+      key: "item",
+      label: "Customer + item(s)",
+      icon: <CubeIcon className="h-4 w-4" />,
+    },
+  ];
+
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
       <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl max-w-5xl w-full max-h-[92vh] flex flex-col">
-        {loading || !offer ? (
+        {/* ===================== CREATE MODE (inline picker) ===================== */}
+        {isCreate ? (
+          <>
+            <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white flex items-center justify-between flex-shrink-0">
+              <h2 className="text-lg font-bold text-gray-900">
+                Create new offer
+              </h2>
+              <button
+                type="button"
+                onClick={onClose}
+                className="text-gray-400 hover:text-gray-600 transition-colors p-1.5 rounded-lg hover:bg-gray-100"
+              >
+                <XMarkIcon className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6 space-y-4">
+              {/* Source tabs */}
+              <div className="grid grid-cols-2 gap-2">
+                {sourceTabs.map((t) => (
+                  <button
+                    key={t.key}
+                    onClick={() => {
+                      setSourceType(t.key);
+                      setSourceSearch("");
+                      setSelectedInquiry(null);
+                      setSelectedItems([]);
+                    }}
+                    className={`flex items-center justify-center gap-2 px-3 py-2 text-sm rounded-lg border transition-all ${
+                      sourceType === t.key
+                        ? "border-primary bg-primary/5 text-primary font-semibold"
+                        : "border-gray-200 text-gray-600 hover:bg-gray-50"
+                    }`}
+                  >
+                    {t.icon}
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Filter / search row */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    {sourceType === "item"
+                      ? "Customer * (required)"
+                      : "Filter by customer"}
+                  </label>
+                  <select
+                    value={filterCustomerId}
+                    onChange={(e) => {
+                      setFilterCustomerId(e.target.value);
+                      if (sourceType === "item") setSelectedItems([]);
+                    }}
+                    className={`w-full px-3 py-2 text-sm border rounded-lg ${
+                      sourceType === "item" && !filterCustomerId
+                        ? "border-amber-400 bg-amber-50/30"
+                        : "border-gray-300"
+                    }`}
+                  >
+                    <option value="">
+                      {sourceType === "item"
+                        ? "Select a customer…"
+                        : "All customers"}
+                    </option>
+                    {customers.map((c: any) => (
+                      <option key={c.id} value={c.id}>
+                        {c.companyName || c.displayName}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Search
+                  </label>
+                  <input
+                    value={sourceSearch}
+                    onChange={(e) => setSourceSearch(e.target.value)}
+                    placeholder={
+                      sourceType === "inquiry"
+                        ? "Search inquiries…"
+                        : "Search items or EAN…"
+                    }
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
+                  />
+                </div>
+              </div>
+
+              {/* Source list */}
+              <div className="space-y-2 max-h-56 overflow-y-auto">
+                {sourceType === "inquiry" &&
+                  (visibleInquiries.length === 0 ? (
+                    <div className="text-center py-4 text-gray-500 text-sm">
+                      No inquiries match.
+                    </div>
+                  ) : (
+                    visibleInquiries.map((inq) => (
+                      <PickerRow
+                        key={inq.id}
+                        selected={selectedInquiry?.id === inq.id}
+                        onClick={() => {
+                          setSelectedInquiry(inq);
+                          setCreateForm((f: any) => ({
+                            ...f,
+                            title: inq.name,
+                          }));
+                        }}
+                        title={inq.name}
+                        subtitle={`Customer: ${inq.customer?.companyName || "—"}`}
+                        meta={`${inq.requests?.length || 0} items · ${
+                          inq.isAssembly ? "Assembly" : "Standard"
+                        }`}
+                      />
+                    ))
+                  ))}
+
+                {sourceType === "item" &&
+                  (!filterCustomerId ? (
+                    <div className="text-center py-4 text-gray-500 text-sm">
+                      Select a customer first to list their items.
+                    </div>
+                  ) : visibleItems.length === 0 ? (
+                    <div className="text-center py-4 text-gray-500 text-sm">
+                      No items match for this customer.
+                    </div>
+                  ) : (
+                    visibleItems.map((it) => (
+                      <PickerRow
+                        key={it.id}
+                        selected={selectedItems.some(
+                          (p) => String(p.id) === String(it.id),
+                        )}
+                        onClick={() => toggleItem(it)}
+                        title={it.item_name || it.itemName}
+                        subtitle={it.ean ? `EAN: ${it.ean}` : `Item ${it.id}`}
+                        meta={it.model || ""}
+                      />
+                    ))
+                  ))}
+              </div>
+
+              {/* Multi-select chips */}
+              {sourceType === "item" && selectedItems.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {selectedItems.map((it) => (
+                    <span
+                      key={it.id}
+                      className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-primary/10 text-primary rounded-full"
+                    >
+                      {it.item_name || it.itemName}
+                      <button
+                        onClick={() => toggleItem(it)}
+                        className="hover:text-rose-600"
+                      >
+                        <XMarkIcon className="h-3 w-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {/* Common fields once a source is chosen */}
+              {(selectedInquiry || selectedItems.length > 0) && (
+                <div className="space-y-4 border-t pt-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Offer title *
+                    </label>
+                    <input
+                      value={createForm.title}
+                      onChange={(e) => cPatch({ title: e.target.value })}
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
+                      placeholder="e.g., Offer for Product XYZ"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Currency
+                      </label>
+                      <select
+                        value={createForm.currency}
+                        onChange={(e) => cPatch({ currency: e.target.value })}
+                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
+                      >
+                        {getAvailableCurrencies().map((c: any) => (
+                          <option key={c.value} value={c.value}>
+                            {c.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Valid until
+                      </label>
+                      <input
+                        type="date"
+                        value={createForm.validUntil}
+                        onChange={(e) => cPatch({ validUntil: e.target.value })}
+                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Pricing mode: unit pricing default */}
+                  <div className="p-3 bg-gray-50 rounded-lg">
+                    <div className="flex items-center justify-between mb-2">
+                      <div>
+                        <span className="text-sm font-medium text-gray-900">
+                          Unit pricing
+                        </span>
+                        <span className="ml-2 text-xs text-gray-500">
+                          {createForm.useUnitPrices
+                            ? "(default)"
+                            : "single price per line"}
+                        </span>
+                      </div>
+                      <button
+                        onClick={() =>
+                          cPatch({ useUnitPrices: !createForm.useUnitPrices })
+                        }
+                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                          createForm.useUnitPrices
+                            ? "bg-green-500"
+                            : "bg-gray-300"
+                        }`}
+                      >
+                        <span
+                          className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
+                            createForm.useUnitPrices
+                              ? "translate-x-5"
+                              : "translate-x-1"
+                          }`}
+                        />
+                      </button>
+                    </div>
+                    {createForm.useUnitPrices && (
+                      <>
+                        <div className="grid grid-cols-3 gap-3">
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                              Unit decimals
+                            </label>
+                            <select
+                              value={createForm.unitPriceDecimalPlaces}
+                              onChange={(e) =>
+                                cPatch({
+                                  unitPriceDecimalPlaces: parseInt(
+                                    e.target.value,
+                                  ),
+                                })
+                              }
+                              className="w-full px-2 py-1 text-xs border border-gray-300 rounded"
+                            >
+                              <option value={2}>2</option>
+                              <option value={3}>3</option>
+                              <option value={4}>4</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                              Total decimals
+                            </label>
+                            <select
+                              value={createForm.totalPriceDecimalPlaces}
+                              onChange={(e) =>
+                                cPatch({
+                                  totalPriceDecimalPlaces: parseInt(
+                                    e.target.value,
+                                  ),
+                                })
+                              }
+                              className="w-full px-2 py-1 text-xs border border-gray-300 rounded"
+                            >
+                              <option value={2}>2</option>
+                              <option value={3}>3</option>
+                              <option value={4}>4</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                              Starting columns
+                            </label>
+                            <input
+                              type="text"
+                              value={createForm.maxUnitPriceColumns || ""}
+                              onChange={(e) => {
+                                const v = e.target.value;
+                                if (v === "")
+                                  return cPatch({ maxUnitPriceColumns: 0 });
+                                if (!/^\d+$/.test(v)) return;
+                                const n = parseInt(v, 10);
+                                if (n > 10)
+                                  return toast.error(
+                                    "Max columns is 10.",
+                                    errorStyles,
+                                  );
+                                cPatch({ maxUnitPriceColumns: n });
+                              }}
+                              className="w-full px-2 py-1 text-xs border border-gray-300 rounded"
+                              placeholder="3"
+                            />
+                          </div>
+                        </div>
+                        <p className="text-xs text-gray-500 mt-2">
+                          You can add or remove price columns later inside the
+                          offer.
+                        </p>
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Create footer */}
+            <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-2 flex-shrink-0">
+              <button
+                onClick={onClose}
+                className="px-4 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCreate}
+                disabled={!canCreate() || creating}
+                className="px-4 py-2 text-sm bg-[#8CC21B] text-white rounded-lg hover:bg-[#7ab318] disabled:opacity-50"
+              >
+                {creating ? "Creating…" : "Create offer"}
+              </button>
+            </div>
+          </>
+        ) : loading || !offer ? (
           <div className="p-6 py-24 text-center">
             <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-gray-200 border-t-primary" />
             <p className="mt-2 text-sm text-gray-500">Loading offer…</p>
