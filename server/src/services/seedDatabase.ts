@@ -5,6 +5,7 @@ import { Parent } from "../models/parents";
 import { BusinessDetails } from "../models/business_details";
 import { Supplier } from "../models/suppliers";
 import { Category } from "../models/categories";
+import { TaxProfile } from "../models/tax_profile";
 
 export const seedDatabase = async () => {
     try {
@@ -16,6 +17,22 @@ export const seedDatabase = async () => {
         const businessDetailsRepository = AppDataSource.getRepository(BusinessDetails);
         const supplierRepository = AppDataSource.getRepository(Supplier);
         const categoryRepository = AppDataSource.getRepository(Category);
+        const taxProfileRepository = AppDataSource.getRepository(TaxProfile);
+
+        const existingTaxProfiles = await taxProfileRepository.count();
+        if (existingTaxProfiles === 0) {
+            console.log("📦 Seeding tax profiles...");
+            const profiles = [
+                { name: "Standard VAT (19%)", rate: 19.00, description: "Standard German VAT rate" },
+                { name: "Reduced VAT (7%)", rate: 7.00, description: "Reduced German VAT rate" },
+                { name: "VAT Free (Inner-community supply / Reverse Charge)", rate: 0.00, description: "Intra-EU business transactions" },
+                { name: "VAT Free (Export to Third Countries)", rate: 0.00, description: "Export to non-EU countries" },
+            ];
+            for (const p of profiles) {
+                await taxProfileRepository.save(taxProfileRepository.create(p));
+            }
+            console.log("  ✓ Seeded default tax profiles");
+        }
 
         const existingSuppliers = await supplierRepository.count();
         if (existingSuppliers === 0) {

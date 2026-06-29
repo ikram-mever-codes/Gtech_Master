@@ -59,6 +59,7 @@ import {
   deleteBusiness,
   createBusiness,
   updateBusiness,
+  getAllTaxProfiles,
   type Business,
   type SearchFilters,
 } from "@/api/bussiness";
@@ -168,13 +169,12 @@ const slugFromWebsite = (website?: string) => {
 };
 
 const getInputClass = (hasValue: boolean, isEmptySelect: boolean = false) => {
-  return `w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${
-    hasValue
-      ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
-      : isEmptySelect
-        ? "text-gray-400 border-gray-300 bg-white"
-        : "text-gray-900 border-gray-300 bg-white"
-  }`;
+  return `w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-primary/40 focus:border-transparent transition-all ${hasValue
+    ? "font-bold text-emerald-600 border-emerald-500 bg-emerald-50/20"
+    : isEmptySelect
+      ? "text-gray-400 border-gray-300 bg-white"
+      : "text-gray-900 border-gray-300 bg-white"
+    }`;
 };
 
 const CombinedBusinessContactsContent: React.FC = () => {
@@ -284,10 +284,14 @@ const CombinedBusinessContactsContent: React.FC = () => {
     note: "",
     tags: [] as any[],
     tagOrder: "",
+    debtor_no: "",
+    default_tax_profile_id: "",
+    vat_id_status: "unchecked",
   };
   const [businessForm, setBusinessForm] = useState<any>({
     ...emptyBusinessForm,
   });
+  const [taxProfiles, setTaxProfiles] = useState<any[]>([]);
   const [newBusinessTags, setNewBusinessTags] = useState<Tag[]>([]);
   const [newContactTags, setNewContactTags] = useState<Tag[]>([]);
 
@@ -388,6 +392,24 @@ const CombinedBusinessContactsContent: React.FC = () => {
     fetchData();
   }, [filters]);
 
+  useEffect(() => {
+    const loadTaxProfiles = async () => {
+      try {
+        const res: any = await getAllTaxProfiles();
+        if (res) {
+          if (res.success && Array.isArray(res.data)) {
+            setTaxProfiles(res.data);
+          } else if (Array.isArray(res)) {
+            setTaxProfiles(res);
+          }
+        }
+      } catch (error) {
+        console.error("Failed to load tax profiles", error);
+      }
+    };
+    loadTaxProfiles();
+  }, []);
+
   const filteredBusinesses = useMemo(() => {
     const cn = clientFilters.companyName.trim().toLowerCase();
     const num = clientFilters.customerNumber.trim().toLowerCase();
@@ -456,7 +478,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
     }
   }, [searchParams, allBusinesses, urlParamHandled]);
 
-  // Deep link: ?displayName=abc opens that business's details popup by default.
   useEffect(() => {
     if (displayNameHandled) return;
     const dn = searchParams?.get("displayName");
@@ -480,7 +501,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
     });
   };
 
-  // Copies the shareable business link to the clipboard.
   const handleCopyBusinessLink = async (
     business: any,
     e?: React.MouseEvent,
@@ -764,18 +784,18 @@ const CombinedBusinessContactsContent: React.FC = () => {
       const autoDisplay = displayNameTouched.current
         ? prev.displayName
         : generateDisplayName(
-            prev.companyName,
-            allBusinesses,
-            editingBusinessId,
-          );
+          prev.companyName,
+          allBusinesses,
+          editingBusinessId,
+        );
       const autoStar = starPortalTouched.current
         ? prev.starPortalLinkName
         : generateStarPortalLinkName(
-            prev.companyName,
-            prev.website,
-            allBusinesses,
-            editingBusinessId,
-          );
+          prev.companyName,
+          prev.website,
+          allBusinesses,
+          editingBusinessId,
+        );
       return {
         ...prev,
         displayName: autoDisplay,
@@ -851,6 +871,9 @@ const CombinedBusinessContactsContent: React.FC = () => {
       note: business.note || "",
       tags: business.tags || [],
       tagOrder: business.tagOrder || "",
+      debtor_no: business.debtor_no || "",
+      default_tax_profile_id: business.default_tax_profile_id || "",
+      vat_id_status: business.vat_id_status || "unchecked",
     });
 
     setNewBusinessTags(business.tags || []);
@@ -883,6 +906,9 @@ const CombinedBusinessContactsContent: React.FC = () => {
         website: businessForm.website,
         asanaLink: businessForm.asanaLink,
         note: businessForm.note,
+        debtor_no: businessForm.debtor_no,
+        default_tax_profile_id: businessForm.default_tax_profile_id || null,
+        vat_id_status: businessForm.vat_id_status,
       };
       if (businessModalMode === "edit" && editingBusinessId) {
         await updateBusiness(editingBusinessId, payload);
@@ -920,7 +946,7 @@ const CombinedBusinessContactsContent: React.FC = () => {
       setShowBusinessModal(false);
       resetBusinessForm();
       fetchData();
-    } catch {}
+    } catch { }
   };
 
   const handleExportContacts = async () => {
@@ -1225,15 +1251,14 @@ const CombinedBusinessContactsContent: React.FC = () => {
                                   e.stopPropagation();
                                   toggleBusinessContacts(business.id);
                                 }}
-                                className={`${
-                                  !business.contacts ||
+                                className={`${!business.contacts ||
                                   business.contacts.length === 0
-                                    ? "text-red-500 hover:text-red-700"
-                                    : "text-gray-400 hover:text-gray-700"
-                                } flex-shrink-0 mt-0.5`}
+                                  ? "text-red-500 hover:text-red-700"
+                                  : "text-gray-400 hover:text-gray-700"
+                                  } flex-shrink-0 mt-0.5`}
                                 title={
                                   !business.contacts ||
-                                  business.contacts.length === 0
+                                    business.contacts.length === 0
                                     ? "No contacts yet"
                                     : expandedBusinessIds.has(business.id)
                                       ? "Hide contacts"
@@ -1241,11 +1266,10 @@ const CombinedBusinessContactsContent: React.FC = () => {
                                 }
                               >
                                 <ChevronRightIcon
-                                  className={`h-4 w-4 transition-transform duration-200 ${
-                                    expandedBusinessIds.has(business.id)
-                                      ? "rotate-90"
-                                      : ""
-                                  }`}
+                                  className={`h-4 w-4 transition-transform duration-200 ${expandedBusinessIds.has(business.id)
+                                    ? "rotate-90"
+                                    : ""
+                                    }`}
                                 />
                               </button>
                               <div className="min-w-0">
@@ -1266,15 +1290,15 @@ const CombinedBusinessContactsContent: React.FC = () => {
                                   <div className="flex flex-wrap gap-1.5">
                                     {business.tags && business.tags.length > 0
                                       ? sortTags(
-                                          business.tags,
-                                          business.tagOrder,
-                                        ).map((tag: any) => (
-                                          <TagBadge
-                                            key={tag.id}
-                                            tag={tag}
-                                            size="sm"
-                                          />
-                                        ))
+                                        business.tags,
+                                        business.tagOrder,
+                                      ).map((tag: any) => (
+                                        <TagBadge
+                                          key={tag.id}
+                                          tag={tag}
+                                          size="sm"
+                                        />
+                                      ))
                                       : null}
                                   </div>
                                 </div>
@@ -1600,303 +1624,319 @@ const CombinedBusinessContactsContent: React.FC = () => {
         noPadding={true}
         width="max-w-4xl"
       >
-            <ModalHeader
-              entityName="Business"
-              entityNo={businessModalMode === "edit" ? businessForm.customerNumber : null}
-              icon={BuildingOfficeIcon}
-              isEditMode={businessModalMode === "edit"}
-              isEditEnabled={businessEditMode}
-              onToggleEdit={() => setBusinessEditMode(!businessEditMode)}
-              onClose={() => {
-                setShowBusinessModal(false);
-                resetBusinessForm();
-                setBusinessModalMode("create");
+        <ModalHeader
+          entityName="Business"
+          entityNo={businessModalMode === "edit" ? businessForm.customerNumber : null}
+          icon={BuildingOfficeIcon}
+          isEditMode={businessModalMode === "edit"}
+          isEditEnabled={businessEditMode}
+          onToggleEdit={() => setBusinessEditMode(!businessEditMode)}
+          onClose={() => {
+            setShowBusinessModal(false);
+            resetBusinessForm();
+            setBusinessModalMode("create");
+          }}
+          extraHeaderElements={
+            <button
+              type="button"
+              onClick={() => {
+                const q =
+                  businessForm.legalName ||
+                  businessForm.companyName ||
+                  "";
+                window.open(
+                  `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                    q,
+                  )}`,
+                  "_blank",
+                );
               }}
-              extraHeaderElements={
-                <button
-                  type="button"
-                  onClick={() => {
-                    const q =
-                      businessForm.legalName ||
-                      businessForm.companyName ||
-                      "";
-                    window.open(
-                      `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-                        q,
-                      )}`,
-                      "_blank",
-                    );
-                  }}
-                  className="text-rose-500 hover:text-rose-700 transition-colors p-1"
-                  title="Search on Google Maps"
-                >
-                  <MapPinIcon className="w-5 h-5" />
-                </button>
-              }
-            />
-            <div className="p-6 flex-1 overflow-y-auto">
+              className="text-rose-500 hover:text-rose-700 transition-colors p-1"
+              title="Search on Google Maps"
+            >
+              <MapPinIcon className="w-5 h-5" />
+            </button>
+          }
+        />
+        <div className="p-6 flex-1 overflow-y-auto">
 
 
 
-              <div className="space-y-6">
-                <div className="rounded-xl p-4 -mx-4 bg-transparent">
+          <div className="space-y-6">
+            <div className="rounded-xl p-4 -mx-4 bg-transparent">
+              <div className="grid grid-cols-6 gap-4">
+                <div className="col-span-6 md:col-span-2">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Customer No
+                  </label>
+                  <input
+                    type="text"
+                    value={businessForm.customerNumber}
+                    onChange={(e) =>
+                      setBusinessForm({
+                        ...businessForm,
+                        customerNumber: e.target.value,
+                      })
+                    }
+                    disabled={businessFieldDisabled}
+                    className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed font-medium font-mono text-gray-800"
+                    placeholder="K-1001"
+                  />
+                </div>
+
+                <div className="col-span-6 md:col-span-2">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Company Name (full legal name) *
+                  </label>
+                  <input
+                    type="text"
+                    value={businessForm.companyName}
+                    onChange={(e) =>
+                      setBusinessForm({
+                        ...businessForm,
+                        companyName: e.target.value,
+                      })
+                    }
+                    onBlur={handleCompanyNameBlur}
+                    disabled={businessFieldDisabled}
+                    className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed font-medium"
+                    placeholder="Muster GmbH & Co. KG"
+                  />
+                </div>
+
+                <div className="col-span-3 md:col-span-2">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Display Name
+                  </label>
+                  <input
+                    type="text"
+                    value={businessForm.displayName}
+                    onChange={(e) => {
+                      displayNameTouched.current = true;
+                      setBusinessForm({
+                        ...businessForm,
+                        displayName: e.target.value,
+                      });
+                    }}
+                    disabled={businessFieldDisabled}
+                    className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    placeholder="Auto from first word (unique)"
+                  />
+                </div>
+                <div className="col-span-3 md:col-span-2 flex items-end gap-2">
+                  <div className="flex-1">
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Star Portal Link Name
+                    </label>
+                    <input
+                      type="text"
+                      value={businessForm.starPortalLinkName}
+                      onChange={(e) => {
+                        starPortalTouched.current = true;
+                        setBusinessForm({
+                          ...businessForm,
+                          starPortalLinkName: e.target.value,
+                        });
+                      }}
+                      disabled={businessFieldDisabled}
+                      className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                      placeholder="Auto from web URL (between www. and next .)"
+                    />
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={(e) => handleCopyBusinessLink(businessForm, e)}
+                    className="text-gray-500 hover:text-gray-700 transition-colors p-2 mb-0.5 hover:bg-gray-100/50 rounded-lg shrink-0"
+                    title="Copy business link"
+                  >
+                    <ClipboardDocumentIcon className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="col-span-6 md:col-span-3">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Address Additional Line
+                  </label>
+                  <input
+                    type="text"
+                    value={businessForm.addressAdditional}
+                    onChange={(e) =>
+                      setBusinessForm({
+                        ...businessForm,
+                        addressAdditional: e.target.value,
+                      })
+                    }
+                    disabled={businessFieldDisabled}
+                    className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    placeholder="c/o, building, floor…"
+                  />
+                </div>
+                <div className="col-span-6 md:col-span-3">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Street and Street Number
+                  </label>
+                  <input
+                    type="text"
+                    value={businessForm.street}
+                    onChange={(e) =>
+                      setBusinessForm({
+                        ...businessForm,
+                        street: e.target.value,
+                      })
+                    }
+                    disabled={businessFieldDisabled}
+                    className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    placeholder="Musterstraße 12"
+                  />
+                </div>
+
+                <div className="col-span-2">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Postal Code
+                  </label>
+                  <input
+                    type="text"
+                    value={businessForm.postalCode}
+                    onChange={(e) =>
+                      setBusinessForm({
+                        ...businessForm,
+                        postalCode: e.target.value,
+                      })
+                    }
+                    disabled={businessFieldDisabled}
+                    className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    placeholder="80331"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    City
+                  </label>
+                  <input
+                    type="text"
+                    value={businessForm.city}
+                    onChange={(e) =>
+                      setBusinessForm({
+                        ...businessForm,
+                        city: e.target.value,
+                      })
+                    }
+                    disabled={businessFieldDisabled}
+                    className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    placeholder="München"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Country
+                  </label>
+                  <select
+                    value={businessForm.country}
+                    onChange={(e) =>
+                      setBusinessForm({
+                        ...businessForm,
+                        country: e.target.value,
+                      })
+                    }
+                    disabled={businessFieldDisabled}
+                    className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  >
+                    {COUNTRY_OPTIONS.map((c) => (
+                      <option key={c.value} value={c.value}>
+                        {c.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="col-span-3 md:col-span-2">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Email
+                  </label>
+                  <input
+                    type="email"
+                    value={businessForm.email}
+                    onChange={(e) =>
+                      setBusinessForm({
+                        ...businessForm,
+                        email: e.target.value,
+                      })
+                    }
+                    disabled={businessFieldDisabled}
+                    className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    placeholder="info@muster.de"
+                  />
+                </div>
+                <div className="col-span-3 md:col-span-2">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Phone
+                  </label>
+                  <input
+                    type="tel"
+                    value={businessForm.phone}
+                    onChange={(e) =>
+                      setBusinessForm({
+                        ...businessForm,
+                        phone: e.target.value,
+                      })
+                    }
+                    disabled={businessFieldDisabled}
+                    className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    placeholder="+49 89 1234567"
+                  />
+                </div>
+                <div className="col-span-6 md:col-span-2">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Web URL
+                  </label>
+                  <input
+                    type="url"
+                    value={businessForm.website}
+                    onChange={(e) =>
+                      setBusinessForm({
+                        ...businessForm,
+                        website: e.target.value,
+                      })
+                    }
+                    onBlur={handleWebsiteBlur}
+                    disabled={businessFieldDisabled}
+                    className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    placeholder="https://www.muster.de"
+                  />
+                </div>
+
+                <div className="col-span-6 border-t border-gray-200/60 my-2 pt-4">
+                  <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">
+                    Invoicing & Tax Details
+                  </h4>
                   <div className="grid grid-cols-6 gap-4">
-                    {/* Names row (4 across) */}
                     <div className="col-span-6 md:col-span-2">
                       <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Customer No
+                        Debtor Number
                       </label>
                       <input
                         type="text"
-                        value={businessForm.customerNumber}
+                        value={businessForm.debtor_no || ""}
                         onChange={(e) =>
                           setBusinessForm({
                             ...businessForm,
-                            customerNumber: e.target.value,
+                            debtor_no: e.target.value,
                           })
                         }
-                        disabled={businessFieldDisabled}
-                        className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed font-medium font-mono text-gray-800"
-                        placeholder="K-1001"
-                      />
-                    </div>
-
-                    <div className="col-span-6 md:col-span-2">
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Company Name (full legal name) *
-                      </label>
-                      <input
-                        type="text"
-                        value={businessForm.companyName}
-                        onChange={(e) =>
-                          setBusinessForm({
-                            ...businessForm,
-                            companyName: e.target.value,
-                          })
-                        }
-                        onBlur={handleCompanyNameBlur}
                         disabled={businessFieldDisabled}
                         className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed font-medium"
-                        placeholder="Muster GmbH & Co. KG"
+                        placeholder="D-99000"
                       />
                     </div>
 
-                    <div className="col-span-3 md:col-span-2">
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Display Name
-                      </label>
-                      <input
-                        type="text"
-                        value={businessForm.displayName}
-                        onChange={(e) => {
-                          displayNameTouched.current = true;
-                          setBusinessForm({
-                            ...businessForm,
-                            displayName: e.target.value,
-                          });
-                        }}
-                        disabled={businessFieldDisabled}
-                        className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                        placeholder="Auto from first word (unique)"
-                      />
-                    </div>
-
-                    {/* Star Portal Field Wrapper - Adjusted with flex container to give icon inline room */}
-                    <div className="col-span-3 md:col-span-2 flex items-end gap-2">
-                      <div className="flex-1">
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                          Star Portal Link Name
-                        </label>
-                        <input
-                          type="text"
-                          value={businessForm.starPortalLinkName}
-                          onChange={(e) => {
-                            starPortalTouched.current = true;
-                            setBusinessForm({
-                              ...businessForm,
-                              starPortalLinkName: e.target.value,
-                            });
-                          }}
-                          disabled={businessFieldDisabled}
-                          className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                          placeholder="Auto from web URL (between www. and next .)"
-                        />
-                      </div>
-
-                      {/* Copy Button styled to sit neatly inline */}
-                      <button
-                        type="button"
-                        onClick={(e) => handleCopyBusinessLink(businessForm, e)}
-                        className="text-gray-500 hover:text-gray-700 transition-colors p-2 mb-0.5 hover:bg-gray-100/50 rounded-lg shrink-0"
-                        title="Copy business link"
-                      >
-                        <ClipboardDocumentIcon className="w-5 h-5" />
-                      </button>
-                    </div>
-
-                    {/* Address line 1 + Street (2 across) */}
-                    <div className="col-span-6 md:col-span-3">
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Address Additional Line
-                      </label>
-                      <input
-                        type="text"
-                        value={businessForm.addressAdditional}
-                        onChange={(e) =>
-                          setBusinessForm({
-                            ...businessForm,
-                            addressAdditional: e.target.value,
-                          })
-                        }
-                        disabled={businessFieldDisabled}
-                        className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                        placeholder="c/o, building, floor…"
-                      />
-                    </div>
-                    <div className="col-span-6 md:col-span-3">
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Street and Street Number
-                      </label>
-                      <input
-                        type="text"
-                        value={businessForm.street}
-                        onChange={(e) =>
-                          setBusinessForm({
-                            ...businessForm,
-                            street: e.target.value,
-                          })
-                        }
-                        disabled={businessFieldDisabled}
-                        className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                        placeholder="Musterstraße 12"
-                      />
-                    </div>
-
-                    {/* Postal / City / Country (3 across) */}
-                    <div className="col-span-2">
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Postal Code
-                      </label>
-                      <input
-                        type="text"
-                        value={businessForm.postalCode}
-                        onChange={(e) =>
-                          setBusinessForm({
-                            ...businessForm,
-                            postalCode: e.target.value,
-                          })
-                        }
-                        disabled={businessFieldDisabled}
-                        className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                        placeholder="80331"
-                      />
-                    </div>
-                    <div className="col-span-2">
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        City
-                      </label>
-                      <input
-                        type="text"
-                        value={businessForm.city}
-                        onChange={(e) =>
-                          setBusinessForm({
-                            ...businessForm,
-                            city: e.target.value,
-                          })
-                        }
-                        disabled={businessFieldDisabled}
-                        className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                        placeholder="München"
-                      />
-                    </div>
-                    <div className="col-span-2">
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Country
-                      </label>
-                      <select
-                        value={businessForm.country}
-                        onChange={(e) =>
-                          setBusinessForm({
-                            ...businessForm,
-                            country: e.target.value,
-                          })
-                        }
-                        disabled={businessFieldDisabled}
-                        className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                      >
-                        {COUNTRY_OPTIONS.map((c) => (
-                          <option key={c.value} value={c.value}>
-                            {c.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* Email / Phone / Web (3 across) */}
-                    <div className="col-span-3 md:col-span-2">
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Email
-                      </label>
-                      <input
-                        type="email"
-                        value={businessForm.email}
-                        onChange={(e) =>
-                          setBusinessForm({
-                            ...businessForm,
-                            email: e.target.value,
-                          })
-                        }
-                        disabled={businessFieldDisabled}
-                        className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                        placeholder="info@muster.de"
-                      />
-                    </div>
-                    <div className="col-span-3 md:col-span-2">
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Phone
-                      </label>
-                      <input
-                        type="tel"
-                        value={businessForm.phone}
-                        onChange={(e) =>
-                          setBusinessForm({
-                            ...businessForm,
-                            phone: e.target.value,
-                          })
-                        }
-                        disabled={businessFieldDisabled}
-                        className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                        placeholder="+49 89 1234567"
-                      />
-                    </div>
                     <div className="col-span-6 md:col-span-2">
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Web URL
-                      </label>
-                      <input
-                        type="url"
-                        value={businessForm.website}
-                        onChange={(e) =>
-                          setBusinessForm({
-                            ...businessForm,
-                            website: e.target.value,
-                          })
-                        }
-                        onBlur={handleWebsiteBlur}
-                        disabled={businessFieldDisabled}
-                        className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                        placeholder="https://www.muster.de"
-                      />
-                    </div>
-
-                    {/* VAT / Tax ID */}
-                    <div className="col-span-3 md:col-span-2">
                       <label className="block text-xs font-medium text-gray-700 mb-1">
                         VAT / Tax ID
                       </label>
                       <input
                         type="text"
-                        value={businessForm.vatTaxId}
+                        value={businessForm.vatTaxId || ""}
                         onChange={(e) =>
                           setBusinessForm({
                             ...businessForm,
@@ -1904,11 +1944,59 @@ const CombinedBusinessContactsContent: React.FC = () => {
                           })
                         }
                         disabled={businessFieldDisabled}
-                        className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                        className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed font-medium"
                         placeholder="DE123456789"
                       />
                     </div>
-                    <div className="col-span-3 md:col-span-4">
+
+                    <div className="col-span-6 md:col-span-2">
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        VAT Check Status
+                      </label>
+                      <select
+                        value={businessForm.vat_id_status || "unchecked"}
+                        onChange={(e) =>
+                          setBusinessForm({
+                            ...businessForm,
+                            vat_id_status: e.target.value,
+                          })
+                        }
+                        disabled={businessFieldDisabled}
+                        className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed text-gray-900 bg-white"
+                      >
+                        <option value="unchecked">Unchecked</option>
+                        <option value="vies_valid">VIES Valid</option>
+                        <option value="vies_invalid">VIES Invalid</option>
+                        <option value="bzst_qualified_valid">BZSt Qualified Valid</option>
+                        <option value="bzst_qualified_invalid">BZSt Qualified Invalid</option>
+                      </select>
+                    </div>
+
+                    <div className="col-span-6 md:col-span-3">
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        Default Tax Profile
+                      </label>
+                      <select
+                        value={businessForm.default_tax_profile_id || ""}
+                        onChange={(e) =>
+                          setBusinessForm({
+                            ...businessForm,
+                            default_tax_profile_id: e.target.value || "",
+                          })
+                        }
+                        disabled={businessFieldDisabled}
+                        className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed text-gray-900 bg-white"
+                      >
+                        <option value="">None / Not Assigned</option>
+                        {taxProfiles.map((tp) => (
+                          <option key={tp.id} value={tp.id}>
+                            {tp.name} ({tp.rate}%)
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="col-span-6 md:col-span-3">
                       <label className="block text-xs font-medium text-gray-700 mb-1">
                         Asana Link
                       </label>
@@ -1926,209 +2014,206 @@ const CombinedBusinessContactsContent: React.FC = () => {
                         placeholder="https://app.asana.com/..."
                       />
                     </div>
-
-                    {/* Note */}
-                    <div className="col-span-6">
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Note
-                      </label>
-                      <textarea
-                        value={businessForm.note}
-                        onChange={(e) =>
-                          setBusinessForm({
-                            ...businessForm,
-                            note: e.target.value,
-                          })
-                        }
-                        disabled={businessFieldDisabled}
-                        rows={3}
-                        className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                        placeholder="Internal note…"
-                      />
-                    </div>
-
-                    {/* Tags */}
-                    <div className="col-span-6">
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Tags
-                      </label>
-                      {businessModalMode === "create" ? (
-                        <TagPickerInput
-                          category="company"
-                          selectedTags={newBusinessTags}
-                          onChange={setNewBusinessTags}
-                        />
-                      ) : (
-                        <EntityTagSelector
-                          entityId={editingBusinessId!}
-                          entityType="company"
-                          initialTags={businessForm.tags || []}
-                          tagOrder={businessForm.tagOrder}
-                          onTagsUpdated={(updatedTags) =>
-                            setBusinessForm((prev: any) => ({
-                              ...prev,
-                              tags: updatedTags,
-                              tagOrder: updatedTags.map((t) => t.id).join(","),
-                            }))
-                          }
-                          disabled={businessFieldDisabled}
-                        />
-                      )}
-                    </div>
                   </div>
                 </div>
 
-                {/* Logo Section */}
                 <div className="col-span-6">
                   <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Company Label Print Logo
+                    Note
                   </label>
-                  <div className="flex items-center gap-3">
-                    {businessForm.companyLabelPrintLogo ? (
-                      <img
-                        src={businessForm.companyLabelPrintLogo}
-                        alt="Label logo"
-                        className="h-12 w-12 object-contain rounded border border-gray-200 bg-white"
-                      />
-                    ) : (
-                      <div className="h-12 w-12 rounded border border-dashed border-gray-300 flex items-center justify-center text-[10px] text-gray-400">
-                        No logo
-                      </div>
-                    )}
-                    <input
-                      id="labelLogoInput"
-                      type="file"
-                      accept="image/*"
-                      onChange={handleLogoUpload}
-                      disabled={businessFieldDisabled}
-                      className="hidden"
-                    />
-                    <label
-                      htmlFor="labelLogoInput"
-                      className={`px-3 py-1.5 text-xs rounded-lg border border-gray-300/80 bg-white/70 transition-all ${
-                        businessFieldDisabled
-                          ? "opacity-50 cursor-not-allowed"
-                          : "cursor-pointer hover:bg-white"
-                      }`}
-                    >
-                      Upload
-                    </label>
-                    {businessForm.companyLabelPrintLogo &&
-                      !businessFieldDisabled && (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setBusinessForm({
-                              ...businessForm,
-                              companyLabelPrintLogo: "",
-                            })
-                          }
-                          className="text-xs text-red-600 hover:text-red-800"
-                        >
-                          Remove
-                        </button>
-                      )}
-                  </div>
+                  <textarea
+                    value={businessForm.note}
+                    onChange={(e) =>
+                      setBusinessForm({
+                        ...businessForm,
+                        note: e.target.value,
+                      })
+                    }
+                    disabled={businessFieldDisabled}
+                    rows={3}
+                    className="w-full px-3 py-2 text-sm border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    placeholder="Internal note…"
+                  />
                 </div>
 
-                {/* Contacts sub-section */}
-                {businessModalMode === "edit" && (
-                  <div className="rounded-xl p-4 -mx-4 bg-green-50 border border-green-200/70">
-                    <div className="flex items-center justify-between mb-3">
-                      <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                        <UserGroupIcon className="h-5 w-5 text-gray-500" />
-                        <span>Contacts</span>
-                        <span className="text-xs font-normal text-gray-500">
-                          ({modalContacts.length})
-                        </span>
-                      </h3>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const biz = allBusinesses.find(
-                            (b) => b.id === editingBusinessId,
-                          );
-                          if (biz) handleAddContactForBusiness(biz);
-                        }}
-                        className="px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 transition-all flex items-center gap-1"
-                      >
-                        <UserPlusIcon className="h-3 w-3" />
-                        Add Contact
-                      </button>
-                    </div>
-                    <div className="space-y-2">
-                      {modalContacts.length === 0 ? (
-                        <p className="text-sm text-gray-500">
-                          No contacts for this business yet.
-                        </p>
-                      ) : (
-                        modalContacts.map((contact: any) => (
-                          <div
-                            key={contact.id}
-                            className="flex items-center justify-between bg-white border border-green-200 rounded-lg px-3 py-2"
-                          >
-                            <div className="min-w-0">
-                              <div className="text-sm font-medium text-gray-900 truncate">
-                                {contact.name} {contact.familyName}
-                                {contact.contact && (
-                                  <span className="ml-2 inline-flex text-[10px] px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800">
-                                    {contact.contact}
-                                  </span>
-                                )}
-                              </div>
-                              <div className="text-xs text-gray-500 truncate">
-                                {contact.position}
-                                {contact.email ? ` · ${contact.email}` : ""}
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2 flex-shrink-0">
-                              <button
-                                type="button"
-                                onClick={() => openContactModal(contact, true)}
-                                className="text-blue-600 hover:text-blue-800 transition-colors"
-                                title="Edit contact"
-                              >
-                                <PencilIcon className="h-4 w-4" />
-                              </button>
-                              {user?.role === UserRole.ADMIN && (
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    handleDeleteContact(contact.id)
-                                  }
-                                  title="Delete contact"
-                                >
-                                  <Delete sx={{ fontSize: 16, color: "red" }} />
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        ))
-                      )}
-                    </div>
+                <div className="col-span-6">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Tags
+                  </label>
+                  {businessModalMode === "create" ? (
+                    <TagPickerInput
+                      category="company"
+                      selectedTags={newBusinessTags}
+                      onChange={setNewBusinessTags}
+                    />
+                  ) : (
+                    <EntityTagSelector
+                      entityId={editingBusinessId!}
+                      entityType="company"
+                      initialTags={businessForm.tags || []}
+                      tagOrder={businessForm.tagOrder}
+                      onTagsUpdated={(updatedTags) =>
+                        setBusinessForm((prev: any) => ({
+                          ...prev,
+                          tags: updatedTags,
+                          tagOrder: updatedTags.map((t) => t.id).join(","),
+                        }))
+                      }
+                      disabled={businessFieldDisabled}
+                    />
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="col-span-6">
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                Company Label Print Logo
+              </label>
+              <div className="flex items-center gap-3">
+                {businessForm.companyLabelPrintLogo ? (
+                  <img
+                    src={businessForm.companyLabelPrintLogo}
+                    alt="Label logo"
+                    className="h-12 w-12 object-contain rounded border border-gray-200 bg-white"
+                  />
+                ) : (
+                  <div className="h-12 w-12 rounded border border-dashed border-gray-300 flex items-center justify-center text-[10px] text-gray-400">
+                    No logo
                   </div>
                 )}
+                <input
+                  id="labelLogoInput"
+                  type="file"
+                  accept="image/*"
+                  onChange={handleLogoUpload}
+                  disabled={businessFieldDisabled}
+                  className="hidden"
+                />
+                <label
+                  htmlFor="labelLogoInput"
+                  className={`px-3 py-1.5 text-xs rounded-lg border border-gray-300/80 bg-white/70 transition-all ${businessFieldDisabled
+                    ? "opacity-50 cursor-not-allowed"
+                    : "cursor-pointer hover:bg-white"
+                    }`}
+                >
+                  Upload
+                </label>
+                {businessForm.companyLabelPrintLogo &&
+                  !businessFieldDisabled && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setBusinessForm({
+                          ...businessForm,
+                          companyLabelPrintLogo: "",
+                        })
+                      }
+                      className="text-xs text-red-600 hover:text-red-800"
+                    >
+                      Remove
+                    </button>
+                  )}
               </div>
-
             </div>
-            <ModalFooter
-              isEditMode={businessModalMode === "edit"}
-              isEditEnabled={businessEditMode}
-              onDelete={() => {
-                if (editingBusinessId)
-                  handleDeleteBusiness(editingBusinessId);
-              }}
-              onCancel={() => {
-                setShowBusinessModal(false);
-                resetBusinessForm();
-                setBusinessModalMode("create");
-              }}
-              onSave={handleBusinessSubmit}
-              saveLabel={businessModalMode === "edit" ? "Update Business" : "Create Business"}
-              loading={loading}
-              saveDisabled={!businessForm.companyName?.trim() || loading}
-              showDelete={user?.role === UserRole.ADMIN}
-            />
+
+            {businessModalMode === "edit" && (
+              <div className="rounded-xl p-4 -mx-4 bg-green-50 border border-green-200/70">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                    <UserGroupIcon className="h-5 w-5 text-gray-500" />
+                    <span>Contacts</span>
+                    <span className="text-xs font-normal text-gray-500">
+                      ({modalContacts.length})
+                    </span>
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const biz = allBusinesses.find(
+                        (b) => b.id === editingBusinessId,
+                      );
+                      if (biz) handleAddContactForBusiness(biz);
+                    }}
+                    className="px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 transition-all flex items-center gap-1"
+                  >
+                    <UserPlusIcon className="h-3 w-3" />
+                    Add Contact
+                  </button>
+                </div>
+                <div className="space-y-2">
+                  {modalContacts.length === 0 ? (
+                    <p className="text-sm text-gray-500">
+                      No contacts for this business yet.
+                    </p>
+                  ) : (
+                    modalContacts.map((contact: any) => (
+                      <div
+                        key={contact.id}
+                        className="flex items-center justify-between bg-white border border-green-200 rounded-lg px-3 py-2"
+                      >
+                        <div className="min-w-0">
+                          <div className="text-sm font-medium text-gray-900 truncate">
+                            {contact.name} {contact.familyName}
+                            {contact.contact && (
+                              <span className="ml-2 inline-flex text-[10px] px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800">
+                                {contact.contact}
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-xs text-gray-500 truncate">
+                            {contact.position}
+                            {contact.email ? ` · ${contact.email}` : ""}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => openContactModal(contact, true)}
+                            className="text-blue-600 hover:text-blue-800 transition-colors"
+                            title="Edit contact"
+                          >
+                            <PencilIcon className="h-4 w-4" />
+                          </button>
+                          {user?.role === UserRole.ADMIN && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleDeleteContact(contact.id)
+                              }
+                              title="Delete contact"
+                            >
+                              <Delete sx={{ fontSize: 16, color: "red" }} />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+        </div>
+        <ModalFooter
+          isEditMode={businessModalMode === "edit"}
+          isEditEnabled={businessEditMode}
+          onDelete={() => {
+            if (editingBusinessId)
+              handleDeleteBusiness(editingBusinessId);
+          }}
+          onCancel={() => {
+            setShowBusinessModal(false);
+            resetBusinessForm();
+            setBusinessModalMode("create");
+          }}
+          onSave={handleBusinessSubmit}
+          saveLabel={businessModalMode === "edit" ? "Update Business" : "Create Business"}
+          loading={loading}
+          saveDisabled={!businessForm.companyName?.trim() || loading}
+          showDelete={user?.role === UserRole.ADMIN}
+        />
       </CustomModal>
 
       <CustomModal
@@ -2143,402 +2228,400 @@ const CombinedBusinessContactsContent: React.FC = () => {
         width="max-w-2xl"
       >
 
-              {modalMode === "edit" && (
-                <div className="mb-6 flex items-center justify-between bg-gray-50 rounded-lg p-4">
-                  <span className="text-sm font-medium text-gray-700">
-                    Edit Mode
-                  </span>
-                  <div className="flex items-center">
-                    <span className="text-sm text-gray-500 mr-3">
-                      {editModeEnabled ? "Enabled" : "Disabled"}
-                    </span>
-                    <button
-                      type="button"
-                      className={`${
-                        editModeEnabled ? "bg-gray-600" : "bg-gray-200"
-                      } relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2`}
-                      role="switch"
-                      aria-checked={editModeEnabled}
-                      onClick={() => setEditModeEnabled(!editModeEnabled)}
-                    >
-                      <span
-                        aria-hidden="true"
-                        className={`${
-                          editModeEnabled ? "translate-x-5" : "translate-x-0"
-                        } pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out`}
-                      />
-                    </button>
-                  </div>
-                </div>
-              )}
+        {modalMode === "edit" && (
+          <div className="mb-6 flex items-center justify-between bg-gray-50 rounded-lg p-4">
+            <span className="text-sm font-medium text-gray-700">
+              Edit Mode
+            </span>
+            <div className="flex items-center">
+              <span className="text-sm text-gray-500 mr-3">
+                {editModeEnabled ? "Enabled" : "Disabled"}
+              </span>
+              <button
+                type="button"
+                className={`${editModeEnabled ? "bg-gray-600" : "bg-gray-200"
+                  } relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2`}
+                role="switch"
+                aria-checked={editModeEnabled}
+                onClick={() => setEditModeEnabled(!editModeEnabled)}
+              >
+                <span
+                  aria-hidden="true"
+                  className={`${editModeEnabled ? "translate-x-5" : "translate-x-0"
+                    } pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out`}
+                />
+              </button>
+            </div>
+          </div>
+        )}
 
-              <div className="space-y-6">
-                {!selectedBusiness && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Select Business *
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        placeholder="Geschäft suchen..."
-                        value={businessSearchTerm}
-                        onChange={(e) => {
-                          setBusinessSearchTerm(e.target.value);
-                          fetchStarBusinessesForModal(e.target.value);
-                        }}
-                        disabled={modalMode === "edit" && !editModeEnabled}
-                        className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                      />
-                      {allStarBusinesses.length > 0 && (
-                        <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto z-10">
-                          {allStarBusinesses.map((b, index) => (
-                            <button
-                              key={b.value || b.id || `business-${index}`}
-                              onClick={() => {
-                                setSelectedBusiness(b);
-                                setCreateForm({
-                                  ...createForm,
-                                  starBusinessDetailsId: b.value || b.id,
-                                });
-                                setBusinessSearchTerm("");
-                              }}
-                              className="w-full px-4 py-2 text-left hover:bg-gray-50 border-b border-gray-100 last:border-b-0"
-                            >
-                              <div className="font-medium">
-                                {b.name || b.label || b.companyName}
-                              </div>
-                              {b.city && (
-                                <div className="text-sm text-gray-500">
-                                  {b.city}, {b.state}
-                                </div>
-                              )}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {selectedBusiness && (
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h3 className="font-medium text-gray-900">
-                          {selectedBusiness.name ||
-                            selectedBusiness.label ||
-                            selectedBusiness.companyName}
-                        </h3>
-                        {selectedBusiness.city && (
-                          <p className="text-sm text-gray-500">
-                            {selectedBusiness.city}, {selectedBusiness.state}
-                          </p>
-                        )}
-                      </div>
-                      {modalMode !== "edit" && (
-                        <button
-                          onClick={() => {
-                            setSelectedBusiness(null);
-                            setCreateForm({
-                              ...createForm,
-                              starBusinessDetailsId: "",
-                            });
-                          }}
-                          className="text-red-600 hover:text-red-800 transition-colors"
-                        >
-                          <XMarkIcon className="h-5 w-5" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      First Name *
-                    </label>
-                    <input
-                      type="text"
-                      value={createForm.name}
-                      onChange={(e) =>
-                        setCreateForm({ ...createForm, name: e.target.value })
-                      }
-                      disabled={modalMode === "edit" && !editModeEnabled}
-                      className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                      placeholder="Peter"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Last Name *
-                    </label>
-                    <input
-                      type="text"
-                      value={createForm.familyName}
-                      onChange={(e) =>
-                        setCreateForm({
-                          ...createForm,
-                          familyName: e.target.value,
-                        })
-                      }
-                      disabled={modalMode === "edit" && !editModeEnabled}
-                      className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                      placeholder="Müller"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Sex
-                    </label>
-                    <select
-                      value={createForm.sex}
-                      onChange={(e) =>
-                        setCreateForm({ ...createForm, sex: e.target.value })
-                      }
-                      disabled={modalMode === "edit" && !editModeEnabled}
-                      className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                    >
-                      <option value="">Geschlecht auswählen</option>
-                      {SEX_OPTIONS.map((o) => (
-                        <option key={o.value} value={o.value}>
-                          {o.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Position *
-                    </label>
-                    <select
-                      value={createForm.position}
-                      onChange={(e) =>
-                        setCreateForm({
-                          ...createForm,
-                          position: e.target.value,
-                        })
-                      }
-                      disabled={modalMode === "edit" && !editModeEnabled}
-                      className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                    >
-                      <option value="">Position auswählen</option>
-                      {POSITIONS.map((pos) => (
-                        <option key={pos.value} value={pos.value}>
-                          {pos.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {createForm.position === "Others" && (
-                    <div className="col-span-2">
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Position Description *
-                      </label>
-                      <input
-                        type="text"
-                        value={createForm.positionOthers}
-                        onChange={(e) =>
+        <div className="space-y-6">
+          {!selectedBusiness && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Select Business *
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Geschäft suchen..."
+                  value={businessSearchTerm}
+                  onChange={(e) => {
+                    setBusinessSearchTerm(e.target.value);
+                    fetchStarBusinessesForModal(e.target.value);
+                  }}
+                  disabled={modalMode === "edit" && !editModeEnabled}
+                  className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                />
+                {allStarBusinesses.length > 0 && (
+                  <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto z-10">
+                    {allStarBusinesses.map((b, index) => (
+                      <button
+                        key={b.value || b.id || `business-${index}`}
+                        onClick={() => {
+                          setSelectedBusiness(b);
                           setCreateForm({
                             ...createForm,
-                            positionOthers: e.target.value,
-                          })
-                        }
-                        disabled={modalMode === "edit" && !editModeEnabled}
-                        className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                        placeholder="Position beschreiben"
-                      />
-                    </div>
-                  )}
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Email
-                    </label>
-                    <input
-                      type="email"
-                      value={createForm.email}
-                      onChange={(e) =>
-                        setCreateForm({ ...createForm, email: e.target.value })
-                      }
-                      disabled={modalMode === "edit" && !editModeEnabled}
-                      className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                      placeholder="max@beispiel.de"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Phone
-                    </label>
-                    <input
-                      type="tel"
-                      value={createForm.phone}
-                      onChange={(e) =>
-                        setCreateForm({ ...createForm, phone: e.target.value })
-                      }
-                      disabled={modalMode === "edit" && !editModeEnabled}
-                      className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                      placeholder="+49 171 1234567"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      LinkedIn URL
-                    </label>
-                    <input
-                      type="url"
-                      value={createForm.linkedInLink}
-                      onChange={(e) =>
-                        setCreateForm({
-                          ...createForm,
-                          linkedInLink: e.target.value,
-                        })
-                      }
-                      disabled={modalMode === "edit" && !editModeEnabled}
-                      className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                    />
-                  </div>
-                  <div className="col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      <span className="text-green-500 text-xl">💬</span> Contact
-                      Preference
-                    </label>
-                    <input
-                      type="text"
-                      value={createForm.noteContactPreference}
-                      onChange={(e) =>
-                        setCreateForm({
-                          ...createForm,
-                          noteContactPreference: e.target.value,
-                        })
-                      }
-                      disabled={modalMode === "edit" && !editModeEnabled}
-                      className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                    />
-                  </div>
-
-                  <div className="col-span-2 border-l-4 border-purple-500 pl-4 bg-purple-50 rounded-r-lg p-3">
-                    <label className="block text-sm font-medium text-purple-800 mb-1">
-                      <span
-                        className="text-purple-500"
-                        title="Decision Maker Note"
-                      >
-                        🤝
-                      </span>{" "}
-                      Decision Maker Note
-                    </label>
-                    <textarea
-                      value={createForm.decisionMakerNote || ""}
-                      onChange={(e) =>
-                        setCreateForm({
-                          ...createForm,
-                          decisionMakerNote: e.target.value,
-                        })
-                      }
-                      rows={3}
-                      disabled={modalMode === "edit" && !editModeEnabled}
-                      className="w-full px-3 py-2 border border-purple-300 rounded-lg focus:ring-2 focus:ring-purple-500 disabled:bg-gray-100"
-                    />
-                  </div>
-
-                  <div className="col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      <span className="text-blue-500" title="General Note">
-                        📝
-                      </span>{" "}
-                      Notes
-                    </label>
-                    <textarea
-                      value={createForm.note}
-                      onChange={(e) =>
-                        setCreateForm({ ...createForm, note: e.target.value })
-                      }
-                      rows={3}
-                      disabled={modalMode === "edit" && !editModeEnabled}
-                      className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                      placeholder="Internal note about this contact…"
-                    />
-                  </div>
-
-                  <div className="col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Tags
-                    </label>
-                    {modalMode === "create" ? (
-                      <TagPickerInput
-                        category="contact"
-                        selectedTags={newContactTags}
-                        onChange={setNewContactTags}
-                      />
-                    ) : (
-                      <EntityTagSelector
-                        entityId={editingContactId!}
-                        entityType="contact"
-                        initialTags={createForm.tags || []}
-                        tagOrder={createForm.tagOrder}
-                        onTagsUpdated={(updatedTags) =>
-                          setCreateForm((prev: any) => ({
-                            ...prev,
-                            tags: updatedTags,
-                            tagOrder: updatedTags.map((t) => t.id).join(","),
-                          }))
-                        }
-                        disabled={modalMode === "edit" && !editModeEnabled}
-                      />
-                    )}
-                  </div>
-                </div>
-
-                <div className="mt-6 flex justify-between gap-3">
-                  <div>
-                    {modalMode === "edit" && user?.role === UserRole.ADMIN && (
-                      <button
-                        onClick={() => {
-                          if (editingContactId)
-                            handleDeleteContact(editingContactId);
+                            starBusinessDetailsId: b.value || b.id,
+                          });
+                          setBusinessSearchTerm("");
                         }}
-                        disabled={!editModeEnabled}
-                        className="px-3 py-2 text-xs text-red-700 bg-white/80 backdrop-blur-sm border border-red-300/80 rounded hover:bg-red-50/60 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                        className="w-full px-4 py-2 text-left hover:bg-gray-50 border-b border-gray-100 last:border-b-0"
                       >
-                        <TrashIcon className="h-4 w-4" />
-                        Delete Contact
+                        <div className="font-medium">
+                          {b.name || b.label || b.companyName}
+                        </div>
+                        {b.city && (
+                          <div className="text-sm text-gray-500">
+                            {b.city}, {b.state}
+                          </div>
+                        )}
                       </button>
-                    )}
+                    ))}
                   </div>
-                  <div className="flex gap-3">
-                    <button
-                      onClick={() => {
-                        setShowCreateModal(false);
-                        resetCreateForm();
-                        setModalMode("create");
-                        setEditingContactId(null);
-                      }}
-                      className="px-4 py-2 text-gray-700 bg-white/80 backdrop-blur-sm border border-gray-300/80 rounded-lg hover:bg-white/60 transition-all"
-                    >
-                      {modalMode === "edit" ? "Close" : "Cancel"}
-                    </button>
-                    {modalMode === "edit" && editModeEnabled && (
-                      <CustomButton
-                        gradient={true}
-                        onClick={handleCreateContact}
-                        className="px-4 py-2 bg-gray-600/90 backdrop-blur-sm text-white rounded-lg hover:bg-gray-700/90 transition-all"
-                      >
-                        Update Contact Person
-                      </CustomButton>
-                    )}
-                    {modalMode === "create" && (
-                      <CustomButton
-                        gradient={true}
-                        onClick={handleCreateContact}
-                        className="px-4 py-2 bg-gray-600/90 backdrop-blur-sm text-white rounded-lg hover:bg-gray-700/90 transition-all"
-                      >
-                        Add Contact Person
-                      </CustomButton>
-                    )}
-                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {selectedBusiness && (
+            <div className="bg-gray-50 rounded-lg p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-medium text-gray-900">
+                    {selectedBusiness.name ||
+                      selectedBusiness.label ||
+                      selectedBusiness.companyName}
+                  </h3>
+                  {selectedBusiness.city && (
+                    <p className="text-sm text-gray-500">
+                      {selectedBusiness.city}, {selectedBusiness.state}
+                    </p>
+                  )}
                 </div>
+                {modalMode !== "edit" && (
+                  <button
+                    onClick={() => {
+                      setSelectedBusiness(null);
+                      setCreateForm({
+                        ...createForm,
+                        starBusinessDetailsId: "",
+                      });
+                    }}
+                    className="text-red-600 hover:text-red-800 transition-colors"
+                  >
+                    <XMarkIcon className="h-5 w-5" />
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                First Name *
+              </label>
+              <input
+                type="text"
+                value={createForm.name}
+                onChange={(e) =>
+                  setCreateForm({ ...createForm, name: e.target.value })
+                }
+                disabled={modalMode === "edit" && !editModeEnabled}
+                className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                placeholder="Peter"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Last Name *
+              </label>
+              <input
+                type="text"
+                value={createForm.familyName}
+                onChange={(e) =>
+                  setCreateForm({
+                    ...createForm,
+                    familyName: e.target.value,
+                  })
+                }
+                disabled={modalMode === "edit" && !editModeEnabled}
+                className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                placeholder="Müller"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Sex
+              </label>
+              <select
+                value={createForm.sex}
+                onChange={(e) =>
+                  setCreateForm({ ...createForm, sex: e.target.value })
+                }
+                disabled={modalMode === "edit" && !editModeEnabled}
+                className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+              >
+                <option value="">Geschlecht auswählen</option>
+                {SEX_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Position *
+              </label>
+              <select
+                value={createForm.position}
+                onChange={(e) =>
+                  setCreateForm({
+                    ...createForm,
+                    position: e.target.value,
+                  })
+                }
+                disabled={modalMode === "edit" && !editModeEnabled}
+                className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+              >
+                <option value="">Position auswählen</option>
+                {POSITIONS.map((pos) => (
+                  <option key={pos.value} value={pos.value}>
+                    {pos.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {createForm.position === "Others" && (
+              <div className="col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Position Description *
+                </label>
+                <input
+                  type="text"
+                  value={createForm.positionOthers}
+                  onChange={(e) =>
+                    setCreateForm({
+                      ...createForm,
+                      positionOthers: e.target.value,
+                    })
+                  }
+                  disabled={modalMode === "edit" && !editModeEnabled}
+                  className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  placeholder="Position beschreiben"
+                />
+              </div>
+            )}
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Email
+              </label>
+              <input
+                type="email"
+                value={createForm.email}
+                onChange={(e) =>
+                  setCreateForm({ ...createForm, email: e.target.value })
+                }
+                disabled={modalMode === "edit" && !editModeEnabled}
+                className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                placeholder="max@beispiel.de"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Phone
+              </label>
+              <input
+                type="tel"
+                value={createForm.phone}
+                onChange={(e) =>
+                  setCreateForm({ ...createForm, phone: e.target.value })
+                }
+                disabled={modalMode === "edit" && !editModeEnabled}
+                className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                placeholder="+49 171 1234567"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                LinkedIn URL
+              </label>
+              <input
+                type="url"
+                value={createForm.linkedInLink}
+                onChange={(e) =>
+                  setCreateForm({
+                    ...createForm,
+                    linkedInLink: e.target.value,
+                  })
+                }
+                disabled={modalMode === "edit" && !editModeEnabled}
+                className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+              />
+            </div>
+            <div className="col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                <span className="text-green-500 text-xl">💬</span> Contact
+                Preference
+              </label>
+              <input
+                type="text"
+                value={createForm.noteContactPreference}
+                onChange={(e) =>
+                  setCreateForm({
+                    ...createForm,
+                    noteContactPreference: e.target.value,
+                  })
+                }
+                disabled={modalMode === "edit" && !editModeEnabled}
+                className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+              />
+            </div>
+
+            <div className="col-span-2 border-l-4 border-purple-500 pl-4 bg-purple-50 rounded-r-lg p-3">
+              <label className="block text-sm font-medium text-purple-800 mb-1">
+                <span
+                  className="text-purple-500"
+                  title="Decision Maker Note"
+                >
+                  🤝
+                </span>{" "}
+                Decision Maker Note
+              </label>
+              <textarea
+                value={createForm.decisionMakerNote || ""}
+                onChange={(e) =>
+                  setCreateForm({
+                    ...createForm,
+                    decisionMakerNote: e.target.value,
+                  })
+                }
+                rows={3}
+                disabled={modalMode === "edit" && !editModeEnabled}
+                className="w-full px-3 py-2 border border-purple-300 rounded-lg focus:ring-2 focus:ring-purple-500 disabled:bg-gray-100"
+              />
+            </div>
+
+            <div className="col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                <span className="text-blue-500" title="General Note">
+                  📝
+                </span>{" "}
+                Notes
+              </label>
+              <textarea
+                value={createForm.note}
+                onChange={(e) =>
+                  setCreateForm({ ...createForm, note: e.target.value })
+                }
+                rows={3}
+                disabled={modalMode === "edit" && !editModeEnabled}
+                className="w-full px-3 py-2 border border-gray-300/80 bg-white/70 backdrop-blur-sm rounded-lg focus:ring-2 focus:ring-gray-500/50 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                placeholder="Internal note about this contact…"
+              />
+            </div>
+
+            <div className="col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Tags
+              </label>
+              {modalMode === "create" ? (
+                <TagPickerInput
+                  category="contact"
+                  selectedTags={newContactTags}
+                  onChange={setNewContactTags}
+                />
+              ) : (
+                <EntityTagSelector
+                  entityId={editingContactId!}
+                  entityType="contact"
+                  initialTags={createForm.tags || []}
+                  tagOrder={createForm.tagOrder}
+                  onTagsUpdated={(updatedTags) =>
+                    setCreateForm((prev: any) => ({
+                      ...prev,
+                      tags: updatedTags,
+                      tagOrder: updatedTags.map((t) => t.id).join(","),
+                    }))
+                  }
+                  disabled={modalMode === "edit" && !editModeEnabled}
+                />
+              )}
+            </div>
+          </div>
+
+          <div className="mt-6 flex justify-between gap-3">
+            <div>
+              {modalMode === "edit" && user?.role === UserRole.ADMIN && (
+                <button
+                  onClick={() => {
+                    if (editingContactId)
+                      handleDeleteContact(editingContactId);
+                  }}
+                  disabled={!editModeEnabled}
+                  className="px-3 py-2 text-xs text-red-700 bg-white/80 backdrop-blur-sm border border-red-300/80 rounded hover:bg-red-50/60 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                >
+                  <TrashIcon className="h-4 w-4" />
+                  Delete Contact
+                </button>
+              )}
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowCreateModal(false);
+                  resetCreateForm();
+                  setModalMode("create");
+                  setEditingContactId(null);
+                }}
+                className="px-4 py-2 text-gray-700 bg-white/80 backdrop-blur-sm border border-gray-300/80 rounded-lg hover:bg-white/60 transition-all"
+              >
+                {modalMode === "edit" ? "Close" : "Cancel"}
+              </button>
+              {modalMode === "edit" && editModeEnabled && (
+                <CustomButton
+                  gradient={true}
+                  onClick={handleCreateContact}
+                  className="px-4 py-2 bg-gray-600/90 backdrop-blur-sm text-white rounded-lg hover:bg-gray-700/90 transition-all"
+                >
+                  Update Contact Person
+                </CustomButton>
+              )}
+              {modalMode === "create" && (
+                <CustomButton
+                  gradient={true}
+                  onClick={handleCreateContact}
+                  className="px-4 py-2 bg-gray-600/90 backdrop-blur-sm text-white rounded-lg hover:bg-gray-700/90 transition-all"
+                >
+                  Add Contact Person
+                </CustomButton>
+              )}
+            </div>
+          </div>
         </div>
       </CustomModal>
 
@@ -2623,11 +2706,10 @@ const CombinedBusinessContactsContent: React.FC = () => {
         }}
         title={
           businessNoteData
-            ? `Note · ${
-                businessNoteData.displayName ||
-                businessNoteData.companyName ||
-                businessNoteData.name
-              }`
+            ? `Note · ${businessNoteData.displayName ||
+            businessNoteData.companyName ||
+            businessNoteData.name
+            }`
             : "Note"
         }
         width="max-w-2xl"

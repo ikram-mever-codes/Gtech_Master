@@ -86,27 +86,14 @@ const allMenuItems: MenuEntry[] = [
   {
     icon: DollarSign,
     text: "Commercial",
-    resource: "Commercial",
-    children: [
-      {
-        icon: FileText,
-        text: "Customer Offer",
-        path: "/offers",
-        resource: "Offers",
-      },
-    ],
+    path: "/invoices",
+    resource: "Invoices",
   },
   {
     icon: Truck,
     text: "Fulfillment",
     resource: "Delivery",
     children: [
-      {
-        icon: Receipt,
-        text: "Delivery",
-        path: "/invoices",
-        resource: "Invoices",
-      },
       {
         icon: ShoppingCart,
         text: "Order Processing",

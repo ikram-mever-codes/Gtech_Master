@@ -47,6 +47,12 @@ export interface Business {
   isStarCustomer: boolean;
   createdAt: string;
   updatedAt: string;
+  debtor_no?: string;
+  default_tax_profile_id?: string;
+  vat_id_status?: "unchecked" | "vies_valid" | "vies_invalid" | "bzst_qualified_valid" | "bzst_qualified_invalid";
+  vat_id_checked_at?: string;
+  vat_id_check_source?: string;
+  vat_id_check_response_json?: string;
 }
 
 export interface BusinessCreatePayload {
@@ -87,6 +93,9 @@ export interface BusinessCreatePayload {
     saturday?: string;
     sunday?: string;
   };
+  debtor_no?: string;
+  default_tax_profile_id?: string;
+  vat_id_status?: string;
 }
 
 export interface BusinessUpdatePayload extends Partial<BusinessCreatePayload> {
@@ -418,6 +427,16 @@ export const checkBusinessServiceHealth = async () => {
     return response.data;
   } catch (error) {
     handleApiError(error, "Service health check failed");
+    throw error;
+  }
+};
+
+export const getAllTaxProfiles = async () => {
+  try {
+    const response = await api.get("/tax-profiles");
+    return response;
+  } catch (error) {
+    handleApiError(error, "Failed to fetch tax profiles");
     throw error;
   }
 };

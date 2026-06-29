@@ -539,10 +539,19 @@ export class InvoiceController {
         invoice.pdfUrl = pdfUrl;
       }
 
-      const filePath = path.join(process.cwd(), invoice.pdfUrl);
+      let filePath = path.join(process.cwd(), invoice.pdfUrl);
 
       if (!fs.existsSync(filePath)) {
-        return res.status(404).json({ message: "PDF file not found" });
+        console.warn(`[Invoice] PDF file missing for invoice ${invoice.invoiceNumber}, regenerating...`);
+        try {
+          const newPdfUrl = await InvoiceController.generateInvoicePDF(invoice);
+          await invoiceRepository.update(invoiceId, { pdfUrl: newPdfUrl });
+          invoice.pdfUrl = newPdfUrl;
+          filePath = path.join(process.cwd(), newPdfUrl);
+        } catch (genError) {
+          console.error(`[Invoice] PDF regeneration failed for ${invoice.invoiceNumber}:`, genError);
+          return res.status(500).json({ message: "PDF file could not be found or regenerated. Please contact support." });
+        }
       }
 
       res.setHeader("Content-Type", "application/pdf");
@@ -805,22 +814,11 @@ export class InvoiceController {
           orderComment,
         };
       })
-        .filter((inv): inv is any => inv !== null)
-        .filter(inv => {
-          return inv.customItemCount > 0;
-        });
+        .filter((inv): inv is any => inv !== null);
 
       const finalDataMap = new Map();
       data.forEach(inv => {
-        const key = inv.cargoNo || inv.orderNumber;
-        if (!finalDataMap.has(key)) {
-          finalDataMap.set(key, inv);
-        } else {
-          const existing = finalDataMap.get(key);
-          if (inv.orderNumber === inv.cargoNo) {
-            finalDataMap.set(key, inv);
-          }
-        }
+        finalDataMap.set(inv.id, inv);
       });
 
       return res.status(200).json({ success: true, data: Array.from(finalDataMap.values()) });
