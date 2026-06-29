@@ -519,6 +519,9 @@ export const createBusiness = async (
       isStarCustomer,
       starCustomerEmail,
       asanaLink,
+      debtor_no,
+      default_tax_profile_id,
+      vat_id_status,
     } = req.body;
 
     const user = (req as any).user;
@@ -679,6 +682,9 @@ export const createBusiness = async (
           ? companyLabelPrintLogo.trim()
           : undefined;
         customer.vatTaxId = vatTaxId ? vatTaxId.trim() : undefined;
+        customer.debtor_no = debtor_no ? debtor_no.trim() : undefined;
+        customer.default_tax_profile_id = default_tax_profile_id || undefined;
+        customer.vat_id_status = vat_id_status || "unchecked";
         customer.asanaLink = asanaLink ? asanaLink.trim() : undefined;
         customer.addressLine2 = addressAdditional ? addressAdditional.trim() : undefined;
 
@@ -948,6 +954,12 @@ export const createBusiness = async (
       isDeviceMaker: finalCustomer.businessDetails?.isDeviceMaker,
       isStarCustomer: !!finalCustomer.starCustomerDetails,
       vatTaxId: finalCustomer.vatTaxId,
+      debtor_no: finalCustomer.debtor_no,
+      default_tax_profile_id: finalCustomer.default_tax_profile_id,
+      vat_id_status: finalCustomer.vat_id_status,
+      vat_id_checked_at: finalCustomer.vat_id_checked_at,
+      vat_id_check_source: finalCustomer.vat_id_check_source,
+      vat_id_check_response_json: finalCustomer.vat_id_check_response_json,
       createdAt: finalCustomer.createdAt,
       updatedAt: finalCustomer.updatedAt,
     };
@@ -1005,6 +1017,9 @@ export const updateBusiness = async (
       phone,
       vatTaxId,
       asanaLink,
+      debtor_no,
+      default_tax_profile_id,
+      vat_id_status,
     } = updateData;
 
     const user = (req as any).user;
@@ -1194,6 +1209,15 @@ export const updateBusiness = async (
         }
         if (vatTaxId !== undefined) {
           customer.vatTaxId = vatTaxId ? vatTaxId.trim() : undefined;
+        }
+        if (debtor_no !== undefined) {
+          customer.debtor_no = debtor_no ? debtor_no.trim() : undefined;
+        }
+        if (default_tax_profile_id !== undefined) {
+          customer.default_tax_profile_id = default_tax_profile_id || undefined;
+        }
+        if (vat_id_status !== undefined) {
+          customer.vat_id_status = vat_id_status || "unchecked";
         }
         if (asanaLink !== undefined) {
           customer.asanaLink = asanaLink ? asanaLink.trim() : null;
@@ -1443,6 +1467,13 @@ export const updateBusiness = async (
       street: finalCustomer.businessDetails?.address,
       addressAdditional: finalCustomer.addressLine2,
       note: finalCustomer.businessDetails?.description,
+      vatTaxId: finalCustomer.vatTaxId,
+      debtor_no: finalCustomer.debtor_no,
+      default_tax_profile_id: finalCustomer.default_tax_profile_id,
+      vat_id_status: finalCustomer.vat_id_status,
+      vat_id_checked_at: finalCustomer.vat_id_checked_at,
+      vat_id_check_source: finalCustomer.vat_id_check_source,
+      vat_id_check_response_json: finalCustomer.vat_id_check_response_json,
       check_by: finalCustomer.businessDetails?.check_by
         ? {
           id: finalCustomer.businessDetails.check_by.id,
@@ -1482,9 +1513,7 @@ export const updateBusiness = async (
       businessEmail: finalCustomer.businessDetails?.email,
       status: BUSINESS_STATUS.ACTIVE,
       source: finalCustomer.businessDetails?.businessSource,
-      isDeviceMaker: finalCustomer.businessDetails?.isDeviceMaker,
       isStarCustomer: !!finalCustomer.starCustomerDetails,
-      vatTaxId: finalCustomer.vatTaxId,
       tags: finalCustomer.tags,
       tagOrder: finalCustomer.tagOrder,
       createdAt: finalCustomer.createdAt,
@@ -1560,6 +1589,13 @@ export const getBusinessById = async (
       contactEmail: customer.contactEmail,
       contactPhoneNumber: customer.contactPhoneNumber,
       stage: customer.stage,
+      vatTaxId: customer.vatTaxId,
+      debtor_no: customer.debtor_no,
+      default_tax_profile_id: customer.default_tax_profile_id,
+      vat_id_status: customer.vat_id_status,
+      vat_id_checked_at: customer.vat_id_checked_at,
+      vat_id_check_source: customer.vat_id_check_source,
+      vat_id_check_response_json: customer.vat_id_check_response_json,
       businessDetails: customer.businessDetails
         ? {
           ...customer.businessDetails,
@@ -1636,7 +1672,6 @@ export const getBusinessById = async (
       check_timestamp: customer.businessDetails?.check_timestamp,
       note: customer.businessDetails?.description,
       status: BUSINESS_STATUS.ACTIVE,
-      vatTaxId: customer.vatTaxId,
       tags: customer.tags,
       tagOrder: customer.tagOrder,
       createdAt: customer.createdAt,
@@ -1857,6 +1892,12 @@ export const getAllBusinesses = async (
         status: BUSINESS_STATUS.ACTIVE,
         source: customer.businessDetails?.businessSource,
         vatTaxId: customer.vatTaxId,
+        debtor_no: customer.debtor_no,
+        default_tax_profile_id: customer.default_tax_profile_id,
+        vat_id_status: customer.vat_id_status,
+        vat_id_checked_at: customer.vat_id_checked_at,
+        vat_id_check_source: customer.vat_id_check_source,
+        vat_id_check_response_json: customer.vat_id_check_response_json,
         tags: customer.tags,
         tagOrder: customer.tagOrder,
         createdAt: customer.createdAt,

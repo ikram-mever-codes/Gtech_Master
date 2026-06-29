@@ -320,16 +320,22 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
     return matchCust && matchSearch;
   });
 
+  // Items are decoupled from the offer's customer: the customer is just the
+  // recipient. Show every item, filtered only by the search box.
   const visibleItems = items.filter((it) => {
-    const matchCust = filterCustomerId
-      ? String(it.customer_id || it.customer?.id) === filterCustomerId
-      : true;
     const name = it.item_name || it.itemName || "";
-    const matchSearch = sourceSearch
-      ? name.toLowerCase().includes(sourceSearch.toLowerCase()) ||
-        String(it.ean || "").includes(sourceSearch)
-      : true;
-    return matchCust && matchSearch;
+    if (!sourceSearch) return true;
+    const q = sourceSearch.toLowerCase();
+    return (
+      name.toLowerCase().includes(q) ||
+      String(it.ean || "").includes(sourceSearch) ||
+      String(it.model || "")
+        .toLowerCase()
+        .includes(q) ||
+      String(it.customer?.companyName || "")
+        .toLowerCase()
+        .includes(q)
+    );
   });
 
   const toggleItem = (it: any) => {
@@ -764,15 +770,12 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">
                     {sourceType === "item"
-                      ? "Customer * (required)"
+                      ? "Recipient customer * (required)"
                       : "Filter by customer"}
                   </label>
                   <select
                     value={filterCustomerId}
-                    onChange={(e) => {
-                      setFilterCustomerId(e.target.value);
-                      if (sourceType === "item") setSelectedItems([]);
-                    }}
+                    onChange={(e) => setFilterCustomerId(e.target.value)}
                     className={`w-full px-3 py-2 text-sm border rounded-lg ${
                       sourceType === "item" && !filterCustomerId
                         ? "border-amber-400 bg-amber-50/30"
@@ -837,13 +840,11 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                   ))}
 
                 {sourceType === "item" &&
-                  (!filterCustomerId ? (
+                  (visibleItems.length === 0 ? (
                     <div className="text-center py-4 text-gray-500 text-sm">
-                      Select a customer first to list their items.
-                    </div>
-                  ) : visibleItems.length === 0 ? (
-                    <div className="text-center py-4 text-gray-500 text-sm">
-                      No items match for this customer.
+                      {sourceSearch
+                        ? "No items match your search."
+                        : "No items found."}
                     </div>
                   ) : (
                     visibleItems.map((it) => (
@@ -854,7 +855,13 @@ export const OfferDetailModal: React.FC<OfferDetailModalProps> = ({
                         )}
                         onClick={() => toggleItem(it)}
                         title={it.item_name || it.itemName}
-                        subtitle={it.ean ? `EAN: ${it.ean}` : `Item ${it.id}`}
+                        subtitle={
+                          it.customer?.companyName
+                            ? `Item customer: ${it.customer.companyName}`
+                            : it.ean
+                              ? `EAN: ${it.ean}`
+                              : `Item ${it.id}`
+                        }
                         meta={it.model || ""}
                       />
                     ))

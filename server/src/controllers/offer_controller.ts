@@ -90,6 +90,7 @@ import { ConvertInquiryToItemDto, ItemGenerator } from "./inquiry_controller";
 import { Item } from "../models/items";
 import { Taric } from "../models/tarics";
 import { _cachedCjkFontPath, _cachedCjkFontBuffer } from "./order_controller";
+import { In } from "typeorm";
 
 const formatCountry = (country?: string | null): string => {
   if (!country) return "";
@@ -868,25 +869,47 @@ export class OfferController {
   // Prefills the customer (from the item's linked customer, or an explicit
   // body.customerId) and seeds a single line item from the item's data.
   // ==========================================================================
+
   async createOfferFromItem(request: Request, response: Response) {
     try {
       const { itemId } = request.params;
-      const body: CreateOfferFromItemDto = request.body || {};
+      const body: CreateOfferFromItemDto & { itemIds?: string[] } =
+        request.body || {};
+
+      // Full, de-duplicated, order-preserving id list (param = position 1).
+      const requestedIds: string[] = Array.from(
+        new Set(
+          [itemId, ...(Array.isArray(body.itemIds) ? body.itemIds : [])].filter(
+            (id): id is string => !!id,
+          ),
+        ),
+      );
+
+      if (requestedIds.length === 0) {
+        return response
+          .status(400)
+          .json({ success: false, message: "No item ids provided." });
+      }
 
       const itemRepository = AppDataSource.getRepository(Item);
-      const item: any = await itemRepository.findOne({
-        where: { id: itemId as any },
+      const fetchedItems: any[] = await itemRepository.find({
+        where: { id: In(requestedIds as any[]) },
         relations: ["customer", "taric"],
       });
 
-      if (!item) {
+      if (fetchedItems.length === 0) {
         return response
           .status(404)
-          .json({ success: false, message: "Item not found" });
+          .json({ success: false, message: "No matching items found." });
       }
 
-      // Resolve the customer: explicit body.customerId wins, else the item's
-      // own customer. An offer must always carry a customer snapshot.
+      // find() doesn't guarantee order — restore the requested sequence.
+      const itemById = new Map(fetchedItems.map((it) => [String(it.id), it]));
+      const orderedItems = requestedIds
+        .map((id) => itemById.get(String(id)))
+        .filter(Boolean);
+
+      // Recipient customer: body.customerId wins, else first item's customer.
       let customer: any = null;
       if (body.customerId) {
         customer = await this.customerRepository.findOne({
@@ -894,50 +917,41 @@ export class OfferController {
         });
       }
       if (!customer) {
-        customer = item.customer || null;
+        customer = orderedItems[0].customer || null;
       }
       if (!customer) {
         return response.status(400).json({
           success: false,
           message:
-            "This item has no linked customer. Pass a customerId to create the offer.",
+            "No recipient customer could be resolved. Pass a customerId to create the offer.",
         });
       }
 
       const offerNumber = await this.generateOfferNumber();
       const customerSnapshot = this.buildCustomerSnapshot(customer);
 
-      const itemSnapshot: ItemSnapshot = {
-        id: item.id,
-        itemName: item.item_name,
-        itemNameCn: item.item_name_cn,
-        ean: item.ean ? String(item.ean) : undefined,
-        model: item.model,
-        description: item.remark || item.note,
-        specification: item.model,
-        weight: item.weight,
-        width: item.width,
-        height: item.height,
-        length: item.length,
-        purchasePrice: item.RMB_Price || 0,
-        purchaseCurrency: "RMB",
-        photo: item.photo || "",
-      };
-
       const useUnitPrices = body.useUnitPrices || false;
       const defaultUnitPrices = useUnitPrices
         ? this.createDefaultUnitPrices()
         : [];
 
+      // Top-level snapshot reflects the first item (keeps single-item contract).
+      const primary = orderedItems[0];
+      const primarySnapshot: ItemSnapshot = this.buildItemSnapshot(primary);
+
       const offer = this.offerRepository.create({
         offerNumber,
         sourceType: "item",
-        title: body.title || `Offer for ${itemSnapshot.itemName}`,
+        title:
+          body.title ||
+          (orderedItems.length > 1
+            ? `Offer for ${primarySnapshot.itemName} +${orderedItems.length - 1} more`
+            : `Offer for ${primarySnapshot.itemName}`),
         inquiry: null,
         inquiryId: null,
         inquirySnapshot: null,
-        itemId: itemSnapshot.id,
-        itemSnapshot,
+        itemId: primarySnapshot.id,
+        itemSnapshot: primarySnapshot,
         customerId: customer.id,
         customerSnapshot,
         deliveryAddress: this.buildDeliveryAddress(customer),
@@ -961,26 +975,31 @@ export class OfferController {
 
       const savedOffer = await this.offerRepository.save(offer);
 
-      const lineItem = this.lineItemRepository.create({
-        offer: savedOffer,
-        offerId: savedOffer.id,
-        sourceItemId: itemSnapshot.id,
-        itemName: itemSnapshot.itemName,
-        specification: itemSnapshot.specification,
-        description: itemSnapshot.description,
-        weight: itemSnapshot.weight,
-        width: itemSnapshot.width,
-        height: itemSnapshot.height,
-        length: itemSnapshot.length,
-        purchasePrice: itemSnapshot.purchasePrice,
-        purchaseCurrency: itemSnapshot.purchaseCurrency,
-        baseQuantity: body.baseQuantity || "1",
-        position: 1,
-        quantityPrices: [],
-        unitPrices: useUnitPrices ? this.createDefaultUnitPrices() : [],
-        lineTotal: 0,
+      // One line item per selected item, positioned in the requested order.
+      const lineItems = orderedItems.map((item, idx) => {
+        const snap = this.buildItemSnapshot(item);
+        return this.lineItemRepository.create({
+          offer: savedOffer,
+          offerId: savedOffer.id,
+          sourceItemId: snap.id,
+          itemName: snap.itemName,
+          specification: snap.specification,
+          description: snap.description,
+          weight: snap.weight,
+          width: snap.width,
+          height: snap.height,
+          length: snap.length,
+          purchasePrice: snap.purchasePrice,
+          purchaseCurrency: snap.purchaseCurrency,
+          baseQuantity: body.baseQuantity || "1",
+          position: idx + 1,
+          quantityPrices: [],
+          unitPrices: useUnitPrices ? this.createDefaultUnitPrices() : [],
+          lineTotal: 0,
+        });
       });
-      await this.lineItemRepository.save(lineItem);
+
+      await this.lineItemRepository.save(lineItems);
 
       await this.calculateOfferTotals(savedOffer.id);
 
@@ -991,7 +1010,10 @@ export class OfferController {
 
       return response.status(201).json({
         success: true,
-        message: "Offer created from item successfully",
+        message:
+          orderedItems.length > 1
+            ? `Offer created from ${orderedItems.length} items successfully`
+            : "Offer created from item successfully",
         data: completeOffer,
       });
     } catch (error) {
@@ -1003,7 +1025,6 @@ export class OfferController {
       });
     }
   }
-
   // ==========================================================================
   // ADD A LINE ITEM TO AN EXISTING OFFER
   // POST /offers/:offerId/line-items
@@ -3853,5 +3874,24 @@ export class OfferController {
         message: "Internal server error",
       });
     }
+  }
+
+  private buildItemSnapshot(item: any): ItemSnapshot {
+    return {
+      id: item.id,
+      itemName: item.item_name,
+      itemNameCn: item.item_name_cn,
+      ean: item.ean ? String(item.ean) : undefined,
+      model: item.model,
+      description: item.remark || item.note,
+      specification: item.model,
+      weight: item.weight,
+      width: item.width,
+      height: item.height,
+      length: item.length,
+      purchasePrice: item.RMB_Price || 0,
+      purchaseCurrency: "RMB",
+      photo: item.photo || "",
+    };
   }
 }

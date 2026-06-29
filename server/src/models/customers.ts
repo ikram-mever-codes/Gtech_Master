@@ -8,6 +8,7 @@ import {
   OneToOne,
   JoinColumn,
   AfterLoad,
+  ManyToOne,
   ManyToMany,
   JoinTable,
 } from "typeorm";
@@ -18,6 +19,7 @@ import { StarCustomerDetails } from "./star_customer_details";
 import { Inquiry } from "./inquiry";
 import { Tag } from "./tags";
 import { Item } from "./items";
+import { TaxProfile } from "./tax_profile";
 
 @Entity()
 export class Customer {
@@ -43,6 +45,44 @@ export class Customer {
 
   @Column({ nullable: true })
   vatTaxId?: string;
+
+  @Column({ name: "debtor_no", nullable: true })
+  debtor_no?: string;
+
+  @Column({ name: "default_tax_profile_id", nullable: true })
+  default_tax_profile_id?: string;
+
+  @ManyToOne(() => TaxProfile, { nullable: true, onDelete: "SET NULL" })
+  @JoinColumn({ name: "default_tax_profile_id" })
+  defaultTaxProfile?: TaxProfile;
+
+  @Column({
+    name: "vat_id_status",
+    type: "enum",
+    enum: [
+      "unchecked",
+      "vies_valid",
+      "vies_invalid",
+      "bzst_qualified_valid",
+      "bzst_qualified_invalid",
+    ],
+    default: "unchecked",
+  })
+  vat_id_status!:
+    | "unchecked"
+    | "vies_valid"
+    | "vies_invalid"
+    | "bzst_qualified_valid"
+    | "bzst_qualified_invalid";
+
+  @Column({ name: "vat_id_checked_at", type: "timestamp", nullable: true })
+  vat_id_checked_at?: Date;
+
+  @Column({ name: "vat_id_check_source", nullable: true })
+  vat_id_check_source?: string;
+
+  @Column({ name: "vat_id_check_response_json", type: "text", nullable: true })
+  vat_id_check_response_json?: string;
 
   @Column({ unique: true, nullable: true })
   customerNumber?: string;
