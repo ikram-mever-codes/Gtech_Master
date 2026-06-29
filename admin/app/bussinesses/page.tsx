@@ -64,6 +64,7 @@ import {
   type SearchFilters,
 } from "@/api/bussiness";
 import { getAllCountries } from "@/api/countries";
+import { ShippingAddressManager } from "@/components/Businesses/ShippingAddressManager";
 import {
   getAllContactPersons,
   createContactPerson,
@@ -947,7 +948,6 @@ const CombinedBusinessContactsContent: React.FC = () => {
       );
     }
   };
-
   const modalContacts: ContactPersonData[] = editingBusinessId
     ? allBusinesses.find((b) => b.id === editingBusinessId)?.contacts || []
     : [];
@@ -2213,6 +2213,10 @@ const CombinedBusinessContactsContent: React.FC = () => {
                   )}
                 </div>
               </div>
+            )}
+
+            {businessModalMode === "edit" && editingBusinessId && (
+              <ShippingAddressManager companyId={editingBusinessId} countries={dbCountries} />
             )}
           </div>
 
