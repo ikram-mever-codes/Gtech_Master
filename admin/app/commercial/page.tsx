@@ -1952,7 +1952,7 @@ const InvoiceListPage: React.FC = () => {
           ))}
         </div>
 
-        {(activeInvTab === "rechnung" || activeInvTab === "rk") && (
+        {false && (activeInvTab === "rechnung" || activeInvTab === "rk") && (
           <>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 mb-6">
               <div
@@ -2121,9 +2121,7 @@ const InvoiceListPage: React.FC = () => {
 
         {(activeInvTab === "angebot" ||
           activeInvTab === "auftrag" ||
-          activeInvTab === "bestellung" ||
-          activeInvTab === "rechnung" ||
-          activeInvTab === "rk") && (
+          activeInvTab === "bestellung") && (
             <div className="bg-white rounded-[4px] border border-[#E9ECEF] p-4 shadow-sm mb-6">
               <DataTable
                 data={currentItems}
@@ -2198,8 +2196,6 @@ const InvoiceListPage: React.FC = () => {
               )}
             </div>
           )}
-
-
 
         {activeInvTab === "lieferschein" && (
           <div
